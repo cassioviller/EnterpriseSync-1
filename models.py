@@ -29,6 +29,19 @@ class Funcao(db.Model):
     
     funcionarios = db.relationship('Funcionario', backref='funcao_ref', lazy=True)
 
+class HorarioTrabalho(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    nome = db.Column(db.String(100), unique=True, nullable=False)
+    entrada = db.Column(db.Time, nullable=False)
+    saida_almoco = db.Column(db.Time, nullable=False)
+    retorno_almoco = db.Column(db.Time, nullable=False)
+    saida = db.Column(db.Time, nullable=False)
+    dias_semana = db.Column(db.String(20), nullable=False)  # Ex: "1,2,3,4,5" (Segunda=1, Domingo=7)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    
+    def __repr__(self):
+        return f'<HorarioTrabalho {self.nome}>'
+
 class Funcionario(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     nome = db.Column(db.String(100), nullable=False)
@@ -43,9 +56,12 @@ class Funcionario(db.Model):
     ativo = db.Column(db.Boolean, default=True)
     departamento_id = db.Column(db.Integer, db.ForeignKey('departamento.id'))
     funcao_id = db.Column(db.Integer, db.ForeignKey('funcao.id'))
+    horario_trabalho_id = db.Column(db.Integer, db.ForeignKey('horario_trabalho.id'))
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     
+    # Relacionamentos
     registros_ponto = db.relationship('RegistroPonto', backref='funcionario_ref', lazy=True)
+    horario_trabalho = db.relationship('HorarioTrabalho', backref='funcionarios', lazy=True)
 
 class Obra(db.Model):
     id = db.Column(db.Integer, primary_key=True)

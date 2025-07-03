@@ -1,0 +1,198 @@
+{% extends "base.html" %}
+
+{% block title %}Horários de Trabalho - SIGE{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1><i class="fas fa-clock"></i> Horários de Trabalho</h1>
+        <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#horarioModal">
+            <i class="fas fa-plus"></i> Novo Horário
+        </button>
+    </div>
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            {% for category, message in messages %}
+                <div class="alert alert-{{ 'danger' if category == 'error' else 'success' }} alert-dismissible fade show" role="alert">
+                    {{ message }}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                </div>
+            {% endfor %}
+        {% endif %}
+    {% endwith %}
+
+    <div class="card">
+        <div class="card-body">
+            <div class="table-responsive">
+                <table id="horariosTable" class="table table-striped">
+                    <thead>
+                        <tr>
+                            <th>Nome</th>
+                            <th>Entrada</th>
+                            <th>Saída Almoço</th>
+                            <th>Retorno Almoço</th>
+                            <th>Saída</th>
+                            <th>Dias da Semana</th>
+                            <th>Funcionários</th>
+                            <th>Ações</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for horario in horarios %}
+                            <tr>
+                                <td><strong>{{ horario.nome }}</strong></td>
+                                <td>{{ horario.entrada.strftime('%H:%M') }}</td>
+                                <td>{{ horario.saida_almoco.strftime('%H:%M') }}</td>
+                                <td>{{ horario.retorno_almoco.strftime('%H:%M') }}</td>
+                                <td>{{ horario.saida.strftime('%H:%M') }}</td>
+                                <td>
+                                    {% if horario.dias_semana == '1,2,3,4,5' %}
+                                        <span class="badge bg-primary">Segunda a Sexta</span>
+                                    {% elif horario.dias_semana == '1,2,3,4,5,6' %}
+                                        <span class="badge bg-info">Segunda a Sábado</span>
+                                    {% elif horario.dias_semana == '1,2,3,4,6' %}
+                                        <span class="badge bg-warning">Segunda a Quinta e Sábado</span>
+                                    {% elif horario.dias_semana == '2,4,6' %}
+                                        <span class="badge bg-secondary">Terça, Quinta e Sábado</span>
+                                    {% elif horario.dias_semana == '1,3,5' %}
+                                        <span class="badge bg-success">Segunda, Quarta e Sexta</span>
+                                    {% elif horario.dias_semana == '7' %}
+                                        <span class="badge bg-danger">Domingo</span>
+                                    {% elif horario.dias_semana == '6,7' %}
+                                        <span class="badge bg-dark">Sábado e Domingo</span>
+                                    {% else %}
+                                        <span class="badge bg-secondary">{{ horario.dias_semana }}</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <span class="badge bg-info">{{ horario.funcionarios|length }}</span>
+                                </td>
+                                <td>
+                                    <button class="btn btn-sm btn-outline-primary" onclick="editarHorario({{ horario.id }}, '{{ horario.nome }}', '{{ horario.entrada.strftime('%H:%M') }}', '{{ horario.saida_almoco.strftime('%H:%M') }}', '{{ horario.retorno_almoco.strftime('%H:%M') }}', '{{ horario.saida.strftime('%H:%M') }}', '{{ horario.dias_semana }}')">
+                                        <i class="fas fa-edit"></i>
+                                    </button>
+                                    {% if horario.funcionarios|length == 0 %}
+                                        <form method="POST" action="{{ url_for('main.excluir_horario', id=horario.id) }}" class="d-inline" onsubmit="return confirm('Tem certeza que deseja excluir este horário?')">
+                                            <button type="submit" class="btn btn-sm btn-outline-danger">
+                                                <i class="fas fa-trash"></i>
+                                            </button>
+                                        </form>
+                                    {% else %}
+                                        <button class="btn btn-sm btn-outline-secondary" disabled title="Não é possível excluir. Existem funcionários usando este horário.">
+                                            <i class="fas fa-trash"></i>
+                                        </button>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal para Novo/Editar Horário -->
+<div class="modal fade" id="horarioModal" tabindex="-1" aria-labelledby="horarioModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <form method="POST" id="horarioForm">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="horarioModalLabel">Novo Horário de Trabalho</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label for="nome" class="form-label">Nome do Horário</label>
+                        <input type="text" class="form-control" id="nome" name="nome" required>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="entrada" class="form-label">Hora de Entrada</label>
+                                <input type="time" class="form-control" id="entrada" name="entrada" required>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="saida_almoco" class="form-label">Saída para Almoço</label>
+                                <input type="time" class="form-control" id="saida_almoco" name="saida_almoco" required>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="retorno_almoco" class="form-label">Retorno do Almoço</label>
+                                <input type="time" class="form-control" id="retorno_almoco" name="retorno_almoco" required>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="saida" class="form-label">Hora de Saída</label>
+                                <input type="time" class="form-control" id="saida" name="saida" required>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label for="dias_semana" class="form-label">Dias da Semana</label>
+                        <select class="form-select" id="dias_semana" name="dias_semana" required>
+                            <option value="">Selecione...</option>
+                            <option value="1,2,3,4,5">Segunda a Sexta</option>
+                            <option value="1,2,3,4,5,6">Segunda a Sábado</option>
+                            <option value="1,2,3,4,6">Segunda a Quinta e Sábado</option>
+                            <option value="2,4,6">Terça, Quinta e Sábado</option>
+                            <option value="1,3,5">Segunda, Quarta e Sexta</option>
+                            <option value="7">Domingo</option>
+                            <option value="6,7">Sábado e Domingo</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-primary">Salvar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+    // Inicializar DataTable
+    document.addEventListener('DOMContentLoaded', function() {
+        if ($.fn.DataTable) {
+            $('#horariosTable').DataTable({
+                language: {
+                    url: '//cdn.datatables.net/plug-ins/1.10.24/i18n/Portuguese-Brasil.json'
+                },
+                pageLength: 10,
+                responsive: true,
+                order: [[0, 'asc']]
+            });
+        }
+
+        // Limpar form ao fechar modal
+        $('#horarioModal').on('hidden.bs.modal', function () {
+            document.getElementById('horarioForm').reset();
+            document.getElementById('horarioForm').action = '{{ url_for("main.novo_horario") }}';
+            document.getElementById('horarioModalLabel').textContent = 'Novo Horário de Trabalho';
+        });
+    });
+
+    function editarHorario(id, nome, entrada, saida_almoco, retorno_almoco, saida, dias_semana) {
+        document.getElementById('nome').value = nome;
+        document.getElementById('entrada').value = entrada;
+        document.getElementById('saida_almoco').value = saida_almoco;
+        document.getElementById('retorno_almoco').value = retorno_almoco;
+        document.getElementById('saida').value = saida;
+        document.getElementById('dias_semana').value = dias_semana;
+        
+        document.getElementById('horarioForm').action = '{{ url_for("main.editar_horario", id=0) }}'.replace('0', id);
+        document.getElementById('horarioModalLabel').textContent = 'Editar Horário de Trabalho';
+        
+        const modal = new bootstrap.Modal(document.getElementById('horarioModal'));
+        modal.show();
+    }
+</script>
+{% endblock %}

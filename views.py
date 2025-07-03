@@ -62,6 +62,7 @@ def novo_funcionario():
     form = FuncionarioForm()
     form.departamento_id.choices = [(0, 'Selecione...')] + [(d.id, d.nome) for d in Departamento.query.all()]
     form.funcao_id.choices = [(0, 'Selecione...')] + [(f.id, f.nome) for f in Funcao.query.all()]
+    form.horario_trabalho_id.choices = [(0, 'Selecione...')] + [(h.id, h.nome) for h in HorarioTrabalho.query.all()]
     
     if form.validate_on_submit():
         funcionario = Funcionario(
@@ -76,6 +77,7 @@ def novo_funcionario():
             salario=form.salario.data or 0.0,
             departamento_id=form.departamento_id.data if form.departamento_id.data > 0 else None,
             funcao_id=form.funcao_id.data if form.funcao_id.data > 0 else None,
+            horario_trabalho_id=form.horario_trabalho_id.data if form.horario_trabalho_id.data > 0 else None,
             ativo=form.ativo.data
         )
         db.session.add(funcionario)
@@ -1096,3 +1098,67 @@ def nova_ocorrencia(funcionario_id):
     
     flash('Ocorrência registrada com sucesso!', 'success')
     return redirect(url_for('main.funcionario_perfil', id=funcionario_id))
+
+# Horários de Trabalho
+@main_bp.route('/horarios')
+@login_required
+def horarios():
+    horarios = HorarioTrabalho.query.all()
+    return render_template('horarios.html', horarios=horarios)
+
+@main_bp.route('/horarios/novo', methods=['GET', 'POST'])
+@login_required
+def novo_horario():
+    form = HorarioTrabalhoForm()
+    
+    if form.validate_on_submit():
+        horario = HorarioTrabalho(
+            nome=form.nome.data,
+            entrada=form.entrada.data,
+            saida_almoco=form.saida_almoco.data,
+            retorno_almoco=form.retorno_almoco.data,
+            saida=form.saida.data,
+            dias_semana=form.dias_semana.data
+        )
+        db.session.add(horario)
+        db.session.commit()
+        flash('Horário de trabalho cadastrado com sucesso!', 'success')
+        return redirect(url_for('main.horarios'))
+    
+    return render_template('horarios.html', form=form, horarios=HorarioTrabalho.query.all())
+
+@main_bp.route('/horarios/editar/<int:id>', methods=['GET', 'POST'])
+@login_required
+def editar_horario(id):
+    horario = HorarioTrabalho.query.get_or_404(id)
+    form = HorarioTrabalhoForm(obj=horario)
+    
+    if form.validate_on_submit():
+        horario.nome = form.nome.data
+        horario.entrada = form.entrada.data
+        horario.saida_almoco = form.saida_almoco.data
+        horario.retorno_almoco = form.retorno_almoco.data
+        horario.saida = form.saida.data
+        horario.dias_semana = form.dias_semana.data
+        
+        db.session.commit()
+        flash('Horário de trabalho atualizado com sucesso!', 'success')
+        return redirect(url_for('main.horarios'))
+    
+    return render_template('horarios.html', form=form, horarios=HorarioTrabalho.query.all(), edit_id=id)
+
+@main_bp.route('/horarios/excluir/<int:id>', methods=['POST'])
+@login_required
+def excluir_horario(id):
+    horario = HorarioTrabalho.query.get_or_404(id)
+    
+    # Verificar se há funcionários usando este horário
+    funcionarios_usando = Funcionario.query.filter_by(horario_trabalho_id=id).count()
+    if funcionarios_usando > 0:
+        flash(f'Não é possível excluir este horário. {funcionarios_usando} funcionário(s) estão usando este horário.', 'error')
+        return redirect(url_for('main.horarios'))
+    
+    db.session.delete(horario)
+    db.session.commit()
+    flash('Horário de trabalho excluído com sucesso!', 'success')
+    return redirect(url_for('main.horarios'))

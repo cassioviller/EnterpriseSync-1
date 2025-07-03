@@ -7,7 +7,7 @@ from app import app, db
 from models import (
     Usuario, Departamento, Funcao, Funcionario, Obra, Veiculo, 
     Fornecedor, Cliente, Material, Servico, RegistroPonto, 
-    RegistroAlimentacao, CustoObra
+    RegistroAlimentacao, CustoObra, HorarioTrabalho
 )
 from werkzeug.security import generate_password_hash
 from datetime import date, datetime, time, timedelta
@@ -15,12 +15,18 @@ import random
 
 def create_sample_data():
     with app.app_context():
-        # Limpar dados existentes (exceto usuário admin)
+        # Limpar dados existentes na ordem correta para evitar erros de FK
         RegistroAlimentacao.query.delete()
         RegistroPonto.query.delete()
         CustoObra.query.delete()
-        Funcionario.query.delete()
+        
+        # Primeiro remover referências de obras para funcionários
+        for obra in Obra.query.all():
+            obra.responsavel_id = None
+        db.session.commit()
+        
         Obra.query.delete()
+        Funcionario.query.delete()
         Veiculo.query.delete()
         Fornecedor.query.delete()
         Cliente.query.delete()
@@ -28,6 +34,40 @@ def create_sample_data():
         Servico.query.delete()
         Funcao.query.delete()
         Departamento.query.delete()
+        HorarioTrabalho.query.delete()
+        
+        # Criar horários de trabalho
+        from datetime import time
+        
+        horarios = [
+            HorarioTrabalho(
+                nome='Comercial - Segunda a Sexta',
+                entrada=time(8, 0),
+                saida_almoco=time(12, 0),
+                retorno_almoco=time(13, 0),
+                saida=time(17, 0),
+                dias_semana='1,2,3,4,5'
+            ),
+            HorarioTrabalho(
+                nome='Obra - Segunda a Sábado',
+                entrada=time(7, 0),
+                saida_almoco=time(11, 30),
+                retorno_almoco=time(12, 30),
+                saida=time(16, 0),
+                dias_semana='1,2,3,4,5,6'
+            ),
+            HorarioTrabalho(
+                nome='Noturno - Segunda a Sexta',
+                entrada=time(22, 0),
+                saida_almoco=time(2, 0),
+                retorno_almoco=time(3, 0),
+                saida=time(6, 0),
+                dias_semana='1,2,3,4,5'
+            )
+        ]
+        
+        for horario in horarios:
+            db.session.add(horario)
         
         # Criar departamentos
         departamentos = [

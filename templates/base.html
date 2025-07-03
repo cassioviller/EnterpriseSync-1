@@ -54,6 +54,9 @@
                             <li><a class="dropdown-item" href="{{ url_for('main.funcoes') }}">
                                 <i class="fas fa-user-tie"></i> Funções
                             </a></li>
+                            <li><a class="dropdown-item" href="{{ url_for('main.horarios') }}">
+                                <i class="fas fa-clock"></i> Horários de Trabalho
+                            </a></li>
                             <li><hr class="dropdown-divider"></li>
                             <li><a class="dropdown-item" href="{{ url_for('main.obras') }}">
                                 <i class="fas fa-hard-hat"></i> Obras
@@ -77,11 +80,7 @@
                         </ul>
                     </li>
                     
-                    <li class="nav-item">
-                        <a class="nav-link" href="{{ url_for('main.ponto') }}">
-                            <i class="fas fa-clock"></i> Ponto
-                        </a>
-                    </li>
+
                     
                     <li class="nav-item">
                         <a class="nav-link" href="{{ url_for('main.alimentacao') }}">

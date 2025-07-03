@@ -24,6 +24,7 @@ class FuncionarioForm(FlaskForm):
     salario = FloatField('Salário', validators=[Optional(), NumberRange(min=0)])
     departamento_id = SelectField('Departamento', coerce=int, validators=[Optional()])
     funcao_id = SelectField('Função', coerce=int, validators=[Optional()])
+    horario_trabalho_id = SelectField('Horário de Trabalho', coerce=int, validators=[Optional()])
     ativo = BooleanField('Ativo', default=True)
 
 class ObraForm(FlaskForm):
@@ -112,3 +113,19 @@ class AlimentacaoForm(FlaskForm):
     ], validators=[DataRequired()])
     valor = FloatField('Valor', validators=[DataRequired(), NumberRange(min=0)])
     observacoes = TextAreaField('Observações')
+
+class HorarioTrabalhoForm(FlaskForm):
+    nome = StringField('Nome do Horário', validators=[DataRequired(), Length(max=100)])
+    entrada = TimeField('Hora de Entrada', validators=[DataRequired()])
+    saida_almoco = TimeField('Saída para Almoço', validators=[DataRequired()])
+    retorno_almoco = TimeField('Retorno do Almoço', validators=[DataRequired()])
+    saida = TimeField('Hora de Saída', validators=[DataRequired()])
+    dias_semana = SelectField('Dias da Semana', choices=[
+        ('1,2,3,4,5', 'Segunda a Sexta'),
+        ('1,2,3,4,5,6', 'Segunda a Sábado'),
+        ('1,2,3,4,6', 'Segunda a Quinta e Sábado'),
+        ('2,4,6', 'Terça, Quinta e Sábado'),
+        ('1,3,5', 'Segunda, Quarta e Sexta'),
+        ('7', 'Domingo'),
+        ('6,7', 'Sábado e Domingo')
+    ], validators=[DataRequired()])
