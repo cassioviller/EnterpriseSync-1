@@ -166,3 +166,67 @@ class RDOFiltroForm(FlaskForm):
         ('Rascunho', 'Rascunho'),
         ('Finalizado', 'Finalizado')
     ], validators=[Optional()])
+
+
+# Novos formulários para funcionalidades aprimoradas
+class RestauranteForm(FlaskForm):
+    """Formulário para cadastro de restaurantes"""
+    nome = StringField('Nome', validators=[DataRequired(), Length(max=100)])
+    endereco = TextAreaField('Endereço')
+    telefone = StringField('Telefone', validators=[Optional(), Length(max=20)])
+    email = StringField('Email', validators=[Optional(), Email(), Length(max=120)])
+    contato_responsavel = StringField('Contato Responsável', validators=[Optional(), Length(max=100)])
+    ativo = BooleanField('Ativo', default=True)
+
+
+class AlimentacaoMultiplaForm(FlaskForm):
+    """Formulário para lançamento de alimentação para múltiplos funcionários"""
+    data = DateField('Data', validators=[DataRequired()], default=date.today)
+    tipo = SelectField('Tipo', choices=[
+        ('marmita', 'Marmita'),
+        ('refeicao_local', 'Refeição no Local'),
+        ('cafe', 'Café da Manhã'),
+        ('jantar', 'Jantar'),
+        ('lanche', 'Lanche'),
+        ('outros', 'Outros')
+    ], validators=[DataRequired()])
+    valor = FloatField('Valor', validators=[DataRequired(), NumberRange(min=0)])
+    obra_id = SelectField('Obra (Opcional)', coerce=int, validators=[Optional()])
+    restaurante_id = SelectField('Restaurante (Opcional)', coerce=int, validators=[Optional()])
+    funcionarios_selecionados = StringField('Funcionários Selecionados')  # JSON string
+    observacoes = TextAreaField('Observações')
+
+
+class UsoVeiculoForm(FlaskForm):
+    """Formulário para registro de uso de veículo"""
+    veiculo_id = SelectField('Veículo', coerce=int, validators=[DataRequired()])
+    funcionario_id = SelectField('Funcionário', coerce=int, validators=[DataRequired()])
+    data_uso = DateField('Data de Uso', validators=[DataRequired()], default=date.today)
+    km_inicial = IntegerField('KM Inicial', validators=[Optional(), NumberRange(min=0)])
+    km_final = IntegerField('KM Final', validators=[Optional(), NumberRange(min=0)])
+    finalidade = StringField('Finalidade', validators=[Optional(), Length(max=200)])
+    observacoes = TextAreaField('Observações')
+
+
+class CustoVeiculoForm(FlaskForm):
+    """Formulário para registro de custo de veículo"""
+    veiculo_id = SelectField('Veículo', coerce=int, validators=[DataRequired()])
+    data_custo = DateField('Data do Custo', validators=[DataRequired()], default=date.today)
+    valor = FloatField('Valor', validators=[DataRequired(), NumberRange(min=0)])
+    tipo_custo = SelectField('Tipo de Custo', choices=[
+        ('combustivel', 'Combustível'),
+        ('manutencao', 'Manutenção'),
+        ('seguro', 'Seguro'),
+        ('multa', 'Multa'),
+        ('lavagem', 'Lavagem'),
+        ('outros', 'Outros')
+    ], validators=[DataRequired()])
+    descricao = TextAreaField('Descrição')
+    km_atual = IntegerField('KM Atual', validators=[Optional(), NumberRange(min=0)])
+    fornecedor = StringField('Fornecedor', validators=[Optional(), Length(max=100)])
+
+
+class FiltroDataForm(FlaskForm):
+    """Formulário para filtros de data"""
+    data_inicio = DateField('Data de Início', validators=[Optional()])
+    data_fim = DateField('Data de Fim', validators=[Optional()])

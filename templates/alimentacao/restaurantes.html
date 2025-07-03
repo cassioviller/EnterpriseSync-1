@@ -1,0 +1,387 @@
+{% extends "base.html" %}
+{% block title %}Controle de Alimentação - Restaurantes{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <!-- Cabeçalho -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2><i class="fas fa-utensils me-2"></i>Controle de Alimentação</h2>
+        <div>
+            <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#modalNovoLancamento">
+                <i class="fas fa-plus me-2"></i>Novo Lançamento
+            </button>
+            <button type="button" class="btn btn-outline-secondary ms-2" data-bs-toggle="modal" data-bs-target="#modalNovoRestaurante">
+                <i class="fas fa-store me-2"></i>Novo Restaurante
+            </button>
+        </div>
+    </div>
+
+    <!-- Filtros de Data -->
+    <div class="card mb-4">
+        <div class="card-body">
+            <form method="POST" action="{{ url_for('main.alimentacao_restaurantes') }}" class="row g-3">
+                {{ filtro_form.hidden_tag() }}
+                <div class="col-md-4">
+                    {{ filtro_form.data_inicio.label(class="form-label") }}
+                    {{ filtro_form.data_inicio(class="form-control") }}
+                </div>
+                <div class="col-md-4">
+                    {{ filtro_form.data_fim.label(class="form-label") }}
+                    {{ filtro_form.data_fim(class="form-control") }}
+                </div>
+                <div class="col-md-4 d-flex align-items-end">
+                    <button type="submit" class="btn btn-outline-primary">
+                        <i class="fas fa-filter me-2"></i>Aplicar Filtros
+                    </button>
+                    <a href="{{ url_for('main.alimentacao_restaurantes') }}" class="btn btn-outline-secondary ms-2">
+                        <i class="fas fa-times me-2"></i>Limpar
+                    </a>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- KPIs Gerais -->
+    <div class="row mb-4">
+        <div class="col-md-3">
+            <div class="card text-bg-primary">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between">
+                        <div>
+                            <h6 class="card-title mb-0">Custo Total do Período</h6>
+                            <h4 class="mb-0">R$ {{ "%.2f"|format(kpis.custo_total) }}</h4>
+                        </div>
+                        <div class="align-self-center">
+                            <i class="fas fa-dollar-sign fa-2x"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card text-bg-success">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between">
+                        <div>
+                            <h6 class="card-title mb-0">Média Diária</h6>
+                            <h4 class="mb-0">R$ {{ "%.2f"|format(kpis.media_diaria) }}</h4>
+                        </div>
+                        <div class="align-self-center">
+                            <i class="fas fa-chart-line fa-2x"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card text-bg-info">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between">
+                        <div>
+                            <h6 class="card-title mb-0">Registros Hoje</h6>
+                            <h4 class="mb-0">{{ kpis.registros_hoje }}</h4>
+                        </div>
+                        <div class="align-self-center">
+                            <i class="fas fa-calendar-day fa-2x"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card text-bg-warning">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between">
+                        <div>
+                            <h6 class="card-title mb-0">Total de Funcionários</h6>
+                            <h4 class="mb-0">{{ kpis.funcionarios_alimentados }}</h4>
+                        </div>
+                        <div class="align-self-center">
+                            <i class="fas fa-users fa-2x"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Cards de Restaurantes -->
+    <div class="row">
+        {% if restaurantes %}
+            {% for restaurante in restaurantes %}
+            <div class="col-md-6 col-lg-4 mb-4">
+                <div class="card h-100">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0">
+                            <i class="fas fa-store me-2"></i>{{ restaurante.nome }}
+                        </h5>
+                        <span class="badge bg-{{ 'success' if restaurante.ativo else 'secondary' }}">
+                            {{ 'Ativo' if restaurante.ativo else 'Inativo' }}
+                        </span>
+                    </div>
+                    <div class="card-body">
+                        {% if restaurante.endereco %}
+                        <p class="card-text">
+                            <i class="fas fa-map-marker-alt me-2"></i>{{ restaurante.endereco[:50] }}...
+                        </p>
+                        {% endif %}
+                        
+                        {% if restaurante.telefone %}
+                        <p class="card-text">
+                            <i class="fas fa-phone me-2"></i>{{ restaurante.telefone }}
+                        </p>
+                        {% endif %}
+
+                        <!-- KPIs do Restaurante -->
+                        <div class="row mt-3">
+                            <div class="col-6">
+                                <small class="text-muted">Custo Total</small>
+                                <div class="fw-bold">R$ {{ "%.2f"|format(restaurante.kpis.custo_total) }}</div>
+                            </div>
+                            <div class="col-6">
+                                <small class="text-muted">Registros</small>
+                                <div class="fw-bold">{{ restaurante.kpis.total_registros }}</div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="card-footer">
+                        <div class="d-grid gap-2">
+                            <a href="{{ url_for('main.detalhes_restaurante', restaurante_id=restaurante.id) }}" 
+                               class="btn btn-primary">
+                                <i class="fas fa-eye me-2"></i>Ver Detalhes
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        {% else %}
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-body text-center py-5">
+                        <i class="fas fa-store fa-3x text-muted mb-3"></i>
+                        <h5 class="text-muted">Nenhum restaurante cadastrado</h5>
+                        <p class="text-muted">Cadastre o primeiro restaurante para começar o controle de alimentação.</p>
+                        <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#modalNovoRestaurante">
+                            <i class="fas fa-plus me-2"></i>Cadastrar Restaurante
+                        </button>
+                    </div>
+                </div>
+            </div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Modal para Novo Lançamento -->
+<div class="modal fade" id="modalNovoLancamento" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <form method="POST" action="{{ url_for('main.criar_alimentacao_multipla') }}">
+                {{ alimentacao_form.hidden_tag() }}
+                <div class="modal-header">
+                    <h5 class="modal-title">
+                        <i class="fas fa-utensils me-2"></i>Novo Lançamento de Alimentação
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            {{ alimentacao_form.data.label(class="form-label") }}
+                            {{ alimentacao_form.data(class="form-control") }}
+                        </div>
+                        <div class="col-md-6">
+                            {{ alimentacao_form.tipo.label(class="form-label") }}
+                            {{ alimentacao_form.tipo(class="form-select") }}
+                        </div>
+                        <div class="col-md-6">
+                            {{ alimentacao_form.valor.label(class="form-label") }}
+                            {{ alimentacao_form.valor(class="form-control", step="0.01") }}
+                        </div>
+                        <div class="col-md-6">
+                            {{ alimentacao_form.restaurante_id.label(class="form-label") }}
+                            {{ alimentacao_form.restaurante_id(class="form-select") }}
+                        </div>
+                        <div class="col-12">
+                            {{ alimentacao_form.obra_id.label(class="form-label") }}
+                            {{ alimentacao_form.obra_id(class="form-select") }}
+                        </div>
+                        
+                        <!-- Seleção de Funcionários -->
+                        <div class="col-12">
+                            <label class="form-label">Funcionários</label>
+                            <div class="border rounded p-3">
+                                <div class="mb-3">
+                                    <input type="text" class="form-control" id="buscarFuncionario" 
+                                           placeholder="Digite o nome do funcionário...">
+                                </div>
+                                <div id="funcionariosSelecionados" class="mb-3">
+                                    <div class="text-muted text-center">Nenhum funcionário selecionado</div>
+                                </div>
+                                <div id="listaFuncionarios" class="d-none">
+                                    <!-- Lista de funcionários será populada dinamicamente -->
+                                </div>
+                            </div>
+                            {{ alimentacao_form.funcionarios_selecionados(class="form-control", type="hidden") }}
+                        </div>
+                        
+                        <div class="col-12">
+                            {{ alimentacao_form.observacoes.label(class="form-label") }}
+                            {{ alimentacao_form.observacoes(class="form-control", rows="3") }}
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-save me-2"></i>Salvar Lançamento
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Modal para Novo Restaurante -->
+<div class="modal fade" id="modalNovoRestaurante" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <form method="POST" action="{{ url_for('main.criar_restaurante') }}">
+                {{ restaurante_form.hidden_tag() }}
+                <div class="modal-header">
+                    <h5 class="modal-title">
+                        <i class="fas fa-store me-2"></i>Novo Restaurante
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="row g-3">
+                        <div class="col-12">
+                            {{ restaurante_form.nome.label(class="form-label") }}
+                            {{ restaurante_form.nome(class="form-control") }}
+                        </div>
+                        <div class="col-12">
+                            {{ restaurante_form.endereco.label(class="form-label") }}
+                            {{ restaurante_form.endereco(class="form-control", rows="3") }}
+                        </div>
+                        <div class="col-md-6">
+                            {{ restaurante_form.telefone.label(class="form-label") }}
+                            {{ restaurante_form.telefone(class="form-control") }}
+                        </div>
+                        <div class="col-md-6">
+                            {{ restaurante_form.email.label(class="form-label") }}
+                            {{ restaurante_form.email(class="form-control") }}
+                        </div>
+                        <div class="col-12">
+                            {{ restaurante_form.contato_responsavel.label(class="form-label") }}
+                            {{ restaurante_form.contato_responsavel(class="form-control") }}
+                        </div>
+                        <div class="col-12">
+                            <div class="form-check">
+                                {{ restaurante_form.ativo(class="form-check-input") }}
+                                {{ restaurante_form.ativo.label(class="form-check-label") }}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-save me-2"></i>Cadastrar Restaurante
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+// Dados dos funcionários para seleção múltipla
+const funcionarios = {{ funcionarios_json|safe }};
+let funcionariosSelecionados = [];
+
+document.addEventListener('DOMContentLoaded', function() {
+    const buscarInput = document.getElementById('buscarFuncionario');
+    const listaFuncionarios = document.getElementById('listaFuncionarios');
+    const containerSelecionados = document.getElementById('funcionariosSelecionados');
+    const inputHidden = document.getElementById('funcionarios_selecionados');
+    
+    // Evento de busca
+    buscarInput.addEventListener('input', function() {
+        const termo = this.value.toLowerCase();
+        
+        if (termo.length >= 2) {
+            const funcionariosFiltrados = funcionarios.filter(f => 
+                f.nome.toLowerCase().includes(termo) &&
+                !funcionariosSelecionados.some(fs => fs.id === f.id)
+            );
+            
+            mostrarListaFuncionarios(funcionariosFiltrados);
+            listaFuncionarios.classList.remove('d-none');
+        } else {
+            listaFuncionarios.classList.add('d-none');
+        }
+    });
+    
+    function mostrarListaFuncionarios(funcionarios) {
+        listaFuncionarios.innerHTML = '';
+        
+        funcionarios.forEach(funcionario => {
+            const item = document.createElement('div');
+            item.className = 'list-group-item list-group-item-action';
+            item.style.cursor = 'pointer';
+            item.innerHTML = `
+                <div class="d-flex justify-content-between">
+                    <div>
+                        <strong>${funcionario.nome}</strong>
+                        <small class="text-muted d-block">${funcionario.funcao}</small>
+                    </div>
+                    <i class="fas fa-plus"></i>
+                </div>
+            `;
+            
+            item.addEventListener('click', function() {
+                adicionarFuncionario(funcionario);
+                buscarInput.value = '';
+                listaFuncionarios.classList.add('d-none');
+            });
+            
+            listaFuncionarios.appendChild(item);
+        });
+    }
+    
+    function adicionarFuncionario(funcionario) {
+        funcionariosSelecionados.push(funcionario);
+        atualizarVisualizacao();
+        atualizarInputHidden();
+    }
+    
+    function removerFuncionario(funcionarioId) {
+        funcionariosSelecionados = funcionariosSelecionados.filter(f => f.id !== funcionarioId);
+        atualizarVisualizacao();
+        atualizarInputHidden();
+    }
+    
+    function atualizarVisualizacao() {
+        if (funcionariosSelecionados.length === 0) {
+            containerSelecionados.innerHTML = '<div class="text-muted text-center">Nenhum funcionário selecionado</div>';
+        } else {
+            containerSelecionados.innerHTML = funcionariosSelecionados.map(funcionario => `
+                <span class="badge bg-primary me-2 mb-2">
+                    ${funcionario.nome}
+                    <button type="button" class="btn-close btn-close-white ms-2" 
+                            onclick="removerFuncionario(${funcionario.id})" style="font-size: 0.7em;"></button>
+                </span>
+            `).join('');
+        }
+    }
+    
+    function atualizarInputHidden() {
+        inputHidden.value = JSON.stringify(funcionariosSelecionados.map(f => f.id));
+    }
+    
+    // Tornar a função global para o onclick
+    window.removerFuncionario = removerFuncionario;
+});
+</script>
+{% endblock %}

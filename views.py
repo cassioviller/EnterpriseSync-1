@@ -1090,7 +1090,7 @@ def novo_rdo(obra_id=None):
     
     # Preparar dados para JavaScript
     funcionarios = [
-        {'id': f.id, 'nome': f.nome, 'funcao': f.funcao.nome if f.funcao else 'Sem função'}
+        {'id': f.id, 'nome': f.nome, 'funcao': f.funcao_ref.nome if f.funcao_ref else 'Sem função'}
         for f in Funcionario.query.filter_by(ativo=True).all()
     ]
     
@@ -1242,3 +1242,234 @@ def rdos_por_obra(id):
     rdos = RDO.query.filter_by(obra_id=id).order_by(RDO.data_relatorio.desc()).all()
     
     return render_template('rdo/rdos_obra.html', obra=obra, rdos=rdos)
+
+
+# ========== NOVAS FUNCIONALIDADES: ALIMENTAÇÃO APRIMORADA ==========
+
+@main_bp.route('/alimentacao/restaurantes')
+@main_bp.route('/alimentacao/restaurantes', methods=['POST'])
+@login_required
+def alimentacao_restaurantes():
+    """Página principal de alimentação com cards de restaurantes e KPIs"""
+    from forms import FiltroDataForm, AlimentacaoMultiplaForm, RestauranteForm
+    from models import Restaurante, RegistroAlimentacao, Funcionario, Obra
+    from datetime import date, datetime, timedelta
+    from sqlalchemy import func
+    import json
+    
+    # Formulários
+    filtro_form = FiltroDataForm()
+    alimentacao_form = AlimentacaoMultiplaForm()
+    restaurante_form = RestauranteForm()
+    
+    # Definir período padrão (mês atual)
+    data_inicio = date.today().replace(day=1)
+    data_fim = date.today()
+    
+    # Aplicar filtros se fornecidos
+    if request.method == 'POST' and filtro_form.validate_on_submit():
+        if filtro_form.data_inicio.data:
+            data_inicio = filtro_form.data_inicio.data
+        if filtro_form.data_fim.data:
+            data_fim = filtro_form.data_fim.data
+    
+    # Popular formulários
+    alimentacao_form.obra_id.choices = [(0, 'Selecione...')] + [(obra.id, obra.nome) for obra in Obra.query.all()]
+    alimentacao_form.restaurante_id.choices = [(0, 'Selecione...')] + [(r.id, r.nome) for r in Restaurante.query.filter_by(ativo=True).all()]
+    
+    # Calcular KPIs gerais
+    query_kpis = RegistroAlimentacao.query.filter(
+        RegistroAlimentacao.data >= data_inicio,
+        RegistroAlimentacao.data <= data_fim
+    )
+    
+    custo_total = db.session.query(func.sum(RegistroAlimentacao.valor)).filter(
+        RegistroAlimentacao.data >= data_inicio,
+        RegistroAlimentacao.data <= data_fim
+    ).scalar() or 0
+    
+    registros_hoje = RegistroAlimentacao.query.filter_by(data=date.today()).count()
+    
+    funcionarios_alimentados = db.session.query(func.count(func.distinct(RegistroAlimentacao.funcionario_id))).filter(
+        RegistroAlimentacao.data >= data_inicio,
+        RegistroAlimentacao.data <= data_fim
+    ).scalar() or 0
+    
+    dias_periodo = (data_fim - data_inicio).days + 1
+    media_diaria = custo_total / dias_periodo if dias_periodo > 0 else 0
+    
+    kpis = {
+        'custo_total': custo_total,
+        'media_diaria': media_diaria,
+        'registros_hoje': registros_hoje,
+        'funcionarios_alimentados': funcionarios_alimentados
+    }
+    
+    # Buscar restaurantes com KPIs
+    restaurantes = []
+    for restaurante in Restaurante.query.all():
+        custo_restaurante = db.session.query(func.sum(RegistroAlimentacao.valor)).filter(
+            RegistroAlimentacao.restaurante_id == restaurante.id,
+            RegistroAlimentacao.data >= data_inicio,
+            RegistroAlimentacao.data <= data_fim
+        ).scalar() or 0
+        
+        total_registros = RegistroAlimentacao.query.filter(
+            RegistroAlimentacao.restaurante_id == restaurante.id,
+            RegistroAlimentacao.data >= data_inicio,
+            RegistroAlimentacao.data <= data_fim
+        ).count()
+        
+        restaurante.kpis = {
+            'custo_total': custo_restaurante,
+            'total_registros': total_registros
+        }
+        restaurantes.append(restaurante)
+    
+    # Dados para JavaScript
+    funcionarios = [
+        {'id': f.id, 'nome': f.nome, 'funcao': f.funcao_ref.nome if f.funcao_ref else 'Sem função'}
+        for f in Funcionario.query.filter_by(ativo=True).all()
+    ]
+    funcionarios_json = json.dumps(funcionarios)
+    
+    return render_template('alimentacao/restaurantes.html',
+                         restaurantes=restaurantes,
+                         kpis=kpis,
+                         filtro_form=filtro_form,
+                         alimentacao_form=alimentacao_form,
+                         restaurante_form=restaurante_form,
+                         funcionarios_json=funcionarios_json)
+
+
+@main_bp.route('/alimentacao/restaurante/criar', methods=['POST'])
+@login_required
+def criar_restaurante():
+    """Criar novo restaurante"""
+    from forms import RestauranteForm
+    from models import Restaurante
+    
+    form = RestauranteForm()
+    
+    if form.validate_on_submit():
+        restaurante = Restaurante(
+            nome=form.nome.data,
+            endereco=form.endereco.data,
+            telefone=form.telefone.data,
+            email=form.email.data,
+            contato_responsavel=form.contato_responsavel.data,
+            ativo=form.ativo.data
+        )
+        
+        db.session.add(restaurante)
+        db.session.commit()
+        
+        flash('Restaurante cadastrado com sucesso!', 'success')
+    else:
+        flash('Erro ao cadastrar restaurante. Verifique os dados.', 'error')
+    
+    return redirect(url_for('main.alimentacao_restaurantes'))
+
+
+@main_bp.route('/alimentacao/multipla/criar', methods=['POST'])
+@login_required
+def criar_alimentacao_multipla():
+    """Criar lançamento de alimentação para múltiplos funcionários"""
+    from forms import AlimentacaoMultiplaForm
+    from models import RegistroAlimentacao
+    import json
+    
+    form = AlimentacaoMultiplaForm()
+    
+    # Popular choices para validação
+    from models import Obra, Restaurante
+    form.obra_id.choices = [(0, 'Selecione...')] + [(obra.id, obra.nome) for obra in Obra.query.all()]
+    form.restaurante_id.choices = [(0, 'Selecione...')] + [(r.id, r.nome) for r in Restaurante.query.filter_by(ativo=True).all()]
+    
+    if form.validate_on_submit():
+        try:
+            funcionarios_ids = json.loads(form.funcionarios_selecionados.data)
+            
+            if not funcionarios_ids:
+                flash('Selecione pelo menos um funcionário.', 'error')
+                return redirect(url_for('main.alimentacao_restaurantes'))
+            
+            # Criar registro para cada funcionário selecionado
+            registros_criados = 0
+            for funcionario_id in funcionarios_ids:
+                registro = RegistroAlimentacao(
+                    funcionario_id=funcionario_id,
+                    obra_id=form.obra_id.data if form.obra_id.data != 0 else None,
+                    restaurante_id=form.restaurante_id.data if form.restaurante_id.data != 0 else None,
+                    data=form.data.data,
+                    tipo=form.tipo.data,
+                    valor=form.valor.data,
+                    observacoes=form.observacoes.data
+                )
+                db.session.add(registro)
+                registros_criados += 1
+            
+            db.session.commit()
+            
+            flash(f'Lançamento criado com sucesso para {registros_criados} funcionário(s)!', 'success')
+            
+        except Exception as e:
+            db.session.rollback()
+            flash('Erro ao criar lançamento. Tente novamente.', 'error')
+    else:
+        flash('Erro na validação dos dados. Verifique as informações.', 'error')
+    
+    return redirect(url_for('main.alimentacao_restaurantes'))
+
+
+@main_bp.route('/alimentacao/restaurante/<int:restaurante_id>')
+@login_required
+def detalhes_restaurante(restaurante_id):
+    """Página de detalhes de um restaurante específico"""
+    from models import Restaurante, RegistroAlimentacao, Funcionario
+    from datetime import date, timedelta
+    from sqlalchemy import func
+    
+    restaurante = Restaurante.query.get_or_404(restaurante_id)
+    
+    # Período padrão (mês atual)
+    data_inicio = date.today().replace(day=1)
+    data_fim = date.today()
+    
+    # KPIs do restaurante
+    custo_total = db.session.query(func.sum(RegistroAlimentacao.valor)).filter(
+        RegistroAlimentacao.restaurante_id == restaurante.id,
+        RegistroAlimentacao.data >= data_inicio,
+        RegistroAlimentacao.data <= data_fim
+    ).scalar() or 0
+    
+    total_registros = RegistroAlimentacao.query.filter(
+        RegistroAlimentacao.restaurante_id == restaurante.id,
+        RegistroAlimentacao.data >= data_inicio,
+        RegistroAlimentacao.data <= data_fim
+    ).count()
+    
+    funcionarios_unicos = db.session.query(func.count(func.distinct(RegistroAlimentacao.funcionario_id))).filter(
+        RegistroAlimentacao.restaurante_id == restaurante.id,
+        RegistroAlimentacao.data >= data_inicio,
+        RegistroAlimentacao.data <= data_fim
+    ).scalar() or 0
+    
+    media_por_funcionario = custo_total / funcionarios_unicos if funcionarios_unicos > 0 else 0
+    
+    kpis = {
+        'custo_total': custo_total,
+        'total_registros': total_registros,
+        'funcionarios_unicos': funcionarios_unicos,
+        'media_por_funcionario': media_por_funcionario
+    }
+    
+    # Histórico de lançamentos
+    registros = RegistroAlimentacao.query.filter(
+        RegistroAlimentacao.restaurante_id == restaurante.id
+    ).join(Funcionario).order_by(RegistroAlimentacao.data.desc()).limit(50).all()
+    
+    return render_template('alimentacao/detalhes_restaurante.html',
+                         restaurante=restaurante,
+                         kpis=kpis,
+                         registros=registros)

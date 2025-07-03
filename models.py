@@ -126,6 +126,7 @@ class RegistroAlimentacao(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     funcionario_id = db.Column(db.Integer, db.ForeignKey('funcionario.id'), nullable=False)
     obra_id = db.Column(db.Integer, db.ForeignKey('obra.id'))
+    restaurante_id = db.Column(db.Integer, db.ForeignKey('restaurante.id'))
     data = db.Column(db.Date, nullable=False)
     tipo = db.Column(db.String(20), nullable=False)  # 'cafe', 'almoco', 'jantar', 'lanche'
     valor = db.Column(db.Float, nullable=False)
@@ -235,3 +236,67 @@ class RDOFoto(db.Model):
     caminho_arquivo = db.Column(db.String(500), nullable=False)
     legenda = db.Column(db.Text)
     uploaded_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+
+# Novos modelos para funcionalidades aprimoradas
+class Restaurante(db.Model):
+    """Modelo para restaurantes/fornecedores de alimentação"""
+    __tablename__ = 'restaurante'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    nome = db.Column(db.String(100), nullable=False)
+    endereco = db.Column(db.Text)
+    telefone = db.Column(db.String(20))
+    email = db.Column(db.String(120))
+    contato_responsavel = db.Column(db.String(100))
+    ativo = db.Column(db.Boolean, default=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    
+    # Relacionamentos
+    registros_alimentacao = db.relationship('RegistroAlimentacao', backref='restaurante_ref', lazy=True)
+    
+    def __repr__(self):
+        return f'<Restaurante {self.nome}>'
+
+
+class UsoVeiculo(db.Model):
+    """Modelo para registro de uso de veículos"""
+    __tablename__ = 'uso_veiculo'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    veiculo_id = db.Column(db.Integer, db.ForeignKey('veiculo.id'), nullable=False)
+    funcionario_id = db.Column(db.Integer, db.ForeignKey('funcionario.id'), nullable=False)
+    data_uso = db.Column(db.Date, nullable=False)
+    km_inicial = db.Column(db.Integer)
+    km_final = db.Column(db.Integer)
+    finalidade = db.Column(db.String(200))
+    observacoes = db.Column(db.Text)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    
+    # Relacionamentos
+    veiculo = db.relationship('Veiculo', backref='usos')
+    funcionario = db.relationship('Funcionario', backref='usos_veiculo')
+    
+    def __repr__(self):
+        return f'<UsoVeiculo {self.veiculo_id} - {self.funcionario_id}>'
+
+
+class CustoVeiculo(db.Model):
+    """Modelo para custos de veículos"""
+    __tablename__ = 'custo_veiculo'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    veiculo_id = db.Column(db.Integer, db.ForeignKey('veiculo.id'), nullable=False)
+    data_custo = db.Column(db.Date, nullable=False)
+    valor = db.Column(db.Float, nullable=False)
+    tipo_custo = db.Column(db.String(50), nullable=False)  # 'combustivel', 'manutencao', 'seguro', 'outros'
+    descricao = db.Column(db.Text)
+    km_atual = db.Column(db.Integer)
+    fornecedor = db.Column(db.String(100))
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    
+    # Relacionamentos
+    veiculo = db.relationship('Veiculo', backref='custos_veiculo')
+    
+    def __repr__(self):
+        return f'<CustoVeiculo {self.veiculo_id} - {self.valor}>'
