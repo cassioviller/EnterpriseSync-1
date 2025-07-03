@@ -501,10 +501,8 @@ def detalhes_obra(id):
     # ===== CÁLCULO DOS KPIS =====
     
     # 1. Custos de Transporte (Veículos)
-    custo_transporte = db.session.query(func.sum(CustoVeiculo.valor)).join(
-        UsoVeiculo, CustoVeiculo.veiculo_id == UsoVeiculo.veiculo_id
-    ).filter(
-        UsoVeiculo.obra_id == id,
+    # Por enquanto, vamos usar apenas custos de veículos sem vinculação específica à obra
+    custo_transporte = db.session.query(func.sum(CustoVeiculo.valor)).filter(
         CustoVeiculo.data_custo.between(data_inicio, data_fim)
     ).scalar() or 0.0
     
