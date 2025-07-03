@@ -1,0 +1,255 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard - SIGE{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <h1 class="h3 mb-4">
+            <i class="fas fa-tachometer-alt"></i> Dashboard
+        </h1>
+    </div>
+</div>
+
+<!-- KPIs Cards -->
+<div class="row mb-4">
+    <div class="col-md-3">
+        <div class="card bg-primary text-white">
+            <div class="card-body">
+                <div class="d-flex align-items-center">
+                    <div class="flex-grow-1">
+                        <h5 class="card-title mb-0">Funcionários Ativos</h5>
+                        <h2 class="mb-0">{{ total_funcionarios }}</h2>
+                    </div>
+                    <div class="ms-3">
+                        <i class="fas fa-users fa-2x opacity-75"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-3">
+        <div class="card bg-success text-white">
+            <div class="card-body">
+                <div class="d-flex align-items-center">
+                    <div class="flex-grow-1">
+                        <h5 class="card-title mb-0">Obras Ativas</h5>
+                        <h2 class="mb-0">{{ total_obras }}</h2>
+                    </div>
+                    <div class="ms-3">
+                        <i class="fas fa-hard-hat fa-2x opacity-75"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-3">
+        <div class="card bg-warning text-white">
+            <div class="card-body">
+                <div class="d-flex align-items-center">
+                    <div class="flex-grow-1">
+                        <h5 class="card-title mb-0">Veículos</h5>
+                        <h2 class="mb-0">{{ total_veiculos }}</h2>
+                    </div>
+                    <div class="ms-3">
+                        <i class="fas fa-truck fa-2x opacity-75"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-3">
+        <div class="card bg-info text-white">
+            <div class="card-body">
+                <div class="d-flex align-items-center">
+                    <div class="flex-grow-1">
+                        <h5 class="card-title mb-0">Custos do Mês</h5>
+                        <h2 class="mb-0">R$ {{ '{:,.2f}'.format(custos_recentes|sum(attribute='total_custo') or 0) }}</h2>
+                    </div>
+                    <div class="ms-3">
+                        <i class="fas fa-dollar-sign fa-2x opacity-75"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Charts Row -->
+<div class="row mb-4">
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-chart-pie"></i> Funcionários por Departamento
+                </h5>
+            </div>
+            <div class="card-body">
+                <canvas id="funcionariosDeptChart" width="400" height="200"></canvas>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-chart-bar"></i> Custos por Obra
+                </h5>
+            </div>
+            <div class="card-body">
+                <canvas id="custosObraChart" width="400" height="200"></canvas>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Tables Row -->
+<div class="row">
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-hard-hat"></i> Obras em Andamento
+                </h5>
+            </div>
+            <div class="card-body">
+                {% if obras_andamento %}
+                    <div class="table-responsive">
+                        <table class="table table-sm">
+                            <thead>
+                                <tr>
+                                    <th>Obra</th>
+                                    <th>Início</th>
+                                    <th>Orçamento</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for obra in obras_andamento %}
+                                <tr>
+                                    <td>{{ obra.nome }}</td>
+                                    <td>{{ obra.data_inicio.strftime('%d/%m/%Y') if obra.data_inicio else '-' }}</td>
+                                    <td>R$ {{ '{:,.2f}'.format(obra.orcamento) }}</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                {% else %}
+                    <p class="text-muted mb-0">Nenhuma obra em andamento.</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-dollar-sign"></i> Custos Recentes
+                </h5>
+            </div>
+            <div class="card-body">
+                {% if custos_recentes %}
+                    <div class="table-responsive">
+                        <table class="table table-sm">
+                            <thead>
+                                <tr>
+                                    <th>Obra</th>
+                                    <th>Custo Total</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for custo in custos_recentes %}
+                                <tr>
+                                    <td>{{ custo.nome }}</td>
+                                    <td>R$ {{ '{:,.2f}'.format(custo.total_custo) }}</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                {% else %}
+                    <p class="text-muted mb-0">Nenhum custo registrado.</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+// Dados dos gráficos
+const funcionariosDeptData = {
+    labels: [{% for item in funcionarios_dept %}'{{ item[0] }}'{% if not loop.last %},{% endif %}{% endfor %}],
+    datasets: [{
+        data: [{% for item in funcionarios_dept %}{{ item[1] }}{% if not loop.last %},{% endif %}{% endfor %}],
+        backgroundColor: [
+            'rgba(54, 162, 235, 0.8)',
+            'rgba(255, 99, 132, 0.8)',
+            'rgba(255, 205, 86, 0.8)',
+            'rgba(75, 192, 192, 0.8)',
+            'rgba(153, 102, 255, 0.8)',
+            'rgba(255, 159, 64, 0.8)'
+        ]
+    }]
+};
+
+const custosObraData = {
+    labels: [{% for item in custos_recentes %}'{{ item.nome }}'{% if not loop.last %},{% endif %}{% endfor %}],
+    datasets: [{
+        label: 'Custo (R$)',
+        data: [{% for item in custos_recentes %}{{ item.total_custo }}{% if not loop.last %},{% endif %}{% endfor %}],
+        backgroundColor: 'rgba(54, 162, 235, 0.8)',
+        borderColor: 'rgba(54, 162, 235, 1)',
+        borderWidth: 1
+    }]
+};
+
+// Gráfico de funcionários por departamento
+const funcionariosDeptCtx = document.getElementById('funcionariosDeptChart').getContext('2d');
+new Chart(funcionariosDeptCtx, {
+    type: 'pie',
+    data: funcionariosDeptData,
+    options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+            legend: {
+                position: 'bottom'
+            }
+        }
+    }
+});
+
+// Gráfico de custos por obra
+const custosObraCtx = document.getElementById('custosObraChart').getContext('2d');
+new Chart(custosObraCtx, {
+    type: 'bar',
+    data: custosObraData,
+    options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+            legend: {
+                display: false
+            }
+        },
+        scales: {
+            y: {
+                beginAtZero: true,
+                ticks: {
+                    callback: function(value) {
+                        return 'R$ ' + value.toLocaleString('pt-BR');
+                    }
+                }
+            }
+        }
+    }
+});
+</script>
+{% endblock %}

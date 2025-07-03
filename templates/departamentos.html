@@ -1,0 +1,119 @@
+{% extends "base.html" %}
+
+{% block title %}Departamentos - SIGE{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h1 class="h3">
+                <i class="fas fa-sitemap"></i> Departamentos
+            </h1>
+            <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#departamentoModal">
+                <i class="fas fa-plus"></i> Novo Departamento
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- Tabela de Departamentos -->
+<div class="card">
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table table-striped" id="departamentosTable">
+                <thead>
+                    <tr>
+                        <th>Nome</th>
+                        <th>Descrição</th>
+                        <th>Funcionários</th>
+                        <th>Criado em</th>
+                        <th>Ações</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for departamento in departamentos %}
+                    <tr>
+                        <td>{{ departamento.nome }}</td>
+                        <td>{{ departamento.descricao or '-' }}</td>
+                        <td>{{ departamento.funcionarios|length }}</td>
+                        <td>{{ departamento.created_at.strftime('%d/%m/%Y %H:%M') if departamento.created_at else '-' }}</td>
+                        <td>
+                            <div class="btn-group btn-group-sm">
+                                <button class="btn btn-outline-primary" onclick="editarDepartamento({{ departamento.id }})">
+                                    <i class="fas fa-edit"></i>
+                                </button>
+                                <button class="btn btn-outline-danger" onclick="excluirDepartamento({{ departamento.id }})">
+                                    <i class="fas fa-trash"></i>
+                                </button>
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Departamento -->
+<div class="modal fade" id="departamentoModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="fas fa-sitemap"></i> 
+                    <span id="modalTitle">Novo Departamento</span>
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="POST" action="{{ url_for('main.novo_departamento') }}" id="departamentoForm">
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label for="nome" class="form-label">Nome *</label>
+                        <input type="text" class="form-control" id="nome" name="nome" required>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="descricao" class="form-label">Descrição</label>
+                        <textarea class="form-control" id="descricao" name="descricao" rows="3"></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-primary">Salvar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+$(document).ready(function() {
+    // Inicializar DataTable
+    $('#departamentosTable').DataTable({
+        language: {
+            url: '//cdn.datatables.net/plug-ins/1.13.6/i18n/pt-BR.json'
+        },
+        order: [[0, 'asc']],
+        pageLength: 25
+    });
+});
+
+function editarDepartamento(id) {
+    // Implementar edição
+    alert('Funcionalidade de edição será implementada');
+}
+
+function excluirDepartamento(id) {
+    if (confirm('Tem certeza que deseja excluir este departamento?')) {
+        const form = document.createElement('form');
+        form.method = 'POST';
+        form.action = '/departamentos/' + id + '/excluir';
+        document.body.appendChild(form);
+        form.submit();
+    }
+}
+</script>
+{% endblock %}

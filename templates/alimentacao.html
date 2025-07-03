@@ -1,0 +1,250 @@
+{% extends "base.html" %}
+
+{% block title %}Alimentação - SIGE{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h1 class="h3">
+                <i class="fas fa-utensils"></i> Controle de Alimentação
+            </h1>
+            <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#alimentacaoModal">
+                <i class="fas fa-plus"></i> Novo Registro
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- Resumo -->
+<div class="row mb-4">
+    <div class="col-md-3">
+        <div class="card bg-success text-white">
+            <div class="card-body">
+                <div class="d-flex align-items-center">
+                    <div class="flex-grow-1">
+                        <h5 class="card-title mb-0">Total do Mês</h5>
+                        <h3 class="mb-0">R$ {{ '{:,.2f}'.format(registros|sum(attribute='valor') or 0) }}</h3>
+                    </div>
+                    <div class="ms-3">
+                        <i class="fas fa-calendar-month fa-2x opacity-75"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-3">
+        <div class="card bg-primary text-white">
+            <div class="card-body">
+                <div class="d-flex align-items-center">
+                    <div class="flex-grow-1">
+                        <h5 class="card-title mb-0">Registros Hoje</h5>
+                        <h3 class="mb-0">{{ registros|selectattr('data', 'equalto', date.today())|list|length }}</h3>
+                    </div>
+                    <div class="ms-3">
+                        <i class="fas fa-calendar-day fa-2x opacity-75"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-3">
+        <div class="card bg-warning text-white">
+            <div class="card-body">
+                <div class="d-flex align-items-center">
+                    <div class="flex-grow-1">
+                        <h5 class="card-title mb-0">Média Diária</h5>
+                        <h3 class="mb-0">R$ {{ '{:,.2f}'.format((registros|sum(attribute='valor') or 0) / 30) }}</h3>
+                    </div>
+                    <div class="ms-3">
+                        <i class="fas fa-chart-line fa-2x opacity-75"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-3">
+        <div class="card bg-info text-white">
+            <div class="card-body">
+                <div class="d-flex align-items-center">
+                    <div class="flex-grow-1">
+                        <h5 class="card-title mb-0">Funcionários</h5>
+                        <h3 class="mb-0">{{ registros|map(attribute='funcionario_id')|unique|list|length }}</h3>
+                    </div>
+                    <div class="ms-3">
+                        <i class="fas fa-users fa-2x opacity-75"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Tabela de Registros -->
+<div class="card">
+    <div class="card-header">
+        <h5 class="card-title mb-0">
+            <i class="fas fa-history"></i> Registros de Alimentação
+        </h5>
+    </div>
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table table-striped" id="alimentacaoTable">
+                <thead>
+                    <tr>
+                        <th>Funcionário</th>
+                        <th>Data</th>
+                        <th>Tipo</th>
+                        <th>Valor</th>
+                        <th>Obra</th>
+                        <th>Observações</th>
+                        <th>Ações</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for registro in registros %}
+                    <tr>
+                        <td>{{ registro.funcionario_ref.nome }}</td>
+                        <td>{{ registro.data.strftime('%d/%m/%Y') }}</td>
+                        <td>
+                            {% if registro.tipo == 'cafe' %}
+                                <span class="badge bg-warning">Café da Manhã</span>
+                            {% elif registro.tipo == 'almoco' %}
+                                <span class="badge bg-success">Almoço</span>
+                            {% elif registro.tipo == 'jantar' %}
+                                <span class="badge bg-primary">Jantar</span>
+                            {% else %}
+                                <span class="badge bg-secondary">Lanche</span>
+                            {% endif %}
+                        </td>
+                        <td>R$ {{ '{:,.2f}'.format(registro.valor) }}</td>
+                        <td>{{ registro.obra_ref.nome if registro.obra_ref else '-' }}</td>
+                        <td>{{ registro.observacoes or '-' }}</td>
+                        <td>
+                            <div class="btn-group btn-group-sm">
+                                <button class="btn btn-outline-primary" onclick="editarRegistro({{ registro.id }})">
+                                    <i class="fas fa-edit"></i>
+                                </button>
+                                <button class="btn btn-outline-danger" onclick="excluirRegistro({{ registro.id }})">
+                                    <i class="fas fa-trash"></i>
+                                </button>
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Registro de Alimentação -->
+<div class="modal fade" id="alimentacaoModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="fas fa-utensils"></i> 
+                    <span id="modalTitle">Novo Registro de Alimentação</span>
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="POST" action="{{ url_for('main.nova_alimentacao') }}" id="alimentacaoForm">
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label for="funcionario_id" class="form-label">Funcionário *</label>
+                        <select class="form-select" id="funcionario_id" name="funcionario_id" required>
+                            <option value="">Selecione...</option>
+                            <!-- Options will be populated by JavaScript -->
+                        </select>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="data" class="form-label">Data *</label>
+                                <input type="date" class="form-control" id="data" name="data" required>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="tipo" class="form-label">Tipo *</label>
+                                <select class="form-select" id="tipo" name="tipo" required>
+                                    <option value="">Selecione...</option>
+                                    <option value="cafe">Café da Manhã</option>
+                                    <option value="almoco">Almoço</option>
+                                    <option value="jantar">Jantar</option>
+                                    <option value="lanche">Lanche</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="valor" class="form-label">Valor *</label>
+                                <input type="number" class="form-control" id="valor" name="valor" step="0.01" min="0" required>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="obra_id" class="form-label">Obra</label>
+                                <select class="form-select" id="obra_id" name="obra_id">
+                                    <option value="">Selecione...</option>
+                                    <!-- Options will be populated by JavaScript -->
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="observacoes" class="form-label">Observações</label>
+                        <textarea class="form-control" id="observacoes" name="observacoes" rows="2"></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-primary">Salvar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+$(document).ready(function() {
+    // Inicializar DataTable
+    $('#alimentacaoTable').DataTable({
+        language: {
+            url: '//cdn.datatables.net/plug-ins/1.13.6/i18n/pt-BR.json'
+        },
+        order: [[1, 'desc']],
+        pageLength: 25
+    });
+    
+    // Configurar data padrão
+    document.getElementById('data').valueAsDate = new Date();
+});
+
+function editarRegistro(id) {
+    // Implementar edição
+    alert('Funcionalidade de edição será implementada');
+}
+
+function excluirRegistro(id) {
+    if (confirm('Tem certeza que deseja excluir este registro?')) {
+        const form = document.createElement('form');
+        form.method = 'POST';
+        form.action = '/alimentacao/' + id + '/excluir';
+        document.body.appendChild(form);
+        form.submit();
+    }
+}
+</script>
+{% endblock %}

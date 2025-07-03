@@ -1,0 +1,371 @@
+/* Custom CSS for SIGE - Estruturas do Vale */
+
+/* Override minimal styles only when necessary */
+:root {
+    --sige-primary: #0d6efd;
+    --sige-secondary: #6c757d;
+    --sige-success: #198754;
+    --sige-warning: #ffc107;
+    --sige-danger: #dc3545;
+    --sige-info: #0dcaf0;
+}
+
+/* Custom utilities */
+.text-truncate-2 {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+}
+
+.text-truncate-3 {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+}
+
+/* Dashboard specific styles */
+.dashboard-card {
+    transition: transform 0.2s ease-in-out;
+}
+
+.dashboard-card:hover {
+    transform: translateY(-2px);
+}
+
+/* Chart containers */
+.chart-container {
+    position: relative;
+    height: 300px;
+    margin: 20px 0;
+}
+
+/* DataTables customization for dark theme */
+.dataTables_wrapper .dataTables_filter input {
+    background-color: var(--bs-dark) !important;
+    border-color: var(--bs-secondary) !important;
+    color: var(--bs-light) !important;
+}
+
+.dataTables_wrapper .dataTables_length select {
+    background-color: var(--bs-dark) !important;
+    border-color: var(--bs-secondary) !important;
+    color: var(--bs-light) !important;
+}
+
+/* Modal adjustments */
+.modal-content {
+    border: 1px solid var(--bs-secondary);
+}
+
+/* Form enhancements */
+.form-floating > .form-control:focus,
+.form-floating > .form-control:not(:placeholder-shown) {
+    padding-top: 1.625rem;
+    padding-bottom: 0.625rem;
+}
+
+/* Badge customizations */
+.badge-status {
+    font-size: 0.75rem;
+    padding: 0.25rem 0.5rem;
+}
+
+/* Loading spinner */
+.spinner-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.5);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 9999;
+}
+
+.spinner-overlay .spinner-border {
+    width: 3rem;
+    height: 3rem;
+}
+
+/* Print styles */
+@media print {
+    .no-print {
+        display: none !important;
+    }
+    
+    .navbar,
+    .btn,
+    .modal {
+        display: none !important;
+    }
+    
+    .card {
+        border: 1px solid #000 !important;
+        box-shadow: none !important;
+    }
+    
+    .table {
+        border: 1px solid #000 !important;
+    }
+    
+    .table th,
+    .table td {
+        border: 1px solid #000 !important;
+    }
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    .navbar-brand {
+        font-size: 1rem;
+    }
+    
+    .btn-group-sm .btn {
+        padding: 0.25rem 0.5rem;
+        font-size: 0.7rem;
+    }
+    
+    .card-body {
+        padding: 1rem;
+    }
+    
+    .table-responsive {
+        border: none;
+    }
+}
+
+/* Custom animations */
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.fade-in {
+    animation: fadeIn 0.3s ease-in-out;
+}
+
+/* Status indicators */
+.status-indicator {
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    margin-right: 5px;
+}
+
+.status-indicator.active {
+    background-color: var(--bs-success);
+}
+
+.status-indicator.inactive {
+    background-color: var(--bs-secondary);
+}
+
+.status-indicator.warning {
+    background-color: var(--bs-warning);
+}
+
+.status-indicator.danger {
+    background-color: var(--bs-danger);
+}
+
+/* Clock display */
+.clock-display {
+    font-family: 'Courier New', monospace;
+    font-size: 2rem;
+    font-weight: bold;
+    text-align: center;
+    padding: 1rem;
+    background: linear-gradient(45deg, var(--bs-primary), var(--bs-info));
+    color: white;
+    border-radius: 10px;
+    margin: 1rem 0;
+}
+
+/* File upload area */
+.file-upload-area {
+    border: 2px dashed var(--bs-secondary);
+    border-radius: 8px;
+    padding: 2rem;
+    text-align: center;
+    transition: all 0.3s ease;
+}
+
+.file-upload-area:hover {
+    border-color: var(--bs-primary);
+    background-color: rgba(13, 110, 253, 0.1);
+}
+
+/* Progress bars */
+.progress-thin {
+    height: 4px;
+}
+
+.progress-thick {
+    height: 20px;
+}
+
+/* Sidebar for mobile */
+@media (max-width: 991px) {
+    .sidebar-mobile {
+        position: fixed;
+        top: 0;
+        left: -100%;
+        width: 280px;
+        height: 100vh;
+        background-color: var(--bs-dark);
+        transition: left 0.3s ease;
+        z-index: 1050;
+    }
+    
+    .sidebar-mobile.show {
+        left: 0;
+    }
+    
+    .sidebar-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background-color: rgba(0, 0, 0, 0.5);
+        z-index: 1049;
+    }
+}
+
+/* Custom scrollbar */
+.custom-scrollbar {
+    scrollbar-width: thin;
+    scrollbar-color: var(--bs-secondary) transparent;
+}
+
+.custom-scrollbar::-webkit-scrollbar {
+    width: 8px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+    background-color: var(--bs-secondary);
+    border-radius: 4px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+    background-color: var(--bs-secondary);
+}
+
+/* Tooltips */
+.tooltip-inner {
+    max-width: 200px;
+    padding: 0.5rem;
+    font-size: 0.875rem;
+}
+
+/* Alert customizations */
+.alert-dismissible .btn-close {
+    position: absolute;
+    top: 0;
+    right: 0;
+    z-index: 2;
+    padding: 0.75rem;
+}
+
+/* Error states */
+.is-invalid {
+    border-color: var(--bs-danger) !important;
+}
+
+.invalid-feedback {
+    display: block;
+    width: 100%;
+    margin-top: 0.25rem;
+    font-size: 0.875rem;
+    color: var(--bs-danger);
+}
+
+/* Success states */
+.is-valid {
+    border-color: var(--bs-success) !important;
+}
+
+.valid-feedback {
+    display: block;
+    width: 100%;
+    margin-top: 0.25rem;
+    font-size: 0.875rem;
+    color: var(--bs-success);
+}
+
+/* Custom buttons */
+.btn-outline-light:hover {
+    background-color: var(--bs-light);
+    border-color: var(--bs-light);
+    color: var(--bs-dark);
+}
+
+/* Image previews */
+.image-preview {
+    max-width: 200px;
+    max-height: 200px;
+    border: 1px solid var(--bs-secondary);
+    border-radius: 4px;
+    padding: 4px;
+    margin: 10px 0;
+}
+
+/* Empty states */
+.empty-state {
+    text-align: center;
+    padding: 3rem 1rem;
+    color: var(--bs-secondary);
+}
+
+.empty-state i {
+    font-size: 3rem;
+    margin-bottom: 1rem;
+}
+
+/* Loading states */
+.loading-skeleton {
+    background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+    background-size: 200% 100%;
+    animation: loading 1.5s infinite;
+}
+
+@keyframes loading {
+    0% {
+        background-position: 200% 0;
+    }
+    100% {
+        background-position: -200% 0;
+    }
+}
+
+/* Compact mode */
+.compact-mode .card-body {
+    padding: 0.75rem;
+}
+
+.compact-mode .table td,
+.compact-mode .table th {
+    padding: 0.5rem;
+}
+
+.compact-mode .btn {
+    padding: 0.25rem 0.5rem;
+    font-size: 0.875rem;
+}

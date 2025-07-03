@@ -1,0 +1,211 @@
+{% extends "base.html" %}
+
+{% block title %}Veículos - SIGE{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h1 class="h3">
+                <i class="fas fa-truck"></i> Veículos
+            </h1>
+            <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#veiculoModal">
+                <i class="fas fa-plus"></i> Novo Veículo
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- Tabela de Veículos -->
+<div class="card">
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table table-striped" id="veiculosTable">
+                <thead>
+                    <tr>
+                        <th>Placa</th>
+                        <th>Marca/Modelo</th>
+                        <th>Ano</th>
+                        <th>Tipo</th>
+                        <th>KM Atual</th>
+                        <th>Status</th>
+                        <th>Próxima Manutenção</th>
+                        <th>Ações</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for veiculo in veiculos %}
+                    <tr>
+                        <td>{{ veiculo.placa }}</td>
+                        <td>{{ veiculo.marca }} {{ veiculo.modelo }}</td>
+                        <td>{{ veiculo.ano or '-' }}</td>
+                        <td>{{ veiculo.tipo }}</td>
+                        <td>{{ '{:,}'.format(veiculo.km_atual) }} km</td>
+                        <td>
+                            {% if veiculo.status == 'Disponível' %}
+                                <span class="badge bg-success">{{ veiculo.status }}</span>
+                            {% elif veiculo.status == 'Em uso' %}
+                                <span class="badge bg-primary">{{ veiculo.status }}</span>
+                            {% elif veiculo.status == 'Manutenção' %}
+                                <span class="badge bg-warning">{{ veiculo.status }}</span>
+                            {% else %}
+                                <span class="badge bg-secondary">{{ veiculo.status }}</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if veiculo.data_proxima_manutencao %}
+                                {{ veiculo.data_proxima_manutencao.strftime('%d/%m/%Y') }}
+                                {% if veiculo.data_proxima_manutencao <= date.today() %}
+                                    <i class="fas fa-exclamation-triangle text-warning ms-1"></i>
+                                {% endif %}
+                            {% else %}
+                                -
+                            {% endif %}
+                        </td>
+                        <td>
+                            <div class="btn-group btn-group-sm">
+                                <button class="btn btn-outline-primary" onclick="editarVeiculo({{ veiculo.id }})">
+                                    <i class="fas fa-edit"></i>
+                                </button>
+                                <button class="btn btn-outline-danger" onclick="excluirVeiculo({{ veiculo.id }})">
+                                    <i class="fas fa-trash"></i>
+                                </button>
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Veículo -->
+<div class="modal fade" id="veiculoModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="fas fa-truck"></i> 
+                    <span id="modalTitle">Novo Veículo</span>
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="POST" action="{{ url_for('main.novo_veiculo') }}" id="veiculoForm">
+                <div class="modal-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="placa" class="form-label">Placa *</label>
+                                <input type="text" class="form-control" id="placa" name="placa" required>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="tipo" class="form-label">Tipo *</label>
+                                <select class="form-select" id="tipo" name="tipo" required>
+                                    <option value="">Selecione...</option>
+                                    <option value="Carro">Carro</option>
+                                    <option value="Caminhão">Caminhão</option>
+                                    <option value="Moto">Moto</option>
+                                    <option value="Van">Van</option>
+                                    <option value="Outro">Outro</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="marca" class="form-label">Marca *</label>
+                                <input type="text" class="form-control" id="marca" name="marca" required>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="modelo" class="form-label">Modelo *</label>
+                                <input type="text" class="form-control" id="modelo" name="modelo" required>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="ano" class="form-label">Ano</label>
+                                <input type="number" class="form-control" id="ano" name="ano" min="1900" max="2030">
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="km_atual" class="form-label">KM Atual</label>
+                                <input type="number" class="form-control" id="km_atual" name="km_atual" min="0">
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="status" class="form-label">Status</label>
+                                <select class="form-select" id="status" name="status">
+                                    <option value="Disponível">Disponível</option>
+                                    <option value="Em uso">Em uso</option>
+                                    <option value="Manutenção">Manutenção</option>
+                                    <option value="Indisponível">Indisponível</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="data_ultima_manutencao" class="form-label">Última Manutenção</label>
+                                <input type="date" class="form-control" id="data_ultima_manutencao" name="data_ultima_manutencao">
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="data_proxima_manutencao" class="form-label">Próxima Manutenção</label>
+                        <input type="date" class="form-control" id="data_proxima_manutencao" name="data_proxima_manutencao">
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-primary">Salvar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+$(document).ready(function() {
+    // Inicializar DataTable
+    $('#veiculosTable').DataTable({
+        language: {
+            url: '//cdn.datatables.net/plug-ins/1.13.6/i18n/pt-BR.json'
+        },
+        order: [[0, 'asc']],
+        pageLength: 25
+    });
+});
+
+function editarVeiculo(id) {
+    // Implementar edição
+    alert('Funcionalidade de edição será implementada');
+}
+
+function excluirVeiculo(id) {
+    if (confirm('Tem certeza que deseja excluir este veículo?')) {
+        const form = document.createElement('form');
+        form.method = 'POST';
+        form.action = '/veiculos/' + id + '/excluir';
+        document.body.appendChild(form);
+        form.submit();
+    }
+}
+</script>
+{% endblock %}

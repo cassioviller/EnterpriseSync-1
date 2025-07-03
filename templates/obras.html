@@ -1,0 +1,194 @@
+{% extends "base.html" %}
+
+{% block title %}Obras - SIGE{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h1 class="h3">
+                <i class="fas fa-hard-hat"></i> Obras
+            </h1>
+            <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#obraModal">
+                <i class="fas fa-plus"></i> Nova Obra
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- Tabela de Obras -->
+<div class="card">
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table table-striped" id="obrasTable">
+                <thead>
+                    <tr>
+                        <th>Nome</th>
+                        <th>Endereço</th>
+                        <th>Início</th>
+                        <th>Previsão Fim</th>
+                        <th>Orçamento</th>
+                        <th>Status</th>
+                        <th>Responsável</th>
+                        <th>Ações</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for obra in obras %}
+                    <tr>
+                        <td>{{ obra.nome }}</td>
+                        <td>{{ obra.endereco or '-' }}</td>
+                        <td>{{ obra.data_inicio.strftime('%d/%m/%Y') if obra.data_inicio else '-' }}</td>
+                        <td>{{ obra.data_previsao_fim.strftime('%d/%m/%Y') if obra.data_previsao_fim else '-' }}</td>
+                        <td>R$ {{ '{:,.2f}'.format(obra.orcamento) }}</td>
+                        <td>
+                            {% if obra.status == 'Em andamento' %}
+                                <span class="badge bg-success">{{ obra.status }}</span>
+                            {% elif obra.status == 'Concluída' %}
+                                <span class="badge bg-primary">{{ obra.status }}</span>
+                            {% elif obra.status == 'Pausada' %}
+                                <span class="badge bg-warning">{{ obra.status }}</span>
+                            {% else %}
+                                <span class="badge bg-secondary">{{ obra.status }}</span>
+                            {% endif %}
+                        </td>
+                        <td>{{ obra.responsavel.nome if obra.responsavel else '-' }}</td>
+                        <td>
+                            <div class="btn-group btn-group-sm">
+                                <button class="btn btn-outline-primary" onclick="editarObra({{ obra.id }})">
+                                    <i class="fas fa-edit"></i>
+                                </button>
+                                <button class="btn btn-outline-info" onclick="verCustos({{ obra.id }})">
+                                    <i class="fas fa-dollar-sign"></i>
+                                </button>
+                                <button class="btn btn-outline-danger" onclick="excluirObra({{ obra.id }})">
+                                    <i class="fas fa-trash"></i>
+                                </button>
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Obra -->
+<div class="modal fade" id="obraModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="fas fa-hard-hat"></i> 
+                    <span id="modalTitle">Nova Obra</span>
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="POST" action="{{ url_for('main.nova_obra') }}" id="obraForm">
+                <div class="modal-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="nome" class="form-label">Nome *</label>
+                                <input type="text" class="form-control" id="nome" name="nome" required>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="status" class="form-label">Status</label>
+                                <select class="form-select" id="status" name="status">
+                                    <option value="Em andamento">Em andamento</option>
+                                    <option value="Concluída">Concluída</option>
+                                    <option value="Pausada">Pausada</option>
+                                    <option value="Cancelada">Cancelada</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="endereco" class="form-label">Endereço</label>
+                        <textarea class="form-control" id="endereco" name="endereco" rows="2"></textarea>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="data_inicio" class="form-label">Data de Início *</label>
+                                <input type="date" class="form-control" id="data_inicio" name="data_inicio" required>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="data_previsao_fim" class="form-label">Previsão de Fim</label>
+                                <input type="date" class="form-control" id="data_previsao_fim" name="data_previsao_fim">
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="orcamento" class="form-label">Orçamento</label>
+                                <input type="number" class="form-control" id="orcamento" name="orcamento" step="0.01" min="0">
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="responsavel_id" class="form-label">Responsável</label>
+                                <select class="form-select" id="responsavel_id" name="responsavel_id">
+                                    <option value="">Selecione...</option>
+                                    <!-- Options will be populated by JavaScript -->
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-primary">Salvar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+$(document).ready(function() {
+    // Inicializar DataTable
+    $('#obrasTable').DataTable({
+        language: {
+            url: '//cdn.datatables.net/plug-ins/1.13.6/i18n/pt-BR.json'
+        },
+        order: [[0, 'asc']],
+        pageLength: 25
+    });
+    
+    // Configurar data de início padrão
+    document.getElementById('data_inicio').valueAsDate = new Date();
+});
+
+function editarObra(id) {
+    // Implementar edição
+    alert('Funcionalidade de edição será implementada');
+}
+
+function verCustos(id) {
+    // Implementar visualização de custos
+    alert('Funcionalidade de custos será implementada');
+}
+
+function excluirObra(id) {
+    if (confirm('Tem certeza que deseja excluir esta obra?')) {
+        const form = document.createElement('form');
+        form.method = 'POST';
+        form.action = '/obras/' + id + '/excluir';
+        document.body.appendChild(form);
+        form.submit();
+    }
+}
+</script>
+{% endblock %}

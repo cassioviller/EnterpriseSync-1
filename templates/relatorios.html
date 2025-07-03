@@ -1,0 +1,519 @@
+{% extends "base.html" %}
+
+{% block title %}Relatórios - SIGE{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <h1 class="h3 mb-4">
+            <i class="fas fa-chart-bar"></i> Relatórios e Dashboards
+        </h1>
+    </div>
+</div>
+
+<!-- Filtros -->
+<div class="card mb-4">
+    <div class="card-header">
+        <h5 class="card-title mb-0">
+            <i class="fas fa-filter"></i> Filtros
+        </h5>
+    </div>
+    <div class="card-body">
+        <form id="filtrosForm">
+            <div class="row">
+                <div class="col-md-3">
+                    <div class="mb-3">
+                        <label for="data_inicio" class="form-label">Data Início</label>
+                        <input type="date" class="form-control" id="data_inicio" name="data_inicio">
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="mb-3">
+                        <label for="data_fim" class="form-label">Data Fim</label>
+                        <input type="date" class="form-control" id="data_fim" name="data_fim">
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="mb-3">
+                        <label for="obra_id" class="form-label">Obra</label>
+                        <select class="form-select" id="obra_id" name="obra_id">
+                            <option value="">Todas</option>
+                            <!-- Options will be populated by JavaScript -->
+                        </select>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="mb-3">
+                        <label for="departamento_id" class="form-label">Departamento</label>
+                        <select class="form-select" id="departamento_id" name="departamento_id">
+                            <option value="">Todos</option>
+                            <!-- Options will be populated by JavaScript -->
+                        </select>
+                    </div>
+                </div>
+            </div>
+            <div class="row">
+                <div class="col-md-12">
+                    <button type="button" class="btn btn-primary" onclick="aplicarFiltros()">
+                        <i class="fas fa-search"></i> Aplicar Filtros
+                    </button>
+                    <button type="button" class="btn btn-secondary" onclick="limparFiltros()">
+                        <i class="fas fa-times"></i> Limpar
+                    </button>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Relatórios Disponíveis -->
+<div class="row">
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-users"></i> Relatórios de Pessoal
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="list-group list-group-flush">
+                    <a href="#" class="list-group-item list-group-item-action" onclick="gerarRelatorio('funcionarios')">
+                        <i class="fas fa-list"></i> Lista de Funcionários
+                    </a>
+                    <a href="#" class="list-group-item list-group-item-action" onclick="gerarRelatorio('ponto')">
+                        <i class="fas fa-clock"></i> Relatório de Ponto
+                    </a>
+                    <a href="#" class="list-group-item list-group-item-action" onclick="gerarRelatorio('horas_extras')">
+                        <i class="fas fa-stopwatch"></i> Horas Extras
+                    </a>
+                    <a href="#" class="list-group-item list-group-item-action" onclick="gerarRelatorio('alimentacao')">
+                        <i class="fas fa-utensils"></i> Relatório de Alimentação
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-hard-hat"></i> Relatórios de Obras
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="list-group list-group-flush">
+                    <a href="#" class="list-group-item list-group-item-action" onclick="gerarRelatorio('obras')">
+                        <i class="fas fa-list"></i> Lista de Obras
+                    </a>
+                    <a href="#" class="list-group-item list-group-item-action" onclick="gerarRelatorio('custos_obra')">
+                        <i class="fas fa-dollar-sign"></i> Custos por Obra
+                    </a>
+                    <a href="#" class="list-group-item list-group-item-action" onclick="gerarRelatorio('progresso_obras')">
+                        <i class="fas fa-chart-line"></i> Progresso das Obras
+                    </a>
+                    <a href="#" class="list-group-item list-group-item-action" onclick="gerarRelatorio('rentabilidade')">
+                        <i class="fas fa-percentage"></i> Rentabilidade
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-chart-pie"></i> Relatórios Gerenciais
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="list-group list-group-flush">
+                    <a href="#" class="list-group-item list-group-item-action" onclick="gerarRelatorio('veiculos')">
+                        <i class="fas fa-truck"></i> Relatório de Veículos
+                    </a>
+                    <a href="#" class="list-group-item list-group-item-action" onclick="gerarRelatorio('fornecedores')">
+                        <i class="fas fa-truck-loading"></i> Relatório de Fornecedores
+                    </a>
+                    <a href="#" class="list-group-item list-group-item-action" onclick="gerarRelatorio('estoque')">
+                        <i class="fas fa-boxes"></i> Relatório de Estoque
+                    </a>
+                    <a href="#" class="list-group-item list-group-item-action" onclick="gerarRelatorio('dashboard_executivo')">
+                        <i class="fas fa-tachometer-alt"></i> Dashboard Executivo
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Área de Resultados -->
+<div class="card mt-4" id="resultadosCard" style="display: none;">
+    <div class="card-header">
+        <h5 class="card-title mb-0">
+            <i class="fas fa-file-alt"></i> Resultados
+        </h5>
+    </div>
+    <div class="card-body">
+        <div id="resultadosContent">
+            <!-- Conteúdo dos relatórios será inserido aqui -->
+        </div>
+    </div>
+</div>
+
+<!-- Gráficos Gerenciais -->
+<div class="row mt-4">
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-chart-line"></i> Evolução de Custos
+                </h5>
+            </div>
+            <div class="card-body">
+                <canvas id="custosChart" width="400" height="200"></canvas>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-chart-bar"></i> Produtividade por Departamento
+                </h5>
+            </div>
+            <div class="card-body">
+                <canvas id="produtividadeChart" width="400" height="200"></canvas>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row mt-4">
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-chart-pie"></i> Distribuição de Custos
+                </h5>
+            </div>
+            <div class="card-body">
+                <canvas id="distribuicaoCustosChart" width="400" height="200"></canvas>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-chart-area"></i> Horas Trabalhadas vs Extras
+                </h5>
+            </div>
+            <div class="card-body">
+                <canvas id="horasChart" width="400" height="200"></canvas>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+$(document).ready(function() {
+    // Configurar datas padrão (último mês)
+    const hoje = new Date();
+    const primeiroDiaMes = new Date(hoje.getFullYear(), hoje.getMonth(), 1);
+    
+    document.getElementById('data_inicio').valueAsDate = primeiroDiaMes;
+    document.getElementById('data_fim').valueAsDate = hoje;
+    
+    // Inicializar gráficos
+    inicializarGraficos();
+});
+
+function aplicarFiltros() {
+    const filtros = {
+        data_inicio: document.getElementById('data_inicio').value,
+        data_fim: document.getElementById('data_fim').value,
+        obra_id: document.getElementById('obra_id').value,
+        departamento_id: document.getElementById('departamento_id').value
+    };
+    
+    // Aplicar filtros aos gráficos
+    atualizarGraficos(filtros);
+}
+
+function limparFiltros() {
+    document.getElementById('filtrosForm').reset();
+    const hoje = new Date();
+    const primeiroDiaMes = new Date(hoje.getFullYear(), hoje.getMonth(), 1);
+    
+    document.getElementById('data_inicio').valueAsDate = primeiroDiaMes;
+    document.getElementById('data_fim').valueAsDate = hoje;
+    
+    aplicarFiltros();
+}
+
+function gerarRelatorio(tipo) {
+    // Mostrar loading
+    document.getElementById('resultadosCard').style.display = 'block';
+    document.getElementById('resultadosContent').innerHTML = '<div class="text-center"><i class="fas fa-spinner fa-spin"></i> Gerando relatório...</div>';
+    
+    // Simular geração de relatório
+    setTimeout(() => {
+        let conteudo = '';
+        
+        switch(tipo) {
+            case 'funcionarios':
+                conteudo = gerarRelatorioFuncionarios();
+                break;
+            case 'ponto':
+                conteudo = gerarRelatorioPonto();
+                break;
+            case 'obras':
+                conteudo = gerarRelatorioObras();
+                break;
+            case 'custos_obra':
+                conteudo = gerarRelatorioCustos();
+                break;
+            default:
+                conteudo = '<p>Relatório não implementado ainda.</p>';
+        }
+        
+        document.getElementById('resultadosContent').innerHTML = conteudo;
+    }, 1000);
+}
+
+function gerarRelatorioFuncionarios() {
+    return `
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <h6>Relatório de Funcionários</h6>
+            <button class="btn btn-sm btn-success" onclick="exportarRelatorio('funcionarios')">
+                <i class="fas fa-download"></i> Exportar
+            </button>
+        </div>
+        <div class="table-responsive">
+            <table class="table table-sm">
+                <thead>
+                    <tr>
+                        <th>Nome</th>
+                        <th>Departamento</th>
+                        <th>Função</th>
+                        <th>Salário</th>
+                        <th>Status</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td colspan="5" class="text-center text-muted">Nenhum dado disponível</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    `;
+}
+
+function gerarRelatorioPonto() {
+    return `
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <h6>Relatório de Ponto</h6>
+            <button class="btn btn-sm btn-success" onclick="exportarRelatorio('ponto')">
+                <i class="fas fa-download"></i> Exportar
+            </button>
+        </div>
+        <div class="table-responsive">
+            <table class="table table-sm">
+                <thead>
+                    <tr>
+                        <th>Funcionário</th>
+                        <th>Data</th>
+                        <th>Entrada</th>
+                        <th>Saída</th>
+                        <th>Horas Trabalhadas</th>
+                        <th>Horas Extras</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td colspan="6" class="text-center text-muted">Nenhum dado disponível</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    `;
+}
+
+function gerarRelatorioObras() {
+    return `
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <h6>Relatório de Obras</h6>
+            <button class="btn btn-sm btn-success" onclick="exportarRelatorio('obras')">
+                <i class="fas fa-download"></i> Exportar
+            </button>
+        </div>
+        <div class="table-responsive">
+            <table class="table table-sm">
+                <thead>
+                    <tr>
+                        <th>Nome</th>
+                        <th>Status</th>
+                        <th>Orçamento</th>
+                        <th>Custo Real</th>
+                        <th>Margem</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td colspan="5" class="text-center text-muted">Nenhum dado disponível</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    `;
+}
+
+function gerarRelatorioCustos() {
+    return `
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <h6>Relatório de Custos por Obra</h6>
+            <button class="btn btn-sm btn-success" onclick="exportarRelatorio('custos')">
+                <i class="fas fa-download"></i> Exportar
+            </button>
+        </div>
+        <div class="table-responsive">
+            <table class="table table-sm">
+                <thead>
+                    <tr>
+                        <th>Obra</th>
+                        <th>Mão de Obra</th>
+                        <th>Materiais</th>
+                        <th>Alimentação</th>
+                        <th>Outros</th>
+                        <th>Total</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td colspan="6" class="text-center text-muted">Nenhum dado disponível</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    `;
+}
+
+function exportarRelatorio(tipo) {
+    alert('Funcionalidade de exportação será implementada');
+}
+
+function inicializarGraficos() {
+    // Gráfico de Custos
+    const custosCtx = document.getElementById('custosChart').getContext('2d');
+    new Chart(custosCtx, {
+        type: 'line',
+        data: {
+            labels: ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun'],
+            datasets: [{
+                label: 'Custos (R$)',
+                data: [0, 0, 0, 0, 0, 0],
+                borderColor: 'rgba(54, 162, 235, 1)',
+                backgroundColor: 'rgba(54, 162, 235, 0.1)',
+                tension: 0.1
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+                y: {
+                    beginAtZero: true
+                }
+            }
+        }
+    });
+    
+    // Gráfico de Produtividade
+    const produtividadeCtx = document.getElementById('produtividadeChart').getContext('2d');
+    new Chart(produtividadeCtx, {
+        type: 'bar',
+        data: {
+            labels: ['Produção', 'Administração', 'Vendas'],
+            datasets: [{
+                label: 'Horas Trabalhadas',
+                data: [0, 0, 0],
+                backgroundColor: 'rgba(75, 192, 192, 0.8)'
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+                y: {
+                    beginAtZero: true
+                }
+            }
+        }
+    });
+    
+    // Gráfico de Distribuição de Custos
+    const distribuicaoCtx = document.getElementById('distribuicaoCustosChart').getContext('2d');
+    new Chart(distribuicaoCtx, {
+        type: 'pie',
+        data: {
+            labels: ['Mão de Obra', 'Materiais', 'Alimentação', 'Outros'],
+            datasets: [{
+                data: [0, 0, 0, 0],
+                backgroundColor: [
+                    'rgba(255, 99, 132, 0.8)',
+                    'rgba(54, 162, 235, 0.8)',
+                    'rgba(255, 205, 86, 0.8)',
+                    'rgba(75, 192, 192, 0.8)'
+                ]
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false
+        }
+    });
+    
+    // Gráfico de Horas
+    const horasCtx = document.getElementById('horasChart').getContext('2d');
+    new Chart(horasCtx, {
+        type: 'bar',
+        data: {
+            labels: ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun'],
+            datasets: [{
+                label: 'Horas Normais',
+                data: [0, 0, 0, 0, 0, 0],
+                backgroundColor: 'rgba(54, 162, 235, 0.8)'
+            }, {
+                label: 'Horas Extras',
+                data: [0, 0, 0, 0, 0, 0],
+                backgroundColor: 'rgba(255, 99, 132, 0.8)'
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+                x: {
+                    stacked: true
+                },
+                y: {
+                    stacked: true,
+                    beginAtZero: true
+                }
+            }
+        }
+    });
+}
+
+function atualizarGraficos(filtros) {
+    // Implementar atualização dos gráficos com base nos filtros
+    console.log('Atualizando gráficos com filtros:', filtros);
+}
+</script>
+{% endblock %}

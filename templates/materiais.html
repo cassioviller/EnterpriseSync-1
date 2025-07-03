@@ -1,0 +1,170 @@
+{% extends "base.html" %}
+
+{% block title %}Materiais - SIGE{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h1 class="h3">
+                <i class="fas fa-boxes"></i> Materiais
+            </h1>
+            <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#materialModal">
+                <i class="fas fa-plus"></i> Novo Material
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- Tabela de Materiais -->
+<div class="card">
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table table-striped" id="materiaisTable">
+                <thead>
+                    <tr>
+                        <th>Nome</th>
+                        <th>Descrição</th>
+                        <th>Unidade</th>
+                        <th>Preço Unitário</th>
+                        <th>Estoque Atual</th>
+                        <th>Estoque Mínimo</th>
+                        <th>Status</th>
+                        <th>Ações</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for material in materiais %}
+                    <tr>
+                        <td>{{ material.nome }}</td>
+                        <td>{{ material.descricao or '-' }}</td>
+                        <td>{{ material.unidade_medida }}</td>
+                        <td>R$ {{ '{:,.2f}'.format(material.preco_unitario) }}</td>
+                        <td>{{ material.estoque_atual }}</td>
+                        <td>{{ material.estoque_minimo }}</td>
+                        <td>
+                            {% if material.estoque_atual <= material.estoque_minimo %}
+                                <span class="badge bg-danger">Estoque Baixo</span>
+                            {% else %}
+                                <span class="badge bg-success">Normal</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <div class="btn-group btn-group-sm">
+                                <button class="btn btn-outline-primary" onclick="editarMaterial({{ material.id }})">
+                                    <i class="fas fa-edit"></i>
+                                </button>
+                                <button class="btn btn-outline-info" onclick="ajustarEstoque({{ material.id }})">
+                                    <i class="fas fa-warehouse"></i>
+                                </button>
+                                <button class="btn btn-outline-danger" onclick="excluirMaterial({{ material.id }})">
+                                    <i class="fas fa-trash"></i>
+                                </button>
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Material -->
+<div class="modal fade" id="materialModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="fas fa-boxes"></i> 
+                    <span id="modalTitle">Novo Material</span>
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="POST" action="{{ url_for('main.novo_material') }}" id="materialForm">
+                <div class="modal-body">
+                    <div class="row">
+                        <div class="col-md-8">
+                            <div class="mb-3">
+                                <label for="nome" class="form-label">Nome *</label>
+                                <input type="text" class="form-control" id="nome" name="nome" required>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="mb-3">
+                                <label for="unidade_medida" class="form-label">Unidade *</label>
+                                <input type="text" class="form-control" id="unidade_medida" name="unidade_medida" required placeholder="ex: kg, m, un">
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="descricao" class="form-label">Descrição</label>
+                        <textarea class="form-control" id="descricao" name="descricao" rows="2"></textarea>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-4">
+                            <div class="mb-3">
+                                <label for="preco_unitario" class="form-label">Preço Unitário</label>
+                                <input type="number" class="form-control" id="preco_unitario" name="preco_unitario" step="0.01" min="0">
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="mb-3">
+                                <label for="estoque_atual" class="form-label">Estoque Atual</label>
+                                <input type="number" class="form-control" id="estoque_atual" name="estoque_atual" min="0">
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="mb-3">
+                                <label for="estoque_minimo" class="form-label">Estoque Mínimo</label>
+                                <input type="number" class="form-control" id="estoque_minimo" name="estoque_minimo" min="0">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-primary">Salvar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+$(document).ready(function() {
+    // Inicializar DataTable
+    $('#materiaisTable').DataTable({
+        language: {
+            url: '//cdn.datatables.net/plug-ins/1.13.6/i18n/pt-BR.json'
+        },
+        order: [[0, 'asc']],
+        pageLength: 25
+    });
+});
+
+function editarMaterial(id) {
+    // Implementar edição
+    alert('Funcionalidade de edição será implementada');
+}
+
+function ajustarEstoque(id) {
+    // Implementar ajuste de estoque
+    alert('Funcionalidade de ajuste de estoque será implementada');
+}
+
+function excluirMaterial(id) {
+    if (confirm('Tem certeza que deseja excluir este material?')) {
+        const form = document.createElement('form');
+        form.method = 'POST';
+        form.action = '/materiais/' + id + '/excluir';
+        document.body.appendChild(form);
+        form.submit();
+    }
+}
+</script>
+{% endblock %}

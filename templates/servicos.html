@@ -1,0 +1,124 @@
+{% extends "base.html" %}
+
+{% block title %}Serviços - SIGE{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h1 class="h3">
+                <i class="fas fa-tools"></i> Serviços
+            </h1>
+            <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#servicoModal">
+                <i class="fas fa-plus"></i> Novo Serviço
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- Tabela de Serviços -->
+<div class="card">
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table table-striped" id="servicosTable">
+                <thead>
+                    <tr>
+                        <th>Nome</th>
+                        <th>Descrição</th>
+                        <th>Preço Unitário</th>
+                        <th>Criado em</th>
+                        <th>Ações</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for servico in servicos %}
+                    <tr>
+                        <td>{{ servico.nome }}</td>
+                        <td>{{ servico.descricao or '-' }}</td>
+                        <td>R$ {{ '{:,.2f}'.format(servico.preco_unitario) }}</td>
+                        <td>{{ servico.created_at.strftime('%d/%m/%Y %H:%M') if servico.created_at else '-' }}</td>
+                        <td>
+                            <div class="btn-group btn-group-sm">
+                                <button class="btn btn-outline-primary" onclick="editarServico({{ servico.id }})">
+                                    <i class="fas fa-edit"></i>
+                                </button>
+                                <button class="btn btn-outline-danger" onclick="excluirServico({{ servico.id }})">
+                                    <i class="fas fa-trash"></i>
+                                </button>
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Serviço -->
+<div class="modal fade" id="servicoModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="fas fa-tools"></i> 
+                    <span id="modalTitle">Novo Serviço</span>
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="POST" action="{{ url_for('main.novo_servico') }}" id="servicoForm">
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label for="nome" class="form-label">Nome *</label>
+                        <input type="text" class="form-control" id="nome" name="nome" required>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="descricao" class="form-label">Descrição</label>
+                        <textarea class="form-control" id="descricao" name="descricao" rows="3"></textarea>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="preco_unitario" class="form-label">Preço Unitário</label>
+                        <input type="number" class="form-control" id="preco_unitario" name="preco_unitario" step="0.01" min="0">
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-primary">Salvar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+$(document).ready(function() {
+    // Inicializar DataTable
+    $('#servicosTable').DataTable({
+        language: {
+            url: '//cdn.datatables.net/plug-ins/1.13.6/i18n/pt-BR.json'
+        },
+        order: [[0, 'asc']],
+        pageLength: 25
+    });
+});
+
+function editarServico(id) {
+    // Implementar edição
+    alert('Funcionalidade de edição será implementada');
+}
+
+function excluirServico(id) {
+    if (confirm('Tem certeza que deseja excluir este serviço?')) {
+        const form = document.createElement('form');
+        form.method = 'POST';
+        form.action = '/servicos/' + id + '/excluir';
+        document.body.appendChild(form);
+        form.submit();
+    }
+}
+</script>
+{% endblock %}

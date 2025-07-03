@@ -1,0 +1,126 @@
+{% extends "base.html" %}
+
+{% block title %}Funções - SIGE{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h1 class="h3">
+                <i class="fas fa-user-tie"></i> Funções
+            </h1>
+            <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#funcaoModal">
+                <i class="fas fa-plus"></i> Nova Função
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- Tabela de Funções -->
+<div class="card">
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table table-striped" id="funcoesTable">
+                <thead>
+                    <tr>
+                        <th>Nome</th>
+                        <th>Descrição</th>
+                        <th>Salário Base</th>
+                        <th>Funcionários</th>
+                        <th>Criado em</th>
+                        <th>Ações</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for funcao in funcoes %}
+                    <tr>
+                        <td>{{ funcao.nome }}</td>
+                        <td>{{ funcao.descricao or '-' }}</td>
+                        <td>R$ {{ '{:,.2f}'.format(funcao.salario_base) }}</td>
+                        <td>{{ funcao.funcionarios|length }}</td>
+                        <td>{{ funcao.created_at.strftime('%d/%m/%Y %H:%M') if funcao.created_at else '-' }}</td>
+                        <td>
+                            <div class="btn-group btn-group-sm">
+                                <button class="btn btn-outline-primary" onclick="editarFuncao({{ funcao.id }})">
+                                    <i class="fas fa-edit"></i>
+                                </button>
+                                <button class="btn btn-outline-danger" onclick="excluirFuncao({{ funcao.id }})">
+                                    <i class="fas fa-trash"></i>
+                                </button>
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Função -->
+<div class="modal fade" id="funcaoModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="fas fa-user-tie"></i> 
+                    <span id="modalTitle">Nova Função</span>
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="POST" action="{{ url_for('main.nova_funcao') }}" id="funcaoForm">
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label for="nome" class="form-label">Nome *</label>
+                        <input type="text" class="form-control" id="nome" name="nome" required>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="descricao" class="form-label">Descrição</label>
+                        <textarea class="form-control" id="descricao" name="descricao" rows="3"></textarea>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="salario_base" class="form-label">Salário Base</label>
+                        <input type="number" class="form-control" id="salario_base" name="salario_base" step="0.01" min="0">
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-primary">Salvar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+$(document).ready(function() {
+    // Inicializar DataTable
+    $('#funcoesTable').DataTable({
+        language: {
+            url: '//cdn.datatables.net/plug-ins/1.13.6/i18n/pt-BR.json'
+        },
+        order: [[0, 'asc']],
+        pageLength: 25
+    });
+});
+
+function editarFuncao(id) {
+    // Implementar edição
+    alert('Funcionalidade de edição será implementada');
+}
+
+function excluirFuncao(id) {
+    if (confirm('Tem certeza que deseja excluir esta função?')) {
+        const form = document.createElement('form');
+        form.method = 'POST';
+        form.action = '/funcoes/' + id + '/excluir';
+        document.body.appendChild(form);
+        form.submit();
+    }
+}
+</script>
+{% endblock %}

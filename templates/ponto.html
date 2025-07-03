@@ -1,0 +1,255 @@
+{% extends "base.html" %}
+
+{% block title %}Ponto - SIGE{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h1 class="h3">
+                <i class="fas fa-clock"></i> Controle de Ponto
+            </h1>
+            <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#pontoModal">
+                <i class="fas fa-plus"></i> Novo Registro
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- Cartão de Registro Rápido -->
+<div class="card mb-4">
+    <div class="card-header">
+        <h5 class="card-title mb-0">
+            <i class="fas fa-stopwatch"></i> Registro Rápido
+        </h5>
+    </div>
+    <div class="card-body">
+        <div class="row">
+            <div class="col-md-6">
+                <div class="d-flex align-items-center mb-3">
+                    <i class="fas fa-clock fa-2x text-primary me-3"></i>
+                    <div>
+                        <h4 class="mb-0" id="currentTime">--:--:--</h4>
+                        <p class="text-muted mb-0" id="currentDate">-- de ------ de ----</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="d-grid gap-2">
+                    <button class="btn btn-success" onclick="registrarPonto('entrada')">
+                        <i class="fas fa-sign-in-alt"></i> Entrada
+                    </button>
+                    <button class="btn btn-warning" onclick="registrarPonto('saida_almoco')">
+                        <i class="fas fa-utensils"></i> Saída Almoço
+                    </button>
+                    <button class="btn btn-info" onclick="registrarPonto('retorno_almoco')">
+                        <i class="fas fa-arrow-left"></i> Retorno Almoço
+                    </button>
+                    <button class="btn btn-danger" onclick="registrarPonto('saida')">
+                        <i class="fas fa-sign-out-alt"></i> Saída
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Tabela de Registros -->
+<div class="card">
+    <div class="card-header">
+        <h5 class="card-title mb-0">
+            <i class="fas fa-history"></i> Registros Recentes
+        </h5>
+    </div>
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table table-striped" id="pontoTable">
+                <thead>
+                    <tr>
+                        <th>Funcionário</th>
+                        <th>Data</th>
+                        <th>Entrada</th>
+                        <th>Saída Almoço</th>
+                        <th>Retorno Almoço</th>
+                        <th>Saída</th>
+                        <th>Horas Trabalhadas</th>
+                        <th>Horas Extras</th>
+                        <th>Obra</th>
+                        <th>Ações</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for registro in registros %}
+                    <tr>
+                        <td>{{ registro.funcionario_ref.nome }}</td>
+                        <td>{{ registro.data.strftime('%d/%m/%Y') }}</td>
+                        <td>{{ registro.hora_entrada.strftime('%H:%M') if registro.hora_entrada else '-' }}</td>
+                        <td>{{ registro.hora_almoco_saida.strftime('%H:%M') if registro.hora_almoco_saida else '-' }}</td>
+                        <td>{{ registro.hora_almoco_retorno.strftime('%H:%M') if registro.hora_almoco_retorno else '-' }}</td>
+                        <td>{{ registro.hora_saida.strftime('%H:%M') if registro.hora_saida else '-' }}</td>
+                        <td>{{ '{:.2f}h'.format(registro.horas_trabalhadas) if registro.horas_trabalhadas else '-' }}</td>
+                        <td>
+                            {% if registro.horas_extras and registro.horas_extras > 0 %}
+                                <span class="badge bg-warning">{{ '{:.2f}h'.format(registro.horas_extras) }}</span>
+                            {% else %}
+                                -
+                            {% endif %}
+                        </td>
+                        <td>{{ registro.obra_ref.nome if registro.obra_ref else '-' }}</td>
+                        <td>
+                            <div class="btn-group btn-group-sm">
+                                <button class="btn btn-outline-primary" onclick="editarRegistro({{ registro.id }})">
+                                    <i class="fas fa-edit"></i>
+                                </button>
+                                <button class="btn btn-outline-danger" onclick="excluirRegistro({{ registro.id }})">
+                                    <i class="fas fa-trash"></i>
+                                </button>
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Registro de Ponto -->
+<div class="modal fade" id="pontoModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="fas fa-clock"></i> 
+                    <span id="modalTitle">Novo Registro de Ponto</span>
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="POST" action="{{ url_for('main.novo_ponto') }}" id="pontoForm">
+                <div class="modal-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="funcionario_id" class="form-label">Funcionário *</label>
+                                <select class="form-select" id="funcionario_id" name="funcionario_id" required>
+                                    <option value="">Selecione...</option>
+                                    <!-- Options will be populated by JavaScript -->
+                                </select>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="obra_id" class="form-label">Obra</label>
+                                <select class="form-select" id="obra_id" name="obra_id">
+                                    <option value="">Selecione...</option>
+                                    <!-- Options will be populated by JavaScript -->
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="data" class="form-label">Data *</label>
+                        <input type="date" class="form-control" id="data" name="data" required>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="hora_entrada" class="form-label">Hora de Entrada</label>
+                                <input type="time" class="form-control" id="hora_entrada" name="hora_entrada">
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="hora_saida" class="form-label">Hora de Saída</label>
+                                <input type="time" class="form-control" id="hora_saida" name="hora_saida">
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="hora_almoco_saida" class="form-label">Saída para Almoço</label>
+                                <input type="time" class="form-control" id="hora_almoco_saida" name="hora_almoco_saida">
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="hora_almoco_retorno" class="form-label">Retorno do Almoço</label>
+                                <input type="time" class="form-control" id="hora_almoco_retorno" name="hora_almoco_retorno">
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="observacoes" class="form-label">Observações</label>
+                        <textarea class="form-control" id="observacoes" name="observacoes" rows="2"></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-primary">Salvar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+$(document).ready(function() {
+    // Inicializar DataTable
+    $('#pontoTable').DataTable({
+        language: {
+            url: '//cdn.datatables.net/plug-ins/1.13.6/i18n/pt-BR.json'
+        },
+        order: [[1, 'desc']],
+        pageLength: 25
+    });
+    
+    // Configurar data padrão
+    document.getElementById('data').valueAsDate = new Date();
+    
+    // Atualizar relógio
+    updateClock();
+    setInterval(updateClock, 1000);
+});
+
+function updateClock() {
+    const now = new Date();
+    const timeString = now.toLocaleTimeString('pt-BR');
+    const dateString = now.toLocaleDateString('pt-BR', { 
+        weekday: 'long', 
+        year: 'numeric', 
+        month: 'long', 
+        day: 'numeric' 
+    });
+    
+    document.getElementById('currentTime').textContent = timeString;
+    document.getElementById('currentDate').textContent = dateString;
+}
+
+function registrarPonto(tipo) {
+    // Implementar registro rápido
+    alert('Funcionalidade de registro rápido será implementada');
+}
+
+function editarRegistro(id) {
+    // Implementar edição
+    alert('Funcionalidade de edição será implementada');
+}
+
+function excluirRegistro(id) {
+    if (confirm('Tem certeza que deseja excluir este registro?')) {
+        const form = document.createElement('form');
+        form.method = 'POST';
+        form.action = '/ponto/' + id + '/excluir';
+        document.body.appendChild(form);
+        form.submit();
+    }
+}
+</script>
+{% endblock %}
