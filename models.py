@@ -132,6 +132,11 @@ class RegistroAlimentacao(db.Model):
     valor = db.Column(db.Float, nullable=False)
     observacoes = db.Column(db.Text)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    
+    # Relacionamentos
+    funcionario_ref = db.relationship('Funcionario')
+    obra_ref = db.relationship('Obra')
+    restaurante_ref = db.relationship('Restaurante')
 
 class Ocorrencia(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -253,7 +258,7 @@ class Restaurante(db.Model):
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     
     # Relacionamentos
-    registros_alimentacao = db.relationship('RegistroAlimentacao', backref='restaurante_ref', lazy=True)
+    registros_alimentacao = db.relationship('RegistroAlimentacao', lazy=True)
     
     def __repr__(self):
         return f'<Restaurante {self.nome}>'
