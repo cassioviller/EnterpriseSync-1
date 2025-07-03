@@ -405,6 +405,38 @@ def editar_obra(id):
     
     return render_template('obras.html', form=form, obra=obra, obras=Obra.query.all())
 
+@main_bp.route('/obra/<int:id>')
+@login_required
+def detalhes_obra(id):
+    obra = Obra.query.get_or_404(id)
+    
+    # Buscar RDOs da obra
+    rdos_recentes = RDO.query.filter_by(obra_id=id).order_by(RDO.data_relatorio.desc()).limit(5).all()
+    total_rdos = RDO.query.filter_by(obra_id=id).count()
+    rdos_finalizados = RDO.query.filter_by(obra_id=id, status='Finalizado').count()
+    
+    # Calcular progresso (pode ser mais sofisticado baseado nas atividades)
+    progresso_obra = 0
+    if total_rdos > 0:
+        progresso_obra = min(100, (rdos_finalizados / total_rdos) * 100)
+    
+    # Calcular dias
+    from datetime import datetime, date
+    hoje = date.today()
+    dias_decorridos = (hoje - obra.data_inicio).days
+    dias_restantes = 0
+    if obra.data_previsao_fim:
+        dias_restantes = max(0, (obra.data_previsao_fim - hoje).days)
+    
+    return render_template('obras/detalhes_obra.html', 
+                         obra=obra,
+                         rdos_recentes=rdos_recentes,
+                         total_rdos=total_rdos,
+                         rdos_finalizados=rdos_finalizados,
+                         progresso_obra=int(progresso_obra),
+                         dias_decorridos=dias_decorridos,
+                         dias_restantes=dias_restantes)
+
 @main_bp.route('/obras/<int:id>/excluir', methods=['POST'])
 @login_required
 def excluir_obra(id):
@@ -1044,7 +1076,8 @@ def lista_rdos():
 def novo_rdo(obra_id=None):
     """Criar novo RDO"""
     from forms import RDOForm
-    from models import Obra
+    from models import Obra, Funcionario
+    import json
     
     form = RDOForm()
     
@@ -1055,7 +1088,25 @@ def novo_rdo(obra_id=None):
     if obra_id:
         form.obra_id.data = obra_id
     
-    return render_template('rdo/formulario_rdo.html', form=form, modo='criar')
+    # Preparar dados para JavaScript
+    funcionarios = [
+        {'id': f.id, 'nome': f.nome, 'funcao': f.funcao.nome if f.funcao else 'Sem função'}
+        for f in Funcionario.query.filter_by(ativo=True).all()
+    ]
+    
+    obras = [
+        {'id': o.id, 'nome': o.nome}
+        for o in Obra.query.all()
+    ]
+    
+    funcionarios_json = json.dumps(funcionarios)
+    obras_json = json.dumps(obras)
+    
+    return render_template('rdo/formulario_rdo.html', 
+                         form=form, 
+                         modo='criar',
+                         funcionarios_json=funcionarios_json,
+                         obras_json=obras_json)
 
 
 @main_bp.route('/rdo/criar', methods=['POST'])

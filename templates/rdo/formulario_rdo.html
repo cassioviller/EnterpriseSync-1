@@ -220,10 +220,9 @@ let contadorEquipamentos = 0;
 let contadorAtividades = 0;
 let contadorOcorrencias = 0;
 
-// Dados dos funcionários (será preenchido pelo backend)
-const funcionarios = [
-    // Este array será preenchido dinamicamente pelo backend
-];
+// Dados dos funcionários para autocompletar
+const funcionarios = {{ funcionarios_json|safe }};
+const obras = {{ obras_json|safe }};
 
 function adicionarMaoObra() {
     contadorMaoObra++;
@@ -241,7 +240,6 @@ function adicionarMaoObra() {
                     <label class="form-label">Funcionário</label>
                     <select class="form-select" name="mao_obra_funcionario_${contadorMaoObra}" required>
                         <option value="">Selecione...</option>
-                        <!-- Opções serão preenchidas dinamicamente -->
                     </select>
                 </div>
                 <div class="col-md-4">
@@ -256,6 +254,16 @@ function adicionarMaoObra() {
         </div>
     `;
     container.insertAdjacentHTML('beforeend', html);
+    
+    // Popular o dropdown de funcionários
+    const selectFuncionario = document.querySelector(`select[name="mao_obra_funcionario_${contadorMaoObra}"]`);
+    funcionarios.forEach(funcionario => {
+        const option = document.createElement('option');
+        option.value = funcionario.id;
+        option.textContent = funcionario.nome;
+        selectFuncionario.appendChild(option);
+    });
+    
     document.getElementById('mao-obra-vazio').style.display = 'none';
 }
 
