@@ -17,6 +17,12 @@ def dashboard():
     total_obras = Obra.query.filter(Obra.status.in_(['Em andamento', 'Pausada'])).count()
     total_veiculos = Veiculo.query.count()
     
+    # Custos do mês atual
+    primeiro_dia_mes = date.today().replace(day=1)
+    custos_mes = db.session.query(func.sum(CustoObra.valor)).filter(
+        CustoObra.data >= primeiro_dia_mes
+    ).scalar() or 0
+    
     # Obras em andamento
     obras_andamento = Obra.query.filter_by(status='Em andamento').limit(5).all()
     
@@ -38,6 +44,7 @@ def dashboard():
                          total_funcionarios=total_funcionarios,
                          total_obras=total_obras,
                          total_veiculos=total_veiculos,
+                         custos_mes=custos_mes,
                          obras_andamento=obras_andamento,
                          funcionarios_dept=funcionarios_dept,
                          custos_recentes=custos_recentes)

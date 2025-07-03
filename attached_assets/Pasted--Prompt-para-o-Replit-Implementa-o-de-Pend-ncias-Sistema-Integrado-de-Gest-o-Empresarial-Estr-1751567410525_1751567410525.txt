@@ -1,0 +1,227 @@
+# Prompt para o Replit: Implementação de Pendências - Sistema Integrado de Gestão Empresarial - Estruturas do Vale
+
+Este prompt tem como objetivo guiar a implementação das funcionalidades pendentes no Sistema Integrado de Gestão Empresarial (SIGE) 'Estruturas do Vale' no Replit. As instruções são focadas no que precisa ser adicionado ou aprimorado em cada página, sem repetir o que já foi desenvolvido. As seções de Fornecedores, Clientes e Materiais devem ser **ignoradas**.
+
+## Instruções de Implementação por Página
+
+### 1. Dashboard
+
+*   **Dados Dinâmicos**: Implemente a lógica para que todos os cards de KPIs (Funcionários Ativos, Obras Ativas, Veículos, Custos do Mês) sejam alimentados dinamicamente com dados do banco de dados.
+*   **Gráfico de Funcionários por Departamento**: Desenvolva o gráfico de pizza ou barras para exibir a distribuição de funcionários por departamento, utilizando dados do banco de dados.
+*   **Gráfico de Custos por Obra**: Crie o gráfico de barras para comparar os custos totais de cada obra ativa, buscando os dados no banco.
+*   **Lista de Obras em Andamento**: Popule a lista com as obras que possuem o status "Em Andamento", exibindo nome, responsável e percentual de conclusão (se disponível).
+*   **Lista de Custos Recentes**: Implemente a exibição das últimas 5-10 despesas registradas no sistema (independentemente do tipo: obra, alimentação, veículo), mostrando data, valor e descrição.
+*   **Interatividade**: Adicione funcionalidade para que os cards e gráficos sejam clicáveis, redirecionando o usuário para as respectivas seções de relatórios ou cadastros para mais detalhes.
+
+### 2. Cadastros
+
+#### 2.1. Funcionários
+
+*   **Preenchimento de Dropdowns**: Implemente a lógica para que os campos "Departamento" e "Função" no formulário de funcionário sejam preenchidos dinamicamente com dados dos cadastros de Departamentos e Funções.
+*   **Validações de Campo**: Adicione validações de frontend e backend para CPF (formato e unicidade), Email (formato e unicidade) e datas (formato válido).
+*   **Campo de Foto**: Inclua um campo para upload e gerenciamento da foto do colaborador no formulário de funcionário. Isso deve envolver:
+    *   Um botão para upload de imagem.
+    *   Visualização da imagem carregada.
+    *   Validações de tipo e tamanho de arquivo.
+    *   Armazenamento seguro do caminho da imagem no banco de dados.
+*   **Ações na Tabela**: Adicione ícones ou botões na coluna "Ações" da tabela de funcionários para:
+    *   **Editar**: Abrir o formulário modal com os dados do funcionário para edição.
+    *   **Excluir**: Remover o registro do funcionário (com confirmação).
+    *   **Visualizar Detalhes/Perfil**: Crie um link para uma página de perfil individual do funcionário (a ser desenvolvida no módulo avançado de RH).
+*   **Filtros Avançados**: Adicione filtros por Departamento, Função e Status (Ativo/Inativo) na listagem de funcionários.
+*   **Ordenação**: Implemente a funcionalidade de ordenação da tabela clicando nos cabeçalhos das colunas (Nome, CPF, Departamento, Função, Salário, Status).
+
+#### 2.2. Departamentos
+
+*   **Validações de Campo**: Adicione validação para o Nome do departamento (unicidade).
+*   **Ações na Tabela**: Adicione ícones ou botões na coluna "Ações" da tabela de departamentos para:
+    *   **Editar**: Abrir o formulário modal com os dados do departamento para edição.
+    *   **Excluir**: Remover o registro do departamento (com confirmação). Implemente a lógica para impedir a exclusão se houver funcionários associados, ou forneça um aviso e opção de realocação.
+*   **Ordenação**: Implemente a ordenação da tabela clicando nos cabeçalhos das colunas (Nome, Descrição).
+
+#### 2.3. Funções
+
+*   **Validações de Campo**: Adicione validação para o Nome da função (unicidade) e Salário Base (numérico).
+*   **Ações na Tabela**: Adicione ícones ou botões na coluna "Ações" da tabela de funções para:
+    *   **Editar**: Abrir o formulário modal com os dados da função para edição.
+    *   **Excluir**: Remover o registro da função (com confirmação). Implemente a lógica para impedir a exclusão se houver funcionários associados, ou forneça um aviso e opção de realocação.
+*   **Ordenação**: Implemente a ordenação da tabela clicando nos cabeçalhos das colunas (Nome, Descrição, Salário Base).
+
+#### 2.4. Obras
+
+*   **Preenchimento de Dropdowns/Autocomplete**: Implemente o preenchimento dinâmico do campo "Responsável" no formulário de obra com dados dos funcionários, utilizando autocomplete.
+*   **Validações de Campo**: Adicione validações para datas (formato válido, data de início anterior à previsão de término) e Orçamento (numérico).
+*   **Ações na Tabela**: Adicione ícones ou botões na coluna "Ações" da tabela de obras para:
+    *   **Editar**: Abrir o formulário modal com os dados da obra para edição.
+    *   **Excluir**: Remover o registro da obra (com confirmação). Implemente a lógica para impedir a exclusão se houver despesas ou receitas associadas.
+    *   **Visualizar Detalhes/Acompanhamento**: Crie um link para uma página de detalhes da obra, onde se possa ver o acompanhamento físico-financeiro, despesas, receitas, alocação de recursos, etc.
+*   **Filtros Avançados**: Adicione filtros por Status e Responsável na listagem de obras.
+*   **Ordenação**: Implemente a ordenação da tabela clicando nos cabeçalhos das colunas (Nome, Início, Previsão Fim, Orçamento, Status).
+
+#### 2.5. Veículos
+
+*   **Validações de Campo**: Adicione validações para Placa (formato e unicidade), Ano de Fabricação (numérico, ano válido) e KM Atual (numérico).
+*   **Ações na Tabela**: Adicione ícones ou botões na coluna "Ações" da tabela de veículos para:
+    *   **Editar**: Abrir o formulário modal com os dados do veículo para edição.
+    *   **Excluir**: Remover o registro do veículo (com confirmação). Implemente a lógica para impedir a exclusão se houver histórico de manutenção, abastecimento ou multas.
+    *   **Visualizar Detalhes/Histórico**: Crie um link para uma página de detalhes do veículo, onde se possa ver o histórico de manutenção, abastecimentos, multas, alocação, etc.
+*   **Filtros Avançados**: Adicione filtros por Tipo de Veículo e Status na listagem de veículos.
+*   **Ordenação**: Implemente a ordenação da tabela clicando nos cabeçalhos das colunas (Placa, Marca/Modelo, Ano, KM Atual, Status, Próxima Manutenção).
+
+#### 2.6. Serviços
+
+*   **Página de Listagem e Formulário**: Crie a página de listagem de serviços com tabela, paginação, pesquisa e botão "+ Novo Serviço". Implemente o formulário modal para adicionar/editar serviços (Nome, Descrição, Preço Unitário).
+*   **Validações de Campo**: Adicione validação para o Nome (unicidade) e Preço Unitário (numérico, maior que zero).
+*   **Ações na Tabela**: Adicione ícones ou botões na coluna "Ações" para Editar e Excluir (com confirmação e lógica para impedir exclusão se associado a despesas de obras).
+*   **Ordenação**: Implemente a ordenação da tabela clicando nos cabeçalhos das colunas (Nome, Preço Unitário).
+
+#### 2.7. Unidades de Medida
+
+*   **Página de Listagem e Formulário**: Crie a página de listagem de unidades de medida com tabela, paginação, pesquisa e botão "+ Nova Unidade de Medida". Implemente o formulário modal para adicionar/editar unidades de medida (Nome, Símbolo).
+*   **Validações de Campo**: Adicione validação para o Nome e Símbolo (unicidade).
+*   **Ações na Tabela**: Adicione ícones ou botões na coluna "Ações" para Editar e Excluir (com confirmação e lógica para impedir exclusão se associado a materiais - *Nota: Materiais foram excluídos, mas a lógica de dependência pode ser adaptada para outros módulos se necessário*).
+*   **Ordenação**: Implemente a ordenação da tabela clicando nos cabeçalhos das colunas (Nome, Símbolo).
+
+#### 2.8. Centros de Custo
+
+*   **Página de Listagem e Formulário**: Crie a página de listagem de centros de custo com tabela, paginação, pesquisa e botão "+ Novo Centro de Custo". Implemente o formulário modal para adicionar/editar centros de custo (Nome, Descrição).
+*   **Validações de Campo**: Adicione validação para o Nome (unicidade).
+*   **Ações na Tabela**: Adicione ícones ou botões na coluna "Ações" para Editar e Excluir (com confirmação e lógica para impedir exclusão se associado a despesas).
+*   **Ordenação**: Implemente a ordenação da tabela clicando nos cabeçalhos das colunas (Nome, Descrição).
+
+#### 2.9. Contas Contábeis
+
+*   **Página de Listagem e Formulário**: Crie a página de listagem de contas contábeis com tabela, paginação, pesquisa e botão "+ Nova Conta Contábil". Implemente o formulário modal para adicionar/editar contas contábeis (Número da Conta, Nome, Tipo).
+*   **Validações de Campo**: Adicione validação para o Número da Conta (unicidade).
+*   **Ações na Tabela**: Adicione ícones ou botões na coluna "Ações" para Editar e Excluir (com confirmação e lógica para impedir exclusão se associado a despesas ou receitas).
+*   **Ordenação**: Implemente a ordenação da tabela clicando nos cabeçalhos das colunas (Número da Conta, Nome, Tipo).
+
+#### 2.10. Tipos de Documento
+
+*   **Página de Listagem e Formulário**: Crie a página de listagem de tipos de documento com tabela, paginação, pesquisa e botão "+ Novo Tipo de Documento". Implemente o formulário modal para adicionar/editar tipos de documento (Nome, Descrição).
+*   **Validações de Campo**: Adicione validação para o Nome (unicidade).
+*   **Ações na Tabela**: Adicione ícones ou botões na coluna "Ações" para Editar e Excluir (com confirmação e lógica para impedir exclusão se associado a despesas ou receitas).
+*   **Ordenação**: Implemente a ordenação da tabela clicando nos cabeçalhos das colunas (Nome, Descrição).
+
+#### 2.11. Métodos de Pagamento
+
+*   **Página de Listagem e Formulário**: Crie a página de listagem de métodos de pagamento com tabela, paginação, pesquisa e botão "+ Novo Método de Pagamento". Implemente o formulário modal para adicionar/editar métodos de pagamento (Nome, Descrição).
+*   **Validações de Campo**: Adicione validação para o Nome (unicidade).
+*   **Ações na Tabela**: Adicione ícones ou botões na coluna "Ações" para Editar e Excluir (com confirmação e lógica para impedir exclusão se associado a receitas).
+*   **Ordenação**: Implemente a ordenação da tabela clicando nos cabeçalhos das colunas (Nome, Descrição).
+
+#### 2.12. Condições de Pagamento
+
+*   **Página de Listagem e Formulário**: Crie a página de listagem de condições de pagamento com tabela, paginação, pesquisa e botão "+ Nova Condição de Pagamento". Implemente o formulário modal para adicionar/editar condições de pagamento (Nome, Descrição, Número de Parcelas).
+*   **Validações de Campo**: Adicione validação para o Nome (unicidade) e Número de Parcelas (numérico, maior ou igual a 1).
+*   **Ações na Tabela**: Adicione ícones ou botões na coluna "Ações" para Editar e Excluir (com confirmação e lógica para impedir exclusão se associado a receitas).
+*   **Ordenação**: Implemente a ordenação da tabela clicando nos cabeçalhos das colunas (Nome, Número de Parcelas).
+
+#### 2.13. Bancos
+
+*   **Página de Listagem e Formulário**: Crie a página de listagem de bancos com tabela, paginação, pesquisa e botão "+ Novo Banco". Implemente o formulário modal para adicionar/editar bancos (Nome, Código).
+*   **Validações de Campo**: Adicione validação para o Nome e Código (unicidade).
+*   **Ações na Tabela**: Adicione ícones ou botões na coluna "Ações" para Editar e Excluir (com confirmação e lógica para impedir exclusão se houver agências ou contas bancárias associadas).
+*   **Ordenação**: Implemente a ordenação da tabela clicando nos cabeçalhos das colunas (Nome, Código).
+
+#### 2.14. Agências
+
+*   **Página de Listagem e Formulário**: Crie a página de listagem de agências com tabela, paginação, pesquisa e botão "+ Nova Agência". Implemente o formulário modal para adicionar/editar agências (Número, Nome, Banco Associado).
+*   **Validações de Campo**: Adicione validação para o Número (unicidade dentro do mesmo banco).
+*   **Ações na Tabela**: Adicione ícones ou botões na coluna "Ações" para Editar e Excluir (com confirmação e lógica para impedir exclusão se houver contas bancárias associadas).
+*   **Ordenação**: Implemente a ordenação da tabela clicando nos cabeçalhos das colunas (Número, Nome, Banco Associado).
+
+#### 2.15. Contas Bancárias
+
+*   **Página de Listagem e Formulário**: Crie a página de listagem de contas bancárias com tabela, paginação, pesquisa e botão "+ Nova Conta Bancária". Implemente o formulário modal para adicionar/editar contas bancárias (Número da Conta, Agência Associada, Banco Associado, Tipo de Conta, Saldo Inicial).
+*   **Validações de Campo**: Adicione validação para o Número da Conta (unicidade) e Saldo Inicial (numérico).
+*   **Ações na Tabela**: Adicione ícones ou botões na coluna "Ações" para Editar e Excluir (com confirmação e lógica para impedir exclusão se associado a receitas).
+*   **Ordenação**: Implemente a ordenação da tabela clicando nos cabeçalhos das colunas (Número da Conta, Tipo de Conta, Saldo Inicial).
+
+### 3. Ponto
+
+#### 3.1. Controle de Ponto (Registro Rápido)
+
+*   **Funcionalidade dos Botões de Registro Rápido**: Implemente a lógica para que, ao clicar nos botões (Entrada, Saída Almoço, Retorno Almoço, Saída), o sistema registre automaticamente o ponto para o funcionário logado (ou selecionado, se for um terminal compartilhado) com a data e hora atuais.
+*   **Validações de Registro Rápido**: Garanta que um funcionário não possa registrar duas entradas consecutivas, ou uma saída antes de uma entrada, etc.
+*   **Preenchimento Automático do Formulário Manual**: Ao abrir o formulário "Novo Registro", a data deve vir preenchida com a data atual. Os campos de hora devem ser preenchidos com a hora atual ou permitir a seleção manual.
+*   **Autocomplete de Funcionário e Obra**: O campo "Funcionário" e "Obra" no formulário manual devem usar autocomplete para facilitar a seleção.
+*   **Cálculo de Horas**: A tabela de registros recentes deve exibir as "Horas Trabalhadas" e "Horas Extras" calculadas automaticamente com base nos registros de ponto.
+*   **Ações na Tabela de Registros Recentes**: Adicione ícones ou botões na coluna "Ações" para:
+    *   **Editar**: Abrir o formulário modal com os dados do registro de ponto para correção (com justificativa).
+    *   **Excluir**: Remover o registro de ponto (com confirmação).
+*   **Filtros Avançados**: Adicione filtros por Funcionário, Obra e Período na tabela de registros recentes.
+
+#### 3.2. Registros de Ponto (Gestão)
+
+*   **Página de Gestão Aprofundada**: Crie uma página (ou estenda a anterior) para gestão aprofundada dos registros de ponto, com:
+    *   **Listagem Completa**: Exibir todos os registros de ponto, com filtros avançados por funcionário, data, tipo de registro, status (aprovado/pendente).
+    *   **Edição e Aprovação**: Interface para que administradores possam editar registros (com justificativa e histórico de alterações) e aprovar/rejeitar alterações ou ocorrências.
+    *   **Relatórios de Ponto**: Geração de relatórios de horas trabalhadas, horas extras, faltas e atrasos por funcionário e período.
+
+#### 3.3. Ocorrências
+
+*   **Página de Gerenciamento de Ocorrências**: Crie a página para listar e gerenciar ocorrências, com:
+    *   **Listagem de Ocorrências**: Tabela com colunas para Funcionário, Tipo de Ocorrência, Data Início, Data Fim, Descrição, Status e Anexo.
+    *   **Formulário de Cadastro/Edição**: Campos para Funcionário (autocomplete), Tipo de Ocorrência (dropdown), Data Início e Data Fim, Descrição, Status (Pendente, Aprovada, Rejeitada), Upload de Anexo.
+    *   **Ações na Tabela**: Editar, Excluir, Visualizar Anexo, Alterar Status.
+*   **Cadastro de Tipos de Ocorrência**: Crie uma sub-página ou modal para gerenciar os tipos de ocorrência (Nome, Descrição).
+
+### 4. Alimentação
+
+#### 4.1. Controle de Alimentação
+
+*   **Dados Dinâmicos**: Implemente a lógica para que todos os cards de KPIs (Total do Mês, Registros Hoje, Média Diária, Funcionários) sejam alimentados dinamicamente com dados do banco de dados.
+*   **Preenchimento de Dropdowns/Autocomplete**: Os campos "Funcionário" e "Obra" no formulário de registro de alimentação devem ser preenchidos dinamicamente com dados dos respectivos cadastros, utilizando autocomplete.
+*   **Validações de Campo**: Adicione validações para Valor (numérico, maior que zero) e Data (formato válido).
+*   **Ações na Tabela**: Adicione ícones ou botões na coluna "Ações" da tabela de registros de alimentação para:
+    *   **Editar**: Abrir o formulário modal com os dados do registro para edição.
+    *   **Excluir**: Remover o registro (com confirmação).
+*   **Filtros Avançados**: Adicione filtros por Funcionário, Obra, Tipo e Período na listagem de registros de alimentação.
+*   **Ordenação**: Implemente a ordenação da tabela clicando nos cabeçalhos das colunas (Funcionário, Data, Tipo, Valor).
+
+### 5. Relatórios e Dashboards
+
+#### 5.1. Relatórios e Dashboards (Visão Geral)
+
+*   **Implementação dos Filtros Globais**: Garanta que os filtros de Data Início, Data Fim, Obra e Departamento funcionem corretamente, aplicando-se a todos os relatórios e gráficos da página. Implemente a persistência dos filtros.
+*   **Preenchimento de Dropdowns/Autocomplete**: Os campos "Obra" e "Departamento" nos filtros devem ser preenchidos dinamicamente com dados dos respectivos cadastros, utilizando autocomplete.
+*   **Relatórios de Pessoal**: Implemente os relatórios detalhados:
+    *   **Lista de Funcionários**: Uma listagem completa dos funcionários, com opção de exportação.
+    *   **Relatório de Ponto**: Detalhamento dos registros de ponto por funcionário e período, incluindo horas trabalhadas, horas extras, faltas e atrasos.
+    *   **Horas Extras**: Relatório específico de horas extras por funcionário, com totalização e custos associados.
+    *   **Relatório de Alimentação**: Consolidação dos gastos com alimentação por funcionário, obra ou período.
+*   **Relatórios de Obras**: Implemente os relatórios detalhados:
+    *   **Lista de Obras**: Listagem completa das obras, com seus status e informações básicas.
+    *   **Custos por Obra**: Relatório detalhado de todas as despesas associadas a cada obra, permitindo a visualização do custo real.
+    *   **Progresso das Obras**: Relatório ou dashboard visual do progresso físico e financeiro das obras.
+    *   **Rentabilidade**: Análise da rentabilidade de cada obra, comparando receitas e despesas.
+*   **Relatórios Gerenciais**: Implemente o relatório detalhado:
+    *   **Relatório de Veículos**: Consolidação de dados sobre a frota, incluindo custos de manutenção, abastecimento, multas e alocação.
+    *   **Remoção de 'Dashboard Estoque'**: Certifique-se de que esta seção seja removida da interface.
+*   **Implementação dos Gráficos**: Todos os gráficos devem ser dinâmicos e interativos, refletindo os dados filtrados:
+    *   **Evolução de Custos**: Gráfico de linha mostrando a evolução dos custos totais ao longo do tempo, com drill-down por categoria de custo.
+    *   **Produtividade por Departamento**: Gráfico de barras comparando a produtividade entre departamentos (se métricas de produtividade forem implementadas).
+    *   **Distribuição de Custos**: Gráfico de pizza ou barras mostrando a proporção dos custos por categoria (Mão de Obra, Alimentação, Outros).
+    *   **Horas Trabalhadas vs Extras**: Gráfico de linha comparando as horas normais e extras ao longo do tempo.
+*   **Exportação de Relatórios**: Adicione a opção de exportação para formatos comuns (CSV, PDF, Excel) para todos os relatórios.
+
+#### 5.2. Relatórios Avançados de Gestão de Pessoas (Módulo RH Avançado)
+
+*   **Dashboard Geral de RH**: Crie uma página dedicada com:
+    *   **KPIs Obrigatórios**: Colaboradores por Função/Departamento (gráficos de distribuição), Faltas e Atrasos (métricas e gráficos de frequência), Absenteísmo (taxa de ausências, análise temporal e por função/departamento), Produtividade (indicadores de desempenho, se aplicável).
+    *   **Filtros Globais de Período**: Seletores de data personalizados e filtros rápidos (últimos 7 dias, 30 dias, mês atual, ano atual), com persistência dos filtros.
+    *   **Análise Temporal**: Gráficos de linha ou área mostrando a evolução de faltas, absenteísmo e frequência ao longo do tempo.
+    *   **Análise por Função/Departamento**: Comparativos de absenteísmo e produtividade entre diferentes funções ou departamentos, com rankings.
+*   **Dashboard Individual por Colaborador**: Crie uma página de perfil para cada funcionário, acessível a partir da lista de funcionários ou do dashboard de RH, contendo:
+    *   Dados cadastrais e foto.
+    *   Histórico detalhado de ponto, faltas, atrasos e ocorrências.
+    *   KPIs individuais de absenteísmo, frequência e horas extras.
+    *   Gráficos de desempenho individual ao longo do tempo.
+*   **Relatórios de Absenteísmo e Frequência**: Implemente relatórios detalhados com filtros avançados, permitindo a análise das causas do absenteísmo e da assiduidade dos colaboradores.
+*   **Cálculos e Regras de Negócio**: O backend deve implementar as lógicas para calcular absenteísmo, frequência, produtividade, impacto financeiro e horas trabalhadas, com validações automáticas e alertas.
+
+## Próximos Passos no Replit
+
+Implemente as funcionalidades listadas acima, focando em uma página/módulo por vez. Priorize a lógica de backend (rotas, manipulação de dados) e a integração com o frontend (templates HTML, JavaScript para interatividade e dados dinâmicos).
+

@@ -1,0 +1,139 @@
+# Meu Prompt para o Replit: Próximos Passos de Implementação do SIGE - Estruturas do Vale
+
+Com base em toda a análise do projeto "Sistema Integrado de Gestão Empresarial - Estruturas do Vale", incluindo os prompts iniciais, o schema do banco de dados, o detalhamento das páginas e as funcionalidades já existentes/pendentes, este é o prompt que eu, como Manus, comandaria ao Replit para continuar o desenvolvimento. O foco é na implementação incremental, na integração e na robustez do sistema, **excluindo explicitamente as seções de Fornecedores, Clientes e Materiais**.
+
+## Filosofia de Implementação
+
+*   **Incremental e Modular**: Desenvolver uma funcionalidade por vez, garantindo que cada módulo funcione de forma independente antes da integração.
+*   **Test-Driven Development (TDD)**: Sempre que possível, escrever testes antes de implementar o código.
+*   **Segurança e Validação**: Priorizar validações de entrada de dados (frontend e backend) e segurança das informações.
+*   **Usabilidade**: Garantir que a interface seja intuitiva e responsiva.
+*   **Performance**: Otimizar consultas ao banco de dados e carregamento de páginas.
+
+## Comandos de Implementação por Módulo
+
+### Módulo 1: Core do Sistema e Autenticação
+
+**Objetivo**: Estabelecer a base do aplicativo Flask, banco de dados e sistema de autenticação.
+
+*   **`main.py`**: Configure o aplicativo Flask. Garanta que `app.config['SECRET_KEY']` esteja definido e que o banco de dados (`database.db`) seja inicializado no contexto do aplicativo. Registre todos os blueprints das rotas (auth, dashboard, cadastros, ponto, alimentacao, relatorios, api).
+*   **`database.py`**: Implemente as funções `init_db()`, `get_db_connection()` e `close_db_connection()`. A função `init_db()` deve criar todas as tabelas do `models.py` se não existirem.
+*   **`models.py`**: Defina todos os modelos de dados (tabelas) para o SQLite, conforme o schema do banco de dados. **Certifique-se de que os modelos para `fornecedores`, `clientes` e `materiais` NÃO sejam criados.** Inclua os modelos para `Usuarios` e `Perfis` para o sistema de autenticação.
+*   **`routes/auth.py`**: Crie as rotas para `login` e `logout`. Implemente a lógica de autenticação de usuários, incluindo hash de senhas e gerenciamento de sessões. Crie o formulário de login no frontend (`templates/login.html`).
+*   **`templates/base.html`**: Crie o template base com a estrutura HTML principal, incluindo cabeçalho (navbar com links para Dashboard, Cadastros, Ponto, Alimentação, Relatórios e Administração), rodapé e blocos para conteúdo específico de cada página. Inclua links para os arquivos CSS e JS estáticos.
+*   **`static/css/style.css`**: Inicie a estilização global do aplicativo, definindo cores, fontes e layout básico.
+*   **`static/js/script.js`**: Crie o arquivo JavaScript principal para funcionalidades globais, como manipulação de modais e requisições AJAX básicas.
+
+### Módulo 2: Dashboard Principal
+
+**Objetivo**: Popular o dashboard com dados dinâmicos e gráficos iniciais.
+
+*   **`routes/dashboard.py`**: Implemente a rota `/dashboard`. Busque os dados necessários do banco de dados para popular os KPIs (Funcionários Ativos, Obras Ativas, Veículos, Custos do Mês). Recupere dados para os gráficos de Funcionários por Departamento e Custos por Obra, e para as listas de Obras em Andamento e Custos Recentes.
+*   **`templates/dashboard.html`**: Implemente o layout do dashboard. Use placeholders para os gráficos e listas. Os dados devem ser passados do backend para o frontend e renderizados dinamicamente.
+*   **`static/js/script.js`**: Adicione a lógica JavaScript para renderizar os gráficos (utilize uma biblioteca JS de gráficos como Chart.js ou D3.js, se necessário) e atualizar os cards de KPIs com os dados recebidos do backend. Implemente a interatividade para que os cards e gráficos sejam clicáveis, redirecionando para as páginas de detalhes.
+
+### Módulo 3: Cadastros Essenciais (Funcionários, Departamentos, Funções, Obras, Veículos)
+
+**Objetivo**: Implementar as funcionalidades CRUD completas para os cadastros mais críticos, incluindo validações e ações na tabela.
+
+*   **`routes/cadastros.py`**: Para cada entidade (Funcionários, Departamentos, Funções, Obras, Veículos), crie as rotas para:
+    *   Listagem (GET `/cadastros/entidade`)
+    *   Criação (POST `/cadastros/entidade/novo`)
+    *   Edição (GET/POST `/cadastros/entidade/editar/<id>`)
+    *   Exclusão (POST `/cadastros/entidade/excluir/<id>`)
+*   **`templates/cadastros/funcionarios.html`**: Implemente a tabela de listagem com paginação, pesquisa e ordenação. Crie o formulário modal para adicionar/editar funcionários, incluindo todos os campos (Nome, CPF, RG, Data de Nascimento, Endereço, Telefone, Email, Data de Admissão, Salário, Departamento, Função, Status, **Campo para Upload de Foto**). Garanta que os dropdowns de Departamento e Função sejam preenchidos dinamicamente.
+*   **`templates/cadastros/departamentos.html`**: Implemente a tabela e o formulário modal para Departamentos (Nome, Descrição). Adicione validação de unicidade para o Nome.
+*   **`templates/cadastros/funcoes.html`**: Implemente a tabela e o formulário modal para Funções (Nome, Descrição, Salário Base). Adicione validação de unicidade para o Nome e tipo numérico para Salário Base.
+*   **`templates/cadastros/obras.html`**: Implemente a tabela e o formulário modal para Obras (Nome, Endereço, Data de Início, Previsão de Término, Orçamento, Status, Responsável). O campo Responsável deve ser um autocomplete/dropdown de Funcionários. Adicione validações de datas e tipo numérico para Orçamento.
+*   **`templates/cadastros/veiculos.html`**: Implemente a tabela e o formulário modal para Veículos (Placa, Marca, Modelo, Ano de Fabricação, Tipo de Veículo, KM Atual, Status, Data da Última Manutenção, Data da Próxima Manutenção). Adicione validações para Placa (formato e unicidade), Ano de Fabricação e KM Atual.
+*   **`static/js/script.js`**: Adicione a lógica JavaScript para:
+    *   Manipulação dos formulários modais (abrir, fechar, submeter).
+    *   Validações de formulário no frontend.
+    *   Lógica para upload de fotos de funcionários (incluindo pré-visualização).
+    *   Funcionalidade de autocomplete para campos como "Responsável" em Obras.
+    *   Confirmação de exclusão de registros.
+
+### Módulo 4: Cadastros Complementares
+
+**Objetivo**: Implementar as funcionalidades CRUD para os cadastros restantes, seguindo o padrão estabelecido.
+
+*   **`routes/cadastros.py`**: Estenda este blueprint para incluir as rotas CRUD para:
+    *   Serviços
+    *   Unidades de Medida
+    *   Centros de Custo
+    *   Contas Contábeis
+    *   Tipos de Documento
+    *   Métodos de Pagamento
+    *   Condições de Pagamento
+    *   Bancos
+    *   Agências
+    *   Contas Bancárias
+*   **`templates/cadastros/*.html`**: Crie os templates HTML correspondentes para cada um desses cadastros, seguindo o padrão de tabela de listagem com paginação, pesquisa, ordenação e formulário modal para adição/edição. Inclua as validações de campo específicas para cada entidade.
+*   **`static/js/script.js`**: Adapte a lógica JavaScript existente para suportar os novos formulários e tabelas, garantindo a interatividade e validações.
+
+### Módulo 5: Controle de Ponto
+
+**Objetivo**: Implementar o sistema de controle de ponto, incluindo registro rápido, gestão de registros e ocorrências.
+
+*   **`routes/ponto.py`**: Crie as rotas para:
+    *   Controle de Ponto (GET `/ponto/controle`)
+    *   Registros de Ponto (GET `/ponto/registros`)
+    *   Ocorrências (GET `/ponto/ocorrencias`)
+    *   Tipos de Ocorrência (GET `/ponto/tipos_ocorrencia`)
+*   **`templates/ponto/controle_ponto.html`**: Implemente o relógio digital e os botões de registro rápido (Entrada, Saída Almoço, Retorno Almoço, Saída). A lógica de registro deve ser para o funcionário logado ou selecionado. Crie a tabela de registros recentes com cálculo de Horas Trabalhadas e Horas Extras. Implemente o formulário modal para "Novo Registro" manual, com autocomplete para Funcionário e Obra, e preenchimento automático de data/hora.
+*   **`templates/ponto/registros_ponto.html`**: Crie a página para gestão aprofundada dos registros de ponto, com listagem completa, filtros avançados (funcionário, data, tipo, status) e interface para edição/aprovação de registros por administradores.
+*   **`templates/ponto/ocorrencias.html`**: Crie a página para listar e gerenciar ocorrências. Implemente o formulário de cadastro/edição com campos para Funcionário (autocomplete), Tipo de Ocorrência (dropdown), Datas, Descrição, Status e Upload de Anexo.
+*   **`templates/ponto/tipos_ocorrencia.html`**: Crie a página para gerenciar os tipos de ocorrência (Nome, Descrição).
+*   **`static/js/script.js`**: Adicione a lógica JavaScript para:
+    *   Funcionalidade dos botões de registro rápido de ponto.
+    *   Validações de registro de ponto (impedir entradas duplicadas, saídas antes de entradas, etc.).
+    *   Cálculo de horas no frontend (se aplicável, para feedback instantâneo).
+    *   Manipulação de formulários e tabelas de ponto e ocorrências.
+
+### Módulo 6: Controle de Alimentação
+
+**Objetivo**: Implementar o sistema de controle de despesas com alimentação.
+
+*   **`routes/alimentacao.py`**: Crie a rota para o controle de alimentação (GET `/alimentacao/controle`).
+*   **`templates/alimentacao/controle_alimentacao.html`**: Implemente os cards de KPIs (Total do Mês, Registros Hoje, Média Diária, Funcionários) com dados dinâmicos. Crie a tabela de registros de alimentação com paginação, pesquisa e ordenação. Implemente o formulário modal para "Novo Registro" com autocomplete para Funcionário e Obra, e validações para Valor e Data.
+*   **`static/js/script.js`**: Adicione a lógica JavaScript para:
+    *   Atualização dinâmica dos cards de KPIs de alimentação.
+    *   Manipulação do formulário modal de registro de alimentação.
+    *   Validações de campo para valor e data.
+
+### Módulo 7: Relatórios e Dashboards
+
+**Objetivo**: Desenvolver os relatórios e dashboards analíticos, consolidando dados de todos os módulos.
+
+*   **`routes/relatorios.py`**: Crie as rotas para:
+    *   Relatórios e Dashboards (GET `/relatorios/dashboard`)
+    *   Dashboard Geral de RH (GET `/relatorios/rh_dashboard_geral`)
+    *   Detalhes do Colaborador (GET `/relatorios/rh_colaborador_detalhes/<id>`)
+*   **`templates/relatorios/relatorios_dashboard.html`**: Implemente os filtros globais (Data Início, Data Fim, Obra, Departamento) com persistência e autocomplete. Crie as seções de links para todos os relatórios específicos (Pessoal, Obras, Gerenciais - **excluindo Dashboard Estoque**). Implemente os gráficos dinâmicos (Evolução de Custos, Produtividade por Departamento, Distribuição de Custos, Horas Trabalhadas vs Extras) com dados do backend e interatividade.
+*   **`templates/relatorios/rh_dashboard_geral.html`**: Crie a página do dashboard geral de RH com KPIs (Colaboradores por Função/Departamento, Faltas e Atrasos, Absenteísmo, Produtividade), filtros de período e gráficos de análise temporal e por função/departamento.
+*   **`templates/relatorios/rh_colaborador_detalhes.html`**: Crie a página de perfil individual do colaborador, exibindo dados cadastrais, foto, histórico de ponto, ocorrências, KPIs individuais e gráficos de desempenho.
+*   **`static/js/script.js`**: Adicione a lógica JavaScript para:
+    *   Aplicação e persistência dos filtros globais nos relatórios.
+    *   Renderização de todos os gráficos de relatórios com dados dinâmicos.
+    *   Funcionalidade de exportação de relatórios (CSV, PDF, Excel).
+
+### Módulo 8: API (Backend para Frontend)
+
+**Objetivo**: Criar endpoints de API para suportar funcionalidades assíncronas e autocomplete.
+
+*   **`routes/api.py`**: Crie endpoints de API para:
+    *   Autocomplete de Funcionários (`/api/funcionarios/autocomplete`)
+    *   Autocomplete de Obras (`/api/obras/autocomplete`)
+    *   Autocomplete de Veículos (`/api/veiculos/autocomplete`)
+    *   Outros endpoints necessários para alimentar os gráficos e KPIs dinamicamente.
+
+## Próximos Passos no Replit
+
+Siga a ordem dos módulos para garantir uma implementação estruturada. Para cada comando, foque em:
+
+1.  **Backend**: Implementar as rotas e a lógica de manipulação de dados no Flask.
+2.  **Frontend**: Desenvolver os templates HTML e a lógica JavaScript para a interface do usuário.
+3.  **Testes**: Testar cada funcionalidade após a implementação para garantir o correto funcionamento e a integração.
+
+Este roteiro detalhado deve guiar o desenvolvimento do seu Sistema Integrado de Gestão Empresarial no Replit. Boa sorte!
+
