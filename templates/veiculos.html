@@ -1,18 +1,173 @@
 {% extends "base.html" %}
 
-{% block title %}Veículos - SIGE{% endblock %}
+{% block title %}Gestão de Veículos - SIGE{% endblock %}
 
 {% block content %}
-<div class="row">
-    <div class="col-12">
-        <div class="d-flex justify-content-between align-items-center mb-4">
-            <h1 class="h3">
-                <i class="fas fa-truck"></i> Veículos
-            </h1>
-            <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#veiculoModal">
-                <i class="fas fa-plus"></i> Novo Veículo
-            </button>
+<div class="container-fluid py-4">
+    <!-- Header -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <h2 class="mb-1">
+                        <i class="fas fa-truck me-2 text-primary"></i>
+                        Gestão de Veículos
+                    </h2>
+                    <p class="text-muted mb-0">Controle da frota e custos operacionais</p>
+                </div>
+                <div class="d-flex gap-2">
+                    <button type="button" class="btn btn-success" data-bs-toggle="modal" data-bs-target="#veiculoModal">
+                        <i class="fas fa-plus me-1"></i> Novo Veículo
+                    </button>
+                </div>
+            </div>
         </div>
+    </div>
+
+    <!-- KPIs Gerais -->
+    <div class="row mb-4">
+        <div class="col-md-3">
+            <div class="card bg-primary text-white">
+                <div class="card-body">
+                    <div class="d-flex align-items-center">
+                        <div class="flex-grow-1">
+                            <h6 class="card-title mb-1">Total de Veículos</h6>
+                            <h4 class="mb-0">{{ veiculos|length }}</h4>
+                        </div>
+                        <div class="ms-3">
+                            <i class="fas fa-truck fa-2x opacity-75"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-success text-white">
+                <div class="card-body">
+                    <div class="d-flex align-items-center">
+                        <div class="flex-grow-1">
+                            <h6 class="card-title mb-1">Disponíveis</h6>
+                            <h4 class="mb-0">{{ veiculos|selectattr('status', 'equalto', 'Disponível')|list|length }}</h4>
+                        </div>
+                        <div class="ms-3">
+                            <i class="fas fa-check-circle fa-2x opacity-75"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-warning text-dark">
+                <div class="card-body">
+                    <div class="d-flex align-items-center">
+                        <div class="flex-grow-1">
+                            <h6 class="card-title mb-1">Em Manutenção</h6>
+                            <h4 class="mb-0">{{ veiculos|selectattr('status', 'equalto', 'Manutenção')|list|length }}</h4>
+                        </div>
+                        <div class="ms-3">
+                            <i class="fas fa-tools fa-2x opacity-75"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-info text-white">
+                <div class="card-body">
+                    <div class="d-flex align-items-center">
+                        <div class="flex-grow-1">
+                            <h6 class="card-title mb-1">Em Uso</h6>
+                            <h4 class="mb-0">{{ veiculos|selectattr('status', 'equalto', 'Em uso')|list|length }}</h4>
+                        </div>
+                        <div class="ms-3">
+                            <i class="fas fa-road fa-2x opacity-75"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Cards de Veículos -->
+    <div class="row">
+        {% for veiculo in veiculos %}
+        <div class="col-lg-4 col-md-6 mb-4">
+            <div class="card h-100 {% if veiculo.status == 'Indisponível' %}border-secondary{% endif %}">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">
+                        <i class="fas fa-truck me-2 text-primary"></i>
+                        {{ veiculo.placa }}
+                    </h5>
+                    {% if veiculo.status == 'Disponível' %}
+                        <span class="badge bg-success">{{ veiculo.status }}</span>
+                    {% elif veiculo.status == 'Em uso' %}
+                        <span class="badge bg-primary">{{ veiculo.status }}</span>
+                    {% elif veiculo.status == 'Manutenção' %}
+                        <span class="badge bg-warning">{{ veiculo.status }}</span>
+                    {% else %}
+                        <span class="badge bg-secondary">{{ veiculo.status }}</span>
+                    {% endif %}
+                </div>
+                <div class="card-body">
+                    <!-- Informações do Veículo -->
+                    <div class="mb-3">
+                        <p class="text-muted mb-1">
+                            <i class="fas fa-car me-1"></i>
+                            {{ veiculo.marca }} {{ veiculo.modelo }}
+                        </p>
+                        <p class="text-muted mb-1">
+                            <i class="fas fa-calendar me-1"></i>
+                            Ano: {{ veiculo.ano or 'N/A' }}
+                        </p>
+                        <p class="text-muted mb-1">
+                            <i class="fas fa-tag me-1"></i>
+                            Tipo: {{ veiculo.tipo }}
+                        </p>
+                        <p class="text-muted mb-1">
+                            <i class="fas fa-tachometer-alt me-1"></i>
+                            KM: {{ '{:,}'.format(veiculo.km_atual or 0) }}
+                        </p>
+                        {% if veiculo.data_proxima_manutencao %}
+                        <p class="text-muted mb-1">
+                            <i class="fas fa-wrench me-1"></i>
+                            Próx. Manutenção: {{ veiculo.data_proxima_manutencao.strftime('%d/%m/%Y') }}
+                        </p>
+                        {% endif %}
+                    </div>
+
+                    <!-- Informações Adicionais -->
+                    <div class="row g-2 mb-3">
+                        <div class="col-6">
+                            <div class="bg-light p-2 rounded text-center">
+                                <small class="text-muted d-block">Status</small>
+                                <strong class="text-primary">{{ veiculo.status }}</strong>
+                            </div>
+                        </div>
+                        <div class="col-6">
+                            <div class="bg-light p-2 rounded text-center">
+                                <small class="text-muted d-block">Tipo</small>
+                                <strong class="text-success">{{ veiculo.tipo }}</strong>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="card-footer">
+                    <div class="d-flex gap-2">
+                        <button type="button" class="btn btn-sm btn-outline-primary flex-fill" 
+                                onclick="editarVeiculo({{ veiculo.id }})">
+                            <i class="fas fa-edit me-1"></i> Editar
+                        </button>
+                        {% if veiculo.status != 'Indisponível' %}
+                        <button type="button" class="btn btn-sm btn-primary" 
+                                onclick="gerenciarVeiculo({{ veiculo.id }}, '{{ veiculo.placa }}')">
+                            <i class="fas fa-cog me-1"></i> Gerenciar
+                        </button>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
     </div>
 </div>
 

@@ -1,0 +1,225 @@
+{% extends "base.html" %}
+
+{% block title %}{{ restaurante.nome }} - Detalhes do Restaurante - SIGE{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <!-- Header -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <h2 class="mb-1">
+                        <i class="fas fa-utensils me-2 text-primary"></i>
+                        {{ restaurante.nome }}
+                        {% if not restaurante.ativo %}
+                            <span class="badge bg-secondary ms-2">Inativo</span>
+                        {% endif %}
+                    </h2>
+                    <p class="text-muted mb-0">Detalhes e histórico do restaurante</p>
+                </div>
+                <div class="d-flex gap-2">
+                    <a href="{{ url_for('main.alimentacao_restaurantes') }}" class="btn btn-outline-secondary">
+                        <i class="fas fa-arrow-left me-1"></i> Voltar
+                    </a>
+                    {% if restaurante.ativo %}
+                    <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#modalNovoLancamento">
+                        <i class="fas fa-plus me-1"></i> Novo Registro
+                    </button>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Informações do Restaurante -->
+    <div class="row mb-4">
+        <div class="col-lg-8">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">
+                        <i class="fas fa-info-circle me-2"></i>
+                        Informações do Restaurante
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <p><strong>Nome:</strong> {{ restaurante.nome }}</p>
+                            {% if restaurante.endereco %}
+                            <p><strong>Endereço:</strong> {{ restaurante.endereco }}</p>
+                            {% endif %}
+                            {% if restaurante.telefone %}
+                            <p><strong>Telefone:</strong> {{ restaurante.telefone }}</p>
+                            {% endif %}
+                        </div>
+                        <div class="col-md-6">
+                            {% if restaurante.email %}
+                            <p><strong>Email:</strong> {{ restaurante.email }}</p>
+                            {% endif %}
+                            {% if restaurante.contato_responsavel %}
+                            <p><strong>Responsável:</strong> {{ restaurante.contato_responsavel }}</p>
+                            {% endif %}
+                            <p><strong>Status:</strong> 
+                                {% if restaurante.ativo %}
+                                    <span class="badge bg-success">Ativo</span>
+                                {% else %}
+                                    <span class="badge bg-secondary">Inativo</span>
+                                {% endif %}
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- KPIs do Restaurante -->
+        <div class="col-lg-4">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">
+                        <i class="fas fa-chart-bar me-2"></i>
+                        KPIs do Período
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="row g-3">
+                        <div class="col-6">
+                            <div class="text-center p-3 bg-primary bg-opacity-10 rounded">
+                                <i class="fas fa-money-bill-wave text-primary fa-2x mb-2"></i>
+                                <h6 class="text-primary mb-1">Custo Total</h6>
+                                <h5 class="mb-0">R$ {{ "%.2f"|format(kpis.custo_total) }}</h5>
+                            </div>
+                        </div>
+                        <div class="col-6">
+                            <div class="text-center p-3 bg-success bg-opacity-10 rounded">
+                                <i class="fas fa-list text-success fa-2x mb-2"></i>
+                                <h6 class="text-success mb-1">Registros</h6>
+                                <h5 class="mb-0">{{ kpis.total_registros }}</h5>
+                            </div>
+                        </div>
+                        <div class="col-6">
+                            <div class="text-center p-3 bg-info bg-opacity-10 rounded">
+                                <i class="fas fa-users text-info fa-2x mb-2"></i>
+                                <h6 class="text-info mb-1">Funcionários</h6>
+                                <h5 class="mb-0">{{ kpis.funcionarios_unicos }}</h5>
+                            </div>
+                        </div>
+                        <div class="col-6">
+                            <div class="text-center p-3 bg-warning bg-opacity-10 rounded">
+                                <i class="fas fa-calculator text-warning fa-2x mb-2"></i>
+                                <h6 class="text-warning mb-1">Média/Func.</h6>
+                                <h5 class="mb-0">R$ {{ "%.2f"|format(kpis.media_por_funcionario) }}</h5>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Histórico de Lançamentos -->
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">
+                        <i class="fas fa-history me-2"></i>
+                        Histórico de Lançamentos
+                    </h5>
+                </div>
+                <div class="card-body">
+                    {% if registros %}
+                    <div class="table-responsive">
+                        <table class="table table-striped">
+                            <thead>
+                                <tr>
+                                    <th>Data</th>
+                                    <th>Funcionário</th>
+                                    <th>Tipo</th>
+                                    <th>Valor</th>
+                                    <th>Obra</th>
+                                    <th>Observações</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for registro in registros %}
+                                <tr>
+                                    <td>{{ registro.data.strftime('%d/%m/%Y') }}</td>
+                                    <td>
+                                        <i class="fas fa-user me-1 text-muted"></i>
+                                        {{ registro.funcionario_ref.nome }}
+                                    </td>
+                                    <td>
+                                        <span class="badge bg-secondary">{{ registro.tipo }}</span>
+                                    </td>
+                                    <td>
+                                        <strong class="text-success">R$ {{ "%.2f"|format(registro.valor) }}</strong>
+                                    </td>
+                                    <td>
+                                        {% if registro.obra_ref %}
+                                            <i class="fas fa-hard-hat me-1 text-muted"></i>
+                                            {{ registro.obra_ref.nome }}
+                                        {% else %}
+                                            <span class="text-muted">-</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if registro.observacoes %}
+                                            {{ registro.observacoes }}
+                                        {% else %}
+                                            <span class="text-muted">-</span>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    {% else %}
+                    <div class="text-center py-4">
+                        <i class="fas fa-utensils fa-3x text-muted mb-3"></i>
+                        <h5 class="text-muted">Nenhum registro encontrado</h5>
+                        <p class="text-muted">Este restaurante ainda não possui lançamentos de alimentação.</p>
+                        {% if restaurante.ativo %}
+                        <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#modalNovoLancamento">
+                            <i class="fas fa-plus me-1"></i> Criar Primeiro Registro
+                        </button>
+                        {% endif %}
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Novo Lançamento (Placeholder - implementar se necessário) -->
+{% if restaurante.ativo %}
+<div class="modal fade" id="modalNovoLancamento" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="fas fa-utensils me-2"></i>
+                    Novo Lançamento - {{ restaurante.nome }}
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="alert alert-info">
+                    <i class="fas fa-info-circle me-2"></i>
+                    Para criar um novo lançamento, volte à página principal de Alimentação e use o botão "Lançamento Múltiplo", selecionando este restaurante.
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fechar</button>
+                <a href="{{ url_for('main.alimentacao_restaurantes') }}" class="btn btn-primary">
+                    <i class="fas fa-arrow-left me-1"></i> Ir para Lançamentos
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+{% endblock %}
