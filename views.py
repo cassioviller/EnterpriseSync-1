@@ -574,6 +574,12 @@ def detalhes_obra(id):
         RegistroPonto.hora_entrada.isnot(None)
     ).distinct().all()
     
+    # Custos da obra no período
+    custos_obra = CustoObra.query.filter(
+        CustoObra.obra_id == id,
+        CustoObra.data.between(data_inicio, data_fim)
+    ).order_by(CustoObra.data.desc()).all()
+    
     # KPIs organizados
     kpis = {
         'custo_transporte': custo_transporte,
@@ -589,6 +595,7 @@ def detalhes_obra(id):
     return render_template('obras/detalhes_obra.html', 
                          obra=obra,
                          kpis=kpis,
+                         custos_obra=custos_obra,
                          rdos_periodo=rdos_periodo,
                          rdos_recentes=rdos_recentes,
                          total_rdos=total_rdos,

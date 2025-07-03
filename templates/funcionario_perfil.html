@@ -383,6 +383,7 @@
                                 <th>Tipo</th>
                                 <th>Valor</th>
                                 <th>Obra</th>
+                                <th>Restaurante</th>
                                 <th>Observações</th>
                                 <th>Ações</th>
                             </tr>
@@ -406,6 +407,13 @@
                                 <td>
                                     {% if registro.obra_ref %}
                                         <span class="badge bg-secondary">{{ registro.obra_ref.nome }}</span>
+                                    {% else %}
+                                        <span class="text-muted">-</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if registro.restaurante_ref %}
+                                        <span class="badge bg-success">{{ registro.restaurante_ref.nome }}</span>
                                     {% else %}
                                         <span class="text-muted">-</span>
                                     {% endif %}

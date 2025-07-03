@@ -100,6 +100,7 @@
                         <th>Tipo</th>
                         <th>Valor</th>
                         <th>Obra</th>
+                        <th>Restaurante</th>
                         <th>Observações</th>
                         <th>Ações</th>
                     </tr>
@@ -122,6 +123,7 @@
                         </td>
                         <td>R$ {{ '{:,.2f}'.format(registro.valor) }}</td>
                         <td>{{ registro.obra_ref.nome if registro.obra_ref else '-' }}</td>
+                        <td>{{ registro.restaurante_ref.nome if registro.restaurante_ref else '-' }}</td>
                         <td>{{ registro.observacoes or '-' }}</td>
                         <td>
                             <div class="btn-group btn-group-sm">
@@ -198,6 +200,16 @@
                                     <!-- Options will be populated by JavaScript -->
                                 </select>
                             </div>
+                        </div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="restaurante_id" class="form-label">Restaurante</label>
+                        <select class="form-select" id="restaurante_id" name="restaurante_id">
+                            <option value="">Selecione...</option>
+                            <!-- Options will be populated by JavaScript -->
+                        </select>
+                    </div>
                         </div>
                     </div>
                     
