@@ -780,7 +780,273 @@ def nova_alimentacao():
 @main_bp.route('/relatorios')
 @login_required
 def relatorios():
-    return render_template('relatorios.html')
+    # Buscar dados para filtros
+    obras = Obra.query.all()
+    departamentos = Departamento.query.all()
+    
+    return render_template('relatorios.html', obras=obras, departamentos=departamentos)
+
+@main_bp.route('/relatorios/dados-graficos', methods=['POST'])
+@login_required
+def dados_graficos():
+    from datetime import datetime, timedelta
+    import json
+    from sqlalchemy import func, extract
+    
+    filtros = request.get_json()
+    
+    # Processar filtros de data
+    data_inicio = datetime.strptime(filtros.get('dataInicio', ''), '%Y-%m-%d').date() if filtros.get('dataInicio') else None
+    data_fim = datetime.strptime(filtros.get('dataFim', ''), '%Y-%m-%d').date() if filtros.get('dataFim') else None
+    obra_id = filtros.get('obra') if filtros.get('obra') else None
+    departamento_id = filtros.get('departamento') if filtros.get('departamento') else None
+    
+    # Data padrão (últimos 6 meses)
+    if not data_inicio or not data_fim:
+        hoje = date.today()
+        data_fim = hoje
+        data_inicio = date(hoje.year, hoje.month - 5 if hoje.month > 5 else hoje.month + 7, 1)
+        if hoje.month <= 5:
+            data_inicio = data_inicio.replace(year=hoje.year - 1)
+    
+    # 1. Evolução de Custos
+    custos_query = db.session.query(
+        extract('month', CustoObra.data).label('mes'),
+        extract('year', CustoObra.data).label('ano'),
+        CustoObra.tipo,
+        func.sum(CustoObra.valor).label('total')
+    ).filter(
+        CustoObra.data >= data_inicio,
+        CustoObra.data <= data_fim
+    )
+    
+    if obra_id:
+        custos_query = custos_query.filter(CustoObra.obra_id == obra_id)
+    
+    custos_dados = custos_query.group_by(
+        extract('year', CustoObra.data),
+        extract('month', CustoObra.data),
+        CustoObra.tipo
+    ).all()
+    
+    # Processar dados de custos
+    meses_labels = []
+    mao_obra_dados = []
+    alimentacao_dados = []
+    veiculos_dados = []
+    
+    # Gerar lista de meses
+    current_date = data_inicio.replace(day=1)
+    while current_date <= data_fim:
+        mes_nome = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun',
+                   'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'][current_date.month - 1]
+        meses_labels.append(f"{mes_nome}/{current_date.year}")
+        
+        # Buscar dados do mês
+        mao_obra_mes = sum(d.total for d in custos_dados if d.mes == current_date.month and d.ano == current_date.year and d.tipo == 'mao_obra')
+        alimentacao_mes = sum(d.total for d in custos_dados if d.mes == current_date.month and d.ano == current_date.year and d.tipo == 'alimentacao')
+        veiculos_mes = sum(d.total for d in custos_dados if d.mes == current_date.month and d.ano == current_date.year and d.tipo == 'veiculo')
+        
+        mao_obra_dados.append(float(mao_obra_mes))
+        alimentacao_dados.append(float(alimentacao_mes))
+        veiculos_dados.append(float(veiculos_mes))
+        
+        # Próximo mês
+        if current_date.month == 12:
+            current_date = current_date.replace(year=current_date.year + 1, month=1)
+        else:
+            current_date = current_date.replace(month=current_date.month + 1)
+    
+    # 2. Produtividade por Departamento
+    produtividade_query = db.session.query(
+        Departamento.nome,
+        func.avg(RegistroPonto.horas_trabalhadas).label('media_horas')
+    ).join(
+        Funcionario, Departamento.id == Funcionario.departamento_id
+    ).join(
+        RegistroPonto, Funcionario.id == RegistroPonto.funcionario_id
+    ).filter(
+        RegistroPonto.data >= data_inicio,
+        RegistroPonto.data <= data_fim
+    )
+    
+    if departamento_id:
+        produtividade_query = produtividade_query.filter(Departamento.id == departamento_id)
+    
+    produtividade_dados = produtividade_query.group_by(Departamento.nome).all()
+    
+    # 3. Distribuição de Custos
+    distribuicao_dados = db.session.query(
+        CustoObra.tipo,
+        func.sum(CustoObra.valor).label('total')
+    ).filter(
+        CustoObra.data >= data_inicio,
+        CustoObra.data <= data_fim
+    )
+    
+    if obra_id:
+        distribuicao_dados = distribuicao_dados.filter(CustoObra.obra_id == obra_id)
+    
+    distribuicao_dados = distribuicao_dados.group_by(CustoObra.tipo).all()
+    
+    # 4. Horas Trabalhadas vs Extras
+    horas_query = db.session.query(
+        extract('month', RegistroPonto.data).label('mes'),
+        extract('year', RegistroPonto.data).label('ano'),
+        func.sum(RegistroPonto.horas_trabalhadas).label('horas_normais'),
+        func.sum(RegistroPonto.horas_extras).label('horas_extras')
+    ).filter(
+        RegistroPonto.data >= data_inicio,
+        RegistroPonto.data <= data_fim
+    )
+    
+    if departamento_id:
+        horas_query = horas_query.join(Funcionario).filter(Funcionario.departamento_id == departamento_id)
+    
+    horas_dados = horas_query.group_by(
+        extract('year', RegistroPonto.data),
+        extract('month', RegistroPonto.data)
+    ).all()
+    
+    # Processar dados de horas
+    horas_normais_dados = []
+    horas_extras_dados = []
+    
+    current_date = data_inicio.replace(day=1)
+    while current_date <= data_fim:
+        horas_mes = next((h for h in horas_dados if h.mes == current_date.month and h.ano == current_date.year), None)
+        
+        horas_normais_dados.append(float(horas_mes.horas_normais or 0) if horas_mes else 0)
+        horas_extras_dados.append(float(horas_mes.horas_extras or 0) if horas_mes else 0)
+        
+        # Próximo mês
+        if current_date.month == 12:
+            current_date = current_date.replace(year=current_date.year + 1, month=1)
+        else:
+            current_date = current_date.replace(month=current_date.month + 1)
+    
+    return jsonify({
+        'evolucao': {
+            'labels': meses_labels,
+            'mao_obra': mao_obra_dados,
+            'alimentacao': alimentacao_dados,
+            'veiculos': veiculos_dados
+        },
+        'produtividade': {
+            'labels': [p.nome for p in produtividade_dados],
+            'valores': [float(p.media_horas or 0) for p in produtividade_dados]
+        },
+        'distribuicao': {
+            'valores': [float(d.total) for d in distribuicao_dados]
+        },
+        'horas': {
+            'labels': meses_labels,
+            'normais': horas_normais_dados,
+            'extras': horas_extras_dados
+        }
+    })
+
+@main_bp.route('/relatorios/gerar/<tipo>', methods=['POST'])
+@login_required
+def gerar_relatorio(tipo):
+    filtros = request.get_json()
+    
+    # Processar filtros
+    data_inicio = datetime.strptime(filtros.get('dataInicio', ''), '%Y-%m-%d').date() if filtros.get('dataInicio') else None
+    data_fim = datetime.strptime(filtros.get('dataFim', ''), '%Y-%m-%d').date() if filtros.get('dataFim') else None
+    obra_id = filtros.get('obra') if filtros.get('obra') else None
+    departamento_id = filtros.get('departamento') if filtros.get('departamento') else None
+    
+    if tipo == 'funcionarios':
+        query = Funcionario.query
+        if departamento_id:
+            query = query.filter_by(departamento_id=departamento_id)
+        funcionarios = query.all()
+        
+        html = '<div class="table-responsive"><table class="table table-striped">'
+        html += '<thead><tr><th>Nome</th><th>CPF</th><th>Departamento</th><th>Função</th><th>Data Admissão</th><th>Salário</th><th>Status</th></tr></thead><tbody>'
+        
+        for f in funcionarios:
+            status_badge = '<span class="badge bg-success">Ativo</span>' if f.ativo else '<span class="badge bg-danger">Inativo</span>'
+            html += f'<tr><td>{f.nome}</td><td>{f.cpf}</td><td>{f.departamento_ref.nome if f.departamento_ref else "-"}</td>'
+            html += f'<td>{f.funcao_ref.nome if f.funcao_ref else "-"}</td><td>{f.data_admissao.strftime("%d/%m/%Y") if f.data_admissao else "-"}</td>'
+            html += f'<td>R$ {f.salario:,.2f}</td><td>{status_badge}</td></tr>'
+        
+        html += '</tbody></table></div>'
+        
+        return jsonify({
+            'titulo': 'Lista de Funcionários',
+            'html': html
+        })
+    
+    elif tipo == 'ponto':
+        query = RegistroPonto.query
+        if data_inicio:
+            query = query.filter(RegistroPonto.data >= data_inicio)
+        if data_fim:
+            query = query.filter(RegistroPonto.data <= data_fim)
+        if obra_id:
+            query = query.filter_by(obra_id=obra_id)
+        
+        registros = query.order_by(RegistroPonto.data.desc()).limit(100).all()
+        
+        html = '<div class="table-responsive"><table class="table table-striped">'
+        html += '<thead><tr><th>Funcionário</th><th>Data</th><th>Entrada</th><th>Saída Almoço</th><th>Retorno Almoço</th><th>Saída</th><th>Horas Trabalhadas</th><th>Horas Extras</th><th>Obra</th></tr></thead><tbody>'
+        
+        for r in registros:
+            html += f'<tr><td>{r.funcionario_ref.nome}</td><td>{r.data.strftime("%d/%m/%Y")}</td>'
+            html += f'<td>{r.hora_entrada.strftime("%H:%M") if r.hora_entrada else "-"}</td>'
+            html += f'<td>{r.hora_almoco_saida.strftime("%H:%M") if r.hora_almoco_saida else "-"}</td>'
+            html += f'<td>{r.hora_almoco_retorno.strftime("%H:%M") if r.hora_almoco_retorno else "-"}</td>'
+            html += f'<td>{r.hora_saida.strftime("%H:%M") if r.hora_saida else "-"}</td>'
+            html += f'<td>{r.horas_trabalhadas:.2f}h</td><td>{r.horas_extras:.2f}h</td>'
+            html += f'<td>{r.obra_ref.nome if r.obra_ref else "-"}</td></tr>'
+        
+        html += '</tbody></table></div>'
+        
+        return jsonify({
+            'titulo': 'Relatório de Ponto',
+            'html': html
+        })
+    
+    elif tipo == 'obras':
+        query = Obra.query
+        if obra_id:
+            query = query.filter_by(id=obra_id)
+        obras = query.all()
+        
+        html = '<div class="table-responsive"><table class="table table-striped">'
+        html += '<thead><tr><th>Nome</th><th>Endereço</th><th>Data Início</th><th>Previsão Fim</th><th>Orçamento</th><th>Status</th><th>Responsável</th></tr></thead><tbody>'
+        
+        for o in obras:
+            status_badges = {
+                'Em andamento': 'bg-primary',
+                'Concluída': 'bg-success',
+                'Pausada': 'bg-warning',
+                'Cancelada': 'bg-danger'
+            }
+            status_badge = f'<span class="badge {status_badges.get(o.status, "bg-secondary")}">{o.status}</span>'
+            
+            html += f'<tr><td>{o.nome}</td><td>{o.endereco or "-"}</td>'
+            html += f'<td>{o.data_inicio.strftime("%d/%m/%Y") if o.data_inicio else "-"}</td>'
+            html += f'<td>{o.data_previsao_fim.strftime("%d/%m/%Y") if o.data_previsao_fim else "-"}</td>'
+            html += f'<td>R$ {o.orcamento:,.2f}</td><td>{status_badge}</td>'
+            
+            responsavel = Funcionario.query.get(o.responsavel_id) if o.responsavel_id else None
+            html += f'<td>{responsavel.nome if responsavel else "-"}</td></tr>'
+        
+        html += '</tbody></table></div>'
+        
+        return jsonify({
+            'titulo': 'Lista de Obras',
+            'html': html
+        })
+    
+    else:
+        return jsonify({
+            'titulo': 'Relatório não implementado',
+            'html': '<p>Este relatório ainda não foi implementado.</p>'
+        })
 
 @main_bp.route('/api/dashboard-data')
 @login_required
