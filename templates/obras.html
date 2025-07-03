@@ -9,82 +9,198 @@
             <h1 class="h3">
                 <i class="fas fa-hard-hat"></i> Obras
             </h1>
-            <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#obraModal">
-                <i class="fas fa-plus"></i> Nova Obra
-            </button>
+            <div class="d-flex gap-2">
+                <button class="btn btn-outline-secondary" onclick="alternarVisualizacao()">
+                    <i class="fas fa-th-large" id="viewToggleIcon"></i>
+                    <span id="viewToggleText">Visualização Cards</span>
+                </button>
+                <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#obraModal">
+                    <i class="fas fa-plus"></i> Nova Obra
+                </button>
+            </div>
         </div>
     </div>
 </div>
 
-<!-- Tabela de Obras -->
-<div class="card">
-    <div class="card-body">
-        <div class="table-responsive">
-            <table class="table table-striped" id="obrasTable">
-                <thead>
-                    <tr>
-                        <th>Nome</th>
-                        <th>Endereço</th>
-                        <th>Início</th>
-                        <th>Previsão Fim</th>
-                        <th>Orçamento</th>
-                        <th>Status</th>
-                        <th>Responsável</th>
-                        <th>Ações</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for obra in obras %}
-                    <tr>
-                        <td>{{ obra.nome }}</td>
-                        <td>{{ obra.endereco or '-' }}</td>
-                        <td>{{ obra.data_inicio.strftime('%d/%m/%Y') if obra.data_inicio else '-' }}</td>
-                        <td>{{ obra.data_previsao_fim.strftime('%d/%m/%Y') if obra.data_previsao_fim else '-' }}</td>
-                        <td>R$ {{ '{:,.2f}'.format(obra.orcamento) }}</td>
-                        <td>
-                            {% if obra.status == 'Em andamento' %}
-                                <span class="badge bg-success">{{ obra.status }}</span>
-                            {% elif obra.status == 'Concluída' %}
-                                <span class="badge bg-primary">{{ obra.status }}</span>
-                            {% elif obra.status == 'Pausada' %}
-                                <span class="badge bg-warning">{{ obra.status }}</span>
-                            {% else %}
-                                <span class="badge bg-secondary">{{ obra.status }}</span>
-                            {% endif %}
-                        </td>
-                        <td>{{ obra.responsavel.nome if obra.responsavel else '-' }}</td>
-                        <td>
-                            <div class="btn-group btn-group-sm">
-                                <a href="{{ url_for('main.detalhes_obra', id=obra.id) }}" 
-                                   class="btn btn-outline-info"
-                                   data-bs-toggle="tooltip" 
-                                   title="Ver Detalhes">
-                                    <i class="fas fa-eye"></i>
-                                </a>
-                                <button class="btn btn-outline-primary" 
-                                        onclick="editarObra({{ obra.id }})"
-                                        data-bs-toggle="tooltip" 
-                                        title="Editar">
-                                    <i class="fas fa-edit"></i>
-                                </button>
-                                <button class="btn btn-outline-success" 
-                                        onclick="verCustos({{ obra.id }})"
-                                        data-bs-toggle="tooltip" 
-                                        title="Ver Custos">
-                                    <i class="fas fa-dollar-sign"></i>
-                                </button>
-                                <button class="btn btn-outline-danger" 
-                                        onclick="excluirObra({{ obra.id }})"
-                                        data-bs-toggle="tooltip" 
-                                        title="Excluir">
-                                    <i class="fas fa-trash"></i>
-                                </button>
+<!-- Visualização em Cards -->
+<div id="cardsView">
+    <div class="row">
+        {% for obra in obras %}
+        <div class="col-xl-4 col-lg-6 col-md-6 mb-4">
+            <div class="card h-100 obra-card" onclick="window.location.href='{{ url_for('main.detalhes_obra', id=obra.id) }}'">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-start mb-3">
+                        <h5 class="card-title text-primary mb-0">{{ obra.nome }}</h5>
+                        {% if obra.status == 'Em andamento' %}
+                            <span class="badge bg-success">{{ obra.status }}</span>
+                        {% elif obra.status == 'Concluída' %}
+                            <span class="badge bg-primary">{{ obra.status }}</span>
+                        {% elif obra.status == 'Pausada' %}
+                            <span class="badge bg-warning">{{ obra.status }}</span>
+                        {% else %}
+                            <span class="badge bg-secondary">{{ obra.status }}</span>
+                        {% endif %}
+                    </div>
+                    
+                    <div class="mb-3">
+                        <small class="text-muted">
+                            <i class="fas fa-map-marker-alt"></i> 
+                            {{ obra.endereco[:50] + '...' if obra.endereco and obra.endereco|length > 50 else (obra.endereco or 'Endereço não informado') }}
+                        </small>
+                    </div>
+                    
+                    <div class="row text-center mb-3">
+                        <div class="col-6">
+                            <div class="border-end">
+                                <h6 class="text-primary mb-0">{{ obra.kpis.total_rdos if obra.kpis else 0 }}</h6>
+                                <small class="text-muted">RDOs</small>
                             </div>
-                        </td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
+                        </div>
+                        <div class="col-6">
+                            <h6 class="text-success mb-0">{{ obra.kpis.dias_trabalhados if obra.kpis else 0 }}</h6>
+                            <small class="text-muted">Dias</small>
+                        </div>
+                    </div>
+                    
+                    <div class="row text-center mb-3">
+                        <div class="col-12">
+                            <h6 class="text-info mb-0">
+                                R$ {{ '{:,.2f}'.format(obra.kpis.custo_total if obra.kpis and obra.kpis.custo_total else 0).replace(',', ' ').replace('.', ',').replace(' ', '.') }}
+                            </h6>
+                            <small class="text-muted">Custo Total</small>
+                        </div>
+                    </div>
+                    
+                    <div class="d-flex justify-content-between align-items-center">
+                        <small class="text-muted">
+                            <i class="fas fa-calendar-alt"></i>
+                            {{ obra.data_inicio.strftime('%d/%m/%Y') if obra.data_inicio else '-' }}
+                        </small>
+                        <small class="text-muted">
+                            <i class="fas fa-user"></i>
+                            {{ obra.responsavel.nome if obra.responsavel else 'Sem responsável' }}
+                        </small>
+                    </div>
+                </div>
+                
+                <div class="card-footer bg-transparent">
+                    <div class="btn-group btn-group-sm w-100">
+                        <a href="{{ url_for('main.detalhes_obra', id=obra.id) }}" 
+                           class="btn btn-outline-info"
+                           onclick="event.stopPropagation()"
+                           data-bs-toggle="tooltip" 
+                           title="Ver Detalhes">
+                            <i class="fas fa-eye"></i>
+                        </a>
+                        <button class="btn btn-outline-primary" 
+                                onclick="event.stopPropagation(); editarObra({{ obra.id }})"
+                                data-bs-toggle="tooltip" 
+                                title="Editar">
+                            <i class="fas fa-edit"></i>
+                        </button>
+                        <a href="{{ url_for('main.novo_rdo', obra_id=obra.id) }}" 
+                           class="btn btn-outline-success"
+                           onclick="event.stopPropagation()"
+                           data-bs-toggle="tooltip" 
+                           title="Novo RDO">
+                            <i class="fas fa-plus"></i>
+                        </a>
+                        <button class="btn btn-outline-danger" 
+                                onclick="event.stopPropagation(); excluirObra({{ obra.id }})"
+                                data-bs-toggle="tooltip" 
+                                title="Excluir">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    
+    {% if not obras %}
+    <div class="text-center py-5">
+        <i class="fas fa-hard-hat fa-3x text-muted mb-3"></i>
+        <h5 class="text-muted">Nenhuma obra cadastrada</h5>
+        <p class="text-muted">Crie a primeira obra da sua empresa.</p>
+        <button class="btn btn-primary btn-lg" data-bs-toggle="modal" data-bs-target="#obraModal">
+            <i class="fas fa-plus"></i> Criar Primeira Obra
+        </button>
+    </div>
+    {% endif %}
+</div>
+
+<!-- Visualização em Tabela -->
+<div id="tableView" style="display: none;">
+    <div class="card">
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-striped" id="obrasTable">
+                    <thead>
+                        <tr>
+                            <th>Nome</th>
+                            <th>Endereço</th>
+                            <th>Início</th>
+                            <th>Previsão Fim</th>
+                            <th>Orçamento</th>
+                            <th>Status</th>
+                            <th>Responsável</th>
+                            <th>Ações</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for obra in obras %}
+                        <tr>
+                            <td>{{ obra.nome }}</td>
+                            <td>{{ obra.endereco or '-' }}</td>
+                            <td>{{ obra.data_inicio.strftime('%d/%m/%Y') if obra.data_inicio else '-' }}</td>
+                            <td>{{ obra.data_previsao_fim.strftime('%d/%m/%Y') if obra.data_previsao_fim else '-' }}</td>
+                            <td>R$ {{ '{:,.2f}'.format(obra.orcamento) if obra.orcamento else '-' }}</td>
+                            <td>
+                                {% if obra.status == 'Em andamento' %}
+                                    <span class="badge bg-success">{{ obra.status }}</span>
+                                {% elif obra.status == 'Concluída' %}
+                                    <span class="badge bg-primary">{{ obra.status }}</span>
+                                {% elif obra.status == 'Pausada' %}
+                                    <span class="badge bg-warning">{{ obra.status }}</span>
+                                {% else %}
+                                    <span class="badge bg-secondary">{{ obra.status }}</span>
+                                {% endif %}
+                            </td>
+                            <td>{{ obra.responsavel.nome if obra.responsavel else '-' }}</td>
+                            <td>
+                                <div class="btn-group btn-group-sm">
+                                    <a href="{{ url_for('main.detalhes_obra', id=obra.id) }}" 
+                                       class="btn btn-outline-info"
+                                       data-bs-toggle="tooltip" 
+                                       title="Ver Detalhes">
+                                        <i class="fas fa-eye"></i>
+                                    </a>
+                                    <button class="btn btn-outline-primary" 
+                                            onclick="editarObra({{ obra.id }})"
+                                            data-bs-toggle="tooltip" 
+                                            title="Editar">
+                                        <i class="fas fa-edit"></i>
+                                    </button>
+                                    <button class="btn btn-outline-success" 
+                                            onclick="window.location.href='{{ url_for('main.novo_rdo', obra_id=obra.id) }}'"
+                                            data-bs-toggle="tooltip" 
+                                            title="Novo RDO">
+                                        <i class="fas fa-plus"></i>
+                                    </button>
+                                    <button class="btn btn-outline-danger" 
+                                            onclick="excluirObra({{ obra.id }})"
+                                            data-bs-toggle="tooltip" 
+                                            title="Excluir">
+                                        <i class="fas fa-trash"></i>
+                                    </button>
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
         </div>
     </div>
 </div>
@@ -170,21 +286,100 @@
 </div>
 {% endblock %}
 
+{% block styles %}
+<style>
+.obra-card {
+    cursor: pointer;
+    transition: all 0.3s ease;
+    border: 1px solid var(--bs-border-color);
+}
+
+.obra-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    border-color: var(--bs-primary);
+}
+
+.obra-card .card-title {
+    font-size: 1.1rem;
+    font-weight: 600;
+}
+
+.obra-card .btn-group {
+    opacity: 0.8;
+    transition: opacity 0.2s ease;
+}
+
+.obra-card:hover .btn-group {
+    opacity: 1;
+}
+
+@media (max-width: 768px) {
+    .obra-card .btn-group .btn {
+        padding: 0.25rem 0.4rem;
+        font-size: 0.8rem;
+    }
+}
+
+.border-end {
+    border-right: 1px solid var(--bs-border-color) !important;
+}
+</style>
+{% endblock %}
+
 {% block scripts %}
 <script>
+let isCardsView = true;
+
 $(document).ready(function() {
-    // Inicializar DataTable
-    $('#obrasTable').DataTable({
-        language: {
-            url: '//cdn.datatables.net/plug-ins/1.13.6/i18n/pt-BR.json'
-        },
-        order: [[0, 'asc']],
-        pageLength: 25
-    });
-    
     // Configurar data de início padrão
-    document.getElementById('data_inicio').valueAsDate = new Date();
+    if (document.getElementById('data_inicio')) {
+        document.getElementById('data_inicio').valueAsDate = new Date();
+    }
+    
+    // Initialize tooltips
+    var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+    tooltipTriggerList.forEach(function(tooltipTriggerEl) {
+        new bootstrap.Tooltip(tooltipTriggerEl);
+    });
 });
+
+function alternarVisualizacao() {
+    const cardsView = document.getElementById('cardsView');
+    const tableView = document.getElementById('tableView');
+    const toggleIcon = document.getElementById('viewToggleIcon');
+    const toggleText = document.getElementById('viewToggleText');
+    
+    if (isCardsView) {
+        // Mudar para visualização em tabela
+        cardsView.style.display = 'none';
+        tableView.style.display = 'block';
+        toggleIcon.className = 'fas fa-th';
+        toggleText.textContent = 'Visualização Tabela';
+        
+        // Inicializar DataTable se ainda não foi inicializado
+        if (!$.fn.DataTable.isDataTable('#obrasTable')) {
+            $('#obrasTable').DataTable({
+                language: {
+                    url: '//cdn.datatables.net/plug-ins/1.13.6/i18n/pt-BR.json'
+                },
+                order: [[0, 'asc']],
+                pageLength: 25,
+                responsive: true
+            });
+        }
+        
+        isCardsView = false;
+    } else {
+        // Mudar para visualização em cards
+        tableView.style.display = 'none';
+        cardsView.style.display = 'block';
+        toggleIcon.className = 'fas fa-th-large';
+        toggleText.textContent = 'Visualização Cards';
+        
+        isCardsView = true;
+    }
+}
 
 function editarObra(id) {
     // Implementar edição

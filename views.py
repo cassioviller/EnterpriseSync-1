@@ -398,7 +398,39 @@ def excluir_funcao(id):
 @main_bp.route('/obras')
 @login_required
 def obras():
+    from datetime import date, timedelta
+    from sqlalchemy import func
+    
     obras = Obra.query.all()
+    
+    # Adicionar KPIs básicos para cada obra (últimos 30 dias)
+    data_fim = date.today()
+    data_inicio = data_fim - timedelta(days=30)
+    
+    for obra in obras:
+        # Calcular RDOs
+        total_rdos = RDO.query.filter_by(obra_id=obra.id).count()
+        
+        # Calcular dias trabalhados (registros de ponto únicos)
+        dias_trabalhados = db.session.query(RegistroPonto.data).filter(
+            RegistroPonto.obra_id == obra.id,
+            RegistroPonto.data.between(data_inicio, data_fim),
+            RegistroPonto.hora_entrada.isnot(None)
+        ).distinct().count()
+        
+        # Calcular custo total básico (últimos 30 dias)
+        custo_alimentacao = db.session.query(func.sum(RegistroAlimentacao.valor)).filter(
+            RegistroAlimentacao.obra_id == obra.id,
+            RegistroAlimentacao.data.between(data_inicio, data_fim)
+        ).scalar() or 0.0
+        
+        # Criar objeto KPI simples
+        obra.kpis = type('KPIs', (), {
+            'total_rdos': total_rdos,
+            'dias_trabalhados': dias_trabalhados,
+            'custo_total': custo_alimentacao  # Simplificado para exibição nos cards
+        })()
+    
     return render_template('obras.html', obras=obras)
 
 @main_bp.route('/obras/novo', methods=['GET', 'POST'])
@@ -449,34 +481,126 @@ def editar_obra(id):
 @main_bp.route('/obra/<int:id>')
 @login_required
 def detalhes_obra(id):
+    from datetime import datetime, date, timedelta
+    from sqlalchemy import func
+    
     obra = Obra.query.get_or_404(id)
     
-    # Buscar RDOs da obra
+    # Obter filtros de data da query string
+    data_inicio_filtro = request.args.get('data_inicio')
+    data_fim_filtro = request.args.get('data_fim')
+    
+    # Definir período padrão (últimos 30 dias)
+    if not data_inicio_filtro or not data_fim_filtro:
+        data_fim = date.today()
+        data_inicio = data_fim - timedelta(days=30)
+    else:
+        data_inicio = datetime.strptime(data_inicio_filtro, '%Y-%m-%d').date()
+        data_fim = datetime.strptime(data_fim_filtro, '%Y-%m-%d').date()
+    
+    # ===== CÁLCULO DOS KPIS =====
+    
+    # 1. Custos de Transporte (Veículos)
+    custo_transporte = db.session.query(func.sum(CustoVeiculo.valor)).join(
+        UsoVeiculo, CustoVeiculo.veiculo_id == UsoVeiculo.veiculo_id
+    ).filter(
+        UsoVeiculo.obra_id == id,
+        CustoVeiculo.data_custo.between(data_inicio, data_fim)
+    ).scalar() or 0.0
+    
+    # 2. Custos de Alimentação
+    custo_alimentacao = db.session.query(func.sum(RegistroAlimentacao.valor)).filter(
+        RegistroAlimentacao.obra_id == id,
+        RegistroAlimentacao.data.between(data_inicio, data_fim)
+    ).scalar() or 0.0
+    
+    # 3. Custos de Mão de Obra
+    # Buscar registros de ponto da obra no período
+    registros_ponto = db.session.query(RegistroPonto).join(Funcionario).filter(
+        RegistroPonto.obra_id == id,
+        RegistroPonto.data.between(data_inicio, data_fim),
+        RegistroPonto.hora_entrada.isnot(None)  # Só dias trabalhados
+    ).all()
+    
+    custo_mao_obra = 0.0
+    total_horas = 0.0
+    dias_trabalhados = len(set(rp.data for rp in registros_ponto))
+    
+    for registro in registros_ponto:
+        if registro.hora_entrada and registro.hora_saida:
+            # Calcular horas trabalhadas
+            entrada = datetime.combine(registro.data, registro.hora_entrada)
+            saida = datetime.combine(registro.data, registro.hora_saida)
+            
+            # Subtrair tempo de almoço (1 hora padrão)
+            horas_dia = (saida - entrada).total_seconds() / 3600 - 1
+            horas_dia = max(0, horas_dia)  # Não pode ser negativo
+            total_horas += horas_dia
+            
+            # Calcular custo baseado no salário do funcionário
+            if registro.funcionario.salario:
+                valor_hora = registro.funcionario.salario / 220  # 220 horas/mês aprox
+                custo_mao_obra += horas_dia * valor_hora
+    
+    # 4. Custo Total da Obra
+    custo_total = custo_transporte + custo_alimentacao + custo_mao_obra
+    
+    # ===== RDOs =====
+    rdos_periodo = RDO.query.filter(
+        RDO.obra_id == id,
+        RDO.data_relatorio.between(data_inicio, data_fim)
+    ).order_by(RDO.data_relatorio.desc()).all()
+    
     rdos_recentes = RDO.query.filter_by(obra_id=id).order_by(RDO.data_relatorio.desc()).limit(5).all()
     total_rdos = RDO.query.filter_by(obra_id=id).count()
     rdos_finalizados = RDO.query.filter_by(obra_id=id, status='Finalizado').count()
     
-    # Calcular progresso (pode ser mais sofisticado baseado nas atividades)
+    # ===== MÉTRICAS ADICIONAIS =====
+    
+    # Progresso da obra
     progresso_obra = 0
     if total_rdos > 0:
         progresso_obra = min(100, (rdos_finalizados / total_rdos) * 100)
     
-    # Calcular dias
-    from datetime import datetime, date
+    # Calcular dias da obra
     hoje = date.today()
-    dias_decorridos = (hoje - obra.data_inicio).days
+    dias_decorridos = (hoje - obra.data_inicio).days if obra.data_inicio else 0
     dias_restantes = 0
     if obra.data_previsao_fim:
         dias_restantes = max(0, (obra.data_previsao_fim - hoje).days)
     
+    # Funcionários únicos que trabalharam na obra no período
+    funcionarios_periodo = db.session.query(Funcionario).join(RegistroPonto).filter(
+        RegistroPonto.obra_id == id,
+        RegistroPonto.data.between(data_inicio, data_fim),
+        RegistroPonto.hora_entrada.isnot(None)
+    ).distinct().all()
+    
+    # KPIs organizados
+    kpis = {
+        'custo_transporte': custo_transporte,
+        'custo_alimentacao': custo_alimentacao,
+        'custo_mao_obra': custo_mao_obra,
+        'custo_total': custo_total,
+        'dias_trabalhados': dias_trabalhados,
+        'total_horas': round(total_horas, 1),
+        'funcionarios_periodo': len(funcionarios_periodo),
+        'rdos_periodo': len(rdos_periodo)
+    }
+    
     return render_template('obras/detalhes_obra.html', 
                          obra=obra,
+                         kpis=kpis,
+                         rdos_periodo=rdos_periodo,
                          rdos_recentes=rdos_recentes,
                          total_rdos=total_rdos,
                          rdos_finalizados=rdos_finalizados,
                          progresso_obra=int(progresso_obra),
                          dias_decorridos=dias_decorridos,
-                         dias_restantes=dias_restantes)
+                         dias_restantes=dias_restantes,
+                         funcionarios_periodo=funcionarios_periodo,
+                         data_inicio=data_inicio,
+                         data_fim=data_fim)
 
 @main_bp.route('/obras/<int:id>/excluir', methods=['POST'])
 @login_required
