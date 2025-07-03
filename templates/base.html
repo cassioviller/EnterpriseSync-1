@@ -24,8 +24,8 @@
     <!-- Navigation -->
     <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
         <div class="container">
-            <a class="navbar-brand" href="{{ url_for('main.dashboard') }}">
-                <i class="fas fa-building"></i> SIGE - Estruturas do Vale
+            <a class="navbar-brand fw-bold" href="{{ url_for('main.dashboard') }}">
+                <i class="fas fa-building me-2"></i>SIGE
             </a>
             
             <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
@@ -36,64 +36,64 @@
                 <ul class="navbar-nav me-auto">
                     <li class="nav-item">
                         <a class="nav-link" href="{{ url_for('main.dashboard') }}">
-                            <i class="fas fa-tachometer-alt"></i> Dashboard
+                            <i class="fas fa-tachometer-alt me-1"></i> Dashboard
                         </a>
-                    </li>
-                    
-                    <li class="nav-item dropdown">
-                        <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown">
-                            <i class="fas fa-database"></i> Cadastros
-                        </a>
-                        <ul class="dropdown-menu">
-                            <li><a class="dropdown-item" href="{{ url_for('main.funcionarios') }}">
-                                <i class="fas fa-users"></i> Funcionários
-                            </a></li>
-                            <li><a class="dropdown-item" href="{{ url_for('main.departamentos') }}">
-                                <i class="fas fa-sitemap"></i> Departamentos
-                            </a></li>
-                            <li><a class="dropdown-item" href="{{ url_for('main.funcoes') }}">
-                                <i class="fas fa-user-tie"></i> Funções
-                            </a></li>
-                            <li><a class="dropdown-item" href="{{ url_for('main.horarios') }}">
-                                <i class="fas fa-clock"></i> Horários de Trabalho
-                            </a></li>
-                            <li><hr class="dropdown-divider"></li>
-                            <li><a class="dropdown-item" href="{{ url_for('main.obras') }}">
-                                <i class="fas fa-hard-hat"></i> Obras
-                            </a></li>
-                            <li><a class="dropdown-item" href="{{ url_for('main.veiculos') }}">
-                                <i class="fas fa-truck"></i> Veículos
-                            </a></li>
-
-                            <li><a class="dropdown-item" href="{{ url_for('main.servicos') }}">
-                                <i class="fas fa-tools"></i> Serviços
-                            </a></li>
-                        </ul>
                     </li>
                     
                     <li class="nav-item">
                         <a class="nav-link" href="{{ url_for('main.funcionarios') }}">
-                            <i class="fas fa-users"></i> Funcionários
+                            <i class="fas fa-users me-1"></i> Funcionários
+                        </a>
+                    </li>
+                    
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ url_for('main.obras') }}">
+                            <i class="fas fa-hard-hat me-1"></i> Obras
+                        </a>
+                    </li>
+                    
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ url_for('main.veiculos') }}">
+                            <i class="fas fa-truck me-1"></i> Veículos
                         </a>
                     </li>
                     
                     <li class="nav-item">
                         <a class="nav-link" href="{{ url_for('main.lista_rdos') }}">
-                            <i class="fas fa-clipboard-list"></i> RDO
+                            <i class="fas fa-clipboard-list me-1"></i> RDO
                         </a>
                     </li>
                     
                     <li class="nav-item">
                         <a class="nav-link" href="{{ url_for('main.alimentacao_restaurantes') }}">
-                            <i class="fas fa-utensils"></i> Alimentação
+                            <i class="fas fa-utensils me-1"></i> Alimentação
                         </a>
                     </li>
                     
                     <li class="nav-item">
                         <a class="nav-link" href="{{ url_for('main.relatorios') }}">
-                            <i class="fas fa-chart-bar"></i> Relatórios
+                            <i class="fas fa-chart-bar me-1"></i> Relatórios
                         </a>
                     </li>
+                    
+                    <li class="nav-item dropdown">
+                        <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown">
+                            <i class="fas fa-cog me-1"></i> Configurações
+                        </a>
+                        <ul class="dropdown-menu">
+                            <li><a class="dropdown-item" href="{{ url_for('main.departamentos') }}">
+                                <i class="fas fa-sitemap me-2"></i> Departamentos
+                            </a></li>
+                            <li><a class="dropdown-item" href="{{ url_for('main.funcoes') }}">
+                                <i class="fas fa-user-tie me-2"></i> Funções
+                            </a></li>
+                            <li><a class="dropdown-item" href="{{ url_for('main.horarios') }}">
+                                <i class="fas fa-clock me-2"></i> Horários de Trabalho
+                            </a></li>
+                            <li><a class="dropdown-item" href="{{ url_for('main.servicos') }}">
+                                <i class="fas fa-tools me-2"></i> Serviços
+                            </a></li>
+                        </ul>
                     </li>
                 </ul>
                 
