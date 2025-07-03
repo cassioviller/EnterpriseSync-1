@@ -3,7 +3,7 @@ from flask_login import login_required, current_user
 from app import db
 from models import *
 from forms import *
-from utils import calcular_horas_trabalhadas, calcular_custo_real_obra, calcular_custos_mes
+from utils import calcular_horas_trabalhadas, calcular_custo_real_obra, calcular_custos_mes, calcular_kpis_funcionarios_geral
 from datetime import datetime, date
 from sqlalchemy import func
 
@@ -73,8 +73,29 @@ def dashboard():
 @main_bp.route('/funcionarios')
 @login_required
 def funcionarios():
-    funcionarios = Funcionario.query.all()
-    return render_template('funcionarios.html', funcionarios=funcionarios)
+    # Filtros de data dos parâmetros
+    data_inicio = request.args.get('data_inicio')
+    data_fim = request.args.get('data_fim')
+    
+    # Definir período padrão (mês atual)
+    if not data_inicio:
+        data_inicio = date.today().replace(day=1)
+    else:
+        data_inicio = datetime.strptime(data_inicio, '%Y-%m-%d').date()
+    
+    if not data_fim:
+        data_fim = date.today()
+    else:
+        data_fim = datetime.strptime(data_fim, '%Y-%m-%d').date()
+    
+    # Calcular KPIs gerais dos funcionários para o período
+    kpis_geral = calcular_kpis_funcionarios_geral(data_inicio, data_fim)
+    
+    return render_template('funcionarios_novo.html', 
+                         funcionarios_kpis=kpis_geral['funcionarios_kpis'],
+                         kpis_geral=kpis_geral,
+                         data_inicio=data_inicio,
+                         data_fim=data_fim)
 
 @main_bp.route('/funcionarios/novo', methods=['GET', 'POST'])
 @login_required

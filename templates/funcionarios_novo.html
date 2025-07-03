@@ -1,0 +1,286 @@
+{% extends "base.html" %}
+
+{% block title %}Funcionários - SIGE{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- Cabeçalho -->
+    <div class="row">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h1 class="h3">
+                    <i class="fas fa-users"></i> Funcionários
+                </h1>
+                <a href="{{ url_for('main.novo_funcionario') }}" class="btn btn-primary">
+                    <i class="fas fa-plus"></i> Novo Funcionário
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Filtros de Data -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-filter"></i> Filtros de Período
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <form method="GET" action="{{ url_for('main.funcionarios') }}">
+                        <div class="row align-items-end">
+                            <div class="col-md-3">
+                                <label for="data_inicio" class="form-label">Data Inicial</label>
+                                <input type="date" class="form-control" name="data_inicio" id="data_inicio" 
+                                       value="{{ data_inicio }}">
+                            </div>
+                            <div class="col-md-3">
+                                <label for="data_fim" class="form-label">Data Final</label>
+                                <input type="date" class="form-control" name="data_fim" id="data_fim" 
+                                       value="{{ data_fim }}">
+                            </div>
+                            <div class="col-md-3">
+                                <button type="submit" class="btn btn-primary">
+                                    <i class="fas fa-search"></i> Aplicar Filtro
+                                </button>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="btn-group" role="group">
+                                    <button type="button" class="btn btn-outline-secondary btn-sm" 
+                                            onclick="setDateRange('ultimo_mes')">Último Mês</button>
+                                    <button type="button" class="btn btn-outline-secondary btn-sm" 
+                                            onclick="setDateRange('ultimos_3_meses')">3 Meses</button>
+                                    <button type="button" class="btn btn-outline-secondary btn-sm" 
+                                            onclick="setDateRange('ano_atual')">Ano Atual</button>
+                                </div>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- KPIs Gerais -->
+    <div class="row mb-4">
+        <div class="col-md-3">
+            <div class="card bg-primary text-white">
+                <div class="card-body">
+                    <div class="d-flex align-items-center">
+                        <div class="flex-grow-1">
+                            <h6 class="card-title mb-0">Funcionários Ativos</h6>
+                            <h4 class="mb-0">{{ kpis_geral.total_funcionarios }}</h4>
+                        </div>
+                        <div class="ms-3">
+                            <i class="fas fa-users fa-2x opacity-75"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-3">
+            <div class="card bg-success text-white">
+                <div class="card-body">
+                    <div class="d-flex align-items-center">
+                        <div class="flex-grow-1">
+                            <h6 class="card-title mb-0">Custo Total</h6>
+                            <h4 class="mb-0">R$ {{ '{:,.2f}'.format(kpis_geral.total_custo_geral).replace(',', '.') }}</h4>
+                        </div>
+                        <div class="ms-3">
+                            <i class="fas fa-dollar-sign fa-2x opacity-75"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-3">
+            <div class="card bg-info text-white">
+                <div class="card-body">
+                    <div class="d-flex align-items-center">
+                        <div class="flex-grow-1">
+                            <h6 class="card-title mb-0">Total de Horas</h6>
+                            <h4 class="mb-0">{{ '{:,.1f}'.format(kpis_geral.total_horas_geral).replace(',', '.') }}h</h4>
+                        </div>
+                        <div class="ms-3">
+                            <i class="fas fa-clock fa-2x opacity-75"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-3">
+            <div class="card bg-warning text-white">
+                <div class="card-body">
+                    <div class="d-flex align-items-center">
+                        <div class="flex-grow-1">
+                            <h6 class="card-title mb-0">Faltas Justificadas</h6>
+                            <h4 class="mb-0">{{ kpis_geral.total_faltas_geral }} dias</h4>
+                            <small>R$ {{ '{:,.2f}'.format(kpis_geral.total_custo_faltas_geral).replace(',', '.') }}</small>
+                        </div>
+                        <div class="ms-3">
+                            <i class="fas fa-exclamation-triangle fa-2x opacity-75"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Cards de Funcionários -->
+    <div class="row">
+        {% for kpi in funcionarios_kpis %}
+        <div class="col-xl-4 col-lg-6 mb-4">
+            <div class="card h-100">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h6 class="card-title mb-0">
+                        <i class="fas fa-user"></i> {{ kpi.funcionario.nome }}
+                    </h6>
+                    <div class="dropdown">
+                        <button class="btn btn-sm btn-outline-secondary" type="button" data-bs-toggle="dropdown">
+                            <i class="fas fa-ellipsis-v"></i>
+                        </button>
+                        <ul class="dropdown-menu">
+                            <li><a class="dropdown-item" href="{{ url_for('main.funcionario_perfil', id=kpi.funcionario.id) }}">
+                                <i class="fas fa-eye"></i> Ver Perfil
+                            </a></li>
+                            <li><a class="dropdown-item" href="{{ url_for('main.editar_funcionario', id=kpi.funcionario.id) }}">
+                                <i class="fas fa-edit"></i> Editar
+                            </a></li>
+                        </ul>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <!-- Informações Básicas -->
+                    <div class="mb-3">
+                        <small class="text-muted">Cargo:</small><br>
+                        <strong>{{ kpi.funcionario.funcao_ref.nome if kpi.funcionario.funcao_ref else 'Não definido' }}</strong>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <small class="text-muted">Departamento:</small><br>
+                        <strong>{{ kpi.funcionario.departamento_ref.nome if kpi.funcionario.departamento_ref else 'Não definido' }}</strong>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <small class="text-muted">Salário:</small><br>
+                        <strong>R$ {{ '{:,.2f}'.format(kpi.funcionario.salario).replace(',', '.') if kpi.funcionario.salario else '0,00' }}</strong>
+                    </div>
+
+                    <!-- KPIs do Período -->
+                    <div class="row text-center">
+                        <div class="col-6 mb-2">
+                            <div class="border rounded p-2">
+                                <small class="text-muted d-block">Horas Trabalhadas</small>
+                                <strong class="text-primary">{{ '{:,.1f}'.format(kpi.horas_trabalhadas).replace(',', '.') }}h</strong>
+                            </div>
+                        </div>
+                        <div class="col-6 mb-2">
+                            <div class="border rounded p-2">
+                                <small class="text-muted d-block">Horas Extras</small>
+                                <strong class="text-info">{{ '{:,.1f}'.format(kpi.horas_extras).replace(',', '.') }}h</strong>
+                            </div>
+                        </div>
+                        <div class="col-6 mb-2">
+                            <div class="border rounded p-2">
+                                <small class="text-muted d-block">Faltas Justificadas</small>
+                                <strong class="text-warning">{{ kpi.dias_faltas_justificadas }} dias</strong>
+                            </div>
+                        </div>
+                        <div class="col-6 mb-2">
+                            <div class="border rounded p-2">
+                                <small class="text-muted d-block">Custo Total</small>
+                                <strong class="text-success">R$ {{ '{:,.2f}'.format(kpi.custo_total).replace(',', '.') }}</strong>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Detalhamento de Custos -->
+                    <div class="mt-3">
+                        <h6 class="text-muted mb-2">Custos Detalhados:</h6>
+                        <div class="row">
+                            <div class="col-6">
+                                <small class="text-muted">Mão de Obra:</small><br>
+                                <small>R$ {{ '{:,.2f}'.format(kpi.custo_mao_obra).replace(',', '.') }}</small>
+                            </div>
+                            <div class="col-6">
+                                <small class="text-muted">Alimentação:</small><br>
+                                <small>R$ {{ '{:,.2f}'.format(kpi.custo_alimentacao).replace(',', '.') }}</small>
+                            </div>
+                            <div class="col-6">
+                                <small class="text-muted">Transporte:</small><br>
+                                <small>R$ {{ '{:,.2f}'.format(kpi.custo_transporte).replace(',', '.') }}</small>
+                            </div>
+                            <div class="col-6">
+                                <small class="text-muted">Faltas:</small><br>
+                                <small class="text-danger">R$ {{ '{:,.2f}'.format(kpi.custo_faltas_justificadas).replace(',', '.') }}</small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="card-footer">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <span class="badge {{ 'bg-success' if kpi.funcionario.ativo else 'bg-secondary' }}">
+                            {{ 'Ativo' if kpi.funcionario.ativo else 'Inativo' }}
+                        </span>
+                        <small class="text-muted">
+                            Desde {{ kpi.funcionario.data_admissao.strftime('%d/%m/%Y') if kpi.funcionario.data_admissao else 'N/A' }}
+                        </small>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+
+    {% if not funcionarios_kpis %}
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-body text-center">
+                    <i class="fas fa-users fa-4x text-muted mb-3"></i>
+                    <h5 class="text-muted">Nenhum funcionário encontrado</h5>
+                    <p class="text-muted">Não há funcionários ativos no período selecionado.</p>
+                    <a href="{{ url_for('main.novo_funcionario') }}" class="btn btn-primary">
+                        <i class="fas fa-plus"></i> Adicionar Primeiro Funcionário
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+</div>
+
+<script>
+function setDateRange(period) {
+    const today = new Date();
+    let startDate, endDate = today;
+    
+    switch(period) {
+        case 'ultimo_mes':
+            startDate = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+            endDate = new Date(today.getFullYear(), today.getMonth(), 0);
+            break;
+        case 'ultimos_3_meses':
+            startDate = new Date(today.getFullYear(), today.getMonth() - 3, 1);
+            break;
+        case 'ano_atual':
+            startDate = new Date(today.getFullYear(), 0, 1);
+            break;
+    }
+    
+    // Formatar datas para yyyy-mm-dd
+    const formatDate = (date) => {
+        return date.getFullYear() + '-' + 
+               String(date.getMonth() + 1).padStart(2, '0') + '-' + 
+               String(date.getDate()).padStart(2, '0');
+    };
+    
+    document.getElementById('data_inicio').value = formatDate(startDate);
+    document.getElementById('data_fim').value = formatDate(endDate);
+}
+</script>
+{% endblock %}

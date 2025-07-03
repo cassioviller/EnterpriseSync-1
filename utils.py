@@ -76,8 +76,10 @@ def calcular_custo_real_obra(obra_id, data_inicio=None, data_fim=None):
         if registro.funcionario_ref and registro.funcionario_ref.salario:
             # Assumindo salário por hora baseado em 220 horas mensais
             salario_hora = registro.funcionario_ref.salario / 220
-            custo_mao_obra += (registro.horas_trabalhadas * salario_hora)
-            custo_mao_obra += (registro.horas_extras * salario_hora * 1.5)  # 50% adicional para horas extras
+            horas_trabalhadas = registro.horas_trabalhadas or 0
+            horas_extras = registro.horas_extras or 0
+            custo_mao_obra += (horas_trabalhadas * salario_hora)
+            custo_mao_obra += (horas_extras * salario_hora * 1.5)  # 50% adicional para horas extras
     
     # Adicionar custo de alimentação
     query_alimentacao = RegistroAlimentacao.query.filter_by(obra_id=obra_id)
@@ -128,8 +130,10 @@ def calcular_custos_mes(data_inicio=None, data_fim=None):
     for registro in registros_ponto:
         if registro.funcionario_ref and registro.funcionario_ref.salario:
             salario_hora = registro.funcionario_ref.salario / 220
-            custo_mao_obra += (registro.horas_trabalhadas * salario_hora)
-            custo_mao_obra += (registro.horas_extras * salario_hora * 1.5)
+            horas_trabalhadas = registro.horas_trabalhadas or 0
+            horas_extras = registro.horas_extras or 0
+            custo_mao_obra += (horas_trabalhadas * salario_hora)
+            custo_mao_obra += (horas_extras * salario_hora * 1.5)
             
             # Custo de faltas justificadas (empresa perde dinheiro)
             if registro.observacoes and 'falta justificada' in registro.observacoes.lower():
@@ -148,6 +152,120 @@ def calcular_custos_mes(data_inicio=None, data_fim=None):
         'faltas_justificadas': custo_faltas_justificadas,
         'outros': custo_outros,
         'total': custo_alimentacao + custo_transporte + custo_mao_obra + custo_faltas_justificadas + custo_outros
+    }
+
+def calcular_kpis_funcionario_periodo(funcionario_id, data_inicio=None, data_fim=None):
+    """
+    Calcula KPIs individuais de um funcionário para um período específico
+    """
+    from models import Funcionario, RegistroPonto, RegistroAlimentacao, CustoVeiculo, UsoVeiculo
+    
+    if not data_inicio:
+        data_inicio = date.today().replace(day=1)
+    if not data_fim:
+        data_fim = date.today()
+    
+    funcionario = Funcionario.query.get(funcionario_id)
+    if not funcionario:
+        return None
+    
+    # Registros de ponto no período
+    registros_ponto = RegistroPonto.query.filter(
+        RegistroPonto.funcionario_id == funcionario_id,
+        RegistroPonto.data >= data_inicio,
+        RegistroPonto.data <= data_fim
+    ).all()
+    
+    # Cálculo de horas trabalhadas
+    total_horas_trabalhadas = 0
+    total_horas_extras = 0
+    dias_faltas_justificadas = 0
+    custo_faltas_justificadas = 0
+    
+    for registro in registros_ponto:
+        horas_trabalhadas = registro.horas_trabalhadas or 0
+        horas_extras = registro.horas_extras or 0
+        total_horas_trabalhadas += horas_trabalhadas
+        total_horas_extras += horas_extras
+        
+        # Contar faltas justificadas
+        if registro.observacoes and 'falta justificada' in registro.observacoes.lower():
+            dias_faltas_justificadas += 1
+            if funcionario.salario:
+                salario_hora = funcionario.salario / 220
+                custo_faltas_justificadas += salario_hora * 8  # 8 horas por dia
+    
+    # Custo de mão de obra
+    custo_mao_obra = 0
+    if funcionario.salario:
+        salario_hora = funcionario.salario / 220
+        custo_mao_obra = (total_horas_trabalhadas * salario_hora) + (total_horas_extras * salario_hora * 1.5)
+    
+    # Custo de alimentação
+    custo_alimentacao = db.session.query(func.sum(RegistroAlimentacao.valor)).filter(
+        RegistroAlimentacao.funcionario_id == funcionario_id,
+        RegistroAlimentacao.data >= data_inicio,
+        RegistroAlimentacao.data <= data_fim
+    ).scalar() or 0
+    
+    # Custo de transporte (baseado no uso de veículos)
+    custo_transporte = 0
+    usos_veiculo = UsoVeiculo.query.filter(
+        UsoVeiculo.funcionario_id == funcionario_id,
+        UsoVeiculo.data_uso >= data_inicio,
+        UsoVeiculo.data_uso <= data_fim
+    ).all()
+    
+    # Assumindo um custo médio por uso de veículo (pode ser refinado)
+    custo_transporte = len(usos_veiculo) * 50.0  # R$ 50 por uso estimado
+    
+    # Custo total do funcionário
+    custo_total = custo_mao_obra + custo_alimentacao + custo_transporte + custo_faltas_justificadas
+    
+    return {
+        'funcionario': funcionario,
+        'horas_trabalhadas': total_horas_trabalhadas,
+        'horas_extras': total_horas_extras,
+        'dias_faltas_justificadas': dias_faltas_justificadas,
+        'custo_mao_obra': custo_mao_obra,
+        'custo_alimentacao': custo_alimentacao,
+        'custo_transporte': custo_transporte,
+        'custo_faltas_justificadas': custo_faltas_justificadas,
+        'custo_total': custo_total
+    }
+
+def calcular_kpis_funcionarios_geral(data_inicio=None, data_fim=None):
+    """
+    Calcula KPIs gerais de todos os funcionários para um período
+    """
+    from models import Funcionario
+    
+    funcionarios_ativos = Funcionario.query.filter_by(ativo=True).all()
+    
+    total_funcionarios = len(funcionarios_ativos)
+    total_custo_geral = 0
+    total_horas_geral = 0
+    total_faltas_geral = 0
+    total_custo_faltas_geral = 0
+    
+    funcionarios_kpis = []
+    
+    for funcionario in funcionarios_ativos:
+        kpi = calcular_kpis_funcionario_periodo(funcionario.id, data_inicio, data_fim)
+        if kpi:
+            funcionarios_kpis.append(kpi)
+            total_custo_geral += kpi['custo_total']
+            total_horas_geral += kpi['horas_trabalhadas']
+            total_faltas_geral += kpi['dias_faltas_justificadas']
+            total_custo_faltas_geral += kpi['custo_faltas_justificadas']
+    
+    return {
+        'total_funcionarios': total_funcionarios,
+        'total_custo_geral': total_custo_geral,
+        'total_horas_geral': total_horas_geral,
+        'total_faltas_geral': total_faltas_geral,
+        'total_custo_faltas_geral': total_custo_faltas_geral,
+        'funcionarios_kpis': funcionarios_kpis
     }
 
 def formatar_cpf(cpf):
