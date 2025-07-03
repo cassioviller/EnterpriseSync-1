@@ -144,3 +144,94 @@ class Ocorrencia(db.Model):
     
     # Relacionamento
     funcionario = db.relationship('Funcionario', backref='ocorrencias')
+
+
+class RDO(db.Model):
+    __tablename__ = 'rdo'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    numero_rdo = db.Column(db.String(20), unique=True, nullable=False)  # Auto-gerado
+    data_relatorio = db.Column(db.Date, nullable=False)
+    obra_id = db.Column(db.Integer, db.ForeignKey('obra.id'), nullable=False)
+    criado_por_id = db.Column(db.Integer, db.ForeignKey('funcionario.id'), nullable=False)
+    
+    # Condições climáticas
+    tempo_manha = db.Column(db.String(50))
+    tempo_tarde = db.Column(db.String(50))
+    tempo_noite = db.Column(db.String(50))
+    observacoes_meteorologicas = db.Column(db.Text)
+    
+    # Comentários gerais
+    comentario_geral = db.Column(db.Text)
+    
+    # Status e controle
+    status = db.Column(db.String(20), default='Rascunho')  # Rascunho, Finalizado
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    # Relacionamentos
+    obra = db.relationship('Obra', backref='rdos')
+    criado_por = db.relationship('Funcionario', backref='rdos_criados')
+    mao_obra = db.relationship('RDOMaoObra', backref='rdo_ref', cascade='all, delete-orphan')
+    equipamentos = db.relationship('RDOEquipamento', backref='rdo_ref', cascade='all, delete-orphan')
+    atividades = db.relationship('RDOAtividade', backref='rdo_ref', cascade='all, delete-orphan')
+    ocorrencias_rdo = db.relationship('RDOOcorrencia', backref='rdo_ref', cascade='all, delete-orphan')
+    fotos = db.relationship('RDOFoto', backref='rdo_ref', cascade='all, delete-orphan')
+    
+    def __repr__(self):
+        return f'<RDO {self.numero_rdo}>'
+
+
+class RDOMaoObra(db.Model):
+    __tablename__ = 'rdo_mao_obra'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    rdo_id = db.Column(db.Integer, db.ForeignKey('rdo.id'), nullable=False)
+    funcionario_id = db.Column(db.Integer, db.ForeignKey('funcionario.id'), nullable=False)
+    funcao_exercida = db.Column(db.String(100), nullable=False)
+    horas_trabalhadas = db.Column(db.Float, nullable=False)
+    
+    # Relacionamentos
+    funcionario = db.relationship('Funcionario', backref='rdos_mao_obra')
+
+
+class RDOEquipamento(db.Model):
+    __tablename__ = 'rdo_equipamento'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    rdo_id = db.Column(db.Integer, db.ForeignKey('rdo.id'), nullable=False)
+    nome_equipamento = db.Column(db.String(100), nullable=False)
+    quantidade = db.Column(db.Integer, nullable=False)
+    horas_uso = db.Column(db.Float, nullable=False)
+    estado_conservacao = db.Column(db.String(50), nullable=False)
+
+
+class RDOAtividade(db.Model):
+    __tablename__ = 'rdo_atividade'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    rdo_id = db.Column(db.Integer, db.ForeignKey('rdo.id'), nullable=False)
+    descricao_atividade = db.Column(db.Text, nullable=False)
+    percentual_conclusao = db.Column(db.Float, nullable=False)  # 0-100
+    observacoes_tecnicas = db.Column(db.Text)
+
+
+class RDOOcorrencia(db.Model):
+    __tablename__ = 'rdo_ocorrencia'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    rdo_id = db.Column(db.Integer, db.ForeignKey('rdo.id'), nullable=False)
+    descricao_ocorrencia = db.Column(db.Text, nullable=False)
+    problemas_identificados = db.Column(db.Text)
+    acoes_corretivas = db.Column(db.Text)
+
+
+class RDOFoto(db.Model):
+    __tablename__ = 'rdo_foto'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    rdo_id = db.Column(db.Integer, db.ForeignKey('rdo.id'), nullable=False)
+    nome_arquivo = db.Column(db.String(255), nullable=False)
+    caminho_arquivo = db.Column(db.String(500), nullable=False)
+    legenda = db.Column(db.Text)
+    uploaded_at = db.Column(db.DateTime, default=datetime.utcnow)

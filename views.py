@@ -1002,3 +1002,192 @@ def excluir_horario(id):
     db.session.commit()
     flash('Horário de trabalho excluído com sucesso!', 'success')
     return redirect(url_for('main.horarios'))
+
+
+# ============ ROTAS RDO ============
+
+@main_bp.route('/rdo')
+@login_required
+def lista_rdos():
+    """Lista todos os RDOs com filtros"""
+    from forms import RDOFiltroForm
+    from models import RDO, Obra
+    
+    form = RDOFiltroForm()
+    
+    # Populando choices das obras
+    form.obra_id.choices = [(0, 'Todas as Obras')] + [(obra.id, obra.nome) for obra in Obra.query.all()]
+    
+    # Query base
+    query = RDO.query.join(Obra).join(Funcionario, RDO.criado_por_id == Funcionario.id)
+    
+    # Aplicar filtros se fornecidos
+    if request.method == 'POST' and form.validate():
+        if form.data_inicio.data:
+            query = query.filter(RDO.data_relatorio >= form.data_inicio.data)
+        if form.data_fim.data:
+            query = query.filter(RDO.data_relatorio <= form.data_fim.data)
+        if form.obra_id.data and form.obra_id.data != 0:
+            query = query.filter(RDO.obra_id == form.obra_id.data)
+        if form.status.data:
+            query = query.filter(RDO.status == form.status.data)
+    
+    # Ordenar por data mais recente
+    rdos = query.order_by(RDO.data_relatorio.desc()).all()
+    
+    return render_template('rdo/lista_rdos.html', rdos=rdos, form=form)
+
+
+@main_bp.route('/rdo/novo')
+@main_bp.route('/rdo/novo/<int:obra_id>')
+@login_required
+def novo_rdo(obra_id=None):
+    """Criar novo RDO"""
+    from forms import RDOForm
+    from models import Obra
+    
+    form = RDOForm()
+    
+    # Populando choices das obras
+    form.obra_id.choices = [(obra.id, obra.nome) for obra in Obra.query.all()]
+    
+    # Se obra_id foi fornecida, pré-selecionar
+    if obra_id:
+        form.obra_id.data = obra_id
+    
+    return render_template('rdo/formulario_rdo.html', form=form, modo='criar')
+
+
+@main_bp.route('/rdo/criar', methods=['POST'])
+@login_required
+def criar_rdo():
+    """Processar criação de RDO"""
+    from forms import RDOForm
+    from models import RDO, Obra
+    import uuid
+    from datetime import datetime
+    
+    form = RDOForm()
+    form.obra_id.choices = [(obra.id, obra.nome) for obra in Obra.query.all()]
+    
+    if form.validate_on_submit():
+        # Gerar número único do RDO
+        numero_rdo = f"RDO-{datetime.now().year}-{str(uuid.uuid4())[:8].upper()}"
+        
+        rdo = RDO(
+            numero_rdo=numero_rdo,
+            data_relatorio=form.data_relatorio.data,
+            obra_id=form.obra_id.data,
+            criado_por_id=current_user.id,  # Assumindo que current_user é um funcionário
+            tempo_manha=form.tempo_manha.data,
+            tempo_tarde=form.tempo_tarde.data,
+            tempo_noite=form.tempo_noite.data,
+            observacoes_meteorologicas=form.observacoes_meteorologicas.data,
+            comentario_geral=form.comentario_geral.data,
+            status=form.status.data
+        )
+        
+        db.session.add(rdo)
+        db.session.commit()
+        
+        flash('RDO criado com sucesso!', 'success')
+        return redirect(url_for('main.visualizar_rdo', id=rdo.id))
+    
+    return render_template('rdo/formulario_rdo.html', form=form, modo='criar')
+
+
+@main_bp.route('/rdo/<int:id>')
+@login_required
+def visualizar_rdo(id):
+    """Visualizar detalhes de um RDO"""
+    from models import RDO
+    
+    rdo = RDO.query.get_or_404(id)
+    return render_template('rdo/visualizar_rdo.html', rdo=rdo)
+
+
+@main_bp.route('/rdo/<int:id>/editar')
+@login_required
+def editar_rdo(id):
+    """Editar RDO existente"""
+    from forms import RDOForm
+    from models import RDO, Obra
+    
+    rdo = RDO.query.get_or_404(id)
+    form = RDOForm(obj=rdo)
+    
+    # Populando choices das obras
+    form.obra_id.choices = [(obra.id, obra.nome) for obra in Obra.query.all()]
+    
+    return render_template('rdo/formulario_rdo.html', form=form, rdo=rdo, modo='editar')
+
+
+@main_bp.route('/rdo/<int:id>/atualizar', methods=['POST'])
+@login_required
+def atualizar_rdo(id):
+    """Processar atualização de RDO"""
+    from forms import RDOForm
+    from models import RDO, Obra
+    
+    rdo = RDO.query.get_or_404(id)
+    form = RDOForm()
+    form.obra_id.choices = [(obra.id, obra.nome) for obra in Obra.query.all()]
+    
+    if form.validate_on_submit():
+        rdo.data_relatorio = form.data_relatorio.data
+        rdo.obra_id = form.obra_id.data
+        rdo.tempo_manha = form.tempo_manha.data
+        rdo.tempo_tarde = form.tempo_tarde.data
+        rdo.tempo_noite = form.tempo_noite.data
+        rdo.observacoes_meteorologicas = form.observacoes_meteorologicas.data
+        rdo.comentario_geral = form.comentario_geral.data
+        rdo.status = form.status.data
+        
+        db.session.commit()
+        
+        flash('RDO atualizado com sucesso!', 'success')
+        return redirect(url_for('main.visualizar_rdo', id=rdo.id))
+    
+    return render_template('rdo/formulario_rdo.html', form=form, rdo=rdo, modo='editar')
+
+
+@main_bp.route('/rdo/<int:id>/excluir', methods=['POST'])
+@login_required
+def excluir_rdo(id):
+    """Excluir RDO"""
+    from models import RDO
+    
+    rdo = RDO.query.get_or_404(id)
+    
+    db.session.delete(rdo)
+    db.session.commit()
+    
+    flash('RDO excluído com sucesso!', 'success')
+    return redirect(url_for('main.lista_rdos'))
+
+
+# Rotas para seções dinâmicas do RDO
+@main_bp.route('/rdo/<int:rdo_id>/mao-obra')
+@login_required
+def gerenciar_mao_obra(rdo_id):
+    """Gerenciar mão de obra do RDO"""
+    from models import RDO, RDOMaoObra, Funcionario
+    
+    rdo = RDO.query.get_or_404(rdo_id)
+    funcionarios = Funcionario.query.filter_by(ativo=True).all()
+    
+    return render_template('rdo/secoes/mao_obra.html', 
+                         rdo=rdo, 
+                         funcionarios=funcionarios)
+
+
+@main_bp.route('/obras/<int:id>/rdos')
+@login_required
+def rdos_por_obra(id):
+    """Lista RDOs de uma obra específica"""
+    from models import Obra, RDO
+    
+    obra = Obra.query.get_or_404(id)
+    rdos = RDO.query.filter_by(obra_id=id).order_by(RDO.data_relatorio.desc()).all()
+    
+    return render_template('rdo/rdos_obra.html', obra=obra, rdos=rdos)

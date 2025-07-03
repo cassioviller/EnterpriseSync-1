@@ -108,3 +108,61 @@ class HorarioTrabalhoForm(FlaskForm):
         ('7', 'Domingo'),
         ('6,7', 'Sábado e Domingo')
     ], validators=[DataRequired()])
+
+
+# Formulários para RDO
+class RDOForm(FlaskForm):
+    # Informações gerais
+    data_relatorio = DateField('Data do Relatório', validators=[DataRequired()], default=date.today)
+    obra_id = SelectField('Obra', coerce=int, validators=[DataRequired()])
+    
+    # Condições climáticas
+    tempo_manha = SelectField('Tempo da Manhã', choices=[
+        ('', 'Selecione...'),
+        ('Ensolarado', 'Ensolarado'),
+        ('Nublado', 'Nublado'),
+        ('Chuvoso', 'Chuvoso'),
+        ('Parcialmente Nublado', 'Parcialmente Nublado'),
+        ('Garoa', 'Garoa'),
+        ('Tempestade', 'Tempestade')
+    ])
+    tempo_tarde = SelectField('Tempo da Tarde', choices=[
+        ('', 'Selecione...'),
+        ('Ensolarado', 'Ensolarado'),
+        ('Nublado', 'Nublado'),
+        ('Chuvoso', 'Chuvoso'),
+        ('Parcialmente Nublado', 'Parcialmente Nublado'),
+        ('Garoa', 'Garoa'),
+        ('Tempestade', 'Tempestade')
+    ])
+    tempo_noite = SelectField('Tempo da Noite', choices=[
+        ('', 'Selecione...'),
+        ('Ensolarado', 'Ensolarado'),
+        ('Nublado', 'Nublado'),
+        ('Chuvoso', 'Chuvoso'),
+        ('Parcialmente Nublado', 'Parcialmente Nublado'),
+        ('Garoa', 'Garoa'),
+        ('Tempestade', 'Tempestade')
+    ])
+    observacoes_meteorologicas = TextAreaField('Observações Meteorológicas')
+    
+    # Comentários
+    comentario_geral = TextAreaField('Comentário Geral')
+    
+    # Status
+    status = SelectField('Status', choices=[
+        ('Rascunho', 'Rascunho'),
+        ('Finalizado', 'Finalizado')
+    ], default='Rascunho')
+
+
+# Formulário para busca/filtro de RDOs
+class RDOFiltroForm(FlaskForm):
+    data_inicio = DateField('Data de Início', validators=[Optional()])
+    data_fim = DateField('Data de Fim', validators=[Optional()])
+    obra_id = SelectField('Obra', coerce=int, validators=[Optional()])
+    status = SelectField('Status', choices=[
+        ('', 'Todos'),
+        ('Rascunho', 'Rascunho'),
+        ('Finalizado', 'Finalizado')
+    ], validators=[Optional()])
