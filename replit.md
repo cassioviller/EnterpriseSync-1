@@ -154,6 +154,8 @@ SIGE (Sistema Integrado de Gestão Empresarial) is a comprehensive business mana
 ## Changelog
 
 - July 03, 2025. Initial setup
+- July 03, 2025. Enhanced employee management with photo upload and real-time validation
+- July 03, 2025. Implemented comprehensive employee profile page with KPIs, time tracking history, and occurrence management
 
 ## User Preferences
 

@@ -142,3 +142,16 @@ class RegistroAlimentacao(db.Model):
     valor = db.Column(db.Float, nullable=False)
     observacoes = db.Column(db.Text)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+class Ocorrencia(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    funcionario_id = db.Column(db.Integer, db.ForeignKey('funcionario.id'), nullable=False)
+    tipo = db.Column(db.String(50), nullable=False)
+    data_inicio = db.Column(db.Date, nullable=False)
+    data_fim = db.Column(db.Date)
+    descricao = db.Column(db.Text)
+    status = db.Column(db.String(20), default='Pendente')
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    
+    # Relacionamento
+    funcionario = db.relationship('Funcionario', backref='ocorrencias')

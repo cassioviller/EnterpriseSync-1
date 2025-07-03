@@ -1,0 +1,844 @@
+{% extends "base.html" %}
+
+{% block title %}{{ funcionario.nome }} - Perfil - SIGE{% endblock %}
+
+{% block content %}
+<!-- Cabeçalho -->
+<div class="row">
+    <div class="col-12">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h1 class="h3">
+                <i class="fas fa-user"></i> {{ funcionario.nome }}
+            </h1>
+            <div class="btn-group">
+                <a href="{{ url_for('editar_funcionario', id=funcionario.id) }}" class="btn btn-primary">
+                    <i class="fas fa-edit"></i> Editar
+                </a>
+                <a href="{{ url_for('funcionarios') }}" class="btn btn-secondary">
+                    <i class="fas fa-arrow-left"></i> Voltar
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Dados Cadastrais Básicos -->
+<div class="row mb-4">
+    <div class="col-md-3">
+        <div class="card text-center">
+            <div class="card-body">
+                <img src="{{ url_for('static', filename='images/default-avatar.svg') }}" 
+                     class="rounded-circle mb-3" 
+                     width="120" 
+                     height="120" 
+                     style="object-fit: cover;">
+                <h5 class="card-title mb-1">{{ funcionario.nome }}</h5>
+                <p class="text-muted mb-2">{{ funcionario.funcao_ref.nome if funcionario.funcao_ref else 'Sem função' }}</p>
+                {% if funcionario.ativo %}
+                    <span class="badge bg-success">Ativo</span>
+                {% else %}
+                    <span class="badge bg-secondary">Inativo</span>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    <div class="col-md-9">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-info-circle"></i> Dados Cadastrais
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-6">
+                        <table class="table table-borderless">
+                            <tr>
+                                <td class="fw-bold">CPF:</td>
+                                <td>{{ funcionario.cpf }}</td>
+                            </tr>
+                            <tr>
+                                <td class="fw-bold">RG:</td>
+                                <td>{{ funcionario.rg or '-' }}</td>
+                            </tr>
+                            <tr>
+                                <td class="fw-bold">Data de Nascimento:</td>
+                                <td>{{ funcionario.data_nascimento.strftime('%d/%m/%Y') if funcionario.data_nascimento else '-' }}</td>
+                            </tr>
+                            <tr>
+                                <td class="fw-bold">Telefone:</td>
+                                <td>{{ funcionario.telefone or '-' }}</td>
+                            </tr>
+                            <tr>
+                                <td class="fw-bold">Email:</td>
+                                <td>{{ funcionario.email or '-' }}</td>
+                            </tr>
+                        </table>
+                    </div>
+                    <div class="col-md-6">
+                        <table class="table table-borderless">
+                            <tr>
+                                <td class="fw-bold">Data de Admissão:</td>
+                                <td>{{ funcionario.data_admissao.strftime('%d/%m/%Y') }}</td>
+                            </tr>
+                            <tr>
+                                <td class="fw-bold">Salário:</td>
+                                <td>R$ {{ '{:,.2f}'.format(funcionario.salario) }}</td>
+                            </tr>
+                            <tr>
+                                <td class="fw-bold">Departamento:</td>
+                                <td>{{ funcionario.departamento_ref.nome if funcionario.departamento_ref else '-' }}</td>
+                            </tr>
+                            <tr>
+                                <td class="fw-bold">Função:</td>
+                                <td>{{ funcionario.funcao_ref.nome if funcionario.funcao_ref else '-' }}</td>
+                            </tr>
+                            <tr>
+                                <td class="fw-bold">Endereço:</td>
+                                <td>{{ funcionario.endereco or '-' }}</td>
+                            </tr>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- KPIs Individuais -->
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-chart-line"></i> Indicadores de Desempenho (Mês Atual)
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-2">
+                        <div class="text-center p-3 border rounded">
+                            <h4 class="text-primary mb-1">{{ '{:.1f}h'.format(kpis.horas_trabalhadas) }}</h4>
+                            <small class="text-muted">Horas Trabalhadas</small>
+                        </div>
+                    </div>
+                    <div class="col-md-2">
+                        <div class="text-center p-3 border rounded">
+                            <h4 class="text-warning mb-1">{{ '{:.1f}h'.format(kpis.horas_extras) }}</h4>
+                            <small class="text-muted">Horas Extras</small>
+                        </div>
+                    </div>
+                    <div class="col-md-2">
+                        <div class="text-center p-3 border rounded">
+                            <h4 class="text-danger mb-1">{{ kpis.faltas }}</h4>
+                            <small class="text-muted">Faltas</small>
+                        </div>
+                    </div>
+                    <div class="col-md-2">
+                        <div class="text-center p-3 border rounded">
+                            <h4 class="text-info mb-1">{{ kpis.atrasos }}</h4>
+                            <small class="text-muted">Atrasos</small>
+                        </div>
+                    </div>
+                    <div class="col-md-2">
+                        <div class="text-center p-3 border rounded">
+                            <h4 class="text-secondary mb-1">{{ '{:.1f}%'.format(kpis.absenteismo) }}</h4>
+                            <small class="text-muted">Absenteísmo</small>
+                        </div>
+                    </div>
+                    <div class="col-md-2">
+                        <div class="text-center p-3 border rounded">
+                            <h4 class="text-success mb-1">{{ '{:.1f}h'.format(kpis.media_horas_diarias) }}</h4>
+                            <small class="text-muted">Média Diária</small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Controle de Ponto -->
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-clock"></i> Controle de Ponto
+                </h5>
+                <button class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#pontoModal">
+                    <i class="fas fa-plus"></i> Novo Registro
+                </button>
+            </div>
+            <div class="card-body">
+                <!-- Filtros -->
+                <div class="row mb-3">
+                    <div class="col-md-3">
+                        <label for="filtro_data_inicio" class="form-label">Data Início</label>
+                        <input type="date" class="form-control" id="filtro_data_inicio">
+                    </div>
+                    <div class="col-md-3">
+                        <label for="filtro_data_fim" class="form-label">Data Fim</label>
+                        <input type="date" class="form-control" id="filtro_data_fim">
+                    </div>
+                    <div class="col-md-3">
+                        <label for="filtro_obra" class="form-label">Obra</label>
+                        <select class="form-select" id="filtro_obra">
+                            <option value="">Todas as obras</option>
+                            {% for obra in obras %}
+                            <option value="{{ obra.id }}">{{ obra.nome }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label">&nbsp;</label>
+                        <div class="d-grid">
+                            <button type="button" class="btn btn-secondary" onclick="filtrarPonto()">
+                                <i class="fas fa-filter"></i> Filtrar
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Tabela de Registros -->
+                <div class="table-responsive">
+                    <table class="table table-striped" id="pontoTable">
+                        <thead>
+                            <tr>
+                                <th>Data</th>
+                                <th>Entrada</th>
+                                <th>Saída Almoço</th>
+                                <th>Retorno Almoço</th>
+                                <th>Saída</th>
+                                <th>H. Trabalhadas</th>
+                                <th>H. Extras</th>
+                                <th>Obra</th>
+                                <th>Ações</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for registro in registros_ponto %}
+                            <tr>
+                                <td>{{ registro.data.strftime('%d/%m/%Y') }}</td>
+                                <td>
+                                    {% if registro.hora_entrada %}
+                                        <span class="badge bg-info">{{ registro.hora_entrada.strftime('%H:%M') }}</span>
+                                    {% else %}
+                                        <span class="text-muted">-</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if registro.hora_almoco_saida %}
+                                        <span class="badge bg-warning">{{ registro.hora_almoco_saida.strftime('%H:%M') }}</span>
+                                    {% else %}
+                                        <span class="text-muted">-</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if registro.hora_almoco_retorno %}
+                                        <span class="badge bg-info">{{ registro.hora_almoco_retorno.strftime('%H:%M') }}</span>
+                                    {% else %}
+                                        <span class="text-muted">-</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if registro.hora_saida %}
+                                        <span class="badge bg-danger">{{ registro.hora_saida.strftime('%H:%M') }}</span>
+                                    {% else %}
+                                        <span class="text-muted">-</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if registro.horas_trabalhadas %}
+                                        <span class="fw-bold text-primary">{{ '{:.2f}h'.format(registro.horas_trabalhadas) }}</span>
+                                    {% else %}
+                                        <span class="text-muted">-</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if registro.horas_extras and registro.horas_extras > 0 %}
+                                        <span class="badge bg-warning">{{ '{:.2f}h'.format(registro.horas_extras) }}</span>
+                                    {% else %}
+                                        <span class="text-muted">-</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if registro.obra_ref %}
+                                        <span class="badge bg-secondary">{{ registro.obra_ref.nome }}</span>
+                                    {% else %}
+                                        <span class="text-muted">-</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <div class="btn-group btn-group-sm">
+                                        <button class="btn btn-outline-primary" 
+                                                onclick="editarPonto({{ registro.id }})"
+                                                data-bs-toggle="tooltip" 
+                                                title="Editar">
+                                            <i class="fas fa-edit"></i>
+                                        </button>
+                                        <button class="btn btn-outline-danger" 
+                                                onclick="excluirPonto({{ registro.id }})"
+                                                data-bs-toggle="tooltip" 
+                                                title="Excluir">
+                                            <i class="fas fa-trash"></i>
+                                        </button>
+                                    </div>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Histórico de Ocorrências -->
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-clipboard-list"></i> Histórico de Ocorrências
+                </h5>
+                <button class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#ocorrenciaModal">
+                    <i class="fas fa-plus"></i> Nova Ocorrência
+                </button>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-striped" id="ocorrenciasTable">
+                        <thead>
+                            <tr>
+                                <th>Tipo</th>
+                                <th>Data Início</th>
+                                <th>Data Fim</th>
+                                <th>Descrição</th>
+                                <th>Status</th>
+                                <th>Ações</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for ocorrencia in ocorrencias %}
+                            <tr>
+                                <td><span class="badge bg-primary">{{ ocorrencia.tipo }}</span></td>
+                                <td>{{ ocorrencia.data_inicio.strftime('%d/%m/%Y') if ocorrencia.data_inicio else '-' }}</td>
+                                <td>{{ ocorrencia.data_fim.strftime('%d/%m/%Y') if ocorrencia.data_fim else '-' }}</td>
+                                <td>{{ ocorrencia.descricao[:50] + '...' if ocorrencia.descricao and ocorrencia.descricao|length > 50 else (ocorrencia.descricao or '-') }}</td>
+                                <td>
+                                    {% if ocorrencia.status == 'Aprovada' %}
+                                        <span class="badge bg-success">{{ ocorrencia.status }}</span>
+                                    {% elif ocorrencia.status == 'Rejeitada' %}
+                                        <span class="badge bg-danger">{{ ocorrencia.status }}</span>
+                                    {% else %}
+                                        <span class="badge bg-warning">{{ ocorrencia.status or 'Pendente' }}</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <div class="btn-group btn-group-sm">
+                                        <button class="btn btn-outline-primary" 
+                                                onclick="editarOcorrencia({{ ocorrencia.id }})"
+                                                data-bs-toggle="tooltip" 
+                                                title="Editar">
+                                            <i class="fas fa-edit"></i>
+                                        </button>
+                                        <button class="btn btn-outline-danger" 
+                                                onclick="excluirOcorrencia({{ ocorrencia.id }})"
+                                                data-bs-toggle="tooltip" 
+                                                title="Excluir">
+                                            <i class="fas fa-trash"></i>
+                                        </button>
+                                    </div>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Histórico de Alimentação -->
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-utensils"></i> Histórico de Alimentação
+                </h5>
+                <button class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#alimentacaoModal">
+                    <i class="fas fa-plus"></i> Novo Registro
+                </button>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-striped" id="alimentacaoTable">
+                        <thead>
+                            <tr>
+                                <th>Data</th>
+                                <th>Tipo</th>
+                                <th>Valor</th>
+                                <th>Obra</th>
+                                <th>Observações</th>
+                                <th>Ações</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for registro in registros_alimentacao %}
+                            <tr>
+                                <td>{{ registro.data.strftime('%d/%m/%Y') }}</td>
+                                <td>
+                                    {% if registro.tipo == 'cafe' %}
+                                        <span class="badge bg-warning">Café da Manhã</span>
+                                    {% elif registro.tipo == 'almoco' %}
+                                        <span class="badge bg-primary">Almoço</span>
+                                    {% elif registro.tipo == 'jantar' %}
+                                        <span class="badge bg-dark">Jantar</span>
+                                    {% else %}
+                                        <span class="badge bg-info">{{ registro.tipo.title() }}</span>
+                                    {% endif %}
+                                </td>
+                                <td>R$ {{ '{:,.2f}'.format(registro.valor) }}</td>
+                                <td>
+                                    {% if registro.obra_ref %}
+                                        <span class="badge bg-secondary">{{ registro.obra_ref.nome }}</span>
+                                    {% else %}
+                                        <span class="text-muted">-</span>
+                                    {% endif %}
+                                </td>
+                                <td>{{ registro.observacoes[:30] + '...' if registro.observacoes and registro.observacoes|length > 30 else (registro.observacoes or '-') }}</td>
+                                <td>
+                                    <div class="btn-group btn-group-sm">
+                                        <button class="btn btn-outline-primary" 
+                                                onclick="editarAlimentacao({{ registro.id }})"
+                                                data-bs-toggle="tooltip" 
+                                                title="Editar">
+                                            <i class="fas fa-edit"></i>
+                                        </button>
+                                        <button class="btn btn-outline-danger" 
+                                                onclick="excluirAlimentacao({{ registro.id }})"
+                                                data-bs-toggle="tooltip" 
+                                                title="Excluir">
+                                            <i class="fas fa-trash"></i>
+                                        </button>
+                                    </div>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Gráficos de Desempenho -->
+<div class="row mb-4">
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-chart-line"></i> Evolução de Horas Trabalhadas
+                </h5>
+            </div>
+            <div class="card-body">
+                <canvas id="horasTrabalhadasChart" width="400" height="200"></canvas>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-chart-bar"></i> Absenteísmo Mensal
+                </h5>
+            </div>
+            <div class="card-body">
+                <canvas id="absenteismoChart" width="400" height="200"></canvas>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Registro de Ponto -->
+<div class="modal fade" id="pontoModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="pontoModalLabel">Novo Registro de Ponto</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="POST" id="pontoForm" action="{{ url_for('novo_ponto') }}">
+                <div class="modal-body">
+                    <input type="hidden" id="funcionario_id" name="funcionario_id" value="{{ funcionario.id }}">
+                    
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="data_ponto" class="form-label">Data *</label>
+                                <input type="date" class="form-control" id="data_ponto" name="data" required>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="obra_id_ponto" class="form-label">Obra</label>
+                                <select class="form-select" id="obra_id_ponto" name="obra_id">
+                                    <option value="">Selecione...</option>
+                                    {% for obra in obras %}
+                                    <option value="{{ obra.id }}">{{ obra.nome }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="hora_entrada_ponto" class="form-label">Hora de Entrada</label>
+                                <div class="input-group">
+                                    <input type="time" class="form-control" id="hora_entrada_ponto" name="hora_entrada">
+                                    <button type="button" class="btn btn-outline-secondary" onclick="preencherHorarioAtual('hora_entrada_ponto')">
+                                        <i class="fas fa-clock"></i>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="hora_saida_ponto" class="form-label">Hora de Saída</label>
+                                <div class="input-group">
+                                    <input type="time" class="form-control" id="hora_saida_ponto" name="hora_saida">
+                                    <button type="button" class="btn btn-outline-secondary" onclick="preencherHorarioAtual('hora_saida_ponto')">
+                                        <i class="fas fa-clock"></i>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="hora_almoco_saida_ponto" class="form-label">Saída para Almoço</label>
+                                <div class="input-group">
+                                    <input type="time" class="form-control" id="hora_almoco_saida_ponto" name="hora_almoco_saida">
+                                    <button type="button" class="btn btn-outline-secondary" onclick="preencherHorarioAtual('hora_almoco_saida_ponto')">
+                                        <i class="fas fa-clock"></i>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="hora_almoco_retorno_ponto" class="form-label">Retorno do Almoço</label>
+                                <div class="input-group">
+                                    <input type="time" class="form-control" id="hora_almoco_retorno_ponto" name="hora_almoco_retorno">
+                                    <button type="button" class="btn btn-outline-secondary" onclick="preencherHorarioAtual('hora_almoco_retorno_ponto')">
+                                        <i class="fas fa-clock"></i>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="observacoes_ponto" class="form-label">Observações</label>
+                        <textarea class="form-control" id="observacoes_ponto" name="observacoes" rows="3"></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-primary">Salvar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Ocorrência -->
+<div class="modal fade" id="ocorrenciaModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="ocorrenciaModalLabel">Nova Ocorrência</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="POST" id="ocorrenciaForm" action="{{ url_for('main.nova_ocorrencia', funcionario_id=funcionario.id) }}">
+                <div class="modal-body">
+                    <input type="hidden" name="funcionario_id" value="{{ funcionario.id }}">
+                    
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="tipo_ocorrencia" class="form-label">Tipo de Ocorrência *</label>
+                                <select class="form-select" id="tipo_ocorrencia" name="tipo" required>
+                                    <option value="">Selecione...</option>
+                                    <option value="Atestado Médico">Atestado Médico</option>
+                                    <option value="Licença">Licença</option>
+                                    <option value="Atraso Justificado">Atraso Justificado</option>
+                                    <option value="Falta Justificada">Falta Justificada</option>
+                                    <option value="Outro">Outro</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="status_ocorrencia" class="form-label">Status</label>
+                                <select class="form-select" id="status_ocorrencia" name="status">
+                                    <option value="Pendente">Pendente</option>
+                                    <option value="Aprovada">Aprovada</option>
+                                    <option value="Rejeitada">Rejeitada</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="data_inicio_ocorrencia" class="form-label">Data Início *</label>
+                                <input type="date" class="form-control" id="data_inicio_ocorrencia" name="data_inicio" required>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="data_fim_ocorrencia" class="form-label">Data Fim</label>
+                                <input type="date" class="form-control" id="data_fim_ocorrencia" name="data_fim">
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="descricao_ocorrencia" class="form-label">Descrição</label>
+                        <textarea class="form-control" id="descricao_ocorrencia" name="descricao" rows="3"></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-primary">Salvar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Alimentação -->
+<div class="modal fade" id="alimentacaoModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="alimentacaoModalLabel">Novo Registro de Alimentação</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="POST" id="alimentacaoForm" action="{{ url_for('nova_alimentacao') }}">
+                <div class="modal-body">
+                    <input type="hidden" name="funcionario_id" value="{{ funcionario.id }}">
+                    
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="data_alimentacao" class="form-label">Data *</label>
+                                <input type="date" class="form-control" id="data_alimentacao" name="data" required>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="tipo_alimentacao" class="form-label">Tipo *</label>
+                                <select class="form-select" id="tipo_alimentacao" name="tipo" required>
+                                    <option value="">Selecione...</option>
+                                    <option value="cafe">Café da Manhã</option>
+                                    <option value="almoco">Almoço</option>
+                                    <option value="jantar">Jantar</option>
+                                    <option value="lanche">Lanche</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="valor_alimentacao" class="form-label">Valor *</label>
+                                <input type="number" class="form-control" id="valor_alimentacao" name="valor" step="0.01" min="0" required>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="obra_id_alimentacao" class="form-label">Obra</label>
+                                <select class="form-select" id="obra_id_alimentacao" name="obra_id">
+                                    <option value="">Selecione...</option>
+                                    {% for obra in obras %}
+                                    <option value="{{ obra.id }}">{{ obra.nome }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="observacoes_alimentacao" class="form-label">Observações</label>
+                        <textarea class="form-control" id="observacoes_alimentacao" name="observacoes" rows="3"></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-primary">Salvar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+// Preenchimento automático de horário atual
+function preencherHorarioAtual(campo) {
+    const now = new Date();
+    const currentTime = now.toTimeString().slice(0, 5);
+    document.getElementById(campo).value = currentTime;
+}
+
+// Filtros de ponto
+function filtrarPonto() {
+    const dataInicio = document.getElementById('filtro_data_inicio').value;
+    const dataFim = document.getElementById('filtro_data_fim').value;
+    const obra = document.getElementById('filtro_obra').value;
+    
+    // Implementar lógica de filtro via AJAX ou recarregar página com parâmetros
+    let url = new URL(window.location);
+    if (dataInicio) url.searchParams.set('data_inicio', dataInicio);
+    if (dataFim) url.searchParams.set('data_fim', dataFim);
+    if (obra) url.searchParams.set('obra', obra);
+    
+    window.location.href = url.toString();
+}
+
+// Funções de edição e exclusão
+function editarPonto(id) {
+    alert('Funcionalidade de edição de ponto será implementada');
+}
+
+function excluirPonto(id) {
+    if (confirm('Tem certeza que deseja excluir este registro de ponto?')) {
+        // Implementar exclusão via AJAX
+        console.log('Excluir ponto:', id);
+    }
+}
+
+function editarOcorrencia(id) {
+    alert('Funcionalidade de edição de ocorrência será implementada');
+}
+
+function excluirOcorrencia(id) {
+    if (confirm('Tem certeza que deseja excluir esta ocorrência?')) {
+        // Implementar exclusão via AJAX
+        console.log('Excluir ocorrência:', id);
+    }
+}
+
+function editarAlimentacao(id) {
+    alert('Funcionalidade de edição de alimentação será implementada');
+}
+
+function excluirAlimentacao(id) {
+    if (confirm('Tem certeza que deseja excluir este registro de alimentação?')) {
+        // Implementar exclusão via AJAX
+        console.log('Excluir alimentação:', id);
+    }
+}
+
+$(document).ready(function() {
+    // Inicializar DataTables
+    $('#pontoTable').DataTable({
+        language: { url: '//cdn.datatables.net/plug-ins/1.13.6/i18n/pt-BR.json' },
+        order: [[0, 'desc']],
+        pageLength: 10
+    });
+    
+    $('#ocorrenciasTable').DataTable({
+        language: { url: '//cdn.datatables.net/plug-ins/1.13.6/i18n/pt-BR.json' },
+        order: [[1, 'desc']],
+        pageLength: 10
+    });
+    
+    $('#alimentacaoTable').DataTable({
+        language: { url: '//cdn.datatables.net/plug-ins/1.13.6/i18n/pt-BR.json' },
+        order: [[0, 'desc']],
+        pageLength: 10
+    });
+    
+    // Definir data padrão nos formulários
+    const today = new Date().toISOString().slice(0, 10);
+    document.getElementById('data_ponto').value = today;
+    document.getElementById('data_inicio_ocorrencia').value = today;
+    document.getElementById('data_alimentacao').value = today;
+    
+    // Inicializar tooltips
+    var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+    tooltipTriggerList.forEach(function(tooltipTriggerEl) {
+        new bootstrap.Tooltip(tooltipTriggerEl);
+    });
+    
+    // Gráficos
+    renderCharts();
+});
+
+function renderCharts() {
+    // Gráfico de Horas Trabalhadas
+    const ctxHoras = document.getElementById('horasTrabalhadasChart').getContext('2d');
+    new Chart(ctxHoras, {
+        type: 'line',
+        data: {
+            labels: {{ graficos.meses|tojson }},
+            datasets: [{
+                label: 'Horas Trabalhadas',
+                data: {{ graficos.horas_trabalhadas|tojson }},
+                borderColor: 'rgb(75, 192, 192)',
+                backgroundColor: 'rgba(75, 192, 192, 0.2)',
+                tension: 0.1
+            }]
+        },
+        options: {
+            responsive: true,
+            scales: {
+                y: {
+                    beginAtZero: true
+                }
+            }
+        }
+    });
+    
+    // Gráfico de Absenteísmo
+    const ctxAbsenteismo = document.getElementById('absenteismoChart').getContext('2d');
+    new Chart(ctxAbsenteismo, {
+        type: 'bar',
+        data: {
+            labels: {{ graficos.meses|tojson }},
+            datasets: [{
+                label: 'Absenteísmo (%)',
+                data: {{ graficos.absenteismo|tojson }},
+                backgroundColor: 'rgba(255, 99, 132, 0.5)',
+                borderColor: 'rgb(255, 99, 132)',
+                borderWidth: 1
+            }]
+        },
+        options: {
+            responsive: true,
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    max: 100
+                }
+            }
+        }
+    });
+}
+</script>
+{% endblock %}

@@ -113,6 +113,48 @@ def editar_funcionario(id):
     
     return render_template('funcionarios.html', form=form, funcionario=funcionario, funcionarios=Funcionario.query.all())
 
+@main_bp.route('/funcionarios/<int:id>/perfil')
+@login_required
+def funcionario_perfil(id):
+    from models_extras import calcular_kpis_funcionario, obter_dados_graficos_funcionario, Ocorrencia
+    
+    funcionario = Funcionario.query.get_or_404(id)
+    
+    # Calcular KPIs individuais
+    kpis = calcular_kpis_funcionario(id)
+    
+    # Buscar registros de ponto
+    registros_ponto = RegistroPonto.query.filter_by(funcionario_id=id).order_by(RegistroPonto.data.desc()).limit(50).all()
+    
+    # Buscar ocorrências
+    ocorrencias = Ocorrencia.query.filter_by(funcionario_id=id).order_by(Ocorrencia.data_inicio.desc()).all()
+    
+    # Buscar registros de alimentação
+    registros_alimentacao = RegistroAlimentacao.query.filter_by(funcionario_id=id).order_by(RegistroAlimentacao.data.desc()).limit(50).all()
+    
+    # Buscar obras para os dropdowns
+    obras = Obra.query.filter_by(status='Em andamento').all()
+    
+    # Obter dados para gráficos
+    graficos = obter_dados_graficos_funcionario(id)
+    
+    # Criar objeto para KPIs (simular uma estrutura)
+    class KPIData:
+        def __init__(self, data):
+            for key, value in data.items():
+                setattr(self, key, value)
+    
+    kpis_obj = KPIData(kpis)
+    
+    return render_template('funcionario_perfil.html',
+                         funcionario=funcionario,
+                         kpis=kpis_obj,
+                         registros_ponto=registros_ponto,
+                         ocorrencias=ocorrencias,
+                         registros_alimentacao=registros_alimentacao,
+                         obras=obras,
+                         graficos=graficos)
+
 @main_bp.route('/funcionarios/<int:id>/excluir', methods=['POST'])
 @login_required
 def excluir_funcionario(id):
@@ -673,3 +715,27 @@ def dashboard_data():
             'data': [float(item[1]) for item in custos_obra]
         }
     })
+
+# Routes para Ocorrências
+@main_bp.route('/funcionarios/<int:funcionario_id>/ocorrencia/nova', methods=['POST'])
+@login_required
+def nova_ocorrencia(funcionario_id):
+    from models import Ocorrencia
+    
+    funcionario = Funcionario.query.get_or_404(funcionario_id)
+    
+    # Criar nova ocorrência
+    ocorrencia = Ocorrencia()
+    ocorrencia.funcionario_id = funcionario_id
+    ocorrencia.tipo = request.form.get('tipo')
+    ocorrencia.data_inicio = datetime.strptime(request.form.get('data_inicio'), '%Y-%m-%d').date()
+    if request.form.get('data_fim'):
+        ocorrencia.data_fim = datetime.strptime(request.form.get('data_fim'), '%Y-%m-%d').date()
+    ocorrencia.descricao = request.form.get('descricao')
+    ocorrencia.status = request.form.get('status', 'Pendente')
+    
+    db.session.add(ocorrencia)
+    db.session.commit()
+    
+    flash('Ocorrência registrada com sucesso!', 'success')
+    return redirect(url_for('main.funcionario_perfil', id=funcionario_id))
