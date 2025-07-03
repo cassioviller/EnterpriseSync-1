@@ -6,8 +6,7 @@ Script para popular o banco de dados do SIGE com dados de teste
 from app import app, db
 from models import (
     Usuario, Departamento, Funcao, Funcionario, Obra, Veiculo, 
-    Fornecedor, Cliente, Material, Servico, RegistroPonto, 
-    RegistroAlimentacao, CustoObra, HorarioTrabalho
+    Servico, RegistroPonto, RegistroAlimentacao, CustoObra, HorarioTrabalho
 )
 from werkzeug.security import generate_password_hash
 from datetime import date, datetime, time, timedelta
@@ -28,9 +27,6 @@ def create_sample_data():
         Obra.query.delete()
         Funcionario.query.delete()
         Veiculo.query.delete()
-        Fornecedor.query.delete()
-        Cliente.query.delete()
-        Material.query.delete()
         Servico.query.delete()
         Funcao.query.delete()
         Departamento.query.delete()
@@ -195,71 +191,7 @@ def create_sample_data():
         
         db.session.commit()
         
-        # Criar fornecedores
-        fornecedores_data = [
-            ('Materiais de Construção Silva Ltda', '12.345.678/0001-90', 'Materiais de construção'),
-            ('Transportadora Rápida Express', '23.456.789/0001-01', 'Serviços de transporte'),
-            ('Ferragens e Ferramentas Unidos', '34.567.890/0001-12', 'Ferramentas e equipamentos'),
-            ('Construtora Parceira S.A.', '45.678.901/0001-23', 'Serviços especializados'),
-            ('Combustíveis e Lubrificantes Ltda', '56.789.012/0001-34', 'Combustíveis e lubrificantes')
-        ]
-        
-        for i, (nome, cnpj, tipo) in enumerate(fornecedores_data):
-            fornecedor = Fornecedor(
-                nome=nome,
-                cnpj_cpf=cnpj,
-                endereco=f'Rua dos Fornecedores, {200 + i * 50} - Belo Horizonte, MG',
-                telefone=f'(31) 3{200 + i}-{5000 + i}',
-                email=f'contato{i+1}@fornecedor.com.br',
-                tipo_produto_servico=tipo
-            )
-            db.session.add(fornecedor)
-        
-        db.session.commit()
-        
-        # Criar clientes
-        clientes_data = [
-            ('Construtora Horizonte Ltda', '11.222.333/0001-44'),
-            ('Incorporadora Vista Bela S.A.', '22.333.444/0001-55'),
-            ('João Carlos Moreira', '123.456.789-10'),
-            ('Empresa Industrial Norte Ltda', '33.444.555/0001-66'),
-            ('Maria Fernanda Alves', '234.567.890-21')
-        ]
-        
-        for i, (nome, doc) in enumerate(clientes_data):
-            cliente = Cliente(
-                nome=nome,
-                cnpj_cpf=doc,
-                endereco=f'Av. dos Clientes, {300 + i * 100} - Belo Horizonte, MG',
-                telefone=f'(31) 3{300 + i}-{6000 + i}',
-                email=f'cliente{i+1}@email.com.br'
-            )
-            db.session.add(cliente)
-        
-        db.session.commit()
-        
-        # Criar materiais
-        materiais_data = [
-            ('Cimento CP-II 50kg', 'Cimento Portland composto', 'sc', 32.50, 50, 120),
-            ('Tijolo Cerâmico 6 furos', 'Tijolo cerâmico comum', 'un', 0.85, 1000, 2500),
-            ('Areia Média', 'Areia para construção civil', 'm³', 45.00, 10, 25),
-            ('Brita 1', 'Brita graduada número 1', 'm³', 55.00, 8, 18),
-            ('Ferro 10mm CA-50', 'Ferro para construção', 'kg', 8.50, 500, 1200),
-            ('Tinta Acrílica Branca', 'Tinta acrílica premium', 'lt', 85.00, 20, 45)
-        ]
-        
-        for nome, desc, unidade, preco, min_estoque, estoque in materiais_data:
-            material = Material(
-                nome=nome,
-                descricao=desc,
-                unidade_medida=unidade,
-                preco_unitario=preco,
-                estoque_minimo=min_estoque,
-                estoque_atual=estoque
-            )
-            db.session.add(material)
-        
-        db.session.commit()
+
         
         # Criar serviços
         servicos_data = [
@@ -386,9 +318,6 @@ def create_sample_data():
         print(f"   • {Funcionario.query.count()} funcionários")
         print(f"   • {Obra.query.count()} obras")
         print(f"   • {Veiculo.query.count()} veículos")
-        print(f"   • {Fornecedor.query.count()} fornecedores")
-        print(f"   • {Cliente.query.count()} clientes")
-        print(f"   • {Material.query.count()} materiais")
         print(f"   • {Servico.query.count()} serviços")
         print(f"   • {RegistroPonto.query.count()} registros de ponto")
         print(f"   • {RegistroAlimentacao.query.count()} registros de alimentação")

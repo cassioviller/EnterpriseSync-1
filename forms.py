@@ -63,28 +63,7 @@ class VeiculoForm(FlaskForm):
     data_ultima_manutencao = DateField('Data da Última Manutenção', validators=[Optional()])
     data_proxima_manutencao = DateField('Data da Próxima Manutenção', validators=[Optional()])
 
-class FornecedorForm(FlaskForm):
-    nome = StringField('Nome/Razão Social', validators=[DataRequired(), Length(max=100)])
-    cnpj_cpf = StringField('CNPJ/CPF', validators=[DataRequired(), Length(max=18)])
-    endereco = TextAreaField('Endereço')
-    telefone = StringField('Telefone', validators=[Optional(), Length(max=20)])
-    email = StringField('Email', validators=[Optional(), Email(), Length(max=120)])
-    tipo_produto_servico = StringField('Tipo de Produto/Serviço', validators=[Optional(), Length(max=100)])
 
-class ClienteForm(FlaskForm):
-    nome = StringField('Nome/Razão Social', validators=[DataRequired(), Length(max=100)])
-    cnpj_cpf = StringField('CNPJ/CPF', validators=[DataRequired(), Length(max=18)])
-    endereco = TextAreaField('Endereço')
-    telefone = StringField('Telefone', validators=[Optional(), Length(max=20)])
-    email = StringField('Email', validators=[Optional(), Email(), Length(max=120)])
-
-class MaterialForm(FlaskForm):
-    nome = StringField('Nome', validators=[DataRequired(), Length(max=100)])
-    descricao = TextAreaField('Descrição')
-    unidade_medida = StringField('Unidade de Medida', validators=[DataRequired(), Length(max=20)])
-    preco_unitario = FloatField('Preço Unitário', validators=[Optional(), NumberRange(min=0)])
-    estoque_minimo = IntegerField('Estoque Mínimo', validators=[Optional(), NumberRange(min=0)])
-    estoque_atual = IntegerField('Estoque Atual', validators=[Optional(), NumberRange(min=0)])
 
 class ServicoForm(FlaskForm):
     nome = StringField('Nome', validators=[DataRequired(), Length(max=100)])
