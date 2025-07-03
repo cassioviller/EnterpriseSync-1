@@ -110,8 +110,11 @@ class RegistroPonto(db.Model):
     hora_almoco_retorno = db.Column(db.Time)
     horas_trabalhadas = db.Column(db.Float, default=0.0)
     horas_extras = db.Column(db.Float, default=0.0)
+    atraso = db.Column(db.Float, default=0.0)  # Atraso em minutos
     observacoes = db.Column(db.Text)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    
+    # Relacionamentos são definidos via backref nos modelos principais
 
 class CustoObra(db.Model):
     id = db.Column(db.Integer, primary_key=True)

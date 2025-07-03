@@ -3,7 +3,7 @@ from flask_login import login_required, current_user
 from app import db
 from models import *
 from forms import *
-from utils import calcular_horas_trabalhadas, calcular_custo_real_obra, calcular_custos_mes, calcular_kpis_funcionarios_geral
+from utils import calcular_horas_trabalhadas, calcular_custo_real_obra, calcular_custos_mes, calcular_kpis_funcionarios_geral, calcular_kpis_funcionario_periodo
 from datetime import datetime, date
 from sqlalchemy import func
 
@@ -254,17 +254,49 @@ def obter_dados_graficos_funcionario(funcionario_id):
 def funcionario_perfil(id):
     funcionario = Funcionario.query.get_or_404(id)
     
-    # Calcular KPIs individuais
-    kpis = calcular_kpis_funcionario(id)
+    # Filtros de data dos parâmetros
+    data_inicio = request.args.get('data_inicio')
+    data_fim = request.args.get('data_fim')
+    obra_filtro = request.args.get('obra')
     
-    # Buscar registros de ponto
-    registros_ponto = RegistroPonto.query.filter_by(funcionario_id=id).order_by(RegistroPonto.data.desc()).limit(50).all()
+    # Definir período padrão (mês atual)
+    if not data_inicio:
+        data_inicio = date.today().replace(day=1)
+    else:
+        data_inicio = datetime.strptime(data_inicio, '%Y-%m-%d').date()
     
-    # Buscar ocorrências
+    if not data_fim:
+        data_fim = date.today()
+    else:
+        data_fim = datetime.strptime(data_fim, '%Y-%m-%d').date()
+    
+    # Calcular KPIs individuais para o período
+    kpis = calcular_kpis_funcionario_periodo(id, data_inicio, data_fim)
+    
+    # Buscar registros de ponto com filtros
+    query_ponto = RegistroPonto.query.filter_by(funcionario_id=id).filter(
+        RegistroPonto.data >= data_inicio,
+        RegistroPonto.data <= data_fim
+    )
+    
+    if obra_filtro:
+        query_ponto = query_ponto.filter_by(obra_id=obra_filtro)
+    
+    registros_ponto = query_ponto.order_by(RegistroPonto.data.desc()).all()
+    
+    # Buscar ocorrências (sem filtro de data por enquanto)
     ocorrencias = Ocorrencia.query.filter_by(funcionario_id=id).order_by(Ocorrencia.data_inicio.desc()).all()
     
-    # Buscar registros de alimentação
-    registros_alimentacao = RegistroAlimentacao.query.filter_by(funcionario_id=id).order_by(RegistroAlimentacao.data.desc()).limit(50).all()
+    # Buscar registros de alimentação com filtros
+    query_alimentacao = RegistroAlimentacao.query.filter_by(funcionario_id=id).filter(
+        RegistroAlimentacao.data >= data_inicio,
+        RegistroAlimentacao.data <= data_fim
+    )
+    
+    if obra_filtro:
+        query_alimentacao = query_alimentacao.filter_by(obra_id=obra_filtro)
+    
+    registros_alimentacao = query_alimentacao.order_by(RegistroAlimentacao.data.desc()).all()
     
     # Buscar obras para os dropdowns
     obras = Obra.query.filter_by(status='Em andamento').all()
@@ -278,7 +310,14 @@ def funcionario_perfil(id):
             for key, value in data.items():
                 setattr(self, key, value)
     
-    kpis_obj = KPIData(kpis)
+    kpis_obj = KPIData(kpis) if kpis else KPIData({
+        'horas_trabalhadas': 0,
+        'horas_extras': 0,
+        'faltas': 0,
+        'atrasos': 0,
+        'absenteismo': 0,
+        'horas_extras_valor': 0
+    })
     
     return render_template('funcionario_perfil.html',
                          funcionario=funcionario,
@@ -287,7 +326,10 @@ def funcionario_perfil(id):
                          ocorrencias=ocorrencias,
                          registros_alimentacao=registros_alimentacao,
                          obras=obras,
-                         graficos=graficos)
+                         graficos=graficos,
+                         data_inicio=data_inicio,
+                         data_fim=data_fim,
+                         obra_filtro=obra_filtro)
 
 @main_bp.route('/funcionarios/<int:id>/excluir', methods=['POST'])
 @login_required

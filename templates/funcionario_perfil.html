@@ -212,6 +212,7 @@
                                 <th>Saída</th>
                                 <th>H. Trabalhadas</th>
                                 <th>H. Extras</th>
+                                <th>Atraso</th>
                                 <th>Obra</th>
                                 <th>Ações</th>
                             </tr>
@@ -258,6 +259,13 @@
                                 <td>
                                     {% if registro.horas_extras and registro.horas_extras > 0 %}
                                         <span class="badge bg-warning">{{ '{:.2f}h'.format(registro.horas_extras) }}</span>
+                                    {% else %}
+                                        <span class="text-muted">-</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if registro.atraso and registro.atraso > 0 %}
+                                        <span class="badge bg-danger">{{ '{:.0f}min'.format(registro.atraso) }}</span>
                                     {% else %}
                                         <span class="text-muted">-</span>
                                     {% endif %}
