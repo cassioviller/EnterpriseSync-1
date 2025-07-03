@@ -107,7 +107,7 @@
                 <tbody>
                     {% for registro in registros %}
                     <tr>
-                        <td>{{ registro.funcionario_ref.nome }}</td>
+                        <td>{{ registro.funcionario.nome if registro.funcionario else '-' }}</td>
                         <td>{{ registro.data.strftime('%d/%m/%Y') }}</td>
                         <td>
                             {% if registro.tipo == 'cafe' %}

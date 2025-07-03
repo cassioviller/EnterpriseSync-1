@@ -27,10 +27,11 @@
         <div class="row">
             <div class="col-md-6">
                 <div class="d-flex align-items-center mb-3">
-                    <i class="fas fa-clock fa-2x text-primary me-3"></i>
+                    <i class="fas fa-clock fa-3x text-primary me-3"></i>
                     <div>
-                        <h4 class="mb-0" id="currentTime">--:--:--</h4>
-                        <p class="text-muted mb-0" id="currentDate">-- de ------ de ----</p>
+                        <h2 class="mb-0 text-primary fw-bold" id="currentTime">--:--:--</h2>
+                        <p class="text-muted mb-0 fs-6" id="currentDate">-- de ------ de ----</p>
+                        <small class="text-success" id="funcionarioLogado">Funcionário: Admin</small>
                     </div>
                 </div>
             </div>
@@ -68,12 +69,13 @@
                     <tr>
                         <th>Funcionário</th>
                         <th>Data</th>
+                        <th>Status</th>
                         <th>Entrada</th>
                         <th>Saída Almoço</th>
                         <th>Retorno Almoço</th>
                         <th>Saída</th>
-                        <th>Horas Trabalhadas</th>
-                        <th>Horas Extras</th>
+                        <th>H. Trabalhadas</th>
+                        <th>H. Extras</th>
                         <th>Obra</th>
                         <th>Ações</th>
                     </tr>
@@ -81,27 +83,87 @@
                 <tbody>
                     {% for registro in registros %}
                     <tr>
-                        <td>{{ registro.funcionario_ref.nome }}</td>
+                        <td>
+                            <div class="fw-bold">{{ registro.funcionario_ref.nome }}</div>
+                            <small class="text-muted">{{ registro.funcionario_ref.funcao_ref.nome if registro.funcionario_ref.funcao_ref else 'Sem função' }}</small>
+                        </td>
                         <td>{{ registro.data.strftime('%d/%m/%Y') }}</td>
-                        <td>{{ registro.hora_entrada.strftime('%H:%M') if registro.hora_entrada else '-' }}</td>
-                        <td>{{ registro.hora_almoco_saida.strftime('%H:%M') if registro.hora_almoco_saida else '-' }}</td>
-                        <td>{{ registro.hora_almoco_retorno.strftime('%H:%M') if registro.hora_almoco_retorno else '-' }}</td>
-                        <td>{{ registro.hora_saida.strftime('%H:%M') if registro.hora_saida else '-' }}</td>
-                        <td>{{ '{:.2f}h'.format(registro.horas_trabalhadas) if registro.horas_trabalhadas else '-' }}</td>
+                        <td>
+                            {% set status_class = '' %}
+                            {% set status_text = '' %}
+                            {% if not registro.hora_entrada %}
+                                {% set status_class = 'bg-danger' %}
+                                {% set status_text = 'Ausente' %}
+                            {% elif not registro.hora_saida %}
+                                {% set status_class = 'bg-warning' %}
+                                {% set status_text = 'Trabalhando' %}
+                            {% else %}
+                                {% set status_class = 'bg-success' %}
+                                {% set status_text = 'Completo' %}
+                            {% endif %}
+                            <span class="badge {{ status_class }}">{{ status_text }}</span>
+                        </td>
+                        <td>
+                            {% if registro.hora_entrada %}
+                                <span class="badge bg-info">{{ registro.hora_entrada.strftime('%H:%M') }}</span>
+                            {% else %}
+                                <span class="text-muted">-</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if registro.hora_almoco_saida %}
+                                <span class="badge bg-warning">{{ registro.hora_almoco_saida.strftime('%H:%M') }}</span>
+                            {% else %}
+                                <span class="text-muted">-</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if registro.hora_almoco_retorno %}
+                                <span class="badge bg-info">{{ registro.hora_almoco_retorno.strftime('%H:%M') }}</span>
+                            {% else %}
+                                <span class="text-muted">-</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if registro.hora_saida %}
+                                <span class="badge bg-danger">{{ registro.hora_saida.strftime('%H:%M') }}</span>
+                            {% else %}
+                                <span class="text-muted">-</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if registro.horas_trabalhadas %}
+                                <span class="fw-bold text-primary">{{ '{:.2f}h'.format(registro.horas_trabalhadas) }}</span>
+                            {% else %}
+                                <span class="text-muted">-</span>
+                            {% endif %}
+                        </td>
                         <td>
                             {% if registro.horas_extras and registro.horas_extras > 0 %}
                                 <span class="badge bg-warning">{{ '{:.2f}h'.format(registro.horas_extras) }}</span>
                             {% else %}
-                                -
+                                <span class="text-muted">-</span>
                             {% endif %}
                         </td>
-                        <td>{{ registro.obra_ref.nome if registro.obra_ref else '-' }}</td>
+                        <td>
+                            {% if registro.obra_ref %}
+                                <span class="badge bg-secondary">{{ registro.obra_ref.nome }}</span>
+                            {% else %}
+                                <span class="text-muted">-</span>
+                            {% endif %}
+                        </td>
                         <td>
                             <div class="btn-group btn-group-sm">
-                                <button class="btn btn-outline-primary" onclick="editarRegistro({{ registro.id }})">
+                                <button class="btn btn-outline-primary" 
+                                        onclick="editarRegistro({{ registro.id }})"
+                                        data-bs-toggle="tooltip" 
+                                        title="Editar">
                                     <i class="fas fa-edit"></i>
                                 </button>
-                                <button class="btn btn-outline-danger" onclick="excluirRegistro({{ registro.id }})">
+                                <button class="btn btn-outline-danger" 
+                                        onclick="excluirRegistro({{ registro.id }})"
+                                        data-bs-toggle="tooltip" 
+                                        title="Excluir">
                                     <i class="fas fa-trash"></i>
                                 </button>
                             </div>
@@ -233,13 +295,47 @@ function updateClock() {
 }
 
 function registrarPonto(tipo) {
-    // Implementar registro rápido
-    alert('Funcionalidade de registro rápido será implementada');
+    const now = new Date();
+    const currentTime = now.toTimeString().slice(0, 5);
+    const currentDate = now.toISOString().slice(0, 10);
+    
+    const tipoTextos = {
+        'entrada': 'Entrada',
+        'saida_almoco': 'Saída para Almoço',
+        'retorno_almoco': 'Retorno do Almoço',
+        'saida': 'Saída'
+    };
+    
+    if (confirm(`Confirmar ${tipoTextos[tipo]} às ${currentTime}?`)) {
+        const form = document.createElement('form');
+        form.method = 'POST';
+        form.action = '/ponto/registro-rapido';
+        
+        const tipoInput = document.createElement('input');
+        tipoInput.type = 'hidden';
+        tipoInput.name = 'tipo';
+        tipoInput.value = tipo;
+        form.appendChild(tipoInput);
+        
+        const timeInput = document.createElement('input');
+        timeInput.type = 'hidden';
+        timeInput.name = 'horario';
+        timeInput.value = currentTime;
+        form.appendChild(timeInput);
+        
+        const dateInput = document.createElement('input');
+        dateInput.type = 'hidden';
+        dateInput.name = 'data';
+        dateInput.value = currentDate;
+        form.appendChild(dateInput);
+        
+        document.body.appendChild(form);
+        form.submit();
+    }
 }
 
 function editarRegistro(id) {
-    // Implementar edição
-    alert('Funcionalidade de edição será implementada');
+    alert('Funcionalidade de edição será implementada em breve');
 }
 
 function excluirRegistro(id) {
