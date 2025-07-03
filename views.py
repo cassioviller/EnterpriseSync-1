@@ -91,7 +91,7 @@ def funcionarios():
     # Calcular KPIs gerais dos funcionários para o período
     kpis_geral = calcular_kpis_funcionarios_geral(data_inicio, data_fim)
     
-    return render_template('funcionarios_novo.html', 
+    return render_template('funcionarios.html', 
                          funcionarios_kpis=kpis_geral['funcionarios_kpis'],
                          kpis_geral=kpis_geral,
                          data_inicio=data_inicio,

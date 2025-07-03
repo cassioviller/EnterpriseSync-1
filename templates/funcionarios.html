@@ -3,46 +3,161 @@
 {% block title %}Funcionários - SIGE{% endblock %}
 
 {% block content %}
-<div class="row">
-    <div class="col-12">
-        <div class="d-flex justify-content-between align-items-center mb-4">
-            <h1 class="h3">
-                <i class="fas fa-users"></i> Funcionários
-            </h1>
-            <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#funcionarioModal">
-                <i class="fas fa-plus"></i> Novo Funcionário
-            </button>
+<div class="container-fluid">
+    <!-- Cabeçalho -->
+    <div class="row">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h1 class="h3">
+                    <i class="fas fa-users"></i> Funcionários
+                </h1>
+                <a href="{{ url_for('main.novo_funcionario') }}" class="btn btn-primary">
+                    <i class="fas fa-plus"></i> Novo Funcionário
+                </a>
+            </div>
         </div>
     </div>
-</div>
 
-<!-- Barra de Pesquisa -->
-<div class="row mb-4">
-    <div class="col-md-6">
-        <div class="input-group">
-            <input type="text" class="form-control" id="searchInput" placeholder="Pesquisar funcionários...">
-            <span class="input-group-text">
-                <i class="fas fa-search"></i>
-            </span>
+    <!-- Filtros de Data -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-filter"></i> Filtros de Período
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <form method="GET" action="{{ url_for('main.funcionarios') }}">
+                        <div class="row align-items-end">
+                            <div class="col-md-3">
+                                <label for="data_inicio" class="form-label">Data Inicial</label>
+                                <input type="date" class="form-control" name="data_inicio" id="data_inicio" 
+                                       value="{{ data_inicio }}">
+                            </div>
+                            <div class="col-md-3">
+                                <label for="data_fim" class="form-label">Data Final</label>
+                                <input type="date" class="form-control" name="data_fim" id="data_fim" 
+                                       value="{{ data_fim }}">
+                            </div>
+                            <div class="col-md-3">
+                                <button type="submit" class="btn btn-primary">
+                                    <i class="fas fa-search"></i> Aplicar Filtro
+                                </button>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="btn-group" role="group">
+                                    <button type="button" class="btn btn-outline-secondary btn-sm" 
+                                            onclick="setDateRange('ultimo_mes')">Último Mês</button>
+                                    <button type="button" class="btn btn-outline-secondary btn-sm" 
+                                            onclick="setDateRange('ultimos_3_meses')">3 Meses</button>
+                                    <button type="button" class="btn btn-outline-secondary btn-sm" 
+                                            onclick="setDateRange('ano_atual')">Ano Atual</button>
+                                </div>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+            </div>
         </div>
     </div>
-    <div class="col-md-6">
-        <select class="form-select" id="statusFilter">
-            <option value="">Todos os Status</option>
-            <option value="ativo">Ativos</option>
-            <option value="inativo">Inativos</option>
-        </select>
+
+    <!-- KPIs Gerais -->
+    <div class="row mb-4">
+        <div class="col-md-3">
+            <div class="card bg-primary text-white">
+                <div class="card-body">
+                    <div class="d-flex align-items-center">
+                        <div class="flex-grow-1">
+                            <h6 class="card-title mb-0">Funcionários Ativos</h6>
+                            <h4 class="mb-0">{{ kpis_geral.total_funcionarios if kpis_geral else 0 }}</h4>
+                        </div>
+                        <div class="ms-3">
+                            <i class="fas fa-users fa-2x opacity-75"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-3">
+            <div class="card bg-success text-white">
+                <div class="card-body">
+                    <div class="d-flex align-items-center">
+                        <div class="flex-grow-1">
+                            <h6 class="card-title mb-0">Custo Total</h6>
+                            <h4 class="mb-0">R$ {{ '{:,.2f}'.format(kpis_geral.total_custo_geral if kpis_geral else 0).replace(',', '.') }}</h4>
+                        </div>
+                        <div class="ms-3">
+                            <i class="fas fa-dollar-sign fa-2x opacity-75"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-3">
+            <div class="card bg-info text-white">
+                <div class="card-body">
+                    <div class="d-flex align-items-center">
+                        <div class="flex-grow-1">
+                            <h6 class="card-title mb-0">Total de Horas</h6>
+                            <h4 class="mb-0">{{ '{:,.1f}'.format(kpis_geral.total_horas_geral if kpis_geral else 0).replace(',', '.') }}h</h4>
+                        </div>
+                        <div class="ms-3">
+                            <i class="fas fa-clock fa-2x opacity-75"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-3">
+            <div class="card bg-warning text-white">
+                <div class="card-body">
+                    <div class="d-flex align-items-center">
+                        <div class="flex-grow-1">
+                            <h6 class="card-title mb-0">Faltas Justificadas</h6>
+                            <h4 class="mb-0">{{ kpis_geral.total_faltas_geral if kpis_geral else 0 }} dias</h4>
+                            <small>R$ {{ '{:,.2f}'.format(kpis_geral.total_custo_faltas_geral if kpis_geral else 0).replace(',', '.') }}</small>
+                        </div>
+                        <div class="ms-3">
+                            <i class="fas fa-exclamation-triangle fa-2x opacity-75"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
     </div>
-</div>
+
+    <!-- Barra de Pesquisa -->
+    <div class="row mb-4">
+        <div class="col-md-6">
+            <div class="input-group">
+                <input type="text" class="form-control" id="searchInput" placeholder="Pesquisar funcionários...">
+                <span class="input-group-text">
+                    <i class="fas fa-search"></i>
+                </span>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <select class="form-select" id="statusFilter">
+                <option value="">Todos os Status</option>
+                <option value="ativo">Ativos</option>
+                <option value="inativo">Inativos</option>
+            </select>
+        </div>
+    </div>
 
 <!-- Grid de Cards de Funcionários -->
 <div class="row" id="funcionariosGrid">
-    {% for funcionario in funcionarios %}
+    {% if funcionarios_kpis %}
+        {% for kpi in funcionarios_kpis %}
     <div class="col-lg-4 col-md-6 mb-4 funcionario-card" 
-         data-nome="{{ funcionario.nome.lower() }}" 
-         data-departamento="{{ funcionario.departamento_ref.nome.lower() if funcionario.departamento_ref else '' }}"
-         data-funcao="{{ funcionario.funcao_ref.nome.lower() if funcionario.funcao_ref else '' }}"
-         data-status="{{ 'ativo' if funcionario.ativo else 'inativo' }}">
+         data-nome="{{ kpi.funcionario.nome.lower() }}" 
+         data-departamento="{{ kpi.funcionario.departamento_ref.nome.lower() if kpi.funcionario.departamento_ref else '' }}"
+         data-funcao="{{ kpi.funcionario.funcao_ref.nome.lower() if kpi.funcionario.funcao_ref else '' }}"
+         data-status="{{ 'ativo' if kpi.funcionario.ativo else 'inativo' }}">
         <div class="card h-100 funcionario-card-item">
             <div class="card-body d-flex flex-column">
                 <!-- Foto e Nome -->
@@ -52,29 +167,45 @@
                          width="80" 
                          height="80" 
                          style="object-fit: cover; aspect-ratio: 1/1;">
-                    <h5 class="card-title mb-1">{{ funcionario.nome }}</h5>
-                    <small class="text-muted">{{ funcionario.email if funcionario.email else '-' }}</small>
+                    <h5 class="card-title mb-1">{{ kpi.funcionario.nome }}</h5>
+                    <small class="text-muted">{{ kpi.funcionario.email if kpi.funcionario.email else '-' }}</small>
                 </div>
                 
                 <!-- Informações -->
                 <div class="mb-3">
                     <div class="mb-2">
                         <i class="fas fa-sitemap text-primary me-2"></i>
-                        <span>{{ funcionario.departamento_ref.nome if funcionario.departamento_ref else '-' }}</span>
+                        <span>{{ kpi.funcionario.departamento_ref.nome if kpi.funcionario.departamento_ref else '-' }}</span>
                     </div>
                     <div class="mb-2">
                         <i class="fas fa-user-tie text-success me-2"></i>
-                        <span>{{ funcionario.funcao_ref.nome if funcionario.funcao_ref else '-' }}</span>
+                        <span>{{ kpi.funcionario.funcao_ref.nome if kpi.funcionario.funcao_ref else '-' }}</span>
                     </div>
                     <div class="mb-2">
                         <i class="fas fa-clock text-info me-2"></i>
-                        <span>{{ funcionario.horario_trabalho.nome if funcionario.horario_trabalho else 'Não definido' }}</span>
+                        <span>{{ kpi.funcionario.horario_trabalho.nome if kpi.funcionario.horario_trabalho else 'Não definido' }}</span>
+                    </div>
+                </div>
+                
+                <!-- KPIs do Período -->
+                <div class="row text-center mb-3">
+                    <div class="col-6">
+                        <div class="border rounded p-2">
+                            <small class="text-muted d-block">Horas</small>
+                            <strong class="text-primary">{{ '{:,.1f}'.format(kpi.horas_trabalhadas).replace(',', '.') }}h</strong>
+                        </div>
+                    </div>
+                    <div class="col-6">
+                        <div class="border rounded p-2">
+                            <small class="text-muted d-block">Custo Total</small>
+                            <strong class="text-success">R$ {{ '{:,.0f}'.format(kpi.custo_total).replace(',', '.') }}</strong>
+                        </div>
                     </div>
                 </div>
                 
                 <!-- Status -->
                 <div class="mb-3">
-                    {% if funcionario.ativo %}
+                    {% if kpi.funcionario.ativo %}
                         <span class="badge bg-success">
                             <i class="fas fa-check-circle me-1"></i>Ativo
                         </span>
@@ -88,22 +219,20 @@
                 <!-- Botões de Ação -->
                 <div class="mt-auto">
                     <div class="d-grid gap-2">
-                        <a href="{{ url_for('main.funcionario_perfil', id=funcionario.id) }}" 
+                        <a href="{{ url_for('main.funcionario_perfil', id=kpi.funcionario.id) }}" 
                            class="btn btn-primary btn-sm">
                             <i class="fas fa-user me-1"></i>Ver Perfil
                         </a>
                         <div class="row g-1">
                             <div class="col-6">
-                                <button class="btn btn-outline-warning btn-sm w-100" 
-                                        onclick="editarFuncionario({{ funcionario.id }})"
-                                        data-bs-toggle="modal" 
-                                        data-bs-target="#funcionarioModal">
+                                <a href="{{ url_for('main.editar_funcionario', id=kpi.funcionario.id) }}"
+                                   class="btn btn-outline-warning btn-sm w-100">
                                     <i class="fas fa-edit"></i> Editar
-                                </button>
+                                </a>
                             </div>
                             <div class="col-6">
                                 <button class="btn btn-outline-danger btn-sm w-100" 
-                                        onclick="excluirFuncionario({{ funcionario.id }}, '{{ funcionario.nome }}')">
+                                        onclick="excluirFuncionario({{ kpi.funcionario.id }}, '{{ kpi.funcionario.nome }}')">
                                     <i class="fas fa-trash"></i> Excluir
                                 </button>
                             </div>
@@ -113,7 +242,21 @@
             </div>
         </div>
     </div>
-    {% endfor %}
+        {% endfor %}
+    {% else %}
+        <div class="col-12">
+            <div class="card">
+                <div class="card-body text-center">
+                    <i class="fas fa-users fa-4x text-muted mb-3"></i>
+                    <h5 class="text-muted">Nenhum funcionário encontrado</h5>
+                    <p class="text-muted">Não há funcionários ativos no período selecionado.</p>
+                    <a href="{{ url_for('main.novo_funcionario') }}" class="btn btn-primary">
+                        <i class="fas fa-plus"></i> Adicionar Primeiro Funcionário
+                    </a>
+                </div>
+            </div>
+        </div>
+    {% endif %}
 </div>
 
 <!-- Mensagem quando não há funcionários -->
@@ -494,5 +637,33 @@ $(document).ready(function() {
         });
     });
 });
+
+function setDateRange(period) {
+    const today = new Date();
+    let startDate, endDate = today;
+    
+    switch(period) {
+        case 'ultimo_mes':
+            startDate = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+            endDate = new Date(today.getFullYear(), today.getMonth(), 0);
+            break;
+        case 'ultimos_3_meses':
+            startDate = new Date(today.getFullYear(), today.getMonth() - 3, 1);
+            break;
+        case 'ano_atual':
+            startDate = new Date(today.getFullYear(), 0, 1);
+            break;
+    }
+    
+    // Formatar datas para yyyy-mm-dd
+    const formatDate = (date) => {
+        return date.getFullYear() + '-' + 
+               String(date.getMonth() + 1).padStart(2, '0') + '-' + 
+               String(date.getDate()).padStart(2, '0');
+    };
+    
+    document.getElementById('data_inicio').value = formatDate(startDate);
+    document.getElementById('data_fim').value = formatDate(endDate);
+}
 </script>
 {% endblock %}
