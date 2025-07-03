@@ -9,6 +9,8 @@ from sqlalchemy import func
 
 main_bp = Blueprint('main', __name__)
 
+# Rotas adicionais de veículos serão adicionadas diretamente aqui
+
 @main_bp.route('/')
 @login_required
 def dashboard():
@@ -532,11 +534,95 @@ def detalhes_veiculo(id):
                          custos=custos,
                          kpis=kpis)
 
+@main_bp.route('/veiculos/<int:id>/editar', methods=['GET', 'POST'])
+@login_required
+def editar_veiculo_route(id):
+    veiculo = Veiculo.query.get_or_404(id)
+    form = VeiculoForm(obj=veiculo)
+    
+    if form.validate_on_submit():
+        veiculo.placa = form.placa.data
+        veiculo.marca = form.marca.data
+        veiculo.modelo = form.modelo.data
+        veiculo.ano = form.ano.data
+        veiculo.tipo = form.tipo.data
+        veiculo.status = form.status.data
+        veiculo.km_atual = form.km_atual.data
+        veiculo.data_ultima_manutencao = form.data_ultima_manutencao.data
+        veiculo.data_proxima_manutencao = form.data_proxima_manutencao.data
+        
+        db.session.commit()
+        flash('Veículo atualizado com sucesso!', 'success')
+        return redirect(url_for('main.detalhes_veiculo', id=id))
+    
+    return render_template('veiculos/editar_veiculo.html', form=form, veiculo=veiculo)
 
+@main_bp.route('/veiculos/<int:id>/novo_uso', methods=['GET', 'POST'])
+@login_required
+def novo_uso_veiculo(id):
+    veiculo = Veiculo.query.get_or_404(id)
+    form = UsoVeiculoForm()
+    
+    # Populando choices
+    form.veiculo_id.choices = [(veiculo.id, f"{veiculo.placa} - {veiculo.marca} {veiculo.modelo}")]
+    form.veiculo_id.data = veiculo.id
+    form.funcionario_id.choices = [(0, 'Selecione...')] + [(f.id, f.nome) for f in Funcionario.query.filter_by(ativo=True).all()]
+    form.obra_id.choices = [(0, 'Selecione...')] + [(o.id, o.nome) for o in Obra.query.all()]
+    
+    if form.validate_on_submit():
+        uso = UsoVeiculo(
+            veiculo_id=form.veiculo_id.data,
+            funcionario_id=form.funcionario_id.data,
+            obra_id=form.obra_id.data if form.obra_id.data != 0 else None,
+            data_uso=form.data_uso.data,
+            km_inicial=form.km_inicial.data,
+            km_final=form.km_final.data,
+            finalidade=form.finalidade.data,
+            observacoes=form.observacoes.data
+        )
+        db.session.add(uso)
+        
+        # Atualizar KM atual do veículo se fornecido
+        if form.km_final.data:
+            veiculo.km_atual = form.km_final.data
+        
+        db.session.commit()
+        flash('Uso do veículo registrado com sucesso!', 'success')
+        return redirect(url_for('main.detalhes_veiculo', id=id))
+    
+    return render_template('veiculos/novo_uso.html', form=form, veiculo=veiculo)
 
-
-
-
+@main_bp.route('/veiculos/<int:id>/novo_custo', methods=['GET', 'POST'])
+@login_required
+def novo_custo_veiculo(id):
+    veiculo = Veiculo.query.get_or_404(id)
+    form = CustoVeiculoForm()
+    
+    # Populando choices
+    form.veiculo_id.choices = [(veiculo.id, f"{veiculo.placa} - {veiculo.marca} {veiculo.modelo}")]
+    form.veiculo_id.data = veiculo.id
+    
+    if form.validate_on_submit():
+        custo = CustoVeiculo(
+            veiculo_id=form.veiculo_id.data,
+            data_custo=form.data_custo.data,
+            valor=form.valor.data,
+            tipo_custo=form.tipo_custo.data,
+            descricao=form.descricao.data,
+            km_atual=form.km_atual.data,
+            fornecedor=form.fornecedor.data
+        )
+        db.session.add(custo)
+        
+        # Atualizar KM atual do veículo se fornecido
+        if form.km_atual.data:
+            veiculo.km_atual = form.km_atual.data
+        
+        db.session.commit()
+        flash('Custo do veículo registrado com sucesso!', 'success')
+        return redirect(url_for('main.detalhes_veiculo', id=id))
+    
+    return render_template('veiculos/novo_custo.html', form=form, veiculo=veiculo)
 
 # Serviços
 @main_bp.route('/servicos')
@@ -897,7 +983,9 @@ def gerar_relatorio(tipo):
             html += f'<td>{r.hora_almoco_saida.strftime("%H:%M") if r.hora_almoco_saida else "-"}</td>'
             html += f'<td>{r.hora_almoco_retorno.strftime("%H:%M") if r.hora_almoco_retorno else "-"}</td>'
             html += f'<td>{r.hora_saida.strftime("%H:%M") if r.hora_saida else "-"}</td>'
-            html += f'<td>{r.horas_trabalhadas:.2f}h</td><td>{r.horas_extras:.2f}h</td>'
+            horas_trab = f"{r.horas_trabalhadas:.2f}h" if r.horas_trabalhadas else "0.00h"
+            horas_ext = f"{r.horas_extras:.2f}h" if r.horas_extras else "0.00h"
+            html += f'<td>{horas_trab}</td><td>{horas_ext}</td>'
             html += f'<td>{r.obra_ref.nome if r.obra_ref else "-"}</td></tr>'
         
         html += '</tbody></table></div>'
