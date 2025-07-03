@@ -39,8 +39,8 @@ function initializeApp() {
     }
     
     // Initialize charts if Chart.js is available
-    if (typeof Chart !== 'undefined') {
-        setupCharts();
+    if (typeof Chart !== 'undefined' && typeof initializeDashboardCharts === 'function') {
+        initializeDashboardCharts();
     }
     
     // Setup auto-save for forms

@@ -596,8 +596,9 @@ def novo_ponto():
 @main_bp.route('/alimentacao')
 @login_required
 def alimentacao():
+    from datetime import date
     registros = RegistroAlimentacao.query.order_by(RegistroAlimentacao.data.desc()).limit(50).all()
-    return render_template('alimentacao.html', registros=registros)
+    return render_template('alimentacao.html', registros=registros, date=date)
 
 @main_bp.route('/alimentacao/novo', methods=['GET', 'POST'])
 @login_required
