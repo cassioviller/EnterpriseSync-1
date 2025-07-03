@@ -16,77 +16,113 @@
     </div>
 </div>
 
-<!-- Tabela de Funcionários -->
-<div class="card">
-    <div class="card-body">
-        <div class="table-responsive">
-            <table class="table table-striped" id="funcionariosTable">
-                <thead>
-                    <tr>
-                        <th>Foto</th>
-                        <th>Nome</th>
-                        <th>CPF</th>
-                        <th>Departamento</th>
-                        <th>Função</th>
-                        <th>Salário</th>
-                        <th>Status</th>
-                        <th>Ações</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for funcionario in funcionarios %}
-                    <tr>
-                        <td>
-                            <img src="{{ url_for('static', filename='images/default-avatar.svg') }}" 
-                                 class="rounded-circle" 
-                                 width="40" 
-                                 height="40" 
-                                 style="object-fit: cover;">
-                        </td>
-                        <td>
-                            <div class="fw-bold">{{ funcionario.nome }}</div>
-                            <small class="text-muted">{{ funcionario.email if funcionario.email else '-' }}</small>
-                        </td>
-                        <td>{{ funcionario.cpf }}</td>
-                        <td>{{ funcionario.departamento_ref.nome if funcionario.departamento_ref else '-' }}</td>
-                        <td>{{ funcionario.funcao_ref.nome if funcionario.funcao_ref else '-' }}</td>
-                        <td>R$ {{ '{:,.2f}'.format(funcionario.salario) }}</td>
-                        <td>
-                            {% if funcionario.ativo %}
-                                <span class="badge bg-success">Ativo</span>
-                            {% else %}
-                                <span class="badge bg-secondary">Inativo</span>
-                            {% endif %}
-                        </td>
-                        <td>
-                            <div class="btn-group btn-group-sm">
-                                <button class="btn btn-outline-primary" 
-                                        onclick="editarFuncionario({{ funcionario.id }})"
-                                        data-bs-toggle="tooltip" 
-                                        title="Editar">
-                                    <i class="fas fa-edit"></i>
-                                </button>
-                                <button class="btn btn-outline-info" 
-                                        onclick="verDetalhesFuncionario({{ funcionario.id }})"
-                                        data-bs-toggle="tooltip" 
-                                        title="Ver Detalhes">
-                                    <i class="fas fa-eye"></i>
-                                </button>
-                                <button class="btn btn-outline-danger" 
-                                        onclick="excluirFuncionario({{ funcionario.id }})"
-                                        data-bs-toggle="tooltip" 
-                                        title="Excluir">
-                                    <i class="fas fa-trash"></i>
-                                </button>
-                            </div>
-                        </td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
+<!-- Barra de Pesquisa -->
+<div class="row mb-4">
+    <div class="col-md-6">
+        <div class="input-group">
+            <input type="text" class="form-control" id="searchInput" placeholder="Pesquisar funcionários...">
+            <span class="input-group-text">
+                <i class="fas fa-search"></i>
+            </span>
         </div>
     </div>
+    <div class="col-md-6">
+        <select class="form-select" id="statusFilter">
+            <option value="">Todos os Status</option>
+            <option value="ativo">Ativos</option>
+            <option value="inativo">Inativos</option>
+        </select>
+    </div>
 </div>
+
+<!-- Grid de Cards de Funcionários -->
+<div class="row" id="funcionariosGrid">
+    {% for funcionario in funcionarios %}
+    <div class="col-lg-4 col-md-6 mb-4 funcionario-card" 
+         data-nome="{{ funcionario.nome.lower() }}" 
+         data-departamento="{{ funcionario.departamento_ref.nome.lower() if funcionario.departamento_ref else '' }}"
+         data-funcao="{{ funcionario.funcao_ref.nome.lower() if funcionario.funcao_ref else '' }}"
+         data-status="{{ 'ativo' if funcionario.ativo else 'inativo' }}">
+        <div class="card h-100 funcionario-card-item">
+            <div class="card-body d-flex flex-column">
+                <!-- Foto e Nome -->
+                <div class="text-center mb-3">
+                    <img src="{{ url_for('static', filename='images/default-avatar.svg') }}" 
+                         class="rounded-circle mb-3" 
+                         width="80" 
+                         height="80" 
+                         style="object-fit: cover; aspect-ratio: 1/1;">
+                    <h5 class="card-title mb-1">{{ funcionario.nome }}</h5>
+                    <small class="text-muted">{{ funcionario.email if funcionario.email else '-' }}</small>
+                </div>
+                
+                <!-- Informações -->
+                <div class="mb-3">
+                    <div class="mb-2">
+                        <i class="fas fa-sitemap text-primary me-2"></i>
+                        <span>{{ funcionario.departamento_ref.nome if funcionario.departamento_ref else '-' }}</span>
+                    </div>
+                    <div class="mb-2">
+                        <i class="fas fa-user-tie text-success me-2"></i>
+                        <span>{{ funcionario.funcao_ref.nome if funcionario.funcao_ref else '-' }}</span>
+                    </div>
+                    <div class="mb-2">
+                        <i class="fas fa-clock text-info me-2"></i>
+                        <span>{{ funcionario.horario_trabalho.nome if funcionario.horario_trabalho else 'Não definido' }}</span>
+                    </div>
+                </div>
+                
+                <!-- Status -->
+                <div class="mb-3">
+                    {% if funcionario.ativo %}
+                        <span class="badge bg-success">
+                            <i class="fas fa-check-circle me-1"></i>Ativo
+                        </span>
+                    {% else %}
+                        <span class="badge bg-danger">
+                            <i class="fas fa-times-circle me-1"></i>Inativo
+                        </span>
+                    {% endif %}
+                </div>
+                
+                <!-- Botões de Ação -->
+                <div class="mt-auto">
+                    <div class="d-grid gap-2">
+                        <a href="{{ url_for('main.funcionario_perfil', id=funcionario.id) }}" 
+                           class="btn btn-primary btn-sm">
+                            <i class="fas fa-user me-1"></i>Ver Perfil
+                        </a>
+                        <div class="row g-1">
+                            <div class="col-6">
+                                <button class="btn btn-outline-warning btn-sm w-100" 
+                                        onclick="editarFuncionario({{ funcionario.id }})"
+                                        data-bs-toggle="modal" 
+                                        data-bs-target="#funcionarioModal">
+                                    <i class="fas fa-edit"></i> Editar
+                                </button>
+                            </div>
+                            <div class="col-6">
+                                <button class="btn btn-outline-danger btn-sm w-100" 
+                                        onclick="excluirFuncionario({{ funcionario.id }}, '{{ funcionario.nome }}')">
+                                    <i class="fas fa-trash"></i> Excluir
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+
+<!-- Mensagem quando não há funcionários -->
+<div id="noResultsMessage" class="text-center py-5" style="display: none;">
+    <i class="fas fa-users fa-3x text-muted mb-3"></i>
+    <h4 class="text-muted">Nenhum funcionário encontrado</h4>
+    <p class="text-muted">Ajuste os filtros de pesquisa ou adicione novos funcionários.</p>
+</div>
+
 
 <!-- Modal Funcionário -->
 <div class="modal fade" id="funcionarioModal" tabindex="-1">
@@ -348,19 +384,54 @@ function resetForm() {
     document.getElementById('data_admissao').valueAsDate = new Date();
 }
 
-$(document).ready(function() {
-    // Initialize DataTable with enhanced features
-    $('#funcionariosTable').DataTable({
-        language: {
-            url: '//cdn.datatables.net/plug-ins/1.13.6/i18n/pt-BR.json'
-        },
-        pageLength: 25,
-        order: [[1, 'asc']], // Order by name (segunda coluna)
-        columnDefs: [
-            { orderable: false, targets: [0, 7] }, // Disable sorting for photo and actions
-            { searchable: false, targets: [0, 7] }  // Disable search for photo and actions
-        ]
+// Função para filtrar funcionários
+function filtrarFuncionarios() {
+    const searchTerm = document.getElementById('searchInput').value.toLowerCase();
+    const statusFilter = document.getElementById('statusFilter').value;
+    const funcionarioCards = document.querySelectorAll('.funcionario-card');
+    let visibleCount = 0;
+    
+    funcionarioCards.forEach(card => {
+        const nome = card.dataset.nome || '';
+        const departamento = card.dataset.departamento || '';
+        const funcao = card.dataset.funcao || '';
+        const status = card.dataset.status || '';
+        
+        const matchesSearch = nome.includes(searchTerm) || 
+                            departamento.includes(searchTerm) || 
+                            funcao.includes(searchTerm);
+        
+        const matchesStatus = statusFilter === '' || status === statusFilter;
+        
+        if (matchesSearch && matchesStatus) {
+            card.style.display = '';
+            visibleCount++;
+        } else {
+            card.style.display = 'none';
+        }
     });
+    
+    // Mostrar/esconder mensagem "nenhum resultado"
+    const noResults = document.getElementById('noResultsMessage');
+    if (visibleCount === 0) {
+        noResults.style.display = 'block';
+    } else {
+        noResults.style.display = 'none';
+    }
+}
+
+$(document).ready(function() {
+    // Setup search and filter functionality
+    const searchInput = document.getElementById('searchInput');
+    const statusFilter = document.getElementById('statusFilter');
+    
+    if (searchInput) {
+        searchInput.addEventListener('input', filtrarFuncionarios);
+    }
+    
+    if (statusFilter) {
+        statusFilter.addEventListener('change', filtrarFuncionarios);
+    }
     
     // Setup photo upload
     setupPhotoUpload();
@@ -403,7 +474,25 @@ $(document).ready(function() {
     }
     
     // Configurar data de admissão padrão
-    document.getElementById('data_admissao').valueAsDate = new Date();
+    const dataAdmissaoInput = document.getElementById('data_admissao');
+    if (dataAdmissaoInput) {
+        dataAdmissaoInput.valueAsDate = new Date();
+    }
+    
+    // Adicionar hover effect aos cards
+    const cards = document.querySelectorAll('.funcionario-card-item');
+    cards.forEach(card => {
+        card.addEventListener('mouseenter', function() {
+            this.style.transform = 'translateY(-5px)';
+            this.style.boxShadow = '0 4px 20px rgba(0,0,0,0.1)';
+            this.style.transition = 'all 0.3s ease';
+        });
+        
+        card.addEventListener('mouseleave', function() {
+            this.style.transform = 'translateY(0)';
+            this.style.boxShadow = '';
+        });
+    });
 });
 </script>
 {% endblock %}

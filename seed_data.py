@@ -64,6 +64,7 @@ def create_sample_data():
         
         for horario in horarios:
             db.session.add(horario)
+        db.session.commit()
         
         # Criar departamentos
         departamentos = [
