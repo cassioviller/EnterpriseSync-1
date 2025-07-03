@@ -3,7 +3,7 @@ from flask_login import login_required, current_user
 from app import db
 from models import *
 from forms import *
-from utils import calcular_horas_trabalhadas, calcular_custo_real_obra
+from utils import calcular_horas_trabalhadas, calcular_custo_real_obra, calcular_custos_mes
 from datetime import datetime, date
 from sqlalchemy import func
 
@@ -14,16 +14,29 @@ main_bp = Blueprint('main', __name__)
 @main_bp.route('/')
 @login_required
 def dashboard():
+    # Filtros de data dos parâmetros
+    data_inicio = request.args.get('data_inicio')
+    data_fim = request.args.get('data_fim')
+    
+    # Definir período padrão (mês atual)
+    if not data_inicio:
+        data_inicio = date.today().replace(day=1)
+    else:
+        data_inicio = datetime.strptime(data_inicio, '%Y-%m-%d').date()
+    
+    if not data_fim:
+        data_fim = date.today()
+    else:
+        data_fim = datetime.strptime(data_fim, '%Y-%m-%d').date()
+    
     # KPIs para o dashboard
     total_funcionarios = Funcionario.query.filter_by(ativo=True).count()
     total_obras = Obra.query.filter(Obra.status.in_(['Em andamento', 'Pausada'])).count()
     total_veiculos = Veiculo.query.count()
     
-    # Custos do mês atual
-    primeiro_dia_mes = date.today().replace(day=1)
-    custos_mes = db.session.query(func.sum(CustoObra.valor)).filter(
-        CustoObra.data >= primeiro_dia_mes
-    ).scalar() or 0
+    # Custos do período usando função corrigida
+    custos_detalhados = calcular_custos_mes(data_inicio, data_fim)
+    custos_mes = custos_detalhados['total']
     
     # Obras em andamento
     obras_andamento = Obra.query.filter_by(status='Em andamento').limit(5).all()
@@ -34,19 +47,24 @@ def dashboard():
         func.count(Funcionario.id).label('total')
     ).join(Funcionario).filter(Funcionario.ativo == True).group_by(Departamento.nome).all()
     
-    # Custos por obra (últimos 30 dias)
-    custos_recentes = db.session.query(
-        Obra.nome,
-        func.sum(CustoObra.valor).label('total_custo')
-    ).join(CustoObra).filter(
-        CustoObra.data >= date.today().replace(day=1)
-    ).group_by(Obra.nome).limit(10).all()
+    # Custos por obra no período
+    custos_recentes = []
+    for obra in Obra.query.limit(10).all():
+        custo_obra = calcular_custo_real_obra(obra.id, data_inicio, data_fim)
+        if custo_obra['custo_total'] > 0:
+            custos_recentes.append({
+                'nome': obra.nome,
+                'total_custo': custo_obra['custo_total']
+            })
     
     return render_template('dashboard.html',
                          total_funcionarios=total_funcionarios,
                          total_obras=total_obras,
                          total_veiculos=total_veiculos,
                          custos_mes=custos_mes,
+                         custos_detalhados=custos_detalhados,
+                         data_inicio=data_inicio,
+                         data_fim=data_fim,
                          obras_andamento=obras_andamento,
                          funcionarios_dept=funcionarios_dept,
                          custos_recentes=custos_recentes)
