@@ -891,11 +891,13 @@ def nova_alimentacao():
     form = AlimentacaoForm()
     form.funcionario_id.choices = [(f.id, f.nome) for f in Funcionario.query.filter_by(ativo=True).all()]
     form.obra_id.choices = [(0, 'Selecione...')] + [(o.id, o.nome) for o in Obra.query.filter_by(status='Em andamento').all()]
+    form.restaurante_id.choices = [(0, 'Selecione...')] + [(r.id, r.nome) for r in Restaurante.query.filter_by(ativo=True).all()]
     
     if form.validate_on_submit():
         registro = RegistroAlimentacao(
             funcionario_id=form.funcionario_id.data,
             obra_id=form.obra_id.data if form.obra_id.data > 0 else None,
+            restaurante_id=form.restaurante_id.data if form.restaurante_id.data > 0 else None,
             data=form.data.data,
             tipo=form.tipo.data,
             valor=form.valor.data,

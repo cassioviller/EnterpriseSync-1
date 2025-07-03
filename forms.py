@@ -83,6 +83,7 @@ class RegistroPontoForm(FlaskForm):
 class AlimentacaoForm(FlaskForm):
     funcionario_id = SelectField('Funcionário', coerce=int, validators=[DataRequired()])
     obra_id = SelectField('Obra', coerce=int, validators=[Optional()])
+    restaurante_id = SelectField('Restaurante', coerce=int, validators=[Optional()])
     data = DateField('Data', validators=[DataRequired()], default=date.today)
     tipo = SelectField('Tipo', choices=[
         ('cafe', 'Café da Manhã'),
