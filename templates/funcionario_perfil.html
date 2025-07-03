@@ -11,10 +11,10 @@
                 <i class="fas fa-user"></i> {{ funcionario.nome }}
             </h1>
             <div class="btn-group">
-                <a href="{{ url_for('editar_funcionario', id=funcionario.id) }}" class="btn btn-primary">
+                <a href="{{ url_for('main.editar_funcionario', id=funcionario.id) }}" class="btn btn-primary">
                     <i class="fas fa-edit"></i> Editar
                 </a>
-                <a href="{{ url_for('funcionarios') }}" class="btn btn-secondary">
+                <a href="{{ url_for('main.funcionarios') }}" class="btn btn-secondary">
                     <i class="fas fa-arrow-left"></i> Voltar
                 </a>
             </div>
@@ -473,7 +473,7 @@
                 <h5 class="modal-title" id="pontoModalLabel">Novo Registro de Ponto</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
-            <form method="POST" id="pontoForm" action="{{ url_for('novo_ponto') }}">
+            <form method="POST" id="pontoForm" action="{{ url_for('main.novo_ponto') }}">
                 <div class="modal-body">
                     <input type="hidden" id="funcionario_id" name="funcionario_id" value="{{ funcionario.id }}">
                     
@@ -636,7 +636,7 @@
                 <h5 class="modal-title" id="alimentacaoModalLabel">Novo Registro de Alimentação</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
-            <form method="POST" id="alimentacaoForm" action="{{ url_for('nova_alimentacao') }}">
+            <form method="POST" id="alimentacaoForm" action="{{ url_for('main.nova_alimentacao') }}">
                 <div class="modal-body">
                     <input type="hidden" name="funcionario_id" value="{{ funcionario.id }}">
                     
