@@ -362,5 +362,10 @@ function excluirVeiculo(id) {
         form.submit();
     }
 }
+
+function gerenciarVeiculo(id, placa) {
+    // Redirecionar para página de detalhes do veículo
+    window.location.href = '/veiculos/' + id + '/detalhes';
+}
 </script>
 {% endblock %}

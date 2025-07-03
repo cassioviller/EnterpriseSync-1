@@ -508,6 +508,30 @@ def excluir_veiculo(id):
     flash('Veículo excluído com sucesso!', 'success')
     return redirect(url_for('main.veiculos'))
 
+@main_bp.route('/veiculos/<int:id>/detalhes')
+@login_required
+def detalhes_veiculo(id):
+    veiculo = Veiculo.query.get_or_404(id)
+    
+    # Buscar registros de uso (quando implementado)
+    usos = []
+    
+    # Buscar registros de custos (quando implementado)
+    custos = []
+    
+    # KPIs do veículo
+    kpis = {
+        'custo_total': 0,
+        'total_usos': 0,
+        'media_km': 0
+    }
+    
+    return render_template('veiculos/detalhes_veiculo.html', 
+                         veiculo=veiculo, 
+                         usos=usos, 
+                         custos=custos,
+                         kpis=kpis)
+
 
 
 
