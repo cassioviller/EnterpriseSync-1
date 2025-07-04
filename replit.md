@@ -201,6 +201,17 @@ SIGE (Sistema Integrado de Gestão Empresarial) is a comprehensive business mana
   - Implemented comprehensive delay tracking: 19.08 hours total delays across 13 records in June 2025
   - Validated all KPI formulas against actual database records for complete accuracy
   - System now correctly displays absence highlighting, delay minutes, and all derived KPIs
+- July 04, 2025. Holiday Identification System and Comprehensive Analysis:
+  - Implemented holiday identification system in timesheet table with visual distinction
+  - Holidays now display as "Feriado" in gray color vs "Falta" in red, with different background colors
+  - Added complete holiday calendar for 2025 including Carnaval, Corpus Christi, and all national holidays
+  - Created comprehensive technical report (RELATORIO_FUNCIONALIDADES_PENDENTES.md) documenting:
+    * 33% implementation rate of documented KPIs (6 of 18 complete)
+    * Incomplete modules: Materials, Suppliers, Clients (templates exist but disconnected)
+    * Non-functional report links in Reports & Dashboards page
+    * Missing export functionality (PDF/Excel) beyond basic CSV
+    * Placeholder modals in restaurant food management
+  - System analysis reveals solid core functionality with clear roadmap for remaining implementations
 
 ## User Preferences
 
