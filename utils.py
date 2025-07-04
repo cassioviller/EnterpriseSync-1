@@ -238,14 +238,14 @@ def calcular_kpis_funcionario_periodo(funcionario_id, data_inicio=None, data_fim
     faltas = max(0, dias_uteis - dias_trabalhados)
     
     # Calcular atrasos (número de dias com atraso)
-    atrasos = len([r for r in registros_ponto if (r.atraso or 0) > 0])
+    atrasos = len([r for r in registros_ponto if (getattr(r, 'total_atraso_horas', 0) or 0) > 0])
     
     # Calcular horas esperadas (dias úteis × 8 horas)
     horas_esperadas = dias_uteis * 8
     
     # Calcular horas perdidas (faltas × 8h + total de minutos de atraso ÷ 60)
     horas_perdidas_faltas = faltas * 8
-    total_minutos_atraso = sum(r.atraso or 0 for r in registros_ponto)
+    total_minutos_atraso = sum(getattr(r, 'total_atraso_minutos', 0) or 0 for r in registros_ponto)
     horas_perdidas_atrasos = total_minutos_atraso / 60
     horas_perdidas_total = horas_perdidas_faltas + horas_perdidas_atrasos
     
@@ -262,7 +262,7 @@ def calcular_kpis_funcionario_periodo(funcionario_id, data_inicio=None, data_fim
         media_horas_diarias = 0
     
     # Calcular pontualidade (% de dias sem atraso)
-    dias_sem_atraso = len([r for r in registros_ponto if (r.atraso or 0) == 0])
+    dias_sem_atraso = len([r for r in registros_ponto if (getattr(r, 'total_atraso_minutos', 0) or 0) == 0])
     if dias_trabalhados > 0:
         pontualidade = (dias_sem_atraso / dias_trabalhados) * 100
     else:
