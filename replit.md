@@ -194,6 +194,13 @@ SIGE (Sistema Integrado de Gestão Empresarial) is a comprehensive business mana
   - Added work schedule display in employee profile data section
   - Improved KPI transparency by aligning calculations with actual data visible in tables
   - Created recalculation script for existing timesheet records to ensure data consistency
+- July 04, 2025. Final KPI Precision Corrections for Pedro Lima Sousa Case:
+  - Investigated and corrected all KPI calculation discrepancies reported for employee Pedro Lima Sousa
+  - Confirmed absence counting logic correctly identifies 5 absences (19/06/25 is Corpus Christi holiday)
+  - Fixed delay calculation system to properly calculate and persist entry delays and early departures
+  - Implemented comprehensive delay tracking: 19.08 hours total delays across 13 records in June 2025
+  - Validated all KPI formulas against actual database records for complete accuracy
+  - System now correctly displays absence highlighting, delay minutes, and all derived KPIs
 
 ## User Preferences
 
