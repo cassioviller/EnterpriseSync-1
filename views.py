@@ -347,11 +347,49 @@ def funcionario_perfil(id):
         # Adicionar informação de falta manualmente para registros filtrados por obra
         from kpis_engine_v3 import identificar_faltas_periodo
         faltas = identificar_faltas_periodo(id, data_inicio, data_fim)
+        
+        # Lista de feriados 2025
+        feriados_2025 = {
+            date(2025, 1, 1),   # Ano Novo
+            date(2025, 2, 17),  # Carnaval (Segunda-feira)
+            date(2025, 2, 18),  # Carnaval (Terça-feira)
+            date(2025, 4, 18),  # Paixão de Cristo (Sexta-feira Santa)
+            date(2025, 4, 21),  # Tiradentes
+            date(2025, 5, 1),   # Dia do Trabalhador
+            date(2025, 6, 19),  # Corpus Christi
+            date(2025, 9, 7),   # Independência
+            date(2025, 10, 12), # Nossa Senhora Aparecida
+            date(2025, 11, 2),  # Finados
+            date(2025, 11, 15), # Proclamação da República
+            date(2025, 12, 25)  # Natal
+        }
+        
         for registro in registros_ponto:
             registro.is_falta = (registro.data in faltas)
+            registro.is_feriado = (registro.data in feriados_2025)
     else:
         # Usar função que já identifica faltas
         registros_ponto, faltas = processar_registros_ponto_com_faltas(id, data_inicio, data_fim)
+        
+        # Lista de feriados 2025 para quando não há filtro de obra
+        feriados_2025 = {
+            date(2025, 1, 1),   # Ano Novo
+            date(2025, 2, 17),  # Carnaval (Segunda-feira)
+            date(2025, 2, 18),  # Carnaval (Terça-feira)
+            date(2025, 4, 18),  # Paixão de Cristo (Sexta-feira Santa)
+            date(2025, 4, 21),  # Tiradentes
+            date(2025, 5, 1),   # Dia do Trabalhador
+            date(2025, 6, 19),  # Corpus Christi
+            date(2025, 9, 7),   # Independência
+            date(2025, 10, 12), # Nossa Senhora Aparecida
+            date(2025, 11, 2),  # Finados
+            date(2025, 11, 15), # Proclamação da República
+            date(2025, 12, 25)  # Natal
+        }
+        
+        # Adicionar informação de feriado para todos os registros
+        for registro in registros_ponto:
+            registro.is_feriado = (registro.data in feriados_2025)
     
     # Buscar ocorrências (sem filtro de data por enquanto)
     ocorrencias = Ocorrencia.query.filter_by(funcionario_id=id).order_by(Ocorrencia.data_inicio.desc()).all()

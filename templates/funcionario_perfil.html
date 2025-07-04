@@ -252,10 +252,12 @@
                         </thead>
                         <tbody>
                             {% for registro in registros_ponto %}
-                            <tr {% if registro.is_falta %}style="background-color: #3d2a2a;"{% endif %}>
+                            <tr {% if registro.is_falta %}style="background-color: #3d2a2a;"{% elif registro.is_feriado %}style="background-color: #2a2a3d;"{% endif %}>
                                 <td>{{ registro.data.strftime('%d/%m/%Y') }}</td>
                                 <td>
-                                    {% if registro.is_falta %}
+                                    {% if registro.is_feriado %}
+                                        <span class="fw-bold" style="color: #6c757d;">Feriado</span>
+                                    {% elif registro.is_falta %}
                                         <span class="fw-bold" style="color: #dc3545;">Falta</span>
                                     {% elif registro.hora_entrada %}
                                         <span class="badge bg-info">{{ registro.hora_entrada.strftime('%H:%M') }}</span>
@@ -264,7 +266,9 @@
                                     {% endif %}
                                 </td>
                                 <td>
-                                    {% if registro.is_falta %}
+                                    {% if registro.is_feriado %}
+                                        <span class="fw-bold" style="color: #6c757d;">Feriado</span>
+                                    {% elif registro.is_falta %}
                                         <span class="fw-bold" style="color: #dc3545;">Falta</span>
                                     {% elif registro.hora_almoco_saida %}
                                         <span class="badge bg-warning">{{ registro.hora_almoco_saida.strftime('%H:%M') }}</span>
@@ -273,7 +277,9 @@
                                     {% endif %}
                                 </td>
                                 <td>
-                                    {% if registro.is_falta %}
+                                    {% if registro.is_feriado %}
+                                        <span class="fw-bold" style="color: #6c757d;">Feriado</span>
+                                    {% elif registro.is_falta %}
                                         <span class="fw-bold" style="color: #dc3545;">Falta</span>
                                     {% elif registro.hora_almoco_retorno %}
                                         <span class="badge bg-info">{{ registro.hora_almoco_retorno.strftime('%H:%M') }}</span>
@@ -282,7 +288,9 @@
                                     {% endif %}
                                 </td>
                                 <td>
-                                    {% if registro.is_falta %}
+                                    {% if registro.is_feriado %}
+                                        <span class="fw-bold" style="color: #6c757d;">Feriado</span>
+                                    {% elif registro.is_falta %}
                                         <span class="fw-bold" style="color: #dc3545;">Falta</span>
                                     {% elif registro.hora_saida %}
                                         <span class="badge bg-danger">{{ registro.hora_saida.strftime('%H:%M') }}</span>
@@ -291,7 +299,9 @@
                                     {% endif %}
                                 </td>
                                 <td>
-                                    {% if registro.is_falta %}
+                                    {% if registro.is_feriado %}
+                                        <span class="fw-bold" style="color: #6c757d;">Feriado</span>
+                                    {% elif registro.is_falta %}
                                         <span class="fw-bold" style="color: #dc3545;">Falta</span>
                                     {% elif registro.horas_trabalhadas %}
                                         <span class="fw-bold text-primary">{{ '{:.2f}h'.format(registro.horas_trabalhadas) }}</span>
@@ -300,7 +310,9 @@
                                     {% endif %}
                                 </td>
                                 <td>
-                                    {% if registro.is_falta %}
+                                    {% if registro.is_feriado %}
+                                        <span class="fw-bold" style="color: #6c757d;">Feriado</span>
+                                    {% elif registro.is_falta %}
                                         <span class="fw-bold" style="color: #dc3545;">Falta</span>
                                     {% elif registro.horas_extras and registro.horas_extras > 0 %}
                                         <span class="badge bg-warning">{{ '{:.2f}h'.format(registro.horas_extras) }}</span>
@@ -309,7 +321,9 @@
                                     {% endif %}
                                 </td>
                                 <td>
-                                    {% if registro.is_falta %}
+                                    {% if registro.is_feriado %}
+                                        <span class="fw-bold" style="color: #6c757d;">Feriado</span>
+                                    {% elif registro.is_falta %}
                                         <span class="fw-bold" style="color: #dc3545;">Falta</span>
                                     {% elif registro.total_atraso_minutos and registro.total_atraso_minutos > 0 %}
                                         <span class="badge bg-danger">{{ '{:.0f}min'.format(registro.total_atraso_minutos) }}</span>
