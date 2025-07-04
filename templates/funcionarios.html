@@ -28,7 +28,7 @@
                     </h5>
                 </div>
                 <div class="card-body">
-                    <form method="GET" action="{{ url_for('main.funcionarios') }}">
+                    <form id="filtroForm" method="GET" action="{{ url_for('main.funcionarios') }}">
                         <div class="row align-items-end">
                             <div class="col-md-3">
                                 <label for="data_inicio" class="form-label">Data Inicial</label>
@@ -639,6 +639,7 @@ $(document).ready(function() {
 });
 
 function setDateRange(period) {
+    console.log('setDateRange chamado com período:', period);
     const today = new Date();
     let startDate, endDate = today;
     
@@ -662,13 +663,29 @@ function setDateRange(period) {
                String(date.getDate()).padStart(2, '0');
     };
     
-    document.getElementById('data_inicio').value = formatDate(startDate);
-    document.getElementById('data_fim').value = formatDate(endDate);
+    const dataInicioInput = document.getElementById('data_inicio');
+    const dataFimInput = document.getElementById('data_fim');
     
-    // Submeter o formulário automaticamente
-    const form = document.querySelector('form[method="GET"]');
-    if (form) {
-        form.submit();
+    if (dataInicioInput && dataFimInput) {
+        const dataInicioFormatada = formatDate(startDate);
+        const dataFimFormatada = formatDate(endDate);
+        
+        console.log('Definindo datas:', dataInicioFormatada, 'até', dataFimFormatada);
+        
+        dataInicioInput.value = dataInicioFormatada;
+        dataFimInput.value = dataFimFormatada;
+        
+        // Aguardar um momento para garantir que os valores foram definidos
+        setTimeout(() => {
+            // Método alternativo: redirecionar diretamente com parâmetros
+            const url = new URL(window.location);
+            url.searchParams.set('data_inicio', dataInicioFormatada);
+            url.searchParams.set('data_fim', dataFimFormatada);
+            console.log('Redirecionando para:', url.toString());
+            window.location.href = url.toString();
+        }, 100);
+    } else {
+        console.error('Campos de data não encontrados!');
     }
 }
 </script>
