@@ -6,6 +6,9 @@ from forms import *
 from utils import calcular_horas_trabalhadas, calcular_custo_real_obra, calcular_custos_mes, calcular_kpis_funcionarios_geral, calcular_kpis_funcionario_periodo, calcular_kpis_funcionario_completo, calcular_ocorrencias_funcionario, processar_meio_periodo_exemplo
 from datetime import datetime, date
 from sqlalchemy import func
+from kpis_engine import kpis_engine
+import os
+from werkzeug.utils import secure_filename
 
 main_bp = Blueprint('main', __name__)
 
@@ -2025,3 +2028,158 @@ def detalhes_restaurante(restaurante_id):
                          restaurante=restaurante,
                          kpis=kpis,
                          registros=registros)
+
+# ========== NOVAS ROTAS DASHBOARD v3.0 ==========
+
+@main_bp.route('/funcionario/<int:id>/dashboard-v3')
+@login_required
+def dashboard_funcionario_v3(id):
+    """
+    Dashboard v3.0 com layout 4-4-2 e KPIs corretos
+    Implementa especificação técnica completa
+    """
+    funcionario = Funcionario.query.get_or_404(id)
+    
+    # Obter parâmetros de filtro
+    data_inicio_str = request.args.get('data_inicio')
+    data_fim_str = request.args.get('data_fim')
+    
+    # Definir período padrão (mês atual)
+    if data_inicio_str and data_fim_str:
+        try:
+            data_inicio = datetime.strptime(data_inicio_str, '%Y-%m-%d').date()
+            data_fim = datetime.strptime(data_fim_str, '%Y-%m-%d').date()
+        except ValueError:
+            data_inicio = date.today().replace(day=1)
+            data_fim = date.today()
+    else:
+        data_inicio = date.today().replace(day=1)
+        data_fim = date.today()
+    
+    # Calcular KPIs usando o engine v3.0
+    try:
+        kpis = kpis_engine.calcular_kpis_funcionario(id, data_inicio, data_fim)
+        if not kpis:
+            flash('Erro ao calcular KPIs do funcionário', 'error')
+            return redirect(url_for('main.funcionario_perfil', id=id))
+    except Exception as e:
+        flash(f'Erro ao processar dados: {str(e)}', 'error')
+        # Criar KPIs vazios para evitar erro na template
+        kpis = {
+            'horas_trabalhadas': 0, 'horas_extras': 0, 'faltas': 0, 'atrasos_horas': 0,
+            'custo_mensal': 0, 'absenteismo': 0, 'media_diaria': 0, 'horas_perdidas': 0,
+            'produtividade': 0, 'custo_alimentacao': 0,
+            'periodo': {'inicio': data_inicio, 'fim': data_fim, 'dias_uteis': 0}
+        }
+    
+    return render_template('dashboard_funcionario_v3.html',
+                         funcionario=funcionario,
+                         kpis=kpis,
+                         periodo=kpis.get('periodo', {'inicio': data_inicio, 'fim': data_fim, 'dias_uteis': 0}))
+
+@main_bp.route('/api/funcionario/<int:id>/kpis')
+@login_required
+def api_kpis_funcionario(id):
+    """
+    API endpoint para atualização automática dos KPIs
+    Retorna dados em JSON para atualização via JavaScript
+    """
+    funcionario = Funcionario.query.get_or_404(id)
+    
+    # Obter parâmetros de filtro
+    data_inicio_str = request.args.get('data_inicio')
+    data_fim_str = request.args.get('data_fim')
+    
+    if data_inicio_str and data_fim_str:
+        try:
+            data_inicio = datetime.strptime(data_inicio_str, '%Y-%m-%d').date()
+            data_fim = datetime.strptime(data_fim_str, '%Y-%m-%d').date()
+        except ValueError:
+            return jsonify({'error': 'Formato de data inválido'}), 400
+    else:
+        data_inicio = date.today().replace(day=1)
+        data_fim = date.today()
+    
+    # Calcular KPIs
+    try:
+        kpis = kpis_engine.calcular_kpis_funcionario(id, data_inicio, data_fim)
+        if not kpis:
+            return jsonify({'error': 'Funcionário não encontrado'}), 404
+        
+        return jsonify(kpis)
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@main_bp.route('/funcionario/<int:id>/relatorio-export')
+@login_required
+def exportar_relatorio_funcionario(id):
+    """
+    Exporta relatório completo do funcionário em formato CSV
+    """
+    funcionario = Funcionario.query.get_or_404(id)
+    
+    # Obter parâmetros de filtro
+    data_inicio_str = request.args.get('data_inicio')
+    data_fim_str = request.args.get('data_fim')
+    
+    if data_inicio_str and data_fim_str:
+        try:
+            data_inicio = datetime.strptime(data_inicio_str, '%Y-%m-%d').date()
+            data_fim = datetime.strptime(data_fim_str, '%Y-%m-%d').date()
+        except ValueError:
+            flash('Formato de data inválido', 'error')
+            return redirect(url_for('main.dashboard_funcionario_v3', id=id))
+    else:
+        data_inicio = date.today().replace(day=1)
+        data_fim = date.today()
+    
+    # Calcular KPIs
+    try:
+        kpis = kpis_engine.calcular_kpis_funcionario(id, data_inicio, data_fim)
+        if not kpis:
+            flash('Erro ao gerar relatório', 'error')
+            return redirect(url_for('main.dashboard_funcionario_v3', id=id))
+        
+        # Gerar conteúdo CSV
+        import csv
+        from io import StringIO
+        from flask import Response
+        
+        output = StringIO()
+        writer = csv.writer(output)
+        
+        # Cabeçalho
+        writer.writerow(['RELATÓRIO DE KPIs - ' + funcionario.nome])
+        writer.writerow(['Código:', funcionario.codigo])
+        writer.writerow(['Período:', f"{data_inicio.strftime('%d/%m/%Y')} a {data_fim.strftime('%d/%m/%Y')}"])
+        writer.writerow([])
+        
+        # Dados dos KPIs
+        writer.writerow(['INDICADOR', 'VALOR', 'UNIDADE'])
+        writer.writerow(['Horas Trabalhadas', kpis['horas_trabalhadas'], 'horas'])
+        writer.writerow(['Horas Extras', kpis['horas_extras'], 'horas'])
+        writer.writerow(['Faltas', kpis['faltas'], 'dias'])
+        writer.writerow(['Atrasos', kpis['atrasos_horas'], 'horas'])
+        writer.writerow(['Custo Mensal', f"R$ {kpis['custo_mensal']:.2f}", 'reais'])
+        writer.writerow(['Absenteísmo', f"{kpis['absenteismo']:.1f}%", 'percentual'])
+        writer.writerow(['Média Diária', kpis['media_diaria'], 'horas/dia'])
+        writer.writerow(['Horas Perdidas', kpis['horas_perdidas'], 'horas'])
+        writer.writerow(['Produtividade', f"{kpis['produtividade']:.1f}%", 'percentual'])
+        writer.writerow(['Custo Alimentação', f"R$ {kpis['custo_alimentacao']:.2f}", 'reais'])
+        
+        output.seek(0)
+        
+        # Retornar como download
+        response = Response(
+            output.getvalue(),
+            mimetype='text/csv',
+            headers={
+                'Content-Disposition': f'attachment; filename=relatorio_kpis_{funcionario.codigo}_{data_inicio}_{data_fim}.csv'
+            }
+        )
+        
+        return response
+        
+    except Exception as e:
+        flash(f'Erro ao gerar relatório: {str(e)}', 'error')
+        return redirect(url_for('main.dashboard_funcionario_v3', id=id))

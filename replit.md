@@ -158,6 +158,14 @@ SIGE (Sistema Integrado de Gestão Empresarial) is a comprehensive business mana
 - July 03, 2025. Implemented comprehensive employee profile page with KPIs, time tracking history, and occurrence management
 - July 03, 2025. Implemented comprehensive Reports and Dashboards page with global filters, interactive charts, and categorized reports
 - July 03, 2025. Removed fornecedores (suppliers), materiais (materials), and clientes (clients) modules completely from system, including database models, forms, routes, and navigation links. Fixed duplicate reports link in header.
+- July 04, 2025. Implemented SIGE v3.0 with advanced KPI engine following technical specification:
+  - Added employee code field (F0001, F0002, etc.) to all existing employees
+  - Created comprehensive KPIs Engine with correct business rules for attendance, delays, and costs
+  - Implemented new dashboard layout 4-4-2 with 10 KPIs as specified
+  - Added enhanced database models for occurrences, work calendar, and detailed time tracking
+  - Created automatic calculation system for delays (entry + early departure in hours)
+  - Implemented correct absence calculation (working days without presence record)
+  - Added real-time KPI updates and CSV export functionality
 
 ## User Preferences
 

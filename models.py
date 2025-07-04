@@ -44,6 +44,7 @@ class HorarioTrabalho(db.Model):
 
 class Funcionario(db.Model):
     id = db.Column(db.Integer, primary_key=True)
+    codigo = db.Column(db.String(10), unique=True, nullable=False)  # F0001, F0002, etc.
     nome = db.Column(db.String(100), nullable=False)
     cpf = db.Column(db.String(14), unique=True, nullable=False)
     rg = db.Column(db.String(20))
@@ -109,13 +110,59 @@ class RegistroPonto(db.Model):
     hora_saida = db.Column(db.Time)
     hora_almoco_saida = db.Column(db.Time)
     hora_almoco_retorno = db.Column(db.Time)
+    
+    # Cálculos automáticos conforme especificação
     horas_trabalhadas = db.Column(db.Float, default=0.0)
     horas_extras = db.Column(db.Float, default=0.0)
-    atraso = db.Column(db.Float, default=0.0)  # Atraso em minutos
+    minutos_atraso_entrada = db.Column(db.Integer, default=0)  # entrada após horário
+    minutos_atraso_saida = db.Column(db.Integer, default=0)    # saída antes do horário
+    total_atraso_minutos = db.Column(db.Integer, default=0)    # soma dos atrasos
+    total_atraso_horas = db.Column(db.Float, default=0.0)      # atrasos em horas
+    
+    # Campos adicionais
+    meio_periodo = db.Column(db.Boolean, default=False)
+    saida_antecipada = db.Column(db.Boolean, default=False)
     observacoes = db.Column(db.Text)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     
     # Relacionamentos são definidos via backref nos modelos principais
+
+# Novos modelos conforme especificação v3.0
+class TipoOcorrencia(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    nome = db.Column(db.String(50), unique=True, nullable=False)  # Atestado Médico, Atraso Justificado, etc.
+    descricao = db.Column(db.Text)
+    requer_documento = db.Column(db.Boolean, default=False)
+    afeta_custo = db.Column(db.Boolean, default=False)  # se deve ser incluído no custo mensal
+    ativo = db.Column(db.Boolean, default=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+class Ocorrencia(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    funcionario_id = db.Column(db.Integer, db.ForeignKey('funcionario.id'), nullable=False)
+    tipo_ocorrencia_id = db.Column(db.Integer, db.ForeignKey('tipo_ocorrencia.id'), nullable=False)
+    data_inicio = db.Column(db.Date, nullable=False)
+    data_fim = db.Column(db.Date)
+    status = db.Column(db.String(20), default='Pendente')  # Pendente, Aprovado, Rejeitado
+    descricao = db.Column(db.Text)
+    documento_anexo = db.Column(db.String(500))  # caminho para arquivo anexo
+    aprovado_por = db.Column(db.Integer, db.ForeignKey('usuario.id'))
+    data_aprovacao = db.Column(db.DateTime)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    
+    # Relacionamentos
+    funcionario = db.relationship('Funcionario', backref='ocorrencias', lazy=True)
+    tipo_ocorrencia = db.relationship('TipoOcorrencia', backref='ocorrencias', lazy=True)
+    aprovador = db.relationship('Usuario', backref='ocorrencias_aprovadas', lazy=True)
+
+class CalendarioUtil(db.Model):
+    data = db.Column(db.Date, primary_key=True)
+    dia_semana = db.Column(db.Integer)  # 1=Segunda, 7=Domingo
+    eh_util = db.Column(db.Boolean, default=True)
+    eh_feriado = db.Column(db.Boolean, default=False)
+    descricao_feriado = db.Column(db.String(100))
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
 class CustoObra(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -142,18 +189,7 @@ class RegistroAlimentacao(db.Model):
     obra_ref = db.relationship('Obra')
     restaurante_ref = db.relationship('Restaurante')
 
-class Ocorrencia(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    funcionario_id = db.Column(db.Integer, db.ForeignKey('funcionario.id'), nullable=False)
-    tipo = db.Column(db.String(50), nullable=False)
-    data_inicio = db.Column(db.Date, nullable=False)
-    data_fim = db.Column(db.Date)
-    descricao = db.Column(db.Text)
-    status = db.Column(db.String(20), default='Pendente')
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    
-    # Relacionamento
-    funcionario = db.relationship('Funcionario', backref='ocorrencias')
+# Modelo removido - duplicata
 
 
 class RDO(db.Model):
