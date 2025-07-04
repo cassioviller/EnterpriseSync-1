@@ -115,44 +115,83 @@
                 </h5>
             </div>
             <div class="card-body">
-                <div class="row">
-                    <div class="col-md-2">
+                <!-- Primeira Linha de KPIs -->
+                <div class="row mb-3">
+                    <div class="col-md-3">
                         <div class="text-center p-3 border rounded">
                             <h4 class="text-primary mb-1">{{ '{:.1f}h'.format(kpis.horas_trabalhadas) }}</h4>
                             <small class="text-muted">Horas Trabalhadas</small>
                         </div>
                     </div>
-                    <div class="col-md-2">
+                    <div class="col-md-3">
                         <div class="text-center p-3 border rounded">
                             <h4 class="text-warning mb-1">{{ '{:.1f}h'.format(kpis.horas_extras) }}</h4>
                             <small class="text-muted">Horas Extras</small>
                         </div>
                     </div>
-                    <div class="col-md-2">
+                    <div class="col-md-3">
                         <div class="text-center p-3 border rounded">
                             <h4 class="text-danger mb-1">{{ kpis.faltas }}</h4>
                             <small class="text-muted">Faltas</small>
                         </div>
                     </div>
-                    <div class="col-md-2">
+                    <div class="col-md-3">
                         <div class="text-center p-3 border rounded">
                             <h4 class="text-info mb-1">{{ kpis.atrasos }}</h4>
                             <small class="text-muted">Atrasos</small>
                         </div>
                     </div>
-                    <div class="col-md-2">
+                </div>
+                
+                <!-- Segunda Linha de KPIs -->
+                <div class="row">
+                    <div class="col-md-3">
+                        <div class="text-center p-3 border rounded">
+                            <h4 class="text-warning mb-1">{{ kpis.meio_periodo if kpis.meio_periodo is defined else 0 }}</h4>
+                            <small class="text-muted">Meio Período</small>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
                         <div class="text-center p-3 border rounded">
                             <h4 class="text-secondary mb-1">{{ '{:.1f}%'.format(kpis.absenteismo) }}</h4>
                             <small class="text-muted">Absenteísmo</small>
                         </div>
                     </div>
-                    <div class="col-md-2">
+                    <div class="col-md-3">
                         <div class="text-center p-3 border rounded">
-                            <h4 class="text-success mb-1">{{ '{:.1f}h'.format(kpis.media_horas_diarias) }}</h4>
+                            <h4 class="text-success mb-1">{{ '{:.1f}h'.format(kpis.media_diaria) }}</h4>
                             <small class="text-muted">Média Diária</small>
                         </div>
                     </div>
+                    <div class="col-md-3">
+                        <div class="text-center p-3 border rounded">
+                            <h4 class="text-primary mb-1">{{ '{:.1f}h'.format(kpis.horas_perdidas_total) if kpis.horas_perdidas_total is defined else '0.0h' }}</h4>
+                            <small class="text-muted">Horas Perdidas</small>
+                        </div>
+                    </div>
                 </div>
+                
+                <!-- Detalhes do Cálculo -->
+                {% if kpis.detalhes is defined %}
+                <div class="row mt-3">
+                    <div class="col-12">
+                        <div class="alert alert-light">
+                            <h6 class="alert-heading">Detalhes do Cálculo:</h6>
+                            <div class="row">
+                                <div class="col-md-4">
+                                    <small><strong>Horas Perdidas por Faltas:</strong> {{ '{:.1f}h'.format(kpis.detalhes.horas_perdidas_faltas) }}</small>
+                                </div>
+                                <div class="col-md-4">
+                                    <small><strong>Horas Perdidas por Atrasos:</strong> {{ '{:.1f}h'.format(kpis.detalhes.horas_perdidas_atrasos) }}</small>
+                                </div>
+                                <div class="col-md-4">
+                                    <small><strong>Horas Perdidas por Meio Período:</strong> {{ '{:.1f}h'.format(kpis.detalhes.horas_perdidas_meio_periodo) }}</small>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                {% endif %}
             </div>
         </div>
     </div>

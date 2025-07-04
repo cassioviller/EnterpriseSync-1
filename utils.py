@@ -1,7 +1,8 @@
-from datetime import datetime, timedelta, date
-from models import CustoObra, RegistroPonto, RegistroAlimentacao, CustoVeiculo
+from datetime import datetime, timedelta, date, time
+from models import CustoObra, RegistroPonto, RegistroAlimentacao, CustoVeiculo, Funcionario, HorarioTrabalho
 from sqlalchemy import func
 from app import db
+import calendar
 
 def calcular_horas_trabalhadas(hora_entrada, hora_saida, hora_almoco_saida=None, hora_almoco_retorno=None):
     """
@@ -372,3 +373,205 @@ def formatar_telefone(telefone):
         return f"({telefone[:2]}) {telefone[2:6]}-{telefone[6:]}"
     
     return telefone
+
+def gerar_dias_uteis_mes(ano, mes):
+    """
+    Gera lista de dias úteis (segunda a sexta) do mês
+    """
+    dias_uteis = []
+    cal = calendar.monthcalendar(ano, mes)
+    
+    for semana in cal:
+        for dia_semana, dia in enumerate(semana):
+            if dia > 0 and dia_semana < 5:  # Segunda a sexta (0-4)
+                dias_uteis.append(date(ano, mes, dia))
+    
+    return dias_uteis
+
+def calcular_ocorrencias_funcionario(funcionario_id, ano, mes):
+    """
+    Calcula faltas, atrasos e meio período para um funcionário
+    """
+    # Buscar funcionário e horário padrão
+    funcionario = Funcionario.query.filter_by(id=funcionario_id).first()
+    if not funcionario:
+        return {
+            'faltas': 0,
+            'atrasos': 0,
+            'meio_periodo': 0,
+            'total_minutos_atraso': 0,
+            'total_horas_perdidas': 0
+        }
+    
+    # Horário padrão (08:00 - 17:00 com 1h almoço)
+    horario_entrada_padrao = time(8, 0)
+    horario_saida_padrao = time(17, 0)
+    tolerancia_minutos = 10  # 10 minutos de tolerância
+    
+    # Buscar registros do mês
+    registros = RegistroPonto.query.filter(
+        RegistroPonto.funcionario_id == funcionario_id,
+        func.extract('year', RegistroPonto.data) == ano,
+        func.extract('month', RegistroPonto.data) == mes
+    ).all()
+    
+    # Criar dicionário de registros por data
+    registros_por_data = {}
+    for registro in registros:
+        data_str = registro.data.strftime('%Y-%m-%d')
+        registros_por_data[data_str] = registro
+    
+    # Gerar dias úteis do mês
+    dias_uteis = gerar_dias_uteis_mes(ano, mes)
+    
+    faltas = 0
+    atrasos = 0
+    meio_periodo = 0
+    total_minutos_atraso = 0
+    total_horas_perdidas = 0
+    
+    for dia_util in dias_uteis:
+        data_str = dia_util.strftime('%Y-%m-%d')
+        registro = registros_por_data.get(data_str)
+        
+        if not registro:
+            # SITUAÇÃO 1: Não há registro = FALTA COMPLETA
+            faltas += 1
+            total_horas_perdidas += 8.0  # 8 horas perdidas
+            continue
+            
+        # Verificar se registro está incompleto
+        if not registro.hora_entrada or not registro.hora_saida:
+            # SITUAÇÃO 2: Registro incompleto = FALTA
+            faltas += 1
+            total_horas_perdidas += 8.0
+            continue
+        
+        # SITUAÇÃO 3: Verificar ATRASO
+        entrada_real = registro.hora_entrada
+        entrada_padrao_datetime = datetime.combine(dia_util, horario_entrada_padrao)
+        entrada_real_datetime = datetime.combine(dia_util, entrada_real)
+        
+        minutos_atraso = (entrada_real_datetime - entrada_padrao_datetime).total_seconds() / 60
+        
+        if minutos_atraso > tolerancia_minutos:
+            atrasos += 1
+            total_minutos_atraso += minutos_atraso
+            # Horas perdidas por atraso
+            total_horas_perdidas += minutos_atraso / 60
+        
+        # SITUAÇÃO 4: Verificar MEIO PERÍODO / SAÍDA ANTECIPADA
+        saida_real = registro.hora_saida
+        saida_padrao_datetime = datetime.combine(dia_util, horario_saida_padrao)
+        saida_real_datetime = datetime.combine(dia_util, saida_real)
+        
+        # Se saiu antes do horário (mais de 30 minutos)
+        minutos_saida_antecipada = (saida_padrao_datetime - saida_real_datetime).total_seconds() / 60
+        
+        if minutos_saida_antecipada > 30:  # Mais de 30 minutos = meio período
+            meio_periodo += 1
+            # Calcular horas perdidas
+            horas_perdidas_saida = minutos_saida_antecipada / 60
+            total_horas_perdidas += horas_perdidas_saida
+    
+    return {
+        'faltas': faltas,
+        'atrasos': atrasos,
+        'meio_periodo': meio_periodo,
+        'total_minutos_atraso': total_minutos_atraso,
+        'total_horas_perdidas': total_horas_perdidas,
+        'detalhes': {
+            'horas_perdidas_faltas': faltas * 8.0,
+            'horas_perdidas_atrasos': total_minutos_atraso / 60,
+            'horas_perdidas_meio_periodo': total_horas_perdidas - (faltas * 8.0) - (total_minutos_atraso / 60)
+        }
+    }
+
+def calcular_kpis_funcionario_completo(funcionario_id, ano=None, mes=None):
+    """
+    Calcula KPIs completos com detecção automática de faltas, atrasos e meio período
+    """
+    if not ano or not mes:
+        hoje = datetime.now()
+        ano = hoje.year
+        mes = hoje.month
+    
+    # Calcular ocorrências
+    ocorrencias = calcular_ocorrencias_funcionario(funcionario_id, ano, mes)
+    
+    # Buscar dados de horas trabalhadas
+    registros_query = RegistroPonto.query.filter(
+        RegistroPonto.funcionario_id == funcionario_id,
+        func.extract('year', RegistroPonto.data) == ano,
+        func.extract('month', RegistroPonto.data) == mes,
+        RegistroPonto.hora_entrada.isnot(None),
+        RegistroPonto.hora_saida.isnot(None)
+    ).all()
+    
+    total_horas_trabalhadas = 0
+    total_horas_extras = 0
+    dias_trabalhados = len(registros_query)
+    
+    for registro in registros_query:
+        if registro.horas_trabalhadas:
+            total_horas_trabalhadas += registro.horas_trabalhadas
+        if registro.horas_extras:
+            total_horas_extras += registro.horas_extras
+    
+    # Calcular horas esperadas do mês (dias úteis x 8h)
+    dias_uteis = gerar_dias_uteis_mes(ano, mes)
+    horas_esperadas = len(dias_uteis) * 8.0
+    
+    # Calcular absenteísmo
+    absenteismo = 0.0
+    if horas_esperadas > 0:
+        absenteismo = (ocorrencias['total_horas_perdidas'] / horas_esperadas) * 100
+    
+    # Calcular média diária
+    media_diaria = 0.0
+    if dias_trabalhados > 0:
+        media_diaria = total_horas_trabalhadas / dias_trabalhados
+    
+    return {
+        'horas_trabalhadas': total_horas_trabalhadas,
+        'horas_extras': total_horas_extras,
+        'faltas': ocorrencias['faltas'],
+        'atrasos': ocorrencias['atrasos'],
+        'meio_periodo': ocorrencias['meio_periodo'],
+        'absenteismo': round(absenteismo, 1),
+        'media_diaria': round(media_diaria, 1),
+        'dias_trabalhados': dias_trabalhados,
+        'horas_esperadas': horas_esperadas,
+        'horas_perdidas_total': ocorrencias['total_horas_perdidas'],
+        'total_minutos_atraso': ocorrencias['total_minutos_atraso'],
+        'detalhes': ocorrencias['detalhes']
+    }
+
+def processar_meio_periodo_exemplo():
+    """
+    Exemplo da lógica de meio período conforme a imagem:
+    Dia 12/06: Funcionário trabalhou 08:00-14:30 = 6.5h (descontando 1h almoço)
+    Horas perdidas = 8h - 6.5h = 1.5h
+    """
+    # Exemplo prático
+    entrada = time(8, 0)      # 08:00
+    saida = time(14, 30)      # 14:30
+    almoco = 1.0              # 1 hora de almoço
+    
+    # Calcular horas trabalhadas
+    entrada_dt = datetime.combine(date.today(), entrada)
+    saida_dt = datetime.combine(date.today(), saida)
+    
+    total_minutos = (saida_dt - entrada_dt).total_seconds() / 60
+    horas_trabalhadas = (total_minutos - (almoco * 60)) / 60
+    
+    jornada_padrao = 8.0
+    horas_perdidas = jornada_padrao - horas_trabalhadas
+    
+    return {
+        'entrada': entrada.strftime('%H:%M'),
+        'saida': saida.strftime('%H:%M'),
+        'horas_trabalhadas': horas_trabalhadas,
+        'horas_perdidas': horas_perdidas,
+        'situacao': 'Meio Período' if horas_perdidas > 0.5 else 'Normal'
+    }

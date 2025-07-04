@@ -3,7 +3,7 @@ from flask_login import login_required, current_user
 from app import db
 from models import *
 from forms import *
-from utils import calcular_horas_trabalhadas, calcular_custo_real_obra, calcular_custos_mes, calcular_kpis_funcionarios_geral, calcular_kpis_funcionario_periodo
+from utils import calcular_horas_trabalhadas, calcular_custo_real_obra, calcular_custos_mes, calcular_kpis_funcionarios_geral, calcular_kpis_funcionario_periodo, calcular_kpis_funcionario_completo, calcular_ocorrencias_funcionario, processar_meio_periodo_exemplo
 from datetime import datetime, date
 from sqlalchemy import func
 
@@ -270,8 +270,14 @@ def funcionario_perfil(id):
     else:
         data_fim = datetime.strptime(data_fim, '%Y-%m-%d').date()
     
-    # Calcular KPIs individuais para o período
-    kpis = calcular_kpis_funcionario_periodo(id, data_inicio, data_fim)
+    # Calcular KPIs individuais para o período (usando nova lógica)
+    hoje = datetime.now()
+    if data_inicio.year == hoje.year and data_inicio.month == hoje.month:
+        # Se for mês atual, usar nova lógica completa
+        kpis = calcular_kpis_funcionario_completo(id, hoje.year, hoje.month)
+    else:
+        # Para períodos anteriores, usar lógica antiga
+        kpis = calcular_kpis_funcionario_periodo(id, data_inicio, data_fim)
     
     # Buscar registros de ponto com filtros
     query_ponto = RegistroPonto.query.filter_by(funcionario_id=id).filter(
