@@ -328,14 +328,9 @@ def funcionario_perfil(id):
     else:
         data_fim = datetime.strptime(data_fim, '%Y-%m-%d').date()
     
-    # Calcular KPIs individuais para o período (usando nova lógica)
-    hoje = datetime.now()
-    if data_inicio.year == hoje.year and data_inicio.month == hoje.month:
-        # Se for mês atual, usar nova lógica completa
-        kpis = calcular_kpis_funcionario_completo(id, hoje.year, hoje.month)
-    else:
-        # Para períodos anteriores, usar lógica antiga
-        kpis = calcular_kpis_funcionario_periodo(id, data_inicio, data_fim)
+    # Calcular KPIs individuais para o período (usando engine v3.0)
+    from kpis_engine_v3 import calcular_kpis_funcionario_v3
+    kpis = calcular_kpis_funcionario_v3(id, data_inicio, data_fim)
     
     # Buscar registros de ponto com filtros
     query_ponto = RegistroPonto.query.filter_by(funcionario_id=id).filter(

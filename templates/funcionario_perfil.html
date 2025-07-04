@@ -111,10 +111,32 @@
         <div class="card">
             <div class="card-header">
                 <h5 class="card-title mb-0">
-                    <i class="fas fa-chart-line"></i> Indicadores de Desempenho (Mês Atual)
+                    <i class="fas fa-chart-line"></i> Indicadores de Desempenho
                 </h5>
             </div>
             <div class="card-body">
+                <!-- Filtros de Período -->
+                <div class="row mb-4">
+                    <div class="col-12">
+                        <div class="d-flex flex-wrap gap-2 align-items-center">
+                            <div class="d-flex gap-2">
+                                <input type="date" id="dataInicio" class="form-control form-control-sm" style="width: 140px;">
+                                <input type="date" id="dataFim" class="form-control form-control-sm" style="width: 140px;">
+                                <button onclick="aplicarFiltros()" class="btn btn-primary btn-sm">
+                                    <i class="fas fa-filter"></i> Aplicar
+                                </button>
+                            </div>
+                            <div class="d-flex gap-1">
+                                <button onclick="filtroRapido('ultimos_7_dias')" class="btn btn-outline-secondary btn-sm">7 dias</button>
+                                <button onclick="filtroRapido('ultimos_30_dias')" class="btn btn-outline-secondary btn-sm">30 dias</button>
+                                <button onclick="filtroRapido('ultimo_mes')" class="btn btn-outline-secondary btn-sm">Último mês</button>
+                                <button onclick="filtroRapido('ultimo_trimestre')" class="btn btn-outline-secondary btn-sm">Trimestre</button>
+                                <button onclick="filtroRapido('ultimo_semestre')" class="btn btn-outline-secondary btn-sm">Semestre</button>
+                                <button onclick="filtroRapido('ultimo_ano')" class="btn btn-outline-secondary btn-sm">Ano</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
                 <!-- Primeira Linha de KPIs -->
                 <div class="row mb-3">
                     <div class="col-md-3">
@@ -206,34 +228,6 @@
                 </button>
             </div>
             <div class="card-body">
-                <!-- Filtros -->
-                <div class="row mb-3">
-                    <div class="col-md-3">
-                        <label for="filtro_data_inicio" class="form-label">Data Início</label>
-                        <input type="date" class="form-control" id="filtro_data_inicio">
-                    </div>
-                    <div class="col-md-3">
-                        <label for="filtro_data_fim" class="form-label">Data Fim</label>
-                        <input type="date" class="form-control" id="filtro_data_fim">
-                    </div>
-                    <div class="col-md-3">
-                        <label for="filtro_obra" class="form-label">Obra</label>
-                        <select class="form-select" id="filtro_obra">
-                            <option value="">Todas as obras</option>
-                            {% for obra in obras %}
-                            <option value="{{ obra.id }}">{{ obra.nome }}</option>
-                            {% endfor %}
-                        </select>
-                    </div>
-                    <div class="col-md-3">
-                        <label class="form-label">&nbsp;</label>
-                        <div class="d-grid">
-                            <button type="button" class="btn btn-secondary" onclick="filtrarPonto()">
-                                <i class="fas fa-filter"></i> Filtrar
-                            </button>
-                        </div>
-                    </div>
-                </div>
 
                 <!-- Tabela de Registros -->
                 <div class="table-responsive">
@@ -905,20 +899,86 @@ function preencherHorarioAtual(campo) {
     document.getElementById(campo).value = currentTime;
 }
 
-// Filtros de ponto
-function filtrarPonto() {
-    const dataInicio = document.getElementById('filtro_data_inicio').value;
-    const dataFim = document.getElementById('filtro_data_fim').value;
-    const obra = document.getElementById('filtro_obra').value;
+// Filtros rápidos para KPIs
+function filtroRapido(tipo) {
+    const hoje = new Date();
+    let dataInicio, dataFim;
     
-    // Implementar lógica de filtro via AJAX ou recarregar página com parâmetros
+    switch(tipo) {
+        case 'ultimos_7_dias':
+            dataInicio = new Date(hoje.getTime() - 7 * 24 * 60 * 60 * 1000);
+            dataFim = hoje;
+            break;
+        case 'ultimos_30_dias':
+            dataInicio = new Date(hoje.getTime() - 30 * 24 * 60 * 60 * 1000);
+            dataFim = hoje;
+            break;
+        case 'ultimo_mes':
+            dataInicio = new Date(hoje.getFullYear(), hoje.getMonth() - 1, 1);
+            dataFim = new Date(hoje.getFullYear(), hoje.getMonth(), 0);
+            break;
+        case 'ultimo_trimestre':
+            dataInicio = new Date(hoje.getTime() - 90 * 24 * 60 * 60 * 1000);
+            dataFim = hoje;
+            break;
+        case 'ultimo_semestre':
+            dataInicio = new Date(hoje.getTime() - 180 * 24 * 60 * 60 * 1000);
+            dataFim = hoje;
+            break;
+        case 'ultimo_ano':
+            dataInicio = new Date(hoje.getFullYear() - 1, hoje.getMonth(), hoje.getDate());
+            dataFim = hoje;
+            break;
+    }
+    
+    // Formatar datas para input HTML
+    const formatarData = (data) => {
+        return data.toISOString().split('T')[0];
+    };
+    
+    document.getElementById('dataInicio').value = formatarData(dataInicio);
+    document.getElementById('dataFim').value = formatarData(dataFim);
+    
+    // Aplicar automaticamente
+    aplicarFiltros();
+}
+
+// Aplicar filtros de período aos KPIs
+function aplicarFiltros() {
+    const dataInicio = document.getElementById('dataInicio').value;
+    const dataFim = document.getElementById('dataFim').value;
+    
+    if (!dataInicio || !dataFim) {
+        alert('Por favor, selecione ambas as datas');
+        return;
+    }
+    
+    // Recarregar página com parâmetros de filtro
     let url = new URL(window.location);
-    if (dataInicio) url.searchParams.set('data_inicio', dataInicio);
-    if (dataFim) url.searchParams.set('data_fim', dataFim);
-    if (obra) url.searchParams.set('obra', obra);
+    url.searchParams.set('data_inicio', dataInicio);
+    url.searchParams.set('data_fim', dataFim);
+    url.searchParams.set('filtro_kpis', 'true');
     
     window.location.href = url.toString();
 }
+
+// Inicializar filtros com mês atual
+document.addEventListener('DOMContentLoaded', function() {
+    const hoje = new Date();
+    const primeiroDia = new Date(hoje.getFullYear(), hoje.getMonth(), 1);
+    const ultimoDia = new Date(hoje.getFullYear(), hoje.getMonth() + 1, 0);
+    
+    const formatarData = (data) => {
+        return data.toISOString().split('T')[0];
+    };
+    
+    if (!document.getElementById('dataInicio').value) {
+        document.getElementById('dataInicio').value = formatarData(primeiroDia);
+    }
+    if (!document.getElementById('dataFim').value) {
+        document.getElementById('dataFim').value = formatarData(ultimoDia);
+    }
+});
 
 // Funções de edição e exclusão
 function editarPonto(id) {
