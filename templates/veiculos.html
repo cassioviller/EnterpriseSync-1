@@ -123,10 +123,7 @@
                             <i class="fas fa-tag me-1"></i>
                             Tipo: {{ veiculo.tipo }}
                         </p>
-                        <p class="text-muted mb-1">
-                            <i class="fas fa-tachometer-alt me-1"></i>
-                            KM: {{ '{:,}'.format(veiculo.km_atual or 0) }}
-                        </p>
+
                         {% if veiculo.data_proxima_manutencao %}
                         <p class="text-muted mb-1">
                             <i class="fas fa-wrench me-1"></i>
@@ -151,18 +148,10 @@
                                 onclick="editarVeiculo({{ veiculo.id }})">
                             <i class="fas fa-edit me-1"></i> Editar
                         </button>
-                        {% if veiculo.status != 'Indisponível' %}
-                        <div class="btn-group" role="group">
-                            <button type="button" class="btn btn-sm btn-success" 
-                                    onclick="novoUso({{ veiculo.id }}, '{{ veiculo.placa }}')">
-                                <i class="fas fa-road me-1"></i> Uso
-                            </button>
-                            <button type="button" class="btn btn-sm btn-warning" 
-                                    onclick="novoCusto({{ veiculo.id }}, '{{ veiculo.placa }}')">
-                                <i class="fas fa-dollar-sign me-1"></i> Custo
-                            </button>
-                        </div>
-                        {% endif %}
+                        <a href="{{ url_for('main.detalhes_veiculo', id=veiculo.id) }}" 
+                           class="btn btn-sm btn-primary">
+                            <i class="fas fa-cog me-1"></i> Gerenciar
+                        </a>
                     </div>
                 </div>
             </div>
@@ -182,7 +171,7 @@
                         <th>Marca/Modelo</th>
                         <th>Ano</th>
                         <th>Tipo</th>
-                        <th>KM Atual</th>
+
                         <th>Status</th>
                         <th>Próxima Manutenção</th>
                         <th>Ações</th>
@@ -195,7 +184,7 @@
                         <td>{{ veiculo.marca }} {{ veiculo.modelo }}</td>
                         <td>{{ veiculo.ano or '-' }}</td>
                         <td>{{ veiculo.tipo }}</td>
-                        <td>{{ '{:,}'.format(veiculo.km_atual) }} km</td>
+
                         <td>
                             {% if veiculo.status == 'Disponível' %}
                                 <span class="badge bg-success">{{ veiculo.status }}</span>
@@ -292,12 +281,7 @@
                                 <input type="number" class="form-control" id="ano" name="ano" min="1900" max="2030">
                             </div>
                         </div>
-                        <div class="col-md-6">
-                            <div class="mb-3">
-                                <label for="km_atual" class="form-label">KM Atual</label>
-                                <input type="number" class="form-control" id="km_atual" name="km_atual" min="0">
-                            </div>
-                        </div>
+
                     </div>
                     
                     <div class="row">
@@ -333,156 +317,123 @@
         </div>
     </div>
 </div>
-<!-- Modal Novo Uso -->
-<div class="modal fade" id="novoUsoModal" tabindex="-1">
-    <div class="modal-dialog modal-lg">
+<!-- Modal Gerenciar Veículo -->
+<div class="modal fade" id="gerenciarVeiculoModal" tabindex="-1">
+    <div class="modal-dialog modal-xl">
         <div class="modal-content">
             <div class="modal-header">
                 <h5 class="modal-title">
-                    <i class="fas fa-road"></i> 
-                    Novo Uso de Veículo - <span id="usoVeiculoPlaca"></span>
+                    <i class="fas fa-cogs"></i> 
+                    Gerenciar Veículo - <span id="gerenciarVeiculoPlaca"></span>
                 </h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
-            <form method="POST" action="{{ url_for('main.novo_uso_veiculo') }}" id="usoForm">
-                <input type="hidden" id="uso_veiculo_id" name="veiculo_id">
-                <div class="modal-body">
-                    <div class="row">
-                        <div class="col-md-6">
-                            <div class="mb-3">
-                                <label for="uso_funcionario_id" class="form-label">Funcionário *</label>
-                                <select class="form-select" id="uso_funcionario_id" name="funcionario_id" required>
-                                    <option value="">Selecione...</option>
-                                    {% for funcionario in funcionarios %}
-                                    <option value="{{ funcionario.id }}">{{ funcionario.nome }}</option>
-                                    {% endfor %}
-                                </select>
+            <div class="modal-body">
+                <div class="row">
+                    <!-- Seção de Uso -->
+                    <div class="col-md-6">
+                        <div class="card">
+                            <div class="card-header bg-success text-white">
+                                <h6 class="card-title mb-0">
+                                    <i class="fas fa-road me-2"></i>Registrar Uso do Veículo
+                                </h6>
                             </div>
-                        </div>
-                        <div class="col-md-6">
-                            <div class="mb-3">
-                                <label for="uso_obra_id" class="form-label">Obra (Opcional)</label>
-                                <select class="form-select" id="uso_obra_id" name="obra_id">
-                                    <option value="">Selecione...</option>
-                                    {% for obra in obras %}
-                                    <option value="{{ obra.id }}">{{ obra.nome }}</option>
-                                    {% endfor %}
-                                </select>
+                            <div class="card-body">
+                                <form method="POST" action="{{ url_for('main.novo_uso_veiculo') }}" id="usoForm">
+                                    <input type="hidden" id="uso_veiculo_id" name="veiculo_id">
+                                    <div class="mb-3">
+                                        <label for="uso_funcionario_id" class="form-label">Funcionário *</label>
+                                        <select class="form-select" id="uso_funcionario_id" name="funcionario_id" required>
+                                            <option value="">Selecione...</option>
+                                            {% for funcionario in funcionarios %}
+                                            <option value="{{ funcionario.id }}">{{ funcionario.nome }}</option>
+                                            {% endfor %}
+                                        </select>
+                                    </div>
+                                    <div class="mb-3">
+                                        <label for="uso_obra_id" class="form-label">Obra (Opcional)</label>
+                                        <select class="form-select" id="uso_obra_id" name="obra_id">
+                                            <option value="">Selecione...</option>
+                                            {% for obra in obras %}
+                                            <option value="{{ obra.id }}">{{ obra.nome }}</option>
+                                            {% endfor %}
+                                        </select>
+                                    </div>
+                                    <div class="mb-3">
+                                        <label for="uso_data_uso" class="form-label">Data de Uso *</label>
+                                        <input type="date" class="form-control" id="uso_data_uso" name="data_uso" required>
+                                    </div>
+                                    <div class="mb-3">
+                                        <label for="uso_finalidade" class="form-label">Finalidade</label>
+                                        <input type="text" class="form-control" id="uso_finalidade" name="finalidade" 
+                                               placeholder="Ex: Transporte para obra">
+                                    </div>
+                                    <div class="mb-3">
+                                        <label for="uso_observacoes" class="form-label">Observações</label>
+                                        <textarea class="form-control" id="uso_observacoes" name="observacoes" rows="2"></textarea>
+                                    </div>
+                                    <button type="submit" class="btn btn-success w-100">
+                                        <i class="fas fa-save me-2"></i>Registrar Uso
+                                    </button>
+                                </form>
                             </div>
                         </div>
                     </div>
                     
-                    <div class="row">
-                        <div class="col-md-4">
-                            <div class="mb-3">
-                                <label for="uso_data_uso" class="form-label">Data de Uso *</label>
-                                <input type="date" class="form-control" id="uso_data_uso" name="data_uso" required>
+                    <!-- Seção de Custo -->
+                    <div class="col-md-6">
+                        <div class="card">
+                            <div class="card-header bg-warning text-dark">
+                                <h6 class="card-title mb-0">
+                                    <i class="fas fa-dollar-sign me-2"></i>Registrar Custo do Veículo
+                                </h6>
+                            </div>
+                            <div class="card-body">
+                                <form method="POST" action="{{ url_for('main.novo_custo_veiculo') }}" id="custoForm">
+                                    <input type="hidden" id="custo_veiculo_id" name="veiculo_id">
+                                    <div class="mb-3">
+                                        <label for="custo_data_custo" class="form-label">Data *</label>
+                                        <input type="date" class="form-control" id="custo_data_custo" name="data_custo" required>
+                                    </div>
+                                    <div class="mb-3">
+                                        <label for="custo_valor" class="form-label">Valor (R$) *</label>
+                                        <input type="number" class="form-control" id="custo_valor" name="valor" 
+                                               step="0.01" min="0" required>
+                                    </div>
+                                    <div class="mb-3">
+                                        <label for="custo_tipo_custo" class="form-label">Tipo de Custo *</label>
+                                        <select class="form-select" id="custo_tipo_custo" name="tipo_custo" required>
+                                            <option value="">Selecione...</option>
+                                            <option value="combustivel">Combustível</option>
+                                            <option value="manutencao">Manutenção</option>
+                                            <option value="seguro">Seguro</option>
+                                            <option value="multa">Multa</option>
+                                            <option value="lavagem">Lavagem</option>
+                                            <option value="outros">Outros</option>
+                                        </select>
+                                    </div>
+                                    <div class="mb-3">
+                                        <label for="custo_fornecedor" class="form-label">Fornecedor</label>
+                                        <input type="text" class="form-control" id="custo_fornecedor" name="fornecedor" 
+                                               placeholder="Ex: Auto Posto Silva">
+                                    </div>
+                                    <div class="mb-3">
+                                        <label for="custo_descricao" class="form-label">Descrição</label>
+                                        <textarea class="form-control" id="custo_descricao" name="descricao" rows="2" 
+                                                  placeholder="Detalhes do custo..."></textarea>
+                                    </div>
+                                    <button type="submit" class="btn btn-warning w-100">
+                                        <i class="fas fa-save me-2"></i>Registrar Custo
+                                    </button>
+                                </form>
                             </div>
                         </div>
-                        <div class="col-md-4">
-                            <div class="mb-3">
-                                <label for="uso_km_inicial" class="form-label">KM Inicial</label>
-                                <input type="number" class="form-control" id="uso_km_inicial" name="km_inicial" min="0">
-                            </div>
-                        </div>
-                        <div class="col-md-4">
-                            <div class="mb-3">
-                                <label for="uso_km_final" class="form-label">KM Final</label>
-                                <input type="number" class="form-control" id="uso_km_final" name="km_final" min="0">
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <div class="mb-3">
-                        <label for="uso_finalidade" class="form-label">Finalidade</label>
-                        <input type="text" class="form-control" id="uso_finalidade" name="finalidade" 
-                               placeholder="Ex: Transporte para obra X">
-                    </div>
-                    
-                    <div class="mb-3">
-                        <label for="uso_observacoes" class="form-label">Observações</label>
-                        <textarea class="form-control" id="uso_observacoes" name="observacoes" rows="3"></textarea>
                     </div>
                 </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
-                    <button type="submit" class="btn btn-success">Registrar Uso</button>
-                </div>
-            </form>
-        </div>
-    </div>
-</div>
-
-<!-- Modal Novo Custo -->
-<div class="modal fade" id="novoCustoModal" tabindex="-1">
-    <div class="modal-dialog modal-lg">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title">
-                    <i class="fas fa-dollar-sign"></i> 
-                    Novo Custo - <span id="custoVeiculoPlaca"></span>
-                </h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
-            <form method="POST" action="{{ url_for('main.novo_custo_veiculo') }}" id="custoForm">
-                <input type="hidden" id="custo_veiculo_id" name="veiculo_id">
-                <div class="modal-body">
-                    <div class="row">
-                        <div class="col-md-6">
-                            <div class="mb-3">
-                                <label for="custo_data_custo" class="form-label">Data *</label>
-                                <input type="date" class="form-control" id="custo_data_custo" name="data_custo" required>
-                            </div>
-                        </div>
-                        <div class="col-md-6">
-                            <div class="mb-3">
-                                <label for="custo_valor" class="form-label">Valor (R$) *</label>
-                                <input type="number" class="form-control" id="custo_valor" name="valor" 
-                                       step="0.01" min="0" required>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <div class="row">
-                        <div class="col-md-6">
-                            <div class="mb-3">
-                                <label for="custo_tipo_custo" class="form-label">Tipo de Custo *</label>
-                                <select class="form-select" id="custo_tipo_custo" name="tipo_custo" required>
-                                    <option value="">Selecione...</option>
-                                    <option value="combustivel">Combustível</option>
-                                    <option value="manutencao">Manutenção</option>
-                                    <option value="seguro">Seguro</option>
-                                    <option value="multa">Multa</option>
-                                    <option value="lavagem">Lavagem</option>
-                                    <option value="outros">Outros</option>
-                                </select>
-                            </div>
-                        </div>
-                        <div class="col-md-6">
-                            <div class="mb-3">
-                                <label for="custo_km_atual" class="form-label">KM Atual</label>
-                                <input type="number" class="form-control" id="custo_km_atual" name="km_atual" min="0">
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <div class="mb-3">
-                        <label for="custo_fornecedor" class="form-label">Fornecedor</label>
-                        <input type="text" class="form-control" id="custo_fornecedor" name="fornecedor" 
-                               placeholder="Ex: Auto Posto Silva">
-                    </div>
-                    
-                    <div class="mb-3">
-                        <label for="custo_descricao" class="form-label">Descrição</label>
-                        <textarea class="form-control" id="custo_descricao" name="descricao" rows="3" 
-                                  placeholder="Detalhes do custo..."></textarea>
-                    </div>
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
-                    <button type="submit" class="btn btn-warning">Registrar Custo</button>
-                </div>
-            </form>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fechar</button>
+            </div>
         </div>
     </div>
 </div>
@@ -536,16 +487,11 @@ function editarVeiculo(id) {
         });
 }
 
-function novoUso(veiculoId, placa) {
+function gerenciarVeiculo(veiculoId, placa) {
     document.getElementById('uso_veiculo_id').value = veiculoId;
-    document.getElementById('usoVeiculoPlaca').textContent = placa;
-    new bootstrap.Modal(document.getElementById('novoUsoModal')).show();
-}
-
-function novoCusto(veiculoId, placa) {
     document.getElementById('custo_veiculo_id').value = veiculoId;
-    document.getElementById('custoVeiculoPlaca').textContent = placa;
-    new bootstrap.Modal(document.getElementById('novoCustoModal')).show();
+    document.getElementById('gerenciarVeiculoPlaca').textContent = placa;
+    new bootstrap.Modal(document.getElementById('gerenciarVeiculoModal')).show();
 }
 
 function excluirVeiculo(id) {

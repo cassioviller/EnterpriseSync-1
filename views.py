@@ -780,24 +780,31 @@ def excluir_veiculo(id):
 def detalhes_veiculo(id):
     veiculo = Veiculo.query.get_or_404(id)
     
-    # Buscar registros de uso (quando implementado)
-    usos = []
+    # Buscar registros de uso
+    usos = UsoVeiculo.query.filter_by(veiculo_id=id).order_by(UsoVeiculo.data_uso.desc()).all()
     
-    # Buscar registros de custos (quando implementado)
-    custos = []
+    # Buscar registros de custo
+    custos = CustoVeiculo.query.filter_by(veiculo_id=id).order_by(CustoVeiculo.data_custo.desc()).all()
+    
+    # Dados para os formulários
+    funcionarios = Funcionario.query.filter_by(ativo=True).order_by(Funcionario.nome).all()
+    obras = Obra.query.filter(Obra.status.in_(['Em andamento', 'Pausada'])).order_by(Obra.nome).all()
     
     # KPIs do veículo
+    custo_total = sum(custo.valor for custo in custos)
     kpis = {
-        'custo_total': 0,
-        'total_usos': 0,
-        'media_km': 0
+        'custo_total': custo_total,
+        'total_usos': len(usos),
+        'total_custos': len(custos)
     }
     
-    return render_template('veiculos/detalhes_veiculo.html', 
+    return render_template('detalhes_veiculo.html', 
                          veiculo=veiculo, 
                          usos=usos, 
                          custos=custos,
-                         kpis=kpis)
+                         kpis=kpis,
+                         funcionarios=funcionarios,
+                         obras=obras)
 
 @main_bp.route('/veiculos/<int:id>/dados')
 @login_required
