@@ -87,43 +87,17 @@ def calcular_kpis_funcionario_v3(funcionario_id, data_inicio=None, data_fim=None
     faltas = max(0, dias_uteis - dias_com_presenca)
     
     # 4. ATRASOS (em horas)
-    # Calcular atrasos de entrada
-    atrasos_entrada = db.session.query(
-        func.coalesce(func.sum(
-            func.case(
-                (RegistroPonto.hora_entrada > funcionario.horario_entrada,
-                 func.extract('epoch', RegistroPonto.hora_entrada - funcionario.horario_entrada) / 3600.0),
-                else_=0
-            )
-        ), 0)
+    # Buscar atrasos já calculados na tabela registro_ponto
+    total_atrasos_horas = db.session.query(
+        func.coalesce(func.sum(RegistroPonto.total_atraso_horas), 0)
     ).filter(
         and_(
             RegistroPonto.funcionario_id == funcionario_id,
             RegistroPonto.data >= data_inicio,
             RegistroPonto.data <= data_fim,
-            RegistroPonto.hora_entrada.isnot(None)
+            RegistroPonto.total_atraso_horas > 0
         )
     ).scalar() or 0
-    
-    # Calcular saídas antecipadas
-    atrasos_saida = db.session.query(
-        func.coalesce(func.sum(
-            func.case(
-                (RegistroPonto.hora_saida < funcionario.horario_saida,
-                 func.extract('epoch', funcionario.horario_saida - RegistroPonto.hora_saida) / 3600.0),
-                else_=0
-            )
-        ), 0)
-    ).filter(
-        and_(
-            RegistroPonto.funcionario_id == funcionario_id,
-            RegistroPonto.data >= data_inicio,
-            RegistroPonto.data <= data_fim,
-            RegistroPonto.hora_saida.isnot(None)
-        )
-    ).scalar() or 0
-    
-    total_atrasos_horas = atrasos_entrada + atrasos_saida
     
     # 5. PRODUTIVIDADE (horas_trabalhadas/horas_esperadas × 100)
     horas_esperadas = dias_uteis * 8  # 8 horas por dia útil
@@ -263,21 +237,22 @@ def atualizar_calculos_ponto(registro_ponto_id):
         # Calcular horas extras (acima de 8 horas)
         registro.horas_extras = max(0, horas_trabalhadas - 8)
     
-    # Calcular atrasos
+    # Calcular atrasos usando horário de trabalho
     minutos_atraso_entrada = 0
     minutos_atraso_saida = 0
     
-    if registro.hora_entrada and funcionario.horario_entrada:
-        if registro.hora_entrada > funcionario.horario_entrada:
-            entrada_esperada = datetime.combine(registro.data, funcionario.horario_entrada)
-            entrada_real = datetime.combine(registro.data, registro.hora_entrada)
-            minutos_atraso_entrada = (entrada_real - entrada_esperada).total_seconds() / 60
-    
-    if registro.hora_saida and funcionario.horario_saida:
-        if registro.hora_saida < funcionario.horario_saida:
-            saida_esperada = datetime.combine(registro.data, funcionario.horario_saida)
-            saida_real = datetime.combine(registro.data, registro.hora_saida)
-            minutos_atraso_saida = (saida_esperada - saida_real).total_seconds() / 60
+    if funcionario.horario_trabalho:
+        if registro.hora_entrada and funcionario.horario_trabalho.entrada:
+            if registro.hora_entrada > funcionario.horario_trabalho.entrada:
+                entrada_esperada = datetime.combine(registro.data, funcionario.horario_trabalho.entrada)
+                entrada_real = datetime.combine(registro.data, registro.hora_entrada)
+                minutos_atraso_entrada = (entrada_real - entrada_esperada).total_seconds() / 60
+        
+        if registro.hora_saida and funcionario.horario_trabalho.saida:
+            if registro.hora_saida < funcionario.horario_trabalho.saida:
+                saida_esperada = datetime.combine(registro.data, funcionario.horario_trabalho.saida)
+                saida_real = datetime.combine(registro.data, registro.hora_saida)
+                minutos_atraso_saida = (saida_esperada - saida_real).total_seconds() / 60
     
     # Atualizar campos calculados
     registro.minutos_atraso_entrada = minutos_atraso_entrada
