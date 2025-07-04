@@ -1,0 +1,32 @@
+No sistema SIGE v3.0, na página de perfil do funcionário (`/funcionarios/{id}/perfil`), identificamos diversos problemas nos cálculos dos KPIs e na exibição de informações cruciais. O objetivo é corrigir esses cálculos e melhorar a transparência dos dados.
+
+Por favor, revise e ajuste a lógica de cálculo na função `calcular_kpis_funcionario_v3` no arquivo `kpis_engine_v3.py` e, se necessário, na função `atualizar_calculos_ponto` para os seguintes KPIs:
+
+1.  **Faltas:**
+    *   **Problema:** O KPI está exibindo 0, mas a tabela de ponto mostra faltas (dias sem registro de entrada em dias úteis).
+    *   **Correção:** Ajuste a lógica para que o cálculo de faltas (`dias_úteis - dias_com_presença`) seja preciso, considerando dias úteis (segunda a sexta) e excluindo feriados nacionais de 2025. Certifique-se de que a `Ocorrencia` com `status` 'Aprovado' seja considerada uma falta justificada e não afete a contagem de faltas para fins de produtividade, mas seja considerada para o custo de mão de obra.
+
+2.  **Atrasos (Horas):**
+    *   **Problema:** O KPI de Atrasos exibe um valor (ex: 2.5h), mas a coluna "Atraso" na tabela de ponto está vazia para os registros visíveis, indicando inconsistência.
+    *   **Correção:** Verifique a lógica de cálculo de `total_atraso_horas` na função `atualizar_calculos_ponto(registro_ponto_id)`. Garanta que os atrasos (entrada tardia e saída antecipada) sejam corretamente calculados, convertidos para horas e persistidos no `RegistroPonto`, e que o KPI some esses valores corretamente.
+
+3.  **Absenteísmo (%):**
+    *   **Problema:** Depende do KPI de Faltas, portanto, está incorreto.
+    *   **Correção:** O cálculo (`(faltas / dias_úteis) × 100`) deve refletir a contagem correta de faltas.
+
+4.  **Horas Perdidas:**
+    *   **Problema:** O cálculo atual não está somando as horas de falta.
+    *   **Correção:** Ajuste o cálculo para `(faltas × 8) + total_atrasos_horas`, garantindo que as horas de falta sejam incluídas.
+
+5.  **Custo Mão de Obra (R$):**
+    *   **Problema:** Necessita de validação da lógica de faltas justificadas/injustificadas.
+    *   **Correção:** Confirme que o cálculo `(horas_trabalhadas + faltas_justificadas × 8) × salario_hora` está corretamente implementado, onde `faltas_justificadas` são as ocorrências aprovadas. O `salario_hora` é `salario / 220` do funcionário.
+
+Além das correções nos KPIs, por favor, implemente a seguinte melhoria na interface:
+
+6.  **Exibição do Horário de Trabalho:**
+    *   **Problema:** O `HorarioTrabalho` ao qual o funcionário está vinculado não é exibido nos "Dados Cadastrais" na página de perfil do funcionário.
+    *   **Correção:** Adicione um campo nos "Dados Cadastrais" (no template Jinja2 da página de perfil do funcionário, ex: `templates/funcionarios/perfil.html`) que exiba o `nome` do `HorarioTrabalho` do funcionário. Esta informação está disponível através do relacionamento `funcionario.horario_trabalho.nome`.
+
+Certifique-se de que todas as alterações mantenham a consistência com a arquitetura do sistema (Flask, SQLAlchemy, PostgreSQL, Bootstrap 5) e as regras de negócio da construção civil. Após as modificações, verifique se os KPIs são exibidos corretamente no layout 4-4-2 e se o horário de trabalho é visível nos dados cadastrais.
+

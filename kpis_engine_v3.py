@@ -84,7 +84,9 @@ def calcular_kpis_funcionario_v3(funcionario_id, data_inicio=None, data_fim=None
         )
     ).scalar() or 0
     
-    faltas = max(0, dias_uteis - dias_com_presenca)
+    # Calcular faltas de forma mais precisa
+    faltas_identificadas = identificar_faltas_periodo(funcionario_id, data_inicio, data_fim)
+    faltas = len(faltas_identificadas)
     
     # 4. ATRASOS (em horas)
     # Buscar atrasos já calculados na tabela registro_ponto
@@ -114,18 +116,30 @@ def calcular_kpis_funcionario_v3(funcionario_id, data_inicio=None, data_fim=None
     horas_perdidas = horas_faltas + total_atrasos_horas
     
     # 9. CUSTO MÃO DE OBRA (horas trabalhadas + faltas justificadas)
-    # Buscar faltas justificadas (simplificado por enquanto)
-    # Assumir que ocorrências com status 'Aprovado' são justificadas
-    faltas_justificadas = db.session.query(
-        func.count(Ocorrencia.id.distinct())
-    ).filter(
-        and_(
-            Ocorrencia.funcionario_id == funcionario_id,
-            Ocorrencia.data_inicio >= data_inicio,
-            Ocorrencia.data_inicio <= data_fim,
-            Ocorrencia.status == 'Aprovado'
-        )
-    ).scalar() or 0
+    # Buscar faltas justificadas: ocorrências aprovadas que cobrem dias úteis
+    faltas_justificadas_count = 0
+    
+    try:
+        ocorrencias_aprovadas = db.session.query(Ocorrencia).filter(
+            and_(
+                Ocorrencia.funcionario_id == funcionario_id,
+                Ocorrencia.data_inicio <= data_fim,
+                Ocorrencia.data_fim >= data_inicio,
+                Ocorrencia.status == 'Aprovado'
+            )
+        ).all()
+        
+        # Contar dias úteis cobertos por ocorrências justificadas
+        for ocorrencia in ocorrencias_aprovadas:
+            inicio_periodo = max(ocorrencia.data_inicio, data_inicio)
+            fim_periodo = min(ocorrencia.data_fim, data_fim)
+            faltas_justificadas_count += calcular_dias_uteis(inicio_periodo, fim_periodo)
+            
+    except Exception as e:
+        # Fallback se tabela Ocorrencia não existir
+        faltas_justificadas_count = 0
+    
+    faltas_justificadas = faltas_justificadas_count
     
     # Calcular custo
     salario_hora = funcionario.salario / 220 if funcionario.salario else 0  # 220 horas/mês

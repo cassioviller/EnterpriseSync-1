@@ -94,6 +94,10 @@
                                 <td>{{ funcionario.funcao_ref.nome if funcionario.funcao_ref else '-' }}</td>
                             </tr>
                             <tr>
+                                <td class="fw-bold">Horário de Trabalho:</td>
+                                <td>{{ funcionario.horario_trabalho.nome if funcionario.horario_trabalho else '-' }}</td>
+                            </tr>
+                            <tr>
                                 <td class="fw-bold">Endereço:</td>
                                 <td>{{ funcionario.endereco or '-' }}</td>
                             </tr>
@@ -307,8 +311,8 @@
                                 <td>
                                     {% if registro.is_falta %}
                                         <span class="fw-bold" style="color: #dc3545;">Falta</span>
-                                    {% elif registro.atraso and registro.atraso > 0 %}
-                                        <span class="badge bg-danger">{{ '{:.0f}min'.format(registro.atraso) }}</span>
+                                    {% elif registro.total_atraso_minutos and registro.total_atraso_minutos > 0 %}
+                                        <span class="badge bg-danger">{{ '{:.0f}min'.format(registro.total_atraso_minutos) }}</span>
                                     {% else %}
                                         <span class="text-muted">-</span>
                                     {% endif %}

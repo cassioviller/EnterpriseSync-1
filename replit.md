@@ -187,6 +187,13 @@ SIGE (Sistema Integrado de Gestão Empresarial) is a comprehensive business mana
   - Developed smart absence logic considering working days and 2025 Brazilian holidays
   - Enhanced KPI engine with functions for absence period identification
   - Integrated absence detection with existing date filter system
+- July 04, 2025. KPI Calculation Corrections and UI Improvements:
+  - Fixed absence calculation logic to use precise business day counting
+  - Enhanced justified absence logic to consider approved occurrences with date ranges
+  - Corrected delay display in timesheet table to use total_atraso_minutos field
+  - Added work schedule display in employee profile data section
+  - Improved KPI transparency by aligning calculations with actual data visible in tables
+  - Created recalculation script for existing timesheet records to ensure data consistency
 
 ## User Preferences
 
