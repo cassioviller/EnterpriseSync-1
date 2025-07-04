@@ -173,6 +173,13 @@ SIGE (Sistema Integrado de Gestão Empresarial) is a comprehensive business mana
   - Fixed UI layout with filters moved above performance indicators
   - Removed "(Mês Atual)" text from all KPI titles as requested
   - System now uses PostgreSQL with proper foreign key relationships
+- July 04, 2025. KPI Engine v3.0 Enhancements and Date Filter Fix:
+  - Enhanced KPI engine with complete 2025 holidays (including Carnaval, Corpus Christi)
+  - Added automatic calculation triggers for new point records
+  - Fixed date filter persistence issue in employee profile page
+  - Implemented proper backend-frontend data flow for date filters
+  - Created recalculation script for existing point records
+  - Ensured all data tables (point, food, occurrences) respect selected date filters
 
 ## User Preferences
 

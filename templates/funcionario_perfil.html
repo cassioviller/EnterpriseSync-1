@@ -120,8 +120,8 @@
                     <div class="col-12">
                         <div class="d-flex flex-wrap gap-2 align-items-center">
                             <div class="d-flex gap-2">
-                                <input type="date" id="dataInicio" class="form-control form-control-sm" style="width: 140px;">
-                                <input type="date" id="dataFim" class="form-control form-control-sm" style="width: 140px;">
+                                <input type="date" id="dataInicio" class="form-control form-control-sm" style="width: 140px;" value="{{ data_inicio.strftime('%Y-%m-%d') if data_inicio else '' }}">
+                                <input type="date" id="dataFim" class="form-control form-control-sm" style="width: 140px;" value="{{ data_fim.strftime('%Y-%m-%d') if data_fim else '' }}">
                                 <button onclick="aplicarFiltros()" class="btn btn-primary btn-sm">
                                     <i class="fas fa-filter"></i> Aplicar
                                 </button>
@@ -962,22 +962,11 @@ function aplicarFiltros() {
     window.location.href = url.toString();
 }
 
-// Inicializar filtros com mês atual
+// Inicializar página sem sobrescrever valores dos campos de data
 document.addEventListener('DOMContentLoaded', function() {
-    const hoje = new Date();
-    const primeiroDia = new Date(hoje.getFullYear(), hoje.getMonth(), 1);
-    const ultimoDia = new Date(hoje.getFullYear(), hoje.getMonth() + 1, 0);
-    
-    const formatarData = (data) => {
-        return data.toISOString().split('T')[0];
-    };
-    
-    if (!document.getElementById('dataInicio').value) {
-        document.getElementById('dataInicio').value = formatarData(primeiroDia);
-    }
-    if (!document.getElementById('dataFim').value) {
-        document.getElementById('dataFim').value = formatarData(ultimoDia);
-    }
+    // Os valores dos campos já são definidos pelo backend via Jinja2
+    // Não fazer nada aqui para preservar os valores corretos
+    console.log('Página de perfil carregada com filtros preservados');
 });
 
 // Funções de edição e exclusão
