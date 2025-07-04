@@ -275,9 +275,12 @@ class UsoVeiculo(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     veiculo_id = db.Column(db.Integer, db.ForeignKey('veiculo.id'), nullable=False)
     funcionario_id = db.Column(db.Integer, db.ForeignKey('funcionario.id'), nullable=False)
+    obra_id = db.Column(db.Integer, db.ForeignKey('obra.id'), nullable=False)
     data_uso = db.Column(db.Date, nullable=False)
     km_inicial = db.Column(db.Integer)
     km_final = db.Column(db.Integer)
+    horario_saida = db.Column(db.Time)
+    horario_chegada = db.Column(db.Time)
     finalidade = db.Column(db.String(200))
     observacoes = db.Column(db.Text)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
@@ -285,6 +288,7 @@ class UsoVeiculo(db.Model):
     # Relacionamentos
     veiculo = db.relationship('Veiculo', backref='usos')
     funcionario = db.relationship('Funcionario', backref='usos_veiculo')
+    obra = db.relationship('Obra', backref='usos_veiculo')
     
     def __repr__(self):
         return f'<UsoVeiculo {self.veiculo_id} - {self.funcionario_id}>'
@@ -296,7 +300,7 @@ class CustoVeiculo(db.Model):
     
     id = db.Column(db.Integer, primary_key=True)
     veiculo_id = db.Column(db.Integer, db.ForeignKey('veiculo.id'), nullable=False)
-    obra_id = db.Column(db.Integer, db.ForeignKey('obra.id'))  # Obra associada ao custo
+    obra_id = db.Column(db.Integer, db.ForeignKey('obra.id'), nullable=False)  # Obra associada ao custo
     data_custo = db.Column(db.Date, nullable=False)
     valor = db.Column(db.Float, nullable=False)
     tipo_custo = db.Column(db.String(50), nullable=False)  # 'combustivel', 'manutencao', 'seguro', 'outros'

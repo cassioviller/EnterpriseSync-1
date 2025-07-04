@@ -202,10 +202,12 @@ class UsoVeiculoForm(FlaskForm):
     """Formulário para registro de uso de veículo"""
     veiculo_id = SelectField('Veículo', coerce=int, validators=[DataRequired()])
     funcionario_id = SelectField('Funcionário', coerce=int, validators=[DataRequired()])
-    obra_id = SelectField('Obra (Opcional)', coerce=int, validators=[Optional()])
+    obra_id = SelectField('Obra', coerce=int, validators=[DataRequired()])
     data_uso = DateField('Data de Uso', validators=[DataRequired()], default=date.today)
     km_inicial = IntegerField('KM Inicial', validators=[Optional(), NumberRange(min=0)])
     km_final = IntegerField('KM Final', validators=[Optional(), NumberRange(min=0)])
+    horario_saida = TimeField('Horário de Saída', validators=[Optional()])
+    horario_chegada = TimeField('Horário de Chegada', validators=[Optional()])
     finalidade = StringField('Finalidade', validators=[Optional(), Length(max=200)])
     observacoes = TextAreaField('Observações')
 
@@ -213,6 +215,7 @@ class UsoVeiculoForm(FlaskForm):
 class CustoVeiculoForm(FlaskForm):
     """Formulário para registro de custo de veículo"""
     veiculo_id = SelectField('Veículo', coerce=int, validators=[DataRequired()])
+    obra_id = SelectField('Obra', coerce=int, validators=[DataRequired()])
     data_custo = DateField('Data do Custo', validators=[DataRequired()], default=date.today)
     valor = FloatField('Valor', validators=[DataRequired(), NumberRange(min=0)])
     tipo_custo = SelectField('Tipo de Custo', choices=[

@@ -843,13 +843,30 @@ def detalhes_veiculo(id):
         'total_custos': len(custos)
     }
     
+    # Dados para gráfico de uso por obra
+    from sqlalchemy import func
+    uso_por_obra = db.session.query(
+        Obra.nome,
+        func.count(UsoVeiculo.id).label('total_usos')
+    ).join(UsoVeiculo, Obra.id == UsoVeiculo.obra_id).filter(
+        UsoVeiculo.veiculo_id == id
+    ).group_by(Obra.id, Obra.nome).all()
+    
+    # Preparar dados para o gráfico de pizza
+    grafico_uso_obras = {
+        'labels': [uso[0] for uso in uso_por_obra],
+        'data': [uso[1] for uso in uso_por_obra],
+        'total': sum([uso[1] for uso in uso_por_obra])
+    }
+    
     return render_template('detalhes_veiculo.html', 
                          veiculo=veiculo, 
                          usos=usos, 
                          custos=custos,
                          kpis=kpis,
                          funcionarios=funcionarios,
-                         obras=obras)
+                         obras=obras,
+                         grafico_uso_obras=grafico_uso_obras)
 
 @main_bp.route('/veiculos/novo-uso-direto', methods=['POST'])
 @login_required
@@ -858,21 +875,40 @@ def novo_uso_veiculo_direto():
     try:
         veiculo_id = request.form.get('veiculo_id')
         funcionario_id = request.form.get('funcionario_id')
-        obra_id = request.form.get('obra_id') or None
+        obra_id = request.form.get('obra_id')
         data_uso = datetime.strptime(request.form.get('data_uso'), '%Y-%m-%d').date()
+        km_inicial = int(request.form.get('km_inicial')) if request.form.get('km_inicial') else None
+        km_final = int(request.form.get('km_final')) if request.form.get('km_final') else None
+        horario_saida = datetime.strptime(request.form.get('horario_saida'), '%H:%M').time() if request.form.get('horario_saida') else None
+        horario_chegada = datetime.strptime(request.form.get('horario_chegada'), '%H:%M').time() if request.form.get('horario_chegada') else None
         finalidade = request.form.get('finalidade')
         observacoes = request.form.get('observacoes')
+        
+        if not obra_id:
+            flash('Obra é obrigatória para registrar uso do veículo!', 'error')
+            return redirect(url_for('main.detalhes_veiculo', id=veiculo_id))
         
         novo_uso = UsoVeiculo(
             veiculo_id=veiculo_id,
             funcionario_id=funcionario_id,
             obra_id=obra_id,
             data_uso=data_uso,
+            km_inicial=km_inicial,
+            km_final=km_final,
+            horario_saida=horario_saida,
+            horario_chegada=horario_chegada,
             finalidade=finalidade,
             observacoes=observacoes
         )
         
         db.session.add(novo_uso)
+        
+        # Atualizar KM do veículo se fornecido
+        if km_final:
+            veiculo = Veiculo.query.get(veiculo_id)
+            if veiculo:
+                veiculo.km_atual = km_final
+        
         db.session.commit()
         
         flash('Uso do veículo registrado com sucesso!', 'success')
@@ -890,9 +926,13 @@ def novo_custo_veiculo():
         data_custo = datetime.strptime(request.form.get('data_custo'), '%Y-%m-%d').date()
         valor = float(request.form.get('valor'))
         tipo_custo = request.form.get('tipo_custo')
-        obra_id = request.form.get('obra_id') or None
+        obra_id = request.form.get('obra_id')
         fornecedor = request.form.get('fornecedor')
         descricao = request.form.get('descricao')
+        
+        if not obra_id:
+            flash('Obra é obrigatória para registrar custo do veículo!', 'error')
+            return redirect(url_for('main.detalhes_veiculo', id=veiculo_id))
         
         novo_custo = CustoVeiculo(
             veiculo_id=veiculo_id,
