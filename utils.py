@@ -390,7 +390,10 @@ def gerar_dias_uteis_mes(ano, mes):
 
 def calcular_ocorrencias_funcionario(funcionario_id, ano, mes):
     """
-    Calcula faltas, atrasos e meio período para um funcionário
+    Calcula faltas, atrasos e meio período baseado apenas nos registros reais existentes:
+    - Faltas: registros com linhas completamente vazias (como nas imagens)
+    - Atrasos: chegada após 08:10 (10 min tolerância)
+    - Meio período: saída antes de 16:30 (30 min tolerância)
     """
     # Buscar funcionário e horário padrão
     funcionario = Funcionario.query.filter_by(id=funcionario_id).first()
@@ -408,21 +411,12 @@ def calcular_ocorrencias_funcionario(funcionario_id, ano, mes):
     horario_saida_padrao = time(17, 0)
     tolerancia_minutos = 10  # 10 minutos de tolerância
     
-    # Buscar registros do mês
+    # Buscar TODOS os registros do mês (incluindo os vazios)
     registros = RegistroPonto.query.filter(
         RegistroPonto.funcionario_id == funcionario_id,
         func.extract('year', RegistroPonto.data) == ano,
         func.extract('month', RegistroPonto.data) == mes
     ).all()
-    
-    # Criar dicionário de registros por data
-    registros_por_data = {}
-    for registro in registros:
-        data_str = registro.data.strftime('%Y-%m-%d')
-        registros_por_data[data_str] = registro
-    
-    # Gerar dias úteis do mês
-    dias_uteis = gerar_dias_uteis_mes(ano, mes)
     
     faltas = 0
     atrasos = 0
@@ -430,27 +424,25 @@ def calcular_ocorrencias_funcionario(funcionario_id, ano, mes):
     total_minutos_atraso = 0
     total_horas_perdidas = 0
     
-    for dia_util in dias_uteis:
-        data_str = dia_util.strftime('%Y-%m-%d')
-        registro = registros_por_data.get(data_str)
-        
-        if not registro:
-            # SITUAÇÃO 1: Não há registro = FALTA COMPLETA
+    # Iterar apenas sobre os registros que existem no banco
+    for registro in registros:
+        # SITUAÇÃO 1: Linha completamente vazia (como nas imagens: 30/06, 23/06, 19/06)
+        if (not registro.hora_entrada and not registro.hora_saida and 
+            not registro.hora_almoco_saida and not registro.hora_almoco_retorno):
             faltas += 1
-            total_horas_perdidas += 8.0  # 8 horas perdidas
+            total_horas_perdidas += 8.0
             continue
             
-        # Verificar se registro está incompleto
+        # SITUAÇÃO 2: Registro incompleto (tem data mas sem entrada/saída)
         if not registro.hora_entrada or not registro.hora_saida:
-            # SITUAÇÃO 2: Registro incompleto = FALTA
             faltas += 1
             total_horas_perdidas += 8.0
             continue
         
         # SITUAÇÃO 3: Verificar ATRASO
         entrada_real = registro.hora_entrada
-        entrada_padrao_datetime = datetime.combine(dia_util, horario_entrada_padrao)
-        entrada_real_datetime = datetime.combine(dia_util, entrada_real)
+        entrada_padrao_datetime = datetime.combine(registro.data, horario_entrada_padrao)
+        entrada_real_datetime = datetime.combine(registro.data, entrada_real)
         
         minutos_atraso = (entrada_real_datetime - entrada_padrao_datetime).total_seconds() / 60
         
@@ -462,8 +454,8 @@ def calcular_ocorrencias_funcionario(funcionario_id, ano, mes):
         
         # SITUAÇÃO 4: Verificar MEIO PERÍODO / SAÍDA ANTECIPADA
         saida_real = registro.hora_saida
-        saida_padrao_datetime = datetime.combine(dia_util, horario_saida_padrao)
-        saida_real_datetime = datetime.combine(dia_util, saida_real)
+        saida_padrao_datetime = datetime.combine(registro.data, horario_saida_padrao)
+        saida_real_datetime = datetime.combine(registro.data, saida_real)
         
         # Se saiu antes do horário (mais de 30 minutos)
         minutos_saida_antecipada = (saida_padrao_datetime - saida_real_datetime).total_seconds() / 60
