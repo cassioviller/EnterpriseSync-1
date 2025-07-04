@@ -268,6 +268,12 @@ def calcular_kpis_funcionario_periodo(funcionario_id, data_inicio=None, data_fim
     else:
         pontualidade = 100
     
+    # Calcular produtividade (% de eficiência)
+    if horas_esperadas > 0:
+        produtividade = (total_horas_trabalhadas / horas_esperadas) * 100
+    else:
+        produtividade = 0
+    
     return {
         'funcionario': funcionario,
         'horas_trabalhadas': total_horas_trabalhadas,
@@ -282,6 +288,7 @@ def calcular_kpis_funcionario_periodo(funcionario_id, data_inicio=None, data_fim
         'custo_faltas_justificadas': custo_faltas_justificadas,
         'custo_total': custo_total,
         'absenteismo': absenteismo,
+        'produtividade': produtividade,  # Novo KPI
         'dias_uteis': dias_uteis,
         'dias_trabalhados': dias_trabalhados,
         'media_horas_diarias': media_horas_diarias,
