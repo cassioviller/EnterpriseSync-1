@@ -587,8 +587,8 @@ def detalhes_obra(id):
             total_horas += horas_dia
             
             # Calcular custo baseado no salário do funcionário
-            if registro.funcionario.salario:
-                valor_hora = registro.funcionario.salario / 220  # 220 horas/mês aprox
+            if registro.funcionario_ref.salario:
+                valor_hora = registro.funcionario_ref.salario / 220  # 220 horas/mês aprox
                 custo_mao_obra += horas_dia * valor_hora
     
     # 4. Custo Total da Obra
