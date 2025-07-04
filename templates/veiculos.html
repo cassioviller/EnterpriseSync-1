@@ -152,10 +152,16 @@
                             <i class="fas fa-edit me-1"></i> Editar
                         </button>
                         {% if veiculo.status != 'Indisponível' %}
-                        <button type="button" class="btn btn-sm btn-primary" 
-                                onclick="gerenciarVeiculo({{ veiculo.id }}, '{{ veiculo.placa }}')">
-                            <i class="fas fa-cog me-1"></i> Gerenciar
-                        </button>
+                        <div class="btn-group" role="group">
+                            <button type="button" class="btn btn-sm btn-success" 
+                                    onclick="novoUso({{ veiculo.id }}, '{{ veiculo.placa }}')">
+                                <i class="fas fa-road me-1"></i> Uso
+                            </button>
+                            <button type="button" class="btn btn-sm btn-warning" 
+                                    onclick="novoCusto({{ veiculo.id }}, '{{ veiculo.placa }}')">
+                                <i class="fas fa-dollar-sign me-1"></i> Custo
+                            </button>
+                        </div>
                         {% endif %}
                     </div>
                 </div>
@@ -327,6 +333,160 @@
         </div>
     </div>
 </div>
+<!-- Modal Novo Uso -->
+<div class="modal fade" id="novoUsoModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="fas fa-road"></i> 
+                    Novo Uso de Veículo - <span id="usoVeiculoPlaca"></span>
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="POST" action="{{ url_for('main.novo_uso_veiculo') }}" id="usoForm">
+                <input type="hidden" id="uso_veiculo_id" name="veiculo_id">
+                <div class="modal-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="uso_funcionario_id" class="form-label">Funcionário *</label>
+                                <select class="form-select" id="uso_funcionario_id" name="funcionario_id" required>
+                                    <option value="">Selecione...</option>
+                                    {% for funcionario in funcionarios %}
+                                    <option value="{{ funcionario.id }}">{{ funcionario.nome }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="uso_obra_id" class="form-label">Obra (Opcional)</label>
+                                <select class="form-select" id="uso_obra_id" name="obra_id">
+                                    <option value="">Selecione...</option>
+                                    {% for obra in obras %}
+                                    <option value="{{ obra.id }}">{{ obra.nome }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-4">
+                            <div class="mb-3">
+                                <label for="uso_data_uso" class="form-label">Data de Uso *</label>
+                                <input type="date" class="form-control" id="uso_data_uso" name="data_uso" required>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="mb-3">
+                                <label for="uso_km_inicial" class="form-label">KM Inicial</label>
+                                <input type="number" class="form-control" id="uso_km_inicial" name="km_inicial" min="0">
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="mb-3">
+                                <label for="uso_km_final" class="form-label">KM Final</label>
+                                <input type="number" class="form-control" id="uso_km_final" name="km_final" min="0">
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="uso_finalidade" class="form-label">Finalidade</label>
+                        <input type="text" class="form-control" id="uso_finalidade" name="finalidade" 
+                               placeholder="Ex: Transporte para obra X">
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="uso_observacoes" class="form-label">Observações</label>
+                        <textarea class="form-control" id="uso_observacoes" name="observacoes" rows="3"></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-success">Registrar Uso</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Novo Custo -->
+<div class="modal fade" id="novoCustoModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="fas fa-dollar-sign"></i> 
+                    Novo Custo - <span id="custoVeiculoPlaca"></span>
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="POST" action="{{ url_for('main.novo_custo_veiculo') }}" id="custoForm">
+                <input type="hidden" id="custo_veiculo_id" name="veiculo_id">
+                <div class="modal-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="custo_data_custo" class="form-label">Data *</label>
+                                <input type="date" class="form-control" id="custo_data_custo" name="data_custo" required>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="custo_valor" class="form-label">Valor (R$) *</label>
+                                <input type="number" class="form-control" id="custo_valor" name="valor" 
+                                       step="0.01" min="0" required>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="custo_tipo_custo" class="form-label">Tipo de Custo *</label>
+                                <select class="form-select" id="custo_tipo_custo" name="tipo_custo" required>
+                                    <option value="">Selecione...</option>
+                                    <option value="combustivel">Combustível</option>
+                                    <option value="manutencao">Manutenção</option>
+                                    <option value="seguro">Seguro</option>
+                                    <option value="multa">Multa</option>
+                                    <option value="lavagem">Lavagem</option>
+                                    <option value="outros">Outros</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="custo_km_atual" class="form-label">KM Atual</label>
+                                <input type="number" class="form-control" id="custo_km_atual" name="km_atual" min="0">
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="custo_fornecedor" class="form-label">Fornecedor</label>
+                        <input type="text" class="form-control" id="custo_fornecedor" name="fornecedor" 
+                               placeholder="Ex: Auto Posto Silva">
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="custo_descricao" class="form-label">Descrição</label>
+                        <textarea class="form-control" id="custo_descricao" name="descricao" rows="3" 
+                                  placeholder="Detalhes do custo..."></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-warning">Registrar Custo</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
 {% endblock %}
 
 {% block scripts %}
@@ -340,11 +500,52 @@ $(document).ready(function() {
         order: [[0, 'asc']],
         pageLength: 25
     });
+    
+    // Configurar data padrão para hoje nos modais
+    const hoje = new Date().toISOString().split('T')[0];
+    $('#uso_data_uso').val(hoje);
+    $('#custo_data_custo').val(hoje);
 });
 
 function editarVeiculo(id) {
-    // Implementar edição
-    alert('Funcionalidade de edição será implementada');
+    // Buscar dados do veículo via AJAX e preencher modal
+    fetch(`/veiculos/${id}/dados`)
+        .then(response => response.json())
+        .then(data => {
+            // Preencher campos do modal
+            document.getElementById('placa').value = data.placa;
+            document.getElementById('marca').value = data.marca;
+            document.getElementById('modelo').value = data.modelo;
+            document.getElementById('ano').value = data.ano || '';
+            document.getElementById('tipo').value = data.tipo;
+            document.getElementById('km_atual').value = data.km_atual || '';
+            document.getElementById('status').value = data.status;
+            document.getElementById('data_ultima_manutencao').value = data.data_ultima_manutencao || '';
+            document.getElementById('data_proxima_manutencao').value = data.data_proxima_manutencao || '';
+            
+            // Alterar form action e título
+            document.getElementById('veiculoForm').action = `/veiculos/${id}/editar`;
+            document.getElementById('modalTitle').textContent = 'Editar Veículo';
+            
+            // Mostrar modal
+            new bootstrap.Modal(document.getElementById('veiculoModal')).show();
+        })
+        .catch(error => {
+            console.error('Erro:', error);
+            alert('Erro ao carregar dados do veículo');
+        });
+}
+
+function novoUso(veiculoId, placa) {
+    document.getElementById('uso_veiculo_id').value = veiculoId;
+    document.getElementById('usoVeiculoPlaca').textContent = placa;
+    new bootstrap.Modal(document.getElementById('novoUsoModal')).show();
+}
+
+function novoCusto(veiculoId, placa) {
+    document.getElementById('custo_veiculo_id').value = veiculoId;
+    document.getElementById('custoVeiculoPlaca').textContent = placa;
+    new bootstrap.Modal(document.getElementById('novoCustoModal')).show();
 }
 
 function excluirVeiculo(id) {
@@ -352,14 +553,27 @@ function excluirVeiculo(id) {
         const form = document.createElement('form');
         form.method = 'POST';
         form.action = '/veiculos/' + id + '/excluir';
+        
+        // Adicionar token CSRF se necessário
+        const csrfToken = document.querySelector('meta[name=csrf-token]');
+        if (csrfToken) {
+            const input = document.createElement('input');
+            input.type = 'hidden';
+            input.name = 'csrf_token';
+            input.value = csrfToken.getAttribute('content');
+            form.appendChild(input);
+        }
+        
         document.body.appendChild(form);
         form.submit();
     }
 }
 
-function gerenciarVeiculo(id, placa) {
-    // Redirecionar para página de detalhes do veículo
-    window.location.href = '/veiculos/' + id + '/detalhes';
-}
+// Resetar modal quando fechar
+document.getElementById('veiculoModal').addEventListener('hidden.bs.modal', function () {
+    document.getElementById('veiculoForm').action = '{{ url_for("main.novo_veiculo") }}';
+    document.getElementById('modalTitle').textContent = 'Novo Veículo';
+    document.getElementById('veiculoForm').reset();
+});
 </script>
 {% endblock %}

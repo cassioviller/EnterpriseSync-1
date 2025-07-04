@@ -713,7 +713,12 @@ def excluir_obra(id):
 @login_required
 def veiculos():
     veiculos = Veiculo.query.all()
-    return render_template('veiculos.html', veiculos=veiculos)
+    funcionarios = Funcionario.query.filter_by(ativo=True).all()
+    obras = Obra.query.filter_by(status='Em andamento').all()
+    return render_template('veiculos.html', 
+                         veiculos=veiculos, 
+                         funcionarios=funcionarios, 
+                         obras=obras)
 
 @main_bp.route('/veiculos/novo', methods=['GET', 'POST'])
 @login_required
@@ -794,38 +799,32 @@ def detalhes_veiculo(id):
                          custos=custos,
                          kpis=kpis)
 
-@main_bp.route('/veiculos/<int:id>/editar', methods=['GET', 'POST'])
+@main_bp.route('/veiculos/<int:id>/dados')
 @login_required
-def editar_veiculo_route(id):
+def dados_veiculo(id):
+    """Retorna dados do veículo em JSON para edição via AJAX"""
     veiculo = Veiculo.query.get_or_404(id)
-    form = VeiculoForm(obj=veiculo)
-    
-    if form.validate_on_submit():
-        veiculo.placa = form.placa.data
-        veiculo.marca = form.marca.data
-        veiculo.modelo = form.modelo.data
-        veiculo.ano = form.ano.data
-        veiculo.tipo = form.tipo.data
-        veiculo.status = form.status.data
-        veiculo.km_atual = form.km_atual.data
-        veiculo.data_ultima_manutencao = form.data_ultima_manutencao.data
-        veiculo.data_proxima_manutencao = form.data_proxima_manutencao.data
-        
-        db.session.commit()
-        flash('Veículo atualizado com sucesso!', 'success')
-        return redirect(url_for('main.detalhes_veiculo', id=id))
-    
-    return render_template('veiculos/editar_veiculo.html', form=form, veiculo=veiculo)
+    return jsonify({
+        'id': veiculo.id,
+        'placa': veiculo.placa,
+        'marca': veiculo.marca,
+        'modelo': veiculo.modelo,
+        'ano': veiculo.ano,
+        'tipo': veiculo.tipo,
+        'km_atual': veiculo.km_atual,
+        'status': veiculo.status,
+        'data_ultima_manutencao': veiculo.data_ultima_manutencao.strftime('%Y-%m-%d') if veiculo.data_ultima_manutencao else '',
+        'data_proxima_manutencao': veiculo.data_proxima_manutencao.strftime('%Y-%m-%d') if veiculo.data_proxima_manutencao else ''
+    })
 
-@main_bp.route('/veiculos/<int:id>/novo_uso', methods=['GET', 'POST'])
+@main_bp.route('/veiculos/uso', methods=['POST'])
 @login_required
-def novo_uso_veiculo(id):
-    veiculo = Veiculo.query.get_or_404(id)
+def novo_uso_veiculo():
+    """Registra novo uso de veículo"""
     form = UsoVeiculoForm()
     
-    # Populando choices
-    form.veiculo_id.choices = [(veiculo.id, f"{veiculo.placa} - {veiculo.marca} {veiculo.modelo}")]
-    form.veiculo_id.data = veiculo.id
+    # Preencher choices dinamicamente
+    form.veiculo_id.choices = [(0, 'Selecione...')] + [(v.id, f"{v.placa} - {v.marca} {v.modelo}") for v in Veiculo.query.filter_by(status='Disponível').all()]
     form.funcionario_id.choices = [(0, 'Selecione...')] + [(f.id, f.nome) for f in Funcionario.query.filter_by(ativo=True).all()]
     form.obra_id.choices = [(0, 'Selecione...')] + [(o.id, o.nome) for o in Obra.query.all()]
     
@@ -833,7 +832,7 @@ def novo_uso_veiculo(id):
         uso = UsoVeiculo(
             veiculo_id=form.veiculo_id.data,
             funcionario_id=form.funcionario_id.data,
-            obra_id=form.obra_id.data if form.obra_id.data != 0 else None,
+            obra_id=form.obra_id.data if form.obra_id.data else None,
             data_uso=form.data_uso.data,
             km_inicial=form.km_inicial.data,
             km_final=form.km_final.data,
@@ -842,25 +841,29 @@ def novo_uso_veiculo(id):
         )
         db.session.add(uso)
         
-        # Atualizar KM atual do veículo se fornecido
-        if form.km_final.data:
-            veiculo.km_atual = form.km_final.data
+        # Atualizar status do veículo para "Em uso"
+        veiculo = Veiculo.query.get(form.veiculo_id.data)
+        if veiculo:
+            veiculo.status = 'Em uso'
+            # Atualizar KM se fornecido
+            if form.km_final.data:
+                veiculo.km_atual = form.km_final.data
         
         db.session.commit()
-        flash('Uso do veículo registrado com sucesso!', 'success')
-        return redirect(url_for('main.detalhes_veiculo', id=id))
+        flash('Uso de veículo registrado com sucesso!', 'success')
+    else:
+        flash('Erro ao registrar uso do veículo. Verifique os dados.', 'error')
     
-    return render_template('veiculos/novo_uso.html', form=form, veiculo=veiculo)
+    return redirect(url_for('main.veiculos'))
 
-@main_bp.route('/veiculos/<int:id>/novo_custo', methods=['GET', 'POST'])
+@main_bp.route('/veiculos/custo', methods=['POST'])
 @login_required
-def novo_custo_veiculo(id):
-    veiculo = Veiculo.query.get_or_404(id)
+def novo_custo_veiculo():
+    """Registra novo custo de veículo"""
     form = CustoVeiculoForm()
     
-    # Populando choices
-    form.veiculo_id.choices = [(veiculo.id, f"{veiculo.placa} - {veiculo.marca} {veiculo.modelo}")]
-    form.veiculo_id.data = veiculo.id
+    # Preencher choices dinamicamente
+    form.veiculo_id.choices = [(0, 'Selecione...')] + [(v.id, f"{v.placa} - {v.marca} {v.modelo}") for v in Veiculo.query.all()]
     
     if form.validate_on_submit():
         custo = CustoVeiculo(
@@ -874,15 +877,18 @@ def novo_custo_veiculo(id):
         )
         db.session.add(custo)
         
-        # Atualizar KM atual do veículo se fornecido
+        # Atualizar KM do veículo se fornecido
         if form.km_atual.data:
-            veiculo.km_atual = form.km_atual.data
+            veiculo = Veiculo.query.get(form.veiculo_id.data)
+            if veiculo:
+                veiculo.km_atual = form.km_atual.data
         
         db.session.commit()
-        flash('Custo do veículo registrado com sucesso!', 'success')
-        return redirect(url_for('main.detalhes_veiculo', id=id))
+        flash('Custo de veículo registrado com sucesso!', 'success')
+    else:
+        flash('Erro ao registrar custo do veículo. Verifique os dados.', 'error')
     
-    return render_template('veiculos/novo_custo.html', form=form, veiculo=veiculo)
+    return redirect(url_for('main.veiculos'))
 
 # Serviços
 @main_bp.route('/servicos')
