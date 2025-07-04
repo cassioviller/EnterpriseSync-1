@@ -222,8 +222,7 @@ def calcular_kpis_funcionario_periodo(funcionario_id, data_inicio=None, data_fim
     # Custo total do funcionário
     custo_total = custo_mao_obra + custo_alimentacao + custo_transporte + custo_faltas_justificadas
     
-    # Calcular taxa de absenteísmo
-    # Dias úteis no período (segunda a sexta)
+    # Calcular dias úteis no período (segunda a sexta)
     dias_uteis = 0
     data_atual = data_inicio
     while data_atual <= data_fim:
@@ -234,9 +233,24 @@ def calcular_kpis_funcionario_periodo(funcionario_id, data_inicio=None, data_fim
     # Dias trabalhados (com registros de ponto)
     dias_trabalhados = len(registros_ponto)
     
-    # Taxa de absenteísmo = (dias não trabalhados / dias úteis) * 100
-    if dias_uteis > 0:
-        absenteismo = ((dias_uteis - dias_trabalhados) / dias_uteis) * 100
+    # Calcular faltas (dias úteis sem registro de ponto)
+    faltas = max(0, dias_uteis - dias_trabalhados)
+    
+    # Calcular atrasos (número de dias com atraso)
+    atrasos = len([r for r in registros_ponto if (r.atraso or 0) > 0])
+    
+    # Calcular horas esperadas (dias úteis × 8 horas)
+    horas_esperadas = dias_uteis * 8
+    
+    # Calcular horas perdidas (faltas × 8h + total de minutos de atraso ÷ 60)
+    horas_perdidas_faltas = faltas * 8
+    total_minutos_atraso = sum(r.atraso or 0 for r in registros_ponto)
+    horas_perdidas_atrasos = total_minutos_atraso / 60
+    horas_perdidas_total = horas_perdidas_faltas + horas_perdidas_atrasos
+    
+    # Taxa de absenteísmo = (horas perdidas / horas esperadas) × 100
+    if horas_esperadas > 0:
+        absenteismo = (horas_perdidas_total / horas_esperadas) * 100
     else:
         absenteismo = 0
     
@@ -245,9 +259,6 @@ def calcular_kpis_funcionario_periodo(funcionario_id, data_inicio=None, data_fim
         media_horas_diarias = total_horas_trabalhadas / dias_trabalhados
     else:
         media_horas_diarias = 0
-    
-    # Calcular total de atrasos
-    total_atrasos = sum(r.atraso or 0 for r in registros_ponto)
     
     # Calcular pontualidade (% de dias sem atraso)
     dias_sem_atraso = len([r for r in registros_ponto if (r.atraso or 0) == 0])
@@ -260,6 +271,9 @@ def calcular_kpis_funcionario_periodo(funcionario_id, data_inicio=None, data_fim
         'funcionario': funcionario,
         'horas_trabalhadas': total_horas_trabalhadas,
         'horas_extras': total_horas_extras,
+        'h_extras': total_horas_extras,  # Alias para compatibilidade com template
+        'faltas': faltas,
+        'atrasos': atrasos,
         'dias_faltas_justificadas': dias_faltas_justificadas,
         'custo_mao_obra': custo_mao_obra,
         'custo_alimentacao': custo_alimentacao,
@@ -270,7 +284,11 @@ def calcular_kpis_funcionario_periodo(funcionario_id, data_inicio=None, data_fim
         'dias_uteis': dias_uteis,
         'dias_trabalhados': dias_trabalhados,
         'media_horas_diarias': media_horas_diarias,
-        'total_atrasos': total_atrasos,
+        'media_diaria': media_horas_diarias,  # Alias para compatibilidade
+        'total_atrasos': atrasos,
+        'total_minutos_atraso': total_minutos_atraso,
+        'horas_perdidas_total': horas_perdidas_total,
+        'horas_esperadas': horas_esperadas,
         'pontualidade': pontualidade
     }
 

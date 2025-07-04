@@ -1,0 +1,584 @@
+# Prompt para Implementar KPIs de Funcionário - Sistema de Gestão
+
+## 🎯 Objetivo
+Implementar e corrigir as KPIs de desempenho dos funcionários no sistema Flask, com foco especial na **lógica do Absenteísmo** que precisa ser calculada corretamente.
+
+## 📊 KPIs a Implementar
+
+### **1. Horas Trabalhadas** ✅
+- **Campo**: `horas_trabalhadas` 
+- **Cálculo**: Soma das horas trabalhadas no mês
+- **Exibição**: "100.9h" (formato com 1 casa decimal + "h")
+
+### **2. Horas Extras** ⚠️
+- **Campo**: `h_extras` (conforme mostrado na imagem)
+- **Cálculo**: Horas que excedem a jornada padrão (8h/dia)
+- **Exibição**: "0.0h" (formato com 1 casa decimal + "h")
+- **Cor**: Amarelo/laranja quando > 0
+
+### **3. Faltas** ⚠️
+- **Campo**: `faltas`
+- **Cálculo**: Número de dias que o funcionário faltou
+- **Exibição**: Número inteiro (ex: "2", "0")
+- **Cor**: Vermelho quando > 0
+
+### **4. Atrasos** ⚠️
+- **Campo**: `atrasos`
+- **Cálculo**: Número de dias que chegou atrasado
+- **Exibição**: Número inteiro (ex: "1", "0")
+- **Cor**: Laranja quando > 0
+
+### **5. Absenteísmo** 🚨 **PRINCIPAL PROBLEMA**
+- **Campo**: `absenteismo`
+- **Cálculo**: `(Horas perdidas ÷ Horas esperadas) × 100`
+- **Exibição**: "0.0%" (formato percentual com 1 casa decimal)
+- **Cor**: Azul/cinza
+- **FÓRMULA DETALHADA**:
+  ```
+  Horas Esperadas = Dias úteis do mês × 8 horas
+  Horas Perdidas = (Faltas × 8h) + (Minutos de atraso ÷ 60)
+  Absenteísmo = (Horas Perdidas ÷ Horas Esperadas) × 100
+  ```
+
+### **6. Média Diária** ✅
+- **Campo**: `media_diaria`
+- **Cálculo**: Horas trabalhadas ÷ Dias trabalhados
+- **Exibição**: "4.8h" (formato com 1 casa decimal + "h")
+
+---
+
+## 🗃️ Estrutura de Dados Necessária
+
+### **Tabela para Controle de Faltas e Atrasos**
+```sql
+-- Tabela para registrar ocorrências (faltas, atrasos, etc.)
+CREATE TABLE IF NOT EXISTS ocorrencias (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    funcionario_id INTEGER NOT NULL,
+    data DATE NOT NULL,
+    tipo TEXT CHECK(tipo IN ('FALTA', 'ATRASO', 'FALTA_PARCIAL')) NOT NULL,
+    
+    -- Para faltas: 1 = falta completa, 0.5 = meio período
+    horas_perdidas DECIMAL(4,2) DEFAULT 0,
+    
+    -- Para atrasos: minutos de atraso
+    minutos_atraso INTEGER DEFAULT 0,
+    
+    -- Justificativa
+    justificado BOOLEAN DEFAULT FALSE,
+    motivo TEXT,
+    observacoes TEXT,
+    
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    
+    FOREIGN KEY (funcionario_id) REFERENCES funcionarios(id),
+    UNIQUE(funcionario_id, data, tipo)
+);
+
+-- Tabela para definir dias úteis por mês (para cálculo do absenteísmo)
+CREATE TABLE IF NOT EXISTS calendario_mensal (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    ano INTEGER NOT NULL,
+    mes INTEGER NOT NULL,
+    dias_uteis INTEGER NOT NULL,
+    horas_esperadas DECIMAL(6,2) NOT NULL, -- dias_uteis * 8
+    
+    UNIQUE(ano, mes)
+);
+```
+
+### **View para KPIs Mensais**
+```sql
+CREATE VIEW IF NOT EXISTS vw_kpis_funcionario_mensal AS
+SELECT 
+    f.id as funcionario_id,
+    f.codigo,
+    f.nome,
+    f.foto_url,
+    
+    -- Período de referência
+    strftime('%Y', COALESCE(rp.data, date('now'))) as ano,
+    strftime('%m', COALESCE(rp.data, date('now'))) as mes,
+    strftime('%Y-%m', COALESCE(rp.data, date('now'))) as ano_mes,
+    
+    -- 1. HORAS TRABALHADAS
+    COALESCE(SUM(rp.horas_trabalhadas), 0) as horas_trabalhadas,
+    
+    -- 2. HORAS EXTRAS (horas acima de 8h por dia)
+    COALESCE(SUM(
+        CASE 
+            WHEN rp.horas_trabalhadas > 8 THEN rp.horas_trabalhadas - 8
+            ELSE 0
+        END
+    ), 0) as h_extras,
+    
+    -- 3. DIAS TRABALHADOS
+    COUNT(DISTINCT rp.data) as dias_trabalhados,
+    
+    -- 4. FALTAS (do mês)
+    COALESCE(faltas.total_faltas, 0) as faltas,
+    
+    -- 5. ATRASOS (do mês)
+    COALESCE(atrasos.total_atrasos, 0) as atrasos,
+    
+    -- 6. HORAS PERDIDAS (faltas + atrasos)
+    COALESCE(faltas.horas_perdidas_faltas, 0) + COALESCE(atrasos.horas_perdidas_atrasos, 0) as horas_perdidas_total,
+    
+    -- 7. HORAS ESPERADAS (do calendário)
+    COALESCE(cal.horas_esperadas, 0) as horas_esperadas,
+    
+    -- 8. ABSENTEÍSMO (fórmula correta)
+    CASE 
+        WHEN COALESCE(cal.horas_esperadas, 0) > 0 THEN
+            ROUND(
+                ((COALESCE(faltas.horas_perdidas_faltas, 0) + COALESCE(atrasos.horas_perdidas_atrasos, 0)) / cal.horas_esperadas) * 100,
+                1
+            )
+        ELSE 0
+    END as absenteismo,
+    
+    -- 9. MÉDIA DIÁRIA
+    CASE 
+        WHEN COUNT(DISTINCT rp.data) > 0 THEN
+            ROUND(COALESCE(SUM(rp.horas_trabalhadas), 0) / COUNT(DISTINCT rp.data), 1)
+        ELSE 0
+    END as media_diaria
+
+FROM funcionarios f
+
+-- Registros de ponto do mês
+LEFT JOIN registros_ponto rp ON f.id = rp.funcionario_id 
+    AND strftime('%Y-%m', rp.data) = strftime('%Y-%m', date('now'))
+
+-- Faltas do mês
+LEFT JOIN (
+    SELECT 
+        funcionario_id,
+        strftime('%Y-%m', data) as ano_mes,
+        COUNT(*) as total_faltas,
+        SUM(horas_perdidas) as horas_perdidas_faltas
+    FROM ocorrencias 
+    WHERE tipo = 'FALTA'
+    GROUP BY funcionario_id, strftime('%Y-%m', data)
+) faltas ON f.id = faltas.funcionario_id 
+    AND faltas.ano_mes = strftime('%Y-%m', date('now'))
+
+-- Atrasos do mês
+LEFT JOIN (
+    SELECT 
+        funcionario_id,
+        strftime('%Y-%m', data) as ano_mes,
+        COUNT(*) as total_atrasos,
+        SUM(minutos_atraso / 60.0) as horas_perdidas_atrasos
+    FROM ocorrencias 
+    WHERE tipo = 'ATRASO'
+    GROUP BY funcionario_id, strftime('%Y-%m', data)
+) atrasos ON f.id = atrasos.funcionario_id 
+    AND atrasos.ano_mes = strftime('%Y-%m', date('now'))
+
+-- Calendário do mês
+LEFT JOIN calendario_mensal cal ON 
+    cal.ano = CAST(strftime('%Y', date('now')) AS INTEGER) AND
+    cal.mes = CAST(strftime('%m', date('now')) AS INTEGER)
+
+WHERE f.status = 'ATIVO'
+GROUP BY f.id, strftime('%Y-%m', COALESCE(rp.data, date('now')))
+ORDER BY f.codigo;
+```
+
+---
+
+## 🐍 Código Python para KPIs
+
+### **Função para Calcular KPIs**
+```python
+def calcular_kpis_funcionario(funcionario_id, ano=None, mes=None):
+    """
+    Calcula KPIs de um funcionário para um mês específico
+    """
+    from datetime import datetime
+    
+    if not ano or not mes:
+        hoje = datetime.now()
+        ano = hoje.year
+        mes = hoje.month
+    
+    conn = get_db()
+    
+    # Buscar KPIs da view
+    kpis = conn.execute('''
+        SELECT * FROM vw_kpis_funcionario_mensal 
+        WHERE funcionario_id = ? AND ano = ? AND mes = ?
+    ''', [funcionario_id, str(ano), f'{mes:02d}']).fetchone()
+    
+    if not kpis:
+        # Retornar KPIs zerados se não houver dados
+        return {
+            'horas_trabalhadas': 0.0,
+            'h_extras': 0.0,
+            'faltas': 0,
+            'atrasos': 0,
+            'absenteismo': 0.0,
+            'media_diaria': 0.0,
+            'dias_trabalhados': 0,
+            'horas_esperadas': 0.0,
+            'horas_perdidas_total': 0.0
+        }
+    
+    conn.close()
+    
+    return {
+        'horas_trabalhadas': float(kpis['horas_trabalhadas']),
+        'h_extras': float(kpis['h_extras']),
+        'faltas': int(kpis['faltas']),
+        'atrasos': int(kpis['atrasos']),
+        'absenteismo': float(kpis['absenteismo']),
+        'media_diaria': float(kpis['media_diaria']),
+        'dias_trabalhados': int(kpis['dias_trabalhados']),
+        'horas_esperadas': float(kpis['horas_esperadas']),
+        'horas_perdidas_total': float(kpis['horas_perdidas_total'])
+    }
+
+def registrar_falta(funcionario_id, data, horas_perdidas=8.0, motivo="", justificado=False):
+    """
+    Registra uma falta de funcionário
+    """
+    conn = get_db()
+    
+    try:
+        conn.execute('''
+            INSERT OR REPLACE INTO ocorrencias (
+                funcionario_id, data, tipo, horas_perdidas, motivo, justificado
+            ) VALUES (?, ?, 'FALTA', ?, ?, ?)
+        ''', [funcionario_id, data, horas_perdidas, motivo, justificado])
+        
+        conn.commit()
+        return True
+    except Exception as e:
+        print(f"Erro ao registrar falta: {e}")
+        return False
+    finally:
+        conn.close()
+
+def registrar_atraso(funcionario_id, data, minutos_atraso, motivo="", justificado=False):
+    """
+    Registra um atraso de funcionário
+    """
+    conn = get_db()
+    
+    try:
+        conn.execute('''
+            INSERT OR REPLACE INTO ocorrencias (
+                funcionario_id, data, tipo, minutos_atraso, motivo, justificado
+            ) VALUES (?, ?, 'ATRASO', ?, ?, ?)
+        ''', [funcionario_id, data, minutos_atraso, motivo, justificado])
+        
+        conn.commit()
+        return True
+    except Exception as e:
+        print(f"Erro ao registrar atraso: {e}")
+        return False
+    finally:
+        conn.close()
+
+def inicializar_calendario_mensal():
+    """
+    Inicializa o calendário com dias úteis dos últimos 12 meses
+    """
+    from datetime import datetime, timedelta
+    import calendar
+    
+    conn = get_db()
+    
+    # Últimos 12 meses
+    hoje = datetime.now()
+    
+    for i in range(12):
+        # Calcular mês/ano
+        mes_atual = hoje.month - i
+        ano_atual = hoje.year
+        
+        if mes_atual <= 0:
+            mes_atual += 12
+            ano_atual -= 1
+        
+        # Calcular dias úteis (segunda a sexta)
+        dias_uteis = 0
+        cal = calendar.monthcalendar(ano_atual, mes_atual)
+        
+        for semana in cal:
+            for dia_semana, dia in enumerate(semana):
+                if dia > 0 and dia_semana < 5:  # Segunda a sexta (0-4)
+                    dias_uteis += 1
+        
+        horas_esperadas = dias_uteis * 8
+        
+        # Inserir no banco
+        conn.execute('''
+            INSERT OR REPLACE INTO calendario_mensal (ano, mes, dias_uteis, horas_esperadas)
+            VALUES (?, ?, ?, ?)
+        ''', [ano_atual, mes_atual, dias_uteis, horas_esperadas])
+    
+    conn.commit()
+    conn.close()
+```
+
+### **Rota Flask para Perfil do Funcionário**
+```python
+@app.route('/funcionarios/<int:funcionario_id>/perfil')
+def perfil_funcionario(funcionario_id):
+    """Perfil do funcionário com KPIs corretos"""
+    conn = get_db()
+    
+    # Dados básicos
+    funcionario = conn.execute('''
+        SELECT f.*, fn.nome as funcao_nome, d.nome as departamento_nome
+        FROM funcionarios f
+        JOIN funcoes fn ON f.funcao_id = fn.id
+        LEFT JOIN departamentos d ON f.departamento_id = d.id
+        WHERE f.id = ?
+    ''', [funcionario_id]).fetchone()
+    
+    if not funcionario:
+        flash('Funcionário não encontrado', 'error')
+        return redirect(url_for('funcionarios'))
+    
+    # KPIs do mês atual
+    kpis = calcular_kpis_funcionario(funcionario_id)
+    
+    # Histórico dos últimos 6 meses
+    historico = []
+    from datetime import datetime, timedelta
+    
+    hoje = datetime.now()
+    for i in range(6):
+        mes_ref = hoje.month - i
+        ano_ref = hoje.year
+        
+        if mes_ref <= 0:
+            mes_ref += 12
+            ano_ref -= 1
+        
+        kpis_mes = calcular_kpis_funcionario(funcionario_id, ano_ref, mes_ref)
+        kpis_mes['mes'] = mes_ref
+        kpis_mes['ano'] = ano_ref
+        kpis_mes['mes_nome'] = calendar.month_name[mes_ref]
+        
+        historico.append(kpis_mes)
+    
+    conn.close()
+    
+    return render_template('funcionarios/perfil.html',
+                         funcionario=funcionario,
+                         kpis=kpis,
+                         historico=historico)
+
+@app.route('/api/funcionarios/<int:funcionario_id>/kpis')
+def api_kpis_funcionario(funcionario_id):
+    """API para retornar KPIs em JSON"""
+    kpis = calcular_kpis_funcionario(funcionario_id)
+    
+    # Formatar para exibição
+    kpis_formatados = {
+        'horas_trabalhadas': f"{kpis['horas_trabalhadas']:.1f}h",
+        'h_extras': f"{kpis['h_extras']:.1f}h",
+        'faltas': str(kpis['faltas']),
+        'atrasos': str(kpis['atrasos']),
+        'absenteismo': f"{kpis['absenteismo']:.1f}%",
+        'media_diaria': f"{kpis['media_diaria']:.1f}h",
+        
+        # Valores numéricos para cálculos
+        'valores': kpis
+    }
+    
+    return jsonify(kpis_formatados)
+```
+
+---
+
+## 🎨 Template HTML para Exibir KPIs
+
+```html
+<!-- Seção de KPIs no perfil do funcionário -->
+<div class="kpis-container">
+    <h3>📊 Indicadores de Desempenho (Mês Atual)</h3>
+    
+    <div class="kpis-grid">
+        <!-- Horas Trabalhadas -->
+        <div class="kpi-card">
+            <div class="kpi-valor">{{ "%.1f"|format(kpis.horas_trabalhadas) }}h</div>
+            <div class="kpi-label">Horas Trabalhadas</div>
+        </div>
+        
+        <!-- Horas Extras -->
+        <div class="kpi-card {{ 'warning' if kpis.h_extras > 0 else '' }}">
+            <div class="kpi-valor">{{ "%.1f"|format(kpis.h_extras) }}h</div>
+            <div class="kpi-label">Horas Extras</div>
+        </div>
+        
+        <!-- Faltas -->
+        <div class="kpi-card {{ 'danger' if kpis.faltas > 0 else '' }}">
+            <div class="kpi-valor">{{ kpis.faltas }}</div>
+            <div class="kpi-label">Faltas</div>
+        </div>
+        
+        <!-- Atrasos -->
+        <div class="kpi-card {{ 'warning' if kpis.atrasos > 0 else '' }}">
+            <div class="kpi-valor">{{ kpis.atrasos }}</div>
+            <div class="kpi-label">Atrasos</div>
+        </div>
+        
+        <!-- Absenteísmo -->
+        <div class="kpi-card info">
+            <div class="kpi-valor">{{ "%.1f"|format(kpis.absenteismo) }}%</div>
+            <div class="kpi-label">Absenteísmo</div>
+        </div>
+        
+        <!-- Média Diária -->
+        <div class="kpi-card success">
+            <div class="kpi-valor">{{ "%.1f"|format(kpis.media_diaria) }}h</div>
+            <div class="kpi-label">Média Diária</div>
+        </div>
+    </div>
+    
+    <!-- Detalhes do Cálculo do Absenteísmo -->
+    <div class="absenteismo-detalhes">
+        <h4>📋 Detalhes do Absenteísmo</h4>
+        <div class="calculo-info">
+            <p><strong>Horas Esperadas:</strong> {{ "%.1f"|format(kpis.horas_esperadas) }}h</p>
+            <p><strong>Horas Perdidas:</strong> {{ "%.1f"|format(kpis.horas_perdidas_total) }}h</p>
+            <p><strong>Fórmula:</strong> ({{ "%.1f"|format(kpis.horas_perdidas_total) }} ÷ {{ "%.1f"|format(kpis.horas_esperadas) }}) × 100 = {{ "%.1f"|format(kpis.absenteismo) }}%</p>
+        </div>
+    </div>
+</div>
+```
+
+---
+
+## 🎯 CSS para Estilizar KPIs
+
+```css
+.kpis-container {
+    background: white;
+    padding: 2rem;
+    border-radius: 12px;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    margin-bottom: 2rem;
+}
+
+.kpis-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 1rem;
+    margin-bottom: 2rem;
+}
+
+.kpi-card {
+    background: #f8f9fa;
+    padding: 1.5rem;
+    border-radius: 8px;
+    text-align: center;
+    border-left: 4px solid #6c757d;
+    transition: transform 0.2s ease;
+}
+
+.kpi-card:hover {
+    transform: translateY(-2px);
+}
+
+.kpi-card.warning {
+    border-left-color: #ffc107;
+    background: #fff3cd;
+}
+
+.kpi-card.danger {
+    border-left-color: #dc3545;
+    background: #f8d7da;
+}
+
+.kpi-card.info {
+    border-left-color: #17a2b8;
+    background: #d1ecf1;
+}
+
+.kpi-card.success {
+    border-left-color: #28a745;
+    background: #d4edda;
+}
+
+.kpi-valor {
+    font-size: 2rem;
+    font-weight: bold;
+    color: #333;
+    margin-bottom: 0.5rem;
+}
+
+.kpi-label {
+    font-size: 0.9rem;
+    color: #666;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.absenteismo-detalhes {
+    background: #f1f3f4;
+    padding: 1rem;
+    border-radius: 8px;
+    border-left: 4px solid #17a2b8;
+}
+
+.calculo-info p {
+    margin: 0.5rem 0;
+    font-size: 0.9rem;
+}
+```
+
+---
+
+## 🚀 Instruções de Implementação
+
+### **1. Executar SQLs**
+```sql
+-- Criar tabelas
+-- (Copiar e executar os SQLs das tabelas acima)
+
+-- Inicializar calendário
+-- (Executar a função inicializar_calendario_mensal())
+```
+
+### **2. Adicionar Funções Python**
+```python
+# Adicionar as funções no main.py
+# (Copiar as funções calcular_kpis_funcionario, registrar_falta, etc.)
+```
+
+### **3. Testar KPIs**
+```python
+# Teste rápido
+funcionario_id = 1
+kpis = calcular_kpis_funcionario(funcionario_id)
+print(f"Absenteísmo: {kpis['absenteismo']:.1f}%")
+```
+
+### **4. Registrar Dados de Teste**
+```python
+# Registrar uma falta para teste
+registrar_falta(1, '2024-01-15', 8.0, 'Doença', True)
+
+# Registrar um atraso para teste  
+registrar_atraso(1, '2024-01-16', 30, 'Trânsito', False)
+```
+
+## ✅ Resultado Esperado
+
+Após implementar este código, as KPIs devem aparecer corretamente:
+
+- **Horas Trabalhadas**: "100.9h" ✅
+- **Horas Extras**: "0.0h" ✅  
+- **Faltas**: "0" ✅
+- **Atrasos**: "0" ✅
+- **Absenteísmo**: "0.0%" ✅ (com cálculo correto)
+- **Média Diária**: "4.8h" ✅
+
+O **Absenteísmo** será calculado corretamente usando a fórmula: `(Horas Perdidas ÷ Horas Esperadas) × 100`
+
