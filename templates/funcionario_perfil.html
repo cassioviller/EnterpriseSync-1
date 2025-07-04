@@ -248,52 +248,66 @@
                         </thead>
                         <tbody>
                             {% for registro in registros_ponto %}
-                            <tr>
+                            <tr {% if registro.is_falta %}style="background-color: #3d2a2a;"{% endif %}>
                                 <td>{{ registro.data.strftime('%d/%m/%Y') }}</td>
                                 <td>
-                                    {% if registro.hora_entrada %}
+                                    {% if registro.is_falta %}
+                                        <span class="fw-bold" style="color: #dc3545;">Falta</span>
+                                    {% elif registro.hora_entrada %}
                                         <span class="badge bg-info">{{ registro.hora_entrada.strftime('%H:%M') }}</span>
                                     {% else %}
                                         <span class="text-muted">-</span>
                                     {% endif %}
                                 </td>
                                 <td>
-                                    {% if registro.hora_almoco_saida %}
+                                    {% if registro.is_falta %}
+                                        <span class="fw-bold" style="color: #dc3545;">Falta</span>
+                                    {% elif registro.hora_almoco_saida %}
                                         <span class="badge bg-warning">{{ registro.hora_almoco_saida.strftime('%H:%M') }}</span>
                                     {% else %}
                                         <span class="text-muted">-</span>
                                     {% endif %}
                                 </td>
                                 <td>
-                                    {% if registro.hora_almoco_retorno %}
+                                    {% if registro.is_falta %}
+                                        <span class="fw-bold" style="color: #dc3545;">Falta</span>
+                                    {% elif registro.hora_almoco_retorno %}
                                         <span class="badge bg-info">{{ registro.hora_almoco_retorno.strftime('%H:%M') }}</span>
                                     {% else %}
                                         <span class="text-muted">-</span>
                                     {% endif %}
                                 </td>
                                 <td>
-                                    {% if registro.hora_saida %}
+                                    {% if registro.is_falta %}
+                                        <span class="fw-bold" style="color: #dc3545;">Falta</span>
+                                    {% elif registro.hora_saida %}
                                         <span class="badge bg-danger">{{ registro.hora_saida.strftime('%H:%M') }}</span>
                                     {% else %}
                                         <span class="text-muted">-</span>
                                     {% endif %}
                                 </td>
                                 <td>
-                                    {% if registro.horas_trabalhadas %}
+                                    {% if registro.is_falta %}
+                                        <span class="fw-bold" style="color: #dc3545;">Falta</span>
+                                    {% elif registro.horas_trabalhadas %}
                                         <span class="fw-bold text-primary">{{ '{:.2f}h'.format(registro.horas_trabalhadas) }}</span>
                                     {% else %}
                                         <span class="text-muted">-</span>
                                     {% endif %}
                                 </td>
                                 <td>
-                                    {% if registro.horas_extras and registro.horas_extras > 0 %}
+                                    {% if registro.is_falta %}
+                                        <span class="fw-bold" style="color: #dc3545;">Falta</span>
+                                    {% elif registro.horas_extras and registro.horas_extras > 0 %}
                                         <span class="badge bg-warning">{{ '{:.2f}h'.format(registro.horas_extras) }}</span>
                                     {% else %}
                                         <span class="text-muted">-</span>
                                     {% endif %}
                                 </td>
                                 <td>
-                                    {% if registro.atraso and registro.atraso > 0 %}
+                                    {% if registro.is_falta %}
+                                        <span class="fw-bold" style="color: #dc3545;">Falta</span>
+                                    {% elif registro.atraso and registro.atraso > 0 %}
                                         <span class="badge bg-danger">{{ '{:.0f}min'.format(registro.atraso) }}</span>
                                     {% else %}
                                         <span class="text-muted">-</span>

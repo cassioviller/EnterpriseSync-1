@@ -265,3 +265,90 @@ def atualizar_calculos_ponto(registro_ponto_id):
     registro.total_atraso_horas = (minutos_atraso_entrada + minutos_atraso_saida) / 60
     
     db.session.commit()
+
+
+def identificar_faltas_periodo(funcionario_id, data_inicio, data_fim):
+    """
+    Identifica dias de falta de um funcionário em um período específico
+    
+    Args:
+        funcionario_id: ID do funcionário
+        data_inicio: Data de início do período
+        data_fim: Data de fim do período
+    
+    Returns:
+        set: Conjunto de datas que são dias de falta
+    """
+    from models import RegistroPonto
+    
+    # Buscar registros de ponto do funcionário no período
+    registros_ponto = RegistroPonto.query.filter(
+        RegistroPonto.funcionario_id == funcionario_id,
+        RegistroPonto.data >= data_inicio,
+        RegistroPonto.data <= data_fim
+    ).all()
+    
+    # Criar conjunto de datas com registro de entrada
+    datas_com_entrada = {r.data for r in registros_ponto if r.hora_entrada}
+    
+    # Feriados nacionais completos para 2025
+    feriados_2025 = [
+        date(2025, 1, 1),   # Ano Novo
+        date(2025, 2, 17),  # Carnaval (Segunda-feira)
+        date(2025, 2, 18),  # Carnaval (Terça-feira)
+        date(2025, 4, 18),  # Paixão de Cristo (Sexta-feira Santa)
+        date(2025, 4, 21),  # Tiradentes
+        date(2025, 5, 1),   # Dia do Trabalhador
+        date(2025, 6, 19),  # Corpus Christi
+        date(2025, 9, 7),   # Independência
+        date(2025, 10, 12), # Nossa Senhora Aparecida
+        date(2025, 11, 2),  # Finados
+        date(2025, 11, 15), # Proclamação da República
+        date(2025, 12, 25), # Natal
+    ]
+    
+    # Identificar todos os dias úteis no período
+    dias_uteis_periodo = set()
+    data_atual = data_inicio
+    
+    while data_atual <= data_fim:
+        # Verificar se é dia útil (segunda a sexta e não é feriado)
+        if data_atual.weekday() < 5 and data_atual not in feriados_2025:
+            dias_uteis_periodo.add(data_atual)
+        data_atual += timedelta(days=1)
+    
+    # Faltas = dias úteis sem registro de entrada
+    faltas = dias_uteis_periodo - datas_com_entrada
+    
+    return faltas
+
+
+def processar_registros_ponto_com_faltas(funcionario_id, data_inicio, data_fim):
+    """
+    Processa registros de ponto adicionando informação sobre faltas
+    
+    Args:
+        funcionario_id: ID do funcionário
+        data_inicio: Data de início do período
+        data_fim: Data de fim do período
+    
+    Returns:
+        tuple: (registros_ponto, faltas_identificadas)
+    """
+    from models import RegistroPonto
+    
+    # Buscar registros de ponto
+    registros_ponto = RegistroPonto.query.filter(
+        RegistroPonto.funcionario_id == funcionario_id,
+        RegistroPonto.data >= data_inicio,
+        RegistroPonto.data <= data_fim
+    ).order_by(RegistroPonto.data.desc()).all()
+    
+    # Identificar faltas
+    faltas = identificar_faltas_periodo(funcionario_id, data_inicio, data_fim)
+    
+    # Adicionar propriedade is_falta aos registros
+    for registro in registros_ponto:
+        registro.is_falta = (registro.data in faltas)
+    
+    return registros_ponto, faltas

@@ -180,6 +180,13 @@ SIGE (Sistema Integrado de Gestão Empresarial) is a comprehensive business mana
   - Implemented proper backend-frontend data flow for date filters
   - Created recalculation script for existing point records
   - Ensured all data tables (point, food, occurrences) respect selected date filters
+- July 04, 2025. Visual Absence Identification System:
+  - Implemented comprehensive absence detection for employee timesheet table
+  - Added red background highlighting (#3d2a2a) for absence days
+  - Created "Falta" text display in red (#dc3545) with bold formatting
+  - Developed smart absence logic considering working days and 2025 Brazilian holidays
+  - Enhanced KPI engine with functions for absence period identification
+  - Integrated absence detection with existing date filter system
 
 ## User Preferences
 

@@ -332,16 +332,26 @@ def funcionario_perfil(id):
     from kpis_engine_v3 import calcular_kpis_funcionario_v3
     kpis = calcular_kpis_funcionario_v3(id, data_inicio, data_fim)
     
-    # Buscar registros de ponto com filtros
-    query_ponto = RegistroPonto.query.filter_by(funcionario_id=id).filter(
-        RegistroPonto.data >= data_inicio,
-        RegistroPonto.data <= data_fim
-    )
+    # Buscar registros de ponto com filtros e identificação de faltas
+    from kpis_engine_v3 import processar_registros_ponto_com_faltas
     
     if obra_filtro:
-        query_ponto = query_ponto.filter_by(obra_id=obra_filtro)
-    
-    registros_ponto = query_ponto.order_by(RegistroPonto.data.desc()).all()
+        # Se há filtro de obra, usar query tradicional
+        query_ponto = RegistroPonto.query.filter_by(funcionario_id=id).filter(
+            RegistroPonto.data >= data_inicio,
+            RegistroPonto.data <= data_fim,
+            RegistroPonto.obra_id == obra_filtro
+        )
+        registros_ponto = query_ponto.order_by(RegistroPonto.data.desc()).all()
+        
+        # Adicionar informação de falta manualmente para registros filtrados por obra
+        from kpis_engine_v3 import identificar_faltas_periodo
+        faltas = identificar_faltas_periodo(id, data_inicio, data_fim)
+        for registro in registros_ponto:
+            registro.is_falta = (registro.data in faltas)
+    else:
+        # Usar função que já identifica faltas
+        registros_ponto, faltas = processar_registros_ponto_com_faltas(id, data_inicio, data_fim)
     
     # Buscar ocorrências (sem filtro de data por enquanto)
     ocorrencias = Ocorrencia.query.filter_by(funcionario_id=id).order_by(Ocorrencia.data_inicio.desc()).all()
