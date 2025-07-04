@@ -631,6 +631,38 @@ def detalhes_obra(id):
         CustoObra.data.between(data_inicio, data_fim)
     ).order_by(CustoObra.data.desc()).all()
     
+    # ===== CUSTOS DE TRANSPORTE DETALHADOS =====
+    custos_transporte = db.session.query(CustoVeiculo).filter(
+        CustoVeiculo.data_custo.between(data_inicio, data_fim)
+    ).order_by(CustoVeiculo.data_custo.desc()).all()
+    
+    custos_transporte_total = sum(c.valor for c in custos_transporte)
+    
+    # ===== CUSTOS DE MÃO DE OBRA DETALHADOS =====
+    custos_mao_obra = []
+    for registro in registros_ponto:
+        if registro.hora_entrada and registro.hora_saida:
+            # Calcular horas trabalhadas
+            entrada = datetime.combine(registro.data, registro.hora_entrada)
+            saida = datetime.combine(registro.data, registro.hora_saida)
+            
+            # Subtrair tempo de almoço (1 hora padrão)
+            horas_dia = (saida - entrada).total_seconds() / 3600 - 1
+            horas_dia = max(0, horas_dia)  # Não pode ser negativo
+            
+            # Calcular custo baseado no salário do funcionário
+            if registro.funcionario_ref.salario:
+                valor_hora = registro.funcionario_ref.salario / 220  # 220 horas/mês aprox
+                total_dia = horas_dia * valor_hora
+                
+                custos_mao_obra.append({
+                    'data': registro.data,
+                    'funcionario_nome': registro.funcionario_ref.nome,
+                    'horas_trabalhadas': horas_dia,
+                    'salario_hora': valor_hora,
+                    'total_dia': total_dia
+                })
+    
     # KPIs organizados
     kpis = {
         'custo_transporte': custo_transporte,
@@ -647,6 +679,9 @@ def detalhes_obra(id):
                          obra=obra,
                          kpis=kpis,
                          custos_obra=custos_obra,
+                         custos_transporte=custos_transporte,
+                         custos_transporte_total=custos_transporte_total,
+                         custos_mao_obra=custos_mao_obra,
                          rdos_periodo=rdos_periodo,
                          rdos_recentes=rdos_recentes,
                          total_rdos=total_rdos,

@@ -396,7 +396,7 @@
     </div>
     <div class="card-body">
         <div class="table-responsive">
-            <table class="table table-hover">
+            <table id="custosTable" class="table table-hover">
                 <thead>
                     <tr>
                         <th>Tipo</th>
@@ -440,6 +440,107 @@
         <div class="text-center py-4">
             <i class="fas fa-info-circle text-muted fa-2x mb-2"></i>
             <p class="text-muted">Nenhum custo registrado para esta obra no período selecionado.</p>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Custos de Transporte -->
+<div class="card mb-4">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <h5 class="mb-0">
+            <i class="fas fa-truck"></i> Custos de Transporte
+        </h5>
+        <span class="badge bg-danger">
+            Total: R$ {{ '{:,.2f}'.format(custos_transporte_total).replace(',', ' ').replace('.', ',').replace(' ', '.') }}
+        </span>
+    </div>
+    <div class="card-body">
+        <div class="table-responsive">
+            <table id="transporteTable" class="table table-hover">
+                <thead>
+                    <tr>
+                        <th>Data</th>
+                        <th>Custo</th>
+                        <th>Tipo</th>
+                        <th>Observações</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for transporte in custos_transporte %}
+                    <tr>
+                        <td>{{ transporte.data_custo.strftime('%d/%m/%Y') }}</td>
+                        <td>R$ {{ '{:,.2f}'.format(transporte.valor).replace(',', ' ').replace('.', ',').replace(' ', '.') }}</td>
+                        <td>
+                            <span class="badge bg-info">
+                                {{ transporte.tipo_custo.title() }}
+                            </span>
+                        </td>
+                        <td>{{ transporte.descricao or '-' }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        
+        {% if not custos_transporte %}
+        <div class="text-center py-4">
+            <i class="fas fa-info-circle text-muted fa-2x mb-2"></i>
+            <p class="text-muted">Nenhum custo de transporte registrado para esta obra no período selecionado.</p>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Custos de Mão de Obra -->
+<div class="card mb-4">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <h5 class="mb-0">
+            <i class="fas fa-hammer"></i> Custos de Mão de Obra
+        </h5>
+        <span class="badge bg-primary">
+            Total: R$ {{ '{:,.2f}'.format(kpis.custo_mao_obra).replace(',', ' ').replace('.', ',').replace(' ', '.') }}
+        </span>
+    </div>
+    <div class="card-body">
+        <div class="table-responsive">
+            <table id="maoObraTable" class="table table-hover">
+                <thead>
+                    <tr>
+                        <th>Dia</th>
+                        <th>Funcionário</th>
+                        <th>Horas Trabalhadas</th>
+                        <th>Salário/Hora</th>
+                        <th>Total do Dia</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for custo_mao in custos_mao_obra %}
+                    <tr>
+                        <td>{{ custo_mao.data.strftime('%d/%m/%Y') }}</td>
+                        <td>
+                            <i class="fas fa-user text-success me-1"></i>
+                            {{ custo_mao.funcionario_nome }}
+                        </td>
+                        <td>
+                            <span class="badge bg-info">
+                                {{ '{:.2f}'.format(custo_mao.horas_trabalhadas).replace('.', ',') }}h
+                            </span>
+                        </td>
+                        <td>R$ {{ '{:,.2f}'.format(custo_mao.salario_hora).replace(',', ' ').replace('.', ',').replace(' ', '.') }}</td>
+                        <td>
+                            <strong>R$ {{ '{:,.2f}'.format(custo_mao.total_dia).replace(',', ' ').replace('.', ',').replace(' ', '.') }}</strong>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        
+        {% if not custos_mao_obra %}
+        <div class="text-center py-4">
+            <i class="fas fa-info-circle text-muted fa-2x mb-2"></i>
+            <p class="text-muted">Nenhum custo de mão de obra calculado para esta obra no período selecionado.</p>
         </div>
         {% endif %}
     </div>
@@ -574,6 +675,42 @@ $(document).ready(function() {
     tooltipTriggerList.forEach(function(tooltipTriggerEl) {
         new bootstrap.Tooltip(tooltipTriggerEl);
     });
+    
+    // Initialize DataTable for Custos Detalhados
+    {% if custos_obra %}
+    $('#custosTable').DataTable({
+        language: {
+            url: '//cdn.datatables.net/plug-ins/1.13.6/i18n/pt-BR.json'
+        },
+        order: [[3, 'desc']], // Ordenar por data (mais recente primeiro)
+        pageLength: 6, // Exibir 6 resultados por página
+        responsive: true
+    });
+    {% endif %}
+    
+    // Initialize DataTable for Custos de Transporte
+    {% if custos_transporte %}
+    $('#transporteTable').DataTable({
+        language: {
+            url: '//cdn.datatables.net/plug-ins/1.13.6/i18n/pt-BR.json'
+        },
+        order: [[0, 'desc']], // Ordenar por data (mais recente primeiro)
+        pageLength: 6,
+        responsive: true
+    });
+    {% endif %}
+    
+    // Initialize DataTable for Custos de Mão de Obra
+    {% if custos_mao_obra %}
+    $('#maoObraTable').DataTable({
+        language: {
+            url: '//cdn.datatables.net/plug-ins/1.13.6/i18n/pt-BR.json'
+        },
+        order: [[0, 'desc']], // Ordenar por data (mais recente primeiro)
+        pageLength: 6,
+        responsive: true
+    });
+    {% endif %}
     
     // Initialize DataTable for RDOs
     {% if rdos_periodo %}
