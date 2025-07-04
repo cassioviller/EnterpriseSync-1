@@ -175,6 +175,7 @@
                                             <th>Data</th>
                                             <th>Valor</th>
                                             <th>Tipo</th>
+                                            <th>Obra</th>
                                             <th>Fornecedor</th>
                                             <th>Descrição</th>
                                         </tr>
@@ -185,6 +186,7 @@
                                             <td>{{ custo.data_custo.strftime('%d/%m/%Y') }}</td>
                                             <td>R$ {{ '{:,.2f}'.format(custo.valor) }}</td>
                                             <td>{{ custo.tipo_custo.title() }}</td>
+                                            <td>{{ custo.obra.nome if custo.obra else '-' }}</td>
                                             <td>{{ custo.fornecedor or '-' }}</td>
                                             <td>{{ custo.descricao or '-' }}</td>
                                         </tr>
@@ -220,7 +222,7 @@
                 </h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
-            <form method="POST" action="{{ url_for('main.novo_uso_veiculo') }}">
+            <form method="POST" action="{{ url_for('main.novo_uso_veiculo_direto') }}">
                 <input type="hidden" name="veiculo_id" value="{{ veiculo.id }}">
                 <div class="modal-body">
                     <div class="row">
@@ -303,17 +305,32 @@
                         </div>
                     </div>
                     
-                    <div class="mb-3">
-                        <label for="tipo_custo" class="form-label">Tipo de Custo *</label>
-                        <select class="form-select" name="tipo_custo" required>
-                            <option value="">Selecione...</option>
-                            <option value="combustivel">Combustível</option>
-                            <option value="manutencao">Manutenção</option>
-                            <option value="seguro">Seguro</option>
-                            <option value="multa">Multa</option>
-                            <option value="lavagem">Lavagem</option>
-                            <option value="outros">Outros</option>
-                        </select>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="tipo_custo" class="form-label">Tipo de Custo *</label>
+                                <select class="form-select" name="tipo_custo" required>
+                                    <option value="">Selecione...</option>
+                                    <option value="combustivel">Combustível</option>
+                                    <option value="manutencao">Manutenção</option>
+                                    <option value="seguro">Seguro</option>
+                                    <option value="multa">Multa</option>
+                                    <option value="lavagem">Lavagem</option>
+                                    <option value="outros">Outros</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="obra_id" class="form-label">Obra (Opcional)</label>
+                                <select class="form-select" name="obra_id">
+                                    <option value="">Selecione...</option>
+                                    {% for obra in obras %}
+                                    <option value="{{ obra.id }}">{{ obra.nome }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                        </div>
                     </div>
                     
                     <div class="mb-3">

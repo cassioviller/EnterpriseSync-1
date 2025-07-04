@@ -132,29 +132,66 @@ def novo_funcionario():
 @login_required
 def editar_funcionario(id):
     funcionario = Funcionario.query.get_or_404(id)
-    form = FuncionarioForm(obj=funcionario)
-    form.departamento_id.choices = [(0, 'Selecione...')] + [(d.id, d.nome) for d in Departamento.query.all()]
-    form.funcao_id.choices = [(0, 'Selecione...')] + [(f.id, f.nome) for f in Funcao.query.all()]
     
-    if form.validate_on_submit():
-        funcionario.nome = form.nome.data
-        funcionario.cpf = form.cpf.data
-        funcionario.rg = form.rg.data
-        funcionario.data_nascimento = form.data_nascimento.data
-        funcionario.endereco = form.endereco.data
-        funcionario.telefone = form.telefone.data
-        funcionario.email = form.email.data
-        funcionario.data_admissao = form.data_admissao.data
-        funcionario.salario = form.salario.data or 0.0
-        funcionario.departamento_id = form.departamento_id.data if form.departamento_id.data > 0 else None
-        funcionario.funcao_id = form.funcao_id.data if form.funcao_id.data > 0 else None
-        funcionario.ativo = form.ativo.data
-        
-        db.session.commit()
-        flash('Funcionário atualizado com sucesso!', 'success')
-        return redirect(url_for('main.funcionarios'))
+    if request.method == 'POST':
+        try:
+            # Atualizar dados do funcionário
+            funcionario.nome = request.form.get('nome')
+            funcionario.cpf = request.form.get('cpf')
+            funcionario.rg = request.form.get('rg')
+            funcionario.endereco = request.form.get('endereco')
+            funcionario.telefone = request.form.get('telefone')
+            funcionario.email = request.form.get('email')
+            funcionario.salario = float(request.form.get('salario', 0) or 0)
+            
+            # Data de nascimento
+            data_nascimento = request.form.get('data_nascimento')
+            if data_nascimento:
+                funcionario.data_nascimento = datetime.strptime(data_nascimento, '%Y-%m-%d').date()
+            
+            # Data de admissão
+            data_admissao = request.form.get('data_admissao')
+            if data_admissao:
+                funcionario.data_admissao = datetime.strptime(data_admissao, '%Y-%m-%d').date()
+            
+            # IDs opcionais
+            departamento_id = request.form.get('departamento_id')
+            funcionario.departamento_id = int(departamento_id) if departamento_id and departamento_id != '0' else None
+            
+            funcao_id = request.form.get('funcao_id')
+            funcionario.funcao_id = int(funcao_id) if funcao_id and funcao_id != '0' else None
+            
+            horario_id = request.form.get('horario_trabalho_id')
+            funcionario.horario_trabalho_id = int(horario_id) if horario_id and horario_id != '0' else None
+            
+            funcionario.ativo = bool(request.form.get('ativo'))
+            
+            # Processar upload de foto
+            if 'foto' in request.files:
+                foto = request.files['foto']
+                if foto and foto.filename:
+                    # Criar diretório se não existir
+                    import os
+                    upload_dir = 'static/uploads/funcionarios'
+                    if not os.path.exists(upload_dir):
+                        os.makedirs(upload_dir)
+                    
+                    # Salvar arquivo
+                    filename = f"funcionario_{funcionario.id}_{foto.filename}"
+                    foto_path = os.path.join(upload_dir, filename)
+                    foto.save(foto_path)
+                    funcionario.foto = f"uploads/funcionarios/{filename}"
+            
+            db.session.commit()
+            flash('Funcionário atualizado com sucesso!', 'success')
+            return redirect(url_for('main.funcionario_perfil', id=funcionario.id))
+            
+        except Exception as e:
+            flash(f'Erro ao atualizar funcionário: {str(e)}', 'error')
+            return redirect(url_for('main.funcionario_perfil', id=id))
     
-    return render_template('funcionarios.html', form=form, funcionario=funcionario, funcionarios=Funcionario.query.all())
+    # Para GET, redirecionar para a página de perfil com modo de edição
+    return redirect(url_for('main.funcionario_perfil', id=id, edit=1))
 
 def calcular_kpis_funcionario(funcionario_id):
     """Calcula KPIs individuais do funcionário para o mês atual"""
@@ -805,6 +842,68 @@ def detalhes_veiculo(id):
                          kpis=kpis,
                          funcionarios=funcionarios,
                          obras=obras)
+
+@main_bp.route('/veiculos/novo-uso-direto', methods=['POST'])
+@login_required
+def novo_uso_veiculo_direto():
+    """Registra novo uso de veículo na página de detalhes"""
+    try:
+        veiculo_id = request.form.get('veiculo_id')
+        funcionario_id = request.form.get('funcionario_id')
+        obra_id = request.form.get('obra_id') or None
+        data_uso = datetime.strptime(request.form.get('data_uso'), '%Y-%m-%d').date()
+        finalidade = request.form.get('finalidade')
+        observacoes = request.form.get('observacoes')
+        
+        novo_uso = UsoVeiculo(
+            veiculo_id=veiculo_id,
+            funcionario_id=funcionario_id,
+            obra_id=obra_id,
+            data_uso=data_uso,
+            finalidade=finalidade,
+            observacoes=observacoes
+        )
+        
+        db.session.add(novo_uso)
+        db.session.commit()
+        
+        flash('Uso do veículo registrado com sucesso!', 'success')
+    except Exception as e:
+        flash(f'Erro ao registrar uso: {str(e)}', 'error')
+    
+    return redirect(url_for('main.detalhes_veiculo', id=veiculo_id))
+
+@main_bp.route('/veiculos/novo-custo', methods=['POST'])
+@login_required
+def novo_custo_veiculo():
+    """Registra novo custo de veículo"""
+    try:
+        veiculo_id = request.form.get('veiculo_id')
+        data_custo = datetime.strptime(request.form.get('data_custo'), '%Y-%m-%d').date()
+        valor = float(request.form.get('valor'))
+        tipo_custo = request.form.get('tipo_custo')
+        obra_id = request.form.get('obra_id') or None
+        fornecedor = request.form.get('fornecedor')
+        descricao = request.form.get('descricao')
+        
+        novo_custo = CustoVeiculo(
+            veiculo_id=veiculo_id,
+            data_custo=data_custo,
+            valor=valor,
+            tipo_custo=tipo_custo,
+            obra_id=obra_id,
+            fornecedor=fornecedor,
+            descricao=descricao
+        )
+        
+        db.session.add(novo_custo)
+        db.session.commit()
+        
+        flash('Custo do veículo registrado com sucesso!', 'success')
+    except Exception as e:
+        flash(f'Erro ao registrar custo: {str(e)}', 'error')
+    
+    return redirect(url_for('main.detalhes_veiculo', id=veiculo_id))
 
 @main_bp.route('/veiculos/<int:id>/dados')
 @login_required

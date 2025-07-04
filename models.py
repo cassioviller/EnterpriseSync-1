@@ -54,6 +54,7 @@ class Funcionario(db.Model):
     data_admissao = db.Column(db.Date, nullable=False)
     salario = db.Column(db.Float, default=0.0)
     ativo = db.Column(db.Boolean, default=True)
+    foto = db.Column(db.String(255))  # Caminho para o arquivo de foto
     departamento_id = db.Column(db.Integer, db.ForeignKey('departamento.id'))
     funcao_id = db.Column(db.Integer, db.ForeignKey('funcao.id'))
     horario_trabalho_id = db.Column(db.Integer, db.ForeignKey('horario_trabalho.id'))
@@ -295,6 +296,7 @@ class CustoVeiculo(db.Model):
     
     id = db.Column(db.Integer, primary_key=True)
     veiculo_id = db.Column(db.Integer, db.ForeignKey('veiculo.id'), nullable=False)
+    obra_id = db.Column(db.Integer, db.ForeignKey('obra.id'))  # Obra associada ao custo
     data_custo = db.Column(db.Date, nullable=False)
     valor = db.Column(db.Float, nullable=False)
     tipo_custo = db.Column(db.String(50), nullable=False)  # 'combustivel', 'manutencao', 'seguro', 'outros'
@@ -305,6 +307,7 @@ class CustoVeiculo(db.Model):
     
     # Relacionamentos
     veiculo = db.relationship('Veiculo', backref='custos_veiculo')
+    obra = db.relationship('Obra', backref='custos_veiculo')
     
     def __repr__(self):
         return f'<CustoVeiculo {self.veiculo_id} - {self.valor}>'
