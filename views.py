@@ -1486,6 +1486,87 @@ def gerar_relatorio(tipo):
             'html': html
         })
     
+    elif tipo == 'horas-extras':
+        query = RegistroPonto.query.filter(RegistroPonto.horas_extras > 0)
+        if data_inicio:
+            query = query.filter(RegistroPonto.data >= data_inicio)
+        if data_fim:
+            query = query.filter(RegistroPonto.data <= data_fim)
+        if departamento_id:
+            query = query.join(Funcionario).filter(Funcionario.departamento_id == departamento_id)
+        if obra_id:
+            query = query.filter_by(obra_id=obra_id)
+        
+        registros = query.order_by(RegistroPonto.data.desc()).limit(100).all()
+        
+        html = '<div class="table-responsive"><table class="table table-striped">'
+        html += '<thead><tr><th>Funcionário</th><th>Data</th><th>Horas Extras</th><th>Valor Aproximado</th><th>Obra</th><th>Departamento</th></tr></thead><tbody>'
+        
+        total_horas = 0
+        total_valor = 0
+        
+        for r in registros:
+            valor_hora = (r.funcionario_ref.salario / 220) * 1.5 if r.funcionario_ref.salario else 0  # 50% adicional
+            valor_extra = (r.horas_extras or 0) * valor_hora
+            total_horas += r.horas_extras or 0
+            total_valor += valor_extra
+            
+            html += f'<tr><td>{r.funcionario_ref.nome}</td><td>{r.data.strftime("%d/%m/%Y")}</td>'
+            html += f'<td>{r.horas_extras:.2f}h</td><td>R$ {valor_extra:.2f}</td>'
+            html += f'<td>{r.obra_ref.nome if r.obra_ref else "-"}</td>'
+            html += f'<td>{r.funcionario_ref.departamento_ref.nome if r.funcionario_ref.departamento_ref else "-"}</td></tr>'
+        
+        html += '</tbody></table></div>'
+        html += f'<div class="mt-3"><strong>Total: {total_horas:.2f} horas extras • R$ {total_valor:,.2f}</strong></div>'
+        
+        return jsonify({
+            'titulo': 'Relatório de Horas Extras',
+            'html': html
+        })
+    
+    elif tipo == 'alimentacao':
+        query = RegistroAlimentacao.query
+        if data_inicio:
+            query = query.filter(RegistroAlimentacao.data >= data_inicio)
+        if data_fim:
+            query = query.filter(RegistroAlimentacao.data <= data_fim)
+        if obra_id:
+            query = query.filter_by(obra_id=obra_id)
+        if departamento_id:
+            query = query.join(Funcionario).filter(Funcionario.departamento_id == departamento_id)
+        
+        registros = query.order_by(RegistroAlimentacao.data.desc()).limit(200).all()
+        
+        html = '<div class="table-responsive"><table class="table table-striped">'
+        html += '<thead><tr><th>Funcionário</th><th>Data</th><th>Tipo</th><th>Valor</th><th>Restaurante</th><th>Obra</th></tr></thead><tbody>'
+        
+        total_valor = 0
+        
+        for r in registros:
+            total_valor += r.valor or 0
+            tipo_labels = {
+                'cafe': 'Café da Manhã',
+                'almoco': 'Almoço', 
+                'jantar': 'Jantar',
+                'lanche': 'Lanche',
+                'marmita': 'Marmita',
+                'refeicao_local': 'Refeição no Local',
+                'outros': 'Outros'
+            }
+            
+            html += f'<tr><td>{r.funcionario_ref.nome}</td><td>{r.data.strftime("%d/%m/%Y")}</td>'
+            html += f'<td>{tipo_labels.get(r.tipo, r.tipo)}</td><td>R$ {r.valor:.2f}</td>'
+            html += f'<td>{r.restaurante_ref.nome if r.restaurante_ref else "-"}</td>'
+            html += f'<td>{r.obra_ref.nome if r.obra_ref else "-"}</td></tr>'
+        
+        html += '</tbody></table></div>'
+        html += f'<div class="mt-3"><strong>Total Gasto: R$ {total_valor:,.2f}</strong></div>'
+        
+        return jsonify({
+            'titulo': 'Relatório de Alimentação',
+            'html': html
+        })
+    
     elif tipo == 'obras':
         query = Obra.query
         if obra_id:
@@ -1519,11 +1600,598 @@ def gerar_relatorio(tipo):
             'html': html
         })
     
+    elif tipo == 'custos-obra':
+        query = CustoObra.query
+        if data_inicio:
+            query = query.filter(CustoObra.data >= data_inicio)
+        if data_fim:
+            query = query.filter(CustoObra.data <= data_fim)
+        if obra_id:
+            query = query.filter_by(obra_id=obra_id)
+        
+        custos = query.order_by(CustoObra.data.desc()).limit(100).all()
+        
+        html = '<div class="table-responsive"><table class="table table-striped">'
+        html += '<thead><tr><th>Data</th><th>Obra</th><th>Tipo</th><th>Descrição</th><th>Valor</th><th>Observações</th></tr></thead><tbody>'
+        
+        total_custos = 0
+        tipos_labels = {
+            'mao_obra': 'Mão de Obra',
+            'material': 'Material',
+            'servico': 'Serviço',
+            'veiculo': 'Veículo',
+            'alimentacao': 'Alimentação'
+        }
+        
+        for c in custos:
+            total_custos += c.valor or 0
+            html += f'<tr><td>{c.data.strftime("%d/%m/%Y")}</td>'
+            html += f'<td>{c.obra_ref.nome if c.obra_ref else "-"}</td>'
+            html += f'<td>{tipos_labels.get(c.tipo, c.tipo)}</td>'
+            html += f'<td>{c.descricao or "-"}</td><td>R$ {c.valor:,.2f}</td>'
+            html += f'<td>{c.observacoes or "-"}</td></tr>'
+        
+        html += '</tbody></table></div>'
+        html += f'<div class="mt-3"><strong>Total de Custos: R$ {total_custos:,.2f}</strong></div>'
+        
+        return jsonify({
+            'titulo': 'Custos por Obra',
+            'html': html
+        })
+    
+    elif tipo == 'progresso-obras':
+        obras = Obra.query.all()
+        from datetime import date
+        
+        html = '<div class="table-responsive"><table class="table table-striped">'
+        html += '<thead><tr><th>Obra</th><th>Status</th><th>Progresso</th><th>Orçamento</th><th>Gastos</th><th>Restante</th><th>Prazo</th></tr></thead><tbody>'
+        
+        for obra in obras:
+            # Calcular gastos totais
+            gastos_total = db.session.query(func.sum(CustoObra.valor)).filter_by(obra_id=obra.id).scalar() or 0
+            restante = (obra.orcamento or 0) - gastos_total
+            
+            # Calcular progresso baseado no orçamento
+            progresso = (gastos_total / obra.orcamento * 100) if obra.orcamento > 0 else 0
+            progresso = min(progresso, 100)
+            
+            # Status do prazo
+            if obra.data_previsao_fim:
+                dias_restantes = (obra.data_previsao_fim - date.today()).days
+                prazo_status = "No prazo" if dias_restantes > 0 else f"Atrasado ({abs(dias_restantes)} dias)"
+                prazo_class = "text-success" if dias_restantes > 0 else "text-danger"
+            else:
+                prazo_status = "Sem prazo definido"
+                prazo_class = "text-muted"
+            
+            status_badges = {
+                'Em andamento': 'bg-primary',
+                'Concluída': 'bg-success',
+                'Pausada': 'bg-warning',
+                'Cancelada': 'bg-danger'
+            }
+            status_badge = f'<span class="badge {status_badges.get(obra.status, "bg-secondary")}">{obra.status}</span>'
+            
+            html += f'<tr><td>{obra.nome}</td><td>{status_badge}</td>'
+            html += f'<td><div class="progress"><div class="progress-bar" style="width: {progresso:.1f}%">{progresso:.1f}%</div></div></td>'
+            html += f'<td>R$ {obra.orcamento:,.2f}</td><td>R$ {gastos_total:,.2f}</td><td>R$ {restante:,.2f}</td>'
+            html += f'<td><span class="{prazo_class}">{prazo_status}</span></td></tr>'
+        
+        html += '</tbody></table></div>'
+        
+        return jsonify({
+            'titulo': 'Progresso das Obras',
+            'html': html
+        })
+    
+    elif tipo == 'veiculos':
+        veiculos = Veiculo.query.all()
+        
+        html = '<div class="table-responsive"><table class="table table-striped">'
+        html += '<thead><tr><th>Placa</th><th>Marca/Modelo</th><th>Ano</th><th>Tipo</th><th>Status</th><th>KM Atual</th><th>Última Manutenção</th><th>Próxima Manutenção</th></tr></thead><tbody>'
+        
+        for v in veiculos:
+            status_badges = {
+                'Disponível': 'bg-success',
+                'Em uso': 'bg-primary',
+                'Manutenção': 'bg-warning',
+                'Indisponível': 'bg-danger'
+            }
+            status_badge = f'<span class="badge {status_badges.get(v.status, "bg-secondary")}">{v.status}</span>'
+            
+            html += f'<tr><td>{v.placa}</td><td>{v.marca} {v.modelo}</td><td>{v.ano or "-"}</td>'
+            html += f'<td>{v.tipo}</td><td>{status_badge}</td><td>{v.km_atual or "-"}</td>'
+            html += f'<td>{v.data_ultima_manutencao.strftime("%d/%m/%Y") if v.data_ultima_manutencao else "-"}</td>'
+            html += f'<td>{v.data_proxima_manutencao.strftime("%d/%m/%Y") if v.data_proxima_manutencao else "-"}</td></tr>'
+        
+        html += '</tbody></table></div>'
+        
+        return jsonify({
+            'titulo': 'Relatório de Veículos',
+            'html': html
+        })
+    
+    elif tipo == 'rentabilidade':
+        obras = Obra.query.all()
+        
+        html = '<div class="table-responsive"><table class="table table-striped">'
+        html += '<thead><tr><th>Obra</th><th>Orçamento</th><th>Custos</th><th>Margem</th><th>Rentabilidade</th><th>Status</th></tr></thead><tbody>'
+        
+        total_orcamento = 0
+        total_custos = 0
+        
+        for obra in obras:
+            custos_obra = db.session.query(func.sum(CustoObra.valor)).filter_by(obra_id=obra.id).scalar() or 0
+            margem = (obra.orcamento or 0) - custos_obra
+            rentabilidade = (margem / obra.orcamento * 100) if obra.orcamento > 0 else 0
+            
+            total_orcamento += obra.orcamento or 0
+            total_custos += custos_obra
+            
+            rent_class = "text-success" if rentabilidade > 0 else "text-danger"
+            
+            html += f'<tr><td>{obra.nome}</td><td>R$ {obra.orcamento:,.2f}</td>'
+            html += f'<td>R$ {custos_obra:,.2f}</td><td>R$ {margem:,.2f}</td>'
+            html += f'<td><span class="{rent_class}">{rentabilidade:.1f}%</span></td>'
+            html += f'<td>{obra.status}</td></tr>'
+        
+        margem_total = total_orcamento - total_custos
+        rentabilidade_total = (margem_total / total_orcamento * 100) if total_orcamento > 0 else 0
+        
+        html += '</tbody></table></div>'
+        html += f'<div class="mt-3"><strong>Totais: Orçamento R$ {total_orcamento:,.2f} • Custos R$ {total_custos:,.2f} • Margem R$ {margem_total:,.2f} • Rentabilidade {rentabilidade_total:.1f}%</strong></div>'
+        
+        return jsonify({
+            'titulo': 'Rentabilidade por Obra',
+            'html': html
+        })
+    
+    elif tipo == 'dashboard-executivo':
+        # Dashboard executivo com KPIs gerais
+        total_funcionarios = Funcionario.query.filter_by(ativo=True).count()
+        total_obras = Obra.query.filter_by(status='Em andamento').count()
+        total_veiculos = Veiculo.query.count()
+        
+        # Custos do mês atual
+        hoje = date.today()
+        primeiro_dia_mes = date(hoje.year, hoje.month, 1)
+        custos_mes = db.session.query(func.sum(CustoObra.valor)).filter(
+            CustoObra.data >= primeiro_dia_mes,
+            CustoObra.data <= hoje
+        ).scalar() or 0
+        
+        # Horas trabalhadas no mês
+        horas_mes = db.session.query(func.sum(RegistroPonto.horas_trabalhadas)).filter(
+            RegistroPonto.data >= primeiro_dia_mes,
+            RegistroPonto.data <= hoje
+        ).scalar() or 0
+        
+        html = '<div class="row">'
+        html += f'<div class="col-md-3"><div class="card text-center"><div class="card-body"><h2 class="text-primary">{total_funcionarios}</h2><p>Funcionários Ativos</p></div></div></div>'
+        html += f'<div class="col-md-3"><div class="card text-center"><div class="card-body"><h2 class="text-success">{total_obras}</h2><p>Obras em Andamento</p></div></div></div>'
+        html += f'<div class="col-md-3"><div class="card text-center"><div class="card-body"><h2 class="text-warning">{total_veiculos}</h2><p>Veículos</p></div></div></div>'
+        html += f'<div class="col-md-3"><div class="card text-center"><div class="card-body"><h2 class="text-info">R$ {custos_mes:,.0f}</h2><p>Custos do Mês</p></div></div></div>'
+        html += '</div>'
+        html += f'<div class="mt-4"><div class="card"><div class="card-body"><h5>Resumo do Mês</h5><p><strong>Horas Trabalhadas:</strong> {horas_mes:.0f}h</p><p><strong>Custo por Hora:</strong> R$ {(custos_mes/horas_mes if horas_mes > 0 else 0):.2f}</p></div></div></div>'
+        
+        return jsonify({
+            'titulo': 'Dashboard Executivo',
+            'html': html
+        })
+    
     else:
         return jsonify({
             'titulo': 'Relatório não implementado',
             'html': '<p>Este relatório ainda não foi implementado.</p>'
         })
+
+@main_bp.route('/relatorios/exportar/<formato>', methods=['POST'])
+@login_required
+def exportar_relatorio(formato):
+    from io import BytesIO
+    from flask import make_response
+    import csv
+    from datetime import datetime
+    
+    # Processar filtros
+    data_inicio = request.form.get('dataInicio')
+    data_fim = request.form.get('dataFim')
+    obra_id = request.form.get('obra')
+    departamento_id = request.form.get('departamento')
+    
+    # Converter datas se fornecidas
+    if data_inicio:
+        data_inicio = datetime.strptime(data_inicio, '%Y-%m-%d').date()
+    if data_fim:
+        data_fim = datetime.strptime(data_fim, '%Y-%m-%d').date()
+    
+    if formato == 'csv':
+        # Exportação CSV consolidada com todos os dados principais
+        output = BytesIO()
+        output.write('\ufeff'.encode('utf-8'))  # BOM for UTF-8
+        
+        # Criar CSV com dados consolidados
+        import io
+        csv_content = io.StringIO()
+        writer = csv.writer(csv_content)
+        
+        # Cabeçalho principal
+        writer.writerow(['RELATÓRIO CONSOLIDADO SIGE - SISTEMA INTEGRADO DE GESTÃO EMPRESARIAL'])
+        writer.writerow(['Data de Geração:', datetime.now().strftime('%d/%m/%Y %H:%M')])
+        writer.writerow(['Período:', f'{data_inicio.strftime("%d/%m/%Y") if data_inicio else "N/A"} até {data_fim.strftime("%d/%m/%Y") if data_fim else "N/A"}'])
+        writer.writerow([])
+        
+        # 1. Dados de Funcionários
+        writer.writerow(['=== FUNCIONÁRIOS ==='])
+        writer.writerow(['Nome', 'CPF', 'Departamento', 'Função', 'Data Admissão', 'Salário', 'Status'])
+        
+        query = Funcionario.query
+        if departamento_id:
+            query = query.filter_by(departamento_id=departamento_id)
+        
+        for f in query.all():
+            writer.writerow([
+                f.nome,
+                f.cpf,
+                f.departamento_ref.nome if f.departamento_ref else '',
+                f.funcao_ref.nome if f.funcao_ref else '',
+                f.data_admissao.strftime('%d/%m/%Y') if f.data_admissao else '',
+                f'R$ {f.salario:,.2f}' if f.salario else '',
+                'Ativo' if f.ativo else 'Inativo'
+            ])
+        
+        writer.writerow([])
+        
+        # 2. Dados de Ponto (se filtros de data fornecidos)
+        if data_inicio and data_fim:
+            writer.writerow(['=== REGISTROS DE PONTO ==='])
+            writer.writerow(['Funcionário', 'Data', 'Entrada', 'Saída Almoço', 'Retorno Almoço', 'Saída', 'Horas Trabalhadas', 'Horas Extras', 'Obra'])
+            
+            query = RegistroPonto.query.filter(
+                RegistroPonto.data >= data_inicio,
+                RegistroPonto.data <= data_fim
+            )
+            if obra_id:
+                query = query.filter_by(obra_id=obra_id)
+            
+            for r in query.order_by(RegistroPonto.data.desc()).limit(500).all():
+                writer.writerow([
+                    r.funcionario_ref.nome,
+                    r.data.strftime('%d/%m/%Y'),
+                    r.hora_entrada.strftime('%H:%M') if r.hora_entrada else '',
+                    r.hora_almoco_saida.strftime('%H:%M') if r.hora_almoco_saida else '',
+                    r.hora_almoco_retorno.strftime('%H:%M') if r.hora_almoco_retorno else '',
+                    r.hora_saida.strftime('%H:%M') if r.hora_saida else '',
+                    f'{r.horas_trabalhadas:.2f}h' if r.horas_trabalhadas else '',
+                    f'{r.horas_extras:.2f}h' if r.horas_extras else '',
+                    r.obra_ref.nome if r.obra_ref else ''
+                ])
+            
+            writer.writerow([])
+        
+        # 3. Obras
+        writer.writerow(['=== OBRAS ==='])
+        writer.writerow(['Nome', 'Endereço', 'Data Início', 'Previsão Fim', 'Orçamento', 'Status', 'Responsável'])
+        
+        query = Obra.query
+        if obra_id:
+            query = query.filter_by(id=obra_id)
+        
+        for o in query.all():
+            responsavel = Funcionario.query.get(o.responsavel_id) if o.responsavel_id else None
+            writer.writerow([
+                o.nome,
+                o.endereco or '',
+                o.data_inicio.strftime('%d/%m/%Y') if o.data_inicio else '',
+                o.data_previsao_fim.strftime('%d/%m/%Y') if o.data_previsao_fim else '',
+                f'R$ {o.orcamento:,.2f}' if o.orcamento else '',
+                o.status,
+                responsavel.nome if responsavel else ''
+            ])
+        
+        # Salvar CSV
+        csv_string = csv_content.getvalue()
+        output.write(csv_string.encode('utf-8'))
+        output.seek(0)
+        
+        response = make_response(output.read())
+        response.headers['Content-Type'] = 'text/csv; charset=utf-8'
+        response.headers['Content-Disposition'] = f'attachment; filename=relatorio_sige_{datetime.now().strftime("%Y%m%d_%H%M")}.csv'
+        
+        return response
+    
+    elif formato == 'excel':
+        from openpyxl import Workbook
+        from openpyxl.styles import Font, PatternFill, Alignment
+        
+        wb = Workbook()
+        
+        # Aba 1: Funcionários
+        ws1 = wb.active
+        ws1.title = "Funcionários"
+        
+        # Cabeçalho
+        ws1['A1'] = 'RELATÓRIO DE FUNCIONÁRIOS - SIGE'
+        ws1['A1'].font = Font(bold=True, size=14)
+        ws1['A2'] = f'Gerado em: {datetime.now().strftime("%d/%m/%Y %H:%M")}'
+        
+        # Headers
+        headers = ['Nome', 'CPF', 'Departamento', 'Função', 'Data Admissão', 'Salário', 'Status']
+        for col, header in enumerate(headers, 1):
+            cell = ws1.cell(row=4, column=col, value=header)
+            cell.font = Font(bold=True)
+            cell.fill = PatternFill(start_color='CCCCCC', end_color='CCCCCC', fill_type='solid')
+        
+        # Dados
+        query = Funcionario.query
+        if departamento_id:
+            query = query.filter_by(departamento_id=departamento_id)
+        
+        for row, f in enumerate(query.all(), 5):
+            ws1.cell(row=row, column=1, value=f.nome)
+            ws1.cell(row=row, column=2, value=f.cpf)
+            ws1.cell(row=row, column=3, value=f.departamento_ref.nome if f.departamento_ref else '')
+            ws1.cell(row=row, column=4, value=f.funcao_ref.nome if f.funcao_ref else '')
+            ws1.cell(row=row, column=5, value=f.data_admissao.strftime('%d/%m/%Y') if f.data_admissao else '')
+            ws1.cell(row=row, column=6, value=f.salario if f.salario else 0)
+            ws1.cell(row=row, column=7, value='Ativo' if f.ativo else 'Inativo')
+        
+        # Aba 2: Obras
+        ws2 = wb.create_sheet("Obras")
+        ws2['A1'] = 'RELATÓRIO DE OBRAS - SIGE'
+        ws2['A1'].font = Font(bold=True, size=14)
+        ws2['A2'] = f'Gerado em: {datetime.now().strftime("%d/%m/%Y %H:%M")}'
+        
+        headers = ['Nome', 'Endereço', 'Data Início', 'Previsão Fim', 'Orçamento', 'Status', 'Responsável']
+        for col, header in enumerate(headers, 1):
+            cell = ws2.cell(row=4, column=col, value=header)
+            cell.font = Font(bold=True)
+            cell.fill = PatternFill(start_color='CCCCCC', end_color='CCCCCC', fill_type='solid')
+        
+        query = Obra.query
+        if obra_id:
+            query = query.filter_by(id=obra_id)
+        
+        for row, o in enumerate(query.all(), 5):
+            responsavel = Funcionario.query.get(o.responsavel_id) if o.responsavel_id else None
+            ws2.cell(row=row, column=1, value=o.nome)
+            ws2.cell(row=row, column=2, value=o.endereco or '')
+            ws2.cell(row=row, column=3, value=o.data_inicio.strftime('%d/%m/%Y') if o.data_inicio else '')
+            ws2.cell(row=row, column=4, value=o.data_previsao_fim.strftime('%d/%m/%Y') if o.data_previsao_fim else '')
+            ws2.cell(row=row, column=5, value=o.orcamento if o.orcamento else 0)
+            ws2.cell(row=row, column=6, value=o.status)
+            ws2.cell(row=row, column=7, value=responsavel.nome if responsavel else '')
+        
+        # Aba 3: Ponto (se filtros de data fornecidos)
+        if data_inicio and data_fim:
+            ws3 = wb.create_sheet("Ponto")
+            ws3['A1'] = 'RELATÓRIO DE PONTO - SIGE'
+            ws3['A1'].font = Font(bold=True, size=14)
+            ws3['A2'] = f'Período: {data_inicio.strftime("%d/%m/%Y")} até {data_fim.strftime("%d/%m/%Y")}'
+            
+            headers = ['Funcionário', 'Data', 'Entrada', 'Saída Almoço', 'Retorno Almoço', 'Saída', 'Horas Trabalhadas', 'Horas Extras', 'Obra']
+            for col, header in enumerate(headers, 1):
+                cell = ws3.cell(row=4, column=col, value=header)
+                cell.font = Font(bold=True)
+                cell.fill = PatternFill(start_color='CCCCCC', end_color='CCCCCC', fill_type='solid')
+            
+            query = RegistroPonto.query.filter(
+                RegistroPonto.data >= data_inicio,
+                RegistroPonto.data <= data_fim
+            )
+            if obra_id:
+                query = query.filter_by(obra_id=obra_id)
+            
+            for row, r in enumerate(query.order_by(RegistroPonto.data.desc()).limit(500).all(), 5):
+                ws3.cell(row=row, column=1, value=r.funcionario_ref.nome)
+                ws3.cell(row=row, column=2, value=r.data.strftime('%d/%m/%Y'))
+                ws3.cell(row=row, column=3, value=r.hora_entrada.strftime('%H:%M') if r.hora_entrada else '')
+                ws3.cell(row=row, column=4, value=r.hora_almoco_saida.strftime('%H:%M') if r.hora_almoco_saida else '')
+                ws3.cell(row=row, column=5, value=r.hora_almoco_retorno.strftime('%H:%M') if r.hora_almoco_retorno else '')
+                ws3.cell(row=row, column=6, value=r.hora_saida.strftime('%H:%M') if r.hora_saida else '')
+                ws3.cell(row=row, column=7, value=r.horas_trabalhadas if r.horas_trabalhadas else 0)
+                ws3.cell(row=row, column=8, value=r.horas_extras if r.horas_extras else 0)
+                ws3.cell(row=row, column=9, value=r.obra_ref.nome if r.obra_ref else '')
+        
+        # Salvar Excel
+        output = BytesIO()
+        wb.save(output)
+        output.seek(0)
+        
+        response = make_response(output.read())
+        response.headers['Content-Type'] = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        response.headers['Content-Disposition'] = f'attachment; filename=relatorio_sige_{datetime.now().strftime("%Y%m%d_%H%M")}.xlsx'
+        
+        return response
+    
+    elif formato == 'pdf':
+        from reportlab.lib.pagesizes import A4, landscape
+        from reportlab.lib import colors
+        from reportlab.lib.styles import getSampleStyleSheet
+        from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
+        
+        output = BytesIO()
+        doc = SimpleDocTemplate(output, pagesize=landscape(A4))
+        elements = []
+        styles = getSampleStyleSheet()
+        
+        # Título
+        title = Paragraph(f'<b>RELATÓRIO SIGE - Sistema Integrado de Gestão Empresarial</b>', styles['Title'])
+        elements.append(title)
+        elements.append(Spacer(1, 12))
+        
+        subtitle = Paragraph(f'Gerado em: {datetime.now().strftime("%d/%m/%Y %H:%M")}<br/>Período: {data_inicio.strftime("%d/%m/%Y") if data_inicio else "N/A"} até {data_fim.strftime("%d/%m/%Y") if data_fim else "N/A"}', styles['Normal'])
+        elements.append(subtitle)
+        elements.append(Spacer(1, 20))
+        
+        # 1. Tabela de Funcionários
+        func_title = Paragraph('<b>FUNCIONÁRIOS</b>', styles['Heading2'])
+        elements.append(func_title)
+        elements.append(Spacer(1, 12))
+        
+        query = Funcionario.query
+        if departamento_id:
+            query = query.filter_by(departamento_id=departamento_id)
+        
+        func_data = [['Nome', 'CPF', 'Departamento', 'Função', 'Salário', 'Status']]
+        for f in query.limit(20).all():  # Limitar para caber na página
+            func_data.append([
+                f.nome[:20] + '...' if len(f.nome) > 20 else f.nome,
+                f.cpf,
+                (f.departamento_ref.nome[:15] + '...' if len(f.departamento_ref.nome) > 15 else f.departamento_ref.nome) if f.departamento_ref else '',
+                (f.funcao_ref.nome[:15] + '...' if len(f.funcao_ref.nome) > 15 else f.funcao_ref.nome) if f.funcao_ref else '',
+                f'R$ {f.salario:,.0f}' if f.salario else '',
+                'Ativo' if f.ativo else 'Inativo'
+            ])
+        
+        func_table = Table(func_data)
+        func_table.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
+            ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('FONTSIZE', (0, 0), (-1, 0), 8),
+            ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+            ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
+            ('FONTSIZE', (0, 1), (-1, -1), 7),
+            ('GRID', (0, 0), (-1, -1), 1, colors.black)
+        ]))
+        elements.append(func_table)
+        elements.append(Spacer(1, 20))
+        
+        # 2. Tabela de Obras
+        obras_title = Paragraph('<b>OBRAS</b>', styles['Heading2'])
+        elements.append(obras_title)
+        elements.append(Spacer(1, 12))
+        
+        query = Obra.query
+        if obra_id:
+            query = query.filter_by(id=obra_id)
+        
+        obras_data = [['Nome', 'Data Início', 'Previsão Fim', 'Orçamento', 'Status']]
+        for o in query.limit(15).all():
+            obras_data.append([
+                o.nome[:25] + '...' if len(o.nome) > 25 else o.nome,
+                o.data_inicio.strftime('%d/%m/%Y') if o.data_inicio else '',
+                o.data_previsao_fim.strftime('%d/%m/%Y') if o.data_previsao_fim else '',
+                f'R$ {o.orcamento:,.0f}' if o.orcamento else '',
+                o.status
+            ])
+        
+        obras_table = Table(obras_data)
+        obras_table.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
+            ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('FONTSIZE', (0, 0), (-1, 0), 8),
+            ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+            ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
+            ('FONTSIZE', (0, 1), (-1, -1), 7),
+            ('GRID', (0, 0), (-1, -1), 1, colors.black)
+        ]))
+        elements.append(obras_table)
+        
+        # Build PDF
+        doc.build(elements)
+        output.seek(0)
+        
+        response = make_response(output.read())
+        response.headers['Content-Type'] = 'application/pdf'
+        response.headers['Content-Disposition'] = f'attachment; filename=relatorio_sige_{datetime.now().strftime("%Y%m%d_%H%M")}.pdf'
+        
+        return response
+    
+    else:
+        return jsonify({'error': 'Formato não suportado'}), 400
+
+@main_bp.route('/alimentacao/restaurantes/<int:restaurante_id>/lancamento', methods=['POST'])
+@login_required
+def criar_lancamento_restaurante(restaurante_id):
+    """Criar lançamento de alimentação para múltiplos funcionários em um restaurante"""
+    from datetime import datetime
+    
+    # Verificar se o restaurante existe e está ativo
+    restaurante = Restaurante.query.get_or_404(restaurante_id)
+    if not restaurante.ativo:
+        flash('Restaurante não está ativo para novos lançamentos.', 'error')
+        return redirect(url_for('main.detalhes_restaurante', restaurante_id=restaurante_id))
+    
+    try:
+        # Obter dados do formulário
+        data_lancamento = datetime.strptime(request.form.get('data_lancamento'), '%Y-%m-%d').date()
+        tipo_refeicao = request.form.get('tipo_refeicao')
+        valor_refeicao = float(request.form.get('valor_refeicao'))
+        obra_id = request.form.get('obra_lancamento') if request.form.get('obra_lancamento') else None
+        observacoes = request.form.get('observacoes_lancamento')
+        funcionarios_ids = request.form.getlist('funcionarios[]')
+        
+        # Validações
+        if not funcionarios_ids:
+            flash('Selecione pelo menos um funcionário para o lançamento.', 'error')
+            return redirect(url_for('main.detalhes_restaurante', restaurante_id=restaurante_id))
+        
+        if valor_refeicao <= 0:
+            flash('O valor da refeição deve ser maior que zero.', 'error')
+            return redirect(url_for('main.detalhes_restaurante', restaurante_id=restaurante_id))
+        
+        # Converter obra_id para inteiro se fornecido
+        if obra_id:
+            obra_id = int(obra_id)
+        
+        # Criar registros de alimentação para cada funcionário
+        registros_criados = 0
+        registros_duplicados = 0
+        
+        for funcionario_id in funcionarios_ids:
+            funcionario_id = int(funcionario_id)
+            
+            # Verificar se já existe registro para este funcionário, data, tipo e restaurante
+            registro_existente = RegistroAlimentacao.query.filter_by(
+                funcionario_id=funcionario_id,
+                data=data_lancamento,
+                tipo=tipo_refeicao,
+                restaurante_id=restaurante_id
+            ).first()
+            
+            if registro_existente:
+                registros_duplicados += 1
+                continue
+            
+            # Criar novo registro
+            novo_registro = RegistroAlimentacao(
+                funcionario_id=funcionario_id,
+                restaurante_id=restaurante_id,
+                obra_id=obra_id,
+                data=data_lancamento,
+                tipo=tipo_refeicao,
+                valor=valor_refeicao,
+                observacoes=observacoes
+            )
+            
+            db.session.add(novo_registro)
+            registros_criados += 1
+        
+        # Salvar no banco de dados
+        db.session.commit()
+        
+        # Mensagem de sucesso
+        if registros_criados > 0:
+            valor_total = registros_criados * valor_refeicao
+            msg = f'Lançamento realizado com sucesso! {registros_criados} registro(s) criado(s) no valor total de R$ {valor_total:.2f}.'
+            if registros_duplicados > 0:
+                msg += f' {registros_duplicados} registro(s) já existiam e foram ignorados.'
+            flash(msg, 'success')
+        else:
+            flash('Nenhum registro foi criado. Todos os funcionários já possuem lançamento para esta data, tipo e restaurante.', 'warning')
+        
+    except ValueError as e:
+        flash('Erro nos dados fornecidos. Verifique os valores e tente novamente.', 'error')
+    except Exception as e:
+        db.session.rollback()
+        flash('Erro interno ao processar o lançamento. Tente novamente.', 'error')
+    
+    return redirect(url_for('main.detalhes_restaurante', restaurante_id=restaurante_id))
 
 @main_bp.route('/api/dashboard-data')
 @login_required
@@ -2072,10 +2740,19 @@ def detalhes_restaurante(restaurante_id):
         RegistroAlimentacao.restaurante_id == restaurante.id
     ).join(Funcionario).order_by(RegistroAlimentacao.data.desc()).limit(50).all()
     
+    # Dados para o formulário de lançamento
+    funcionarios = Funcionario.query.filter_by(ativo=True).order_by(Funcionario.nome).all()
+    from models import Obra
+    obras = Obra.query.filter_by(status='Em andamento').order_by(Obra.nome).all()
+    data_hoje = date.today().strftime('%Y-%m-%d')
+    
     return render_template('alimentacao/detalhes_restaurante.html',
                          restaurante=restaurante,
                          kpis=kpis,
-                         registros=registros)
+                         registros=registros,
+                         funcionarios=funcionarios,
+                         obras=obras,
+                         data_hoje=data_hoje)
 
 # ========== NOVAS ROTAS DASHBOARD v3.0 ==========
 

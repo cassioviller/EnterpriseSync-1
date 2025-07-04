@@ -206,20 +206,183 @@
                 </h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
-            <div class="modal-body">
-                <div class="alert alert-info">
-                    <i class="fas fa-info-circle me-2"></i>
-                    Para criar um novo lançamento, volte à página principal de Alimentação e use o botão "Lançamento Múltiplo", selecionando este restaurante.
+            <form id="formNovoLancamento" method="POST" action="{{ url_for('main.criar_lancamento_restaurante', restaurante_id=restaurante.id) }}">
+                <div class="modal-body">
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label for="data_lancamento" class="form-label">Data</label>
+                            <input type="date" class="form-control" id="data_lancamento" name="data_lancamento" required value="{{ data_hoje }}">
+                        </div>
+                        <div class="col-md-6">
+                            <label for="tipo_refeicao" class="form-label">Tipo de Refeição</label>
+                            <select class="form-control" id="tipo_refeicao" name="tipo_refeicao" required>
+                                <option value="">Selecione...</option>
+                                <option value="cafe">Café da Manhã</option>
+                                <option value="almoco">Almoço</option>
+                                <option value="jantar">Jantar</option>
+                                <option value="lanche">Lanche</option>
+                                <option value="marmita">Marmita</option>
+                                <option value="refeicao_local">Refeição no Local</option>
+                                <option value="outros">Outros</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label for="valor_refeicao" class="form-label">Valor Unitário (R$)</label>
+                            <input type="number" step="0.01" min="0" class="form-control" id="valor_refeicao" name="valor_refeicao" required placeholder="0,00">
+                        </div>
+                        <div class="col-md-6">
+                            <label for="obra_lancamento" class="form-label">Obra (Opcional)</label>
+                            <select class="form-control" id="obra_lancamento" name="obra_lancamento">
+                                <option value="">Selecione uma obra...</option>
+                                {% for obra in obras %}
+                                <option value="{{ obra.id }}">{{ obra.nome }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-12">
+                            <label for="funcionarios_selecionados" class="form-label">Funcionários</label>
+                            <div class="form-check mb-2">
+                                <input class="form-check-input" type="checkbox" id="selecionarTodos" onchange="toggleTodosFuncionarios()">
+                                <label class="form-check-label" for="selecionarTodos">
+                                    <strong>Selecionar Todos</strong>
+                                </label>
+                            </div>
+                            <div class="border rounded p-3" style="max-height: 200px; overflow-y: auto;">
+                                {% for funcionario in funcionarios %}
+                                <div class="form-check">
+                                    <input class="form-check-input funcionario-checkbox" type="checkbox" value="{{ funcionario.id }}" id="func_{{ funcionario.id }}" name="funcionarios[]">
+                                    <label class="form-check-label" for="func_{{ funcionario.id }}">
+                                        {{ funcionario.nome }}
+                                        {% if funcionario.departamento_ref %}
+                                        <small class="text-muted">({{ funcionario.departamento_ref.nome }})</small>
+                                        {% endif %}
+                                    </label>
+                                </div>
+                                {% endfor %}
+                            </div>
+                            <small class="text-muted">Selecione os funcionários que consumiram a refeição</small>
+                        </div>
+                        <div class="col-12">
+                            <label for="observacoes_lancamento" class="form-label">Observações (Opcional)</label>
+                            <textarea class="form-control" id="observacoes_lancamento" name="observacoes_lancamento" rows="3" placeholder="Informações adicionais sobre o lançamento..."></textarea>
+                        </div>
+                    </div>
+                    
+                    <!-- Resumo do Lançamento -->
+                    <div class="alert alert-light mt-3" id="resumoLancamento" style="display: none;">
+                        <h6><i class="fas fa-calculator me-2"></i>Resumo do Lançamento</h6>
+                        <p class="mb-1"><strong>Funcionários selecionados:</strong> <span id="totalFuncionarios">0</span></p>
+                        <p class="mb-1"><strong>Valor unitário:</strong> R$ <span id="valorUnitario">0,00</span></p>
+                        <p class="mb-0"><strong>Valor total:</strong> R$ <span id="valorTotal">0,00</span></p>
+                    </div>
                 </div>
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fechar</button>
-                <a href="{{ url_for('main.alimentacao_restaurantes') }}" class="btn btn-primary">
-                    <i class="fas fa-arrow-left me-1"></i> Ir para Lançamentos
-                </a>
-            </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-primary" id="btnSalvarLancamento">
+                        <i class="fas fa-save me-1"></i> Salvar Lançamento
+                    </button>
+                </div>
+            </form>
         </div>
     </div>
 </div>
 {% endif %}
+
+<script>
+// Função para alternar seleção de todos os funcionários
+function toggleTodosFuncionarios() {
+    const selecionarTodos = document.getElementById('selecionarTodos');
+    const checkboxes = document.querySelectorAll('.funcionario-checkbox');
+    
+    checkboxes.forEach(checkbox => {
+        checkbox.checked = selecionarTodos.checked;
+    });
+    
+    atualizarResumo();
+}
+
+// Função para atualizar resumo do lançamento
+function atualizarResumo() {
+    const checkboxes = document.querySelectorAll('.funcionario-checkbox:checked');
+    const valorInput = document.getElementById('valor_refeicao');
+    
+    const totalFuncionarios = checkboxes.length;
+    const valorUnitario = parseFloat(valorInput.value) || 0;
+    const valorTotal = totalFuncionarios * valorUnitario;
+    
+    document.getElementById('totalFuncionarios').textContent = totalFuncionarios;
+    document.getElementById('valorUnitario').textContent = valorUnitario.toFixed(2).replace('.', ',');
+    document.getElementById('valorTotal').textContent = valorTotal.toFixed(2).replace('.', ',');
+    
+    // Mostrar/ocultar resumo
+    const resumo = document.getElementById('resumoLancamento');
+    if (totalFuncionarios > 0 && valorUnitario > 0) {
+        resumo.style.display = 'block';
+    } else {
+        resumo.style.display = 'none';
+    }
+    
+    // Habilitar/desabilitar botão de salvar
+    const btnSalvar = document.getElementById('btnSalvarLancamento');
+    btnSalvar.disabled = totalFuncionarios === 0 || valorUnitario === 0;
+}
+
+// Event listeners
+document.addEventListener('DOMContentLoaded', function() {
+    // Atualizar resumo quando funcionários são selecionados
+    document.querySelectorAll('.funcionario-checkbox').forEach(checkbox => {
+        checkbox.addEventListener('change', function() {
+            // Verificar se todos estão selecionados para atualizar o checkbox "selecionar todos"
+            const todosCheckboxes = document.querySelectorAll('.funcionario-checkbox');
+            const selecionados = document.querySelectorAll('.funcionario-checkbox:checked');
+            const selecionarTodos = document.getElementById('selecionarTodos');
+            
+            selecionarTodos.checked = todosCheckboxes.length === selecionados.length;
+            selecionarTodos.indeterminate = selecionados.length > 0 && selecionados.length < todosCheckboxes.length;
+            
+            atualizarResumo();
+        });
+    });
+    
+    // Atualizar resumo quando valor é alterado
+    document.getElementById('valor_refeicao').addEventListener('input', atualizarResumo);
+    
+    // Validação do formulário
+    document.getElementById('formNovoLancamento').addEventListener('submit', function(e) {
+        const funcionariosSelecionados = document.querySelectorAll('.funcionario-checkbox:checked');
+        const valor = document.getElementById('valor_refeicao').value;
+        
+        if (funcionariosSelecionados.length === 0) {
+            e.preventDefault();
+            alert('Selecione pelo menos um funcionário para o lançamento.');
+            return false;
+        }
+        
+        if (!valor || parseFloat(valor) <= 0) {
+            e.preventDefault();
+            alert('Informe um valor válido para a refeição.');
+            return false;
+        }
+        
+        // Confirmar lançamento
+        const totalFuncionarios = funcionariosSelecionados.length;
+        const valorTotal = totalFuncionarios * parseFloat(valor);
+        const confirmacao = confirm(`Confirmar lançamento para ${totalFuncionarios} funcionário(s) no valor total de R$ ${valorTotal.toFixed(2).replace('.', ',')}?`);
+        
+        if (!confirmacao) {
+            e.preventDefault();
+            return false;
+        }
+    });
+    
+    // Reset do formulário quando modal é fechado
+    document.getElementById('modalNovoLancamento').addEventListener('hidden.bs.modal', function() {
+        document.getElementById('formNovoLancamento').reset();
+        document.getElementById('selecionarTodos').checked = false;
+        document.getElementById('selecionarTodos').indeterminate = false;
+        document.getElementById('resumoLancamento').style.display = 'none';
+        document.getElementById('btnSalvarLancamento').disabled = true;
+    });
+});
+</script>
 {% endblock %}
