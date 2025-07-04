@@ -1,39 +1,26 @@
 {% extends "base.html" %}
 
-{% block title %}{{ funcionario.codigo }} - {{ funcionario.nome }} - Dashboard KPIs{% endblock %}
+{% block title %}Dashboard KPIs - {{ funcionario.nome }}{% endblock %}
 
 {% block content %}
 <div class="container-fluid mt-4">
-    <!-- Cabeçalho com foto e informações do funcionário -->
+    <!-- Header do Dashboard -->
     <div class="row mb-4">
         <div class="col-12">
-            <div class="card border-0 bg-dark">
-                <div class="card-body p-4">
-                    <div class="d-flex justify-content-between align-items-center">
-                        <div class="d-flex align-items-center">
-                            <div class="me-4">
-                                {% if funcionario.foto %}
-                                    <img src="{{ url_for('static', filename=funcionario.foto) }}" 
-                                         alt="{{ funcionario.nome }}" 
-                                         class="rounded-circle border border-primary"
-                                         style="width: 80px; height: 80px; object-fit: cover;">
-                                {% else %}
-                                    <div class="bg-secondary rounded-circle d-flex align-items-center justify-content-center"
-                                         style="width: 80px; height: 80px;">
-                                        <i class="fas fa-user text-light" style="font-size: 2rem;"></i>
-                                    </div>
-                                {% endif %}
-                            </div>
-                            <div>
-                                <h1 class="h3 mb-1 text-light">{{ funcionario.codigo }} - {{ funcionario.nome }}</h1>
-                                <p class="text-muted mb-0">{{ funcionario.funcao_ref.nome if funcionario.funcao_ref else 'Função não definida' }}</p>
-                                <p class="text-muted mb-0">{{ funcionario.departamento_ref.nome if funcionario.departamento_ref else 'Departamento não definido' }}</p>
-                            </div>
-                        </div>
-                        <div class="text-end">
-                            <span class="badge bg-primary fs-6">Salário: R$ {{ "{:,.2f}".format(funcionario.salario or 0) }}</span>
-                        </div>
-                    </div>
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <h2 class="mb-1">Dashboard de KPIs v3.0</h2>
+                    <p class="text-muted mb-0">
+                        {{ funcionario.nome }} - Código: {{ funcionario.codigo }}
+                    </p>
+                </div>
+                <div>
+                    <a href="{{ url_for('main.exportar_relatorio_funcionario', id=funcionario.id, data_inicio=periodo.inicio, data_fim=periodo.fim) }}" class="btn btn-outline-secondary me-2">
+                        <i class="fas fa-download"></i> Exportar CSV
+                    </a>
+                    <a href="{{ url_for('main.funcionario_perfil', id=funcionario.id) }}" class="btn btn-secondary">
+                        <i class="fas fa-arrow-left"></i> Voltar
+                    </a>
                 </div>
             </div>
         </div>
@@ -43,28 +30,22 @@
     <div class="row mb-4">
         <div class="col-12">
             <div class="card">
-                <div class="card-body">
-                    <h5 class="card-title">
-                        <i class="fas fa-filter"></i> Filtros de Período
-                    </h5>
-                    <form id="filtroForm" class="row g-3">
-                        <div class="col-md-3">
-                            <label for="dataInicio" class="form-label">Data Início</label>
-                            <input type="date" class="form-control" id="dataInicio" name="dataInicio" 
-                                   value="{{ periodo.inicio.strftime('%Y-%m-%d') if periodo else '' }}">
+                <div class="card-body py-3">
+                    <form method="GET" class="row g-3 align-items-end">
+                        <div class="col-md-4">
+                            <label class="form-label">Data de Início</label>
+                            <input type="date" name="data_inicio" class="form-control" 
+                                   value="{{ periodo.inicio.strftime('%Y-%m-%d') if periodo.inicio else '' }}">
                         </div>
-                        <div class="col-md-3">
-                            <label for="dataFim" class="form-label">Data Fim</label>
-                            <input type="date" class="form-control" id="dataFim" name="dataFim"
-                                   value="{{ periodo.fim.strftime('%Y-%m-%d') if periodo else '' }}">
+                        <div class="col-md-4">
+                            <label class="form-label">Data de Fim</label>
+                            <input type="date" name="data_fim" class="form-control" 
+                                   value="{{ periodo.fim.strftime('%Y-%m-%d') if periodo.fim else '' }}">
                         </div>
-                        <div class="col-md-6 d-flex align-items-end">
-                            <button type="button" class="btn btn-primary me-2" onclick="aplicarFiltros()">
-                                <i class="fas fa-search"></i> Aplicar Filtros
+                        <div class="col-md-4">
+                            <button type="submit" class="btn btn-primary w-100">
+                                <i class="fas fa-filter"></i> Filtrar
                             </button>
-                            <button type="button" class="btn btn-outline-secondary me-2" onclick="filtroMes()">Este Mês</button>
-                            <button type="button" class="btn btn-outline-secondary me-2" onclick="filtroTrimestre()">Trimestre</button>
-                            <button type="button" class="btn btn-outline-secondary" onclick="filtroAno()">Este Ano</button>
                         </div>
                     </form>
                 </div>
@@ -72,189 +53,158 @@
         </div>
     </div>
 
-    <!-- Layout 4-4-2: Dashboard de KPIs -->
-    
-    <!-- Primeira Linha - 4 Indicadores -->
-    <div class="row mb-4">
-        <div class="col-md-3">
-            <div class="card bg-primary text-white h-100">
+    <!-- Layout 4-4-2 dos KPIs -->
+    <div class="row g-4">
+        <!-- Primeira linha: 4 KPIs -->
+        <div class="col-lg-3 col-md-6">
+            <div class="card h-100">
                 <div class="card-body text-center">
-                    <i class="fas fa-clock fa-2x mb-3"></i>
-                    <h5 class="card-title">Horas Trabalhadas</h5>
-                    <h2 class="display-6 fw-bold" id="horasTrabalhadas">{{ kpis.horas_trabalhadas }}h</h2>
-                    <small class="opacity-75">No período selecionado</small>
+                    <div class="display-4 text-primary mb-2">
+                        {{ "%.1f"|format(kpis.horas_trabalhadas) }}
+                    </div>
+                    <h6 class="card-title">Horas Trabalhadas</h6>
+                    <small class="text-muted">Total no período</small>
                 </div>
             </div>
         </div>
-        <div class="col-md-3">
-            <div class="card bg-success text-white h-100">
+        
+        <div class="col-lg-3 col-md-6">
+            <div class="card h-100">
                 <div class="card-body text-center">
-                    <i class="fas fa-plus-circle fa-2x mb-3"></i>
-                    <h5 class="card-title">Horas Extras</h5>
-                    <h2 class="display-6 fw-bold" id="horasExtras">{{ kpis.horas_extras }}h</h2>
-                    <small class="opacity-75">Acima da jornada normal</small>
+                    <div class="display-4 text-warning mb-2">
+                        {{ "%.1f"|format(kpis.horas_extras) }}
+                    </div>
+                    <h6 class="card-title">Horas Extras</h6>
+                    <small class="text-muted">Acima da jornada</small>
                 </div>
             </div>
         </div>
-        <div class="col-md-3">
-            <div class="card bg-warning text-dark h-100">
+        
+        <div class="col-lg-3 col-md-6">
+            <div class="card h-100">
                 <div class="card-body text-center">
-                    <i class="fas fa-calendar-times fa-2x mb-3"></i>
-                    <h5 class="card-title">Faltas</h5>
-                    <h2 class="display-6 fw-bold" id="faltas">{{ kpis.faltas }}</h2>
-                    <small class="opacity-75">Dias sem presença</small>
+                    <div class="display-4 text-danger mb-2">
+                        {{ kpis.faltas }}
+                    </div>
+                    <h6 class="card-title">Faltas</h6>
+                    <small class="text-muted">Dias ausentes</small>
                 </div>
             </div>
         </div>
-        <div class="col-md-3">
-            <div class="card bg-danger text-white h-100">
+        
+        <div class="col-lg-3 col-md-6">
+            <div class="card h-100">
                 <div class="card-body text-center">
-                    <i class="fas fa-clock fa-2x mb-3"></i>
-                    <h5 class="card-title">Atrasos</h5>
-                    <h2 class="display-6 fw-bold" id="atrasosHoras">{{ kpis.atrasos_horas }}h</h2>
-                    <small class="opacity-75">Entrada + saída antecipada</small>
+                    <div class="display-4 text-warning mb-2">
+                        {{ "%.1f"|format(kpis.atrasos_horas) }}
+                    </div>
+                    <h6 class="card-title">Atrasos</h6>
+                    <small class="text-muted">Horas de atraso</small>
                 </div>
             </div>
         </div>
-    </div>
 
-    <!-- Segunda Linha - 4 Indicadores -->
-    <div class="row mb-4">
-        <div class="col-md-3">
-            <div class="card bg-info text-white h-100">
+        <!-- Segunda linha: 4 KPIs -->
+        <div class="col-lg-3 col-md-6">
+            <div class="card h-100">
                 <div class="card-body text-center">
-                    <i class="fas fa-dollar-sign fa-2x mb-3"></i>
-                    <h5 class="card-title">Custo Mensal</h5>
-                    <h2 class="display-6 fw-bold" id="custoMensal">R$ {{ "{:,.0f}".format(kpis.custo_mensal) }}</h2>
-                    <small class="opacity-75">Trabalho + faltas justificadas</small>
+                    <div class="display-4 text-success mb-2">
+                        R$ {{ "%.2f"|format(kpis.custo_mensal) }}
+                    </div>
+                    <h6 class="card-title">Custo Mensal</h6>
+                    <small class="text-muted">Valor total</small>
                 </div>
             </div>
         </div>
-        <div class="col-md-3">
-            <div class="card bg-secondary text-white h-100">
+        
+        <div class="col-lg-3 col-md-6">
+            <div class="card h-100">
                 <div class="card-body text-center">
-                    <i class="fas fa-user-times fa-2x mb-3"></i>
-                    <h5 class="card-title">Absenteísmo</h5>
-                    <h2 class="display-6 fw-bold" id="absenteismo">{{ kpis.absenteismo }}%</h2>
-                    <small class="opacity-75">Taxa de ausências</small>
+                    <div class="display-4 text-info mb-2">
+                        {{ "%.1f"|format(kpis.absenteismo) }}%
+                    </div>
+                    <h6 class="card-title">Absenteísmo</h6>
+                    <small class="text-muted">Taxa de ausências</small>
                 </div>
             </div>
         </div>
-        <div class="col-md-3">
-            <div class="card bg-dark text-white h-100">
+        
+        <div class="col-lg-3 col-md-6">
+            <div class="card h-100">
                 <div class="card-body text-center">
-                    <i class="fas fa-chart-line fa-2x mb-3"></i>
-                    <h5 class="card-title">Média Diária</h5>
-                    <h2 class="display-6 fw-bold" id="mediaDiaria">{{ kpis.media_diaria }}h</h2>
-                    <small class="opacity-75">Horas por dia presente</small>
+                    <div class="display-4 text-primary mb-2">
+                        {{ "%.1f"|format(kpis.media_diaria) }}h
+                    </div>
+                    <h6 class="card-title">Média Diária</h6>
+                    <small class="text-muted">Horas por dia</small>
                 </div>
             </div>
         </div>
-        <div class="col-md-3">
-            <div class="card bg-danger text-white h-100">
+        
+        <div class="col-lg-3 col-md-6">
+            <div class="card h-100">
                 <div class="card-body text-center">
-                    <i class="fas fa-exclamation-triangle fa-2x mb-3"></i>
-                    <h5 class="card-title">Horas Perdidas</h5>
-                    <h2 class="display-6 fw-bold" id="horasPerdidas">{{ kpis.horas_perdidas }}h</h2>
-                    <small class="opacity-75">Faltas + atrasos</small>
+                    <div class="display-4 text-danger mb-2">
+                        {{ "%.1f"|format(kpis.horas_perdidas) }}
+                    </div>
+                    <h6 class="card-title">Horas Perdidas</h6>
+                    <small class="text-muted">Faltas + Atrasos</small>
                 </div>
             </div>
         </div>
-    </div>
 
-    <!-- Terceira Linha - 2 Indicadores Grandes -->
-    <div class="row mb-4">
-        <div class="col-md-6">
-            <div class="card h-100" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);">
-                <div class="card-body text-center text-white">
-                    <i class="fas fa-chart-pie fa-3x mb-3"></i>
-                    <h4 class="card-title">Produtividade</h4>
-                    <h1 class="display-4 fw-bold" id="produtividade">{{ kpis.produtividade }}%</h1>
-                    <p class="lead opacity-75">Eficiência em relação às horas esperadas</p>
-                    
-                    <!-- Barra de progresso visual -->
-                    <div class="progress mt-3" style="height: 10px;">
-                        <div class="progress-bar bg-light" role="progressbar" 
+        <!-- Terceira linha: 2 KPIs grandes -->
+        <div class="col-lg-6">
+            <div class="card h-100">
+                <div class="card-body text-center">
+                    <div class="display-3 text-success mb-3">
+                        {{ "%.1f"|format(kpis.produtividade) }}%
+                    </div>
+                    <h5 class="card-title">Produtividade</h5>
+                    <p class="text-muted mb-0">Eficiência do funcionário</p>
+                    <div class="progress mt-3" style="height: 20px;">
+                        <div class="progress-bar bg-success" role="progressbar" 
                              style="width: {{ kpis.produtividade }}%" 
                              aria-valuenow="{{ kpis.produtividade }}" 
-                             aria-valuemin="0" aria-valuemax="100"></div>
+                             aria-valuemin="0" aria-valuemax="100">
+                        </div>
                     </div>
                 </div>
             </div>
         </div>
-        <div class="col-md-6">
-            <div class="card h-100" style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);">
-                <div class="card-body text-center text-white">
-                    <i class="fas fa-utensils fa-3x mb-3"></i>
-                    <h4 class="card-title">Custo Alimentação</h4>
-                    <h1 class="display-4 fw-bold" id="custoAlimentacao">R$ {{ "{:,.0f}".format(kpis.custo_alimentacao) }}</h1>
-                    <p class="lead opacity-75">Gasto total com alimentação</p>
-                    
-                    <!-- Estatística adicional -->
-                    <div class="mt-3">
-                        <small class="opacity-75">
-                            Média por dia: R$ {{ "{:,.0f}".format(kpis.custo_alimentacao / (periodo.dias_uteis or 1)) }}
-                        </small>
+        
+        <div class="col-lg-6">
+            <div class="card h-100">
+                <div class="card-body text-center">
+                    <div class="display-3 text-info mb-3">
+                        R$ {{ "%.2f"|format(kpis.custo_alimentacao) }}
                     </div>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Resumo do Período -->
-    <div class="row mb-4">
-        <div class="col-12">
-            <div class="card border-primary">
-                <div class="card-header bg-primary text-white">
-                    <h5 class="mb-0">
-                        <i class="fas fa-info-circle"></i> Resumo do Período
-                    </h5>
-                </div>
-                <div class="card-body">
-                    <div class="row text-center">
-                        <div class="col-md-3">
-                            <h6 class="text-muted">Período Analisado</h6>
-                            <p class="fw-bold">{{ periodo.inicio.strftime('%d/%m/%Y') }} a {{ periodo.fim.strftime('%d/%m/%Y') }}</p>
-                        </div>
-                        <div class="col-md-3">
-                            <h6 class="text-muted">Dias Úteis</h6>
-                            <p class="fw-bold">{{ periodo.dias_uteis }} dias</p>
-                        </div>
-                        <div class="col-md-3">
-                            <h6 class="text-muted">Dias Trabalhados</h6>
-                            <p class="fw-bold">{{ periodo.dias_uteis - kpis.faltas }} dias</p>
-                        </div>
-                        <div class="col-md-3">
-                            <h6 class="text-muted">Taxa de Presença</h6>
-                            <p class="fw-bold">{{ "{:.1f}".format(100 - kpis.absenteismo) }}%</p>
-                        </div>
-                    </div>
+                    <h5 class="card-title">Custo Alimentação</h5>
+                    <p class="text-muted mb-0">Gastos com refeições</p>
+                    <small class="text-muted">
+                        Período: {{ periodo.inicio.strftime('%d/%m/%Y') }} a {{ periodo.fim.strftime('%d/%m/%Y') }}
+                    </small>
                 </div>
             </div>
         </div>
     </div>
 
-    <!-- Ações Rápidas -->
-    <div class="row">
+    <!-- Informações do Período -->
+    <div class="row mt-4">
         <div class="col-12">
             <div class="card">
                 <div class="card-body">
-                    <h5 class="card-title">
-                        <i class="fas fa-tools"></i> Ações Rápidas
-                    </h5>
-                    <div class="d-flex gap-2 flex-wrap">
-                        <a href="{{ url_for('main.funcionario_perfil', id=funcionario.id) }}" class="btn btn-outline-primary">
-                            <i class="fas fa-user"></i> Ver Perfil Completo
-                        </a>
-                        <a href="{{ url_for('main.novo_ponto') }}?funcionario_id={{ funcionario.id }}" class="btn btn-outline-success">
-                            <i class="fas fa-clock"></i> Registrar Ponto
-                        </a>
-                        <a href="{{ url_for('main.nova_alimentacao') }}?funcionario_id={{ funcionario.id }}" class="btn btn-outline-warning">
-                            <i class="fas fa-utensils"></i> Registrar Alimentação
-                        </a>
-                        <button type="button" class="btn btn-outline-info" onclick="exportarRelatorio()">
-                            <i class="fas fa-download"></i> Exportar Relatório
-                        </button>
+                    <h6 class="card-title">Informações do Período</h6>
+                    <div class="row">
+                        <div class="col-md-4">
+                            <strong>Período:</strong> {{ periodo.inicio.strftime('%d/%m/%Y') }} a {{ periodo.fim.strftime('%d/%m/%Y') }}
+                        </div>
+                        <div class="col-md-4">
+                            <strong>Dias Úteis:</strong> {{ periodo.dias_uteis }} dias
+                        </div>
+                        <div class="col-md-4">
+                            <strong>Última Atualização:</strong> {{ moment().format('DD/MM/YYYY HH:mm') }}
+                        </div>
                     </div>
                 </div>
             </div>
@@ -263,110 +213,31 @@
 </div>
 
 <script>
-// Função para aplicar filtros
-function aplicarFiltros() {
-    const dataInicio = document.getElementById('dataInicio').value;
-    const dataFim = document.getElementById('dataFim').value;
-    
-    if (!dataInicio || !dataFim) {
-        alert('Por favor, selecione as datas de início e fim.');
-        return;
-    }
-    
-    window.location.href = `{{ url_for('main.dashboard_funcionario_v3', id=funcionario.id) }}?data_inicio=${dataInicio}&data_fim=${dataFim}`;
-}
+// Auto-refresh dos KPIs a cada 5 minutos
+setTimeout(function() {
+    location.reload();
+}, 300000);
 
-// Filtros rápidos
-function filtroMes() {
-    const hoje = new Date();
-    const primeiroDia = new Date(hoje.getFullYear(), hoje.getMonth(), 1);
-    const ultimoDia = new Date(hoje.getFullYear(), hoje.getMonth() + 1, 0);
+// Atualização em tempo real via AJAX (opcional)
+function atualizarKPIs() {
+    const urlParams = new URLSearchParams(window.location.search);
+    const dataInicio = urlParams.get('data_inicio') || '';
+    const dataFim = urlParams.get('data_fim') || '';
     
-    document.getElementById('dataInicio').value = primeiroDia.toISOString().split('T')[0];
-    document.getElementById('dataFim').value = ultimoDia.toISOString().split('T')[0];
-    aplicarFiltros();
-}
-
-function filtroTrimestre() {
-    const hoje = new Date();
-    const trimestre = Math.floor(hoje.getMonth() / 3);
-    const primeiroDia = new Date(hoje.getFullYear(), trimestre * 3, 1);
-    const ultimoDia = new Date(hoje.getFullYear(), (trimestre + 1) * 3, 0);
-    
-    document.getElementById('dataInicio').value = primeiroDia.toISOString().split('T')[0];
-    document.getElementById('dataFim').value = ultimoDia.toISOString().split('T')[0];
-    aplicarFiltros();
-}
-
-function filtroAno() {
-    const hoje = new Date();
-    const primeiroDia = new Date(hoje.getFullYear(), 0, 1);
-    const ultimoDia = new Date(hoje.getFullYear(), 11, 31);
-    
-    document.getElementById('dataInicio').value = primeiroDia.toISOString().split('T')[0];
-    document.getElementById('dataFim').value = ultimoDia.toISOString().split('T')[0];
-    aplicarFiltros();
-}
-
-// Função para exportar relatório
-function exportarRelatorio() {
-    const dataInicio = document.getElementById('dataInicio').value;
-    const dataFim = document.getElementById('dataFim').value;
-    
-    window.open(`{{ url_for('main.exportar_relatorio_funcionario', id=funcionario.id) }}?data_inicio=${dataInicio}&data_fim=${dataFim}`, '_blank');
-}
-
-// Atualização automática dos dados a cada 30 segundos
-setInterval(function() {
-    const dataInicio = document.getElementById('dataInicio').value;
-    const dataFim = document.getElementById('dataFim').value;
-    
-    if (dataInicio && dataFim) {
-        fetch(`{{ url_for('main.api_kpis_funcionario', id=funcionario.id) }}?data_inicio=${dataInicio}&data_fim=${dataFim}`)
-            .then(response => response.json())
-            .then(data => {
+    fetch(`/api/funcionario/{{ funcionario.id }}/kpis?data_inicio=${dataInicio}&data_fim=${dataFim}`)
+        .then(response => response.json())
+        .then(data => {
+            if (!data.error) {
                 // Atualizar valores na tela
-                document.getElementById('horasTrabalhadas').textContent = data.horas_trabalhadas + 'h';
-                document.getElementById('horasExtras').textContent = data.horas_extras + 'h';
-                document.getElementById('faltas').textContent = data.faltas;
-                document.getElementById('atrasosHoras').textContent = data.atrasos_horas + 'h';
-                document.getElementById('custoMensal').textContent = 'R$ ' + data.custo_mensal.toLocaleString('pt-BR');
-                document.getElementById('absenteismo').textContent = data.absenteismo + '%';
-                document.getElementById('mediaDiaria').textContent = data.media_diaria + 'h';
-                document.getElementById('horasPerdidas').textContent = data.horas_perdidas + 'h';
-                document.getElementById('produtividade').textContent = data.produtividade + '%';
-                document.getElementById('custoAlimentacao').textContent = 'R$ ' + data.custo_alimentacao.toLocaleString('pt-BR');
-                
-                // Atualizar barra de progresso da produtividade
-                document.querySelector('.progress-bar').style.width = data.produtividade + '%';
-            })
-            .catch(error => console.error('Erro ao atualizar KPIs:', error));
-    }
-}, 30000); // 30 segundos
+                console.log('KPIs atualizados:', data);
+            }
+        })
+        .catch(error => {
+            console.error('Erro ao atualizar KPIs:', error);
+        });
+}
+
+// Executar atualização a cada 2 minutos
+setInterval(atualizarKPIs, 120000);
 </script>
-
-<style>
-.card {
-    transition: transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out;
-}
-
-.card:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 4px 20px rgba(0,0,0,0.1);
-}
-
-.display-6, .display-4 {
-    font-weight: 900;
-    text-shadow: 1px 1px 2px rgba(0,0,0,0.1);
-}
-
-.progress {
-    background-color: rgba(255,255,255,0.2);
-}
-
-.badge {
-    font-size: 0.9rem;
-    padding: 0.5rem 1rem;
-}
-</style>
 {% endblock %}

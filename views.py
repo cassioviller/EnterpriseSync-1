@@ -6,7 +6,7 @@ from forms import *
 from utils import calcular_horas_trabalhadas, calcular_custo_real_obra, calcular_custos_mes, calcular_kpis_funcionarios_geral, calcular_kpis_funcionario_periodo, calcular_kpis_funcionario_completo, calcular_ocorrencias_funcionario, processar_meio_periodo_exemplo
 from datetime import datetime, date
 from sqlalchemy import func
-from kpis_engine import kpis_engine
+from kpis_engine_simple import kpis_engine
 import os
 from werkzeug.utils import secure_filename
 
