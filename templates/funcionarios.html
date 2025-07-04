@@ -664,6 +664,12 @@ function setDateRange(period) {
     
     document.getElementById('data_inicio').value = formatDate(startDate);
     document.getElementById('data_fim').value = formatDate(endDate);
+    
+    // Submeter o formulário automaticamente
+    const form = document.querySelector('form[method="GET"]');
+    if (form) {
+        form.submit();
+    }
 }
 </script>
 {% endblock %}
