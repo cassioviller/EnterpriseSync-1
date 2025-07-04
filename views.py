@@ -1147,6 +1147,11 @@ def novo_ponto():
         
         db.session.add(registro)
         db.session.commit()
+        
+        # Atualizar cálculos automáticos do registro
+        from kpis_engine_v3 import atualizar_calculos_ponto
+        atualizar_calculos_ponto(registro.id)
+        
         flash('Registro de ponto adicionado com sucesso!', 'success')
         return redirect(url_for('main.ponto'))
     

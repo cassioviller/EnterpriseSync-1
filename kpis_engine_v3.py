@@ -174,11 +174,15 @@ def calcular_dias_uteis(data_inicio, data_fim):
     Returns:
         int: Número de dias úteis
     """
-    # Feriados fixos nacionais básicos
+    # Feriados nacionais completos para 2025
     feriados_2025 = [
         date(2025, 1, 1),   # Ano Novo
+        date(2025, 2, 17),  # Carnaval (Segunda-feira)
+        date(2025, 2, 18),  # Carnaval (Terça-feira)
+        date(2025, 4, 18),  # Paixão de Cristo (Sexta-feira Santa)
         date(2025, 4, 21),  # Tiradentes
         date(2025, 5, 1),   # Dia do Trabalhador
+        date(2025, 6, 19),  # Corpus Christi
         date(2025, 9, 7),   # Independência
         date(2025, 10, 12), # Nossa Senhora Aparecida
         date(2025, 11, 2),  # Finados
