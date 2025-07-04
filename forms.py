@@ -1,4 +1,5 @@
 from flask_wtf import FlaskForm
+from flask_wtf.file import FileField, FileAllowed
 from wtforms import StringField, TextAreaField, FloatField, DateField, SelectField, BooleanField, TimeField, IntegerField
 from wtforms.validators import DataRequired, Email, Length, NumberRange, Optional
 from datetime import date
@@ -25,6 +26,7 @@ class FuncionarioForm(FlaskForm):
     departamento_id = SelectField('Departamento', coerce=int, validators=[Optional()])
     funcao_id = SelectField('Função', coerce=int, validators=[Optional()])
     horario_trabalho_id = SelectField('Horário de Trabalho', coerce=int, validators=[Optional()])
+    foto = FileField('Foto', validators=[Optional(), FileAllowed(['jpg', 'jpeg', 'png'], 'Apenas arquivos JPG, JPEG e PNG são permitidos!')])
     ativo = BooleanField('Ativo', default=True)
 
 class ObraForm(FlaskForm):

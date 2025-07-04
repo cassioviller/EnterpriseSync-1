@@ -122,6 +122,24 @@ def novo_funcionario():
             ativo=form.ativo.data
         )
         db.session.add(funcionario)
+        db.session.flush()  # Para obter o ID antes do commit
+        
+        # Processar upload de foto
+        if form.foto.data:
+            foto = form.foto.data
+            if foto.filename:
+                # Criar diretório se não existir
+                import os
+                upload_dir = 'static/uploads/funcionarios'
+                if not os.path.exists(upload_dir):
+                    os.makedirs(upload_dir)
+                
+                # Salvar arquivo
+                filename = f"funcionario_{funcionario.id}_{foto.filename}"
+                foto_path = os.path.join(upload_dir, filename)
+                foto.save(foto_path)
+                funcionario.foto = f"uploads/funcionarios/{filename}"
+        
         db.session.commit()
         flash('Funcionário cadastrado com sucesso!', 'success')
         return redirect(url_for('main.funcionarios'))
