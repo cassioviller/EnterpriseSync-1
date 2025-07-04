@@ -6,23 +6,23 @@ Este relatório identifica funcionalidades incompletas, modais não implementado
 
 ---
 
-## 🚫 MÓDULOS DESABILITADOS / REMOVIDOS
+## 🚫 MÓDULOS REMOVIDOS (LIMPEZA COMPLETA REALIZADA)
 
-### 1. Fornecedores (Completamente Removido)
-- **Status**: Módulo removido do sistema
-- **Impacto**: Impossibilidade de gestão de fornecedores
-- **Template**: `templates/fornecedores.html` existe mas não está conectado
-- **Sugestão**: Reimplementar módulo completo se necessário
+### 1. Fornecedores ✅ REMOVIDO
+- **Status**: Módulo completamente removido do sistema
+- **Impacto**: Sistema sem gestão de fornecedores (existe almoxarifado separado)
+- **Ação Realizada**: Template `templates/fornecedores.html` removido
+- **Observação**: Campo "fornecedor" mantido em custos de veículos (contexto específico)
 
-### 2. Materiais (Parcialmente Implementado)
-- **Status**: Template existe (`templates/materiais.html`) mas sem rotas
-- **Modal**: Modal de cadastro presente mas não funcional
-- **Campos**: Nome, unidade de medida, descrição, preço unitário
-- **Problema**: Falta modelo de dados e rotas no `views.py`
+### 2. Materiais ✅ REMOVIDO
+- **Status**: Módulo completamente removido do sistema
+- **Ação Realizada**: Template `templates/materiais.html` removido
+- **Verificação**: Sem modelos, rotas ou formulários relacionados
 
-### 3. Clientes (Template Órfão)
-- **Status**: Template `templates/clientes.html` existe mas desconectado
-- **Problema**: Sem rotas, modelos ou funcionalidade
+### 3. Clientes ✅ REMOVIDO
+- **Status**: Módulo completamente removido do sistema
+- **Ação Realizada**: Template `templates/clientes.html` removido
+- **Verificação**: Sem modelos, rotas ou formulários relacionados
 
 ---
 

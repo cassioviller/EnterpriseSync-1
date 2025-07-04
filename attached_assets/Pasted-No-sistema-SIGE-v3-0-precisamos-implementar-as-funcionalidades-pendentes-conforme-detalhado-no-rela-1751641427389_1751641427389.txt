@@ -1,0 +1,88 @@
+No sistema SIGE v3.0, precisamos implementar as funcionalidades pendentes conforme detalhado no relatório técnico. O objetivo é tornar o sistema mais completo e funcional, seguindo as prioridades estabelecidas.
+
+Por favor, execute as seguintes ações, priorizando as seções:
+
+## 🔴 CRÍTICO (Implementar Imediatamente)
+
+1.  **Sistema de Relatórios Dinâmicos Funcionais:**
+    *   **Problema:** A interface (`templates/relatorios.html`) está completa, mas os links para os relatórios não são funcionais.
+    *   **Ação:** Implemente as rotas e a lógica de backend (`views.py`, `app.py`) para que os links dos relatórios funcionem. Para cada relatório listado abaixo, crie ou conecte a funcionalidade que gere os dados e os exiba na interface:
+        *   Lista de Funcionários (filtrada)
+        *   Relatório de Ponto (consolidado)
+        *   Horas Extras (por período)
+        *   Relatório de Alimentação (detalhado)
+        *   Relatórios de Obras (custos, progresso)
+        *   Relatórios Financeiros (despesas, receitas)
+
+2.  **Modal de Lançamento de Alimentação em Restaurantes:**
+    *   **Problema:** O modal "Novo Lançamento" em `templates/alimentacao/detalhes_restaurante.html` é apenas um placeholder e não possui funcionalidade de backend.
+    *   **Ação:** Implemente a funcionalidade completa para este modal, incluindo:
+        *   Conexão com o backend para salvar os dados de lançamento de alimentação.
+        *   Validação dos campos de entrada (Data, Tipo, Valor, Obra, Restaurante, Observações).
+        *   Persistência dos dados no banco de dados (tabela `HistoricoAlimentacao`).
+
+3.  **Exportação de Relatórios em PDF/Excel:**
+    *   **Problema:** O sistema carece de funcionalidade para exportar relatórios em PDF/Excel, possuindo apenas exportação CSV no perfil do funcionário.
+    *   **Ação:** Implemente a funcionalidade de exportação para os relatórios gerados, permitindo que os usuários baixem os dados em formatos PDF e Excel. Considere a utilização de bibliotecas Python apropriadas para geração desses formatos (ex: `fpdf2` ou `ReportLab` para PDF, `openpyxl` para Excel).
+
+4.  **Módulo de Materiais Completo (se necessário ao negócio):**
+    *   **Problema:** O template `templates/materiais.html` existe, mas sem rotas e o modal de cadastro não é funcional. Falta modelo de dados e rotas no `views.py`.
+    *   **Ação:** Se este módulo for considerado necessário, implemente-o completamente, incluindo:
+        *   Criação do modelo de dados `Material` em `models.py` com campos como Nome, unidade de medida, descrição, preço unitário.
+        *   Implementação das rotas CRUD (Create, Read, Update, Delete) em `views.py` para gerenciar materiais.
+        *   Conexão do modal de cadastro e edição com o backend.
+
+## 🟡 IMPORTANTE (Próximas Sprints)
+
+1.  **KPIs de Alta Prioridade:**
+    *   **Problema:** Os seguintes KPIs estão pendentes de implementação ou precisam de revisão na lógica de cálculo (`relatorio_kpis_funcionarios.py`):
+        *   **Taxa de Pontualidade:** Percentual de dias sem atraso.
+        *   **Eficiência de Trabalho:** Horas produtivas vs horas pagas.
+        *   **Custo por Hora Produtiva:** Custo total ÷ horas efetivamente trabalhadas.
+        *   **Taxa de Rotatividade:** Entradas e saídas de funcionários.
+        *   **Índice de Satisfação:** Baseado em avaliações e ocorrências.
+    *   **Ação:** Implemente a lógica de cálculo para cada um desses KPIs no `relatorio_kpis_funcionarios.py` e garanta que sejam exibidos corretamente na interface.
+
+2.  **Sistema de Aprovação de Ocorrências:**
+    *   **Problema:** Ocorrências possuem status, mas não há um workflow de aprovação.
+    *   **Ação:** Implemente um sistema de aprovação hierárquica para as ocorrências, permitindo que usuários com permissões específicas possam aprovar ou rejeitar ocorrências, alterando seu status e registrando a ação.
+
+3.  **Controle de Acesso e Permissões:**
+    *   **Problema:** O sistema não possui níveis de permissão.
+    *   **Ação:** Implemente um sistema de roles e permissões por módulo, garantindo que diferentes tipos de usuários (ex: Administrador, Gerente, Funcionário) tenham acesso apenas às funcionalidades e dados relevantes para suas funções.
+
+4.  **Gestão Financeira Avançada:**
+    *   **Problema:** Apenas custos básicos implementados.
+    *   **Ação:** Expanda a gestão financeira para incluir:
+        *   Controle de receitas.
+        *   Fluxo de caixa.
+        *   Orçamentos vs Realizados.
+        *   Centros de custo.
+
+## 🟢 DESEJÁVEL (Backlog)
+
+1.  **Integrações Externas (APIs):**
+    *   **Pendente:** Integração com APIs externas para CEP, validação de CPF/CNPJ e sistemas de pagamento.
+    *   **Ação:** Implemente as integrações necessárias para automatizar a validação de dados e facilitar transações.
+
+2.  **Sistema de Notificações em Tempo Real:**
+    *   **Problema:** Apenas flash messages básicas.
+    *   **Ação:** Implemente um sistema de notificações em tempo real para alertar os usuários sobre eventos importantes (ex: aprovação de ocorrência, novo lançamento de ponto).
+
+3.  **Auditoria e Logs:**
+    *   **Problema:** Sem rastreamento de alterações.
+    *   **Ação:** Implemente um sistema de auditoria para registrar as ações dos usuários e as alterações nos dados do sistema.
+
+4.  **Backup Automatizado:**
+    *   **Problema:** Sem sistema automatizado de backup.
+    *   **Ação:** Implemente rotinas de backup e recuperação automatizadas para garantir a segurança e a integridade dos dados do sistema.
+
+**Considerações Gerais:**
+
+*   Mantenha a arquitetura Flask atual e o uso de Bootstrap para o frontend.
+*   Implemente loading states para ações demoradas e adicione validações JavaScript mais robustas.
+*   Considere a implementação de cache para relatórios pesados e otimize queries de banco de dados com índices adequados.
+*   Implemente migrations formais para o banco de dados.
+
+Este prompt serve como um guia abrangente para as próximas etapas de desenvolvimento do SIGE v3.0, focando nas funcionalidades que trarão maior valor e estabilidade ao sistema.
+
