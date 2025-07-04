@@ -316,7 +316,16 @@ def funcionario_perfil(id):
         'faltas': 0,
         'atrasos': 0,
         'absenteismo': 0,
-        'horas_extras_valor': 0
+        'horas_extras_valor': 0,
+        'media_horas_diarias': 0,
+        'total_atrasos': 0,
+        'pontualidade': 100,
+        'custo_total': 0,
+        'custo_mao_obra': 0,
+        'custo_alimentacao': 0,
+        'custo_transporte': 0,
+        'dias_trabalhados': 0,
+        'dias_uteis': 0
     })
     
     return render_template('funcionario_perfil.html',

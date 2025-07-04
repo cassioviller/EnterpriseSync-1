@@ -222,6 +222,40 @@ def calcular_kpis_funcionario_periodo(funcionario_id, data_inicio=None, data_fim
     # Custo total do funcionário
     custo_total = custo_mao_obra + custo_alimentacao + custo_transporte + custo_faltas_justificadas
     
+    # Calcular taxa de absenteísmo
+    # Dias úteis no período (segunda a sexta)
+    dias_uteis = 0
+    data_atual = data_inicio
+    while data_atual <= data_fim:
+        if data_atual.weekday() < 5:  # Segunda a sexta
+            dias_uteis += 1
+        data_atual = data_atual + timedelta(days=1)
+    
+    # Dias trabalhados (com registros de ponto)
+    dias_trabalhados = len(registros_ponto)
+    
+    # Taxa de absenteísmo = (dias não trabalhados / dias úteis) * 100
+    if dias_uteis > 0:
+        absenteismo = ((dias_uteis - dias_trabalhados) / dias_uteis) * 100
+    else:
+        absenteismo = 0
+    
+    # Calcular média de horas diárias
+    if dias_trabalhados > 0:
+        media_horas_diarias = total_horas_trabalhadas / dias_trabalhados
+    else:
+        media_horas_diarias = 0
+    
+    # Calcular total de atrasos
+    total_atrasos = sum(r.atraso or 0 for r in registros_ponto)
+    
+    # Calcular pontualidade (% de dias sem atraso)
+    dias_sem_atraso = len([r for r in registros_ponto if (r.atraso or 0) == 0])
+    if dias_trabalhados > 0:
+        pontualidade = (dias_sem_atraso / dias_trabalhados) * 100
+    else:
+        pontualidade = 100
+    
     return {
         'funcionario': funcionario,
         'horas_trabalhadas': total_horas_trabalhadas,
@@ -231,7 +265,13 @@ def calcular_kpis_funcionario_periodo(funcionario_id, data_inicio=None, data_fim
         'custo_alimentacao': custo_alimentacao,
         'custo_transporte': custo_transporte,
         'custo_faltas_justificadas': custo_faltas_justificadas,
-        'custo_total': custo_total
+        'custo_total': custo_total,
+        'absenteismo': absenteismo,
+        'dias_uteis': dias_uteis,
+        'dias_trabalhados': dias_trabalhados,
+        'media_horas_diarias': media_horas_diarias,
+        'total_atrasos': total_atrasos,
+        'pontualidade': pontualidade
     }
 
 def calcular_kpis_funcionarios_geral(data_inicio=None, data_fim=None):
