@@ -371,6 +371,11 @@ def funcionario_perfil(id):
         'dias_uteis': 0
     })
     
+    # Buscar dados adicionais para o modal de edição
+    departamentos = Departamento.query.all()
+    funcoes = Funcao.query.all()
+    horarios = HorarioTrabalho.query.all()
+    
     return render_template('funcionario_perfil.html',
                          funcionario=funcionario,
                          kpis=kpis_obj,
@@ -381,7 +386,10 @@ def funcionario_perfil(id):
                          graficos=graficos,
                          data_inicio=data_inicio,
                          data_fim=data_fim,
-                         obra_filtro=obra_filtro)
+                         obra_filtro=obra_filtro,
+                         departamentos=departamentos,
+                         funcoes=funcoes,
+                         horarios=horarios)
 
 @main_bp.route('/funcionarios/<int:id>/excluir', methods=['POST'])
 @login_required
@@ -964,8 +972,8 @@ def novo_uso_veiculo():
 
 @main_bp.route('/veiculos/custo', methods=['POST'])
 @login_required
-def novo_custo_veiculo():
-    """Registra novo custo de veículo"""
+def novo_custo_veiculo_lista():
+    """Registra novo custo de veículo a partir da lista principal"""
     form = CustoVeiculoForm()
     
     # Preencher choices dinamicamente
