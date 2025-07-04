@@ -62,8 +62,8 @@ class Funcionario(db.Model):
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     
     # Relacionamentos
-    registros_ponto = db.relationship('RegistroPonto', backref='funcionario_ref', lazy=True)
-    horario_trabalho = db.relationship('HorarioTrabalho', backref='funcionarios', lazy=True)
+    registros_ponto = db.relationship('RegistroPonto', backref='funcionario_ref', lazy=True, overlaps="funcionario_ref")
+    horario_trabalho = db.relationship('HorarioTrabalho', backref='funcionarios', lazy=True, overlaps="funcionarios")
 
 class Obra(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -152,9 +152,9 @@ class Ocorrencia(db.Model):
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     
     # Relacionamentos
-    funcionario = db.relationship('Funcionario', backref='ocorrencias', lazy=True)
-    tipo_ocorrencia = db.relationship('TipoOcorrencia', backref='ocorrencias', lazy=True)
-    aprovador = db.relationship('Usuario', backref='ocorrencias_aprovadas', lazy=True)
+    funcionario = db.relationship('Funcionario', backref='ocorrencias', lazy=True, overlaps="ocorrencias")
+    tipo_ocorrencia = db.relationship('TipoOcorrencia', backref='ocorrencias', lazy=True, overlaps="ocorrencias")
+    aprovador = db.relationship('Usuario', backref='ocorrencias_aprovadas', lazy=True, overlaps="ocorrencias_aprovadas")
 
 class CalendarioUtil(db.Model):
     data = db.Column(db.Date, primary_key=True)
@@ -185,9 +185,9 @@ class RegistroAlimentacao(db.Model):
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     
     # Relacionamentos
-    funcionario_ref = db.relationship('Funcionario')
-    obra_ref = db.relationship('Obra')
-    restaurante_ref = db.relationship('Restaurante')
+    funcionario_ref = db.relationship('Funcionario', overlaps="registros_alimentacao")
+    obra_ref = db.relationship('Obra', overlaps="registros_alimentacao") 
+    restaurante_ref = db.relationship('Restaurante', overlaps="registros_alimentacao")
 
 # Modelo removido - duplicata
 
@@ -216,13 +216,13 @@ class RDO(db.Model):
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     
     # Relacionamentos
-    obra = db.relationship('Obra', backref='rdos')
-    criado_por = db.relationship('Funcionario', backref='rdos_criados')
-    mao_obra = db.relationship('RDOMaoObra', backref='rdo_ref', cascade='all, delete-orphan')
-    equipamentos = db.relationship('RDOEquipamento', backref='rdo_ref', cascade='all, delete-orphan')
-    atividades = db.relationship('RDOAtividade', backref='rdo_ref', cascade='all, delete-orphan')
-    ocorrencias_rdo = db.relationship('RDOOcorrencia', backref='rdo_ref', cascade='all, delete-orphan')
-    fotos = db.relationship('RDOFoto', backref='rdo_ref', cascade='all, delete-orphan')
+    obra = db.relationship('Obra', backref='rdos', overlaps="rdos")
+    criado_por = db.relationship('Funcionario', backref='rdos_criados', overlaps="rdos_criados")
+    mao_obra = db.relationship('RDOMaoObra', backref='rdo_ref', cascade='all, delete-orphan', overlaps="rdo_ref")
+    equipamentos = db.relationship('RDOEquipamento', backref='rdo_ref', cascade='all, delete-orphan', overlaps="rdo_ref")
+    atividades = db.relationship('RDOAtividade', backref='rdo_ref', cascade='all, delete-orphan', overlaps="rdo_ref")
+    ocorrencias_rdo = db.relationship('RDOOcorrencia', backref='rdo_ref', cascade='all, delete-orphan', overlaps="rdo_ref")
+    fotos = db.relationship('RDOFoto', backref='rdo_ref', cascade='all, delete-orphan', overlaps="rdo_ref")
     
     def __repr__(self):
         return f'<RDO {self.numero_rdo}>'
@@ -238,7 +238,7 @@ class RDOMaoObra(db.Model):
     horas_trabalhadas = db.Column(db.Float, nullable=False)
     
     # Relacionamentos
-    funcionario = db.relationship('Funcionario', backref='rdos_mao_obra')
+    funcionario = db.relationship('Funcionario', backref='rdos_mao_obra', overlaps="rdos_mao_obra")
 
 
 class RDOEquipamento(db.Model):
@@ -298,7 +298,7 @@ class Restaurante(db.Model):
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     
     # Relacionamentos
-    registros_alimentacao = db.relationship('RegistroAlimentacao', lazy=True)
+    registros_alimentacao = db.relationship('RegistroAlimentacao', lazy=True, overlaps="restaurante_ref")
     
     def __repr__(self):
         return f'<Restaurante {self.nome}>'
@@ -322,9 +322,9 @@ class UsoVeiculo(db.Model):
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     
     # Relacionamentos
-    veiculo = db.relationship('Veiculo', backref='usos')
-    funcionario = db.relationship('Funcionario', backref='usos_veiculo')
-    obra = db.relationship('Obra', backref='usos_veiculo')
+    veiculo = db.relationship('Veiculo', backref='usos', overlaps="usos")
+    funcionario = db.relationship('Funcionario', backref='usos_veiculo', overlaps="usos_veiculo")
+    obra = db.relationship('Obra', backref='usos_veiculo', overlaps="usos_veiculo")
     
     def __repr__(self):
         return f'<UsoVeiculo {self.veiculo_id} - {self.funcionario_id}>'
@@ -346,8 +346,8 @@ class CustoVeiculo(db.Model):
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     
     # Relacionamentos
-    veiculo = db.relationship('Veiculo', backref='custos_veiculo')
-    obra = db.relationship('Obra', backref='custos_veiculo')
+    veiculo = db.relationship('Veiculo', backref='custos_veiculo', overlaps="custos_veiculo")
+    obra = db.relationship('Obra', backref='custos_veiculo', overlaps="custos_veiculo")
     
     def __repr__(self):
         return f'<CustoVeiculo {self.veiculo_id} - {self.valor}>'
