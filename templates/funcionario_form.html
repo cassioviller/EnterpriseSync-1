@@ -1,0 +1,319 @@
+{% extends "base.html" %}
+
+{% block title %}{{ titulo }} - SIGE{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- Cabeçalho -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center">
+                <h2><i class="fas fa-user-plus me-2"></i>{{ titulo }}</h2>
+                <a href="{{ url_for('main.funcionarios') }}" class="btn btn-secondary">
+                    <i class="fas fa-arrow-left"></i> Voltar
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Formulário -->
+    <div class="row">
+        <div class="col-md-8">
+            <div class="card">
+                <div class="card-body">
+                    <form method="POST" enctype="multipart/form-data">
+                        {{ form.hidden_tag() }}
+                        
+                        <div class="row">
+                            <div class="col-md-8">
+                                <div class="row g-3">
+                                    <div class="col-md-6">
+                                        <label for="nome" class="form-label">Nome *</label>
+                                        {{ form.nome(class="form-control") }}
+                                        {% if form.nome.errors %}
+                                            <div class="text-danger small">
+                                                {% for error in form.nome.errors %}
+                                                    {{ error }}
+                                                {% endfor %}
+                                            </div>
+                                        {% endif %}
+                                    </div>
+                                    
+                                    <div class="col-md-6">
+                                        <label for="cpf" class="form-label">CPF *</label>
+                                        {{ form.cpf(class="form-control", placeholder="000.000.000-00") }}
+                                        {% if form.cpf.errors %}
+                                            <div class="text-danger small">
+                                                {% for error in form.cpf.errors %}
+                                                    {{ error }}
+                                                {% endfor %}
+                                            </div>
+                                        {% endif %}
+                                    </div>
+                                    
+                                    <div class="col-md-6">
+                                        <label for="rg" class="form-label">RG</label>
+                                        {{ form.rg(class="form-control") }}
+                                    </div>
+                                    
+                                    <div class="col-md-6">
+                                        <label for="data_nascimento" class="form-label">Data de Nascimento</label>
+                                        {{ form.data_nascimento(class="form-control") }}
+                                    </div>
+                                    
+                                    <div class="col-12">
+                                        <label for="endereco" class="form-label">Endereço</label>
+                                        {{ form.endereco(class="form-control", rows="2") }}
+                                    </div>
+                                    
+                                    <div class="col-md-6">
+                                        <label for="telefone" class="form-label">Telefone</label>
+                                        {{ form.telefone(class="form-control", placeholder="(xx) xxxxx-xxxx") }}
+                                    </div>
+                                    
+                                    <div class="col-md-6">
+                                        <label for="email" class="form-label">Email</label>
+                                        {{ form.email(class="form-control") }}
+                                        {% if form.email.errors %}
+                                            <div class="text-danger small">
+                                                {% for error in form.email.errors %}
+                                                    {{ error }}
+                                                {% endfor %}
+                                            </div>
+                                        {% endif %}
+                                    </div>
+                                    
+                                    <div class="col-md-6">
+                                        <label for="data_admissao" class="form-label">Data de Admissão *</label>
+                                        {{ form.data_admissao(class="form-control") }}
+                                        {% if form.data_admissao.errors %}
+                                            <div class="text-danger small">
+                                                {% for error in form.data_admissao.errors %}
+                                                    {{ error }}
+                                                {% endfor %}
+                                            </div>
+                                        {% endif %}
+                                    </div>
+                                    
+                                    <div class="col-md-6">
+                                        <label for="salario" class="form-label">Salário</label>
+                                        {{ form.salario(class="form-control", step="0.01", min="0") }}
+                                        {% if form.salario.errors %}
+                                            <div class="text-danger small">
+                                                {% for error in form.salario.errors %}
+                                                    {{ error }}
+                                                {% endfor %}
+                                            </div>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="col-md-4">
+                                <div class="mb-3">
+                                    <label for="foto" class="form-label">Foto do Funcionário</label>
+                                    {{ form.foto(class="form-control", accept="image/jpeg,image/png,image/jpg") }}
+                                    {% if form.foto.errors %}
+                                        <div class="text-danger small">
+                                            {% for error in form.foto.errors %}
+                                                {{ error }}
+                                            {% endfor %}
+                                        </div>
+                                    {% endif %}
+                                    <div id="foto-preview" class="mt-2" style="display: none;">
+                                        <img id="foto-img" src="" class="img-thumbnail" style="max-width: 200px; max-height: 200px;">
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <hr>
+                        
+                        <div class="row g-3">
+                            <div class="col-md-4">
+                                <label for="departamento_id" class="form-label">Departamento</label>
+                                {{ form.departamento_id(class="form-select") }}
+                                {% if form.departamento_id.errors %}
+                                    <div class="text-danger small">
+                                        {% for error in form.departamento_id.errors %}
+                                            {{ error }}
+                                        {% endfor %}
+                                    </div>
+                                {% endif %}
+                            </div>
+                            
+                            <div class="col-md-4">
+                                <label for="funcao_id" class="form-label">Função</label>
+                                {{ form.funcao_id(class="form-select") }}
+                                {% if form.funcao_id.errors %}
+                                    <div class="text-danger small">
+                                        {% for error in form.funcao_id.errors %}
+                                            {{ error }}
+                                        {% endfor %}
+                                    </div>
+                                {% endif %}
+                            </div>
+                            
+                            <div class="col-md-4">
+                                <label for="horario_trabalho_id" class="form-label">Horário de Trabalho</label>
+                                {{ form.horario_trabalho_id(class="form-select") }}
+                                {% if form.horario_trabalho_id.errors %}
+                                    <div class="text-danger small">
+                                        {% for error in form.horario_trabalho_id.errors %}
+                                            {{ error }}
+                                        {% endfor %}
+                                    </div>
+                                {% endif %}
+                            </div>
+                        </div>
+                        
+                        <div class="row mt-3">
+                            <div class="col-12">
+                                <div class="form-check">
+                                    {{ form.ativo(class="form-check-input") }}
+                                    <label class="form-check-label" for="ativo">
+                                        Funcionário Ativo
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="mt-4">
+                            <button type="submit" class="btn btn-primary">
+                                <i class="fas fa-save"></i> Salvar Funcionário
+                            </button>
+                            <a href="{{ url_for('main.funcionarios') }}" class="btn btn-secondary ms-2">
+                                Cancelar
+                            </a>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-4">
+            <div class="card">
+                <div class="card-header">
+                    <h6><i class="fas fa-info-circle me-2"></i>Informações</h6>
+                </div>
+                <div class="card-body">
+                    <h6>Campos Obrigatórios:</h6>
+                    <ul class="list-unstyled">
+                        <li><strong>Nome:</strong> Nome completo do funcionário</li>
+                        <li><strong>CPF:</strong> Documento único e válido</li>
+                        <li><strong>Data de Admissão:</strong> Data de início na empresa</li>
+                    </ul>
+                    
+                    <hr>
+                    
+                    <h6>Foto do Funcionário:</h6>
+                    <p class="small text-muted">
+                        Aceitos apenas arquivos JPG, JPEG e PNG.<br>
+                        Tamanho máximo recomendado: 2MB
+                    </p>
+                    
+                    <hr>
+                    
+                    <h6>Código do Funcionário:</h6>
+                    <p class="small text-muted">
+                        O código único será gerado automaticamente no formato F0001, F0002, etc.
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+// Preview da foto
+document.getElementById('foto').addEventListener('change', function(e) {
+    const file = e.target.files[0];
+    const preview = document.getElementById('foto-preview');
+    const img = document.getElementById('foto-img');
+    
+    if (file) {
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            img.src = e.target.result;
+            preview.style.display = 'block';
+        };
+        reader.readAsDataURL(file);
+    } else {
+        preview.style.display = 'none';
+    }
+});
+
+// Máscara de CPF
+document.getElementById('cpf').addEventListener('input', function(e) {
+    let value = e.target.value.replace(/\D/g, '');
+    value = value.replace(/(\d{3})(\d)/, '$1.$2');
+    value = value.replace(/(\d{3})(\d)/, '$1.$2');
+    value = value.replace(/(\d{3})(\d{1,2})$/, '$1-$2');
+    e.target.value = value;
+});
+
+// Máscara de telefone
+document.getElementById('telefone').addEventListener('input', function(e) {
+    let value = e.target.value.replace(/\D/g, '');
+    if (value.length <= 10) {
+        value = value.replace(/(\d{2})(\d)/, '($1) $2');
+        value = value.replace(/(\d{4})(\d)/, '$1-$2');
+    } else {
+        value = value.replace(/(\d{2})(\d)/, '($1) $2');
+        value = value.replace(/(\d{5})(\d)/, '$1-$2');
+    }
+    e.target.value = value;
+});
+
+// Validação de CPF em tempo real
+document.getElementById('cpf').addEventListener('blur', function(e) {
+    const cpf = e.target.value;
+    if (cpf && !validarCPF(cpf)) {
+        e.target.classList.add('is-invalid');
+        // Adicionar mensagem de erro se não existir
+        let errorDiv = e.target.parentNode.querySelector('.invalid-feedback');
+        if (!errorDiv) {
+            errorDiv = document.createElement('div');
+            errorDiv.className = 'invalid-feedback';
+            e.target.parentNode.appendChild(errorDiv);
+        }
+        errorDiv.textContent = 'CPF inválido';
+    } else {
+        e.target.classList.remove('is-invalid');
+        const errorDiv = e.target.parentNode.querySelector('.invalid-feedback');
+        if (errorDiv) {
+            errorDiv.remove();
+        }
+    }
+});
+
+function validarCPF(cpf) {
+    cpf = cpf.replace(/[^\d]+/g, '');
+    if (cpf.length !== 11 || !!cpf.match(/(\d)\1{10}/)) return false;
+    
+    let soma = 0;
+    let resto;
+    
+    for (let i = 1; i <= 9; i++) {
+        soma = soma + parseInt(cpf.substring(i-1, i)) * (11 - i);
+    }
+    resto = (soma * 10) % 11;
+    
+    if ((resto === 10) || (resto === 11)) resto = 0;
+    if (resto !== parseInt(cpf.substring(9, 10))) return false;
+    
+    soma = 0;
+    for (let i = 1; i <= 10; i++) {
+        soma = soma + parseInt(cpf.substring(i-1, i)) * (12 - i);
+    }
+    resto = (soma * 10) % 11;
+    
+    if ((resto === 10) || (resto === 11)) resto = 0;
+    if (resto !== parseInt(cpf.substring(10, 11))) return false;
+    
+    return true;
+}
+</script>
+{% endblock %}

@@ -106,48 +106,72 @@ def novo_funcionario():
     form = FuncionarioForm()
     form.departamento_id.choices = [(0, 'Selecione...')] + [(d.id, d.nome) for d in Departamento.query.all()]
     form.funcao_id.choices = [(0, 'Selecione...')] + [(f.id, f.nome) for f in Funcao.query.all()]
-    form.horario_trabalho_id.choices = [(0, 'Selecione...')] + [(h.id, h.nome) for h in HorarioTrabalho.query.all()]
+    form.horario_trabalho_id.choices = [(0, 'Selecione...')] + [(h.id, h.descricao) for h in HorarioTrabalho.query.all()]
     
     if form.validate_on_submit():
-        funcionario = Funcionario(
-            nome=form.nome.data,
-            cpf=form.cpf.data,
-            rg=form.rg.data,
-            data_nascimento=form.data_nascimento.data,
-            endereco=form.endereco.data,
-            telefone=form.telefone.data,
-            email=form.email.data,
-            data_admissao=form.data_admissao.data,
-            salario=form.salario.data or 0.0,
-            departamento_id=form.departamento_id.data if form.departamento_id.data > 0 else None,
-            funcao_id=form.funcao_id.data if form.funcao_id.data > 0 else None,
-            horario_trabalho_id=form.horario_trabalho_id.data if form.horario_trabalho_id.data > 0 else None,
-            ativo=form.ativo.data
-        )
-        db.session.add(funcionario)
-        db.session.flush()  # Para obter o ID antes do commit
-        
-        # Processar upload de foto
-        if form.foto.data:
-            foto = form.foto.data
-            if foto.filename:
-                # Criar diretório se não existir
-                import os
-                upload_dir = 'static/uploads/funcionarios'
-                if not os.path.exists(upload_dir):
-                    os.makedirs(upload_dir)
-                
-                # Salvar arquivo
-                filename = f"funcionario_{funcionario.id}_{foto.filename}"
-                foto_path = os.path.join(upload_dir, filename)
-                foto.save(foto_path)
-                funcionario.foto = f"uploads/funcionarios/{filename}"
-        
-        db.session.commit()
-        flash('Funcionário cadastrado com sucesso!', 'success')
-        return redirect(url_for('main.funcionarios'))
+        try:
+            # Validar CPF
+            from utils import validar_cpf, gerar_codigo_funcionario, salvar_foto_funcionario
+            if not validar_cpf(form.cpf.data):
+                flash('CPF inválido. Verifique o número informado.', 'error')
+                return render_template('funcionario_form.html', form=form, titulo='Novo Funcionário',
+                                     departamentos=Departamento.query.all(),
+                                     funcoes=Funcao.query.all(),
+                                     horarios=HorarioTrabalho.query.all())
+            
+            # Verificar se CPF já existe
+            cpf_existe = Funcionario.query.filter_by(cpf=form.cpf.data).first()
+            if cpf_existe:
+                flash('CPF já cadastrado para outro funcionário.', 'error')
+                return render_template('funcionario_form.html', form=form, titulo='Novo Funcionário',
+                                     departamentos=Departamento.query.all(),
+                                     funcoes=Funcao.query.all(),
+                                     horarios=HorarioTrabalho.query.all())
+            
+            funcionario = Funcionario(
+                nome=form.nome.data,
+                cpf=form.cpf.data,
+                rg=form.rg.data,
+                data_nascimento=form.data_nascimento.data,
+                endereco=form.endereco.data,
+                telefone=form.telefone.data,
+                email=form.email.data,
+                data_admissao=form.data_admissao.data,
+                salario=form.salario.data or 0.0,
+                departamento_id=form.departamento_id.data if form.departamento_id.data > 0 else None,
+                funcao_id=form.funcao_id.data if form.funcao_id.data > 0 else None,
+                horario_trabalho_id=form.horario_trabalho_id.data if form.horario_trabalho_id.data > 0 else None,
+                ativo=form.ativo.data
+            )
+            
+            # Gerar código único
+            funcionario.codigo = gerar_codigo_funcionario()
+            
+            db.session.add(funcionario)
+            db.session.flush()  # Para obter o ID antes do commit
+            
+            # Processar upload de foto
+            if form.foto.data:
+                foto_path = salvar_foto_funcionario(form.foto.data, funcionario.codigo)
+                if foto_path:
+                    funcionario.foto = foto_path
+            
+            db.session.commit()
+            flash('Funcionário cadastrado com sucesso!', 'success')
+            return redirect(url_for('main.funcionarios'))
+            
+        except Exception as e:
+            db.session.rollback()
+            flash(f'Erro ao cadastrar funcionário: {str(e)}', 'error')
+            return render_template('funcionario_form.html', form=form, titulo='Novo Funcionário',
+                                 departamentos=Departamento.query.all(),
+                                 funcoes=Funcao.query.all(),
+                                 horarios=HorarioTrabalho.query.all())
     
-    return render_template('funcionarios.html', form=form, funcionarios=Funcionario.query.all())
+    return render_template('funcionario_form.html', form=form, titulo='Novo Funcionário',
+                         departamentos=Departamento.query.all(),
+                         funcoes=Funcao.query.all(),
+                         horarios=HorarioTrabalho.query.all())
 
 @main_bp.route('/funcionarios/<int:id>/editar', methods=['GET', 'POST'])
 @login_required
@@ -191,17 +215,10 @@ def editar_funcionario(id):
             if 'foto' in request.files:
                 foto = request.files['foto']
                 if foto and foto.filename:
-                    # Criar diretório se não existir
-                    import os
-                    upload_dir = 'static/uploads/funcionarios'
-                    if not os.path.exists(upload_dir):
-                        os.makedirs(upload_dir)
-                    
-                    # Salvar arquivo
-                    filename = f"funcionario_{funcionario.id}_{foto.filename}"
-                    foto_path = os.path.join(upload_dir, filename)
-                    foto.save(foto_path)
-                    funcionario.foto = f"uploads/funcionarios/{filename}"
+                    from utils import salvar_foto_funcionario
+                    foto_path = salvar_foto_funcionario(foto, funcionario.codigo)
+                    if foto_path:
+                        funcionario.foto = foto_path
             
             db.session.commit()
             flash('Funcionário atualizado com sucesso!', 'success')

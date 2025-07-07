@@ -3,6 +3,10 @@ from models import CustoObra, RegistroPonto, RegistroAlimentacao, CustoVeiculo, 
 from sqlalchemy import func
 from app import db
 import calendar
+import os
+import re
+from werkzeug.utils import secure_filename
+from flask import current_app
 
 def calcular_horas_trabalhadas(hora_entrada, hora_saida, hora_almoco_saida=None, hora_almoco_retorno=None):
     """
@@ -43,6 +47,93 @@ def calcular_horas_trabalhadas(hora_entrada, hora_saida, hora_almoco_saida=None,
         'total': round(horas_trabalhadas, 2),
         'extras': round(horas_extras, 2)
     }
+
+def gerar_codigo_funcionario():
+    """Gera código único para funcionário no formato F0001, F0002, etc."""
+    ultimo_funcionario = Funcionario.query.filter(
+        Funcionario.codigo.isnot(None)
+    ).order_by(Funcionario.codigo.desc()).first()
+    
+    if ultimo_funcionario and ultimo_funcionario.codigo:
+        # Extrair número do último código
+        numero_str = ultimo_funcionario.codigo[1:]  # Remove 'F'
+        try:
+            ultimo_numero = int(numero_str)
+            novo_numero = ultimo_numero + 1
+        except (ValueError, TypeError):
+            novo_numero = 1
+    else:
+        novo_numero = 1
+    
+    return f"F{novo_numero:04d}"
+
+def salvar_foto_funcionario(foto, codigo):
+    """Salva foto do funcionário e retorna o nome do arquivo"""
+    if not foto:
+        return None
+    
+    # Criar diretório se não existe
+    upload_dir = os.path.join(current_app.static_folder, 'uploads', 'funcionarios')
+    os.makedirs(upload_dir, exist_ok=True)
+    
+    # Nome seguro do arquivo
+    filename = secure_filename(foto.filename)
+    extensao = filename.rsplit('.', 1)[1].lower() if '.' in filename else 'jpg'
+    
+    # Nome final: codigo_funcionario.extensao
+    nome_arquivo = f"{codigo}.{extensao}"
+    caminho_completo = os.path.join(upload_dir, nome_arquivo)
+    
+    # Salvar arquivo
+    foto.save(caminho_completo)
+    
+    # Retornar caminho relativo para salvar no banco
+    return f"uploads/funcionarios/{nome_arquivo}"
+
+def validar_cpf(cpf):
+    """Valida CPF brasileiro"""
+    if not cpf:
+        return False
+    
+    # Remove caracteres não numéricos
+    cpf = re.sub(r'[^0-9]', '', cpf)
+    
+    # Verifica se tem 11 dígitos
+    if len(cpf) != 11:
+        return False
+    
+    # Verifica se não é uma sequência de números iguais
+    if cpf == cpf[0] * 11:
+        return False
+    
+    # Algoritmo de validação do CPF
+    def calcular_digito(cpf_parcial, peso_inicial):
+        soma = sum(int(cpf_parcial[i]) * (peso_inicial - i) for i in range(len(cpf_parcial)))
+        resto = soma % 11
+        return 0 if resto < 2 else 11 - resto
+    
+    # Verifica primeiro dígito
+    if int(cpf[9]) != calcular_digito(cpf[:9], 10):
+        return False
+    
+    # Verifica segundo dígito
+    if int(cpf[10]) != calcular_digito(cpf[:10], 11):
+        return False
+    
+    return True
+
+def formatar_cpf(cpf):
+    """Formata CPF no padrão XXX.XXX.XXX-XX"""
+    if not cpf:
+        return ""
+    
+    # Remove caracteres não numéricos
+    cpf = re.sub(r'[^0-9]', '', cpf)
+    
+    if len(cpf) == 11:
+        return f"{cpf[:3]}.{cpf[3:6]}.{cpf[6:9]}-{cpf[9:]}"
+    
+    return cpf
 
 def calcular_custo_real_obra(obra_id, data_inicio=None, data_fim=None):
     """
