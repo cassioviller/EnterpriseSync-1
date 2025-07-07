@@ -98,12 +98,12 @@
                                 title="Editar">
                             <i class="fas fa-edit"></i>
                         </button>
-                        <a href="{{ url_for('main.novo_rdo', obra_id=obra.id) }}" 
+                        <a href="{{ url_for('main.obra_detalhes', id=obra.id) }}" 
                            class="btn btn-outline-success"
                            onclick="event.stopPropagation()"
                            data-bs-toggle="tooltip" 
-                           title="Novo RDO">
-                            <i class="fas fa-plus"></i>
+                           title="Ver Detalhes">
+                            <i class="fas fa-eye"></i>
                         </a>
                         <button class="btn btn-outline-danger" 
                                 onclick="event.stopPropagation(); excluirObra({{ obra.id }})"
