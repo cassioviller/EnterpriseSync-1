@@ -1772,3 +1772,71 @@ def exportar_relatorio(tipo):
         return gerar_relatorio_funcional(tipo, formato, filtros)
     except Exception as e:
         return jsonify({'erro': str(e)}), 500
+
+@main_bp.route('/funcionarios/<int:funcionario_id>/ocorrencias/nova', methods=['POST'])
+@login_required
+def nova_ocorrencia(funcionario_id):
+    """Cria nova ocorrência para funcionário"""
+    funcionario = Funcionario.query.get_or_404(funcionario_id)
+    
+    try:
+        # Criar ocorrência baseada no modelo existente
+        ocorrencia = Ocorrencia(
+            funcionario_id=funcionario_id,
+            tipo=request.form.get('tipo'),
+            data_inicio=datetime.strptime(request.form.get('data_inicio'), '%Y-%m-%d').date(),
+            data_fim=datetime.strptime(request.form.get('data_fim'), '%Y-%m-%d').date() if request.form.get('data_fim') else None,
+            status=request.form.get('status', 'Pendente'),
+            descricao=request.form.get('descricao', '')
+        )
+        
+        db.session.add(ocorrencia)
+        db.session.commit()
+        
+        flash('Ocorrência registrada com sucesso!', 'success')
+        
+    except Exception as e:
+        db.session.rollback()
+        flash(f'Erro ao registrar ocorrência: {str(e)}', 'error')
+        
+    return redirect(url_for('main.funcionario_perfil', id=funcionario_id))
+
+@main_bp.route('/funcionarios/ocorrencias/<int:ocorrencia_id>/editar', methods=['POST'])
+@login_required
+def editar_ocorrencia(ocorrencia_id):
+    """Edita ocorrência existente"""
+    ocorrencia = Ocorrencia.query.get_or_404(ocorrencia_id)
+    
+    try:
+        ocorrencia.tipo = request.form.get('tipo')
+        ocorrencia.data_inicio = datetime.strptime(request.form.get('data_inicio'), '%Y-%m-%d').date()
+        ocorrencia.data_fim = datetime.strptime(request.form.get('data_fim'), '%Y-%m-%d').date() if request.form.get('data_fim') else None
+        ocorrencia.status = request.form.get('status')
+        ocorrencia.descricao = request.form.get('descricao', '')
+        
+        db.session.commit()
+        flash('Ocorrência atualizada com sucesso!', 'success')
+        
+    except Exception as e:
+        db.session.rollback()
+        flash(f'Erro ao atualizar ocorrência: {str(e)}', 'error')
+        
+    return redirect(url_for('main.funcionario_perfil', id=ocorrencia.funcionario_id))
+
+@main_bp.route('/funcionarios/ocorrencias/<int:ocorrencia_id>/excluir', methods=['POST'])
+@login_required
+def excluir_ocorrencia(ocorrencia_id):
+    """Exclui ocorrência"""
+    ocorrencia = Ocorrencia.query.get_or_404(ocorrencia_id)
+    funcionario_id = ocorrencia.funcionario_id
+    
+    try:
+        db.session.delete(ocorrencia)
+        db.session.commit()
+        flash('Ocorrência excluída com sucesso!', 'success')
+        
+    except Exception as e:
+        db.session.rollback()
+        flash(f'Erro ao excluir ocorrência: {str(e)}', 'error')
+        
+    return redirect(url_for('main.funcionario_perfil', id=funcionario_id))

@@ -1121,5 +1121,64 @@ function renderCharts() {
         }
     });
 }
+
+// Funções para modal de ocorrência
+function editarOcorrencia(ocorrenciaId) {
+    console.log('Editando ocorrência:', ocorrenciaId);
+    alert('Funcionalidade de edição será implementada em breve.');
+}
+
+function excluirOcorrencia(ocorrenciaId) {
+    if (confirm('Tem certeza que deseja excluir esta ocorrência?')) {
+        const form = document.createElement('form');
+        form.method = 'POST';
+        form.action = '/funcionarios/ocorrencias/' + ocorrenciaId + '/excluir';
+        document.body.appendChild(form);
+        form.submit();
+    }
+}
+
+// Validação do formulário de ocorrência
+document.addEventListener('DOMContentLoaded', function() {
+    const ocorrenciaForm = document.getElementById('ocorrenciaForm');
+    if (ocorrenciaForm) {
+        ocorrenciaForm.addEventListener('submit', function(e) {
+            const tipo = document.getElementById('tipo_ocorrencia').value;
+            const dataInicio = document.getElementById('data_inicio_ocorrencia').value;
+            
+            if (!tipo) {
+                e.preventDefault();
+                alert('Por favor, selecione o tipo de ocorrência.');
+                return;
+            }
+            
+            if (!dataInicio) {
+                e.preventDefault();
+                alert('Por favor, informe a data de início.');
+                return;
+            }
+            
+            const dataFim = document.getElementById('data_fim_ocorrencia').value;
+            if (dataFim && dataFim < dataInicio) {
+                e.preventDefault();
+                alert('A data de fim deve ser posterior à data de início.');
+                return;
+            }
+        });
+    }
+    
+    // Limpar formulário ao abrir modal
+    const ocorrenciaModal = document.getElementById('ocorrenciaModal');
+    if (ocorrenciaModal) {
+        ocorrenciaModal.addEventListener('show.bs.modal', function() {
+            const form = this.querySelector('form');
+            if (form) {
+                form.reset();
+                const hoje = new Date().toISOString().split('T')[0];
+                document.getElementById('data_inicio_ocorrencia').value = hoje;
+            }
+        });
+    }
+});
 </script>
 {% endblock %}

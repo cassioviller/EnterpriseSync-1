@@ -1,0 +1,591 @@
+
+
+
+## Prompt para Replit Agent: Implementar Modal de Ocorrências em Funcionário
+
+**Contexto do Projeto:**
+O SIGE v3.0 é um Sistema Integrado de Gestão Empresarial desenvolvido com Flask, SQLAlchemy, PostgreSQL, Bootstrap 5 e Docker/EasyPanel. No módulo de funcionários, o modal de ocorrências (`templates/funcionario_perfil.html`) está incompleto, apresentando apenas uma estrutura parcial e sem integração completa com o backend.
+
+**Papel do Replit Agent:**
+Como um Engenheiro de Frontend e Backend, sua tarefa é finalizar a implementação do modal de ocorrências para funcionários, garantindo sua funcionalidade completa e integração com o sistema.
+
+**Tarefa Específica:**
+Completar a implementação do "Modal de Ocorrências em Funcionário" em `templates/funcionario_perfil.html`. Isso inclui:
+1.  **Finalizar a estrutura do formulário** dentro do modal, assegurando que todos os campos necessários para registrar uma ocorrência estejam presentes (ex: tipo de ocorrência, descrição, data, funcionário relacionado, status).
+2.  **Implementar a lógica de frontend (JavaScript/jQuery)** para controlar a abertura e fechamento do modal, capturar os dados do formulário e enviá-los para o backend via requisição assíncrona (AJAX).
+3.  **Criar ou ajustar a rota de backend (Flask)** para receber os dados da ocorrência, realizar a validação necessária e persistir a nova ocorrência no banco de dados PostgreSQL usando SQLAlchemy.
+4.  **Associar a ocorrência ao funcionário** correto no banco de dados, garantindo a integridade referencial.
+5.  **Exibir as ocorrências registradas** para o funcionário em questão na página de perfil, atualizando a lista de ocorrências dinamicamente após o registro de uma nova.
+
+**Critérios de Aceitação:**
+*   O modal de ocorrências deve abrir e fechar corretamente na página de perfil do funcionário.
+*   Deve ser possível preencher e submeter uma nova ocorrência através do formulário do modal.
+*   A ocorrência submetida deve ser salva no banco de dados e associada ao funcionário correto.
+*   As ocorrências existentes devem ser exibidas de forma clara na página de perfil do funcionário, e a lista deve ser atualizada após o registro de uma nova ocorrência.
+*   O código deve seguir as melhores práticas de desenvolvimento com Flask, SQLAlchemy, JavaScript e Bootstrap 5.
+*   Não deve haver erros no console do navegador ou nos logs do servidor ao interagir com o modal de ocorrências.
+
+**Exemplo de Uso:**
+Para validar a implementação, execute o servidor Flask e siga estes passos:
+1.  Acesse o perfil de um funcionário (ex: `http://localhost:5000/funcionarios/1`).
+2.  Clique no botão para abrir o modal de ocorrências.
+3.  Preencha o formulário com os dados da ocorrência e clique em "Salvar".
+4.  Verifique se a nova ocorrência aparece na lista de ocorrências do funcionário e se os dados foram persistidos no banco de dados.
+
+**Comandos para Teste (no ambiente Replit):**
+```bash
+# Para iniciar o servidor Flask:
+python app.py
+```
+
+**Validação:**
+Teste a abertura e o fechamento do modal. Preencha o formulário com dados válidos e inválidos para verificar as validações. Submeta uma ocorrência e confirme que ela é salva no banco de dados e exibida corretamente na interface. Verifique os logs do servidor para quaisquer erros.
+
+
+
+## Prompt para Replit Agent: Implementar KPIs de Alta Prioridade
+
+**Contexto do Projeto:**
+O SIGE v3.0 é um Sistema Integrado de Gestão Empresarial desenvolvido com Flask, SQLAlchemy, PostgreSQL, Bootstrap 5 e Docker/EasyPanel. O sistema de KPIs está bem estruturado, mas alguns KPIs de alta prioridade, como "Taxa de Pontualidade" e "Eficiência de Trabalho", ainda não estão completamente implementados ou exibidos no dashboard principal.
+
+**Papel do Replit Agent:**
+Como um Engenheiro de Backend e Analista de Dados, sua tarefa é implementar e exibir os KPIs de alta prioridade, garantindo que os cálculos estejam corretos e que os dados sejam apresentados de forma clara na interface do usuário.
+
+**Tarefa Específica:**
+Implementar os seguintes KPIs de alta prioridade, conforme descrito no `pasted_content.txt`:
+1.  **Taxa de Pontualidade**: Calcular o percentual de dias sem atraso para cada funcionário ou para a equipe como um todo.
+2.  **Eficiência de Trabalho**: Calcular a relação entre horas produtivas e horas pagas para cada funcionário.
+3.  **Custo por Hora Produtiva**: Calcular o custo total dividido pelas horas efetivamente trabalhadas.
+
+Para cada KPI, você deve:
+*   **Criar ou ajustar a lógica de cálculo** no backend (Python/Flask), utilizando os dados existentes no banco de dados PostgreSQL via SQLAlchemy. Considere o arquivo `relatorio_kpis_funcionarios.py` como ponto de partida ou referência.
+*   **Integrar os resultados dos cálculos** com o módulo de KPIs existente ou criar novas rotas para expor esses dados.
+*   **Exibir os resultados** desses KPIs em dashboards ou relatórios relevantes no frontend, utilizando os componentes do Bootstrap 5 para a apresentação visual (ex: cartões de KPI, gráficos simples).
+
+**Critérios de Aceitação:**
+*   Os KPIs de Taxa de Pontualidade, Eficiência de Trabalho e Custo por Hora Produtiva devem ser calculados com precisão com base nos dados do sistema.
+*   Os valores dos KPIs devem ser exibidos em uma seção apropriada do dashboard principal ou em relatórios específicos, de forma compreensível para o usuário.
+*   A apresentação visual dos KPIs deve ser clara e auxiliar na interpretação dos dados.
+*   O código deve seguir as melhores práticas de desenvolvimento com Flask, SQLAlchemy e Python para análise de dados.
+*   Não deve haver erros no console do navegador ou nos logs do servidor ao acessar as páginas que exibem os KPIs.
+
+**Exemplo de Uso:**
+Para validar a implementação, execute o servidor Flask e siga estes passos:
+1.  Acesse o dashboard principal ou a página de relatórios de KPIs (ex: `http://localhost:5000/dashboard` ou `http://localhost:5000/kpis`).
+2.  Verifique se os valores da Taxa de Pontualidade, Eficiência de Trabalho e Custo por Hora Produtiva estão sendo exibidos e se parecem consistentes com os dados de entrada.
+
+**Comandos para Teste (no ambiente Replit):**
+```bash
+# Para iniciar o servidor Flask:
+python app.py
+```
+
+**Validação:**
+Verifique os cálculos dos KPIs manualmente com alguns dados de teste e compare com os valores exibidos no sistema. Acesse as páginas onde os KPIs são exibidos e garanta que os dados estão corretos e formatados adequadamente. Teste com diferentes cenários de dados para garantir a robustez dos cálculos.
+
+
+
+## Prompt para Replit Agent: Implementar Sistema de Aprovação de Ocorrências
+
+**Contexto do Projeto:**
+O SIGE v3.0 é um Sistema Integrado de Gestão Empresarial desenvolvido com Flask, SQLAlchemy, PostgreSQL, Bootstrap 5 e Docker/EasyPanel. Atualmente, as ocorrências possuem um status, mas não há um workflow de aprovação hierárquica implementado, o que impede um controle mais granular e formalizado.
+
+**Papel do Replit Agent:**
+Como um Engenheiro de Backend, sua tarefa é desenvolver um sistema de aprovação para as ocorrências, permitindo que diferentes níveis de usuários possam aprovar ou rejeitar ocorrências, seguindo um fluxo predefinido.
+
+**Tarefa Específica:**
+Implementar um sistema de aprovação hierárquica para as ocorrências. Isso inclui:
+1.  **Definir um modelo de dados** para o workflow de aprovação. Este modelo deve incluir campos como `status_aprovacao` (ex: Pendente, Em Revisão, Aprovado, Rejeitado), `aprovador_id`, `data_aprovacao`, `comentarios_aprovacao` e `historico_aprovacao`.
+2.  **Modificar o modelo de Ocorrências** existente para incluir uma referência ao status de aprovação e ao histórico de aprovações.
+3.  **Criar rotas de backend (Flask)** que permitam a usuários com permissão específica (ex: gerentes, diretores) alterar o status de uma ocorrência (aprovar/rejeitar) e adicionar comentários relevantes.
+4.  **Implementar a lógica de negócio** para definir a hierarquia de aprovação. Por exemplo, uma ocorrência pode precisar da aprovação de um gerente antes de ser encaminhada para um diretor.
+5.  **Atualizar a interface do usuário (frontend)** para exibir o status de aprovação de cada ocorrência e, para usuários autorizados, apresentar botões ou controles para interagir com o workflow de aprovação (ex: "Aprovar", "Rejeitar", "Enviar para Revisão").
+
+**Critérios de Aceitação:**
+*   Ocorrências devem ter um status de aprovação claro e atualizável (ex: Pendente, Aprovado, Rejeitado).
+*   Apenas usuários com as permissões corretas devem ser capazes de alterar o status de aprovação de uma ocorrência.
+*   O workflow de aprovação deve seguir a hierarquia definida, impedindo aprovações fora da ordem ou por usuários não autorizados.
+*   O histórico de aprovações de cada ocorrência deve ser registrado e consultável.
+*   O código deve seguir as melhores práticas de desenvolvimento com Flask, SQLAlchemy e Bootstrap 5.
+*   Não deve haver erros no console do navegador ou nos logs do servidor ao interagir com o sistema de aprovação.
+
+**Exemplo de Uso:**
+Para validar a implementação, execute o servidor Flask e siga estes passos:
+1.  Crie uma nova ocorrência no sistema.
+2.  Faça login como um usuário com permissão de aprovação (ex: um gerente).
+3.  Acesse a ocorrência recém-criada e utilize os botões para "Aprovar" ou "Rejeitar" a ocorrência.
+4.  Verifique se o status da ocorrência é atualizado e se o histórico de aprovação registra a ação.
+5.  Tente realizar uma aprovação com um usuário sem permissão e verifique se a ação é bloqueada.
+
+**Comandos para Teste (no ambiente Replit):**
+```bash
+# Para iniciar o servidor Flask:
+python app.py
+```
+
+**Validação:**
+Teste o fluxo de aprovação com diferentes perfis de usuário para garantir que as permissões e a hierarquia estão funcionando corretamente. Verifique se o status das ocorrências é atualizado no banco de dados e se o histórico de aprovações é registrado de forma precisa.
+
+
+
+## Prompt para Replit Agent: Implementar Controle de Acesso e Permissões
+
+**Contexto do Projeto:**
+O SIGE v3.0 é um Sistema Integrado de Gestão Empresarial desenvolvido com Flask, SQLAlchemy, PostgreSQL, Bootstrap 5 e Docker/EasyPanel. Atualmente, o sistema não possui um controle de acesso baseado em níveis de permissão (roles), o que é fundamental para a segurança e a segregação de funções.
+
+**Papel do Replit Agent:**
+Como um Engenheiro de Backend e Segurança, sua tarefa é implementar um sistema robusto de controle de acesso baseado em roles (RBAC - Role-Based Access Control) e permissões por módulo, garantindo que apenas usuários autorizados possam acessar determinadas funcionalidades ou dados.
+
+**Tarefa Específica:**
+Implementar um sistema de controle de acesso baseado em roles (RBAC) para o SIGE v3.0. Isso inclui:
+1.  **Definir modelos de dados** para `Roles` (perfis de usuário, ex: Administrador, Gerente, Funcionário) e `Permissões` (ações específicas ou acesso a módulos, ex: `can_view_reports`, `can_edit_employees`).
+2.  **Associar usuários a roles** e roles a permissões no banco de dados PostgreSQL via SQLAlchemy. Isso pode envolver a criação de tabelas de relacionamento (muitos-para-muitos).
+3.  **Implementar a lógica de verificação de permissões** no backend (Flask) para proteger rotas e funcionalidades específicas. Utilize decoradores (ex: `@login_required`, `@permission_required`) para controlar o acesso a views e endpoints da API.
+4.  **Atualizar a interface do usuário (frontend)** para exibir ou ocultar elementos (botões, links, seções do menu) com base nas permissões do usuário logado, garantindo que funcionalidades não autorizadas não sejam sequer visíveis.
+5.  **Opcional, mas desejável**: Criar uma interface de administração simples para gerenciar roles e permissões, permitindo que administradores atribuam roles a usuários e definam permissões para cada role.
+
+**Critérios de Aceitação:**
+*   Usuários com diferentes roles devem ter acesso a diferentes conjuntos de funcionalidades e dados, conforme as permissões definidas.
+*   Tentativas de acesso não autorizado a rotas protegidas devem ser bloqueadas e, idealmente, redirecionar o usuário para uma página de erro ou para a página de login, com uma mensagem informativa.
+*   O sistema deve ser flexível o suficiente para permitir a adição de novas roles e permissões no futuro, sem a necessidade de grandes refatorações.
+*   O código deve seguir as melhores práticas de segurança em Flask e SQLAlchemy, prevenindo vulnerabilidades de acesso.
+*   Não deve haver erros no console do navegador ou nos logs do servidor ao testar as permissões.
+
+**Exemplo de Uso:**
+Para validar a implementação, execute o servidor Flask e siga estes passos:
+1.  Crie um usuário com a role "Administrador" e outro com a role "Funcionário Comum".
+2.  Faça login como "Administrador" e verifique se todas as funcionalidades estão acessíveis.
+3.  Faça login como "Funcionário Comum" e verifique se ele tem acesso apenas às funcionalidades permitidas para seu perfil (ex: pode ver seu próprio perfil, mas não pode editar outros funcionários ou acessar relatórios restritos).
+4.  Tente acessar uma rota restrita diretamente pela URL com o usuário "Funcionário Comum" e confirme que o acesso é negado.
+
+**Comandos para Teste (no ambiente Replit):**
+```bash
+# Para iniciar o servidor Flask:
+python app.py
+```
+
+**Validação:**
+Crie diferentes usuários com diferentes roles e teste o acesso a diversas partes do sistema para garantir que as permissões estão sendo aplicadas corretamente. Verifique os logs do servidor para quaisquer tentativas de acesso não autorizado e confirme que elas são devidamente registradas e tratadas.
+
+
+
+## Prompt para Replit Agent: Implementar Gestão Financeira Avançada
+
+**Contexto do Projeto:**
+O SIGE v3.0 é um Sistema Integrado de Gestão Empresarial desenvolvido com Flask, SQLAlchemy, PostgreSQL, Bootstrap 5 e Docker/EasyPanel. Atualmente, o sistema possui apenas funcionalidades básicas de controle de custos. É necessário expandir o módulo financeiro para incluir controle de receitas, fluxo de caixa, orçamentos vs. realizados e centros de custo, para uma gestão financeira mais completa.
+
+**Papel do Replit Agent:**
+Como um Engenheiro de Backend e Especialista em Sistemas Financeiros, sua tarefa é expandir o módulo financeiro do SIGE v3.0 para incluir funcionalidades avançadas de gestão financeira.
+
+**Tarefa Específica:**
+Implementar as seguintes funcionalidades de gestão financeira avançada:
+1.  **Controle de Receitas**: Criar um módulo completo para registrar, visualizar, editar e gerenciar receitas, incluindo operações CRUD (Create, Read, Update, Delete).
+2.  **Fluxo de Caixa**: Desenvolver uma funcionalidade para visualizar o fluxo de caixa (entradas e saídas) de forma consolidada e detalhada, permitindo filtros por período (dia, mês, ano).
+3.  **Orçamentos vs. Realizados**: Implementar a capacidade de definir orçamentos para projetos ou categorias e, posteriormente, comparar esses orçamentos com os valores reais (realizados), gerando relatórios de desvio.
+4.  **Centros de Custo**: Adicionar a funcionalidade de associar despesas e receitas a centros de custo específicos, permitindo uma análise gerencial mais granular.
+
+Para cada funcionalidade:
+*   **Definir ou ajustar modelos de dados** no PostgreSQL via SQLAlchemy para suportar as novas entidades e relacionamentos (ex: `Receita`, `CentroCusto`, `Orcamento`).
+*   **Criar rotas de backend (Flask)** para as operações CRUD e para a geração de dados para os relatórios financeiros (fluxo de caixa, orçamentos).
+*   **Desenvolver interfaces de usuário (frontend)** com Bootstrap 5 para a entrada de dados (formulários de receitas/despesas), visualização de relatórios (tabelas, gráficos) e configuração de orçamentos e centros de custo.
+
+**Critérios de Aceitação:**
+*   Deve ser possível registrar receitas e despesas, associando-as a centros de custo.
+*   O fluxo de caixa deve ser visualizável de forma clara e precisa para diferentes períodos.
+*   Relatórios de orçamento vs. realizado devem mostrar as diferenças e percentuais de desvio de forma compreensível.
+*   A associação de transações a centros de custo deve funcionar corretamente e ser refletida nos relatórios.
+*   O código deve seguir as melhores práticas de desenvolvimento com Flask, SQLAlchemy e Bootstrap 5.
+*   Não deve haver erros no console do navegador ou nos logs do servidor ao interagir com o módulo financeiro.
+
+**Exemplo de Uso:**
+Para validar a implementação, execute o servidor Flask e siga estes passos:
+1.  Registre uma nova receita e uma nova despesa, associando-as a diferentes centros de custo.
+2.  Acesse o relatório de fluxo de caixa e filtre por um mês específico para ver as entradas e saídas.
+3.  Crie um orçamento para um projeto e, após registrar algumas despesas relacionadas, acesse o relatório de orçamento vs. realizado para ver a comparação.
+
+**Comandos para Teste (no ambiente Replit):**
+```bash
+# Para iniciar o servidor Flask:
+python app.py
+```
+
+**Validação:**
+Teste o registro de receitas e despesas, a visualização do fluxo de caixa e a criação/comparação de orçamentos. Verifique a consistência dos dados no banco de dados e a precisão dos relatórios financeiros gerados. Teste com diferentes cenários de dados para garantir a robustez dos cálculos e a correta categorização por centros de custo.
+
+
+
+## Prompt para Replit Agent: Implementar Integrações Externas (APIs)
+
+**Contexto do Projeto:**
+O SIGE v3.0 é um Sistema Integrado de Gestão Empresarial desenvolvido com Flask, SQLAlchemy, PostgreSQL, Bootstrap 5 e Docker/EasyPanel. Atualmente, o sistema opera de forma autônoma e não possui integrações com APIs externas para funcionalidades comuns como validação de CEP, CPF/CNPJ ou sistemas de pagamento, o que limita sua capacidade de automação e validação de dados.
+
+**Papel do Replit Agent:**
+Como um Engenheiro de Backend, sua tarefa é implementar integrações com APIs externas para aprimorar a funcionalidade e a validação de dados no SIGE v3.0.
+
+**Tarefa Específica:**
+Implementar integrações com APIs externas para as seguintes funcionalidades:
+1.  **Validação de CEP**: Integrar com uma API de CEP (ex: ViaCEP, Correios) para permitir o preenchimento automático de endereços em formulários, a partir da inserção do CEP.
+2.  **Validação de CPF/CNPJ**: Integrar com uma API de validação de documentos (ex: ReceitaWS para CNPJ, ou similar para CPF) para verificar a validade e, se possível, obter dados cadastrais de pessoas físicas e jurídicas.
+3.  **Integração com Sistemas de Pagamento**: Preparar a base para futura integração com um gateway de pagamento (ex: Stripe, PagSeguro, Mercado Pago), focando inicialmente na estrutura de comunicação e nos modelos de dados necessários para transações.
+
+Para cada integração, você deve:
+*   **Identificar e selecionar uma API** pública e gratuita (ou com plano gratuito para testes) que atenda aos requisitos da funcionalidade.
+*   **Criar rotas de backend (Flask)** que consumam essas APIs, tratando as requisições e respostas de forma segura e eficiente.
+*   **Atualizar as interfaces de usuário (frontend)** com Bootstrap 5 para acionar as chamadas de API (ex: um evento `onblur` no campo CEP para preencher o endereço automaticamente) e exibir os resultados ou mensagens de erro.
+*   **Implementar tratamento de erros** robusto para falhas nas chamadas de API (ex: API indisponível, dados inválidos), fornecendo feedback adequado ao usuário.
+
+**Critérios de Aceitação:**
+*   Ao digitar um CEP válido em um formulário, os campos de endereço (rua, bairro, cidade, estado) devem ser preenchidos automaticamente e corretamente.
+*   Ao informar um CPF/CNPJ, o sistema deve ser capaz de validar o documento através da API externa e, se aplicável, exibir informações adicionais.
+*   A estrutura para integração com sistemas de pagamento deve estar pronta para expansão futura, com modelos de dados e rotas iniciais definidos.
+*   O código deve seguir as melhores práticas de desenvolvimento com Flask para consumo de APIs externas, incluindo o uso de variáveis de ambiente para chaves de API.
+*   Não deve haver erros no console do navegador ou nos logs do servidor ao interagir com as integrações.
+
+**Exemplo de Uso:**
+Para validar a implementação, execute o servidor Flask e siga estes passos:
+1.  Acesse um formulário de cadastro (ex: de funcionário ou cliente).
+2.  No campo de CEP, digite um CEP válido (ex: `01001-000`) e verifique se os campos de endereço são preenchidos automaticamente.
+3.  Em um formulário de cadastro de pessoa jurídica, digite um CNPJ válido e um inválido, verificando se o sistema indica a validade ou não.
+
+**Comandos para Teste (no ambiente Replit):**
+```bash
+# Para instalar bibliotecas Python necessárias (ex: requests para chamadas HTTP):
+pip install requests
+# Para iniciar o servidor Flask:
+python app.py
+```
+
+**Validação:**
+Teste as integrações com dados válidos e inválidos (CEPs, CPFs/CNPJs) para garantir que as APIs estão sendo consumidas corretamente e que o tratamento de erros está funcionando. Verifique a resposta do sistema no frontend e nos logs do servidor para confirmar o sucesso das chamadas de API.
+
+
+
+## Prompt para Replit Agent: Implementar Sistema de Notificações em Tempo Real
+
+**Contexto do Projeto:**
+O SIGE v3.0 é um Sistema Integrado de Gestão Empresarial desenvolvido com Flask, SQLAlchemy, PostgreSQL, Bootstrap 5 e Docker/EasyPanel. Atualmente, o sistema utiliza apenas flash messages básicas para notificações. É necessário um sistema de notificações em tempo real para melhorar a experiência do usuário, fornecendo alertas instantâneos sobre eventos importantes.
+
+**Papel do Replit Agent:**
+Como um Engenheiro de Backend e Frontend, sua tarefa é implementar um sistema de notificações em tempo real no SIGE v3.0, permitindo que os usuários recebam alertas instantâneos sobre eventos importantes do sistema.
+
+**Tarefa Específica:**
+Implementar um sistema de notificações em tempo real. Isso inclui:
+1.  **Escolher e integrar uma tecnologia de comunicação em tempo real** (ex: WebSockets com Flask-SocketIO, ou Server-Sent Events - SSE). A escolha deve ser compatível com o ambiente Replit/EasyPanel.
+2.  **Criar um modelo de dados** para armazenar as notificações no banco de dados PostgreSQL via SQLAlchemy. Este modelo deve incluir campos como `mensagem`, `tipo` (ex: sucesso, erro, alerta), `usuario_alvo_id`, `lida` (booleano), `data_criacao`.
+3.  **Implementar a lógica de backend (Flask)** para gerar e enviar notificações para usuários específicos ou grupos, com base em eventos do sistema (ex: nova ocorrência registrada, aprovação de solicitação, atualização de status de um projeto).
+4.  **Desenvolver a interface de usuário (frontend)** com Bootstrap 5 para exibir as notificações de forma não intrusiva (ex: um ícone de sino com um contador de notificações não lidas no cabeçalho, pop-ups temporários para novas notificações) e permitir que o usuário as marque como lidas.
+
+**Critérios de Aceitação:**
+*   Notificações devem ser entregues aos usuários em tempo real, sem a necessidade de recarregar a página, quando um evento que gera notificação ocorre.
+*   As notificações devem ser persistidas no banco de dados e exibidas corretamente na interface do usuário, mesmo após o usuário navegar para outras páginas ou recarregar a aplicação.
+*   O usuário deve ser capaz de marcar as notificações como lidas, e o contador de notificações não lidas deve ser atualizado dinamicamente.
+*   O sistema deve ser escalável para lidar com um volume crescente de notificações e múltiplos usuários simultâneos.
+*   O código deve seguir as melhores práticas de desenvolvimento com Flask e da tecnologia de tempo real escolhida.
+*   Não deve haver erros no console do navegador ou nos logs do servidor durante o envio ou recebimento de notificações.
+
+**Exemplo de Uso:**
+Para validar a implementação, execute o servidor Flask e siga estes passos:
+1.  Faça login como um usuário no sistema.
+2.  Em outra sessão (ou simulando um evento de backend), crie uma nova ocorrência ou aprove uma solicitação que gere uma notificação para o usuário logado.
+3.  Verifique se o usuário logado recebe uma notificação instantânea no navegador (ex: um pop-up ou o contador do sino é atualizado).
+4.  Clique no ícone de sino para ver a lista de notificações e marque algumas como lidas, observando a atualização do contador.
+
+**Comandos para Teste (no ambiente Replit):**
+```bash
+# Para instalar bibliotecas Python necessárias (ex: Flask-SocketIO):
+pip install Flask-SocketIO
+# Para iniciar o servidor Flask:
+python app.py
+```
+
+**Validação:**
+Simule diversos eventos que geram notificações (ex: criação de registros, mudanças de status) e verifique se as notificações são recebidas em tempo real pelos usuários corretos. Teste a persistência das notificações no banco de dados e o gerenciamento (marcar como lida) na interface do usuário. Monitore os logs do servidor para garantir que não há erros no processo de envio/recebimento.
+
+
+
+## Prompt para Replit Agent: Implementar Auditoria e Logs
+
+**Contexto do Projeto:**
+O SIGE v3.0 é um Sistema Integrado de Gestão Empresarial desenvolvido com Flask, SQLAlchemy, PostgreSQL, Bootstrap 5 e Docker/EasyPanel. Atualmente, o sistema não possui um rastreamento de alterações ou um log de ações dos usuários, o que é uma lacuna crítica para a segurança, conformidade e rastreabilidade das operações.
+
+**Papel do Replit Agent:**
+Como um Engenheiro de Backend e Segurança, sua tarefa é implementar um sistema de auditoria e log de ações dos usuários no SIGE v3.0, registrando eventos importantes para garantir a rastreabilidade e a conformidade com requisitos de auditoria.
+
+**Tarefa Específica:**
+Implementar um sistema de auditoria e log de ações dos usuários. Isso inclui:
+1.  **Criar um modelo de dados** para registrar eventos de auditoria no banco de dados PostgreSQL via SQLAlchemy. Este modelo deve incluir campos como `usuario_id`, `acao_realizada` (ex: 'CREATE', 'UPDATE', 'DELETE', 'LOGIN'), `data_hora`, `modulo_afetado`, `registro_id_afetado`, `dados_antes` (JSON/Text), `dados_depois` (JSON/Text), `ip_origem`.
+2.  **Integrar a lógica de log** em operações críticas do sistema. Isso significa que sempre que um usuário realizar uma ação que modifique dados (ex: criar um funcionário, editar uma obra, excluir um registro financeiro) ou acessar funcionalidades sensíveis (ex: login, alteração de permissões), essa ação deve ser registrada.
+3.  **Registrar informações detalhadas** sobre cada ação, incluindo quem fez, o que foi feito, quando, em qual módulo, qual registro foi afetado e, idealmente, os valores dos campos antes e depois da alteração para facilitar a auditoria.
+4.  **Desenvolver uma interface de usuário (frontend)** com Bootstrap 5 para visualizar os logs de auditoria. Esta interface deve permitir a busca e filtragem de registros por usuário, data, tipo de ação, módulo, etc., e exibir os detalhes de cada log de forma clara.
+
+**Critérios de Aceitação:**
+*   Todas as ações críticas do sistema (CRUD de entidades principais, login, alterações de permissão) devem ser registradas no log de auditoria.
+*   O log deve conter informações suficientes para rastrear a origem e o impacto de cada ação, incluindo os dados antes e depois da alteração, quando aplicável.
+*   A interface de visualização de logs deve ser funcional, permitindo a busca e filtragem de registros de forma eficiente.
+*   O sistema de log deve ter um impacto mínimo no desempenho geral do sistema.
+*   O código deve seguir as melhores práticas de desenvolvimento com Flask e SQLAlchemy para logging e auditoria, garantindo a segurança e a integridade dos logs.
+*   Não deve haver erros no console do navegador ou nos logs do servidor durante o registro ou visualização de logs.
+
+**Exemplo de Uso:**
+Para validar a implementação, execute o servidor Flask e siga estes passos:
+1.  Realize diversas ações no sistema (ex: crie um novo funcionário, edite uma obra, exclua uma despesa, faça login e logout).
+2.  Acesse a página de logs de auditoria (ex: `http://localhost:5000/auditoria`).
+3.  Utilize os filtros para buscar ações realizadas por um usuário específico ou em um determinado módulo.
+4.  Clique em um registro de log para ver os detalhes completos da ação, incluindo os dados antigos e novos de um registro modificado.
+
+**Comandos para Teste (no ambiente Replit):**
+```bash
+# Para iniciar o servidor Flask:
+python app.py
+```
+
+**Validação:**
+Realize diversas ações no sistema (criar, editar, excluir registros, fazer login) e verifique se elas são devidamente registradas no log de auditoria. Acesse a interface de logs e teste as funcionalidades de busca e filtro para garantir que os dados estão sendo exibidos corretamente e que a informação é útil para fins de auditoria.
+
+
+
+## Prompt para Replit Agent: Implementar Backup Automatizado
+
+**Contexto do Projeto:**
+O SIGE v3.0 é um Sistema Integrado de Gestão Empresarial desenvolvido com Flask, SQLAlchemy, PostgreSQL, Bootstrap 5 e Docker/EasyPanel. Atualmente, não há um sistema automatizado de backup para o banco de dados PostgreSQL, o que representa um risco significativo para a perda de dados e a continuidade do negócio.
+
+**Papel do Replit Agent:**
+Como um Engenheiro de DevOps e Backend, sua tarefa é implementar rotinas de backup automatizado para o banco de dados PostgreSQL do SIGE v3.0, garantindo a segurança e a capacidade de recuperação dos dados em caso de falhas.
+
+**Tarefa Específica:**
+Implementar um sistema de backup automatizado para o banco de dados PostgreSQL. Isso inclui:
+1.  **Configurar rotinas de backup** que possam ser executadas de forma programada. Isso pode ser feito através de scripts shell (`pg_dump`) agendados via `cron` (se o ambiente Replit/EasyPanel permitir agendamento de tarefas) ou através de uma função no próprio aplicativo Flask que possa ser acionada manualmente ou por um scheduler interno.
+2.  **Utilizar ferramentas apropriadas** para backup de PostgreSQL, como o `pg_dump`, que permite exportar o banco de dados para um arquivo.
+3.  **Definir um local de armazenamento** para os backups. Este local deve ser seguro e, idealmente, externo ao ambiente de execução principal para evitar perda de dados em caso de falha do servidor (ex: um diretório específico no sistema de arquivos do Replit, ou considerar a integração com um serviço de armazenamento em nuvem se houver suporte).
+4.  **Implementar um mecanismo de recuperação** simples para restaurar o banco de dados a partir de um backup (ex: `pg_restore`), para fins de teste e em caso de necessidade real.
+5.  **Adicionar logs** para monitorar o sucesso ou falha dos backups, registrando informações como data/hora da execução, tamanho do backup e quaisquer erros.
+
+**Critérios de Aceitação:**
+*   Os backups do banco de dados devem ser gerados automaticamente em intervalos definidos (ex: diariamente).
+*   Os arquivos de backup devem ser armazenados em um local seguro e acessível, com um nome de arquivo que inclua a data e hora para fácil identificação.
+*   Deve ser possível restaurar o banco de dados a partir de um backup gerado, sem perda de dados, em um ambiente de teste.
+*   O processo de backup deve ser robusto e registrar logs de sua execução, indicando sucesso ou falha.
+*   O código/scripts devem seguir as melhores práticas de segurança e automação para backups de banco de dados.
+
+**Exemplo de Uso:**
+Para validar a implementação, execute o servidor Flask e siga estes passos:
+1.  Verifique os logs do sistema ou o diretório de backups para confirmar que os backups estão sendo executados regularmente e que os arquivos estão sendo criados.
+2.  Em um ambiente de teste separado, simule uma falha no banco de dados e execute o comando de restauração para verificar se o banco de dados é restaurado com sucesso a partir do backup mais recente.
+
+**Comandos para Teste (no ambiente Replit):**
+```bash
+# Exemplo de comando para backup (ajustar conforme o ambiente Replit e credenciais do PostgreSQL):
+pg_dump -Fc -h localhost -U <seu_usuario_postgres> <seu_banco_de_dados> > /caminho/para/backup/sige_backup_$(date +%Y%m%d%H%M%S).dump
+
+# Exemplo de comando para restauração (em um ambiente de teste):
+pg_restore -Fc -h localhost -U <seu_usuario_postgres> -d <seu_banco_de_dados> /caminho/para/backup/sige_backup.dump
+
+# Para iniciar o servidor Flask:
+python app.py
+```
+
+**Validação:**
+Realize um backup manual e tente restaurá-lo em um ambiente de teste para garantir que o processo funciona. Verifique a existência dos arquivos de backup no local especificado e os logs de execução para confirmar que o processo está ocorrendo sem erros. Teste a recuperação de dados para garantir a integridade do backup.
+
+
+
+## Prompt para Replit Agent: Implementar Navegação e Filtros Persistentes
+
+**Contexto do Projeto:**
+O SIGE v3.0 é um Sistema Integrado de Gestão Empresarial desenvolvido com Flask, SQLAlchemy, PostgreSQL, Bootstrap 5 e Docker/EasyPanel. Atualmente, a experiência do usuário é prejudicada pela não persistência de filtros e estados de navegação entre as páginas ou sessões, exigindo que o usuário redefina suas preferências a cada navegação.
+
+**Papel do Replit Agent:**
+Como um Engenheiro de Frontend e Backend, sua tarefa é implementar a persistência de filtros e estados de navegação para melhorar significativamente a usabilidade e a eficiência do sistema.
+
+**Tarefa Específica:**
+Implementar a persistência de filtros e estados de navegação. Isso inclui:
+1.  **Identificar os filtros e estados de navegação** que devem ser persistidos. Exemplos incluem filtros de busca (por nome, status, data), paginação, ordenação de tabelas e seleção de abas em módulos com múltiplas visualizações.
+2.  **Utilizar mecanismos de persistência apropriados**. Para o frontend, considere `localStorage` ou `sessionStorage` para persistir o estado no navegador do cliente. Para o backend, utilize variáveis de sessão do Flask ou parâmetros de URL para manter o estado durante a navegação entre páginas.
+3.  **Garantir que, ao navegar entre páginas ou recarregar a página**, os filtros e estados previamente aplicados sejam restaurados automaticamente, proporcionando uma experiência de usuário contínua.
+4.  **Aplicar essa persistência** em módulos onde a filtragem e a navegação são comuns e impactam diretamente a produtividade do usuário (ex: listagem de funcionários, relatórios, gestão de obras).
+
+**Critérios de Aceitação:**
+*   Os filtros aplicados em listagens e relatórios devem ser mantidos ao navegar para outras páginas e retornar, ou ao recarregar a página, sem a necessidade de redefinição manual.
+*   A persistência deve ser transparente para o usuário e não deve causar lentidão ou impacto negativo no desempenho do sistema.
+*   O código deve seguir as melhores práticas de desenvolvimento com Flask e JavaScript para manipulação de estado, garantindo a segurança e a eficiência.
+*   Não deve haver erros no console do navegador ou nos logs do servidor ao interagir com os filtros e a navegação persistente.
+
+**Exemplo de Uso:**
+Para validar a implementação, execute o servidor Flask e siga estes passos:
+1.  Na página de listagem de funcionários, aplique um filtro por "Departamento: Vendas" e ordene a tabela por "Nome (A-Z)".
+2.  Navegue para o perfil de um funcionário e, em seguida, retorne para a página de listagem de funcionários.
+3.  Verifique se o filtro por "Departamento: Vendas" e a ordenação por "Nome (A-Z)" ainda estão ativos, sem que você precise redefini-los.
+
+**Comandos para Teste (no ambiente Replit):**
+```bash
+# Para iniciar o servidor Flask:
+python app.py
+```
+
+**Validação:**
+Teste a aplicação de filtros em diferentes módulos e verifique se eles persistem ao navegar e recarregar as páginas. Confirme que a experiência do usuário é aprimorada e que o sistema mantém o estado esperado. Verifique também o comportamento em diferentes navegadores para garantir compatibilidade.
+
+
+
+## Prompt para Replit Agent: Otimizar Responsividade Mobile
+
+**Contexto do Projeto:**
+O SIGE v3.0 é um Sistema Integrado de Gestão Empresarial desenvolvido com Flask, SQLAlchemy, PostgreSQL, Bootstrap 5 e Docker/EasyPanel. Embora o Bootstrap 5 seja utilizado, a responsividade mobile pode necessitar de otimizações para garantir uma usabilidade ideal em diferentes dispositivos e tamanhos de tela.
+
+**Papel do Replit Agent:**
+Como um Engenheiro de Frontend, sua tarefa é otimizar a responsividade mobile do SIGE v3.0, garantindo que a interface seja totalmente funcional e visualmente agradável em diferentes tamanhos de tela, desde smartphones até tablets.
+
+**Tarefa Específica:**
+Otimizar a responsividade mobile do sistema. Isso inclui:
+1.  **Revisar as páginas principais** do sistema (ex: dashboard, listagens de dados, formulários, páginas de detalhes) para identificar problemas de layout, elementos cortados, rolagem horizontal desnecessária e problemas de usabilidade em dispositivos móveis.
+2.  **Ajustar o CSS e o HTML** utilizando as classes e componentes responsivos do Bootstrap 5 de forma mais eficaz. Se necessário, adicione CSS personalizado (`@media queries`) para resolver problemas específicos que o Bootstrap não cubra por padrão.
+3.  **Garantir que todos os elementos interativos** (ex: botões, links, campos de formulário, tabelas) sejam facilmente clicáveis e utilizáveis em telas pequenas, com espaçamento adequado e tamanhos de fonte legíveis.
+4.  **Otimizar o carregamento de imagens e outros ativos** para dispositivos móveis, se aplicável, para melhorar o desempenho em redes mais lentas.
+
+**Critérios de Aceitação:**
+*   A interface do sistema deve se adaptar corretamente a diferentes tamanhos de tela (smartphones, tablets) sem apresentar rolagem horizontal.
+*   Todos os elementos da interface devem ser acessíveis e utilizáveis em dispositivos móveis, sem que o usuário precise dar zoom ou rolar excessivamente.
+*   A experiência do usuário em dispositivos móveis deve ser fluida e intuitiva, com layouts que priorizem a informação essencial.
+*   O código deve seguir as melhores práticas de desenvolvimento frontend responsivo e o uso adequado do Bootstrap 5.
+*   Não deve haver erros de layout ou funcionalidade em diferentes viewports, e o console do navegador não deve apresentar erros relacionados à responsividade.
+
+**Exemplo de Uso:**
+Para validar a implementação, execute o servidor Flask e siga estes passos:
+1.  Acesse o SIGE v3.0 em um navegador mobile (smartphone ou tablet) ou utilize as ferramentas de desenvolvedor do navegador (modo de dispositivo) para simular diferentes tamanhos de tela.
+2.  Navegue por todas as páginas principais do sistema (dashboard, listagens, formulários) e interaja com os elementos.
+3.  Verifique se o layout se ajusta, se os textos são legíveis e se os botões são facilmente clicáveis em todas as resoluções testadas.
+
+**Comandos para Teste (no ambiente Replit):**
+```bash
+# Para iniciar o servidor Flask:
+python app.py
+```
+
+**Validação:**
+Teste o sistema em diferentes emuladores de dispositivos móveis ou diretamente em smartphones/tablets para verificar a responsividade e a usabilidade. Utilize as ferramentas de desenvolvedor do navegador para inspecionar o layout em diferentes resoluções e garantir que não há elementos sobrepostos ou cortados. Preste atenção especial a tabelas e formulários complexos, que geralmente são os mais desafiadores em telas pequenas.
+
+
+
+## Prompt para Replit Agent: Melhorar Busca e Autocomplete
+
+**Contexto do Projeto:**
+O SIGE v3.0 é um Sistema Integrado de Gestão Empresarial desenvolvido com Flask, SQLAlchemy, PostgreSQL, Bootstrap 5 e Docker/EasyPanel. Atualmente, o sistema possui uma funcionalidade de busca básica. É necessário aprimorá-la com recursos de busca avançada e autocomplete para tornar a pesquisa de informações mais eficiente e intuitiva para o usuário.
+
+**Papel do Replit Agent:**
+Como um Engenheiro de Backend e Frontend, sua tarefa é aprimorar o sistema de busca existente e adicionar funcionalidades de autocomplete para otimizar a recuperação de informações no SIGE v3.0.
+
+**Tarefa Específica:**
+Melhorar a busca e adicionar funcionalidades de autocomplete. Isso inclui:
+1.  **Implementar busca avançada** com múltiplos filtros em módulos onde a busca é relevante (ex: listagem de funcionários, obras, veículos). Os filtros devem permitir a combinação de critérios (ex: buscar funcionários por nome E departamento E status).
+2.  **Adicionar funcionalidade de autocomplete** em campos de busca estratégicos, sugerindo resultados relevantes à medida que o usuário digita (ex: nomes de funcionários, nomes de obras, placas de veículos).
+3.  **Otimizar as queries de busca** no backend (Flask/SQLAlchemy) para garantir desempenho, mesmo com grandes volumes de dados. Considere o uso de índices de banco de dados e técnicas de otimização de consultas.
+4.  **Atualizar a interface do usuário (frontend)** com Bootstrap 5 para exibir os resultados da busca de forma clara e as sugestões de autocomplete de maneira responsiva e amigável.
+
+**Critérios de Aceitação:**
+*   A busca avançada deve permitir a combinação de múltiplos filtros e retornar resultados precisos e relevantes.
+*   A funcionalidade de autocomplete deve sugerir resultados em tempo real, com base na entrada do usuário, e as sugestões devem ser relevantes e rápidas.
+*   O desempenho da busca e do autocomplete deve ser rápido e responsivo, sem atrasos perceptíveis para o usuário.
+*   O código deve seguir as melhores práticas de desenvolvimento com Flask, SQLAlchemy e JavaScript para busca e autocomplete.
+*   Não deve haver erros no console do navegador ou nos logs do servidor ao utilizar as funcionalidades de busca.
+
+**Exemplo de Uso:**
+Para validar a implementação, execute o servidor Flask e siga estes passos:
+1.  Na página de listagem de funcionários, comece a digitar um nome no campo de busca e verifique se sugestões de nomes completos aparecem abaixo do campo.
+2.  Utilize os filtros de busca avançada (ex: nome e departamento) para refinar a busca de funcionários e confirme que os resultados são precisos.
+
+**Comandos para Teste (no ambiente Replit):**
+```bash
+# Para iniciar o servidor Flask:
+python app.py
+```
+
+**Validação:**
+Teste a busca avançada com diferentes combinações de filtros e verifique a precisão dos resultados. Teste a funcionalidade de autocomplete em campos relevantes, verificando a relevância e a velocidade das sugestões. Monitore o desempenho das queries no backend para garantir que a otimização foi eficaz.
+
+
+
+## Prompt para Replit Agent: Melhorar Modal de Edição de Funcionário
+
+**Contexto do Projeto:**
+O SIGE v3.0 é um Sistema Integrado de Gestão Empresarial desenvolvido com Flask, SQLAlchemy, PostgreSQL, Bootstrap 5 e Docker/EasyPanel. O modal de edição de funcionário (`templates/funcionarios.html`) já existe e é funcional, mas pode se beneficiar de melhorias na experiência do usuário (UX) e na robustez das validações de formulário.
+
+**Papel do Replit Agent:**
+Como um Engenheiro de Frontend e Backend, sua tarefa é aprimorar o modal de edição de funcionário, focando em otimizar a experiência do usuário e garantir a integridade dos dados através de validações mais completas.
+
+**Tarefa Específica:**
+Melhorar o "Modal de Edição de Funcionário" em `templates/funcionarios.html`. Isso inclui:
+1.  **Revisar e aprimorar as validações de formulário** (tanto no frontend com JavaScript/jQuery quanto no backend com Flask-WTF ou validação manual) para todos os campos do modal. Garanta que os dados inseridos sejam consistentes e corretos (ex: formato de e-mail, números de telefone, datas válidas, campos obrigatórios).
+2.  **Implementar feedback visual claro** para o usuário em caso de erros de validação. Isso pode incluir mensagens de erro contextuais, destaque de campos inválidos e desativação do botão de submissão até que o formulário esteja válido.
+3.  **Otimizar a experiência do usuário (UX)** no modal. Considere aspectos como a ordem dos campos, a clareza dos rótulos, a usabilidade em dispositivos móveis e a facilidade de navegação entre os campos.
+4.  **Garantir que a atualização dos dados** do funcionário no banco de dados ocorra de forma eficiente e sem erros, refletindo as alterações feitas no modal.
+
+**Critérios de Aceitação:**
+*   Todas as validações de campos do formulário de edição de funcionário devem funcionar corretamente, tanto no frontend quanto no backend.
+*   Mensagens de erro claras e informativas devem ser exibidas ao usuário em caso de falha na validação, orientando-o sobre como corrigir o problema.
+*   A experiência de uso do modal deve ser intuitiva e eficiente, permitindo que o usuário edite as informações do funcionário de forma rápida e sem frustrações.
+*   A edição de um funcionário deve ser persistida no banco de dados sem problemas, e as alterações devem ser visíveis imediatamente após a submissão.
+*   O código deve seguir as melhores práticas de desenvolvimento com Flask, SQLAlchemy, JavaScript e Bootstrap 5.
+*   Não deve haver erros no console do navegador ou nos logs do servidor ao interagir com o modal de edição.
+
+**Exemplo de Uso:**
+Para validar a implementação, execute o servidor Flask e siga estes passos:
+1.  Acesse a página de listagem de funcionários e abra o modal de edição para um funcionário existente.
+2.  Tente salvar o formulário com dados inválidos (ex: e-mail sem \'@\', telefone com letras) e observe as mensagens de erro e o feedback visual.
+3.  Preencha o formulário com dados válidos e salve. Verifique se as informações do funcionário foram atualizadas corretamente na listagem e no perfil.
+
+**Comandos para Teste (no ambiente Replit):**
+```bash
+# Para iniciar o servidor Flask:
+python app.py
+```
+
+**Validação:**
+Teste o modal de edição de funcionário com diversos cenários de entrada de dados (válidos, inválidos, incompletos) para verificar a eficácia das validações e a usabilidade do modal. Confirme a persistência dos dados no banco de dados e a correta exibição das informações atualizadas.
+
+
+
+## Prompt para Replit Agent: Implementar Gestão de Documentos
+
+**Contexto do Projeto:**
+O SIGE v3.0 é um Sistema Integrado de Gestão Empresarial desenvolvido com Flask, SQLAlchemy, PostgreSQL, Bootstrap 5 e Docker/EasyPanel. Atualmente, a gestão de documentos é limitada a fotos de funcionários, e é necessário um sistema mais abrangente para upload e gestão de documentos por obra/funcionário.
+
+**Papel do Replit Agent:**
+Como um Engenheiro de Backend e Frontend, sua tarefa é implementar um módulo completo de gestão de documentos, permitindo o upload, armazenamento e associação de documentos a obras e funcionários.
+
+**Tarefa Específica:**
+Implementar um módulo completo de gestão de documentos. Isso inclui:
+1.  **Criar um modelo de dados** para `Documentos` (ex: nome do arquivo, tipo, caminho de armazenamento, data de upload, associado a funcionário/obra).
+2.  **Desenvolver rotas de backend (Flask)** para:
+    -   Upload seguro de arquivos (tratamento de tipos de arquivo, tamanho, nomes).
+    -   Associação de documentos a registros existentes (funcionários, obras).
+    -   Download de documentos.
+    -   Exclusão de documentos.
+3.  **Implementar a lógica de armazenamento de arquivos** no servidor (ou em um serviço de armazenamento de objetos, se aplicável no ambiente Replit/EasyPanel).
+4.  **Criar interfaces de usuário (frontend)** com Bootstrap 5 para:
+    -   Botões de upload de documentos nas páginas de funcionários e obras.
+    -   Listagem de documentos associados a um funcionário ou obra.
+    -   Funcionalidade para visualizar/baixar documentos.
+
+**Critérios de Aceitação:**
+*   É possível fazer upload de diferentes tipos de documentos (PDF, imagens, documentos de texto) e associá-los a funcionários ou obras.
+*   Os documentos devem ser armazenados de forma segura e acessível.
+*   É possível visualizar e baixar os documentos associados a um funcionário ou obra.
+*   A exclusão de documentos deve funcionar corretamente.
+*   O código deve seguir as melhores práticas de Flask para manipulação de arquivos e SQLAlchemy para persistência de dados.
+*   Nenhum erro deve ser apresentado no console do navegador ou no log do servidor ao interagir com o módulo de documentos.
+
+**Exemplo de Uso:**
+Para validar a implementação, execute o servidor Flask e siga estes passos:
+1.  Na página de perfil de um funcionário, faça upload de um contrato de trabalho.
+2.  Na página de uma obra, faça upload de plantas ou licenças.
+3.  Acesse a lista de documentos de um funcionário/obra e baixe um documento específico.
+
+**Comandos para Teste (no ambiente Replit):**
+```bash
+# Para iniciar o servidor Flask:
+python app.py
+```
+
+**Validação:**
+Teste o upload de diferentes tipos de arquivos, a associação a funcionários e obras, e as funcionalidades de download e exclusão. Verifique a integridade dos arquivos armazenados e a correta exibição na interface.
+
