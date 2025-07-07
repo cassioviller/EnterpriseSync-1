@@ -237,3 +237,89 @@ class FiltroDataForm(FlaskForm):
     """Formulário para filtros de data"""
     data_inicio = DateField('Data de Início', validators=[Optional()])
     data_fim = DateField('Data de Fim', validators=[Optional()])
+
+# Formulários para Gestão Financeira Avançada
+
+class CentroCustoForm(FlaskForm):
+    """Formulário para cadastro de centros de custo"""
+    codigo = StringField('Código', validators=[DataRequired(), Length(max=20)])
+    nome = StringField('Nome', validators=[DataRequired(), Length(max=100)])
+    descricao = TextAreaField('Descrição')
+    tipo = SelectField('Tipo', choices=[
+        ('obra', 'Obra'),
+        ('departamento', 'Departamento'),
+        ('projeto', 'Projeto'),
+        ('atividade', 'Atividade')
+    ], validators=[DataRequired()])
+    obra_id = SelectField('Obra (Opcional)', coerce=int, validators=[Optional()])
+    departamento_id = SelectField('Departamento (Opcional)', coerce=int, validators=[Optional()])
+    ativo = BooleanField('Ativo', default=True)
+
+class ReceitaForm(FlaskForm):
+    """Formulário para registro de receitas"""
+    numero_receita = StringField('Número da Receita', validators=[DataRequired(), Length(max=20)])
+    obra_id = SelectField('Obra (Opcional)', coerce=int, validators=[Optional()])
+    centro_custo_id = SelectField('Centro de Custo (Opcional)', coerce=int, validators=[Optional()])
+    origem = SelectField('Origem', choices=[
+        ('obra', 'Obra'),
+        ('servico', 'Serviço'),
+        ('venda', 'Venda'),
+        ('consultoria', 'Consultoria'),
+        ('outros', 'Outros')
+    ], validators=[DataRequired()])
+    descricao = StringField('Descrição', validators=[DataRequired(), Length(max=200)])
+    valor = FloatField('Valor', validators=[DataRequired(), NumberRange(min=0)])
+    data_receita = DateField('Data da Receita', validators=[DataRequired()], default=date.today)
+    data_recebimento = DateField('Data do Recebimento', validators=[Optional()])
+    status = SelectField('Status', choices=[
+        ('Pendente', 'Pendente'),
+        ('Recebido', 'Recebido'),
+        ('Cancelado', 'Cancelado')
+    ], default='Pendente')
+    forma_recebimento = SelectField('Forma de Recebimento', choices=[
+        ('', 'Selecione...'),
+        ('Dinheiro', 'Dinheiro'),
+        ('Transferência', 'Transferência Bancária'),
+        ('Cartão', 'Cartão'),
+        ('Cheque', 'Cheque'),
+        ('PIX', 'PIX'),
+        ('Outros', 'Outros')
+    ], validators=[Optional()])
+    observacoes = TextAreaField('Observações')
+
+class OrcamentoObraForm(FlaskForm):
+    """Formulário para orçamento de obras"""
+    obra_id = SelectField('Obra', coerce=int, validators=[DataRequired()])
+    categoria = SelectField('Categoria', choices=[
+        ('mao_obra', 'Mão de Obra'),
+        ('material', 'Material'),
+        ('equipamento', 'Equipamento'),
+        ('servicos_terceiros', 'Serviços de Terceiros'),
+        ('alimentacao', 'Alimentação'),
+        ('transporte', 'Transporte'),
+        ('outros', 'Outros')
+    ], validators=[DataRequired()])
+    orcamento_planejado = FloatField('Orçamento Planejado', validators=[DataRequired(), NumberRange(min=0)])
+    receita_planejada = FloatField('Receita Planejada', validators=[Optional(), NumberRange(min=0)])
+    observacoes = TextAreaField('Observações')
+
+class FluxoCaixaFiltroForm(FlaskForm):
+    """Formulário para filtros do fluxo de caixa"""
+    data_inicio = DateField('Data de Início', validators=[Optional()])
+    data_fim = DateField('Data de Fim', validators=[Optional()])
+    tipo_movimento = SelectField('Tipo de Movimento', choices=[
+        ('', 'Todos'),
+        ('ENTRADA', 'Entrada'),
+        ('SAIDA', 'Saída')
+    ], validators=[Optional()])
+    categoria = SelectField('Categoria', choices=[
+        ('', 'Todas'),
+        ('receita', 'Receita'),
+        ('custo_obra', 'Custo de Obra'),
+        ('custo_veiculo', 'Custo de Veículo'),
+        ('alimentacao', 'Alimentação'),
+        ('salario', 'Salário'),
+        ('outros', 'Outros')
+    ], validators=[Optional()])
+    obra_id = SelectField('Obra', coerce=int, validators=[Optional()])
+    centro_custo_id = SelectField('Centro de Custo', coerce=int, validators=[Optional()])

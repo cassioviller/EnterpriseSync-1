@@ -76,8 +76,8 @@ class Obra(db.Model):
     responsavel_id = db.Column(db.Integer, db.ForeignKey('funcionario.id'))
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     
-    registros_ponto = db.relationship('RegistroPonto', backref='obra_ref', lazy=True)
-    custos = db.relationship('CustoObra', backref='obra_ref', lazy=True)
+    registros_ponto = db.relationship('RegistroPonto', backref='obra_ref', lazy=True, overlaps="obra_ref")
+    custos = db.relationship('CustoObra', backref='obra_ref', lazy=True, overlaps="obra_ref")
 
 class Veiculo(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -167,11 +167,111 @@ class CalendarioUtil(db.Model):
 class CustoObra(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     obra_id = db.Column(db.Integer, db.ForeignKey('obra.id'), nullable=False)
+    centro_custo_id = db.Column(db.Integer, db.ForeignKey('centro_custo.id'))
     tipo = db.Column(db.String(20), nullable=False)  # 'mao_obra', 'material', 'servico', 'veiculo', 'alimentacao'
     descricao = db.Column(db.String(200), nullable=False)
     valor = db.Column(db.Float, nullable=False)
     data = db.Column(db.Date, nullable=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    
+    # Relacionamentos
+    obra = db.relationship('Obra', overlaps="custos,obra_ref")
+    centro_custo_ref = db.relationship('CentroCusto', backref='custos')
+
+# Novos modelos para Gestão Financeira Avançada
+
+class CentroCusto(db.Model):
+    """Centros de custo para classificação financeira"""
+    __tablename__ = 'centro_custo'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    codigo = db.Column(db.String(20), unique=True, nullable=False)  # CC001, CC002, etc.
+    nome = db.Column(db.String(100), nullable=False)
+    descricao = db.Column(db.Text)
+    tipo = db.Column(db.String(20), nullable=False)  # 'obra', 'departamento', 'projeto', 'atividade'
+    ativo = db.Column(db.Boolean, default=True)
+    obra_id = db.Column(db.Integer, db.ForeignKey('obra.id'))  # Associação opcional com obra
+    departamento_id = db.Column(db.Integer, db.ForeignKey('departamento.id'))  # Associação opcional com departamento
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    
+    # Relacionamentos
+    obra = db.relationship('Obra', overlaps="centros_custo_lista")
+    departamento = db.relationship('Departamento', overlaps="centros_custo_lista")
+
+class Receita(db.Model):
+    """Registro de receitas da empresa"""
+    __tablename__ = 'receita'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    numero_receita = db.Column(db.String(20), unique=True, nullable=False)  # REC001, REC002, etc.
+    obra_id = db.Column(db.Integer, db.ForeignKey('obra.id'))
+    centro_custo_id = db.Column(db.Integer, db.ForeignKey('centro_custo.id'))
+    origem = db.Column(db.String(50), nullable=False)  # 'obra', 'servico', 'venda', 'outros'
+    descricao = db.Column(db.String(200), nullable=False)
+    valor = db.Column(db.Float, nullable=False)
+    data_receita = db.Column(db.Date, nullable=False)
+    data_recebimento = db.Column(db.Date)  # Data real do recebimento
+    status = db.Column(db.String(20), default='Pendente')  # 'Pendente', 'Recebido', 'Cancelado'
+    forma_recebimento = db.Column(db.String(30))  # 'Dinheiro', 'Transferência', 'Cartão', 'Cheque'
+    observacoes = db.Column(db.Text)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    
+    # Relacionamentos
+    obra = db.relationship('Obra', overlaps="receitas_lista")
+    centro_custo = db.relationship('CentroCusto', overlaps="receitas_lista")
+
+class OrcamentoObra(db.Model):
+    """Orçamento planejado vs. realizado por obra"""
+    __tablename__ = 'orcamento_obra'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    obra_id = db.Column(db.Integer, db.ForeignKey('obra.id'), nullable=False)
+    categoria = db.Column(db.String(30), nullable=False)  # 'mao_obra', 'material', 'equipamento', 'outros'
+    orcamento_planejado = db.Column(db.Float, nullable=False, default=0.0)
+    custo_realizado = db.Column(db.Float, default=0.0)
+    receita_planejada = db.Column(db.Float, default=0.0)
+    receita_realizada = db.Column(db.Float, default=0.0)
+    data_atualizacao = db.Column(db.DateTime, default=datetime.utcnow)
+    observacoes = db.Column(db.Text)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    
+    # Relacionamentos
+    obra = db.relationship('Obra', overlaps="orcamentos_lista")
+    
+    @property
+    def desvio_custo(self):
+        """Calcula o desvio percentual do custo"""
+        if self.orcamento_planejado > 0:
+            return ((self.custo_realizado - self.orcamento_planejado) / self.orcamento_planejado) * 100
+        return 0.0
+    
+    @property
+    def desvio_receita(self):
+        """Calcula o desvio percentual da receita"""
+        if self.receita_planejada > 0:
+            return ((self.receita_realizada - self.receita_planejada) / self.receita_planejada) * 100
+        return 0.0
+
+class FluxoCaixa(db.Model):
+    """Movimentações de fluxo de caixa consolidadas"""
+    __tablename__ = 'fluxo_caixa'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    data_movimento = db.Column(db.Date, nullable=False)
+    tipo_movimento = db.Column(db.String(10), nullable=False)  # 'ENTRADA', 'SAIDA'
+    categoria = db.Column(db.String(30), nullable=False)  # 'receita', 'custo_obra', 'custo_veiculo', 'alimentacao', 'salario'
+    valor = db.Column(db.Float, nullable=False)
+    descricao = db.Column(db.String(200), nullable=False)
+    obra_id = db.Column(db.Integer, db.ForeignKey('obra.id'))
+    centro_custo_id = db.Column(db.Integer, db.ForeignKey('centro_custo.id'))
+    referencia_id = db.Column(db.Integer)  # ID da tabela de origem (receita, custo_obra, etc.)
+    referencia_tabela = db.Column(db.String(30))  # Nome da tabela de origem
+    observacoes = db.Column(db.Text)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    
+    # Relacionamentos
+    obra = db.relationship('Obra', overlaps="movimentos_caixa_lista")
+    centro_custo = db.relationship('CentroCusto', overlaps="movimentos_caixa_lista")
 
 class RegistroAlimentacao(db.Model):
     id = db.Column(db.Integer, primary_key=True)

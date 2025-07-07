@@ -1,0 +1,140 @@
+{% extends "base.html" %}
+
+{% block title %}Centros de Custo - SIGE{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- Header -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center">
+                <h2><i class="fas fa-sitemap me-2"></i>Centros de Custo</h2>
+                <a href="{{ url_for('main.novo_centro_custo') }}" class="btn btn-primary">
+                    <i class="fas fa-plus"></i> Novo Centro de Custo
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Tabela de Centros de Custo -->
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-body">
+                    {% if centros %}
+                        <div class="table-responsive">
+                            <table class="table table-hover" id="centrosTable">
+                                <thead>
+                                    <tr>
+                                        <th>Código</th>
+                                        <th>Nome</th>
+                                        <th>Tipo</th>
+                                        <th>Obra Associada</th>
+                                        <th>Departamento</th>
+                                        <th>Status</th>
+                                        <th>Criado em</th>
+                                        <th>Ações</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for centro in centros %}
+                                    <tr>
+                                        <td><code>{{ centro.codigo }}</code></td>
+                                        <td><strong>{{ centro.nome }}</strong></td>
+                                        <td>
+                                            <span class="badge bg-secondary">
+                                                {{ centro.tipo.title() }}
+                                            </span>
+                                        </td>
+                                        <td>
+                                            {% if centro.obra %}
+                                                <a href="{{ url_for('main.obra_detalhes', id=centro.obra.id) }}">
+                                                    {{ centro.obra.nome }}
+                                                </a>
+                                            {% else %}
+                                                <span class="text-muted">-</span>
+                                            {% endif %}
+                                        </td>
+                                        <td>
+                                            {% if centro.departamento %}
+                                                {{ centro.departamento.nome }}
+                                            {% else %}
+                                                <span class="text-muted">-</span>
+                                            {% endif %}
+                                        </td>
+                                        <td>
+                                            <span class="badge bg-{% if centro.ativo %}success{% else %}danger{% endif %}">
+                                                {% if centro.ativo %}Ativo{% else %}Inativo{% endif %}
+                                            </span>
+                                        </td>
+                                        <td>{{ centro.created_at.strftime('%d/%m/%Y') }}</td>
+                                        <td>
+                                            <div class="btn-group btn-group-sm">
+                                                <button class="btn btn-outline-primary btn-sm" 
+                                                        onclick="editarCentro({{ centro.id }})">
+                                                    <i class="fas fa-edit"></i>
+                                                </button>
+                                                <button class="btn btn-outline-{% if centro.ativo %}warning{% else %}success{% endif %} btn-sm" 
+                                                        onclick="toggleStatus({{ centro.id }}, {{ centro.ativo|lower }})">
+                                                    <i class="fas fa-{% if centro.ativo %}pause{% else %}play{% endif %}"></i>
+                                                </button>
+                                                <button class="btn btn-outline-danger btn-sm" 
+                                                        onclick="excluirCentro({{ centro.id }})">
+                                                    <i class="fas fa-trash"></i>
+                                                </button>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    {% else %}
+                        <div class="text-center text-muted py-5">
+                            <i class="fas fa-sitemap fa-3x mb-3"></i>
+                            <h5>Nenhum centro de custo cadastrado</h5>
+                            <p>Crie centros de custo para organizar melhor as finanças da empresa.</p>
+                            <a href="{{ url_for('main.novo_centro_custo') }}" class="btn btn-primary">
+                                <i class="fas fa-plus"></i> Criar Primeiro Centro de Custo
+                            </a>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+// DataTable
+$(document).ready(function() {
+    $('#centrosTable').DataTable({
+        language: { url: '//cdn.datatables.net/plug-ins/1.13.6/i18n/pt-BR.json' },
+        order: [[6, 'desc']],
+        pageLength: 25
+    });
+});
+
+function editarCentro(id) {
+    // TODO: Implementar modal de edição
+    alert('Funcionalidade de edição será implementada em breve.');
+}
+
+function toggleStatus(id, ativo) {
+    const acao = ativo ? 'desativar' : 'ativar';
+    if (confirm(`Tem certeza que deseja ${acao} este centro de custo?`)) {
+        // TODO: Implementar toggle de status
+        alert('Funcionalidade será implementada em breve.');
+    }
+}
+
+function excluirCentro(id) {
+    if (confirm('Tem certeza que deseja excluir este centro de custo? Esta ação não pode ser desfeita.')) {
+        // TODO: Implementar exclusão
+        alert('Funcionalidade de exclusão será implementada em breve.');
+    }
+}
+</script>
+{% endblock %}

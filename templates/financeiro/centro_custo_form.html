@@ -1,0 +1,164 @@
+{% extends "base.html" %}
+
+{% block title %}{{ titulo }} - SIGE{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- Header -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center">
+                <h2><i class="fas fa-sitemap me-2"></i>{{ titulo }}</h2>
+                <a href="{{ url_for('main.centros_custo') }}" class="btn btn-secondary">
+                    <i class="fas fa-arrow-left"></i> Voltar
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Formulário -->
+    <div class="row">
+        <div class="col-md-8">
+            <div class="card">
+                <div class="card-body">
+                    <form method="POST">
+                        {{ form.hidden_tag() }}
+                        
+                        <div class="row g-3">
+                            <div class="col-md-6">
+                                <label for="codigo" class="form-label">Código *</label>
+                                {{ form.codigo(class="form-control") }}
+                                {% if form.codigo.errors %}
+                                    <div class="text-danger small">
+                                        {% for error in form.codigo.errors %}
+                                            {{ error }}
+                                        {% endfor %}
+                                    </div>
+                                {% endif %}
+                            </div>
+                            
+                            <div class="col-md-6">
+                                <label for="tipo" class="form-label">Tipo *</label>
+                                {{ form.tipo(class="form-select") }}
+                                {% if form.tipo.errors %}
+                                    <div class="text-danger small">
+                                        {% for error in form.tipo.errors %}
+                                            {{ error }}
+                                        {% endfor %}
+                                    </div>
+                                {% endif %}
+                            </div>
+                            
+                            <div class="col-12">
+                                <label for="nome" class="form-label">Nome *</label>
+                                {{ form.nome(class="form-control") }}
+                                {% if form.nome.errors %}
+                                    <div class="text-danger small">
+                                        {% for error in form.nome.errors %}
+                                            {{ error }}
+                                        {% endfor %}
+                                    </div>
+                                {% endif %}
+                            </div>
+                            
+                            <div class="col-12">
+                                <label for="descricao" class="form-label">Descrição</label>
+                                {{ form.descricao(class="form-control", rows="3") }}
+                            </div>
+                            
+                            <div class="col-md-6">
+                                <label for="obra_id" class="form-label">Obra Associada</label>
+                                {{ form.obra_id(class="form-select") }}
+                                <small class="form-text text-muted">Opcional - associe a uma obra específica</small>
+                            </div>
+                            
+                            <div class="col-md-6">
+                                <label for="departamento_id" class="form-label">Departamento Associado</label>
+                                {{ form.departamento_id(class="form-select") }}
+                                <small class="form-text text-muted">Opcional - associe a um departamento</small>
+                            </div>
+                            
+                            <div class="col-12">
+                                <div class="form-check">
+                                    {{ form.ativo(class="form-check-input") }}
+                                    <label class="form-check-label" for="ativo">
+                                        Centro de custo ativo
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="mt-4">
+                            <button type="submit" class="btn btn-primary">
+                                <i class="fas fa-save"></i> Salvar Centro de Custo
+                            </button>
+                            <a href="{{ url_for('main.centros_custo') }}" class="btn btn-secondary ms-2">
+                                Cancelar
+                            </a>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-4">
+            <div class="card">
+                <div class="card-header">
+                    <h6><i class="fas fa-info-circle me-2"></i>Informações</h6>
+                </div>
+                <div class="card-body">
+                    <h6>Tipos de Centro de Custo:</h6>
+                    <ul class="list-unstyled">
+                        <li><strong>Obra:</strong> Custos específicos de uma obra</li>
+                        <li><strong>Departamento:</strong> Custos por departamento</li>
+                        <li><strong>Projeto:</strong> Custos de projetos específicos</li>
+                        <li><strong>Atividade:</strong> Custos por tipo de atividade</li>
+                    </ul>
+                    
+                    <hr>
+                    
+                    <h6>Código do Centro:</h6>
+                    <p class="small text-muted">
+                        O código é gerado automaticamente no formato CC001, CC002, etc.
+                        Você pode alterar se necessário.
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+// Atualizar campos condicionalmente baseado no tipo
+document.addEventListener('DOMContentLoaded', function() {
+    const tipoSelect = document.getElementById('tipo');
+    const obraSelect = document.getElementById('obra_id');
+    const departamentoSelect = document.getElementById('departamento_id');
+    
+    function atualizarCampos() {
+        const tipo = tipoSelect.value;
+        
+        // Resetar seleções
+        obraSelect.value = '0';
+        departamentoSelect.value = '0';
+        
+        // Mostrar/ocultar campos baseado no tipo
+        if (tipo === 'obra') {
+            obraSelect.closest('.col-md-6').style.display = 'block';
+            departamentoSelect.closest('.col-md-6').style.display = 'none';
+        } else if (tipo === 'departamento') {
+            obraSelect.closest('.col-md-6').style.display = 'none';
+            departamentoSelect.closest('.col-md-6').style.display = 'block';
+        } else {
+            obraSelect.closest('.col-md-6').style.display = 'block';
+            departamentoSelect.closest('.col-md-6').style.display = 'block';
+        }
+    }
+    
+    tipoSelect.addEventListener('change', atualizarCampos);
+    atualizarCampos(); // Executar na inicialização
+});
+</script>
+{% endblock %}

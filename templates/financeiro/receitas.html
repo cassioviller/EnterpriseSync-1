@@ -1,0 +1,272 @@
+{% extends "base.html" %}
+
+{% block title %}Receitas - SIGE{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- Header -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center">
+                <h2><i class="fas fa-receipt me-2"></i>Gestão de Receitas</h2>
+                <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#novaReceitaModal">
+                    <i class="fas fa-plus"></i> Nova Receita
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Filtros -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-body">
+                    <form method="GET" class="row g-3">
+                        <div class="col-md-3">
+                            <label for="data_inicio" class="form-label">Data Início</label>
+                            <input type="date" name="data_inicio" id="data_inicio" class="form-control" 
+                                   value="{{ data_inicio or '' }}">
+                        </div>
+                        <div class="col-md-3">
+                            <label for="data_fim" class="form-label">Data Fim</label>
+                            <input type="date" name="data_fim" id="data_fim" class="form-control" 
+                                   value="{{ data_fim or '' }}">
+                        </div>
+                        <div class="col-md-2">
+                            <label for="status" class="form-label">Status</label>
+                            <select name="status" id="status" class="form-select">
+                                <option value="">Todos</option>
+                                <option value="Pendente" {{ 'selected' if status_filtro == 'Pendente' }}>Pendente</option>
+                                <option value="Recebido" {{ 'selected' if status_filtro == 'Recebido' }}>Recebido</option>
+                                <option value="Cancelado" {{ 'selected' if status_filtro == 'Cancelado' }}>Cancelado</option>
+                            </select>
+                        </div>
+                        <div class="col-md-3">
+                            <label for="obra_id" class="form-label">Obra</label>
+                            <select name="obra_id" id="obra_id" class="form-select">
+                                <option value="">Todas</option>
+                                {% for obra in obras %}
+                                <option value="{{ obra.id }}" {{ 'selected' if obra_filtro == obra.id|string }}>
+                                    {{ obra.nome }}
+                                </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-md-1 d-flex align-items-end">
+                            <button type="submit" class="btn btn-outline-primary w-100">
+                                <i class="fas fa-filter"></i>
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Tabela de Receitas -->
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-body">
+                    {% if receitas %}
+                        <div class="table-responsive">
+                            <table class="table table-hover" id="receitasTable">
+                                <thead>
+                                    <tr>
+                                        <th>Número</th>
+                                        <th>Data Receita</th>
+                                        <th>Descrição</th>
+                                        <th>Origem</th>
+                                        <th>Obra</th>
+                                        <th>Valor</th>
+                                        <th>Status</th>
+                                        <th>Data Recebimento</th>
+                                        <th>Ações</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for receita in receitas %}
+                                    <tr>
+                                        <td><code>{{ receita.numero_receita }}</code></td>
+                                        <td>{{ receita.data_receita.strftime('%d/%m/%Y') }}</td>
+                                        <td>{{ receita.descricao }}</td>
+                                        <td>{{ receita.origem.title() }}</td>
+                                        <td>
+                                            {% if receita.obra %}
+                                                {{ receita.obra.nome }}
+                                            {% else %}
+                                                <span class="text-muted">-</span>
+                                            {% endif %}
+                                        </td>
+                                        <td class="text-end">
+                                            <strong>R$ {{ "%.2f"|format(receita.valor) }}</strong>
+                                        </td>
+                                        <td>
+                                            <span class="badge bg-{% if receita.status == 'Recebido' %}success{% elif receita.status == 'Pendente' %}warning{% else %}danger{% endif %}">
+                                                {{ receita.status }}
+                                            </span>
+                                        </td>
+                                        <td>
+                                            {% if receita.data_recebimento %}
+                                                {{ receita.data_recebimento.strftime('%d/%m/%Y') }}
+                                            {% else %}
+                                                <span class="text-muted">-</span>
+                                            {% endif %}
+                                        </td>
+                                        <td>
+                                            <div class="btn-group btn-group-sm">
+                                                <button class="btn btn-outline-primary btn-sm" 
+                                                        onclick="editarReceita({{ receita.id }})">
+                                                    <i class="fas fa-edit"></i>
+                                                </button>
+                                                <button class="btn btn-outline-danger btn-sm" 
+                                                        onclick="excluirReceita({{ receita.id }})">
+                                                    <i class="fas fa-trash"></i>
+                                                </button>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    {% else %}
+                        <div class="text-center text-muted py-5">
+                            <i class="fas fa-receipt fa-3x mb-3"></i>
+                            <h5>Nenhuma receita encontrada</h5>
+                            <p>Cadastre receitas para acompanhar o fluxo de caixa da empresa.</p>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Nova Receita -->
+<div class="modal fade" id="novaReceitaModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Nova Receita</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="POST" action="{{ url_for('main.nova_receita') }}">
+                <div class="modal-body">
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label for="numero_receita" class="form-label">Número da Receita</label>
+                            <input type="text" class="form-control" name="numero_receita" 
+                                   placeholder="Gerado automaticamente" readonly>
+                        </div>
+                        <div class="col-md-6">
+                            <label for="origem" class="form-label">Origem *</label>
+                            <select name="origem" class="form-select" required>
+                                <option value="">Selecione...</option>
+                                <option value="obra">Obra</option>
+                                <option value="servico">Serviço</option>
+                                <option value="venda">Venda</option>
+                                <option value="consultoria">Consultoria</option>
+                                <option value="outros">Outros</option>
+                            </select>
+                        </div>
+                        <div class="col-12">
+                            <label for="descricao" class="form-label">Descrição *</label>
+                            <input type="text" class="form-control" name="descricao" required>
+                        </div>
+                        <div class="col-md-6">
+                            <label for="valor" class="form-label">Valor *</label>
+                            <input type="number" class="form-control" name="valor" step="0.01" min="0" required>
+                        </div>
+                        <div class="col-md-6">
+                            <label for="data_receita" class="form-label">Data da Receita *</label>
+                            <input type="date" class="form-control" name="data_receita" required>
+                        </div>
+                        <div class="col-md-6">
+                            <label for="obra_id" class="form-label">Obra</label>
+                            <select name="obra_id" class="form-select">
+                                <option value="0">Nenhuma obra específica</option>
+                                {% for obra in obras %}
+                                <option value="{{ obra.id }}">{{ obra.nome }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label for="centro_custo_id" class="form-label">Centro de Custo</label>
+                            <select name="centro_custo_id" class="form-select">
+                                <option value="0">Nenhum centro específico</option>
+                                {% for centro in centros_custo %}
+                                <option value="{{ centro.id }}">{{ centro.nome }} ({{ centro.codigo }})</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label for="status" class="form-label">Status</label>
+                            <select name="status" class="form-select">
+                                <option value="Pendente">Pendente</option>
+                                <option value="Recebido">Recebido</option>
+                                <option value="Cancelado">Cancelado</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label for="data_recebimento" class="form-label">Data do Recebimento</label>
+                            <input type="date" class="form-control" name="data_recebimento">
+                        </div>
+                        <div class="col-md-6">
+                            <label for="forma_recebimento" class="form-label">Forma de Recebimento</label>
+                            <select name="forma_recebimento" class="form-select">
+                                <option value="">Selecione...</option>
+                                <option value="Dinheiro">Dinheiro</option>
+                                <option value="Transferência">Transferência Bancária</option>
+                                <option value="Cartão">Cartão</option>
+                                <option value="Cheque">Cheque</option>
+                                <option value="PIX">PIX</option>
+                                <option value="Outros">Outros</option>
+                            </select>
+                        </div>
+                        <div class="col-12">
+                            <label for="observacoes" class="form-label">Observações</label>
+                            <textarea class="form-control" name="observacoes" rows="3"></textarea>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-primary">Salvar Receita</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+// DataTable
+$(document).ready(function() {
+    $('#receitasTable').DataTable({
+        language: { url: '//cdn.datatables.net/plug-ins/1.13.6/i18n/pt-BR.json' },
+        order: [[1, 'desc']],
+        pageLength: 25
+    });
+});
+
+// Definir data padrão
+document.addEventListener('DOMContentLoaded', function() {
+    const hoje = new Date().toISOString().slice(0, 10);
+    document.querySelector('input[name="data_receita"]').value = hoje;
+});
+
+function editarReceita(id) {
+    // TODO: Implementar modal de edição
+    alert('Funcionalidade de edição será implementada em breve.');
+}
+
+function excluirReceita(id) {
+    if (confirm('Tem certeza que deseja excluir esta receita?')) {
+        // TODO: Implementar exclusão
+        alert('Funcionalidade de exclusão será implementada em breve.');
+    }
+}
+</script>
+{% endblock %}

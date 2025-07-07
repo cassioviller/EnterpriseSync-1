@@ -1840,3 +1840,92 @@ def excluir_ocorrencia(ocorrencia_id):
         flash(f'Erro ao excluir ocorrência: {str(e)}', 'error')
         
     return redirect(url_for('main.funcionario_perfil', id=funcionario_id))
+
+# === ROTAS FINANCEIRAS ===
+
+@main_bp.route('/financeiro')
+@login_required
+def financeiro_dashboard():
+    """Dashboard principal do módulo financeiro"""
+    # Filtros de data
+    data_inicio = request.args.get('data_inicio')
+    data_fim = request.args.get('data_fim')
+    
+    if not data_inicio:
+        data_inicio = date.today().replace(day=1)
+    else:
+        data_inicio = datetime.strptime(data_inicio, '%Y-%m-%d').date()
+    
+    if not data_fim:
+        data_fim = date.today()
+    else:
+        data_fim = datetime.strptime(data_fim, '%Y-%m-%d').date()
+    
+    # Importar módulo financeiro
+    from financeiro import obter_kpis_financeiros, calcular_fluxo_caixa_periodo
+    
+    # KPIs financeiros
+    kpis = obter_kpis_financeiros(data_inicio, data_fim)
+    
+    # Fluxo de caixa detalhado
+    fluxo = calcular_fluxo_caixa_periodo(data_inicio, data_fim)
+    
+    # Receitas recentes
+    receitas_recentes = Receita.query.filter(
+        Receita.data_receita >= data_inicio,
+        Receita.data_receita <= data_fim
+    ).order_by(Receita.data_receita.desc()).limit(10).all()
+    
+    # Centros de custo ativos
+    centros_custo = CentroCusto.query.filter_by(ativo=True).all()
+    
+    return render_template('financeiro/dashboard.html',
+                         kpis=kpis,
+                         fluxo=fluxo,
+                         receitas_recentes=receitas_recentes,
+                         centros_custo=centros_custo,
+                         data_inicio=data_inicio,
+                         data_fim=data_fim)
+
+@main_bp.route('/financeiro/receitas')
+@login_required
+def receitas():
+    """Página de gestão de receitas"""
+    # Filtros
+    data_inicio = request.args.get('data_inicio')
+    data_fim = request.args.get('data_fim')
+    status_filtro = request.args.get('status', '')
+    obra_filtro = request.args.get('obra_id', '')
+    
+    query = Receita.query
+    
+    if data_inicio:
+        query = query.filter(Receita.data_receita >= datetime.strptime(data_inicio, '%Y-%m-%d').date())
+    if data_fim:
+        query = query.filter(Receita.data_receita <= datetime.strptime(data_fim, '%Y-%m-%d').date())
+    if status_filtro:
+        query = query.filter(Receita.status == status_filtro)
+    if obra_filtro:
+        query = query.filter(Receita.obra_id == int(obra_filtro))
+    
+    receitas = query.order_by(Receita.data_receita.desc()).all()
+    
+    # Dados para formulários
+    obras = Obra.query.filter_by(status='Em andamento').all()
+    centros_custo = CentroCusto.query.filter_by(ativo=True).all()
+    
+    return render_template('financeiro/receitas.html',
+                         receitas=receitas,
+                         obras=obras,
+                         centros_custo=centros_custo,
+                         data_inicio=data_inicio,
+                         data_fim=data_fim,
+                         status_filtro=status_filtro,
+                         obra_filtro=obra_filtro)
+
+@main_bp.route('/financeiro/centros-custo')
+@login_required
+def centros_custo():
+    """Página de gestão de centros de custo"""
+    centros = CentroCusto.query.all()
+    return render_template('financeiro/centros_custo.html', centros=centros)

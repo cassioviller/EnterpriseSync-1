@@ -1,0 +1,287 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard Financeiro - SIGE{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- Header com filtros -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center">
+                <h2><i class="fas fa-chart-line me-2"></i>Dashboard Financeiro</h2>
+                <div class="d-flex gap-2">
+                    <input type="date" id="data_inicio" class="form-control" 
+                           value="{{ data_inicio }}" style="width: auto;">
+                    <input type="date" id="data_fim" class="form-control" 
+                           value="{{ data_fim }}" style="width: auto;">
+                    <button class="btn btn-primary" onclick="aplicarFiltros()">
+                        <i class="fas fa-filter"></i> Filtrar
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- KPIs Principais -->
+    <div class="row mb-4">
+        <div class="col-md-3">
+            <div class="card bg-success text-white">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between">
+                        <div>
+                            <h6 class="card-title">Total Entradas</h6>
+                            <h4>R$ {{ "%.2f"|format(kpis.total_entradas) }}</h4>
+                        </div>
+                        <div class="align-self-center">
+                            <i class="fas fa-arrow-up fa-2x"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-danger text-white">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between">
+                        <div>
+                            <h6 class="card-title">Total Saídas</h6>
+                            <h4>R$ {{ "%.2f"|format(kpis.total_saidas) }}</h4>
+                        </div>
+                        <div class="align-self-center">
+                            <i class="fas fa-arrow-down fa-2x"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-primary text-white">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between">
+                        <div>
+                            <h6 class="card-title">Saldo Período</h6>
+                            <h4>R$ {{ "%.2f"|format(kpis.saldo_periodo) }}</h4>
+                        </div>
+                        <div class="align-self-center">
+                            <i class="fas fa-balance-scale fa-2x"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-warning text-dark">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between">
+                        <div>
+                            <h6 class="card-title">Receitas Pendentes</h6>
+                            <h4>R$ {{ "%.2f"|format(kpis.receitas_pendentes) }}</h4>
+                        </div>
+                        <div class="align-self-center">
+                            <i class="fas fa-clock fa-2x"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Gráficos e Análises -->
+    <div class="row mb-4">
+        <div class="col-md-8">
+            <div class="card">
+                <div class="card-header">
+                    <h5><i class="fas fa-chart-area me-2"></i>Fluxo de Caixa por Categoria</h5>
+                </div>
+                <div class="card-body">
+                    <canvas id="fluxoCaixaChart" height="100"></canvas>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card">
+                <div class="card-header">
+                    <h5><i class="fas fa-exclamation-triangle me-2"></i>Obras com Desvio</h5>
+                </div>
+                <div class="card-body">
+                    {% if kpis.obras_com_desvio %}
+                        {% for obra in kpis.obras_com_desvio %}
+                        <div class="alert alert-warning mb-2">
+                            <strong>{{ obra.obra }}</strong><br>
+                            <small>Desvio: {{ "%.1f"|format(obra.desvio) }}%</small>
+                        </div>
+                        {% endfor %}
+                    {% else %}
+                        <div class="text-muted text-center">
+                            <i class="fas fa-check-circle fa-3x mb-2"></i><br>
+                            Nenhuma obra com desvio significativo
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Tabelas de Resumo -->
+    <div class="row">
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header d-flex justify-content-between">
+                    <h5><i class="fas fa-receipt me-2"></i>Receitas Recentes</h5>
+                    <a href="{{ url_for('main.receitas') }}" class="btn btn-sm btn-outline-primary">
+                        Ver Todas
+                    </a>
+                </div>
+                <div class="card-body">
+                    {% if receitas_recentes %}
+                        <div class="table-responsive">
+                            <table class="table table-sm">
+                                <thead>
+                                    <tr>
+                                        <th>Data</th>
+                                        <th>Descrição</th>
+                                        <th>Valor</th>
+                                        <th>Status</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for receita in receitas_recentes %}
+                                    <tr>
+                                        <td>{{ receita.data_receita.strftime('%d/%m/%Y') }}</td>
+                                        <td>{{ receita.descricao }}</td>
+                                        <td>R$ {{ "%.2f"|format(receita.valor) }}</td>
+                                        <td>
+                                            <span class="badge bg-{% if receita.status == 'Recebido' %}success{% elif receita.status == 'Pendente' %}warning{% else %}danger{% endif %}">
+                                                {{ receita.status }}
+                                            </span>
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    {% else %}
+                        <div class="text-muted text-center">
+                            Nenhuma receita no período
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header d-flex justify-content-between">
+                    <h5><i class="fas fa-sitemap me-2"></i>Centros de Custo</h5>
+                    <a href="{{ url_for('main.centros_custo') }}" class="btn btn-sm btn-outline-primary">
+                        Gerenciar
+                    </a>
+                </div>
+                <div class="card-body">
+                    {% if centros_custo %}
+                        <div class="table-responsive">
+                            <table class="table table-sm">
+                                <thead>
+                                    <tr>
+                                        <th>Código</th>
+                                        <th>Nome</th>
+                                        <th>Tipo</th>
+                                        <th>Status</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for centro in centros_custo %}
+                                    <tr>
+                                        <td><code>{{ centro.codigo }}</code></td>
+                                        <td>{{ centro.nome }}</td>
+                                        <td>{{ centro.tipo.title() }}</td>
+                                        <td>
+                                            <span class="badge bg-{% if centro.ativo %}success{% else %}secondary{% endif %}">
+                                                {% if centro.ativo %}Ativo{% else %}Inativo{% endif %}
+                                            </span>
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    {% else %}
+                        <div class="text-muted text-center">
+                            Nenhum centro de custo cadastrado
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function aplicarFiltros() {
+    const dataInicio = document.getElementById('data_inicio').value;
+    const dataFim = document.getElementById('data_fim').value;
+    
+    const url = new URL(window.location.href);
+    url.searchParams.set('data_inicio', dataInicio);
+    url.searchParams.set('data_fim', dataFim);
+    
+    window.location.href = url.toString();
+}
+
+// Gráfico de Fluxo de Caixa
+document.addEventListener('DOMContentLoaded', function() {
+    const ctx = document.getElementById('fluxoCaixaChart').getContext('2d');
+    
+    const categorias = {{ kpis.resumo_categorias.keys()|list|tojson }};
+    const entradas = {{ [kpis.resumo_categorias[cat]['entradas'] for cat in kpis.resumo_categorias.keys()]|tojson }};
+    const saidas = {{ [kpis.resumo_categorias[cat]['saidas'] for cat in kpis.resumo_categorias.keys()]|tojson }};
+    
+    new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: categorias,
+            datasets: [{
+                label: 'Entradas',
+                data: entradas,
+                backgroundColor: 'rgba(40, 167, 69, 0.8)',
+                borderColor: 'rgba(40, 167, 69, 1)',
+                borderWidth: 1
+            }, {
+                label: 'Saídas',
+                data: saidas,
+                backgroundColor: 'rgba(220, 53, 69, 0.8)',
+                borderColor: 'rgba(220, 53, 69, 1)',
+                borderWidth: 1
+            }]
+        },
+        options: {
+            responsive: true,
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    ticks: {
+                        callback: function(value) {
+                            return 'R$ ' + value.toLocaleString('pt-BR', {minimumFractionDigits: 2});
+                        }
+                    }
+                }
+            },
+            plugins: {
+                legend: {
+                    position: 'top'
+                },
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            return context.dataset.label + ': R$ ' + 
+                                   context.parsed.y.toLocaleString('pt-BR', {minimumFractionDigits: 2});
+                        }
+                    }
+                }
+            }
+        }
+    });
+});
+</script>
+{% endblock %}
