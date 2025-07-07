@@ -254,6 +254,17 @@ SIGE (Sistema Integrado de Gestão Empresarial) is a comprehensive business mana
   - Descrição de fluxos de usuário críticos passo a passo
   - Avaliação de estratégias de teste e recomendações
   - Relatório técnico completo para facilitar manutenção e desenvolvimento futuro
+- July 07, 2025. Módulo de Gestão Financeira Avançada - v4.0:
+  - Implementado módulo financeiro completo com 4 novos modelos: CentroCusto, Receita, OrcamentoObra, FluxoCaixa
+  - Criado engine de cálculos financeiros (financeiro.py) com KPIs e análises
+  - Rotas backend completas: dashboard financeiro, receitas, fluxo de caixa, centros de custo
+  - Interface web responsiva com Bootstrap 5 e gráficos Chart.js integrados
+  - Menu de navegação com dropdown "Financeiro" adicionado ao sistema
+  - Sistema de sincronização automática do fluxo de caixa com dados existentes
+  - Controle de receitas com status (Pendente/Recebido) e múltiplas formas de recebimento
+  - Centros de custo configuráveis por obra, departamento, projeto ou atividade
+  - Correção de erro na página de obras (referência de rota inexistente)
+  - Sistema financeiro totalmente operacional e integrado ao SIGE v3.0
 
 ## User Preferences
 
