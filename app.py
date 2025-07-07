@@ -37,10 +37,12 @@ login_manager.login_message = 'Por favor, faça login para acessar esta página.
 from models import *
 from auth import auth_bp
 from views import main_bp
+from relatorios_funcionais import relatorios_bp
 
 # Register blueprints
 app.register_blueprint(auth_bp, url_prefix='/auth')
 app.register_blueprint(main_bp)
+app.register_blueprint(relatorios_bp, url_prefix='/relatorios')
 
 @login_manager.user_loader
 def load_user(user_id):

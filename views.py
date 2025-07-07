@@ -1429,8 +1429,8 @@ def gerar_relatorio(tipo):
     # Processar filtros
     data_inicio = datetime.strptime(filtros.get('dataInicio', ''), '%Y-%m-%d').date() if filtros.get('dataInicio') else None
     data_fim = datetime.strptime(filtros.get('dataFim', ''), '%Y-%m-%d').date() if filtros.get('dataFim') else None
-    obra_id = filtros.get('obra') if filtros.get('obra') else None
-    departamento_id = filtros.get('departamento') if filtros.get('departamento') else None
+    obra_id = int(filtros.get('obra')) if filtros.get('obra') else None
+    departamento_id = int(filtros.get('departamento')) if filtros.get('departamento') else None
     
     if tipo == 'funcionarios':
         query = Funcionario.query
@@ -1439,18 +1439,18 @@ def gerar_relatorio(tipo):
         funcionarios = query.all()
         
         html = '<div class="table-responsive"><table class="table table-striped">'
-        html += '<thead><tr><th>Nome</th><th>CPF</th><th>Departamento</th><th>Função</th><th>Data Admissão</th><th>Salário</th><th>Status</th></tr></thead><tbody>'
+        html += '<thead><tr><th>Código</th><th>Nome</th><th>CPF</th><th>Departamento</th><th>Função</th><th>Data Admissão</th><th>Salário</th><th>Status</th></tr></thead><tbody>'
         
         for f in funcionarios:
             status_badge = '<span class="badge bg-success">Ativo</span>' if f.ativo else '<span class="badge bg-danger">Inativo</span>'
-            html += f'<tr><td>{f.nome}</td><td>{f.cpf}</td><td>{f.departamento_ref.nome if f.departamento_ref else "-"}</td>'
+            html += f'<tr><td>{f.codigo or "-"}</td><td>{f.nome}</td><td>{f.cpf}</td><td>{f.departamento_ref.nome if f.departamento_ref else "-"}</td>'
             html += f'<td>{f.funcao_ref.nome if f.funcao_ref else "-"}</td><td>{f.data_admissao.strftime("%d/%m/%Y") if f.data_admissao else "-"}</td>'
             html += f'<td>R$ {f.salario:,.2f}</td><td>{status_badge}</td></tr>'
         
         html += '</tbody></table></div>'
         
         return jsonify({
-            'titulo': 'Lista de Funcionários',
+            'titulo': f'Lista de Funcionários ({len(funcionarios)} registros)',
             'html': html
         })
     
@@ -1462,27 +1462,28 @@ def gerar_relatorio(tipo):
             query = query.filter(RegistroPonto.data <= data_fim)
         if obra_id:
             query = query.filter_by(obra_id=obra_id)
+        if departamento_id:
+            query = query.join(Funcionario).filter(Funcionario.departamento_id == departamento_id)
         
-        registros = query.order_by(RegistroPonto.data.desc()).limit(100).all()
+        registros = query.join(Funcionario).order_by(RegistroPonto.data.desc()).all()
         
         html = '<div class="table-responsive"><table class="table table-striped">'
-        html += '<thead><tr><th>Funcionário</th><th>Data</th><th>Entrada</th><th>Saída Almoço</th><th>Retorno Almoço</th><th>Saída</th><th>Horas Trabalhadas</th><th>Horas Extras</th><th>Obra</th></tr></thead><tbody>'
+        html += '<thead><tr><th>Data</th><th>Funcionário</th><th>Obra</th><th>Entrada</th><th>Saída</th><th>Horas Trabalhadas</th><th>Horas Extras</th><th>Atrasos</th></tr></thead><tbody>'
         
         for r in registros:
-            html += f'<tr><td>{r.funcionario_ref.nome}</td><td>{r.data.strftime("%d/%m/%Y")}</td>'
+            html += f'<tr><td>{r.data.strftime("%d/%m/%Y")}</td>'
+            html += f'<td>{r.funcionario.nome}</td>'
+            html += f'<td>{r.obra.nome if r.obra else "-"}</td>'
             html += f'<td>{r.hora_entrada.strftime("%H:%M") if r.hora_entrada else "-"}</td>'
-            html += f'<td>{r.hora_almoco_saida.strftime("%H:%M") if r.hora_almoco_saida else "-"}</td>'
-            html += f'<td>{r.hora_almoco_retorno.strftime("%H:%M") if r.hora_almoco_retorno else "-"}</td>'
             html += f'<td>{r.hora_saida.strftime("%H:%M") if r.hora_saida else "-"}</td>'
-            horas_trab = f"{r.horas_trabalhadas:.2f}h" if r.horas_trabalhadas else "0.00h"
-            horas_ext = f"{r.horas_extras:.2f}h" if r.horas_extras else "0.00h"
-            html += f'<td>{horas_trab}</td><td>{horas_ext}</td>'
-            html += f'<td>{r.obra_ref.nome if r.obra_ref else "-"}</td></tr>'
+            html += f'<td>{r.horas_trabalhadas:.2f}h</td>'
+            html += f'<td>{r.horas_extras:.2f}h</td>'
+            html += f'<td>{r.total_atraso_minutos or 0} min</td></tr>'
         
         html += '</tbody></table></div>'
         
         return jsonify({
-            'titulo': 'Relatório de Ponto',
+            'titulo': f'Relatório de Ponto ({len(registros)} registros)',
             'html': html
         })
     
@@ -1492,35 +1493,36 @@ def gerar_relatorio(tipo):
             query = query.filter(RegistroPonto.data >= data_inicio)
         if data_fim:
             query = query.filter(RegistroPonto.data <= data_fim)
-        if departamento_id:
-            query = query.join(Funcionario).filter(Funcionario.departamento_id == departamento_id)
         if obra_id:
             query = query.filter_by(obra_id=obra_id)
+        if departamento_id:
+            query = query.join(Funcionario).filter(Funcionario.departamento_id == departamento_id)
         
-        registros = query.order_by(RegistroPonto.data.desc()).limit(100).all()
+        registros = query.join(Funcionario).order_by(RegistroPonto.data.desc()).all()
         
         html = '<div class="table-responsive"><table class="table table-striped">'
-        html += '<thead><tr><th>Funcionário</th><th>Data</th><th>Horas Extras</th><th>Valor Aproximado</th><th>Obra</th><th>Departamento</th></tr></thead><tbody>'
+        html += '<thead><tr><th>Data</th><th>Funcionário</th><th>Obra</th><th>Horas Extras</th><th>Valor Estimado</th></tr></thead><tbody>'
         
         total_horas = 0
         total_valor = 0
         
         for r in registros:
-            valor_hora = (r.funcionario_ref.salario / 220) * 1.5 if r.funcionario_ref.salario else 0  # 50% adicional
-            valor_extra = (r.horas_extras or 0) * valor_hora
-            total_horas += r.horas_extras or 0
-            total_valor += valor_extra
+            valor_hora = (r.funcionario.salario / 220) * 1.5 if r.funcionario.salario else 0
+            valor_extras = r.horas_extras * valor_hora
+            total_horas += r.horas_extras
+            total_valor += valor_extras
             
-            html += f'<tr><td>{r.funcionario_ref.nome}</td><td>{r.data.strftime("%d/%m/%Y")}</td>'
-            html += f'<td>{r.horas_extras:.2f}h</td><td>R$ {valor_extra:.2f}</td>'
-            html += f'<td>{r.obra_ref.nome if r.obra_ref else "-"}</td>'
-            html += f'<td>{r.funcionario_ref.departamento_ref.nome if r.funcionario_ref.departamento_ref else "-"}</td></tr>'
+            html += f'<tr><td>{r.data.strftime("%d/%m/%Y")}</td>'
+            html += f'<td>{r.funcionario.nome}</td>'
+            html += f'<td>{r.obra.nome if r.obra else "-"}</td>'
+            html += f'<td>{r.horas_extras:.2f}h</td>'
+            html += f'<td>R$ {valor_extras:.2f}</td></tr>'
         
+        html += f'<tr class="table-info"><td colspan="3"><strong>TOTAL</strong></td><td><strong>{total_horas:.2f}h</strong></td><td><strong>R$ {total_valor:.2f}</strong></td></tr>'
         html += '</tbody></table></div>'
-        html += f'<div class="mt-3"><strong>Total: {total_horas:.2f} horas extras • R$ {total_valor:,.2f}</strong></div>'
         
         return jsonify({
-            'titulo': 'Relatório de Horas Extras',
+            'titulo': f'Relatório de Horas Extras ({len(registros)} registros)',
             'html': html
         })
     
@@ -1535,35 +1537,27 @@ def gerar_relatorio(tipo):
         if departamento_id:
             query = query.join(Funcionario).filter(Funcionario.departamento_id == departamento_id)
         
-        registros = query.order_by(RegistroAlimentacao.data.desc()).limit(200).all()
+        registros = query.join(Funcionario).order_by(RegistroAlimentacao.data.desc()).all()
         
         html = '<div class="table-responsive"><table class="table table-striped">'
-        html += '<thead><tr><th>Funcionário</th><th>Data</th><th>Tipo</th><th>Valor</th><th>Restaurante</th><th>Obra</th></tr></thead><tbody>'
+        html += '<thead><tr><th>Data</th><th>Funcionário</th><th>Tipo</th><th>Restaurante</th><th>Obra</th><th>Valor</th></tr></thead><tbody>'
         
         total_valor = 0
         
         for r in registros:
-            total_valor += r.valor or 0
-            tipo_labels = {
-                'cafe': 'Café da Manhã',
-                'almoco': 'Almoço', 
-                'jantar': 'Jantar',
-                'lanche': 'Lanche',
-                'marmita': 'Marmita',
-                'refeicao_local': 'Refeição no Local',
-                'outros': 'Outros'
-            }
-            
-            html += f'<tr><td>{r.funcionario_ref.nome}</td><td>{r.data.strftime("%d/%m/%Y")}</td>'
-            html += f'<td>{tipo_labels.get(r.tipo, r.tipo)}</td><td>R$ {r.valor:.2f}</td>'
-            html += f'<td>{r.restaurante_ref.nome if r.restaurante_ref else "-"}</td>'
-            html += f'<td>{r.obra_ref.nome if r.obra_ref else "-"}</td></tr>'
+            total_valor += r.valor
+            html += f'<tr><td>{r.data.strftime("%d/%m/%Y")}</td>'
+            html += f'<td>{r.funcionario.nome}</td>'
+            html += f'<td>{r.tipo.title()}</td>'
+            html += f'<td>{r.restaurante.nome if r.restaurante else "-"}</td>'
+            html += f'<td>{r.obra.nome if r.obra else "-"}</td>'
+            html += f'<td>R$ {r.valor:.2f}</td></tr>'
         
+        html += f'<tr class="table-info"><td colspan="5"><strong>TOTAL</strong></td><td><strong>R$ {total_valor:.2f}</strong></td></tr>'
         html += '</tbody></table></div>'
-        html += f'<div class="mt-3"><strong>Total Gasto: R$ {total_valor:,.2f}</strong></div>'
         
         return jsonify({
-            'titulo': 'Relatório de Alimentação',
+            'titulo': f'Relatório de Alimentação ({len(registros)} registros)',
             'html': html
         })
     
@@ -1571,32 +1565,27 @@ def gerar_relatorio(tipo):
         query = Obra.query
         if obra_id:
             query = query.filter_by(id=obra_id)
+        
         obras = query.all()
         
         html = '<div class="table-responsive"><table class="table table-striped">'
-        html += '<thead><tr><th>Nome</th><th>Endereço</th><th>Data Início</th><th>Previsão Fim</th><th>Orçamento</th><th>Status</th><th>Responsável</th></tr></thead><tbody>'
+        html += '<thead><tr><th>Nome</th><th>Responsável</th><th>Data Início</th><th>Previsão Fim</th><th>Orçamento</th><th>Status</th><th>Funcionários</th></tr></thead><tbody>'
         
-        for o in obras:
-            status_badges = {
-                'Em andamento': 'bg-primary',
-                'Concluída': 'bg-success',
-                'Pausada': 'bg-warning',
-                'Cancelada': 'bg-danger'
-            }
-            status_badge = f'<span class="badge {status_badges.get(o.status, "bg-secondary")}">{o.status}</span>'
+        for obra in obras:
+            funcionarios_obra = db.session.query(func.count(FuncionarioObra.id)).filter_by(obra_id=obra.id).scalar()
             
-            html += f'<tr><td>{o.nome}</td><td>{o.endereco or "-"}</td>'
-            html += f'<td>{o.data_inicio.strftime("%d/%m/%Y") if o.data_inicio else "-"}</td>'
-            html += f'<td>{o.data_previsao_fim.strftime("%d/%m/%Y") if o.data_previsao_fim else "-"}</td>'
-            html += f'<td>R$ {o.orcamento:,.2f}</td><td>{status_badge}</td>'
-            
-            responsavel = Funcionario.query.get(o.responsavel_id) if o.responsavel_id else None
-            html += f'<td>{responsavel.nome if responsavel else "-"}</td></tr>'
+            html += f'<tr><td>{obra.nome}</td>'
+            html += f'<td>{obra.responsavel.nome if obra.responsavel else "-"}</td>'
+            html += f'<td>{obra.data_inicio.strftime("%d/%m/%Y") if obra.data_inicio else "-"}</td>'
+            html += f'<td>{obra.data_previsao_fim.strftime("%d/%m/%Y") if obra.data_previsao_fim else "-"}</td>'
+            html += f'<td>R$ {obra.orcamento:,.2f}</td>'
+            html += f'<td><span class="badge bg-primary">{obra.status}</span></td>'
+            html += f'<td>{funcionarios_obra}</td></tr>'
         
         html += '</tbody></table></div>'
         
         return jsonify({
-            'titulo': 'Lista de Obras',
+            'titulo': f'Lista de Obras ({len(obras)} registros)',
             'html': html
         })
     
@@ -1609,161 +1598,77 @@ def gerar_relatorio(tipo):
         if obra_id:
             query = query.filter_by(obra_id=obra_id)
         
-        custos = query.order_by(CustoObra.data.desc()).limit(100).all()
+        custos = query.join(Obra).order_by(CustoObra.data.desc()).all()
         
         html = '<div class="table-responsive"><table class="table table-striped">'
-        html += '<thead><tr><th>Data</th><th>Obra</th><th>Tipo</th><th>Descrição</th><th>Valor</th><th>Observações</th></tr></thead><tbody>'
+        html += '<thead><tr><th>Data</th><th>Obra</th><th>Tipo</th><th>Descrição</th><th>Valor</th></tr></thead><tbody>'
         
         total_custos = 0
-        tipos_labels = {
-            'mao_obra': 'Mão de Obra',
-            'material': 'Material',
-            'servico': 'Serviço',
-            'veiculo': 'Veículo',
-            'alimentacao': 'Alimentação'
-        }
         
-        for c in custos:
-            total_custos += c.valor or 0
-            html += f'<tr><td>{c.data.strftime("%d/%m/%Y")}</td>'
-            html += f'<td>{c.obra_ref.nome if c.obra_ref else "-"}</td>'
-            html += f'<td>{tipos_labels.get(c.tipo, c.tipo)}</td>'
-            html += f'<td>{c.descricao or "-"}</td><td>R$ {c.valor:,.2f}</td>'
-            html += f'<td>{c.observacoes or "-"}</td></tr>'
+        for custo in custos:
+            total_custos += custo.valor
+            html += f'<tr><td>{custo.data.strftime("%d/%m/%Y")}</td>'
+            html += f'<td>{custo.obra.nome}</td>'
+            html += f'<td>{custo.tipo.title()}</td>'
+            html += f'<td>{custo.descricao or "-"}</td>'
+            html += f'<td>R$ {custo.valor:.2f}</td></tr>'
         
-        html += '</tbody></table></div>'
-        html += f'<div class="mt-3"><strong>Total de Custos: R$ {total_custos:,.2f}</strong></div>'
-        
-        return jsonify({
-            'titulo': 'Custos por Obra',
-            'html': html
-        })
-    
-    elif tipo == 'progresso-obras':
-        obras = Obra.query.all()
-        from datetime import date
-        
-        html = '<div class="table-responsive"><table class="table table-striped">'
-        html += '<thead><tr><th>Obra</th><th>Status</th><th>Progresso</th><th>Orçamento</th><th>Gastos</th><th>Restante</th><th>Prazo</th></tr></thead><tbody>'
-        
-        for obra in obras:
-            # Calcular gastos totais
-            gastos_total = db.session.query(func.sum(CustoObra.valor)).filter_by(obra_id=obra.id).scalar() or 0
-            restante = (obra.orcamento or 0) - gastos_total
-            
-            # Calcular progresso baseado no orçamento
-            progresso = (gastos_total / obra.orcamento * 100) if obra.orcamento > 0 else 0
-            progresso = min(progresso, 100)
-            
-            # Status do prazo
-            if obra.data_previsao_fim:
-                dias_restantes = (obra.data_previsao_fim - date.today()).days
-                prazo_status = "No prazo" if dias_restantes > 0 else f"Atrasado ({abs(dias_restantes)} dias)"
-                prazo_class = "text-success" if dias_restantes > 0 else "text-danger"
-            else:
-                prazo_status = "Sem prazo definido"
-                prazo_class = "text-muted"
-            
-            status_badges = {
-                'Em andamento': 'bg-primary',
-                'Concluída': 'bg-success',
-                'Pausada': 'bg-warning',
-                'Cancelada': 'bg-danger'
-            }
-            status_badge = f'<span class="badge {status_badges.get(obra.status, "bg-secondary")}">{obra.status}</span>'
-            
-            html += f'<tr><td>{obra.nome}</td><td>{status_badge}</td>'
-            html += f'<td><div class="progress"><div class="progress-bar" style="width: {progresso:.1f}%">{progresso:.1f}%</div></div></td>'
-            html += f'<td>R$ {obra.orcamento:,.2f}</td><td>R$ {gastos_total:,.2f}</td><td>R$ {restante:,.2f}</td>'
-            html += f'<td><span class="{prazo_class}">{prazo_status}</span></td></tr>'
-        
+        html += f'<tr class="table-info"><td colspan="4"><strong>TOTAL</strong></td><td><strong>R$ {total_custos:.2f}</strong></td></tr>'
         html += '</tbody></table></div>'
         
         return jsonify({
-            'titulo': 'Progresso das Obras',
+            'titulo': f'Custos por Obra ({len(custos)} registros)',
             'html': html
         })
     
     elif tipo == 'veiculos':
-        veiculos = Veiculo.query.all()
+        query = Veiculo.query
+        veiculos = query.all()
         
         html = '<div class="table-responsive"><table class="table table-striped">'
-        html += '<thead><tr><th>Placa</th><th>Marca/Modelo</th><th>Ano</th><th>Tipo</th><th>Status</th><th>KM Atual</th><th>Última Manutenção</th><th>Próxima Manutenção</th></tr></thead><tbody>'
+        html += '<thead><tr><th>Placa</th><th>Marca/Modelo</th><th>Ano</th><th>Tipo</th><th>KM Atual</th><th>Status</th><th>Próxima Manutenção</th></tr></thead><tbody>'
         
-        for v in veiculos:
-            status_badges = {
-                'Disponível': 'bg-success',
-                'Em uso': 'bg-primary',
-                'Manutenção': 'bg-warning',
-                'Indisponível': 'bg-danger'
-            }
-            status_badge = f'<span class="badge {status_badges.get(v.status, "bg-secondary")}">{v.status}</span>'
-            
-            html += f'<tr><td>{v.placa}</td><td>{v.marca} {v.modelo}</td><td>{v.ano or "-"}</td>'
-            html += f'<td>{v.tipo}</td><td>{status_badge}</td><td>{v.km_atual or "-"}</td>'
-            html += f'<td>{v.data_ultima_manutencao.strftime("%d/%m/%Y") if v.data_ultima_manutencao else "-"}</td>'
-            html += f'<td>{v.data_proxima_manutencao.strftime("%d/%m/%Y") if v.data_proxima_manutencao else "-"}</td></tr>'
+        for veiculo in veiculos:
+            html += f'<tr><td>{veiculo.placa}</td>'
+            html += f'<td>{veiculo.marca} {veiculo.modelo}</td>'
+            html += f'<td>{veiculo.ano or "-"}</td>'
+            html += f'<td>{veiculo.tipo}</td>'
+            html += f'<td>{veiculo.km_atual or 0:,} km</td>'
+            html += f'<td><span class="badge bg-info">{veiculo.status}</span></td>'
+            html += f'<td>{veiculo.data_proxima_manutencao.strftime("%d/%m/%Y") if veiculo.data_proxima_manutencao else "-"}</td></tr>'
         
         html += '</tbody></table></div>'
         
         return jsonify({
-            'titulo': 'Relatório de Veículos',
-            'html': html
-        })
-    
-    elif tipo == 'rentabilidade':
-        obras = Obra.query.all()
-        
-        html = '<div class="table-responsive"><table class="table table-striped">'
-        html += '<thead><tr><th>Obra</th><th>Orçamento</th><th>Custos</th><th>Margem</th><th>Rentabilidade</th><th>Status</th></tr></thead><tbody>'
-        
-        total_orcamento = 0
-        total_custos = 0
-        
-        for obra in obras:
-            custos_obra = db.session.query(func.sum(CustoObra.valor)).filter_by(obra_id=obra.id).scalar() or 0
-            margem = (obra.orcamento or 0) - custos_obra
-            rentabilidade = (margem / obra.orcamento * 100) if obra.orcamento > 0 else 0
-            
-            total_orcamento += obra.orcamento or 0
-            total_custos += custos_obra
-            
-            rent_class = "text-success" if rentabilidade > 0 else "text-danger"
-            
-            html += f'<tr><td>{obra.nome}</td><td>R$ {obra.orcamento:,.2f}</td>'
-            html += f'<td>R$ {custos_obra:,.2f}</td><td>R$ {margem:,.2f}</td>'
-            html += f'<td><span class="{rent_class}">{rentabilidade:.1f}%</span></td>'
-            html += f'<td>{obra.status}</td></tr>'
-        
-        margem_total = total_orcamento - total_custos
-        rentabilidade_total = (margem_total / total_orcamento * 100) if total_orcamento > 0 else 0
-        
-        html += '</tbody></table></div>'
-        html += f'<div class="mt-3"><strong>Totais: Orçamento R$ {total_orcamento:,.2f} • Custos R$ {total_custos:,.2f} • Margem R$ {margem_total:,.2f} • Rentabilidade {rentabilidade_total:.1f}%</strong></div>'
-        
-        return jsonify({
-            'titulo': 'Rentabilidade por Obra',
+            'titulo': f'Relatório de Veículos ({len(veiculos)} registros)',
             'html': html
         })
     
     elif tipo == 'dashboard-executivo':
-        # Dashboard executivo com KPIs gerais
+        # Dados consolidados para dashboard executivo
         total_funcionarios = Funcionario.query.filter_by(ativo=True).count()
         total_obras = Obra.query.filter_by(status='Em andamento').count()
         total_veiculos = Veiculo.query.count()
         
         # Custos do mês atual
         hoje = date.today()
-        primeiro_dia_mes = date(hoje.year, hoje.month, 1)
+        primeiro_dia_mes = hoje.replace(day=1)
+        
         custos_mes = db.session.query(func.sum(CustoObra.valor)).filter(
             CustoObra.data >= primeiro_dia_mes,
             CustoObra.data <= hoje
         ).scalar() or 0
         
-        # Horas trabalhadas no mês
+        # Horas trabalhadas do mês
         horas_mes = db.session.query(func.sum(RegistroPonto.horas_trabalhadas)).filter(
             RegistroPonto.data >= primeiro_dia_mes,
             RegistroPonto.data <= hoje
+        ).scalar() or 0
+        
+        # Alimentação do mês
+        alimentacao_mes = db.session.query(func.sum(RegistroAlimentacao.valor)).filter(
+            RegistroAlimentacao.data >= primeiro_dia_mes,
+            RegistroAlimentacao.data <= hoje
         ).scalar() or 0
         
         html = '<div class="row">'
@@ -1772,1139 +1677,75 @@ def gerar_relatorio(tipo):
         html += f'<div class="col-md-3"><div class="card text-center"><div class="card-body"><h2 class="text-warning">{total_veiculos}</h2><p>Veículos</p></div></div></div>'
         html += f'<div class="col-md-3"><div class="card text-center"><div class="card-body"><h2 class="text-info">R$ {custos_mes:,.0f}</h2><p>Custos do Mês</p></div></div></div>'
         html += '</div>'
-        html += f'<div class="mt-4"><div class="card"><div class="card-body"><h5>Resumo do Mês</h5><p><strong>Horas Trabalhadas:</strong> {horas_mes:.0f}h</p><p><strong>Custo por Hora:</strong> R$ {(custos_mes/horas_mes if horas_mes > 0 else 0):.2f}</p></div></div></div>'
+        
+        html += '<div class="row mt-4">'
+        html += f'<div class="col-md-6"><div class="card"><div class="card-body"><h5>Resumo Mensal</h5><p><strong>Horas Trabalhadas:</strong> {horas_mes:.0f}h</p><p><strong>Custo por Hora:</strong> R$ {(custos_mes/horas_mes if horas_mes > 0 else 0):.2f}</p></div></div></div>'
+        html += f'<div class="col-md-6"><div class="card"><div class="card-body"><h5>Alimentação</h5><p><strong>Gasto Mensal:</strong> R$ {alimentacao_mes:,.2f}</p><p><strong>Média por Funcionário:</strong> R$ {(alimentacao_mes/total_funcionarios if total_funcionarios > 0 else 0):.2f}</p></div></div></div>'
+        html += '</div>'
         
         return jsonify({
             'titulo': 'Dashboard Executivo',
             'html': html
         })
     
+    elif tipo == 'progresso-obras':
+        obras = Obra.query.all()
+        
+        html = '<div class="table-responsive"><table class="table table-striped">'
+        html += '<thead><tr><th>Obra</th><th>Progresso</th><th>Orçamento</th><th>Gasto Atual</th><th>Saldo</th><th>% Utilizado</th></tr></thead><tbody>'
+        
+        for obra in obras:
+            gasto_atual = db.session.query(func.sum(CustoObra.valor)).filter_by(obra_id=obra.id).scalar() or 0
+            saldo = obra.orcamento - gasto_atual
+            percentual = (gasto_atual / obra.orcamento * 100) if obra.orcamento > 0 else 0
+            
+            cor_saldo = 'text-success' if saldo > 0 else 'text-danger'
+            
+            html += f'<tr><td>{obra.nome}</td>'
+            html += f'<td><span class="badge bg-info">{obra.status}</span></td>'
+            html += f'<td>R$ {obra.orcamento:,.2f}</td>'
+            html += f'<td>R$ {gasto_atual:,.2f}</td>'
+            html += f'<td class="{cor_saldo}">R$ {saldo:,.2f}</td>'
+            html += f'<td>{percentual:.1f}%</td></tr>'
+        
+        html += '</tbody></table></div>'
+        
+        return jsonify({
+            'titulo': f'Progresso das Obras ({len(obras)} registros)',
+            'html': html
+        })
+    
+    elif tipo == 'rentabilidade':
+        # Análise de rentabilidade por obra
+        obras = Obra.query.all()
+        
+        html = '<div class="table-responsive"><table class="table table-striped">'
+        html += '<thead><tr><th>Obra</th><th>Receita Prevista</th><th>Custos</th><th>Margem</th><th>% Margem</th><th>Status</th></tr></thead><tbody>'
+        
+        for obra in obras:
+            custos_obra = db.session.query(func.sum(CustoObra.valor)).filter_by(obra_id=obra.id).scalar() or 0
+            receita_prevista = obra.orcamento * 1.3  # Assumindo 30% de margem padrão
+            margem = receita_prevista - custos_obra
+            percentual_margem = (margem / receita_prevista * 100) if receita_prevista > 0 else 0
+            
+            cor_margem = 'text-success' if margem > 0 else 'text-danger'
+            
+            html += f'<tr><td>{obra.nome}</td>'
+            html += f'<td>R$ {receita_prevista:,.2f}</td>'
+            html += f'<td>R$ {custos_obra:,.2f}</td>'
+            html += f'<td class="{cor_margem}">R$ {margem:,.2f}</td>'
+            html += f'<td class="{cor_margem}">{percentual_margem:.1f}%</td>'
+            html += f'<td><span class="badge bg-primary">{obra.status}</span></td></tr>'
+        
+        html += '</tbody></table></div>'
+        
+        return jsonify({
+            'titulo': f'Análise de Rentabilidade ({len(obras)} obras)',
+            'html': html
+        })
+    
     else:
         return jsonify({
             'titulo': 'Relatório não implementado',
-            'html': '<p>Este relatório ainda não foi implementado.</p>'
+            'html': '<div class="alert alert-info">Este tipo de relatório ainda não foi implementado.</div>'
         })
-
-@main_bp.route('/relatorios/exportar/<formato>', methods=['POST'])
-@login_required
-def exportar_relatorio(formato):
-    from io import BytesIO
-    from flask import make_response
-    import csv
-    from datetime import datetime
-    
-    # Processar filtros
-    data_inicio = request.form.get('dataInicio')
-    data_fim = request.form.get('dataFim')
-    obra_id = request.form.get('obra')
-    departamento_id = request.form.get('departamento')
-    
-    # Converter datas se fornecidas
-    if data_inicio:
-        data_inicio = datetime.strptime(data_inicio, '%Y-%m-%d').date()
-    if data_fim:
-        data_fim = datetime.strptime(data_fim, '%Y-%m-%d').date()
-    
-    if formato == 'csv':
-        # Exportação CSV consolidada com todos os dados principais
-        output = BytesIO()
-        output.write('\ufeff'.encode('utf-8'))  # BOM for UTF-8
-        
-        # Criar CSV com dados consolidados
-        import io
-        csv_content = io.StringIO()
-        writer = csv.writer(csv_content)
-        
-        # Cabeçalho principal
-        writer.writerow(['RELATÓRIO CONSOLIDADO SIGE - SISTEMA INTEGRADO DE GESTÃO EMPRESARIAL'])
-        writer.writerow(['Data de Geração:', datetime.now().strftime('%d/%m/%Y %H:%M')])
-        writer.writerow(['Período:', f'{data_inicio.strftime("%d/%m/%Y") if data_inicio else "N/A"} até {data_fim.strftime("%d/%m/%Y") if data_fim else "N/A"}'])
-        writer.writerow([])
-        
-        # 1. Dados de Funcionários
-        writer.writerow(['=== FUNCIONÁRIOS ==='])
-        writer.writerow(['Nome', 'CPF', 'Departamento', 'Função', 'Data Admissão', 'Salário', 'Status'])
-        
-        query = Funcionario.query
-        if departamento_id:
-            query = query.filter_by(departamento_id=departamento_id)
-        
-        for f in query.all():
-            writer.writerow([
-                f.nome,
-                f.cpf,
-                f.departamento_ref.nome if f.departamento_ref else '',
-                f.funcao_ref.nome if f.funcao_ref else '',
-                f.data_admissao.strftime('%d/%m/%Y') if f.data_admissao else '',
-                f'R$ {f.salario:,.2f}' if f.salario else '',
-                'Ativo' if f.ativo else 'Inativo'
-            ])
-        
-        writer.writerow([])
-        
-        # 2. Dados de Ponto (se filtros de data fornecidos)
-        if data_inicio and data_fim:
-            writer.writerow(['=== REGISTROS DE PONTO ==='])
-            writer.writerow(['Funcionário', 'Data', 'Entrada', 'Saída Almoço', 'Retorno Almoço', 'Saída', 'Horas Trabalhadas', 'Horas Extras', 'Obra'])
-            
-            query = RegistroPonto.query.filter(
-                RegistroPonto.data >= data_inicio,
-                RegistroPonto.data <= data_fim
-            )
-            if obra_id:
-                query = query.filter_by(obra_id=obra_id)
-            
-            for r in query.order_by(RegistroPonto.data.desc()).limit(500).all():
-                writer.writerow([
-                    r.funcionario_ref.nome,
-                    r.data.strftime('%d/%m/%Y'),
-                    r.hora_entrada.strftime('%H:%M') if r.hora_entrada else '',
-                    r.hora_almoco_saida.strftime('%H:%M') if r.hora_almoco_saida else '',
-                    r.hora_almoco_retorno.strftime('%H:%M') if r.hora_almoco_retorno else '',
-                    r.hora_saida.strftime('%H:%M') if r.hora_saida else '',
-                    f'{r.horas_trabalhadas:.2f}h' if r.horas_trabalhadas else '',
-                    f'{r.horas_extras:.2f}h' if r.horas_extras else '',
-                    r.obra_ref.nome if r.obra_ref else ''
-                ])
-            
-            writer.writerow([])
-        
-        # 3. Obras
-        writer.writerow(['=== OBRAS ==='])
-        writer.writerow(['Nome', 'Endereço', 'Data Início', 'Previsão Fim', 'Orçamento', 'Status', 'Responsável'])
-        
-        query = Obra.query
-        if obra_id:
-            query = query.filter_by(id=obra_id)
-        
-        for o in query.all():
-            responsavel = Funcionario.query.get(o.responsavel_id) if o.responsavel_id else None
-            writer.writerow([
-                o.nome,
-                o.endereco or '',
-                o.data_inicio.strftime('%d/%m/%Y') if o.data_inicio else '',
-                o.data_previsao_fim.strftime('%d/%m/%Y') if o.data_previsao_fim else '',
-                f'R$ {o.orcamento:,.2f}' if o.orcamento else '',
-                o.status,
-                responsavel.nome if responsavel else ''
-            ])
-        
-        # Salvar CSV
-        csv_string = csv_content.getvalue()
-        output.write(csv_string.encode('utf-8'))
-        output.seek(0)
-        
-        response = make_response(output.read())
-        response.headers['Content-Type'] = 'text/csv; charset=utf-8'
-        response.headers['Content-Disposition'] = f'attachment; filename=relatorio_sige_{datetime.now().strftime("%Y%m%d_%H%M")}.csv'
-        
-        return response
-    
-    elif formato == 'excel':
-        from openpyxl import Workbook
-        from openpyxl.styles import Font, PatternFill, Alignment
-        
-        wb = Workbook()
-        
-        # Aba 1: Funcionários
-        ws1 = wb.active
-        ws1.title = "Funcionários"
-        
-        # Cabeçalho
-        ws1['A1'] = 'RELATÓRIO DE FUNCIONÁRIOS - SIGE'
-        ws1['A1'].font = Font(bold=True, size=14)
-        ws1['A2'] = f'Gerado em: {datetime.now().strftime("%d/%m/%Y %H:%M")}'
-        
-        # Headers
-        headers = ['Nome', 'CPF', 'Departamento', 'Função', 'Data Admissão', 'Salário', 'Status']
-        for col, header in enumerate(headers, 1):
-            cell = ws1.cell(row=4, column=col, value=header)
-            cell.font = Font(bold=True)
-            cell.fill = PatternFill(start_color='CCCCCC', end_color='CCCCCC', fill_type='solid')
-        
-        # Dados
-        query = Funcionario.query
-        if departamento_id:
-            query = query.filter_by(departamento_id=departamento_id)
-        
-        for row, f in enumerate(query.all(), 5):
-            ws1.cell(row=row, column=1, value=f.nome)
-            ws1.cell(row=row, column=2, value=f.cpf)
-            ws1.cell(row=row, column=3, value=f.departamento_ref.nome if f.departamento_ref else '')
-            ws1.cell(row=row, column=4, value=f.funcao_ref.nome if f.funcao_ref else '')
-            ws1.cell(row=row, column=5, value=f.data_admissao.strftime('%d/%m/%Y') if f.data_admissao else '')
-            ws1.cell(row=row, column=6, value=f.salario if f.salario else 0)
-            ws1.cell(row=row, column=7, value='Ativo' if f.ativo else 'Inativo')
-        
-        # Aba 2: Obras
-        ws2 = wb.create_sheet("Obras")
-        ws2['A1'] = 'RELATÓRIO DE OBRAS - SIGE'
-        ws2['A1'].font = Font(bold=True, size=14)
-        ws2['A2'] = f'Gerado em: {datetime.now().strftime("%d/%m/%Y %H:%M")}'
-        
-        headers = ['Nome', 'Endereço', 'Data Início', 'Previsão Fim', 'Orçamento', 'Status', 'Responsável']
-        for col, header in enumerate(headers, 1):
-            cell = ws2.cell(row=4, column=col, value=header)
-            cell.font = Font(bold=True)
-            cell.fill = PatternFill(start_color='CCCCCC', end_color='CCCCCC', fill_type='solid')
-        
-        query = Obra.query
-        if obra_id:
-            query = query.filter_by(id=obra_id)
-        
-        for row, o in enumerate(query.all(), 5):
-            responsavel = Funcionario.query.get(o.responsavel_id) if o.responsavel_id else None
-            ws2.cell(row=row, column=1, value=o.nome)
-            ws2.cell(row=row, column=2, value=o.endereco or '')
-            ws2.cell(row=row, column=3, value=o.data_inicio.strftime('%d/%m/%Y') if o.data_inicio else '')
-            ws2.cell(row=row, column=4, value=o.data_previsao_fim.strftime('%d/%m/%Y') if o.data_previsao_fim else '')
-            ws2.cell(row=row, column=5, value=o.orcamento if o.orcamento else 0)
-            ws2.cell(row=row, column=6, value=o.status)
-            ws2.cell(row=row, column=7, value=responsavel.nome if responsavel else '')
-        
-        # Aba 3: Ponto (se filtros de data fornecidos)
-        if data_inicio and data_fim:
-            ws3 = wb.create_sheet("Ponto")
-            ws3['A1'] = 'RELATÓRIO DE PONTO - SIGE'
-            ws3['A1'].font = Font(bold=True, size=14)
-            ws3['A2'] = f'Período: {data_inicio.strftime("%d/%m/%Y")} até {data_fim.strftime("%d/%m/%Y")}'
-            
-            headers = ['Funcionário', 'Data', 'Entrada', 'Saída Almoço', 'Retorno Almoço', 'Saída', 'Horas Trabalhadas', 'Horas Extras', 'Obra']
-            for col, header in enumerate(headers, 1):
-                cell = ws3.cell(row=4, column=col, value=header)
-                cell.font = Font(bold=True)
-                cell.fill = PatternFill(start_color='CCCCCC', end_color='CCCCCC', fill_type='solid')
-            
-            query = RegistroPonto.query.filter(
-                RegistroPonto.data >= data_inicio,
-                RegistroPonto.data <= data_fim
-            )
-            if obra_id:
-                query = query.filter_by(obra_id=obra_id)
-            
-            for row, r in enumerate(query.order_by(RegistroPonto.data.desc()).limit(500).all(), 5):
-                ws3.cell(row=row, column=1, value=r.funcionario_ref.nome)
-                ws3.cell(row=row, column=2, value=r.data.strftime('%d/%m/%Y'))
-                ws3.cell(row=row, column=3, value=r.hora_entrada.strftime('%H:%M') if r.hora_entrada else '')
-                ws3.cell(row=row, column=4, value=r.hora_almoco_saida.strftime('%H:%M') if r.hora_almoco_saida else '')
-                ws3.cell(row=row, column=5, value=r.hora_almoco_retorno.strftime('%H:%M') if r.hora_almoco_retorno else '')
-                ws3.cell(row=row, column=6, value=r.hora_saida.strftime('%H:%M') if r.hora_saida else '')
-                ws3.cell(row=row, column=7, value=r.horas_trabalhadas if r.horas_trabalhadas else 0)
-                ws3.cell(row=row, column=8, value=r.horas_extras if r.horas_extras else 0)
-                ws3.cell(row=row, column=9, value=r.obra_ref.nome if r.obra_ref else '')
-        
-        # Salvar Excel
-        output = BytesIO()
-        wb.save(output)
-        output.seek(0)
-        
-        response = make_response(output.read())
-        response.headers['Content-Type'] = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
-        response.headers['Content-Disposition'] = f'attachment; filename=relatorio_sige_{datetime.now().strftime("%Y%m%d_%H%M")}.xlsx'
-        
-        return response
-    
-    elif formato == 'pdf':
-        from reportlab.lib.pagesizes import A4, landscape
-        from reportlab.lib import colors
-        from reportlab.lib.styles import getSampleStyleSheet
-        from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
-        
-        output = BytesIO()
-        doc = SimpleDocTemplate(output, pagesize=landscape(A4))
-        elements = []
-        styles = getSampleStyleSheet()
-        
-        # Título
-        title = Paragraph(f'<b>RELATÓRIO SIGE - Sistema Integrado de Gestão Empresarial</b>', styles['Title'])
-        elements.append(title)
-        elements.append(Spacer(1, 12))
-        
-        subtitle = Paragraph(f'Gerado em: {datetime.now().strftime("%d/%m/%Y %H:%M")}<br/>Período: {data_inicio.strftime("%d/%m/%Y") if data_inicio else "N/A"} até {data_fim.strftime("%d/%m/%Y") if data_fim else "N/A"}', styles['Normal'])
-        elements.append(subtitle)
-        elements.append(Spacer(1, 20))
-        
-        # 1. Tabela de Funcionários
-        func_title = Paragraph('<b>FUNCIONÁRIOS</b>', styles['Heading2'])
-        elements.append(func_title)
-        elements.append(Spacer(1, 12))
-        
-        query = Funcionario.query
-        if departamento_id:
-            query = query.filter_by(departamento_id=departamento_id)
-        
-        func_data = [['Nome', 'CPF', 'Departamento', 'Função', 'Salário', 'Status']]
-        for f in query.limit(20).all():  # Limitar para caber na página
-            func_data.append([
-                f.nome[:20] + '...' if len(f.nome) > 20 else f.nome,
-                f.cpf,
-                (f.departamento_ref.nome[:15] + '...' if len(f.departamento_ref.nome) > 15 else f.departamento_ref.nome) if f.departamento_ref else '',
-                (f.funcao_ref.nome[:15] + '...' if len(f.funcao_ref.nome) > 15 else f.funcao_ref.nome) if f.funcao_ref else '',
-                f'R$ {f.salario:,.0f}' if f.salario else '',
-                'Ativo' if f.ativo else 'Inativo'
-            ])
-        
-        func_table = Table(func_data)
-        func_table.setStyle(TableStyle([
-            ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
-            ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
-            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-            ('FONTSIZE', (0, 0), (-1, 0), 8),
-            ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
-            ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
-            ('FONTSIZE', (0, 1), (-1, -1), 7),
-            ('GRID', (0, 0), (-1, -1), 1, colors.black)
-        ]))
-        elements.append(func_table)
-        elements.append(Spacer(1, 20))
-        
-        # 2. Tabela de Obras
-        obras_title = Paragraph('<b>OBRAS</b>', styles['Heading2'])
-        elements.append(obras_title)
-        elements.append(Spacer(1, 12))
-        
-        query = Obra.query
-        if obra_id:
-            query = query.filter_by(id=obra_id)
-        
-        obras_data = [['Nome', 'Data Início', 'Previsão Fim', 'Orçamento', 'Status']]
-        for o in query.limit(15).all():
-            obras_data.append([
-                o.nome[:25] + '...' if len(o.nome) > 25 else o.nome,
-                o.data_inicio.strftime('%d/%m/%Y') if o.data_inicio else '',
-                o.data_previsao_fim.strftime('%d/%m/%Y') if o.data_previsao_fim else '',
-                f'R$ {o.orcamento:,.0f}' if o.orcamento else '',
-                o.status
-            ])
-        
-        obras_table = Table(obras_data)
-        obras_table.setStyle(TableStyle([
-            ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
-            ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
-            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-            ('FONTSIZE', (0, 0), (-1, 0), 8),
-            ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
-            ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
-            ('FONTSIZE', (0, 1), (-1, -1), 7),
-            ('GRID', (0, 0), (-1, -1), 1, colors.black)
-        ]))
-        elements.append(obras_table)
-        
-        # Build PDF
-        doc.build(elements)
-        output.seek(0)
-        
-        response = make_response(output.read())
-        response.headers['Content-Type'] = 'application/pdf'
-        response.headers['Content-Disposition'] = f'attachment; filename=relatorio_sige_{datetime.now().strftime("%Y%m%d_%H%M")}.pdf'
-        
-        return response
-    
-    else:
-        return jsonify({'error': 'Formato não suportado'}), 400
-
-@main_bp.route('/alimentacao/restaurantes/<int:restaurante_id>/lancamento', methods=['POST'])
-@login_required
-def criar_lancamento_restaurante(restaurante_id):
-    """Criar lançamento de alimentação para múltiplos funcionários em um restaurante"""
-    from datetime import datetime
-    
-    # Verificar se o restaurante existe e está ativo
-    restaurante = Restaurante.query.get_or_404(restaurante_id)
-    if not restaurante.ativo:
-        flash('Restaurante não está ativo para novos lançamentos.', 'error')
-        return redirect(url_for('main.detalhes_restaurante', restaurante_id=restaurante_id))
-    
-    try:
-        # Obter dados do formulário
-        data_lancamento = datetime.strptime(request.form.get('data_lancamento'), '%Y-%m-%d').date()
-        tipo_refeicao = request.form.get('tipo_refeicao')
-        valor_refeicao = float(request.form.get('valor_refeicao'))
-        obra_id = request.form.get('obra_lancamento') if request.form.get('obra_lancamento') else None
-        observacoes = request.form.get('observacoes_lancamento')
-        funcionarios_ids = request.form.getlist('funcionarios[]')
-        
-        # Validações
-        if not funcionarios_ids:
-            flash('Selecione pelo menos um funcionário para o lançamento.', 'error')
-            return redirect(url_for('main.detalhes_restaurante', restaurante_id=restaurante_id))
-        
-        if valor_refeicao <= 0:
-            flash('O valor da refeição deve ser maior que zero.', 'error')
-            return redirect(url_for('main.detalhes_restaurante', restaurante_id=restaurante_id))
-        
-        # Converter obra_id para inteiro se fornecido
-        if obra_id:
-            obra_id = int(obra_id)
-        
-        # Criar registros de alimentação para cada funcionário
-        registros_criados = 0
-        registros_duplicados = 0
-        
-        for funcionario_id in funcionarios_ids:
-            funcionario_id = int(funcionario_id)
-            
-            # Verificar se já existe registro para este funcionário, data, tipo e restaurante
-            registro_existente = RegistroAlimentacao.query.filter_by(
-                funcionario_id=funcionario_id,
-                data=data_lancamento,
-                tipo=tipo_refeicao,
-                restaurante_id=restaurante_id
-            ).first()
-            
-            if registro_existente:
-                registros_duplicados += 1
-                continue
-            
-            # Criar novo registro
-            novo_registro = RegistroAlimentacao(
-                funcionario_id=funcionario_id,
-                restaurante_id=restaurante_id,
-                obra_id=obra_id,
-                data=data_lancamento,
-                tipo=tipo_refeicao,
-                valor=valor_refeicao,
-                observacoes=observacoes
-            )
-            
-            db.session.add(novo_registro)
-            registros_criados += 1
-        
-        # Salvar no banco de dados
-        db.session.commit()
-        
-        # Mensagem de sucesso
-        if registros_criados > 0:
-            valor_total = registros_criados * valor_refeicao
-            msg = f'Lançamento realizado com sucesso! {registros_criados} registro(s) criado(s) no valor total de R$ {valor_total:.2f}.'
-            if registros_duplicados > 0:
-                msg += f' {registros_duplicados} registro(s) já existiam e foram ignorados.'
-            flash(msg, 'success')
-        else:
-            flash('Nenhum registro foi criado. Todos os funcionários já possuem lançamento para esta data, tipo e restaurante.', 'warning')
-        
-    except ValueError as e:
-        flash('Erro nos dados fornecidos. Verifique os valores e tente novamente.', 'error')
-    except Exception as e:
-        db.session.rollback()
-        flash('Erro interno ao processar o lançamento. Tente novamente.', 'error')
-    
-    return redirect(url_for('main.detalhes_restaurante', restaurante_id=restaurante_id))
-
-@main_bp.route('/api/dashboard-data')
-@login_required
-def dashboard_data():
-    # Dados para gráficos do dashboard
-    funcionarios_dept = db.session.query(
-        Departamento.nome,
-        func.count(Funcionario.id).label('total')
-    ).join(Funcionario).filter(Funcionario.ativo == True).group_by(Departamento.nome).all()
-    
-    custos_obra = db.session.query(
-        Obra.nome,
-        func.sum(CustoObra.valor).label('total_custo')
-    ).join(CustoObra).group_by(Obra.nome).limit(10).all()
-    
-    return jsonify({
-        'funcionarios_departamento': {
-            'labels': [item[0] for item in funcionarios_dept],
-            'data': [item[1] for item in funcionarios_dept]
-        },
-        'custos_obra': {
-            'labels': [item[0] for item in custos_obra],
-            'data': [float(item[1]) for item in custos_obra]
-        }
-    })
-
-# Routes para Ocorrências
-@main_bp.route('/funcionarios/<int:funcionario_id>/ocorrencia/nova', methods=['POST'])
-@login_required
-def nova_ocorrencia(funcionario_id):
-    from models import Ocorrencia
-    
-    funcionario = Funcionario.query.get_or_404(funcionario_id)
-    
-    # Criar nova ocorrência
-    ocorrencia = Ocorrencia()
-    ocorrencia.funcionario_id = funcionario_id
-    ocorrencia.tipo = request.form.get('tipo')
-    ocorrencia.data_inicio = datetime.strptime(request.form.get('data_inicio'), '%Y-%m-%d').date()
-    if request.form.get('data_fim'):
-        ocorrencia.data_fim = datetime.strptime(request.form.get('data_fim'), '%Y-%m-%d').date()
-    ocorrencia.descricao = request.form.get('descricao')
-    ocorrencia.status = request.form.get('status', 'Pendente')
-    
-    db.session.add(ocorrencia)
-    db.session.commit()
-    
-    flash('Ocorrência registrada com sucesso!', 'success')
-    return redirect(url_for('main.funcionario_perfil', id=funcionario_id))
-
-# Horários de Trabalho
-@main_bp.route('/horarios')
-@login_required
-def horarios():
-    horarios = HorarioTrabalho.query.all()
-    return render_template('horarios.html', horarios=horarios)
-
-@main_bp.route('/horarios/novo', methods=['GET', 'POST'])
-@login_required
-def novo_horario():
-    form = HorarioTrabalhoForm()
-    
-    if form.validate_on_submit():
-        horario = HorarioTrabalho(
-            nome=form.nome.data,
-            entrada=form.entrada.data,
-            saida_almoco=form.saida_almoco.data,
-            retorno_almoco=form.retorno_almoco.data,
-            saida=form.saida.data,
-            dias_semana=form.dias_semana.data
-        )
-        db.session.add(horario)
-        db.session.commit()
-        flash('Horário de trabalho cadastrado com sucesso!', 'success')
-        return redirect(url_for('main.horarios'))
-    
-    return render_template('horarios.html', form=form, horarios=HorarioTrabalho.query.all())
-
-@main_bp.route('/horarios/editar/<int:id>', methods=['GET', 'POST'])
-@login_required
-def editar_horario(id):
-    horario = HorarioTrabalho.query.get_or_404(id)
-    form = HorarioTrabalhoForm(obj=horario)
-    
-    if form.validate_on_submit():
-        horario.nome = form.nome.data
-        horario.entrada = form.entrada.data
-        horario.saida_almoco = form.saida_almoco.data
-        horario.retorno_almoco = form.retorno_almoco.data
-        horario.saida = form.saida.data
-        horario.dias_semana = form.dias_semana.data
-        
-        db.session.commit()
-        flash('Horário de trabalho atualizado com sucesso!', 'success')
-        return redirect(url_for('main.horarios'))
-    
-    return render_template('horarios.html', form=form, horarios=HorarioTrabalho.query.all(), edit_id=id)
-
-@main_bp.route('/horarios/excluir/<int:id>', methods=['POST'])
-@login_required
-def excluir_horario(id):
-    horario = HorarioTrabalho.query.get_or_404(id)
-    
-    # Verificar se há funcionários usando este horário
-    funcionarios_usando = Funcionario.query.filter_by(horario_trabalho_id=id).count()
-    if funcionarios_usando > 0:
-        flash(f'Não é possível excluir este horário. {funcionarios_usando} funcionário(s) estão usando este horário.', 'error')
-        return redirect(url_for('main.horarios'))
-    
-    db.session.delete(horario)
-    db.session.commit()
-    flash('Horário de trabalho excluído com sucesso!', 'success')
-    return redirect(url_for('main.horarios'))
-
-
-# ============ ROTAS RDO ============
-
-@main_bp.route('/rdo')
-@login_required
-def lista_rdos():
-    """Lista todos os RDOs com filtros"""
-    from forms import RDOFiltroForm
-    from models import RDO, Obra
-    
-    form = RDOFiltroForm()
-    
-    # Populando choices das obras
-    form.obra_id.choices = [(0, 'Todas as Obras')] + [(obra.id, obra.nome) for obra in Obra.query.all()]
-    
-    # Query base
-    query = RDO.query.join(Obra).join(Funcionario, RDO.criado_por_id == Funcionario.id)
-    
-    # Aplicar filtros se fornecidos
-    if request.method == 'POST' and form.validate():
-        if form.data_inicio.data:
-            query = query.filter(RDO.data_relatorio >= form.data_inicio.data)
-        if form.data_fim.data:
-            query = query.filter(RDO.data_relatorio <= form.data_fim.data)
-        if form.obra_id.data and form.obra_id.data != 0:
-            query = query.filter(RDO.obra_id == form.obra_id.data)
-        if form.status.data:
-            query = query.filter(RDO.status == form.status.data)
-    
-    # Ordenar por data mais recente
-    rdos = query.order_by(RDO.data_relatorio.desc()).all()
-    
-    return render_template('rdo/lista_rdos.html', rdos=rdos, form=form)
-
-
-@main_bp.route('/rdo/novo')
-@main_bp.route('/rdo/novo/<int:obra_id>')
-@login_required
-def novo_rdo(obra_id=None):
-    """Criar novo RDO"""
-    from forms import RDOForm
-    from models import Obra, Funcionario
-    import json
-    
-    form = RDOForm()
-    
-    # Populando choices das obras
-    form.obra_id.choices = [(obra.id, obra.nome) for obra in Obra.query.all()]
-    
-    # Se obra_id foi fornecida, pré-selecionar
-    if obra_id:
-        form.obra_id.data = obra_id
-    
-    # Preparar dados para JavaScript
-    funcionarios = [
-        {'id': f.id, 'nome': f.nome, 'funcao': f.funcao_ref.nome if f.funcao_ref else 'Sem função'}
-        for f in Funcionario.query.filter_by(ativo=True).all()
-    ]
-    
-    obras = [
-        {'id': o.id, 'nome': o.nome}
-        for o in Obra.query.all()
-    ]
-    
-    funcionarios_json = json.dumps(funcionarios)
-    obras_json = json.dumps(obras)
-    
-    return render_template('rdo/formulario_rdo.html', 
-                         form=form, 
-                         modo='criar',
-                         funcionarios_json=funcionarios_json,
-                         obras_json=obras_json)
-
-
-@main_bp.route('/rdo/criar', methods=['POST'])
-@login_required
-def criar_rdo():
-    """Processar criação de RDO"""
-    from forms import RDOForm
-    from models import RDO, Obra
-    import uuid
-    from datetime import datetime
-    
-    form = RDOForm()
-    form.obra_id.choices = [(obra.id, obra.nome) for obra in Obra.query.all()]
-    
-    if form.validate_on_submit():
-        # Gerar número único do RDO
-        numero_rdo = f"RDO-{datetime.now().year}-{str(uuid.uuid4())[:8].upper()}"
-        
-        rdo = RDO(
-            numero_rdo=numero_rdo,
-            data_relatorio=form.data_relatorio.data,
-            obra_id=form.obra_id.data,
-            criado_por_id=current_user.id,  # Assumindo que current_user é um funcionário
-            tempo_manha=form.tempo_manha.data,
-            tempo_tarde=form.tempo_tarde.data,
-            tempo_noite=form.tempo_noite.data,
-            observacoes_meteorologicas=form.observacoes_meteorologicas.data,
-            comentario_geral=form.comentario_geral.data,
-            status=form.status.data
-        )
-        
-        db.session.add(rdo)
-        db.session.commit()
-        
-        flash('RDO criado com sucesso!', 'success')
-        return redirect(url_for('main.visualizar_rdo', id=rdo.id))
-    
-    return render_template('rdo/formulario_rdo.html', form=form, modo='criar')
-
-
-@main_bp.route('/rdo/<int:id>')
-@login_required
-def visualizar_rdo(id):
-    """Visualizar detalhes de um RDO"""
-    from models import RDO
-    
-    rdo = RDO.query.get_or_404(id)
-    return render_template('rdo/visualizar_rdo.html', rdo=rdo)
-
-
-@main_bp.route('/rdo/<int:id>/editar')
-@login_required
-def editar_rdo(id):
-    """Editar RDO existente"""
-    from forms import RDOForm
-    from models import RDO, Obra
-    
-    rdo = RDO.query.get_or_404(id)
-    form = RDOForm(obj=rdo)
-    
-    # Populando choices das obras
-    form.obra_id.choices = [(obra.id, obra.nome) for obra in Obra.query.all()]
-    
-    return render_template('rdo/formulario_rdo.html', form=form, rdo=rdo, modo='editar')
-
-
-@main_bp.route('/rdo/<int:id>/atualizar', methods=['POST'])
-@login_required
-def atualizar_rdo(id):
-    """Processar atualização de RDO"""
-    from forms import RDOForm
-    from models import RDO, Obra
-    
-    rdo = RDO.query.get_or_404(id)
-    form = RDOForm()
-    form.obra_id.choices = [(obra.id, obra.nome) for obra in Obra.query.all()]
-    
-    if form.validate_on_submit():
-        rdo.data_relatorio = form.data_relatorio.data
-        rdo.obra_id = form.obra_id.data
-        rdo.tempo_manha = form.tempo_manha.data
-        rdo.tempo_tarde = form.tempo_tarde.data
-        rdo.tempo_noite = form.tempo_noite.data
-        rdo.observacoes_meteorologicas = form.observacoes_meteorologicas.data
-        rdo.comentario_geral = form.comentario_geral.data
-        rdo.status = form.status.data
-        
-        db.session.commit()
-        
-        flash('RDO atualizado com sucesso!', 'success')
-        return redirect(url_for('main.visualizar_rdo', id=rdo.id))
-    
-    return render_template('rdo/formulario_rdo.html', form=form, rdo=rdo, modo='editar')
-
-
-@main_bp.route('/rdo/<int:id>/excluir', methods=['POST'])
-@login_required
-def excluir_rdo(id):
-    """Excluir RDO"""
-    from models import RDO
-    
-    rdo = RDO.query.get_or_404(id)
-    
-    db.session.delete(rdo)
-    db.session.commit()
-    
-    flash('RDO excluído com sucesso!', 'success')
-    return redirect(url_for('main.lista_rdos'))
-
-
-# Rotas para seções dinâmicas do RDO
-@main_bp.route('/rdo/<int:rdo_id>/mao-obra')
-@login_required
-def gerenciar_mao_obra(rdo_id):
-    """Gerenciar mão de obra do RDO"""
-    from models import RDO, RDOMaoObra, Funcionario
-    
-    rdo = RDO.query.get_or_404(rdo_id)
-    funcionarios = Funcionario.query.filter_by(ativo=True).all()
-    
-    return render_template('rdo/secoes/mao_obra.html', 
-                         rdo=rdo, 
-                         funcionarios=funcionarios)
-
-
-@main_bp.route('/obras/<int:id>/rdos')
-@login_required
-def rdos_por_obra(id):
-    """Lista RDOs de uma obra específica"""
-    from models import Obra, RDO
-    
-    obra = Obra.query.get_or_404(id)
-    rdos = RDO.query.filter_by(obra_id=id).order_by(RDO.data_relatorio.desc()).all()
-    
-    return render_template('rdo/rdos_obra.html', obra=obra, rdos=rdos)
-
-
-# ========== NOVAS FUNCIONALIDADES: ALIMENTAÇÃO APRIMORADA ==========
-
-@main_bp.route('/alimentacao/restaurantes')
-@main_bp.route('/alimentacao/restaurantes', methods=['POST'])
-@login_required
-def alimentacao_restaurantes():
-    """Página principal de alimentação com cards de restaurantes e KPIs"""
-    from forms import FiltroDataForm, AlimentacaoMultiplaForm, RestauranteForm
-    from models import Restaurante, RegistroAlimentacao, Funcionario, Obra
-    from datetime import date, datetime, timedelta
-    from sqlalchemy import func
-    import json
-    
-    # Formulários
-    filtro_form = FiltroDataForm()
-    alimentacao_form = AlimentacaoMultiplaForm()
-    restaurante_form = RestauranteForm()
-    
-    # Definir período padrão (mês atual)
-    data_inicio = date.today().replace(day=1)
-    data_fim = date.today()
-    
-    # Aplicar filtros se fornecidos
-    if request.method == 'POST' and filtro_form.validate_on_submit():
-        if filtro_form.data_inicio.data:
-            data_inicio = filtro_form.data_inicio.data
-        if filtro_form.data_fim.data:
-            data_fim = filtro_form.data_fim.data
-    
-    # Popular formulários
-    alimentacao_form.obra_id.choices = [(0, 'Selecione...')] + [(obra.id, obra.nome) for obra in Obra.query.all()]
-    alimentacao_form.restaurante_id.choices = [(0, 'Selecione...')] + [(r.id, r.nome) for r in Restaurante.query.filter_by(ativo=True).all()]
-    
-    # Calcular KPIs gerais
-    query_kpis = RegistroAlimentacao.query.filter(
-        RegistroAlimentacao.data >= data_inicio,
-        RegistroAlimentacao.data <= data_fim
-    )
-    
-    custo_total = db.session.query(func.sum(RegistroAlimentacao.valor)).filter(
-        RegistroAlimentacao.data >= data_inicio,
-        RegistroAlimentacao.data <= data_fim
-    ).scalar() or 0
-    
-    registros_hoje = RegistroAlimentacao.query.filter_by(data=date.today()).count()
-    
-    funcionarios_alimentados = db.session.query(func.count(func.distinct(RegistroAlimentacao.funcionario_id))).filter(
-        RegistroAlimentacao.data >= data_inicio,
-        RegistroAlimentacao.data <= data_fim
-    ).scalar() or 0
-    
-    dias_periodo = (data_fim - data_inicio).days + 1
-    media_diaria = custo_total / dias_periodo if dias_periodo > 0 else 0
-    
-    kpis = {
-        'custo_total': custo_total,
-        'media_diaria': media_diaria,
-        'registros_hoje': registros_hoje,
-        'funcionarios_alimentados': funcionarios_alimentados
-    }
-    
-    # Buscar restaurantes com KPIs
-    restaurantes = []
-    for restaurante in Restaurante.query.all():
-        custo_restaurante = db.session.query(func.sum(RegistroAlimentacao.valor)).filter(
-            RegistroAlimentacao.restaurante_id == restaurante.id,
-            RegistroAlimentacao.data >= data_inicio,
-            RegistroAlimentacao.data <= data_fim
-        ).scalar() or 0
-        
-        total_registros = RegistroAlimentacao.query.filter(
-            RegistroAlimentacao.restaurante_id == restaurante.id,
-            RegistroAlimentacao.data >= data_inicio,
-            RegistroAlimentacao.data <= data_fim
-        ).count()
-        
-        restaurante.kpis = {
-            'custo_total': custo_restaurante,
-            'total_registros': total_registros
-        }
-        restaurantes.append(restaurante)
-    
-    # Dados para JavaScript
-    funcionarios = [
-        {'id': f.id, 'nome': f.nome, 'funcao': f.funcao_ref.nome if f.funcao_ref else 'Sem função'}
-        for f in Funcionario.query.filter_by(ativo=True).all()
-    ]
-    funcionarios_json = json.dumps(funcionarios)
-    
-    return render_template('alimentacao/restaurantes.html',
-                         restaurantes=restaurantes,
-                         kpis=kpis,
-                         filtro_form=filtro_form,
-                         alimentacao_form=alimentacao_form,
-                         restaurante_form=restaurante_form,
-                         funcionarios_json=funcionarios_json)
-
-
-@main_bp.route('/alimentacao/restaurante/criar', methods=['POST'])
-@login_required
-def criar_restaurante():
-    """Criar novo restaurante"""
-    from forms import RestauranteForm
-    from models import Restaurante
-    
-    form = RestauranteForm()
-    
-    if form.validate_on_submit():
-        restaurante = Restaurante(
-            nome=form.nome.data,
-            endereco=form.endereco.data,
-            telefone=form.telefone.data,
-            email=form.email.data,
-            contato_responsavel=form.contato_responsavel.data,
-            ativo=form.ativo.data
-        )
-        
-        db.session.add(restaurante)
-        db.session.commit()
-        
-        flash('Restaurante cadastrado com sucesso!', 'success')
-    else:
-        flash('Erro ao cadastrar restaurante. Verifique os dados.', 'error')
-    
-    return redirect(url_for('main.alimentacao_restaurantes'))
-
-
-@main_bp.route('/alimentacao/multipla/criar', methods=['POST'])
-@login_required
-def criar_alimentacao_multipla():
-    """Criar lançamento de alimentação para múltiplos funcionários"""
-    from forms import AlimentacaoMultiplaForm
-    from models import RegistroAlimentacao
-    import json
-    
-    form = AlimentacaoMultiplaForm()
-    
-    # Popular choices para validação
-    from models import Obra, Restaurante
-    form.obra_id.choices = [(0, 'Selecione...')] + [(obra.id, obra.nome) for obra in Obra.query.all()]
-    form.restaurante_id.choices = [(0, 'Selecione...')] + [(r.id, r.nome) for r in Restaurante.query.filter_by(ativo=True).all()]
-    
-    if form.validate_on_submit():
-        try:
-            funcionarios_ids = json.loads(form.funcionarios_selecionados.data)
-            
-            if not funcionarios_ids:
-                flash('Selecione pelo menos um funcionário.', 'error')
-                return redirect(url_for('main.alimentacao_restaurantes'))
-            
-            # Criar registro para cada funcionário selecionado
-            registros_criados = 0
-            for funcionario_id in funcionarios_ids:
-                registro = RegistroAlimentacao(
-                    funcionario_id=funcionario_id,
-                    obra_id=form.obra_id.data if form.obra_id.data != 0 else None,
-                    restaurante_id=form.restaurante_id.data if form.restaurante_id.data != 0 else None,
-                    data=form.data.data,
-                    tipo=form.tipo.data,
-                    valor=form.valor.data,
-                    observacoes=form.observacoes.data
-                )
-                db.session.add(registro)
-                registros_criados += 1
-            
-            db.session.commit()
-            
-            flash(f'Lançamento criado com sucesso para {registros_criados} funcionário(s)!', 'success')
-            
-        except Exception as e:
-            db.session.rollback()
-            flash('Erro ao criar lançamento. Tente novamente.', 'error')
-    else:
-        flash('Erro na validação dos dados. Verifique as informações.', 'error')
-    
-    return redirect(url_for('main.alimentacao_restaurantes'))
-
-
-@main_bp.route('/alimentacao/restaurante/<int:restaurante_id>')
-@login_required
-def detalhes_restaurante(restaurante_id):
-    """Página de detalhes de um restaurante específico"""
-    from models import Restaurante, RegistroAlimentacao, Funcionario
-    from datetime import date, timedelta
-    from sqlalchemy import func
-    
-    restaurante = Restaurante.query.get_or_404(restaurante_id)
-    
-    # Período padrão (mês atual)
-    data_inicio = date.today().replace(day=1)
-    data_fim = date.today()
-    
-    # KPIs do restaurante
-    custo_total = db.session.query(func.sum(RegistroAlimentacao.valor)).filter(
-        RegistroAlimentacao.restaurante_id == restaurante.id,
-        RegistroAlimentacao.data >= data_inicio,
-        RegistroAlimentacao.data <= data_fim
-    ).scalar() or 0
-    
-    total_registros = RegistroAlimentacao.query.filter(
-        RegistroAlimentacao.restaurante_id == restaurante.id,
-        RegistroAlimentacao.data >= data_inicio,
-        RegistroAlimentacao.data <= data_fim
-    ).count()
-    
-    funcionarios_unicos = db.session.query(func.count(func.distinct(RegistroAlimentacao.funcionario_id))).filter(
-        RegistroAlimentacao.restaurante_id == restaurante.id,
-        RegistroAlimentacao.data >= data_inicio,
-        RegistroAlimentacao.data <= data_fim
-    ).scalar() or 0
-    
-    media_por_funcionario = custo_total / funcionarios_unicos if funcionarios_unicos > 0 else 0
-    
-    kpis = {
-        'custo_total': custo_total,
-        'total_registros': total_registros,
-        'funcionarios_unicos': funcionarios_unicos,
-        'media_por_funcionario': media_por_funcionario
-    }
-    
-    # Histórico de lançamentos
-    registros = RegistroAlimentacao.query.filter(
-        RegistroAlimentacao.restaurante_id == restaurante.id
-    ).join(Funcionario).order_by(RegistroAlimentacao.data.desc()).limit(50).all()
-    
-    # Dados para o formulário de lançamento
-    funcionarios = Funcionario.query.filter_by(ativo=True).order_by(Funcionario.nome).all()
-    from models import Obra
-    obras = Obra.query.filter_by(status='Em andamento').order_by(Obra.nome).all()
-    data_hoje = date.today().strftime('%Y-%m-%d')
-    
-    return render_template('alimentacao/detalhes_restaurante.html',
-                         restaurante=restaurante,
-                         kpis=kpis,
-                         registros=registros,
-                         funcionarios=funcionarios,
-                         obras=obras,
-                         data_hoje=data_hoje)
-
-# ========== NOVAS ROTAS DASHBOARD v3.0 ==========
-
-@main_bp.route('/funcionario/<int:id>/dashboard-v3')
-@login_required
-def dashboard_funcionario_v3(id):
-    """
-    Dashboard v3.0 com layout 4-4-2 e KPIs corretos
-    Implementa especificação técnica completa
-    """
-    funcionario = Funcionario.query.get_or_404(id)
-    
-    # Obter parâmetros de filtro
-    data_inicio_str = request.args.get('data_inicio')
-    data_fim_str = request.args.get('data_fim')
-    
-    # Definir período padrão (mês atual)
-    if data_inicio_str and data_fim_str:
-        try:
-            data_inicio = datetime.strptime(data_inicio_str, '%Y-%m-%d').date()
-            data_fim = datetime.strptime(data_fim_str, '%Y-%m-%d').date()
-        except ValueError:
-            data_inicio = date.today().replace(day=1)
-            data_fim = date.today()
-    else:
-        data_inicio = date.today().replace(day=1)
-        data_fim = date.today()
-    
-    # Calcular KPIs usando o engine v3.0
-    try:
-        kpis = kpis_engine.calcular_kpis_funcionario(id, data_inicio, data_fim)
-        if not kpis:
-            flash('Erro ao calcular KPIs do funcionário', 'error')
-            return redirect(url_for('main.funcionario_perfil', id=id))
-    except Exception as e:
-        flash(f'Erro ao processar dados: {str(e)}', 'error')
-        # Criar KPIs vazios para evitar erro na template
-        kpis = {
-            'horas_trabalhadas': 0, 'horas_extras': 0, 'faltas': 0, 'atrasos_horas': 0,
-            'custo_mensal': 0, 'absenteismo': 0, 'media_diaria': 0, 'horas_perdidas': 0,
-            'produtividade': 0, 'custo_alimentacao': 0,
-            'periodo': {'inicio': data_inicio, 'fim': data_fim, 'dias_uteis': 0}
-        }
-    
-    return render_template('dashboard_funcionario_v3.html',
-                         funcionario=funcionario,
-                         kpis=kpis,
-                         periodo=kpis.get('periodo', {'inicio': data_inicio, 'fim': data_fim, 'dias_uteis': 0}))
-
-@main_bp.route('/api/funcionario/<int:id>/kpis')
-@login_required
-def api_kpis_funcionario(id):
-    """
-    API endpoint para atualização automática dos KPIs
-    Retorna dados em JSON para atualização via JavaScript
-    """
-    funcionario = Funcionario.query.get_or_404(id)
-    
-    # Obter parâmetros de filtro
-    data_inicio_str = request.args.get('data_inicio')
-    data_fim_str = request.args.get('data_fim')
-    
-    if data_inicio_str and data_fim_str:
-        try:
-            data_inicio = datetime.strptime(data_inicio_str, '%Y-%m-%d').date()
-            data_fim = datetime.strptime(data_fim_str, '%Y-%m-%d').date()
-        except ValueError:
-            return jsonify({'error': 'Formato de data inválido'}), 400
-    else:
-        data_inicio = date.today().replace(day=1)
-        data_fim = date.today()
-    
-    # Calcular KPIs
-    try:
-        kpis = kpis_engine.calcular_kpis_funcionario(id, data_inicio, data_fim)
-        if not kpis:
-            return jsonify({'error': 'Funcionário não encontrado'}), 404
-        
-        return jsonify(kpis)
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
-
-@main_bp.route('/funcionario/<int:id>/relatorio-export')
-@login_required
-def exportar_relatorio_funcionario(id):
-    """
-    Exporta relatório completo do funcionário em formato CSV
-    """
-    funcionario = Funcionario.query.get_or_404(id)
-    
-    # Obter parâmetros de filtro
-    data_inicio_str = request.args.get('data_inicio')
-    data_fim_str = request.args.get('data_fim')
-    
-    if data_inicio_str and data_fim_str:
-        try:
-            data_inicio = datetime.strptime(data_inicio_str, '%Y-%m-%d').date()
-            data_fim = datetime.strptime(data_fim_str, '%Y-%m-%d').date()
-        except ValueError:
-            flash('Formato de data inválido', 'error')
-            return redirect(url_for('main.dashboard_funcionario_v3', id=id))
-    else:
-        data_inicio = date.today().replace(day=1)
-        data_fim = date.today()
-    
-    # Calcular KPIs
-    try:
-        kpis = kpis_engine.calcular_kpis_funcionario(id, data_inicio, data_fim)
-        if not kpis:
-            flash('Erro ao gerar relatório', 'error')
-            return redirect(url_for('main.dashboard_funcionario_v3', id=id))
-        
-        # Gerar conteúdo CSV
-        import csv
-        from io import StringIO
-        from flask import Response
-        
-        output = StringIO()
-        writer = csv.writer(output)
-        
-        # Cabeçalho
-        writer.writerow(['RELATÓRIO DE KPIs - ' + funcionario.nome])
-        writer.writerow(['Código:', funcionario.codigo])
-        writer.writerow(['Período:', f"{data_inicio.strftime('%d/%m/%Y')} a {data_fim.strftime('%d/%m/%Y')}"])
-        writer.writerow([])
-        
-        # Dados dos KPIs
-        writer.writerow(['INDICADOR', 'VALOR', 'UNIDADE'])
-        writer.writerow(['Horas Trabalhadas', kpis['horas_trabalhadas'], 'horas'])
-        writer.writerow(['Horas Extras', kpis['horas_extras'], 'horas'])
-        writer.writerow(['Faltas', kpis['faltas'], 'dias'])
-        writer.writerow(['Atrasos', kpis['atrasos_horas'], 'horas'])
-        writer.writerow(['Custo Mensal', f"R$ {kpis['custo_mensal']:.2f}", 'reais'])
-        writer.writerow(['Absenteísmo', f"{kpis['absenteismo']:.1f}%", 'percentual'])
-        writer.writerow(['Média Diária', kpis['media_diaria'], 'horas/dia'])
-        writer.writerow(['Horas Perdidas', kpis['horas_perdidas'], 'horas'])
-        writer.writerow(['Produtividade', f"{kpis['produtividade']:.1f}%", 'percentual'])
-        writer.writerow(['Custo Alimentação', f"R$ {kpis['custo_alimentacao']:.2f}", 'reais'])
-        
-        output.seek(0)
-        
-        # Retornar como download
-        response = Response(
-            output.getvalue(),
-            mimetype='text/csv',
-            headers={
-                'Content-Disposition': f'attachment; filename=relatorio_kpis_{funcionario.codigo}_{data_inicio}_{data_fim}.csv'
-            }
-        )
-        
-        return response
-        
-    except Exception as e:
-        flash(f'Erro ao gerar relatório: {str(e)}', 'error')
-        return redirect(url_for('main.dashboard_funcionario_v3', id=id))

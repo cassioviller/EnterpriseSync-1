@@ -162,7 +162,10 @@
             <button type="button" class="btn btn-sm btn-outline-primary" id="exportarCSV">
                 <i class="fas fa-download"></i> CSV
             </button>
-            <button type="button" class="btn btn-sm btn-outline-primary" id="exportarPDF">
+            <button type="button" class="btn btn-sm btn-outline-success" id="exportarExcel">
+                <i class="fas fa-file-excel"></i> Excel
+            </button>
+            <button type="button" class="btn btn-sm btn-outline-danger" id="exportarPDF">
                 <i class="fas fa-file-pdf"></i> PDF
             </button>
         </div>
@@ -262,6 +265,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Botões de exportação
     document.getElementById('exportarCSV').addEventListener('click', () => exportarRelatorio('csv'));
+    document.getElementById('exportarExcel').addEventListener('click', () => exportarRelatorio('excel'));
     document.getElementById('exportarPDF').addEventListener('click', () => exportarRelatorio('pdf'));
 
     // Carregar dados iniciais
