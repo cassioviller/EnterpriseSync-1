@@ -1923,9 +1923,117 @@ def receitas():
                          status_filtro=status_filtro,
                          obra_filtro=obra_filtro)
 
+@main_bp.route('/financeiro/fluxo-caixa')
+@login_required
+def fluxo_caixa():
+    """Página de fluxo de caixa"""
+    from financeiro import calcular_fluxo_caixa_periodo
+    
+    # Filtros padrão
+    data_inicio = request.args.get('data_inicio', date.today().replace(day=1).strftime('%Y-%m-%d'))
+    data_fim = request.args.get('data_fim', date.today().strftime('%Y-%m-%d'))
+    obra_id = request.args.get('obra_id', 0, type=int)
+    centro_custo_id = request.args.get('centro_custo_id', 0, type=int)
+    tipo_movimento = request.args.get('tipo_movimento', '')
+    categoria = request.args.get('categoria', '')
+    
+    # Converter datas
+    data_inicio_dt = datetime.strptime(data_inicio, '%Y-%m-%d').date()
+    data_fim_dt = datetime.strptime(data_fim, '%Y-%m-%d').date()
+    
+    # Calcular fluxo
+    fluxo = calcular_fluxo_caixa_periodo(
+        data_inicio_dt, 
+        data_fim_dt,
+        obra_id if obra_id != 0 else None,
+        centro_custo_id if centro_custo_id != 0 else None
+    )
+    
+    # Filtrar movimentos adicionalmente
+    movimentos_filtrados = fluxo['movimentos']
+    if tipo_movimento:
+        movimentos_filtrados = [m for m in movimentos_filtrados if m.tipo_movimento == tipo_movimento]
+    if categoria:
+        movimentos_filtrados = [m for m in movimentos_filtrados if m.categoria == categoria]
+    
+    # Dados para formulários
+    obras = Obra.query.all()
+    centros_custo = CentroCusto.query.filter_by(ativo=True).all()
+    
+    return render_template('financeiro/fluxo_caixa.html',
+                         fluxo=fluxo,
+                         movimentos=movimentos_filtrados,
+                         obras=obras,
+                         centros_custo=centros_custo,
+                         filtros={
+                             'data_inicio': data_inicio,
+                             'data_fim': data_fim,
+                             'obra_id': obra_id,
+                             'centro_custo_id': centro_custo_id,
+                             'tipo_movimento': tipo_movimento,
+                             'categoria': categoria
+                         })
+
 @main_bp.route('/financeiro/centros-custo')
 @login_required
 def centros_custo():
     """Página de gestão de centros de custo"""
     centros = CentroCusto.query.all()
     return render_template('financeiro/centros_custo.html', centros=centros)
+
+@main_bp.route('/financeiro/centros-custo/novo', methods=['GET', 'POST'])
+@login_required
+def novo_centro_custo():
+    """Criar novo centro de custo"""
+    from financeiro import gerar_codigo_centro_custo
+    
+    if request.method == 'POST':
+        try:
+            centro = CentroCusto(
+                codigo=request.form.get('codigo'),
+                nome=request.form.get('nome'),
+                descricao=request.form.get('descricao'),
+                tipo=request.form.get('tipo'),
+                obra_id=int(request.form.get('obra_id')) if request.form.get('obra_id') != '0' else None,
+                departamento_id=int(request.form.get('departamento_id')) if request.form.get('departamento_id') != '0' else None,
+                ativo=bool(request.form.get('ativo'))
+            )
+            
+            db.session.add(centro)
+            db.session.commit()
+            flash('Centro de custo cadastrado com sucesso!', 'success')
+            return redirect(url_for('main.centros_custo'))
+        except Exception as e:
+            db.session.rollback()
+            flash(f'Erro ao cadastrar centro de custo: {str(e)}', 'error')
+    
+    # Dados para formulário
+    obras = Obra.query.all()
+    departamentos = Departamento.query.all()
+    codigo_padrao = gerar_codigo_centro_custo()
+    
+    return render_template('financeiro/centro_custo_form.html', 
+                         titulo='Novo Centro de Custo',
+                         codigo_padrao=codigo_padrao,
+                         obras=obras,
+                         departamentos=departamentos)
+
+@main_bp.route('/financeiro/sincronizar-fluxo', methods=['POST'])
+@login_required
+def sincronizar_fluxo():
+    """Sincronizar dados do fluxo de caixa"""
+    try:
+        from financeiro import sincronizar_fluxo_caixa
+        sincronizar_fluxo_caixa()
+        
+        if request.is_json:
+            return jsonify({'success': True, 'message': 'Fluxo de caixa sincronizado com sucesso!'})
+        else:
+            flash('Fluxo de caixa sincronizado com sucesso!', 'success')
+            return redirect(url_for('main.fluxo_caixa'))
+    except Exception as e:
+        if request.is_json:
+            return jsonify({'success': False, 'message': str(e)})
+        else:
+            flash(f'Erro ao sincronizar fluxo de caixa: {str(e)}', 'error')
+            return redirect(url_for('main.fluxo_caixa'))

@@ -1,0 +1,244 @@
+{% extends "base.html" %}
+
+{% block title %}Fluxo de Caixa - SIGE{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- Header -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center">
+                <h2><i class="fas fa-exchange-alt me-2"></i>Fluxo de Caixa</h2>
+                <button class="btn btn-outline-primary" onclick="sincronizarFluxo()">
+                    <i class="fas fa-sync"></i> Sincronizar
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Filtros -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-body">
+                    <form method="GET" class="row g-3">
+                        <div class="col-md-2">
+                            <label for="data_inicio" class="form-label">Data Início</label>
+                            <input type="date" name="data_inicio" id="data_inicio" class="form-control" 
+                                   value="{{ filtros.data_inicio }}">
+                        </div>
+                        <div class="col-md-2">
+                            <label for="data_fim" class="form-label">Data Fim</label>
+                            <input type="date" name="data_fim" id="data_fim" class="form-control" 
+                                   value="{{ filtros.data_fim }}">
+                        </div>
+                        <div class="col-md-2">
+                            <label for="obra_id" class="form-label">Obra</label>
+                            <select name="obra_id" id="obra_id" class="form-select">
+                                <option value="0">Todas</option>
+                                {% for obra in obras %}
+                                <option value="{{ obra.id }}" {{ 'selected' if filtros.obra_id == obra.id }}>
+                                    {{ obra.nome }}
+                                </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-md-2">
+                            <label for="centro_custo_id" class="form-label">Centro de Custo</label>
+                            <select name="centro_custo_id" id="centro_custo_id" class="form-select">
+                                <option value="0">Todos</option>
+                                {% for centro in centros_custo %}
+                                <option value="{{ centro.id }}" {{ 'selected' if filtros.centro_custo_id == centro.id }}>
+                                    {{ centro.nome }}
+                                </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-md-2">
+                            <label for="tipo_movimento" class="form-label">Tipo</label>
+                            <select name="tipo_movimento" id="tipo_movimento" class="form-select">
+                                <option value="">Todos</option>
+                                <option value="ENTRADA" {{ 'selected' if filtros.tipo_movimento == 'ENTRADA' }}>Entrada</option>
+                                <option value="SAIDA" {{ 'selected' if filtros.tipo_movimento == 'SAIDA' }}>Saída</option>
+                            </select>
+                        </div>
+                        <div class="col-md-2 d-flex align-items-end">
+                            <button type="submit" class="btn btn-primary w-100">
+                                <i class="fas fa-filter"></i> Filtrar
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Resumo do Fluxo -->
+    <div class="row mb-4">
+        <div class="col-md-4">
+            <div class="card bg-success text-white">
+                <div class="card-body text-center">
+                    <h5><i class="fas fa-arrow-up me-2"></i>Total Entradas</h5>
+                    <h3>R$ {{ "%.2f"|format(fluxo.total_entradas) }}</h3>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card bg-danger text-white">
+                <div class="card-body text-center">
+                    <h5><i class="fas fa-arrow-down me-2"></i>Total Saídas</h5>
+                    <h3>R$ {{ "%.2f"|format(fluxo.total_saidas) }}</h3>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card bg-{% if fluxo.saldo_periodo >= 0 %}primary{% else %}warning{% endif %} text-white">
+                <div class="card-body text-center">
+                    <h5><i class="fas fa-balance-scale me-2"></i>Saldo Período</h5>
+                    <h3>R$ {{ "%.2f"|format(fluxo.saldo_periodo) }}</h3>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Tabela de Movimentos -->
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5><i class="fas fa-list me-2"></i>Movimentos ({{ movimentos|length }} registros)</h5>
+                </div>
+                <div class="card-body">
+                    {% if movimentos %}
+                        <div class="table-responsive">
+                            <table class="table table-hover" id="movimentosTable">
+                                <thead>
+                                    <tr>
+                                        <th>Data</th>
+                                        <th>Tipo</th>
+                                        <th>Categoria</th>
+                                        <th>Descrição</th>
+                                        <th>Obra</th>
+                                        <th>Centro de Custo</th>
+                                        <th>Valor</th>
+                                        <th>Referência</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for movimento in movimentos %}
+                                    <tr class="{% if movimento.tipo_movimento == 'ENTRADA' %}table-success{% else %}table-danger{% endif %}">
+                                        <td>{{ movimento.data_movimento.strftime('%d/%m/%Y') }}</td>
+                                        <td>
+                                            <span class="badge bg-{% if movimento.tipo_movimento == 'ENTRADA' %}success{% else %}danger{% endif %}">
+                                                {% if movimento.tipo_movimento == 'ENTRADA' %}
+                                                    <i class="fas fa-arrow-up me-1"></i>Entrada
+                                                {% else %}
+                                                    <i class="fas fa-arrow-down me-1"></i>Saída
+                                                {% endif %}
+                                            </span>
+                                        </td>
+                                        <td>
+                                            <span class="badge bg-secondary">
+                                                {{ movimento.categoria.title() }}
+                                            </span>
+                                        </td>
+                                        <td>{{ movimento.descricao }}</td>
+                                        <td>
+                                            {% if movimento.obra %}
+                                                <a href="{{ url_for('main.obra_detalhes', id=movimento.obra.id) }}">
+                                                    {{ movimento.obra.nome }}
+                                                </a>
+                                            {% else %}
+                                                <span class="text-muted">-</span>
+                                            {% endif %}
+                                        </td>
+                                        <td>
+                                            {% if movimento.centro_custo %}
+                                                {{ movimento.centro_custo.nome }}
+                                            {% else %}
+                                                <span class="text-muted">-</span>
+                                            {% endif %}
+                                        </td>
+                                        <td class="text-end">
+                                            <strong class="{% if movimento.tipo_movimento == 'ENTRADA' %}text-success{% else %}text-danger{% endif %}">
+                                                {% if movimento.tipo_movimento == 'ENTRADA' %}+{% else %}-{% endif %}
+                                                R$ {{ "%.2f"|format(movimento.valor) }}
+                                            </strong>
+                                        </td>
+                                        <td>
+                                            {% if movimento.referencia_tabela and movimento.referencia_id %}
+                                                <small class="text-muted">
+                                                    {{ movimento.referencia_tabela }}#{{ movimento.referencia_id }}
+                                                </small>
+                                            {% else %}
+                                                <span class="text-muted">-</span>
+                                            {% endif %}
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    {% else %}
+                        <div class="text-center text-muted py-5">
+                            <i class="fas fa-exchange-alt fa-3x mb-3"></i>
+                            <h5>Nenhum movimento encontrado</h5>
+                            <p>Não há movimentos financeiros no período selecionado.</p>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+// DataTable
+$(document).ready(function() {
+    $('#movimentosTable').DataTable({
+        language: { url: '//cdn.datatables.net/plug-ins/1.13.6/i18n/pt-BR.json' },
+        order: [[0, 'desc']],
+        pageLength: 25,
+        columnDefs: [
+            { targets: [6], className: 'text-end' }
+        ]
+    });
+});
+
+function sincronizarFluxo() {
+    if (confirm('Deseja sincronizar o fluxo de caixa com todos os dados do sistema? Esta operação pode levar alguns minutos.')) {
+        // Mostrar loading
+        const btn = event.target;
+        const originalText = btn.innerHTML;
+        btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Sincronizando...';
+        btn.disabled = true;
+        
+        fetch('{{ url_for("main.sincronizar_fluxo") }}', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': '{{ csrf_token() }}'
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                location.reload();
+            } else {
+                alert('Erro ao sincronizar: ' + data.message);
+            }
+        })
+        .catch(error => {
+            alert('Erro ao sincronizar fluxo de caixa.');
+            console.error('Error:', error);
+        })
+        .finally(() => {
+            btn.innerHTML = originalText;
+            btn.disabled = false;
+        });
+    }
+}
+</script>
+{% endblock %}

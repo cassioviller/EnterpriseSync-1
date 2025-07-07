@@ -1,0 +1,91 @@
+# PROMPT PARA REPLIT AGENT: IMPLEMENTAÇÃO DE FUNCIONALIDADES PENDENTES - SIGE v3.0
+
+## Contexto do Projeto
+
+Este projeto refere-se ao **Sistema Integrado de Gestão Empresarial (SIGE) v3.0**, uma aplicação web desenvolvida em **Flask (Python)** com **SQLAlchemy** e **PostgreSQL** no backend, e **Bootstrap 5**, **JavaScript (jQuery, Chart.js, DataTables.js)** no frontend. O sistema é voltado para a gestão de empresas de construção civil, abrangendo funcionários, obras, veículos, controle de ponto e alimentação. A versão atual é a v3.0, com atualizações recentes até 07 de Julho de 2025. A linguagem principal do sistema é o **Português Brasileiro**.
+
+## Objetivo
+
+O objetivo é implementar e/ou aprimorar funcionalidades específicas que foram identificadas como pendentes ou incompletas no sistema SIGE v3.0, conforme detalhado nos relatórios de análise. O foco é garantir a completude operacional e aprimorar a experiência do usuário e a capacidade gerencial do sistema.
+
+## Funcionalidades Pendentes e Requisitos Detalhados
+
+Com base na análise técnica e nos relatórios de progresso, as seguintes funcionalidades necessitam de implementação ou aprimoramento:
+
+### 1. Gestão Financeira Avançada
+
+**Problema:** Atualmente, o sistema foca apenas em custos básicos (alimentação, veículos, mão de obra). Falta um módulo completo para uma gestão financeira holística.
+
+**Requisitos:**
+-   **Controle de Receitas:** Implementar um módulo para registro e acompanhamento de receitas, com campos como data, origem (obra, serviço, etc.), valor e descrição.
+-   **Fluxo de Caixa:** Desenvolver uma funcionalidade para visualizar o fluxo de caixa (entradas e saídas) por período, permitindo filtros por obra, departamento, etc.
+-   **Orçamentos vs. Realizados:** Criar um sistema para comparar o orçamento planejado de obras e projetos com os custos e receitas reais, gerando relatórios de desvio.
+-   **Centros de Custo:** Implementar a capacidade de associar despesas e receitas a centros de custo específicos (ex: por obra, por departamento), para uma análise financeira mais granular.
+
+**Impacto Esperado:** Melhorar significativamente a capacidade de gestão financeira da empresa, permitindo um controle mais preciso e decisões mais informadas.
+
+### 3. Segurança e Controle de Acesso
+
+**Problema:** O sistema não possui um sistema de níveis de permissão granular (roles e permissões por módulo) e carece de um sistema de auditoria.
+
+**Requisitos:**
+-   **Controle de Acesso Baseado em Papéis (RBAC):** Implementar um sistema de roles (ex: Administrador, Gerente de Obras, RH, Funcionário) e associar permissões específicas a cada role (ex: Administrador pode acessar tudo, Funcionário só pode ver seu próprio ponto).
+-   **Gerenciamento de Permissões:** Criar uma interface administrativa para atribuir roles aos usuários e gerenciar quais funcionalidades e dados cada role pode acessar (visualizar, criar, editar, excluir).
+-   **Sistema de Auditoria (Logs de Ações):** Implementar um sistema de log que registre as ações críticas dos usuários (ex: criação/edição/exclusão de registros, tentativas de login, alterações de permissão), incluindo data/hora, usuário e tipo de ação.
+
+**Impacto Esperado:** Aumentar a segurança do sistema, garantir a conformidade com políticas internas e externas, e permitir o rastreamento de atividades para fins de auditoria e resolução de problemas.
+
+### 4. Automação e Integrações
+
+**Problema:** O sistema carece de workflows de aprovação, gestão de documentos abrangente e integrações com sistemas externos.
+
+**Requisitos:**
+-   **Sistema de Aprovações:** Desenvolver um workflow de aprovação hierárquico para ocorrências (ex: solicitação de licença precisa ser aprovada pelo gerente de departamento e RH). Incluir status de aprovação (Pendente, Aprovado, Rejeitado) e notificações.
+-   **Gestão de Documentos:** Expandir a funcionalidade de gestão de documentos para além das fotos de funcionários. Permitir o upload, armazenamento e associação de documentos (ex: contratos de obra, licenças, certificados de funcionários) a obras, funcionários ou veículos.
+-   **Integração com APIs Externas:**
+    -   **Validação de Endereços (CEP):** Integrar com uma API de CEP para preenchimento automático de endereços em cadastros de obras e funcionários.
+    -   **Validação de CPF/CNPJ:** Integrar com APIs de validação de CPF/CNPJ para garantir a integridade dos dados cadastrais.
+    -   **Sistemas de Pagamento (Opcional):** Se relevante para futuras funcionalidades (ex: pagamento de fornecedores, reembolso de despesas), considerar integração com gateways de pagamento.
+-   **Sincronização de Dados (APIs):** Desenvolver APIs RESTful para permitir a integração e sincronização de dados do SIGE com outros sistemas internos ou externos da empresa.
+
+**Impacto Esperado:** Reduzir a carga de trabalho manual, minimizar erros, agilizar processos e permitir a interoperabilidade do SIGE com outras ferramentas e plataformas.
+
+### 5. Melhorias de UX/UI e Performance
+
+**Problema:** Existem oportunidades para aprimorar a usabilidade e a performance geral do sistema.
+
+**Requisitos:**
+-   **Persistência de Filtros:** Implementar a persistência dos filtros selecionados (ex: data, obra, departamento) entre as páginas e sessões do usuário, para evitar a necessidade de reaplicá-los constantemente.
+-   **Otimização de Responsividade Mobile:** Realizar testes aprofundados e otimizações na interface para garantir uma experiência de usuário fluida e responsiva em todos os dispositivos móveis (smartphones e tablets).
+-   **Notificações em Tempo Real:** Substituir ou complementar as mensagens flash básicas por um sistema de notificações em tempo real (ex: pop-ups, badges no menu) para alertas importantes (ex: manutenção de veículos vencida, aprovação de ocorrência).
+-   **Busca Avançada e Autocomplete:** Aprimorar as funcionalidades de busca em tabelas e formulários, permitindo buscas com múltiplos critérios e sugestões de autocomplete para campos como nome de funcionário, placa de veículo, nome de obra.
+-   **Otimização de Banco de Dados:** Analisar e otimizar queries SQL complexas, adicionar índices em colunas frequentemente usadas (ex: `data`, `funcionario_id`, `obra_id`) para melhorar a performance de carregamento de dados, especialmente em relatórios e dashboards.
+-   **Cache de Dados:** Implementar mecanismos de cache para dados frequentemente acessados ou resultados de cálculos complexos (ex: KPIs, relatórios), reduzindo a carga no banco de dados e acelerando o tempo de resposta.
+
+**Impacto Esperado:** Melhorar a satisfação do usuário, agilizar a navegação e a interação com o sistema, e garantir que o sistema seja rápido e eficiente mesmo com o aumento do volume de dados.
+
+## Informações Críticas para o Replit Agent
+
+-   **Versão do Sistema:** SIGE v3.0 (com as atualizações v3.1, v3.2, v3.3 de 07/07/2025 já aplicadas).
+-   **Tecnologias:** Flask, SQLAlchemy, PostgreSQL, Bootstrap 5, JavaScript (jQuery, Chart.js, DataTables.js).
+-   **Contexto:** Sistema de gestão para construção civil, com foco em RH, obras, veículos, ponto e alimentação.
+-   **Linguagem:** Português Brasileiro para toda a interface e documentação.
+-   **Modelos de Dados:** Referenciar os modelos existentes em `models.py` (ex: `Funcionario`, `Obra`, `RegistroPonto`, `Ocorrencia`) e criar novos modelos conforme necessário para as funcionalidades financeiras, estoque, etc.
+-   **Engine de KPIs:** O `kpis_engine_v3.py` já está 100% implementado para os KPIs atuais. Novas métricas financeiras ou de estoque devem ser integradas de forma consistente.
+-   **Layout:** Manter a consistência do layout com Bootstrap 5 (tema escuro) e a estrutura de templates Jinja2 (`base.html`).
+-   **Fluxo de Dados:** Respeitar os fluxos de dados existentes e integrar as novas funcionalidades de forma coesa.
+-   **Priorização:** As funcionalidades estão listadas por categoria. O Replit Agent deve abordar uma categoria por vez, começando pelas de maior impacto (Gestão Financeira Avançada, Segurança/Controle de Acesso).
+
+## Exemplo de Abordagem (para o Replit Agent)
+
+Para cada funcionalidade, o Replit Agent deve:
+1.  **Analisar:** Compreender o requisito e identificar os arquivos (`.py`, `.html`, `.js`) que serão afetados.
+2.  **Planejar:** Propor um plano de implementação, incluindo alterações no modelo de dados, rotas, lógica de negócio e interface de usuário.
+3.  **Implementar:** Realizar as modificações no código, adicionando novas funcionalidades ou aprimorando as existentes.
+4.  **Testar:** Garantir que a funcionalidade implementada esteja correta e não introduza regressões.
+5.  **Documentar:** Atualizar a documentação relevante (se aplicável) e fornecer um resumo das alterações realizadas.
+
+--- 
+
+**FIM DO PROMPT**
+

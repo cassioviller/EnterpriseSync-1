@@ -19,15 +19,13 @@ def criar_centros_custo():
             'codigo': 'CC001',
             'nome': 'Obra Residencial Alpha',
             'tipo': 'obra',
-            'descricao': 'Centro de custo para obra residencial Alpha',
-            'obra_id': 1  # Assumindo obra com ID 1
+            'descricao': 'Centro de custo para obra residencial Alpha'
         },
         {
             'codigo': 'CC002',
             'nome': 'Departamento Engenharia',
             'tipo': 'departamento',
-            'descricao': 'Custos do departamento de engenharia',
-            'departamento_id': 1  # Assumindo departamento com ID 1
+            'descricao': 'Custos do departamento de engenharia'
         },
         {
             'codigo': 'CC003',
@@ -45,8 +43,7 @@ def criar_centros_custo():
             'codigo': 'CC005',
             'nome': 'Obra Comercial Beta',
             'tipo': 'obra',
-            'descricao': 'Centro de custo para obra comercial Beta',
-            'obra_id': 2  # Assumindo obra com ID 2
+            'descricao': 'Centro de custo para obra comercial Beta'
         }
     ]
     
@@ -65,8 +62,6 @@ def criar_receitas():
     receitas = [
         {
             'numero_receita': 'REC001',
-            'obra_id': 1,
-            'centro_custo_id': 1,
             'origem': 'obra',
             'descricao': 'Primeira parcela Obra Alpha',
             'valor': 45000.00,
@@ -77,8 +72,6 @@ def criar_receitas():
         },
         {
             'numero_receita': 'REC002',
-            'obra_id': 1,
-            'centro_custo_id': 1,
             'origem': 'obra',
             'descricao': 'Segunda parcela Obra Alpha',
             'valor': 45000.00,
@@ -87,8 +80,6 @@ def criar_receitas():
         },
         {
             'numero_receita': 'REC003',
-            'obra_id': 2,
-            'centro_custo_id': 5,
             'origem': 'obra',
             'descricao': 'Pagamento inicial Obra Beta',
             'valor': 25000.00,
@@ -109,8 +100,6 @@ def criar_receitas():
         },
         {
             'numero_receita': 'REC005',
-            'obra_id': 1,
-            'centro_custo_id': 1,
             'origem': 'obra',
             'descricao': 'Terceira parcela Obra Alpha',
             'valor': 45000.00,
@@ -130,50 +119,28 @@ def criar_receitas():
 def criar_orcamentos_obra():
     """Criar orçamentos vs. realizado para obras"""
     orcamentos = [
-        # Obra 1 - Alpha
+        # Exemplo de orçamentos genéricos
         {
-            'obra_id': 1,
             'categoria': 'mao_obra',
             'orcamento_planejado': 50000.00,
-            'receita_planejada': 135000.00  # Total esperado da obra
+            'receita_planejada': 135000.00  # Total esperado
         },
         {
-            'obra_id': 1,
             'categoria': 'material',
             'orcamento_planejado': 30000.00
         },
         {
-            'obra_id': 1,
             'categoria': 'equipamento',
             'orcamento_planejado': 15000.00
         },
         {
-            'obra_id': 1,
             'categoria': 'alimentacao',
             'orcamento_planejado': 8000.00
-        },
-        # Obra 2 - Beta
-        {
-            'obra_id': 2,
-            'categoria': 'mao_obra',
-            'orcamento_planejado': 35000.00,
-            'receita_planejada': 75000.00
-        },
-        {
-            'obra_id': 2,
-            'categoria': 'material',
-            'orcamento_planejado': 20000.00
-        },
-        {
-            'obra_id': 2,
-            'categoria': 'equipamento',
-            'orcamento_planejado': 10000.00
         }
     ]
     
     for orc_data in orcamentos:
         orcamento = OrcamentoObra.query.filter_by(
-            obra_id=orc_data['obra_id'],
             categoria=orc_data['categoria']
         ).first()
         if not orcamento:

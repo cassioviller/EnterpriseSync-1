@@ -225,7 +225,7 @@ class OrcamentoObra(db.Model):
     __tablename__ = 'orcamento_obra'
     
     id = db.Column(db.Integer, primary_key=True)
-    obra_id = db.Column(db.Integer, db.ForeignKey('obra.id'), nullable=False)
+    obra_id = db.Column(db.Integer, db.ForeignKey('obra.id'), nullable=True)
     categoria = db.Column(db.String(30), nullable=False)  # 'mao_obra', 'material', 'equipamento', 'outros'
     orcamento_planejado = db.Column(db.Float, nullable=False, default=0.0)
     custo_realizado = db.Column(db.Float, default=0.0)
