@@ -1421,10 +1421,14 @@ def dados_graficos():
         }
     })
 
-@main_bp.route('/relatorios/gerar/<tipo>', methods=['POST'])
+@main_bp.route('/relatorios/gerar/<tipo>', methods=['GET', 'POST'])
 @login_required
 def gerar_relatorio(tipo):
-    filtros = request.get_json()
+    # Processar filtros de GET ou POST
+    if request.method == 'POST':
+        filtros = request.get_json() or {}
+    else:
+        filtros = request.args.to_dict()
     
     # Processar filtros
     data_inicio = datetime.strptime(filtros.get('dataInicio', ''), '%Y-%m-%d').date() if filtros.get('dataInicio') else None
@@ -1749,3 +1753,22 @@ def gerar_relatorio(tipo):
             'titulo': 'Relatório não implementado',
             'html': '<div class="alert alert-info">Este tipo de relatório ainda não foi implementado.</div>'
         })
+
+@main_bp.route('/relatorios/exportar/<tipo>', methods=['GET', 'POST'])
+@login_required
+def exportar_relatorio(tipo):
+    """Exporta relatório em formato específico"""
+    from relatorios_funcionais import gerar_relatorio_funcional
+    
+    # Processar filtros e formato
+    if request.method == 'POST':
+        filtros = request.get_json() or {}
+        formato = filtros.get('formato', 'csv')
+    else:
+        filtros = request.args.to_dict()
+        formato = filtros.get('formato', 'csv')
+    
+    try:
+        return gerar_relatorio_funcional(tipo, formato, filtros)
+    except Exception as e:
+        return jsonify({'erro': str(e)}), 500

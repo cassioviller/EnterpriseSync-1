@@ -567,5 +567,189 @@ def _exportar_pdf(data_inicio, data_fim, obra_id, departamento_id):
     response = make_response(pdf)
     response.headers["Content-Disposition"] = f"attachment; filename=relatorio_sige_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
     response.headers["Content-Type"] = "application/pdf"
+    return response
+
+def gerar_relatorio_funcional(tipo, formato, filtros=None):
+    """
+    Função principal para gerar relatórios funcionais com exportação
+    Suporta formatos: csv, excel, pdf
+    """
+    if filtros is None:
+        filtros = {}
+    
+    # Processar filtros
+    data_inicio = datetime.strptime(filtros.get('dataInicio', ''), '%Y-%m-%d').date() if filtros.get('dataInicio') else None
+    data_fim = datetime.strptime(filtros.get('dataFim', ''), '%Y-%m-%d').date() if filtros.get('dataFim') else None
+    obra_id = int(filtros.get('obra')) if filtros.get('obra') else None
+    departamento_id = int(filtros.get('departamento')) if filtros.get('departamento') else None
+    
+    # Gerar dados do relatório
+    dados = []
+    nome_arquivo = f"relatorio_{tipo}_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+    
+    if tipo == 'funcionarios':
+        query = Funcionario.query
+        if departamento_id:
+            query = query.filter_by(departamento_id=departamento_id)
+        funcionarios = query.all()
+        
+        for func in funcionarios:
+            dados.append({
+                'Código': func.codigo or '',
+                'Nome': func.nome,
+                'CPF': func.cpf,
+                'Departamento': func.departamento_ref.nome if func.departamento_ref else '',
+                'Função': func.funcao_ref.nome if func.funcao_ref else '',
+                'Data Admissão': func.data_admissao.strftime('%d/%m/%Y') if func.data_admissao else '',
+                'Salário': f'R$ {func.salario:,.2f}' if func.salario else '',
+                'Status': 'Ativo' if func.ativo else 'Inativo'
+            })
+    
+    elif tipo == 'ponto':
+        query = RegistroPonto.query
+        if data_inicio:
+            query = query.filter(RegistroPonto.data >= data_inicio)
+        if data_fim:
+            query = query.filter(RegistroPonto.data <= data_fim)
+        if departamento_id:
+            query = query.join(Funcionario).filter(Funcionario.departamento_id == departamento_id)
+        
+        registros = query.all()
+        for reg in registros:
+            dados.append({
+                'Data': reg.data.strftime('%d/%m/%Y'),
+                'Funcionário': reg.funcionario_ref.nome,
+                'Entrada': reg.hora_entrada.strftime('%H:%M') if reg.hora_entrada else '',
+                'Saída': reg.hora_saida.strftime('%H:%M') if reg.hora_saida else '',
+                'Horas Trabalhadas': f"{reg.horas_trabalhadas:.2f}" if reg.horas_trabalhadas else '0.00',
+                'Horas Extras': f"{reg.horas_extras:.2f}" if reg.horas_extras else '0.00',
+                'Atraso (min)': str(reg.total_atraso_minutos or 0),
+                'Observações': reg.observacoes or ''
+            })
+    
+    # Gerar arquivo baseado no formato
+    if formato == 'csv':
+        return _gerar_csv_export(dados, nome_arquivo)
+    elif formato == 'excel':
+        return _gerar_excel_export(dados, nome_arquivo)
+    elif formato == 'pdf':
+        return _gerar_pdf_export(dados, nome_arquivo, tipo)
+    else:
+        return jsonify({'erro': 'Formato não suportado'}), 400
+
+def _gerar_csv_export(dados, nome_arquivo):
+    """Gera arquivo CSV"""
+    if not dados:
+        return jsonify({'erro': 'Nenhum dado encontrado'}), 400
+    
+    output = io.StringIO()
+    writer = csv.DictWriter(output, fieldnames=dados[0].keys())
+    writer.writeheader()
+    writer.writerows(dados)
+    
+    response = make_response(output.getvalue())
+    response.headers['Content-Type'] = 'text/csv'
+    response.headers['Content-Disposition'] = f'attachment; filename="{nome_arquivo}.csv"'
+    return response
+
+def _gerar_excel_export(dados, nome_arquivo):
+    """Gera arquivo Excel usando openpyxl"""
+    try:
+        from openpyxl import Workbook
+        from openpyxl.styles import Font, Alignment
+        
+        if not dados:
+            return jsonify({'erro': 'Nenhum dado encontrado'}), 400
+        
+        wb = Workbook()
+        ws = wb.active
+        ws.title = "Relatório"
+        
+        # Cabeçalhos
+        headers = list(dados[0].keys())
+        for col, header in enumerate(headers, 1):
+            cell = ws.cell(row=1, column=col, value=header)
+            cell.font = Font(bold=True)
+            cell.alignment = Alignment(horizontal='center')
+        
+        # Dados
+        for row, item in enumerate(dados, 2):
+            for col, header in enumerate(headers, 1):
+                ws.cell(row=row, column=col, value=item[header])
+        
+        # Salvar em BytesIO
+        output = BytesIO()
+        wb.save(output)
+        output.seek(0)
+        
+        response = make_response(output.read())
+        response.headers['Content-Type'] = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        response.headers['Content-Disposition'] = f'attachment; filename="{nome_arquivo}.xlsx"'
+        return response
+        
+    except ImportError:
+        return jsonify({'erro': 'Biblioteca openpyxl não disponível'}), 500
+
+def _gerar_pdf_export(dados, nome_arquivo, tipo):
+    """Gera arquivo PDF usando reportlab"""
+    try:
+        from reportlab.lib.pagesizes import letter, A4
+        from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
+        from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+        from reportlab.lib import colors
+        from reportlab.lib.units import inch
+        
+        if not dados:
+            return jsonify({'erro': 'Nenhum dado encontrado'}), 400
+        
+        buffer = BytesIO()
+        doc = SimpleDocTemplate(buffer, pagesize=A4)
+        styles = getSampleStyleSheet()
+        
+        # Título
+        title_style = ParagraphStyle(
+            'CustomTitle',
+            parent=styles['Heading1'],
+            fontSize=16,
+            spaceAfter=30,
+            alignment=1  # Center
+        )
+        title = Paragraph(f"Relatório - {tipo.replace('-', ' ').title()}", title_style)
+        
+        # Preparar dados da tabela
+        table_data = []
+        headers = list(dados[0].keys())
+        table_data.append(headers)
+        
+        for item in dados:
+            row = [str(item[header]) for header in headers]
+            table_data.append(row)
+        
+        # Criar tabela
+        table = Table(table_data)
+        table.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
+            ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('FONTSIZE', (0, 0), (-1, 0), 10),
+            ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+            ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
+            ('GRID', (0, 0), (-1, -1), 1, colors.black),
+            ('FONTSIZE', (0, 1), (-1, -1), 8),
+        ]))
+        
+        # Construir documento
+        elements = [title, Spacer(1, 12), table]
+        doc.build(elements)
+        
+        buffer.seek(0)
+        response = make_response(buffer.read())
+        response.headers['Content-Type'] = 'application/pdf'
+        response.headers['Content-Disposition'] = f'attachment; filename="{nome_arquivo}.pdf"'
+        return response
+        
+    except ImportError:
+        return jsonify({'erro': 'Biblioteca reportlab não disponível'}), 500
     
     return response
