@@ -265,6 +265,23 @@ SIGE (Sistema Integrado de Gestão Empresarial) is a comprehensive business mana
   - Centros de custo configuráveis por obra, departamento, projeto ou atividade
   - Correção de erro na página de obras (referência de rota inexistente)
   - Sistema financeiro totalmente operacional e integrado ao SIGE v3.0
+- July 07, 2025. Correção Completa do Sistema de Funcionários - v4.1:
+  - Implementadas funções utilitárias críticas: gerar_codigo_funcionario, salvar_foto_funcionario, validar_cpf
+  - Corrigidas rotas truncadas novo_funcionario e editar_funcionario com validações completas
+  - Criado template funcionario_form.html com JavaScript para preview de foto e máscaras
+  - Validação de CPF em tempo real com algoritmo brasileiro oficial
+  - Sistema de upload de foto funcional com nomenclatura por código do funcionário
+  - Prevenção de duplicatas de CPF e geração automática de códigos únicos (F0001, F0002, etc.)
+  - Máscaras de entrada para CPF e telefone com formatação automática
+  - Criado relatório técnico completo (RELATORIO_PONTO_E_CUSTOS_FUNCIONARIOS.md) documentando:
+    * Arquitetura completa do sistema de controle de ponto
+    * Engine de KPIs v3.0 com 10 indicadores em layout 4-4-2
+    * Lógica detalhada de cálculo de custos (mão de obra, alimentação, transporte)
+    * Algoritmo de identificação inteligente de faltas considerando dias úteis e feriados
+    * Sistema de triggers automáticos para atualização de cálculos de ponto
+    * Regras de negócio específicas para construção civil
+    * Métricas de performance e otimizações implementadas
+  - Sistema de funcionários agora 100% operacional com cadastro, edição e gestão completa
 
 ## User Preferences
 
