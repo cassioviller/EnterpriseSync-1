@@ -298,10 +298,17 @@ Header:
 - Status de acompanhamento
 
 ### 6.4 Alimentação
-- Registro por funcionário
-- Tipos: marmita, refeição local, lanches
-- Vinculação a obras e restaurantes
-- Lançamento múltiplo
+- **Gestão de Restaurantes:** CRUD completo com status ativo/inativo
+- **Lançamento Individual:** Registro por funcionário
+- **Lançamento Múltiplo:** Modal funcional para múltiplos funcionários
+- **Tipos Suportados:** Marmita, refeição local, café, almoço, jantar, lanches
+- **Vinculação:** Obras e restaurantes
+- **KPIs:** Custo total, registros únicos, funcionários atendidos
+- **Funcionalidade Avançada:** Modal implementado em 07/07/2025 com:
+  - Seleção múltipla de funcionários com "Selecionar Todos"
+  - Cálculo automático de valor total em tempo real
+  - Validação de duplicatas
+  - Confirmação de lançamento com resumo
 
 ### 6.5 Relatórios
 - Dashboard executivo
@@ -442,6 +449,40 @@ Ao solicitar modificações, sempre mencione:
 
 ---
 
+## 13. CHANGELOG ATUALIZAÇÕES RECENTES
+
+### 📅 07 de Julho de 2025 - v3.1
+**Implementação: Modal Funcional de Alimentação**
+
+#### Funcionalidades Adicionadas:
+- **Modal de Lançamento em Restaurantes:** Implementação completa do modal funcional na página de detalhes de restaurantes
+- **Formulário Dinâmico:** Seleção múltipla de funcionários com checkbox "Selecionar Todos"
+- **Cálculo em Tempo Real:** Valor total atualizado automaticamente baseado na seleção
+- **Validação Completa:** Frontend (JavaScript) e backend (Python/Flask)
+- **Prevenção de Duplicatas:** Sistema verifica registros existentes antes de criar
+- **Rota Backend:** `/alimentacao/restaurantes/<int:restaurante_id>/lancamento` (POST)
+
+#### Arquivos Modificados:
+- `templates/alimentacao/detalhes_restaurante.html` - Modal funcional implementado
+- `views.py` - Nova rota `criar_lancamento_restaurante()` adicionada
+- JavaScript personalizado para UX interativo
+
+#### Benefícios Operacionais:
+- Redução de tempo para lançamentos múltiplos
+- Interface mais intuitiva para gestores
+- Melhor controle de custos de alimentação
+- Experiência de usuário aprimorada
+
+### 📅 04 de Julho de 2025 - v3.0
+**Implementação Base: Sistema KPIs Avançado**
+- Engine v3.0 de cálculo de KPIs
+- Layout 4-4-2 no perfil do funcionário
+- Sistema de detecção de feriados
+- Identificação visual de ausências
+- Cálculo automático de atrasos
+
+---
+
 **FIM DO RELATÓRIO**
 
-*Este documento serve como referência completa para entendimento do sistema SIGE v3.0 e criação de prompts eficazes para desenvolvimento futuro.*
+*Este documento serve como referência completa para entendimento do sistema SIGE v3.0+ e criação de prompts eficazes para desenvolvimento futuro.*
