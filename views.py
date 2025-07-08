@@ -771,11 +771,34 @@ def obras():
     from datetime import date, timedelta
     from sqlalchemy import func
     
-    obras = Obra.query.all()
+    # Filtros
+    nome_filtro = request.args.get('nome', '').strip()
+    status_filtro = request.args.get('status', '')
+    data_inicio_filtro = request.args.get('data_inicio')
+    data_fim_filtro = request.args.get('data_fim')
     
-    # Adicionar KPIs básicos para cada obra (últimos 30 dias)
-    data_fim = date.today()
-    data_inicio = data_fim - timedelta(days=30)
+    # Query base
+    query = Obra.query
+    
+    # Aplicar filtros
+    if nome_filtro:
+        query = query.filter(Obra.nome.ilike(f'%{nome_filtro}%'))
+    if status_filtro:
+        query = query.filter(Obra.status == status_filtro)
+    
+    obras = query.all()
+    
+    # Período para KPIs (padrão: último mês)
+    if data_fim_filtro:
+        data_fim = datetime.strptime(data_fim_filtro, '%Y-%m-%d').date()
+    else:
+        data_fim = date.today()
+        
+    if data_inicio_filtro:
+        data_inicio = datetime.strptime(data_inicio_filtro, '%Y-%m-%d').date()
+    else:
+        # Último mês por padrão
+        data_inicio = data_fim - timedelta(days=30)
     
     for obra in obras:
         # Calcular RDOs
@@ -801,7 +824,18 @@ def obras():
             'custo_total': custo_alimentacao  # Simplificado para exibição nos cards
         })()
     
-    return render_template('obras.html', obras=obras)
+    # Status disponíveis para filtro
+    status_options = ['Em andamento', 'Concluída', 'Pausada', 'Cancelada']
+    
+    return render_template('obras.html', 
+                         obras=obras,
+                         filtros={
+                             'nome': nome_filtro,
+                             'status': status_filtro,
+                             'data_inicio': data_inicio_filtro or data_inicio.strftime('%Y-%m-%d'),
+                             'data_fim': data_fim_filtro or data_fim.strftime('%Y-%m-%d')
+                         },
+                         status_options=status_options)
 
 @main_bp.route('/obras/novo', methods=['GET', 'POST'])
 @login_required

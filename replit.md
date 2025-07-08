@@ -332,6 +332,14 @@ SIGE (Sistema Integrado de Gestão Empresarial) is a comprehensive business mana
   - Horas extras calculadas corretamente: 8h (feriado 100%) + 4h (sábado 50%) + 4h (domingo 100%) = 20h
   - Sistema visual mantém identificação por badges e cores para tipos especiais
   - KPIs agora refletem dados precisos: 83h trabalhadas, 20h extras, 1h atrasos, 1 falta
+- July 08, 2025. Melhorias na Página de Obras com Filtros Rápidos - v4.8:
+  - Removido botão duplicado "Ver Detalhes" nos cards e tabela de obras
+  - Implementados filtros rápidos na parte superior: nome da obra, status, período de datas
+  - Pré-selecionado período padrão para últimos 30 dias (mês atual)
+  - Botão "Limpar Filtros" para resetar busca facilmente
+  - Informação visual sobre período padrão para cálculo de KPIs
+  - Navegação otimizada: botão verde agora cria RDO com obra pré-selecionada
+  - Interface mais limpa e funcional para gestão de obras
 
 ## User Preferences
 
