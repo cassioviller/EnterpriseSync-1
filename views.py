@@ -886,10 +886,39 @@ def obras():
         ).scalar() or 0.0
         
         # Criar objeto KPI simples
+        # Calcular custos reais da obra
+        custo_obra_total = 0
+        
+        # Custos diretos de obra
+        try:
+            from models import CustoObra
+            custos_obra = db.session.query(CustoObra).filter(
+                CustoObra.obra_id == obra.id,
+                CustoObra.data >= data_inicio,
+                CustoObra.data <= data_fim
+            ).all()
+            custo_obra_total += sum(custo.valor for custo in custos_obra)
+        except:
+            pass
+        
+        # Adicionar custos de alimentação
+        custo_obra_total += custo_alimentacao
+        
+        # Custos de veículos da obra
+        try:
+            custos_veiculos = db.session.query(CustoVeiculo).filter(
+                CustoVeiculo.obra_id == obra.id,
+                CustoVeiculo.data_custo >= data_inicio,
+                CustoVeiculo.data_custo <= data_fim
+            ).all()
+            custo_obra_total += sum(custo.valor for custo in custos_veiculos)
+        except:
+            pass
+        
         obra.kpis = type('KPIs', (), {
             'total_rdos': total_rdos,
             'dias_trabalhados': dias_trabalhados,
-            'custo_total': custo_alimentacao  # Simplificado para exibição nos cards
+            'custo_total': custo_obra_total
         })()
     
     # Status disponíveis para filtro
@@ -2481,3 +2510,12 @@ def sincronizar_fluxo():
         else:
             flash(f'Erro ao sincronizar fluxo de caixa: {str(e)}', 'error')
             return redirect(url_for('main.fluxo_caixa'))
+
+@main_bp.route('/horarios-trabalho')
+@login_required
+def horarios_trabalho():
+    """Página de gestão de horários de trabalho"""
+    horarios = HorarioTrabalho.query.all()
+    return render_template('horarios_trabalho.html', horarios=horarios)
+
+
