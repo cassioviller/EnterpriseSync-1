@@ -170,7 +170,7 @@
                     <i class="fas fa-clipboard-list"></i> RDOs do Período
                     <span class="badge bg-primary ms-2">{{ rdos_periodo|length }}</span>
                 </h5>
-                <a href="{{ url_for('main.novo_rdo', obra_id=obra.id) }}" class="btn btn-sm btn-primary">
+                <a href="{{ url_for('main.novo_rdo') }}?obra_id={{ obra.id }}" class="btn btn-sm btn-primary">
                     <i class="fas fa-plus"></i> Novo RDO
                 </a>
             </div>

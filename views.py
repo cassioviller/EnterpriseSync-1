@@ -2185,6 +2185,140 @@ def centros_custo():
     centros = CentroCusto.query.all()
     return render_template('financeiro/centros_custo.html', centros=centros)
 
+# ============================================================================
+# ROTAS RDO (RELATÓRIO DIÁRIO DE OBRA)
+# ============================================================================
+
+@main_bp.route('/rdo')
+@login_required
+def lista_rdos():
+    """Lista todos os RDOs com filtros"""
+    page = request.args.get('page', 1, type=int)
+    
+    # Filtros
+    obra_id = request.args.get('obra_id')
+    data_inicio = request.args.get('data_inicio')
+    data_fim = request.args.get('data_fim')
+    status = request.args.get('status')
+    
+    # Query base
+    query = RDO.query
+    
+    # Aplicar filtros
+    if obra_id:
+        query = query.filter(RDO.obra_id == obra_id)
+    if data_inicio:
+        query = query.filter(RDO.data_relatorio >= datetime.strptime(data_inicio, '%Y-%m-%d').date())
+    if data_fim:
+        query = query.filter(RDO.data_relatorio <= datetime.strptime(data_fim, '%Y-%m-%d').date())
+    if status:
+        query = query.filter(RDO.status == status)
+    
+    # Ordenação e paginação
+    rdos = query.order_by(RDO.data_relatorio.desc()).paginate(
+        page=page, per_page=20, error_out=False
+    )
+    
+    # Dados para filtros
+    obras = Obra.query.all()
+    
+    return render_template('rdo/lista_rdos.html', 
+                         rdos=rdos, 
+                         obras=obras,
+                         filtros={
+                             'obra_id': obra_id,
+                             'data_inicio': data_inicio,
+                             'data_fim': data_fim,
+                             'status': status
+                         })
+
+@main_bp.route('/rdo/novo')
+@login_required
+def novo_rdo():
+    """Formulário para criar novo RDO"""
+    obra_id = request.args.get('obra_id')
+    
+    # Dados para o formulário
+    obras = Obra.query.filter_by(status='Em andamento').all()
+    funcionarios = Funcionario.query.filter_by(ativo=True).all()
+    
+    return render_template('rdo/formulario_rdo.html', 
+                         obras=obras,
+                         funcionarios=funcionarios,
+                         obra_id_selecionada=obra_id,
+                         modo='criar')
+
+@main_bp.route('/rdo/criar', methods=['POST'])
+@login_required
+def criar_rdo():
+    """Processar criação de novo RDO"""
+    try:
+        # Gerar número único do RDO
+        import uuid
+        numero_rdo = f"RDO-{datetime.now().year}-{str(uuid.uuid4())[:8].upper()}"
+        
+        rdo = RDO(
+            numero_rdo=numero_rdo,
+            data_relatorio=datetime.strptime(request.form.get('data_relatorio'), '%Y-%m-%d').date(),
+            obra_id=request.form.get('obra_id'),
+            criado_por_id=current_user.id,
+            tempo_manha=request.form.get('tempo_manha', ''),
+            tempo_tarde=request.form.get('tempo_tarde', ''),
+            tempo_noite=request.form.get('tempo_noite', ''),
+            observacoes_meteorologicas=request.form.get('observacoes_meteorologicas', ''),
+            comentario_geral=request.form.get('comentario_geral', ''),
+            status=request.form.get('status', 'Rascunho')
+        )
+        
+        db.session.add(rdo)
+        db.session.commit()
+        
+        flash('RDO criado com sucesso!', 'success')
+        return redirect(url_for('main.visualizar_rdo', id=rdo.id))
+        
+    except Exception as e:
+        db.session.rollback()
+        flash(f'Erro ao criar RDO: {str(e)}', 'error')
+        return redirect(url_for('main.novo_rdo'))
+
+@main_bp.route('/rdo/<int:id>')
+@login_required
+def visualizar_rdo(id):
+    """Visualizar detalhes de um RDO"""
+    rdo = RDO.query.get_or_404(id)
+    return render_template('rdo/visualizar_rdo.html', rdo=rdo)
+
+@main_bp.route('/rdo/<int:id>/editar')
+@login_required
+def editar_rdo(id):
+    """Formulário para editar RDO"""
+    rdo = RDO.query.get_or_404(id)
+    obras = Obra.query.all()
+    funcionarios = Funcionario.query.filter_by(ativo=True).all()
+    
+    return render_template('rdo/formulario_rdo.html', 
+                         rdo=rdo,
+                         obras=obras,
+                         funcionarios=funcionarios,
+                         modo='editar')
+
+@main_bp.route('/rdo/<int:id>/excluir', methods=['POST'])
+@login_required
+def excluir_rdo(id):
+    """Excluir RDO"""
+    try:
+        rdo = RDO.query.get_or_404(id)
+        db.session.delete(rdo)
+        db.session.commit()
+        
+        flash('RDO excluído com sucesso!', 'success')
+        return redirect(url_for('main.lista_rdos'))
+        
+    except Exception as e:
+        db.session.rollback()
+        flash(f'Erro ao excluir RDO: {str(e)}', 'error')
+        return redirect(url_for('main.lista_rdos'))
+
 @main_bp.route('/financeiro/centros-custo/novo', methods=['GET', 'POST'])
 @login_required
 def novo_centro_custo():

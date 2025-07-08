@@ -318,6 +318,12 @@ SIGE (Sistema Integrado de Gestão Empresarial) is a comprehensive business mana
   - Corrigida exibição de horários de almoço (mostra "-" ao invés de "Sem Intervalo" quando não há)
   - Sistema agora reflete corretamente a realidade: maioria dos funcionários fazem intervalo de almoço
   - Feriados trabalhados exibem corretamente horários de entrada, saída e almoço com horas extras
+- July 08, 2025. Correção do Link RDO no Menu de Navegação - v4.6:
+  - Corrigido link "RDO" no menu principal que estava direcionando para relatórios
+  - Link agora aponta corretamente para main.lista_rdos
+  - Implementadas rotas RDO completas: lista_rdos, novo_rdo, criar_rdo, visualizar_rdo, editar_rdo, excluir_rdo
+  - Corrigido link de criação de RDO na página de detalhes de obra
+  - Sistema RDO (Relatório Diário de Obra) agora totalmente funcional e acessível pelo menu
 
 ## User Preferences
 
