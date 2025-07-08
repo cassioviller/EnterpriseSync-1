@@ -2338,13 +2338,17 @@ def lista_rdos():
 @login_required
 def novo_rdo():
     """Formulário para criar novo RDO"""
+    from forms import RDOForm
+    
     obra_id = request.args.get('obra_id')
+    form = RDOForm()
     
     # Dados para o formulário
     obras = Obra.query.filter_by(status='Em andamento').all()
     funcionarios = Funcionario.query.filter_by(ativo=True).all()
     
     return render_template('rdo/formulario_rdo.html', 
+                         form=form,
                          obras=obras,
                          funcionarios=funcionarios,
                          obra_id_selecionada=obra_id,
