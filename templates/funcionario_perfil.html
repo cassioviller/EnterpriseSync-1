@@ -208,6 +208,33 @@
                 </div>
 
                 <div class="row mb-3">
+                    <div class="col-md-3">
+                        <div class="text-center p-3 border rounded">
+                            <h4 class="text-success mb-1">R$ {{ '{:,.2f}'.format(kpis.custo_mao_obra) if kpis.custo_mao_obra is defined else '0,00' }}</h4>
+                            <small class="text-muted">Custo Mão de obra</small>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="text-center p-3 border rounded">
+                            <h4 class="text-primary mb-1">R$ {{ '{:,.2f}'.format(kpis.custo_alimentacao) if kpis.custo_alimentacao is defined else '0,00' }}</h4>
+                            <small class="text-muted">Custo Alimentação</small>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="text-center p-3 border rounded">
+                            <h4 class="text-secondary mb-1">R$ {{ '{:,.2f}'.format(kpis.custo_transporte) if kpis.custo_transporte is defined else '0,00' }}</h4>
+                            <small class="text-muted">Custo Transporte</small>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="text-center p-3 border rounded">
+                            <h4 class="text-warning mb-1">{{ '{:.1f}h'.format(kpis.horas_perdidas) if kpis.horas_perdidas is defined else '0.0h' }}</h4>
+                            <small class="text-muted">Horas Perdidas</small>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="row mb-3">
                     <div class="col-md-4">
                         <div class="text-center p-3 border rounded">
                             <h4 class="text-info mb-1">R$ {{ '{:,.2f}'.format(kpis.outros_custos if kpis.outros_custos is defined else 0) }}</h4>
@@ -216,14 +243,14 @@
                     </div>
                     <div class="col-md-4">
                         <div class="text-center p-3 border rounded">
-                            <h4 class="text-success mb-1">R$ {{ '{:,.2f}'.format(kpis.custo_mao_obra) if kpis.custo_mao_obra is defined else '0,00' }}</h4>
-                            <small class="text-muted">Custo Mão de obra</small>
+                            <h4 class="text-success mb-1">{{ '{:.1f}%'.format(kpis.produtividade) if kpis.produtividade is defined else '0.0%' }}</h4>
+                            <small class="text-muted">Produtividade</small>
                         </div>
                     </div>
                     <div class="col-md-4">
                         <div class="text-center p-3 border rounded">
-                            <h4 class="text-primary mb-1">R$ {{ '{:,.2f}'.format(kpis.custo_alimentacao) if kpis.custo_alimentacao is defined else '0,00' }}</h4>
-                            <small class="text-muted">Custo Alimentação</small>
+                            <h4 class="text-secondary mb-1">{{ '{:.1f}%'.format((kpis.horas_trabalhadas / kpis.horas_esperadas * 100) if kpis.horas_esperadas > 0 else 0) }}</h4>
+                            <small class="text-muted">Eficiência</small>
                         </div>
                     </div>
                 </div>

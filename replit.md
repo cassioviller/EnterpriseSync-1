@@ -364,6 +364,22 @@ SIGE (Sistema Integrado de Gestão Empresarial) is a comprehensive business mana
   - Corrigido cálculo de "Horas Perdidas": agora usa fórmula ((faltas*8) + atrasos)
   - Corrigido erro de template Jinja2 com hasattr, usando "is defined" ao invés
   - Sistema de outros custos completamente integrado aos KPIs com cálculo automático
+- July 08, 2025. Revisão Completa e Validação de KPIs - v5.2:
+  - Revisão completa de todos os KPIs do sistema conforme solicitado
+  - Dashboard: KPI "Outros" agora alimentado corretamente pela tabela OutroCusto
+  - Perfil do funcionário: Layout corrigido para 4-4-3 com custo transporte adicionado
+  - Engine de KPIs v3.0: Adicionado cálculo de outros custos e custo transporte
+  - Correção em utils.py: calcular_custos_mes() usando OutroCusto ao invés de CustoObra
+  - Criado relatório técnico completo (RELATORIO_KPIS_COMPLETO.md) documentando:
+    * Todos os KPIs de todas as páginas do sistema
+    * Fórmulas de cálculo e fontes de dados
+    * Correções implementadas e validadas
+    * Testes executados com dados reais
+  - Script de teste (testar_kpis_completo.py) validando todos os cálculos
+  - Resultados dos testes: R$ 53.791,32 em custos totais (junho/2025)
+  - Fórmula de horas perdidas validada: (1 * 8) + 1.00 = 9.00h
+  - Sistema de outros custos testado: R$ 300,00 (Vale Transporte + Desconto VT)
+  - Todos os KPIs funcionando corretamente e integrados
 
 ## User Preferences
 

@@ -1,5 +1,5 @@
 from datetime import datetime, timedelta, date, time
-from models import CustoObra, RegistroPonto, RegistroAlimentacao, CustoVeiculo, Funcionario, HorarioTrabalho
+from models import CustoObra, RegistroPonto, RegistroAlimentacao, CustoVeiculo, Funcionario, HorarioTrabalho, OutroCusto
 from sqlalchemy import func
 from app import db
 import calendar
@@ -231,10 +231,10 @@ def calcular_custos_mes(data_inicio=None, data_fim=None):
             if registro.observacoes and 'falta justificada' in registro.observacoes.lower():
                 custo_faltas_justificadas += salario_hora * 8  # 8 horas por dia
     
-    # Outros custos operacionais
-    custo_outros = db.session.query(func.sum(CustoObra.valor)).filter(
-        CustoObra.data >= data_inicio,
-        CustoObra.data <= data_fim
+    # Outros custos (vale transporte, descontos, etc.)
+    custo_outros = db.session.query(func.sum(OutroCusto.valor)).filter(
+        OutroCusto.data >= data_inicio,
+        OutroCusto.data <= data_fim
     ).scalar() or 0
     
     return {

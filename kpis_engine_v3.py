@@ -32,7 +32,7 @@ def calcular_kpis_funcionario_v3(funcionario_id, data_inicio=None, data_fim=None
     Returns:
         dict: Dicionário com os 10 KPIs calculados
     """
-    from models import Funcionario, RegistroPonto, RegistroAlimentacao, Ocorrencia, TipoOcorrencia
+    from models import Funcionario, RegistroPonto, RegistroAlimentacao, Ocorrencia, TipoOcorrencia, OutroCusto, CustoVeiculo
     
     # Buscar funcionário
     funcionario = Funcionario.query.get(funcionario_id)
@@ -164,6 +164,21 @@ def calcular_kpis_funcionario_v3(funcionario_id, data_inicio=None, data_fim=None
         )
     ).scalar() or 0
     
+    # 11. CUSTO TRANSPORTE (veículos da obra - aproximação)
+    # Nota: CustoVeiculo não tem funcionario_id, então calculamos baseado na obra
+    custo_transporte = 0.0  # Por enquanto, será implementado quando houver relação funcionário-veículo
+    
+    # 12. OUTROS CUSTOS (vale transporte, descontos, etc.)
+    outros_custos = db.session.query(
+        func.coalesce(func.sum(OutroCusto.valor), 0)
+    ).filter(
+        and_(
+            OutroCusto.funcionario_id == funcionario_id,
+            OutroCusto.data >= data_inicio,
+            OutroCusto.data <= data_fim
+        )
+    ).scalar() or 0
+    
     return {
         'funcionario': funcionario,
         'horas_trabalhadas': float(horas_trabalhadas),
@@ -176,6 +191,8 @@ def calcular_kpis_funcionario_v3(funcionario_id, data_inicio=None, data_fim=None
         'horas_perdidas': float(horas_perdidas),
         'custo_mao_obra': float(custo_mao_obra),
         'custo_alimentacao': float(custo_alimentacao),
+        'custo_transporte': float(custo_transporte),
+        'outros_custos': float(outros_custos),
         'dias_uteis': dias_uteis,
         'dias_com_presenca': dias_com_presenca,
         'faltas_justificadas': faltas_justificadas,
