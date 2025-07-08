@@ -366,9 +366,9 @@
                                     {% endif %}
                                 </td>
                                 <td>
-                                    {% if registro.is_feriado %}
+                                    {% if registro.tipo_registro == 'feriado' %}
                                         <span class="fw-bold" style="color: #6c757d;">Feriado</span>
-                                    {% elif registro.is_falta %}
+                                    {% elif registro.tipo_registro == 'falta' or registro.tipo_registro == 'falta_justificada' %}
                                         {% if registro.tipo_registro == 'falta_justificada' %}
                                             <span class="fw-bold" style="color: #28a745;">Falta Justificada</span>
                                         {% else %}
@@ -433,6 +433,103 @@
 </div>
 
 <!-- Seção de Ocorrências removida conforme solicitado -->
+
+<!-- Outros Custos -->
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-money-bill-wave"></i> Outros Custos
+                </h5>
+                <button class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#outroCustoModal">
+                    <i class="fas fa-plus"></i> Novo Registro
+                </button>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-striped" id="outrosCustosTable">
+                        <thead>
+                            <tr>
+                                <th>Data</th>
+                                <th>Tipo</th>
+                                <th>Categoria</th>
+                                <th>Valor</th>
+                                <th>Percentual</th>
+                                <th>Obra</th>
+                                <th>Descrição</th>
+                                <th>Ações</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for custo in outros_custos %}
+                            <tr>
+                                <td>{{ custo.data.strftime('%d/%m/%Y') }}</td>
+                                <td>
+                                    {% if custo.tipo == 'vale_transporte' %}
+                                        <span class="badge bg-info">Vale Transporte</span>
+                                    {% elif custo.tipo == 'vale_alimentacao' %}
+                                        <span class="badge bg-success">Vale Alimentação</span>
+                                    {% elif custo.tipo == 'desconto_vt' %}
+                                        <span class="badge bg-warning">Desconto VT</span>
+                                    {% elif custo.tipo == 'desconto_outras' %}
+                                        <span class="badge bg-danger">Outros Descontos</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if custo.categoria == 'adicional' %}
+                                        <span class="text-success fw-bold">Adicional</span>
+                                    {% else %}
+                                        <span class="text-danger fw-bold">Desconto</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if custo.categoria == 'adicional' %}
+                                        <span class="text-success">+R$ {{ '{:,.2f}'.format(custo.valor) }}</span>
+                                    {% else %}
+                                        <span class="text-danger">-R$ {{ '{:,.2f}'.format(custo.valor) }}</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if custo.percentual %}
+                                        <span class="badge bg-secondary">{{ custo.percentual }}%</span>
+                                    {% else %}
+                                        <span class="text-muted">-</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if custo.obra %}
+                                        <span class="badge bg-primary">{{ custo.obra.nome }}</span>
+                                    {% else %}
+                                        <span class="text-muted">Geral</span>
+                                    {% endif %}
+                                </td>
+                                <td>{{ custo.descricao or '-' }}</td>
+                                <td>
+                                    <div class="btn-group" role="group">
+                                        <button class="btn btn-outline-primary btn-sm" 
+                                                onclick="editarOutroCusto({{ custo.id }})"
+                                                data-bs-toggle="tooltip" 
+                                                title="Editar">
+                                            <i class="fas fa-edit"></i>
+                                        </button>
+                                        <button class="btn btn-outline-danger btn-sm" 
+                                                onclick="excluirOutroCusto({{ custo.id }})"
+                                                data-bs-toggle="tooltip" 
+                                                title="Excluir">
+                                            <i class="fas fa-trash"></i>
+                                        </button>
+                                    </div>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
 
 <!-- Histórico de Alimentação -->
 <div class="row mb-4">
@@ -1323,6 +1420,12 @@ $(document).ready(function() {
         pageLength: 10
     });
     
+    $('#outrosCustosTable').DataTable({
+        language: { url: '//cdn.datatables.net/plug-ins/1.13.6/i18n/pt-BR.json' },
+        order: [[0, 'desc']],
+        pageLength: 10
+    });
+    
     // Definir data padrão nos formulários
     const today = new Date().toISOString().slice(0, 10);
     document.getElementById('data_ponto').value = today;
@@ -1467,5 +1570,145 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 });
+
+// Função para excluir outro custo
+function excluirOutroCusto(id) {
+    if (confirm('Tem certeza que deseja excluir este registro de outros custos?')) {
+        fetch(`/funcionarios/{{ funcionario.id }}/outros-custos/${id}`, {
+            method: 'DELETE',
+            headers: {
+                'Content-Type': 'application/json',
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                alert('Registro excluído com sucesso!');
+                location.reload();
+            } else {
+                alert('Erro ao excluir registro: ' + data.message);
+            }
+        })
+        .catch(error => {
+            console.error('Erro:', error);
+            alert('Erro ao excluir registro');
+        });
+    }
+}
+
+// Auto-selecionar categoria baseado no tipo
+document.addEventListener('DOMContentLoaded', function() {
+    const tipoSelect = document.getElementById('tipo_outro_custo');
+    if (tipoSelect) {
+        tipoSelect.addEventListener('change', function() {
+            const categoria = document.getElementById('categoria_outro_custo');
+            const percentual = document.getElementById('percentual_outro_custo');
+            
+            if (this.value === 'desconto_vt' || this.value === 'desconto_outras') {
+                categoria.value = 'desconto';
+                if (this.value === 'desconto_vt') {
+                    percentual.value = '6';
+                }
+            } else if (this.value === 'vale_transporte' || this.value === 'vale_alimentacao') {
+                categoria.value = 'adicional';
+                percentual.value = '';
+            }
+        });
+    }
+    
+    // Limpar formulário ao fechar modal
+    const modal = document.getElementById('outroCustoModal');
+    if (modal) {
+        modal.addEventListener('hidden.bs.modal', function () {
+            document.getElementById('outroCustoForm').reset();
+        });
+    }
+});
 </script>
+
+<!-- Modal Outros Custos -->
+<div class="modal fade" id="outroCustoModal" tabindex="-1" aria-labelledby="outroCustoModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="outroCustoModalLabel">
+                    <i class="fas fa-money-bill-wave"></i> Novo Registro de Outros Custos
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form id="outroCustoForm" action="{{ url_for('main.criar_outro_custo', funcionario_id=funcionario.id) }}" method="POST">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="data_outro_custo" class="form-label">Data</label>
+                                <input type="date" class="form-control" id="data_outro_custo" name="data" required>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="tipo_outro_custo" class="form-label">Tipo</label>
+                                <select class="form-select" id="tipo_outro_custo" name="tipo" required>
+                                    <option value="">Selecione...</option>
+                                    <option value="vale_transporte">Vale Transporte</option>
+                                    <option value="vale_alimentacao">Vale Alimentação</option>
+                                    <option value="desconto_vt">Desconto VT (6%)</option>
+                                    <option value="desconto_outras">Outros Descontos</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="categoria_outro_custo" class="form-label">Categoria</label>
+                                <select class="form-select" id="categoria_outro_custo" name="categoria" required>
+                                    <option value="">Selecione...</option>
+                                    <option value="adicional">Adicional (+)</option>
+                                    <option value="desconto">Desconto (-)</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="valor_outro_custo" class="form-label">Valor (R$)</label>
+                                <input type="number" step="0.01" class="form-control" id="valor_outro_custo" name="valor" required>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="percentual_outro_custo" class="form-label">Percentual (%)</label>
+                                <input type="number" step="0.01" class="form-control" id="percentual_outro_custo" name="percentual" placeholder="Ex: 6 para 6%">
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="obra_outro_custo" class="form-label">Obra</label>
+                                <select class="form-select" id="obra_outro_custo" name="obra_id">
+                                    <option value="">Geral</option>
+                                    {% for obra in obras %}
+                                    <option value="{{ obra.id }}">{{ obra.nome }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label for="descricao_outro_custo" class="form-label">Descrição</label>
+                        <textarea class="form-control" id="descricao_outro_custo" name="descricao" rows="3" placeholder="Detalhes sobre o custo..."></textarea>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button type="submit" form="outroCustoForm" class="btn btn-primary">
+                    <i class="fas fa-save"></i> Salvar
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
 {% endblock %}

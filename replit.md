@@ -346,6 +346,16 @@ SIGE (Sistema Integrado de Gestão Empresarial) is a comprehensive business mana
   - Melhorada visualização de horas extras para evitar confusão com dados paginados
   - Verificação de dados confirmada: 20h extras (8h+4h+4h+4h) calculadas corretamente
   - Interface otimizada para mostrar todos os dados relevantes do período selecionado
+- July 08, 2025. Sistema de Outros Custos com Vale Transporte e Descontos - v5.0:
+  - Implementado modelo OutroCusto para gestão de custos adicionais e descontos
+  - Seção "Outros Custos" adicionada entre registro de ponto e alimentação no perfil do funcionário
+  - Tipos suportados: Vale Transporte, Vale Alimentação, Desconto VT (6%), Outros Descontos
+  - Modal funcional com auto-seleção de categoria e validações
+  - Rotas backend para criar e excluir outros custos
+  - Corrigido erro no template financeiro (dashboard.html) com list comprehension em Jinja2
+  - Corrigido exibição de horas extras do feriado trabalhado na tabela de ponto
+  - Sistema permite controle completo de custos adicionais e descontos sobre salário
+  - Dados de exemplo populados para demonstração das funcionalidades
 
 ## User Preferences
 

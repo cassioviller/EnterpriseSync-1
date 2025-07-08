@@ -2,6 +2,7 @@ from flask import Blueprint, render_template, request, redirect, url_for, flash,
 from flask_login import login_required, current_user
 from app import db
 from models import *
+from models import OutroCusto
 from forms import *
 from utils import calcular_horas_trabalhadas, calcular_custo_real_obra, calcular_custos_mes, calcular_kpis_funcionarios_geral, calcular_kpis_funcionario_periodo, calcular_kpis_funcionario_completo, calcular_ocorrencias_funcionario, processar_meio_periodo_exemplo
 from datetime import datetime, date
@@ -609,6 +610,17 @@ def funcionario_perfil(id):
     
     registros_alimentacao = query_alimentacao.order_by(RegistroAlimentacao.data.desc()).all()
     
+    # Buscar outros custos com filtros
+    query_outros_custos = OutroCusto.query.filter_by(funcionario_id=id).filter(
+        OutroCusto.data >= data_inicio,
+        OutroCusto.data <= data_fim
+    )
+    
+    if obra_filtro:
+        query_outros_custos = query_outros_custos.filter_by(obra_id=obra_filtro)
+    
+    outros_custos = query_outros_custos.order_by(OutroCusto.data.desc()).all()
+    
     # Buscar obras para os dropdowns
     obras = Obra.query.filter_by(status='Em andamento').all()
     
@@ -650,6 +662,7 @@ def funcionario_perfil(id):
                          registros_ponto=registros_ponto,
                          ocorrencias=ocorrencias,
                          registros_alimentacao=registros_alimentacao,
+                         outros_custos=outros_custos,
                          obras=obras,
                          graficos=graficos,
                          data_inicio=data_inicio,
@@ -667,6 +680,52 @@ def excluir_funcionario(id):
     db.session.commit()
     flash('Funcionário excluído com sucesso!', 'success')
     return redirect(url_for('main.funcionarios'))
+
+@main_bp.route('/funcionarios/<int:funcionario_id>/outros-custos', methods=['POST'])
+@login_required
+def criar_outro_custo(funcionario_id):
+    funcionario = Funcionario.query.get_or_404(funcionario_id)
+    
+    try:
+        data = datetime.strptime(request.form['data'], '%Y-%m-%d').date()
+        
+        outro_custo = OutroCusto(
+            funcionario_id=funcionario_id,
+            data=data,
+            tipo=request.form['tipo'],
+            categoria=request.form['categoria'],
+            valor=float(request.form['valor']),
+            descricao=request.form.get('descricao'),
+            obra_id=request.form.get('obra_id') if request.form.get('obra_id') else None,
+            percentual=float(request.form['percentual']) if request.form.get('percentual') else None
+        )
+        
+        db.session.add(outro_custo)
+        db.session.commit()
+        
+        flash('Outro custo registrado com sucesso!', 'success')
+    except Exception as e:
+        db.session.rollback()
+        flash(f'Erro ao registrar outro custo: {str(e)}', 'error')
+    
+    return redirect(url_for('main.funcionario_perfil', id=funcionario_id))
+
+@main_bp.route('/funcionarios/<int:funcionario_id>/outros-custos/<int:custo_id>', methods=['DELETE'])
+@login_required
+def excluir_outro_custo(funcionario_id, custo_id):
+    custo = OutroCusto.query.get_or_404(custo_id)
+    
+    # Verificar se o custo pertence ao funcionário
+    if custo.funcionario_id != funcionario_id:
+        return jsonify({'success': False, 'message': 'Registro não encontrado'}), 404
+    
+    try:
+        db.session.delete(custo)
+        db.session.commit()
+        return jsonify({'success': True, 'message': 'Registro excluído com sucesso'})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'message': str(e)}), 500
 
 # Departamentos
 @main_bp.route('/departamentos')

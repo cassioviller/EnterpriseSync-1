@@ -234,8 +234,8 @@ document.addEventListener('DOMContentLoaded', function() {
     const ctx = document.getElementById('fluxoCaixaChart').getContext('2d');
     
     const categorias = {{ kpis.resumo_categorias.keys()|list|tojson }};
-    const entradas = {{ [kpis.resumo_categorias[cat]['entradas'] for cat in kpis.resumo_categorias.keys()]|tojson }};
-    const saidas = {{ [kpis.resumo_categorias[cat]['saidas'] for cat in kpis.resumo_categorias.keys()]|tojson }};
+    const entradas = {{ kpis.resumo_categorias.values()|list|map(attribute='entradas')|list|tojson }};
+    const saidas = {{ kpis.resumo_categorias.values()|list|map(attribute='saidas')|list|tojson }};
     
     new Chart(ctx, {
         type: 'bar',
