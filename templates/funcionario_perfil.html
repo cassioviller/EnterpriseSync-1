@@ -243,6 +243,20 @@
                 </button>
             </div>
             <div class="card-body">
+                <!-- Legenda Visual para Tipos de Lançamento -->
+                <div class="row mb-3">
+                    <div class="col-12">
+                        <div class="alert alert-info p-2">
+                            <strong>Legenda:</strong>
+                            <span class="badge bg-success ms-2"><i class="fas fa-calendar-week"></i> SÁBADO</span>
+                            <span class="badge bg-warning ms-2"><i class="fas fa-sun"></i> DOMINGO</span>
+                            <span class="badge bg-info ms-2"><i class="fas fa-star"></i> FERIADO TRAB.</span>
+                            <span class="badge bg-secondary ms-2"><i class="fas fa-home"></i> FERIADO</span>
+                            <span class="badge bg-primary ms-2"><i class="fas fa-check"></i> JUSTIFICADA</span>
+                            <span class="badge bg-danger ms-2"><i class="fas fa-times"></i> FALTA</span>
+                        </div>
+                    </div>
+                </div>
 
                 <!-- Tabela de Registros -->
                 <div class="table-responsive">
@@ -263,8 +277,25 @@
                         </thead>
                         <tbody>
                             {% for registro in registros_ponto %}
-                            <tr {% if registro.is_falta %}style="background-color: #3d2a2a;"{% elif registro.is_feriado %}style="background-color: #2a2a3d;"{% endif %}>
-                                <td>{{ registro.data.strftime('%d/%m/%Y') }}</td>
+                            <tr {% if registro.is_falta %}style="background-color: #3d2a2a;"{% elif registro.is_feriado %}style="background-color: #2a2a3d;"{% elif registro.tipo_registro == 'sabado_horas_extras' %}style="background-color: #2a3d2a;"{% elif registro.tipo_registro == 'domingo_horas_extras' %}style="background-color: #3d2a3d;"{% endif %}>
+                                <td>
+                                    <div class="d-flex align-items-center">
+                                        <span>{{ registro.data.strftime('%d/%m/%Y') }}</span>
+                                        {% if registro.tipo_registro == 'sabado_horas_extras' %}
+                                            <span class="badge bg-success ms-2"><i class="fas fa-calendar-week"></i> SÁBADO</span>
+                                        {% elif registro.tipo_registro == 'domingo_horas_extras' %}
+                                            <span class="badge bg-warning ms-2"><i class="fas fa-sun"></i> DOMINGO</span>
+                                        {% elif registro.tipo_registro == 'feriado_trabalhado' %}
+                                            <span class="badge bg-info ms-2"><i class="fas fa-star"></i> FERIADO TRAB.</span>
+                                        {% elif registro.tipo_registro == 'feriado' %}
+                                            <span class="badge bg-secondary ms-2"><i class="fas fa-home"></i> FERIADO</span>
+                                        {% elif registro.tipo_registro == 'falta_justificada' %}
+                                            <span class="badge bg-primary ms-2"><i class="fas fa-check"></i> JUSTIFICADA</span>
+                                        {% elif registro.tipo_registro == 'falta' %}
+                                            <span class="badge bg-danger ms-2"><i class="fas fa-times"></i> FALTA</span>
+                                        {% endif %}
+                                    </div>
+                                </td>
                                 <td>
                                     {% if registro.is_feriado %}
                                         <span class="fw-bold" style="color: #6c757d;">Feriado</span>
@@ -510,7 +541,30 @@
                                         <span class="text-muted">-</span>
                                     {% endif %}
                                 </td>
-                                <td>{{ registro.observacoes[:30] + '...' if registro.observacoes and registro.observacoes|length > 30 else (registro.observacoes or '-') }}</td>
+                                <td>
+                                    {% if registro.observacoes %}
+                                        <div class="d-flex align-items-center">
+                                            {% if registro.tipo_registro == 'sabado_horas_extras' %}
+                                                <i class="fas fa-calendar-week text-success me-2"></i>
+                                            {% elif registro.tipo_registro == 'domingo_horas_extras' %}
+                                                <i class="fas fa-sun text-warning me-2"></i>
+                                            {% elif registro.tipo_registro == 'feriado_trabalhado' %}
+                                                <i class="fas fa-star text-info me-2"></i>
+                                            {% elif registro.tipo_registro == 'feriado' %}
+                                                <i class="fas fa-home text-secondary me-2"></i>
+                                            {% elif registro.tipo_registro == 'falta_justificada' %}
+                                                <i class="fas fa-check text-primary me-2"></i>
+                                            {% elif registro.tipo_registro == 'falta' %}
+                                                <i class="fas fa-times text-danger me-2"></i>
+                                            {% else %}
+                                                <i class="fas fa-briefcase text-muted me-2"></i>
+                                            {% endif %}
+                                            <span>{{ registro.observacoes[:30] + '...' if registro.observacoes|length > 30 else registro.observacoes }}</span>
+                                        </div>
+                                    {% else %}
+                                        <span class="text-muted">-</span>
+                                    {% endif %}
+                                </td>
                                 <td>
                                     <div class="btn-group btn-group-sm">
                                         <button class="btn btn-outline-primary" 
