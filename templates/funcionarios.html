@@ -11,9 +11,14 @@
                 <h1 class="h3">
                     <i class="fas fa-users"></i> Funcionários
                 </h1>
-                <a href="{{ url_for('main.novo_funcionario') }}" class="btn btn-primary">
-                    <i class="fas fa-plus"></i> Novo Funcionário
-                </a>
+                <div class="btn-group">
+                    <a href="{{ url_for('main.novo_funcionario') }}" class="btn btn-primary">
+                        <i class="fas fa-plus"></i> Novo Funcionário
+                    </a>
+                    <button type="button" class="btn btn-outline-primary" data-bs-toggle="modal" data-bs-target="#funcionarioModal" onclick="abrirModalNovoFuncionario()">
+                        <i class="fas fa-plus-circle"></i> Modal Rápido
+                    </button>
+                </div>
             </div>
         </div>
     </div>
@@ -278,7 +283,7 @@
                 </h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
-            <form method="POST" id="funcionarioForm" enctype="multipart/form-data">
+            <form method="POST" id="funcionarioForm" enctype="multipart/form-data" action="{{ url_for('main.funcionario_modal') }}">
                 <div class="modal-body">
                     <div class="row">
                         <div class="col-md-8">
@@ -294,7 +299,7 @@
                                         <label for="cpf" class="form-label">CPF *</label>
                                         <input type="text" class="form-control" id="cpf" name="cpf" required 
                                                pattern="[0-9]{3}\.[0-9]{3}\.[0-9]{3}-[0-9]{2}" 
-                                               placeholder="000.000.000-00">
+                                               placeholder="000.000.000-00" oninput="formatCPF(this)">
                                     </div>
                                 </div>
                             </div>
@@ -335,7 +340,7 @@
                         <div class="col-md-6">
                             <div class="mb-3">
                                 <label for="telefone" class="form-label">Telefone</label>
-                                <input type="text" class="form-control" id="telefone" name="telefone">
+                                <input type="text" class="form-control" id="telefone" name="telefone" oninput="formatPhone(this)">
                             </div>
                         </div>
                         <div class="col-md-6">
@@ -366,8 +371,10 @@
                             <div class="mb-3">
                                 <label for="departamento_id" class="form-label">Departamento</label>
                                 <select class="form-select" id="departamento_id" name="departamento_id">
-                                    <option value="">Selecione...</option>
-                                    <!-- Options will be populated by JavaScript -->
+                                    <option value="0">Selecione...</option>
+                                    {% for departamento in departamentos %}
+                                        <option value="{{ departamento.id }}">{{ departamento.nome }}</option>
+                                    {% endfor %}
                                 </select>
                             </div>
                         </div>
@@ -375,8 +382,10 @@
                             <div class="mb-3">
                                 <label for="funcao_id" class="form-label">Função</label>
                                 <select class="form-select" id="funcao_id" name="funcao_id">
-                                    <option value="">Selecione...</option>
-                                    <!-- Options will be populated by JavaScript -->
+                                    <option value="0">Selecione...</option>
+                                    {% for funcao in funcoes %}
+                                        <option value="{{ funcao.id }}">{{ funcao.nome }}</option>
+                                    {% endfor %}
                                 </select>
                             </div>
                         </div>
@@ -384,8 +393,10 @@
                             <div class="mb-3">
                                 <label for="horario_trabalho_id" class="form-label">Horário de Trabalho</label>
                                 <select class="form-select" id="horario_trabalho_id" name="horario_trabalho_id">
-                                    <option value="">Selecione...</option>
-                                    <!-- Options will be populated by JavaScript -->
+                                    <option value="0">Selecione...</option>
+                                    {% for horario in horarios %}
+                                        <option value="{{ horario.id }}">{{ horario.nome }}</option>
+                                    {% endfor %}
                                 </select>
                             </div>
                         </div>
@@ -402,7 +413,9 @@
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
-                    <button type="submit" class="btn btn-primary">Salvar</button>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-save"></i> Salvar Funcionário
+                    </button>
                 </div>
             </form>
         </div>
@@ -412,6 +425,20 @@
 
 {% block scripts %}
 <script>
+// Abrir modal para novo funcionário
+function abrirModalNovoFuncionario() {
+    // Limpar formulário
+    document.getElementById('funcionarioForm').reset();
+    document.getElementById('modalTitle').textContent = 'Novo Funcionário';
+    document.getElementById('funcionarioForm').action = "{{ url_for('main.funcionario_modal') }}";
+    
+    // Esconder preview da foto
+    const fotoPreview = document.getElementById('foto-preview');
+    if (fotoPreview) {
+        fotoPreview.style.display = 'none';
+    }
+}
+
 // Enhanced photo upload functionality
 function setupPhotoUpload() {
     const fotoInput = document.getElementById('foto');

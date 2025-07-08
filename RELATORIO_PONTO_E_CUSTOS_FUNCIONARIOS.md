@@ -62,10 +62,6 @@ class RegistroPonto(db.Model):
     total_atraso_minutos = db.Column(db.Integer, default=0)
     total_atraso_horas = db.Column(db.Float, default=0.0)
     
-    # Flags especiais
-    meio_periodo = db.Column(db.Boolean, default=False)
-    saida_antecipada = db.Column(db.Boolean, default=False)
-    observacoes = db.Column(db.Text)
 ```
 
 **Características Avançadas:**

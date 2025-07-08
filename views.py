@@ -97,6 +97,9 @@ def funcionarios():
     return render_template('funcionarios.html', 
                          funcionarios_kpis=kpis_geral['funcionarios_kpis'],
                          kpis_geral=kpis_geral,
+                         departamentos=Departamento.query.all(),
+                         funcoes=Funcao.query.all(),
+                         horarios=HorarioTrabalho.query.all(),
                          data_inicio=data_inicio,
                          data_fim=data_fim)
 
@@ -106,7 +109,7 @@ def novo_funcionario():
     form = FuncionarioForm()
     form.departamento_id.choices = [(0, 'Selecione...')] + [(d.id, d.nome) for d in Departamento.query.all()]
     form.funcao_id.choices = [(0, 'Selecione...')] + [(f.id, f.nome) for f in Funcao.query.all()]
-    form.horario_trabalho_id.choices = [(0, 'Selecione...')] + [(h.id, h.descricao) for h in HorarioTrabalho.query.all()]
+    form.horario_trabalho_id.choices = [(0, 'Selecione...')] + [(h.id, h.nome) for h in HorarioTrabalho.query.all()]
     
     if form.validate_on_submit():
         try:
@@ -230,6 +233,80 @@ def editar_funcionario(id):
     
     # Para GET, redirecionar para a página de perfil com modo de edição
     return redirect(url_for('main.funcionario_perfil', id=id, edit=1))
+
+@main_bp.route('/funcionarios/modal', methods=['POST'])
+@login_required
+def funcionario_modal():
+    """Rota específica para processamento do modal de funcionários"""
+    try:
+        # Validar CPF
+        from utils import validar_cpf, gerar_codigo_funcionario, salvar_foto_funcionario
+        
+        cpf = request.form.get('cpf')
+        if not validar_cpf(cpf):
+            flash('CPF inválido. Verifique o número informado.', 'error')
+            return redirect(url_for('main.funcionarios'))
+        
+        # Verificar se CPF já existe
+        cpf_existe = Funcionario.query.filter_by(cpf=cpf).first()
+        if cpf_existe:
+            flash('CPF já cadastrado para outro funcionário.', 'error')
+            return redirect(url_for('main.funcionarios'))
+        
+        funcionario = Funcionario(
+            nome=request.form.get('nome'),
+            cpf=cpf,
+            rg=request.form.get('rg'),
+            endereco=request.form.get('endereco'),
+            telefone=request.form.get('telefone'),
+            email=request.form.get('email'),
+            salario=float(request.form.get('salario', 0) or 0),
+            ativo=bool(request.form.get('ativo'))
+        )
+        
+        # Datas opcionais
+        data_nascimento = request.form.get('data_nascimento')
+        if data_nascimento:
+            funcionario.data_nascimento = datetime.strptime(data_nascimento, '%Y-%m-%d').date()
+        
+        data_admissao = request.form.get('data_admissao')
+        if data_admissao:
+            funcionario.data_admissao = datetime.strptime(data_admissao, '%Y-%m-%d').date()
+        else:
+            funcionario.data_admissao = date.today()  # Padrão para hoje
+        
+        # IDs opcionais
+        departamento_id = request.form.get('departamento_id')
+        funcionario.departamento_id = int(departamento_id) if departamento_id and departamento_id != '0' else None
+        
+        funcao_id = request.form.get('funcao_id')
+        funcionario.funcao_id = int(funcao_id) if funcao_id and funcao_id != '0' else None
+        
+        horario_id = request.form.get('horario_trabalho_id')
+        funcionario.horario_trabalho_id = int(horario_id) if horario_id and horario_id != '0' else None
+        
+        # Gerar código único
+        funcionario.codigo = gerar_codigo_funcionario()
+        
+        db.session.add(funcionario)
+        db.session.flush()  # Para obter o ID antes do commit
+        
+        # Processar upload de foto
+        if 'foto' in request.files:
+            foto = request.files['foto']
+            if foto and foto.filename:
+                foto_path = salvar_foto_funcionario(foto, funcionario.codigo)
+                if foto_path:
+                    funcionario.foto = foto_path
+        
+        db.session.commit()
+        flash('Funcionário cadastrado com sucesso!', 'success')
+        return redirect(url_for('main.funcionarios'))
+        
+    except Exception as e:
+        db.session.rollback()
+        flash(f'Erro ao cadastrar funcionário: {str(e)}', 'error')
+        return redirect(url_for('main.funcionarios'))
 
 def calcular_kpis_funcionario(funcionario_id):
     """Calcula KPIs individuais do funcionário para o mês atual"""
