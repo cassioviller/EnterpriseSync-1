@@ -292,6 +292,8 @@ SIGE (Sistema Integrado de Gestão Empresarial) is a comprehensive business mana
   - Correção crítica na lógica de faltas: agora contabiliza apenas registros explícitos de falta no sistema
   - Atualizado engines de KPIs (v3.0 e simple) para não calcular faltas automáticas por dias sem registro
   - Sistema respeita regra de negócio: faltas só são contabilizadas quando lançadas manualmente no módulo
+  - Correções visuais: falta justificada aparece em verde, atrasos limitados a 2 casas decimais
+  - Registros de exemplo criados para Cássio com tipos corretos (feriado trabalhado, sábado/domingo extras)
 
 ## User Preferences
 

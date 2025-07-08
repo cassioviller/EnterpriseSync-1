@@ -174,7 +174,7 @@
                     </div>
                     <div class="col-md-3">
                         <div class="text-center p-3 border rounded">
-                            <h4 class="text-info mb-1">{{ kpis.atrasos }}</h4>
+                            <h4 class="text-info mb-1">{{ '{:.2f}h'.format(kpis.atrasos) }}</h4>
                             <small class="text-muted">Atrasos</small>
                         </div>
                     </div>
@@ -343,7 +343,11 @@
                                     {% if registro.is_feriado %}
                                         <span class="fw-bold" style="color: #6c757d;">Feriado</span>
                                     {% elif registro.is_falta %}
-                                        <span class="fw-bold" style="color: #dc3545;">Falta</span>
+                                        {% if registro.tipo_registro == 'falta_justificada' %}
+                                            <span class="fw-bold" style="color: #28a745;">Falta Justificada</span>
+                                        {% else %}
+                                            <span class="fw-bold" style="color: #dc3545;">Falta</span>
+                                        {% endif %}
                                     {% elif registro.total_atraso_minutos and registro.total_atraso_minutos > 0 %}
                                         <span class="badge bg-danger">{{ '{:.0f}min'.format(registro.total_atraso_minutos) }}</span>
                                     {% else %}
