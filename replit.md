@@ -311,6 +311,13 @@ SIGE (Sistema Integrado de Gestão Empresarial) is a comprehensive business mana
   - Corrigida exibição de todos os tipos de registro (feriado, falta, feriado trabalhado) nas colunas
   - Template atualizado para usar tipo_registro ao invés de is_feriado/is_falta para maior precisão
   - Registros de exemplo incluem: atrasos, trabalho sem almoço, feriado trabalhado com horários completos
+- July 08, 2025. Ajustes Finais no Sistema de Ponto - v4.5:
+  - Corrigidos intervalos de almoço: maioria dos dias possui horário de almoço (12:00-13:00)
+  - Apenas dia 13/06 mantido sem intervalo (trabalho contínuo de 8h)
+  - Removida completamente seção "Histórico de Ocorrências" do perfil do funcionário
+  - Corrigida exibição de horários de almoço (mostra "-" ao invés de "Sem Intervalo" quando não há)
+  - Sistema agora reflete corretamente a realidade: maioria dos funcionários fazem intervalo de almoço
+  - Feriados trabalhados exibem corretamente horários de entrada, saída e almoço com horas extras
 
 ## User Preferences
 
