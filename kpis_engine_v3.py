@@ -93,17 +93,20 @@ def calcular_kpis_funcionario_v3(funcionario_id, data_inicio=None, data_fim=None
     ).count()
     
     # 4. ATRASOS (em horas)
-    # Buscar atrasos já calculados na tabela registro_ponto
-    total_atrasos_horas = db.session.query(
-        func.coalesce(func.sum(RegistroPonto.total_atraso_horas), 0)
+    # Buscar atrasos em minutos e converter para horas
+    total_atrasos_minutos = db.session.query(
+        func.coalesce(func.sum(RegistroPonto.total_atraso_minutos), 0)
     ).filter(
         and_(
             RegistroPonto.funcionario_id == funcionario_id,
             RegistroPonto.data >= data_inicio,
             RegistroPonto.data <= data_fim,
-            RegistroPonto.total_atraso_horas > 0
+            RegistroPonto.total_atraso_minutos > 0
         )
     ).scalar() or 0
+    
+    # Converter minutos para horas
+    total_atrasos_horas = total_atrasos_minutos / 60.0
     
     # 5. PRODUTIVIDADE (horas_trabalhadas/horas_esperadas × 100)
     horas_esperadas = dias_uteis * 8  # 8 horas por dia útil
@@ -170,7 +173,7 @@ def calcular_kpis_funcionario_v3(funcionario_id, data_inicio=None, data_fim=None
         'produtividade': float(produtividade),
         'absenteismo': float(absenteismo),
         'media_diaria': float(media_diaria),
-        'horas_perdidas_total': float(horas_perdidas),
+        'horas_perdidas': float(horas_perdidas),
         'custo_mao_obra': float(custo_mao_obra),
         'custo_alimentacao': float(custo_alimentacao),
         'dias_uteis': dias_uteis,

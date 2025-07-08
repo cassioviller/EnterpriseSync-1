@@ -324,6 +324,14 @@ SIGE (Sistema Integrado de Gestão Empresarial) is a comprehensive business mana
   - Implementadas rotas RDO completas: lista_rdos, novo_rdo, criar_rdo, visualizar_rdo, editar_rdo, excluir_rdo
   - Corrigido link de criação de RDO na página de detalhes de obra
   - Sistema RDO (Relatório Diário de Obra) agora totalmente funcional e acessível pelo menu
+- July 08, 2025. Correção de KPIs e Feriados Trabalhados - v4.7:
+  - Corrigidos registros do Cássio para junho/2025 com dados realistas
+  - Feriado trabalhado (07/06 - Corpus Christi) agora mostra 100% de horas extras corretamente
+  - Engine de KPIs v3.0 corrigido para calcular atrasos baseado em total_atraso_minutos
+  - Atrasos agora contabilizados corretamente: 30min + 30min = 1.0h total
+  - Horas extras calculadas corretamente: 8h (feriado 100%) + 4h (sábado 50%) + 4h (domingo 100%) = 20h
+  - Sistema visual mantém identificação por badges e cores para tipos especiais
+  - KPIs agora refletem dados precisos: 83h trabalhadas, 20h extras, 1h atrasos, 1 falta
 
 ## User Preferences
 
