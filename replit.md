@@ -304,6 +304,13 @@ SIGE (Sistema Integrado de Gestão Empresarial) is a comprehensive business mana
   - Ícones distintivos em observações: calendário (sábado), sol (domingo), estrela (feriado trab.), casa (feriado), check (justificada), X (falta)
   - Legenda visual explicativa no topo da tabela de ponto para orientação do usuário
   - Sistema permite identificação rápida e fácil de todos os tipos de lançamento especiais
+- July 08, 2025. Correções em Feriados Trabalhados e Lógica de Almoço - v4.4:
+  - Corrigido feriado trabalhado para mostrar horários de entrada/saída e horas extras contabilizadas
+  - Implementada lógica para trabalho sem intervalo de almoço ("Sem Intervalo" em verde)
+  - Adicionados registros com atrasos (30min entrada, 15min entrada + 15min saída antecipada)
+  - Corrigida exibição de todos os tipos de registro (feriado, falta, feriado trabalhado) nas colunas
+  - Template atualizado para usar tipo_registro ao invés de is_feriado/is_falta para maior precisão
+  - Registros de exemplo incluem: atrasos, trabalho sem almoço, feriado trabalhado com horários completos
 
 ## User Preferences
 
