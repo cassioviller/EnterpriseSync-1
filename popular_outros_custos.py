@@ -1,117 +1,175 @@
+#!/usr/bin/env python3
 """
-Script para popular dados de exemplo de outros custos para os funcionários
+Script para popular outros custos para junho 2025
 """
 
 from app import app, db
-from models import OutroCusto, Funcionario, Obra
 from datetime import date
+from models import Funcionario, OutroCusto, CustoVeiculo, CustoObra, Veiculo, Obra
+import random
 
 def popular_outros_custos():
-    """
-    Cria dados de exemplo para outros custos dos funcionários
-    """
+    """Popular outros custos para todos os funcionários"""
+    print("=== Populando outros custos ===")
     
-    with app.app_context():
-        # Verificar se já existem dados
-        if OutroCusto.query.count() > 0:
-            print("Dados de outros custos já existem!")
-            return
+    funcionarios = Funcionario.query.filter_by(ativo=True).all()
+    
+    registros_criados = 0
+    
+    for funcionario in funcionarios:
+        # Vale transporte mensal
+        registro = OutroCusto(
+            funcionario_id=funcionario.id,
+            data=date(2025, 6, 1),
+            tipo='Vale Transporte',
+            categoria='Benefício',
+            valor=150.00,
+            descricao=f"Vale transporte mensal - {funcionario.nome}"
+        )
+        db.session.add(registro)
+        registros_criados += 1
         
-        # Buscar funcionários e obras existentes
-        cassio = Funcionario.query.filter_by(nome="Cássio Silva").first()
-        pedro = Funcionario.query.filter_by(nome="Pedro Lima Sousa").first()
-        obra1 = Obra.query.first()
+        # Desconto VT
+        registro = OutroCusto(
+            funcionario_id=funcionario.id,
+            data=date(2025, 6, 1),
+            tipo='Desconto VT 6%',
+            categoria='Desconto',
+            valor=9.00,
+            descricao=f"Desconto vale transporte - {funcionario.nome}"
+        )
+        db.session.add(registro)
+        registros_criados += 1
         
-        if not cassio or not pedro:
-            print("Funcionários não encontrados!")
-            return
-        
-        outros_custos = [
-            # Vale transporte - Cássio
-            OutroCusto(
-                funcionario_id=cassio.id,
-                data=date(2025, 6, 1),
-                tipo='vale_transporte',
-                categoria='adicional',
-                valor=150.00,
-                descricao='Vale transporte mensal junho/2025',
-                obra_id=obra1.id if obra1 else None
-            ),
+        # Outros custos aleatórios
+        if random.random() < 0.5:  # 50% chance
+            tipos_extras = ['Adiantamento Salário', 'Uniforme', 'EPI', 'Vale Alimentação']
+            tipo_extra = random.choice(tipos_extras)
+            valor_extra = random.choice([200.00, 300.00, 500.00])
             
-            # Desconto VT 6% - Cássio
-            OutroCusto(
-                funcionario_id=cassio.id,
-                data=date(2025, 6, 1),
-                tipo='desconto_vt',
-                categoria='desconto',
-                valor=150.00,
-                percentual=6.0,
-                descricao='Desconto 6% vale transporte sobre salário',
-                obra_id=obra1.id if obra1 else None
-            ),
-            
-            # Vale alimentação - Cássio
-            OutroCusto(
-                funcionario_id=cassio.id,
-                data=date(2025, 6, 15),
-                tipo='vale_alimentacao',
-                categoria='adicional',
-                valor=300.00,
-                descricao='Vale alimentação quinzenal',
-                obra_id=obra1.id if obra1 else None
-            ),
-            
-            # Vale transporte - Pedro
-            OutroCusto(
-                funcionario_id=pedro.id,
-                data=date(2025, 6, 1),
-                tipo='vale_transporte',
-                categoria='adicional',
-                valor=120.00,
-                descricao='Vale transporte mensal junho/2025',
-                obra_id=obra1.id if obra1 else None
-            ),
-            
-            # Desconto VT 6% - Pedro
-            OutroCusto(
-                funcionario_id=pedro.id,
-                data=date(2025, 6, 1),
-                tipo='desconto_vt',
-                categoria='desconto',
-                valor=120.00,
-                percentual=6.0,
-                descricao='Desconto 6% vale transporte sobre salário',
-                obra_id=obra1.id if obra1 else None
-            ),
-            
-            # Outros descontos - Pedro
-            OutroCusto(
-                funcionario_id=pedro.id,
-                data=date(2025, 6, 10),
-                tipo='desconto_outras',
-                categoria='desconto',
-                valor=50.00,
-                descricao='Desconto por dano em equipamento',
-                obra_id=obra1.id if obra1 else None
-            ),
-        ]
-        
-        for custo in outros_custos:
-            db.session.add(custo)
-        
-        db.session.commit()
-        print(f"✅ {len(outros_custos)} registros de outros custos criados com sucesso!")
-        
-        # Exibir resumo
-        print("\n📊 Resumo dos outros custos criados:")
-        for funcionario in [cassio, pedro]:
-            custos_func = OutroCusto.query.filter_by(funcionario_id=funcionario.id).all()
-            print(f"\n{funcionario.nome}:")
-            total_adicional = sum(c.valor for c in custos_func if c.categoria == 'adicional')
-            total_desconto = sum(c.valor for c in custos_func if c.categoria == 'desconto')
-            print(f"  - Adicionais: +R$ {total_adicional:.2f}")
-            print(f"  - Descontos: -R$ {total_desconto:.2f}")
-            print(f"  - Líquido: R$ {total_adicional - total_desconto:.2f}")
+            registro = OutroCusto(
+                funcionario_id=funcionario.id,
+                data=date(2025, 6, random.randint(5, 25)),
+                tipo=tipo_extra,
+                categoria='Outros',
+                valor=valor_extra,
+                descricao=f"{tipo_extra} - {funcionario.nome}"
+            )
+            db.session.add(registro)
+            registros_criados += 1
+    
+    db.session.commit()
+    print(f"Criados {registros_criados} outros custos")
 
-if __name__ == '__main__':
-    popular_outros_custos()
+def popular_custos_veiculos():
+    """Popular custos de veículos"""
+    print("=== Populando custos de veículos ===")
+    
+    veiculos = Veiculo.query.all()
+    obras = Obra.query.filter_by(status='Em andamento').all()
+    
+    if not veiculos or not obras:
+        print("Erro: Veículos ou obras não encontrados")
+        return
+    
+    registros_criados = 0
+    
+    for veiculo in veiculos:
+        obra = random.choice(obras)
+        
+        # Combustível (várias vezes no mês)
+        for i in range(5):
+            registro = CustoVeiculo(
+                veiculo_id=veiculo.id,
+                obra_id=obra.id,
+                data_custo=date(2025, 6, random.randint(1, 30)),
+                valor=random.choice([250.00, 300.00, 350.00]),
+                tipo_custo='combustivel',
+                descricao=f"Abastecimento {veiculo.placa}",
+                fornecedor='Posto Ipiranga'
+            )
+            db.session.add(registro)
+            registros_criados += 1
+        
+        # Manutenção
+        registro = CustoVeiculo(
+            veiculo_id=veiculo.id,
+            obra_id=obra.id,
+            data_custo=date(2025, 6, random.randint(10, 20)),
+            valor=random.choice([800.00, 1200.00, 1500.00]),
+            tipo_custo='manutencao',
+            descricao=f"Manutenção {veiculo.placa}",
+            fornecedor='Oficina Central'
+        )
+        db.session.add(registro)
+        registros_criados += 1
+    
+    db.session.commit()
+    print(f"Criados {registros_criados} custos de veículos")
+
+def popular_custos_obras():
+    """Popular custos de obras"""
+    print("=== Populando custos de obras ===")
+    
+    obras = Obra.query.filter_by(status='Em andamento').all()
+    
+    if not obras:
+        print("Erro: Obras não encontradas")
+        return
+    
+    registros_criados = 0
+    
+    for obra in obras:
+        # Materiais
+        for i in range(6):
+            registro = CustoObra(
+                obra_id=obra.id,
+                data=date(2025, 6, random.randint(1, 30)),
+                valor=random.choice([1500.00, 2000.00, 2500.00]),
+                tipo='material',
+                descricao=f"Material de construção - {obra.nome}"
+            )
+            db.session.add(registro)
+            registros_criados += 1
+        
+        # Equipamentos
+        for i in range(3):
+            registro = CustoObra(
+                obra_id=obra.id,
+                data=date(2025, 6, random.randint(1, 30)),
+                valor=random.choice([1000.00, 1500.00, 2000.00]),
+                tipo='equipamento',
+                descricao=f"Equipamento - {obra.nome}"
+            )
+            db.session.add(registro)
+            registros_criados += 1
+        
+        # Serviços
+        for i in range(4):
+            registro = CustoObra(
+                obra_id=obra.id,
+                data=date(2025, 6, random.randint(1, 30)),
+                valor=random.choice([800.00, 1200.00, 1600.00]),
+                tipo='servico',
+                descricao=f"Serviço terceirizado - {obra.nome}"
+            )
+            db.session.add(registro)
+            registros_criados += 1
+    
+    db.session.commit()
+    print(f"Criados {registros_criados} custos de obras")
+
+def main():
+    """Função principal"""
+    with app.app_context():
+        print("POPULANDO CUSTOS ADICIONAIS - JUNHO 2025")
+        print("=" * 45)
+        
+        popular_outros_custos()
+        popular_custos_veiculos()
+        popular_custos_obras()
+        
+        print("\n✅ Custos adicionais criados!")
+
+if __name__ == "__main__":
+    main()

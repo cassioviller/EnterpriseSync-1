@@ -1,132 +1,184 @@
 #!/usr/bin/env python3
 """
-Script para popular a coluna obra de todos os funcionários e atualizar registros de ponto
-com cálculo automático de horas trabalhadas, extras e atrasos.
+Script para popular dados básicos de funcionários e obras para junho 2025
 """
 
-import random
-from datetime import datetime, time, timedelta
 from app import app, db
-from models import Funcionario, Obra, RegistroPonto, HorarioTrabalho
+from datetime import date, datetime, timedelta
+from models import Funcionario, Obra, RegistroPonto, RegistroAlimentacao, OutroCusto, Restaurante
+import random
 
-def calcular_horas_trabalho(hora_entrada, hora_saida, hora_almoco_saida, hora_almoco_retorno, horario_trabalho):
-    """
-    Calcula horas trabalhadas, extras e atraso baseado no horário de trabalho padrão.
-    """
-    if not hora_entrada or not hora_saida:
-        return 0.0, 0.0, 0.0
+def popular_registros_ponto():
+    """Popula registros de ponto para funcionários ativos"""
+    print("=== Populando registros de ponto ===")
     
-    # Converter para datetime para facilitar cálculos
-    entrada = datetime.combine(datetime.today(), hora_entrada)
-    saida = datetime.combine(datetime.today(), hora_saida)
+    funcionarios = Funcionario.query.filter_by(ativo=True).limit(3).all()  # Apenas 3 funcionários
+    obras = Obra.query.filter_by(status='Em andamento').all()
     
-    # Se saída for antes da entrada, assumir que passou da meia-noite
-    if saida < entrada:
-        saida += timedelta(days=1)
+    if not funcionarios or not obras:
+        print("Erro: Funcionários ou obras não encontrados")
+        return
     
-    # Calcular tempo de almoço
-    tempo_almoco = timedelta(hours=1)  # Padrão 1 hora
-    if hora_almoco_saida and hora_almoco_retorno:
-        almoco_saida = datetime.combine(datetime.today(), hora_almoco_saida)
-        almoco_retorno = datetime.combine(datetime.today(), hora_almoco_retorno)
-        if almoco_retorno > almoco_saida:
-            tempo_almoco = almoco_retorno - almoco_saida
+    # Dias úteis de junho (sem feriados)
+    dias_uteis = [
+        date(2025, 6, 2), date(2025, 6, 3), date(2025, 6, 4), date(2025, 6, 5), date(2025, 6, 6),
+        date(2025, 6, 9), date(2025, 6, 10), date(2025, 6, 11), date(2025, 6, 12), date(2025, 6, 13),
+        date(2025, 6, 16), date(2025, 6, 17), date(2025, 6, 18), date(2025, 6, 20),
+        date(2025, 6, 23), date(2025, 6, 24), date(2025, 6, 25), date(2025, 6, 26), date(2025, 6, 27),
+        date(2025, 6, 30)
+    ]
     
-    # Tempo total trabalhado
-    tempo_total = saida - entrada - tempo_almoco
-    horas_trabalhadas = tempo_total.total_seconds() / 3600
+    registros_criados = 0
     
-    # Calcular atraso (baseado no horário padrão de entrada 08:00)
-    horario_entrada_padrao = time(8, 0)  # 08:00
-    atraso = 0.0
-    if hora_entrada > horario_entrada_padrao:
-        entrada_padrao = datetime.combine(datetime.today(), horario_entrada_padrao)
-        entrada_real = datetime.combine(datetime.today(), hora_entrada)
-        atraso_delta = entrada_real - entrada_padrao
-        atraso = atraso_delta.total_seconds() / 60  # em minutos
-    
-    # Calcular horas extras (acima de 8 horas trabalhadas)
-    horas_extras = max(0.0, horas_trabalhadas - 8.0)
-    
-    # Ajustar horas trabalhadas para não contar extras
-    horas_trabalhadas_efetivas = min(8.0, horas_trabalhadas)
-    
-    return horas_trabalhadas_efetivas, horas_extras, atraso
-
-def popular_obras_funcionarios():
-    """Popula a coluna obra para todos os funcionários e atualiza cálculos de ponto"""
-    
-    with app.app_context():
-        print("👷 Iniciando população de obras para funcionários...")
+    for funcionario in funcionarios:
+        obra = random.choice(obras)
         
-        # Buscar todas as obras em andamento
-        obras = Obra.query.filter_by(status='Em andamento').all()
-        if not obras:
-            print("❌ Nenhuma obra em andamento encontrada!")
-            return
-        
-        # Buscar todos os funcionários ativos
-        funcionarios = Funcionario.query.filter_by(ativo=True).all()
-        if not funcionarios:
-            print("❌ Nenhum funcionário ativo encontrado!")
-            return
-        
-        print(f"📊 Encontrados:")
-        print(f"   - {len(funcionarios)} funcionários ativos")
-        print(f"   - {len(obras)} obras em andamento")
-        
-        # Atribuir obras aos funcionários (distribuição equilibrada)
-        print("\n🏗️ Atribuindo obras aos funcionários...")
-        for i, funcionario in enumerate(funcionarios):
-            # Distribuir funcionários entre as obras
-            obra_index = i % len(obras)
-            obra = obras[obra_index]
-            
-            # Atualizar todos os registros de ponto deste funcionário
-            registros_ponto = RegistroPonto.query.filter_by(funcionario_id=funcionario.id).all()
-            
-            for registro in registros_ponto:
-                # Atribuir obra se não tiver
-                if not registro.obra_id:
-                    registro.obra_id = obra.id
+        for data in dias_uteis:
+            # 90% presença, 10% falta
+            if random.random() < 0.9:
+                # Trabalho normal
+                entrada = datetime.combine(data, datetime.strptime('08:00', '%H:%M').time())
+                saida = datetime.combine(data, datetime.strptime('17:00', '%H:%M').time())
                 
-                # Recalcular horas se tem horários
-                if registro.hora_entrada and registro.hora_saida:
-                    horas_trabalhadas, horas_extras, atraso = calcular_horas_trabalho(
-                        registro.hora_entrada,
-                        registro.hora_saida,
-                        registro.hora_almoco_saida,
-                        registro.hora_almoco_retorno,
-                        None
-                    )
-                    
-                    registro.horas_trabalhadas = horas_trabalhadas
-                    registro.horas_extras = horas_extras
-                    registro.atraso = atraso
-            
-            print(f"   ✓ {funcionario.nome} → {obra.nome} ({len(registros_ponto)} registros de ponto atualizados)")
-        
-        try:
-            db.session.commit()
-            print("\n✅ Obras atribuídas e cálculos atualizados com sucesso!")
-            
-            # Estatísticas finais
-            print("\n📈 Estatísticas finais:")
-            total_registros = RegistroPonto.query.count()
-            com_obra = RegistroPonto.query.filter(RegistroPonto.obra_id.isnot(None)).count()
-            com_horas = RegistroPonto.query.filter(RegistroPonto.horas_trabalhadas > 0).count()
-            com_extras = RegistroPonto.query.filter(RegistroPonto.horas_extras > 0).count()
-            com_atraso = RegistroPonto.query.filter(RegistroPonto.atraso > 0).count()
-            
-            print(f"   - Total de registros de ponto: {total_registros}")
-            print(f"   - Com obra: {com_obra} ({com_obra/total_registros*100:.1f}%)")
-            print(f"   - Com horas calculadas: {com_horas} ({com_horas/total_registros*100:.1f}%)")
-            print(f"   - Com horas extras: {com_extras} ({com_extras/total_registros*100:.1f}%)")
-            print(f"   - Com atraso: {com_atraso} ({com_atraso/total_registros*100:.1f}%)")
-            
-        except Exception as e:
-            db.session.rollback()
-            print(f"❌ Erro ao salvar: {e}")
+                # Pequenos atrasos ocasionais
+                if random.random() < 0.3:
+                    entrada += timedelta(minutes=random.randint(10, 30))
+                
+                atraso_minutos = max(0, (entrada - datetime.combine(data, datetime.strptime('08:00', '%H:%M').time())).total_seconds() / 60)
+                
+                registro = RegistroPonto(
+                    funcionario_id=funcionario.id,
+                    data=data,
+                    obra_id=obra.id,
+                    hora_entrada=entrada.time(),
+                    hora_saida=saida.time(),
+                    hora_almoco_saida=datetime.strptime('12:00', '%H:%M').time(),
+                    hora_almoco_retorno=datetime.strptime('13:00', '%H:%M').time(),
+                    horas_trabalhadas=8.0,
+                    horas_extras=0.0,
+                    horas_trabalhadas_calculadas=8.0,
+                    total_atraso_minutos=atraso_minutos,
+                    tipo_registro='trabalho_normal',
+                    observacoes='Trabalho normal'
+                )
+                db.session.add(registro)
+                registros_criados += 1
+            else:
+                # Falta
+                registro = RegistroPonto(
+                    funcionario_id=funcionario.id,
+                    data=data,
+                    obra_id=obra.id,
+                    tipo_registro='falta',
+                    observacoes='Falta não justificada'
+                )
+                db.session.add(registro)
+                registros_criados += 1
+    
+    # Feriado trabalhado (Corpus Christi - 19/06)
+    for funcionario in funcionarios:
+        obra = random.choice(obras)
+        registro = RegistroPonto(
+            funcionario_id=funcionario.id,
+            data=date(2025, 6, 19),
+            obra_id=obra.id,
+            hora_entrada=datetime.strptime('08:00', '%H:%M').time(),
+            hora_saida=datetime.strptime('17:00', '%H:%M').time(),
+            hora_almoco_saida=datetime.strptime('12:00', '%H:%M').time(),
+            hora_almoco_retorno=datetime.strptime('13:00', '%H:%M').time(),
+            horas_trabalhadas=8,
+            horas_extras=8,
+            horas_trabalhadas_calculadas=8,
+            total_atraso_minutos=0,
+            tipo_registro='feriado_trabalhado',
+            percentual_extras=100,
+            observacoes="Corpus Christi - 100% horas extras"
+        )
+        db.session.add(registro)
+        registros_criados += 1
+    
+    db.session.commit()
+    print(f"Criados {registros_criados} registros de ponto")
 
-if __name__ == '__main__':
-    popular_obras_funcionarios()
+def popular_alimentacao():
+    """Popula registros de alimentação"""
+    print("=== Populando registros de alimentação ===")
+    
+    funcionarios = Funcionario.query.filter_by(ativo=True).limit(3).all()
+    restaurantes = Restaurante.query.all()
+    
+    if not restaurantes:
+        print("Erro: Nenhum restaurante encontrado")
+        return
+    
+    registros_criados = 0
+    
+    for funcionario in funcionarios:
+        # Alimentação em dias alternados
+        for dia in range(2, 31, 2):
+            data = date(2025, 6, dia)
+            if data.weekday() < 5:  # Apenas dias úteis
+                restaurante = random.choice(restaurantes)
+                
+                registro = RegistroAlimentacao(
+                    funcionario_id=funcionario.id,
+                    restaurante_id=restaurante.id,
+                    data=data,
+                    valor=random.choice([18.00, 22.00, 25.00]),
+                    tipo_refeicao='Almoço',
+                    observacoes=f"Almoço no {restaurante.nome}"
+                )
+                db.session.add(registro)
+                registros_criados += 1
+    
+    db.session.commit()
+    print(f"Criados {registros_criados} registros de alimentação")
+
+def popular_outros_custos():
+    """Popula outros custos"""
+    print("=== Populando outros custos ===")
+    
+    funcionarios = Funcionario.query.filter_by(ativo=True).limit(3).all()
+    
+    registros_criados = 0
+    
+    for funcionario in funcionarios:
+        # Vale transporte
+        registro = OutroCusto(
+            funcionario_id=funcionario.id,
+            data=date(2025, 6, 1),
+            tipo='Vale Transporte',
+            valor=150.00,
+            descricao=f"Vale transporte mensal - {funcionario.nome}"
+        )
+        db.session.add(registro)
+        registros_criados += 1
+        
+        # Desconto VT
+        registro = OutroCusto(
+            funcionario_id=funcionario.id,
+            data=date(2025, 6, 1),
+            tipo='Desconto VT 6%',
+            valor=9.00,
+            descricao=f"Desconto vale transporte - {funcionario.nome}"
+        )
+        db.session.add(registro)
+        registros_criados += 1
+    
+    db.session.commit()
+    print(f"Criados {registros_criados} outros custos")
+
+def main():
+    """Função principal"""
+    with app.app_context():
+        print("POPULANDO DADOS BÁSICOS - JUNHO 2025")
+        print("=" * 40)
+        
+        popular_registros_ponto()
+        popular_alimentacao()
+        popular_outros_custos()
+        
+        print("\n✅ Dados básicos criados!")
+
+if __name__ == "__main__":
+    main()

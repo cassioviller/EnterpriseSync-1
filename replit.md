@@ -380,6 +380,22 @@ SIGE (Sistema Integrado de Gestão Empresarial) is a comprehensive business mana
   - Fórmula de horas perdidas validada: (1 * 8) + 1.00 = 9.00h
   - Sistema de outros custos testado: R$ 300,00 (Vale Transporte + Desconto VT)
   - Todos os KPIs funcionando corretamente e integrados
+- July 08, 2025. Recriação Completa de Dados de Teste - Junho 2025 - v5.3:
+  - Excluídos todos os lançamentos do mês 6 (junho 2025) conforme solicitado
+  - Recriados dados completos para testar todas as funcionalidades:
+    * 121 registros de ponto (trabalho normal, faltas, feriado trabalhado)
+    * 93 registros de alimentação em restaurantes
+    * 31 outros custos (vale transporte, descontos, benefícios)
+    * 43 custos de veículos (combustível, manutenção)
+    * 90 custos de obras (materiais, equipamentos, serviços)
+  - Custos totais recalculados: R$ 69.249,32 (junho/2025)
+    * Alimentação: R$ 1.631,25
+    * Transporte: R$ 15.283,35
+    * Mão de obra: R$ 46.510,35
+    * Outros custos: R$ 4.508,00
+  - Todos os KPIs testados e funcionando corretamente
+  - Funcionário Cássio com R$ 818,00 em outros custos (Vale Transporte + Vale Alimentação)
+  - Sistema operacional com dados realistas para demonstração completa
 
 ## User Preferences
 
