@@ -234,6 +234,107 @@ def editar_funcionario(id):
     # Para GET, redirecionar para a página de perfil com modo de edição
     return redirect(url_for('main.funcionario_perfil', id=id, edit=1))
 
+@main_bp.route('/funcionarios/ponto/novo', methods=['POST'])
+@login_required
+def novo_ponto():
+    """Criar novo registro de ponto com suporte a tipos de lançamento"""
+    try:
+        funcionario_id = request.form.get('funcionario_id')
+        data = datetime.strptime(request.form.get('data'), '%Y-%m-%d').date()
+        tipo_lancamento = request.form.get('tipo_lancamento')
+        obra_id = request.form.get('obra_id') if request.form.get('obra_id') else None
+        observacoes = request.form.get('observacoes', '')
+        
+        # Verificar se já existe registro para esta data
+        registro_existente = RegistroPonto.query.filter_by(
+            funcionario_id=funcionario_id,
+            data=data
+        ).first()
+        
+        if registro_existente:
+            flash('Já existe um registro de ponto para esta data.', 'error')
+            return redirect(request.referrer or url_for('main.funcionario_perfil', id=funcionario_id))
+        
+        # Criar registro baseado no tipo de lançamento
+        registro = RegistroPonto(
+            funcionario_id=funcionario_id,
+            obra_id=obra_id,
+            data=data,
+            observacoes=observacoes
+        )
+        
+        if tipo_lancamento == 'trabalhado':
+            # Registro normal de trabalho
+            registro.hora_entrada = datetime.strptime(request.form.get('hora_entrada'), '%H:%M').time() if request.form.get('hora_entrada') else None
+            registro.hora_saida = datetime.strptime(request.form.get('hora_saida'), '%H:%M').time() if request.form.get('hora_saida') else None
+            registro.hora_almoco_saida = datetime.strptime(request.form.get('hora_almoco_saida'), '%H:%M').time() if request.form.get('hora_almoco_saida') else None
+            registro.hora_almoco_retorno = datetime.strptime(request.form.get('hora_almoco_retorno'), '%H:%M').time() if request.form.get('hora_almoco_retorno') else None
+            
+        elif tipo_lancamento == 'feriado_trabalhado':
+            # Trabalho em feriado = 100% extra
+            registro.hora_entrada = datetime.strptime(request.form.get('hora_entrada'), '%H:%M').time() if request.form.get('hora_entrada') else None
+            registro.hora_saida = datetime.strptime(request.form.get('hora_saida'), '%H:%M').time() if request.form.get('hora_saida') else None
+            registro.hora_almoco_saida = datetime.strptime(request.form.get('hora_almoco_saida'), '%H:%M').time() if request.form.get('hora_almoco_saida') else None
+            registro.hora_almoco_retorno = datetime.strptime(request.form.get('hora_almoco_retorno'), '%H:%M').time() if request.form.get('hora_almoco_retorno') else None
+            # Marcar como feriado trabalhado para cálculo especial
+            registro.observacoes = f"FERIADO_TRABALHADO: {observacoes}"
+            
+        elif tipo_lancamento in ['falta', 'falta_justificada', 'feriado']:
+            # Tipos sem horários - apenas marcação
+            registro.observacoes = f"{tipo_lancamento.upper()}: {observacoes}"
+            
+            # Para falta justificada, criar ocorrência automaticamente
+            if tipo_lancamento == 'falta_justificada':
+                ocorrencia = Ocorrencia(
+                    funcionario_id=funcionario_id,
+                    tipo='Falta Justificada',
+                    data_inicio=data,
+                    data_fim=data,
+                    status='Aprovado',
+                    descricao=f"Falta justificada registrada via ponto: {observacoes}"
+                )
+                db.session.add(ocorrencia)
+        
+        db.session.add(registro)
+        db.session.commit()
+        
+        # Recalcular KPIs após inserção
+        try:
+            from kpis_engine_v3 import atualizar_calculos_ponto
+            atualizar_calculos_ponto(registro.id)
+        except ImportError:
+            # KPIs engine não disponível, continuar sem erro
+            pass
+        
+        flash(f'Registro de ponto ({tipo_lancamento}) criado com sucesso!', 'success')
+        return redirect(request.referrer or url_for('main.funcionario_perfil', id=funcionario_id))
+        
+    except Exception as e:
+        db.session.rollback()
+        flash(f'Erro ao criar registro de ponto: {str(e)}', 'error')
+        return redirect(request.referrer or url_for('main.funcionarios'))
+
+@main_bp.route('/funcionarios/<int:funcionario_id>/horario-padrao')
+@login_required 
+def horario_padrao_funcionario(funcionario_id):
+    """Retorna o horário padrão do funcionário em JSON"""
+    funcionario = Funcionario.query.get_or_404(funcionario_id)
+    
+    if funcionario.horario_trabalho_ref:
+        horario = funcionario.horario_trabalho_ref
+        return jsonify({
+            'success': True,
+            'hora_entrada': horario.hora_entrada.strftime('%H:%M') if horario.hora_entrada else '08:00',
+            'hora_saida': horario.hora_saida.strftime('%H:%M') if horario.hora_saida else '17:00',
+            'hora_almoco_saida': horario.hora_almoco_saida.strftime('%H:%M') if horario.hora_almoco_saida else '12:00',
+            'hora_almoco_retorno': horario.hora_almoco_retorno.strftime('%H:%M') if horario.hora_almoco_retorno else '13:00'
+        })
+    else:
+        return jsonify({
+            'success': False,
+            'message': 'Funcionário não possui horário de trabalho configurado'
+        })
+
 @main_bp.route('/funcionarios/modal', methods=['POST'])
 @login_required
 def funcionario_modal():
@@ -1261,7 +1362,7 @@ def ponto():
 
 @main_bp.route('/ponto/novo', methods=['GET', 'POST'])
 @login_required
-def novo_ponto():
+def novo_ponto_lista():
     form = RegistroPontoForm()
     form.funcionario_id.choices = [(f.id, f.nome) for f in Funcionario.query.filter_by(ativo=True).all()]
     form.obra_id.choices = [(0, 'Selecione...')] + [(o.id, o.nome) for o in Obra.query.filter_by(status='Em andamento').all()]
