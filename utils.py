@@ -325,8 +325,8 @@ def calcular_kpis_funcionario_periodo(funcionario_id, data_inicio=None, data_fim
     # Dias trabalhados (com registros de ponto)
     dias_trabalhados = len(registros_ponto)
     
-    # Calcular faltas (dias úteis sem registro de ponto)
-    faltas = max(0, dias_uteis - dias_trabalhados)
+    # Calcular faltas (apenas registros explícitos de falta no sistema)
+    faltas = len([r for r in registros_ponto if r.tipo_registro in ['falta', 'falta_justificada']])
     
     # Calcular atrasos (número de dias com atraso)
     atrasos = len([r for r in registros_ponto if (getattr(r, 'total_atraso_horas', 0) or 0) > 0])

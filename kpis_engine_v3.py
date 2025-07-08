@@ -84,9 +84,13 @@ def calcular_kpis_funcionario_v3(funcionario_id, data_inicio=None, data_fim=None
         )
     ).scalar() or 0
     
-    # Calcular faltas de forma mais precisa
-    faltas_identificadas = identificar_faltas_periodo(funcionario_id, data_inicio, data_fim)
-    faltas = len(faltas_identificadas)
+    # 3. FALTAS (apenas registros explícitos de falta no sistema)
+    faltas = db.session.query(RegistroPonto).filter(
+        RegistroPonto.funcionario_id == funcionario_id,
+        RegistroPonto.data >= data_inicio,
+        RegistroPonto.data <= data_fim,
+        RegistroPonto.tipo_registro.in_(['falta', 'falta_justificada'])
+    ).count()
     
     # 4. ATRASOS (em horas)
     # Buscar atrasos já calculados na tabela registro_ponto
@@ -105,14 +109,14 @@ def calcular_kpis_funcionario_v3(funcionario_id, data_inicio=None, data_fim=None
     horas_esperadas = dias_uteis * 8  # 8 horas por dia útil
     produtividade = (horas_trabalhadas / horas_esperadas * 100) if horas_esperadas > 0 else 0
     
-    # 6. ABSENTEÍSMO (faltas/dias_úteis × 100)
+    # 6. ABSENTEÍSMO (faltas registradas/dias_úteis × 100)
     absenteismo = (faltas / dias_uteis * 100) if dias_uteis > 0 else 0
     
     # 7. MÉDIA DIÁRIA (horas trabalhadas / dias com presença)
     media_diaria = (horas_trabalhadas / dias_com_presenca) if dias_com_presenca > 0 else 0
     
-    # 8. HORAS PERDIDAS (faltas em horas + atrasos em horas)
-    horas_faltas = faltas * 8  # 8 horas por falta
+    # 8. HORAS PERDIDAS (faltas registradas em horas + atrasos em horas)
+    horas_faltas = faltas * 8  # 8 horas por falta registrada no sistema
     horas_perdidas = horas_faltas + total_atrasos_horas
     
     # 9. CUSTO MÃO DE OBRA (horas trabalhadas + faltas justificadas)

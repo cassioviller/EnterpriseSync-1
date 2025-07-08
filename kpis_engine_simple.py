@@ -101,9 +101,8 @@ class KPIsEngine:
         return total_extras
     
     def _calcular_faltas(self, registros_ponto, dias_uteis):
-        """3. Faltas: Número absoluto de dias úteis sem presença"""
-        dias_com_registro = len([r for r in registros_ponto if r.hora_entrada])
-        return max(0, dias_uteis - dias_com_registro)
+        """3. Faltas: Apenas registros explícitos de falta no sistema"""
+        return len([r for r in registros_ponto if r.tipo_registro in ['falta', 'falta_justificada']])
     
     def _calcular_atrasos_horas(self, registros_ponto):
         """4. Atrasos: Total de horas de atraso (entrada + saída antecipada)"""

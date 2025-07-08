@@ -282,6 +282,16 @@ SIGE (Sistema Integrado de Gestão Empresarial) is a comprehensive business mana
     * Regras de negócio específicas para construção civil
     * Métricas de performance e otimizações implementadas
   - Sistema de funcionários agora 100% operacional com cadastro, edição e gestão completa
+- July 08, 2025. Sistema de Tipos de Lançamento com Percentuais Configuráveis - v4.2:
+  - Implementados tipos especiais: "Sábado Horas Extras" e "Domingo Horas Extras" com percentuais configuráveis
+  - Migração de banco de dados adicionando colunas tipo_registro e percentual_extras (119 registros atualizados)
+  - Campo percentual habilitado para trabalho normal quando há horas extras detectadas
+  - JavaScript dinâmico para mostrar/ocultar campos baseado no tipo selecionado
+  - Fotos SVG aleatórias geradas para todos os funcionários (F0001.svg, F0002.svg, etc.)
+  - Sistema de fotos corrigido em cards de funcionários e perfis de detalhes
+  - Correção crítica na lógica de faltas: agora contabiliza apenas registros explícitos de falta no sistema
+  - Atualizado engines de KPIs (v3.0 e simple) para não calcular faltas automáticas por dias sem registro
+  - Sistema respeita regra de negócio: faltas só são contabilizadas quando lançadas manualmente no módulo
 
 ## User Preferences
 
