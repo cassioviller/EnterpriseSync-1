@@ -122,6 +122,8 @@ class RegistroPonto(db.Model):
     # Campos adicionais
     meio_periodo = db.Column(db.Boolean, default=False)
     saida_antecipada = db.Column(db.Boolean, default=False)
+    tipo_registro = db.Column(db.String(30), default='trabalhado')  # trabalhado, falta, falta_justificada, feriado, feriado_trabalhado, sabado_horas_extras, domingo_horas_extras
+    percentual_extras = db.Column(db.Float, default=0.0)  # percentual de horas extras configurável
     observacoes = db.Column(db.Text)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)

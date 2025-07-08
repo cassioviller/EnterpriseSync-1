@@ -243,6 +243,7 @@ def novo_ponto():
         data = datetime.strptime(request.form.get('data'), '%Y-%m-%d').date()
         tipo_lancamento = request.form.get('tipo_lancamento')
         obra_id = request.form.get('obra_id') if request.form.get('obra_id') else None
+        percentual_extras = float(request.form.get('percentual_extras', 0)) if request.form.get('percentual_extras') else 0.0
         observacoes = request.form.get('observacoes', '')
         
         # Verificar se já existe registro para esta data
@@ -260,7 +261,9 @@ def novo_ponto():
             funcionario_id=funcionario_id,
             obra_id=obra_id,
             data=data,
-            observacoes=observacoes
+            observacoes=observacoes,
+            tipo_registro=tipo_lancamento,
+            percentual_extras=percentual_extras
         )
         
         if tipo_lancamento == 'trabalhado':
@@ -278,6 +281,17 @@ def novo_ponto():
             registro.hora_almoco_retorno = datetime.strptime(request.form.get('hora_almoco_retorno'), '%H:%M').time() if request.form.get('hora_almoco_retorno') else None
             # Marcar como feriado trabalhado para cálculo especial
             registro.observacoes = f"FERIADO_TRABALHADO: {observacoes}"
+            
+        elif tipo_lancamento in ['sabado_horas_extras', 'domingo_horas_extras']:
+            # Trabalho em fim de semana com horas extras
+            registro.hora_entrada = datetime.strptime(request.form.get('hora_entrada'), '%H:%M').time() if request.form.get('hora_entrada') else None
+            registro.hora_saida = datetime.strptime(request.form.get('hora_saida'), '%H:%M').time() if request.form.get('hora_saida') else None
+            registro.hora_almoco_saida = datetime.strptime(request.form.get('hora_almoco_saida'), '%H:%M').time() if request.form.get('hora_almoco_saida') else None
+            registro.hora_almoco_retorno = datetime.strptime(request.form.get('hora_almoco_retorno'), '%H:%M').time() if request.form.get('hora_almoco_retorno') else None
+            
+            # Marcar tipo específico para cálculo com percentual configurado
+            percentual_info = f" (Extra: {percentual_extras}%)" if percentual_extras > 0 else ""
+            registro.observacoes = f"{tipo_lancamento.upper()}{percentual_info}: {observacoes}"
             
         elif tipo_lancamento in ['falta', 'falta_justificada', 'feriado']:
             # Tipos sem horários - apenas marcação
@@ -320,15 +334,17 @@ def horario_padrao_funcionario(funcionario_id):
     """Retorna o horário padrão do funcionário em JSON"""
     funcionario = Funcionario.query.get_or_404(funcionario_id)
     
-    if funcionario.horario_trabalho_ref:
-        horario = funcionario.horario_trabalho_ref
-        return jsonify({
-            'success': True,
-            'hora_entrada': horario.hora_entrada.strftime('%H:%M') if horario.hora_entrada else '08:00',
-            'hora_saida': horario.hora_saida.strftime('%H:%M') if horario.hora_saida else '17:00',
-            'hora_almoco_saida': horario.hora_almoco_saida.strftime('%H:%M') if horario.hora_almoco_saida else '12:00',
-            'hora_almoco_retorno': horario.hora_almoco_retorno.strftime('%H:%M') if horario.hora_almoco_retorno else '13:00'
-        })
+    # Buscar horário de trabalho do funcionário
+    if funcionario.horario_trabalho_id:
+        horario = HorarioTrabalho.query.get(funcionario.horario_trabalho_id)
+        if horario:
+            return jsonify({
+                'success': True,
+                'hora_entrada': horario.entrada.strftime('%H:%M') if horario.entrada else '08:00',
+                'hora_saida': horario.saida.strftime('%H:%M') if horario.saida else '17:00',
+                'hora_almoco_saida': horario.saida_almoco.strftime('%H:%M') if horario.saida_almoco else '12:00',
+                'hora_almoco_retorno': horario.retorno_almoco.strftime('%H:%M') if horario.retorno_almoco else '13:00'
+            })
     else:
         return jsonify({
             'success': False,

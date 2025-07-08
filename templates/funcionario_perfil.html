@@ -571,6 +571,8 @@
                                                 <option value="falta_justificada">Falta Justificada</option>
                                                 <option value="feriado">Feriado</option>
                                                 <option value="feriado_trabalhado">Feriado Trabalhado</option>
+                                                <option value="sabado_horas_extras">Sábado Horas Extras</option>
+                                                <option value="domingo_horas_extras">Domingo Horas Extras</option>
                                             </select>
                                         </div>
                                         <div class="col-md-4">
@@ -596,6 +598,12 @@
                                         </div>
                                         <div id="alertaFaltaJustificada" class="alert alert-success" style="display: none;">
                                             <i class="fas fa-check-circle"></i> <strong>Falta Justificada:</strong> Ausência com justificativa. Uma ocorrência será criada automaticamente.
+                                        </div>
+                                        <div id="alertaSabadoHorasExtras" class="alert alert-primary" style="display: none;">
+                                            <i class="fas fa-calendar-week"></i> <strong>Sábado Horas Extras:</strong> Trabalho em sábado. Configure o percentual extra (normalmente 50-60%) no cadastro.
+                                        </div>
+                                        <div id="alertaDomingoHorasExtras" class="alert alert-warning" style="display: none;">
+                                            <i class="fas fa-calendar-alt"></i> <strong>Domingo Horas Extras:</strong> Trabalho em domingo recebe <strong>100% de adicional</strong> sobre as horas normais.
                                         </div>
                                     </div>
                                 </div>
@@ -673,6 +681,15 @@
                                     </div>
                                 </div>
                             </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Percentual de Horas Extras (para tipos que precisam) -->
+                    <div class="mb-3" id="campo_percentual_extras" style="display: none;">
+                        <label for="percentual_extras" class="form-label">Percentual de Horas Extras (%)</label>
+                        <input type="number" class="form-control" id="percentual_extras" name="percentual_extras" min="0" max="200" step="1" placeholder="Ex: 50, 60, 100">
+                        <div class="form-text">
+                            <small>Informe o percentual adicional sobre as horas normais (50-60% para sábado, 100% para domingo/feriado)</small>
                         </div>
                     </div>
                     
@@ -1014,8 +1031,42 @@ function alterarTipoLancamento() {
             // Tornar campos obrigatórios
             document.getElementById('hora_entrada_ponto').required = true;
             document.getElementById('hora_saida_ponto').required = true;
+            // Mostrar campo de percentual com valor padrão 100%
+            document.getElementById('campo_percentual_extras').style.display = 'block';
+            document.getElementById('percentual_extras').value = '100';
+            document.getElementById('percentual_extras').required = true;
             // Mostrar alerta específico
             mostrarAlerta('alertaFeriadoTrabalhado');
+            break;
+            
+        case 'sabado_horas_extras':
+            // Mostrar campos de horário e botão
+            camposHorario.style.display = 'block';
+            btnHorarioPadrao.style.display = 'block';
+            // Tornar campos obrigatórios
+            document.getElementById('hora_entrada_ponto').required = true;
+            document.getElementById('hora_saida_ponto').required = true;
+            // Mostrar campo de percentual
+            document.getElementById('campo_percentual_extras').style.display = 'block';
+            document.getElementById('percentual_extras').value = '50';  // Valor padrão sugerido
+            document.getElementById('percentual_extras').required = true;
+            // Mostrar alerta específico
+            mostrarAlerta('alertaSabadoHorasExtras');
+            break;
+            
+        case 'domingo_horas_extras':
+            // Mostrar campos de horário e botão
+            camposHorario.style.display = 'block';
+            btnHorarioPadrao.style.display = 'block';
+            // Tornar campos obrigatórios
+            document.getElementById('hora_entrada_ponto').required = true;
+            document.getElementById('hora_saida_ponto').required = true;
+            // Mostrar campo de percentual com valor padrão 100%
+            document.getElementById('campo_percentual_extras').style.display = 'block';
+            document.getElementById('percentual_extras').value = '100';
+            document.getElementById('percentual_extras').required = true;
+            // Mostrar alerta específico
+            mostrarAlerta('alertaDomingoHorasExtras');
             break;
             
         case 'falta':
@@ -1057,6 +1108,9 @@ function alterarTipoLancamento() {
             btnHorarioPadrao.style.display = 'none';
             document.getElementById('hora_entrada_ponto').required = false;
             document.getElementById('hora_saida_ponto').required = false;
+            // Esconder campo de percentual
+            document.getElementById('campo_percentual_extras').style.display = 'none';
+            document.getElementById('percentual_extras').required = false;
             // Esconder alertas
             document.getElementById('alertaTipoLancamento').style.display = 'none';
     }
@@ -1095,7 +1149,7 @@ function preencherHorarioPadrao() {
 // Função para mostrar alerta específico do tipo de lançamento
 function mostrarAlerta(alertaId) {
     // Esconder todos os alertas primeiro
-    const alertas = ['alertaTrabalhado', 'alertaFeriado', 'alertaFeriadoTrabalhado', 'alertaFalta', 'alertaFaltaJustificada'];
+    const alertas = ['alertaTrabalhado', 'alertaFeriado', 'alertaFeriadoTrabalhado', 'alertaFalta', 'alertaFaltaJustificada', 'alertaSabadoHorasExtras', 'alertaDomingoHorasExtras'];
     alertas.forEach(id => {
         document.getElementById(id).style.display = 'none';
     });
@@ -1369,6 +1423,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 // Resetar visibilidade dos elementos
                 document.getElementById('campos_horario').style.display = 'none';
                 document.getElementById('btnHorarioPadrao').style.display = 'none';
+                document.getElementById('campo_percentual_extras').style.display = 'none';
                 document.getElementById('alertaTipoLancamento').style.display = 'none';
             }
         });
