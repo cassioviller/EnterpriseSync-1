@@ -576,8 +576,9 @@ def funcionario_perfil(id):
         }
         
         for registro in registros_ponto:
-            registro.is_falta = (registro.data in faltas)
-            registro.is_feriado = (registro.data in feriados_2025)
+            # Adicionar informações sobre faltas e feriados baseado no tipo_registro
+            registro.is_falta = (registro.tipo_registro in ['falta', 'falta_justificada'])
+            registro.is_feriado = (registro.tipo_registro in ['feriado', 'feriado_trabalhado'])
     else:
         # Usar função que já identifica faltas
         registros_ponto, faltas = processar_registros_ponto_com_faltas(id, data_inicio, data_fim)
@@ -598,9 +599,10 @@ def funcionario_perfil(id):
             date(2025, 12, 25)  # Natal
         }
         
-        # Adicionar informação de feriado para todos os registros
+        # Adicionar informação de feriado e faltas para todos os registros
         for registro in registros_ponto:
-            registro.is_feriado = (registro.data in feriados_2025)
+            registro.is_falta = (registro.tipo_registro in ['falta', 'falta_justificada'])
+            registro.is_feriado = (registro.tipo_registro in ['feriado', 'feriado_trabalhado'])
     
     # Buscar ocorrências (sem filtro de data por enquanto)
     ocorrencias = Ocorrencia.query.filter_by(funcionario_id=id).order_by(Ocorrencia.data_inicio.desc()).all()

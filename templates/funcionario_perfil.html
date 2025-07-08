@@ -324,9 +324,17 @@
                                     {% if registro.is_feriado %}
                                         <span class="fw-bold" style="color: #6c757d;">Feriado</span>
                                     {% elif registro.is_falta %}
-                                        <span class="fw-bold" style="color: #dc3545;">Falta</span>
+                                        {% if registro.tipo_registro == 'falta_justificada' %}
+                                            <span class="fw-bold" style="color: #28a745;">Falta Justificada</span>
+                                        {% else %}
+                                            <span class="fw-bold" style="color: #dc3545;">Falta</span>
+                                        {% endif %}
                                     {% elif registro.horas_extras and registro.horas_extras > 0 %}
-                                        <span class="badge bg-warning">{{ '{:.2f}h'.format(registro.horas_extras) }}</span>
+                                        {% if registro.percentual_extras %}
+                                            <span class="badge bg-warning">{{ '{:.0f}h - {:.0f}%'.format(registro.horas_extras, registro.percentual_extras) }}</span>
+                                        {% else %}
+                                            <span class="badge bg-warning">{{ '{:.0f}h'.format(registro.horas_extras) }}</span>
+                                        {% endif %}
                                     {% else %}
                                         <span class="text-muted">-</span>
                                     {% endif %}
