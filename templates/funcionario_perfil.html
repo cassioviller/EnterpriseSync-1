@@ -258,6 +258,20 @@
                     </div>
                 </div>
 
+                <!-- Resumo do Período -->
+                <div class="row mb-3">
+                    <div class="col-12">
+                        <div class="alert alert-info">
+                            <small>
+                                <strong>Resumo do período:</strong>
+                                {{ registros_ponto|length }} registros encontrados |
+                                Horas Extras: {{ '{:.1f}h'.format(registros_ponto|sum(attribute='horas_extras') or 0) }} |
+                                Horas Trabalhadas: {{ '{:.1f}h'.format(registros_ponto|sum(attribute='horas_trabalhadas') or 0) }}
+                            </small>
+                        </div>
+                    </div>
+                </div>
+
                 <!-- Tabela de Registros -->
                 <div class="table-responsive">
                     <table class="table table-striped" id="pontoTable">
@@ -1286,7 +1300,15 @@ $(document).ready(function() {
     $('#pontoTable').DataTable({
         language: { url: '//cdn.datatables.net/plug-ins/1.13.6/i18n/pt-BR.json' },
         order: [[0, 'desc']],
-        pageLength: 10
+        pageLength: 25,
+        lengthMenu: [10, 25, 50, 100],
+        dom: 'lBfrtip',
+        buttons: [
+            {
+                extend: 'pageLength',
+                text: 'Registros por página'
+            }
+        ]
     });
     
     $('#ocorrenciasTable').DataTable({

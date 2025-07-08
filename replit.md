@@ -340,6 +340,12 @@ SIGE (Sistema Integrado de Gestão Empresarial) is a comprehensive business mana
   - Informação visual sobre período padrão para cálculo de KPIs
   - Navegação otimizada: botão verde agora cria RDO com obra pré-selecionada
   - Interface mais limpa e funcional para gestão de obras
+- July 08, 2025. Correção de Visualização de KPIs - v4.9:
+  - Corrigido problema de paginação na tabela de ponto (pageLength aumentado para 25)
+  - Adicionado resumo visual do período mostrando totais calculados
+  - Melhorada visualização de horas extras para evitar confusão com dados paginados
+  - Verificação de dados confirmada: 20h extras (8h+4h+4h+4h) calculadas corretamente
+  - Interface otimizada para mostrar todos os dados relevantes do período selecionado
 
 ## User Preferences
 
