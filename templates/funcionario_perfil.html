@@ -152,55 +152,63 @@
                         </div>
                     </div>
                 </div>
-                <!-- Primeira Linha de KPIs -->
+                <!-- Grid 3-3 de KPIs -->
                 <div class="row mb-3">
-                    <div class="col-md-3">
+                    <div class="col-md-4">
                         <div class="text-center p-3 border rounded">
                             <h4 class="text-primary mb-1">{{ '{:.1f}h'.format(kpis.horas_trabalhadas) }}</h4>
                             <small class="text-muted">Horas Trabalhadas</small>
                         </div>
                     </div>
-                    <div class="col-md-3">
+                    <div class="col-md-4">
                         <div class="text-center p-3 border rounded">
                             <h4 class="text-warning mb-1">{{ '{:.1f}h'.format(kpis.horas_extras) }}</h4>
                             <small class="text-muted">Horas Extras</small>
                         </div>
                     </div>
-                    <div class="col-md-3">
+                    <div class="col-md-4">
                         <div class="text-center p-3 border rounded">
                             <h4 class="text-danger mb-1">{{ kpis.faltas }}</h4>
                             <small class="text-muted">Faltas</small>
                         </div>
                     </div>
-                    <div class="col-md-3">
+                </div>
+                
+                <div class="row mb-3">
+                    <div class="col-md-4">
                         <div class="text-center p-3 border rounded">
                             <h4 class="text-info mb-1">{{ '{:.2f}h'.format(kpis.atrasos) }}</h4>
                             <small class="text-muted">Atrasos</small>
                         </div>
                     </div>
-                </div>
-                
-                <!-- Segunda Linha de KPIs -->
-                <div class="row mb-3">
-                    <div class="col-md-3">
+                    <div class="col-md-4">
                         <div class="text-center p-3 border rounded">
                             <h4 class="text-success mb-1">{{ '{:.1f}%'.format(kpis.produtividade) if kpis.produtividade is defined else '0.0%' }}</h4>
                             <small class="text-muted">Produtividade</small>
                         </div>
                     </div>
-                    <div class="col-md-3">
+                    <div class="col-md-4">
+                        <div class="text-center p-3 border rounded">
+                            <h4 class="text-info mb-1">R$ {{ '{:,.2f}'.format(kpis.outros_custos if hasattr(kpis, 'outros_custos') else 0) }}</h4>
+                            <small class="text-muted">Outros Custos</small>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="row mb-3">
+                    <div class="col-md-4">
                         <div class="text-center p-3 border rounded">
                             <h4 class="text-secondary mb-1">{{ '{:.1f}%'.format(kpis.absenteismo) }}</h4>
                             <small class="text-muted">Absenteísmo</small>
                         </div>
                     </div>
-                    <div class="col-md-3">
+                    <div class="col-md-4">
                         <div class="text-center p-3 border rounded">
                             <h4 class="text-info mb-1">{{ '{:.1f}h'.format(kpis.media_diaria) }}</h4>
                             <small class="text-muted">Média Diária</small>
                         </div>
                     </div>
-                    <div class="col-md-3">
+                    <div class="col-md-4">
                         <div class="text-center p-3 border rounded">
                             <h4 class="text-warning mb-1">{{ '{:.1f}h'.format(kpis.horas_perdidas_total) if kpis.horas_perdidas_total is defined else '0.0h' }}</h4>
                             <small class="text-muted">Horas Perdidas</small>
@@ -208,7 +216,7 @@
                     </div>
                 </div>
                 
-                <!-- Terceira Linha de KPIs -->
+                <!-- Custos -->
                 <div class="row">
                     <div class="col-md-6">
                         <div class="text-center p-3 border rounded">
@@ -455,8 +463,7 @@
                                 <th>Tipo</th>
                                 <th>Categoria</th>
                                 <th>Valor</th>
-                                <th>Percentual</th>
-                                <th>Obra</th>
+
                                 <th>Descrição</th>
                                 <th>Ações</th>
                             </tr>
@@ -466,15 +473,9 @@
                             <tr>
                                 <td>{{ custo.data.strftime('%d/%m/%Y') }}</td>
                                 <td>
-                                    {% if custo.tipo == 'vale_transporte' %}
-                                        <span class="badge bg-info">Vale Transporte</span>
-                                    {% elif custo.tipo == 'vale_alimentacao' %}
-                                        <span class="badge bg-success">Vale Alimentação</span>
-                                    {% elif custo.tipo == 'desconto_vt' %}
-                                        <span class="badge bg-warning">Desconto VT</span>
-                                    {% elif custo.tipo == 'desconto_outras' %}
-                                        <span class="badge bg-danger">Outros Descontos</span>
-                                    {% endif %}
+                                    <span class="badge {% if custo.categoria == 'adicional' %}bg-success{% else %}bg-warning{% endif %}">
+                                        {{ custo.tipo }}
+                                    </span>
                                 </td>
                                 <td>
                                     {% if custo.categoria == 'adicional' %}
@@ -490,20 +491,7 @@
                                         <span class="text-danger">-R$ {{ '{:,.2f}'.format(custo.valor) }}</span>
                                     {% endif %}
                                 </td>
-                                <td>
-                                    {% if custo.percentual %}
-                                        <span class="badge bg-secondary">{{ custo.percentual }}%</span>
-                                    {% else %}
-                                        <span class="text-muted">-</span>
-                                    {% endif %}
-                                </td>
-                                <td>
-                                    {% if custo.obra %}
-                                        <span class="badge bg-primary">{{ custo.obra.nome }}</span>
-                                    {% else %}
-                                        <span class="text-muted">Geral</span>
-                                    {% endif %}
-                                </td>
+
                                 <td>{{ custo.descricao or '-' }}</td>
                                 <td>
                                     <div class="btn-group" role="group">
@@ -1596,27 +1584,8 @@ function excluirOutroCusto(id) {
     }
 }
 
-// Auto-selecionar categoria baseado no tipo
+// Limpar formulário ao fechar modal
 document.addEventListener('DOMContentLoaded', function() {
-    const tipoSelect = document.getElementById('tipo_outro_custo');
-    if (tipoSelect) {
-        tipoSelect.addEventListener('change', function() {
-            const categoria = document.getElementById('categoria_outro_custo');
-            const percentual = document.getElementById('percentual_outro_custo');
-            
-            if (this.value === 'desconto_vt' || this.value === 'desconto_outras') {
-                categoria.value = 'desconto';
-                if (this.value === 'desconto_vt') {
-                    percentual.value = '6';
-                }
-            } else if (this.value === 'vale_transporte' || this.value === 'vale_alimentacao') {
-                categoria.value = 'adicional';
-                percentual.value = '';
-            }
-        });
-    }
-    
-    // Limpar formulário ao fechar modal
     const modal = document.getElementById('outroCustoModal');
     if (modal) {
         modal.addEventListener('hidden.bs.modal', function () {
@@ -1648,13 +1617,8 @@ document.addEventListener('DOMContentLoaded', function() {
                         <div class="col-md-6">
                             <div class="mb-3">
                                 <label for="tipo_outro_custo" class="form-label">Tipo</label>
-                                <select class="form-select" id="tipo_outro_custo" name="tipo" required>
-                                    <option value="">Selecione...</option>
-                                    <option value="vale_transporte">Vale Transporte</option>
-                                    <option value="vale_alimentacao">Vale Alimentação</option>
-                                    <option value="desconto_vt">Desconto VT (6%)</option>
-                                    <option value="desconto_outras">Outros Descontos</option>
-                                </select>
+                                <input type="text" class="form-control" id="tipo_outro_custo" name="tipo" 
+                                       placeholder="Ex: Vale Transporte, Vale Alimentação, Desconto VT..." required>
                             </div>
                         </div>
                     </div>
@@ -1676,25 +1640,7 @@ document.addEventListener('DOMContentLoaded', function() {
                             </div>
                         </div>
                     </div>
-                    <div class="row">
-                        <div class="col-md-6">
-                            <div class="mb-3">
-                                <label for="percentual_outro_custo" class="form-label">Percentual (%)</label>
-                                <input type="number" step="0.01" class="form-control" id="percentual_outro_custo" name="percentual" placeholder="Ex: 6 para 6%">
-                            </div>
-                        </div>
-                        <div class="col-md-6">
-                            <div class="mb-3">
-                                <label for="obra_outro_custo" class="form-label">Obra</label>
-                                <select class="form-select" id="obra_outro_custo" name="obra_id">
-                                    <option value="">Geral</option>
-                                    {% for obra in obras %}
-                                    <option value="{{ obra.id }}">{{ obra.nome }}</option>
-                                    {% endfor %}
-                                </select>
-                            </div>
-                        </div>
-                    </div>
+
                     <div class="mb-3">
                         <label for="descricao_outro_custo" class="form-label">Descrição</label>
                         <textarea class="form-control" id="descricao_outro_custo" name="descricao" rows="3" placeholder="Detalhes sobre o custo..."></textarea>

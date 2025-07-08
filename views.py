@@ -633,23 +633,34 @@ def funcionario_perfil(id):
             for key, value in data.items():
                 setattr(self, key, value)
     
-    kpis_obj = KPIData(kpis) if kpis else KPIData({
-        'horas_trabalhadas': 0,
-        'horas_extras': 0,
-        'faltas': 0,
-        'atrasos': 0,
-        'absenteismo': 0,
-        'horas_extras_valor': 0,
-        'media_horas_diarias': 0,
-        'total_atrasos': 0,
-        'pontualidade': 100,
-        'custo_total': 0,
-        'custo_mao_obra': 0,
-        'custo_alimentacao': 0,
-        'custo_transporte': 0,
-        'dias_trabalhados': 0,
-        'dias_uteis': 0
-    })
+    # Adicionar cálculo de outros custos
+    total_outros_custos = sum(c.valor if c.categoria == 'adicional' else -c.valor for c in outros_custos)
+    
+    if kpis:
+        # Corrigir horas perdidas: (faltas * 8) + atrasos
+        kpis['horas_perdidas_total'] = (kpis.get('faltas', 0) * 8) + kpis.get('atrasos', 0)
+        kpis['outros_custos'] = total_outros_custos
+        kpis_obj = KPIData(kpis)
+    else:
+        kpis_obj = KPIData({
+            'horas_trabalhadas': 0,
+            'horas_extras': 0,
+            'faltas': 0,
+            'atrasos': 0,
+            'absenteismo': 0,
+            'horas_extras_valor': 0,
+            'media_horas_diarias': 0,
+            'total_atrasos': 0,
+            'pontualidade': 100,
+            'custo_total': 0,
+            'custo_mao_obra': 0,
+            'custo_alimentacao': 0,
+            'custo_transporte': 0,
+            'dias_trabalhados': 0,
+            'dias_uteis': 0,
+            'horas_perdidas_total': 0,
+            'outros_custos': total_outros_custos
+        })
     
     # Buscar dados adicionais para o modal de edição
     departamentos = Departamento.query.all()
@@ -695,9 +706,7 @@ def criar_outro_custo(funcionario_id):
             tipo=request.form['tipo'],
             categoria=request.form['categoria'],
             valor=float(request.form['valor']),
-            descricao=request.form.get('descricao'),
-            obra_id=request.form.get('obra_id') if request.form.get('obra_id') else None,
-            percentual=float(request.form['percentual']) if request.form.get('percentual') else None
+            descricao=request.form.get('descricao')
         )
         
         db.session.add(outro_custo)
