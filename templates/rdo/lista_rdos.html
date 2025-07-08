@@ -24,27 +24,37 @@
         </h5>
     </div>
     <div class="card-body">
-        <form method="POST" class="row g-3">
-            {{ form.csrf_token }}
+        <form method="GET" class="row g-3">
             
             <div class="col-md-3">
-                {{ form.data_inicio.label(class="form-label") }}
-                {{ form.data_inicio(class="form-control") }}
+                <label class="form-label">Data Início</label>
+                <input type="date" name="data_inicio" class="form-control" value="{{ filtros.data_inicio }}">
             </div>
             
             <div class="col-md-3">
-                {{ form.data_fim.label(class="form-label") }}
-                {{ form.data_fim(class="form-control") }}
+                <label class="form-label">Data Fim</label>
+                <input type="date" name="data_fim" class="form-control" value="{{ filtros.data_fim }}">
             </div>
             
             <div class="col-md-3">
-                {{ form.obra_id.label(class="form-label") }}
-                {{ form.obra_id(class="form-select") }}
+                <label class="form-label">Obra</label>
+                <select name="obra_id" class="form-select">
+                    <option value="">Todas as Obras</option>
+                    {% for obra in obras %}
+                        <option value="{{ obra.id }}" {{ 'selected' if filtros.obra_id == obra.id|string else '' }}>
+                            {{ obra.nome }}
+                        </option>
+                    {% endfor %}
+                </select>
             </div>
             
             <div class="col-md-3">
-                {{ form.status.label(class="form-label") }}
-                {{ form.status(class="form-select") }}
+                <label class="form-label">Status</label>
+                <select name="status" class="form-select">
+                    <option value="">Todos os Status</option>
+                    <option value="rascunho" {{ 'selected' if filtros.status == 'rascunho' else '' }}>Rascunho</option>
+                    <option value="finalizado" {{ 'selected' if filtros.status == 'finalizado' else '' }}>Finalizado</option>
+                </select>
             </div>
             
             <div class="col-12">

@@ -797,7 +797,7 @@ def obras():
     if data_inicio_filtro:
         data_inicio = datetime.strptime(data_inicio_filtro, '%Y-%m-%d').date()
     else:
-        # Último mês por padrão
+        # Último mês por padrão (30 dias atrás)
         data_inicio = data_fim - timedelta(days=30)
     
     for obra in obras:

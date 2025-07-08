@@ -25,7 +25,7 @@
 <!-- Filtros Rápidos -->
 <div class="card mb-4">
     <div class="card-body">
-        <form method="GET" class="row g-3">
+        <form method="GET" id="filtroForm" class="row g-3 align-items-end">
             <div class="col-md-4">
                 <label for="nome" class="form-label">Nome da Obra</label>
                 <input type="text" class="form-control" id="nome" name="nome" 
@@ -44,33 +44,28 @@
                 </select>
             </div>
             
-            <div class="col-md-2">
-                <label for="data_inicio" class="form-label">Data Início</label>
-                <input type="date" class="form-control" id="data_inicio" name="data_inicio" 
-                       value="{{ filtros.data_inicio }}">
-            </div>
-            
-            <div class="col-md-2">
-                <label for="data_fim" class="form-label">Data Fim</label>
-                <input type="date" class="form-control" id="data_fim" name="data_fim" 
-                       value="{{ filtros.data_fim }}">
-            </div>
-            
-            <div class="col-md-1 d-flex align-items-end">
-                <button type="submit" class="btn btn-outline-primary w-100">
-                    <i class="fas fa-search"></i>
-                </button>
+            <div class="col-md-5">
+                <label class="form-label">Período</label>
+                <div class="btn-group d-flex" role="group">
+                    <button type="button" class="btn btn-outline-secondary btn-periodo" data-periodo="7">7 dias</button>
+                    <button type="button" class="btn btn-outline-secondary btn-periodo" data-periodo="30">30 dias</button>
+                    <button type="button" class="btn btn-outline-secondary btn-periodo active" data-periodo="30">Último mês</button>
+                    <button type="button" class="btn btn-outline-secondary btn-periodo" data-periodo="trimestre">Trimestre</button>
+                    <button type="button" class="btn btn-outline-secondary btn-periodo" data-periodo="semestre">Semestre</button>
+                    <button type="button" class="btn btn-outline-secondary btn-periodo" data-periodo="ano">Ano</button>
+                </div>
+                <input type="hidden" id="data_inicio" name="data_inicio" value="{{ filtros.data_inicio }}">
+                <input type="hidden" id="data_fim" name="data_fim" value="{{ filtros.data_fim }}">
             </div>
         </form>
         
-        <div class="mt-2">
-            <a href="{{ url_for('main.obras') }}" class="btn btn-outline-secondary btn-sm">
-                <i class="fas fa-times"></i> Limpar Filtros
+        <div class="mt-3">
+            <button type="submit" form="filtroForm" class="btn btn-outline-primary">
+                <i class="fas fa-search"></i> Filtrar
+            </button>
+            <a href="{{ url_for('main.obras') }}" class="btn btn-outline-secondary">
+                <i class="fas fa-times"></i> Limpar
             </a>
-            <small class="text-muted ms-3">
-                <i class="fas fa-info-circle"></i> 
-                Período padrão: últimos 30 dias para cálculo de KPIs
-            </small>
         </div>
     </div>
 </div>
@@ -447,5 +442,46 @@ function excluirObra(id) {
         form.submit();
     }
 }
+
+// Filtros rápidos de período
+$(document).ready(function() {
+    $('.btn-periodo').click(function() {
+        // Remove active class from all buttons
+        $('.btn-periodo').removeClass('active');
+        // Add active class to clicked button
+        $(this).addClass('active');
+        
+        const periodo = $(this).data('periodo');
+        const hoje = new Date();
+        let dataInicio, dataFim;
+        
+        dataFim = hoje.toISOString().split('T')[0];
+        
+        switch(periodo) {
+            case 7:
+                dataInicio = new Date(hoje.getTime() - 7 * 24 * 60 * 60 * 1000);
+                break;
+            case 30:
+                dataInicio = new Date(hoje.getTime() - 30 * 24 * 60 * 60 * 1000);
+                break;
+
+            case 'trimestre':
+                dataInicio = new Date(hoje.getFullYear(), hoje.getMonth() - 3, hoje.getDate());
+                break;
+            case 'semestre':
+                dataInicio = new Date(hoje.getFullYear(), hoje.getMonth() - 6, hoje.getDate());
+                break;
+            case 'ano':
+                dataInicio = new Date(hoje.getFullYear() - 1, hoje.getMonth(), hoje.getDate());
+                break;
+        }
+        
+        $('#data_inicio').val(dataInicio.toISOString().split('T')[0]);
+        $('#data_fim').val(dataFim);
+        
+        // Auto-submit form
+        $('#filtroForm').submit();
+    });
+});
 </script>
 {% endblock %}
