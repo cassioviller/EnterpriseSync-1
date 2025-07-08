@@ -297,17 +297,8 @@ def novo_ponto():
             # Tipos sem horários - apenas marcação
             registro.observacoes = f"{tipo_lancamento.upper()}: {observacoes}"
             
-            # Para falta justificada, criar ocorrência automaticamente
-            if tipo_lancamento == 'falta_justificada':
-                ocorrencia = Ocorrencia(
-                    funcionario_id=funcionario_id,
-                    tipo='Falta Justificada',
-                    data_inicio=data,
-                    data_fim=data,
-                    status='Aprovado',
-                    descricao=f"Falta justificada registrada via ponto: {observacoes}"
-                )
-                db.session.add(ocorrencia)
+            # Para falta justificada, apenas registrar o ponto (sem criar ocorrência)
+            # Ocorrências serão gerenciadas separadamente se necessário
         
         db.session.add(registro)
         db.session.commit()

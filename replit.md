@@ -294,6 +294,9 @@ SIGE (Sistema Integrado de Gestão Empresarial) is a comprehensive business mana
   - Sistema respeita regra de negócio: faltas só são contabilizadas quando lançadas manualmente no módulo
   - Correções visuais: falta justificada aparece em verde, atrasos limitados a 2 casas decimais
   - Registros de exemplo criados para Cássio com tipos corretos (feriado trabalhado, sábado/domingo extras)
+  - CRUD de ponto corrigido: removido erro na criação de ocorrências automáticas
+  - Perfil do Cássio populado com 12 registros demonstrando todos os tipos de lançamento no mês 6/2025
+  - Tipos demonstrados: trabalho normal, falta, falta justificada, feriado, feriado trabalhado, sábado/domingo extras, meio período
 
 ## User Preferences
 
