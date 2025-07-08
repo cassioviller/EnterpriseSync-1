@@ -356,6 +356,14 @@ SIGE (Sistema Integrado de Gestão Empresarial) is a comprehensive business mana
   - Corrigido exibição de horas extras do feriado trabalhado na tabela de ponto
   - Sistema permite controle completo de custos adicionais e descontos sobre salário
   - Dados de exemplo populados para demonstração das funcionalidades
+- July 08, 2025. Correções no Modal e Layout dos Indicadores - v5.1:
+  - Corrigido modal de outros custos: removidos campos "Percentual (%)" e "Obra" conforme solicitado
+  - Campo "Tipo" alterado para input text livre (ex: Vale Transporte, Vale Alimentação, etc.)
+  - Layout dos indicadores reorganizado para grid 4-4-3 (4 colunas + 4 colunas + 3 colunas)
+  - "Outros Custos" posicionado na segunda linha, última coluna (posição 2-4)
+  - Corrigido cálculo de "Horas Perdidas": agora usa fórmula ((faltas*8) + atrasos)
+  - Corrigido erro de template Jinja2 com hasattr, usando "is defined" ao invés
+  - Sistema de outros custos completamente integrado aos KPIs com cálculo automático
 
 ## User Preferences
 

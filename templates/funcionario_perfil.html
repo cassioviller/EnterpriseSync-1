@@ -152,44 +152,56 @@
                         </div>
                     </div>
                 </div>
-                <!-- Grid 3-3 de KPIs -->
+                <!-- Grid 4-4-3 de KPIs -->
                 <div class="row mb-3">
-                    <div class="col-md-4">
+                    <div class="col-md-3">
                         <div class="text-center p-3 border rounded">
                             <h4 class="text-primary mb-1">{{ '{:.1f}h'.format(kpis.horas_trabalhadas) }}</h4>
                             <small class="text-muted">Horas Trabalhadas</small>
                         </div>
                     </div>
-                    <div class="col-md-4">
+                    <div class="col-md-3">
                         <div class="text-center p-3 border rounded">
                             <h4 class="text-warning mb-1">{{ '{:.1f}h'.format(kpis.horas_extras) }}</h4>
                             <small class="text-muted">Horas Extras</small>
                         </div>
                     </div>
-                    <div class="col-md-4">
+                    <div class="col-md-3">
                         <div class="text-center p-3 border rounded">
                             <h4 class="text-danger mb-1">{{ kpis.faltas }}</h4>
                             <small class="text-muted">Faltas</small>
                         </div>
                     </div>
-                </div>
-                
-                <div class="row mb-3">
-                    <div class="col-md-4">
+                    <div class="col-md-3">
                         <div class="text-center p-3 border rounded">
                             <h4 class="text-info mb-1">{{ '{:.2f}h'.format(kpis.atrasos) }}</h4>
                             <small class="text-muted">Atrasos</small>
                         </div>
                     </div>
-                    <div class="col-md-4">
+                </div>
+                
+                <div class="row mb-3">
+                    <div class="col-md-3">
                         <div class="text-center p-3 border rounded">
                             <h4 class="text-success mb-1">{{ '{:.1f}%'.format(kpis.produtividade) if kpis.produtividade is defined else '0.0%' }}</h4>
                             <small class="text-muted">Produtividade</small>
                         </div>
                     </div>
-                    <div class="col-md-4">
+                    <div class="col-md-3">
                         <div class="text-center p-3 border rounded">
-                            <h4 class="text-info mb-1">R$ {{ '{:,.2f}'.format(kpis.outros_custos if hasattr(kpis, 'outros_custos') else 0) }}</h4>
+                            <h4 class="text-secondary mb-1">{{ '{:.1f}%'.format(kpis.absenteismo) }}</h4>
+                            <small class="text-muted">Absenteísmo</small>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="text-center p-3 border rounded">
+                            <h4 class="text-info mb-1">{{ '{:.1f}h'.format(kpis.media_diaria) }}</h4>
+                            <small class="text-muted">Média Diária</small>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="text-center p-3 border rounded">
+                            <h4 class="text-info mb-1">R$ {{ '{:,.2f}'.format(kpis.outros_custos if kpis.outros_custos is defined else 0) }}</h4>
                             <small class="text-muted">Outros Custos</small>
                         </div>
                     </div>
@@ -198,39 +210,25 @@
                 <div class="row mb-3">
                     <div class="col-md-4">
                         <div class="text-center p-3 border rounded">
-                            <h4 class="text-secondary mb-1">{{ '{:.1f}%'.format(kpis.absenteismo) }}</h4>
-                            <small class="text-muted">Absenteísmo</small>
-                        </div>
-                    </div>
-                    <div class="col-md-4">
-                        <div class="text-center p-3 border rounded">
-                            <h4 class="text-info mb-1">{{ '{:.1f}h'.format(kpis.media_diaria) }}</h4>
-                            <small class="text-muted">Média Diária</small>
-                        </div>
-                    </div>
-                    <div class="col-md-4">
-                        <div class="text-center p-3 border rounded">
                             <h4 class="text-warning mb-1">{{ '{:.1f}h'.format(kpis.horas_perdidas_total) if kpis.horas_perdidas_total is defined else '0.0h' }}</h4>
                             <small class="text-muted">Horas Perdidas</small>
                         </div>
                     </div>
-                </div>
-                
-                <!-- Custos -->
-                <div class="row">
-                    <div class="col-md-6">
+                    <div class="col-md-4">
                         <div class="text-center p-3 border rounded">
                             <h4 class="text-success mb-1">R$ {{ '{:,.2f}'.format(kpis.custo_mao_obra) if kpis.custo_mao_obra is defined else '0,00' }}</h4>
                             <small class="text-muted">Custo Mão de obra</small>
                         </div>
                     </div>
-                    <div class="col-md-6">
+                    <div class="col-md-4">
                         <div class="text-center p-3 border rounded">
                             <h4 class="text-primary mb-1">R$ {{ '{:,.2f}'.format(kpis.custo_alimentacao) if kpis.custo_alimentacao is defined else '0,00' }}</h4>
                             <small class="text-muted">Custo Alimentação</small>
                         </div>
                     </div>
                 </div>
+                
+
                 
 
             </div>
