@@ -131,31 +131,15 @@ def calcular_kpis_funcionario_v3(funcionario_id, data_inicio=None, data_fim=None
     horas_faltas = faltas * 8  # 8 horas por falta não justificada
     horas_perdidas = horas_faltas + total_atrasos_horas
     
-    # 9. CUSTO MÃO DE OBRA (horas trabalhadas + faltas justificadas)
-    # Buscar faltas justificadas: ocorrências aprovadas que cobrem dias úteis
-    faltas_justificadas_count = 0
-    
-    try:
-        ocorrencias_aprovadas = db.session.query(Ocorrencia).filter(
-            and_(
-                Ocorrencia.funcionario_id == funcionario_id,
-                Ocorrencia.data_inicio <= data_fim,
-                Ocorrencia.data_fim >= data_inicio,
-                Ocorrencia.status == 'Aprovado'
-            )
-        ).all()
-        
-        # Contar dias úteis cobertos por ocorrências justificadas
-        for ocorrencia in ocorrencias_aprovadas:
-            inicio_periodo = max(ocorrencia.data_inicio, data_inicio)
-            fim_periodo = min(ocorrencia.data_fim, data_fim)
-            faltas_justificadas_count += calcular_dias_uteis(inicio_periodo, fim_periodo)
-            
-    except Exception as e:
-        # Fallback se tabela Ocorrencia não existir
-        faltas_justificadas_count = 0
-    
-    faltas_justificadas = faltas_justificadas_count
+    # 9. FALTAS JUSTIFICADAS (contar registros de ponto com tipo 'falta_justificada')
+    faltas_justificadas = RegistroPonto.query.filter(
+        and_(
+            RegistroPonto.funcionario_id == funcionario_id,
+            RegistroPonto.data >= data_inicio,
+            RegistroPonto.data <= data_fim,
+            RegistroPonto.tipo_registro == 'falta_justificada'
+        )
+    ).count()
     
     # Calcular custos
     salario_hora = funcionario.salario / 220 if funcionario.salario else 0  # 220 horas/mês

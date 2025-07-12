@@ -1,0 +1,666 @@
+# Prompt para Teste Completo do Sistema SIGE v6.0
+
+## 🎯 OBJETIVO
+
+Criar um sistema de testes automatizado e manual para verificar se todas as funcionalidades do SIGE v6.0 estão funcionando corretamente, com foco especial nas correções dos KPIs implementadas.
+
+---
+
+## 📋 CHECKLIST DE TESTES
+
+### **FASE 1: TESTES AUTOMATIZADOS**
+
+#### **1.1 Script de Teste dos KPIs**
+
+Crie um arquivo `test_kpis_completo.py` na raiz do projeto:
+
+```python
+#!/usr/bin/env python3
+"""
+Teste Completo dos KPIs - SIGE v6.0
+Verifica todas as funcionalidades e correções implementadas
+"""
+
+import os
+import sys
+from datetime import date, datetime, timedelta
+from app import app, db
+from models import *
+from kpis_engine_v3 import calcular_kpis_funcionario_v3
+
+def executar_todos_os_testes():
+    """
+    Executa todos os testes do sistema SIGE v6.0
+    """
+    with app.app_context():
+        print("🚀 INICIANDO TESTES COMPLETOS DO SIGE v6.0")
+        print("=" * 80)
+        
+        # Lista de testes
+        testes = [
+            teste_funcionario_joao,
+            teste_separacao_faltas,
+            teste_calculo_absenteismo,
+            teste_horas_perdidas,
+            teste_layout_kpis,
+            teste_custos_funcionario,
+            teste_dados_auxiliares,
+            teste_edge_cases
+        ]
+        
+        resultados = []
+        
+        for teste in testes:
+            try:
+                print(f"\n🔍 Executando: {teste.__name__}")
+                resultado = teste()
+                resultados.append((teste.__name__, resultado, None))
+                print(f"✅ {teste.__name__}: {'PASSOU' if resultado else 'FALHOU'}")
+            except Exception as e:
+                resultados.append((teste.__name__, False, str(e)))
+                print(f"❌ {teste.__name__}: ERRO - {str(e)}")
+        
+        # Relatório final
+        print("\n" + "=" * 80)
+        print("📊 RELATÓRIO FINAL DOS TESTES")
+        print("=" * 80)
+        
+        passou = sum(1 for _, resultado, _ in resultados if resultado)
+        total = len(resultados)
+        
+        print(f"✅ Testes que passaram: {passou}/{total}")
+        print(f"❌ Testes que falharam: {total - passou}/{total}")
+        print(f"📈 Taxa de sucesso: {(passou/total)*100:.1f}%")
+        
+        print("\n📋 DETALHES:")
+        for nome, resultado, erro in resultados:
+            status = "✅ PASSOU" if resultado else "❌ FALHOU"
+            print(f"  {status}: {nome}")
+            if erro:
+                print(f"    Erro: {erro}")
+        
+        if passou == total:
+            print("\n🎉 TODOS OS TESTES PASSARAM! Sistema funcionando corretamente.")
+        else:
+            print(f"\n⚠️ {total - passou} teste(s) falharam. Verifique os problemas acima.")
+        
+        return passou == total
+
+def teste_funcionario_joao():
+    """
+    Testa os KPIs do funcionário João Silva dos Santos (F0099)
+    """
+    funcionario = Funcionario.query.filter_by(codigo='F0099').first()
+    if not funcionario:
+        print("  ❌ Funcionário F0099 não encontrado")
+        return False
+    
+    data_inicio = date(2025, 6, 1)
+    data_fim = date(2025, 6, 30)
+    
+    kpis = calcular_kpis_funcionario_v3(funcionario.id, data_inicio, data_fim)
+    if not kpis:
+        print("  ❌ Erro ao calcular KPIs")
+        return False
+    
+    # Verificações específicas
+    verificacoes = [
+        (kpis['faltas'] == 1, f"Faltas não justificadas: {kpis['faltas']} (esperado: 1)"),
+        (kpis['absenteismo'] == 5.0, f"Absenteísmo: {kpis['absenteismo']}% (esperado: 5.0%)"),
+        (kpis['horas_perdidas'] == 10.25, f"Horas perdidas: {kpis['horas_perdidas']}h (esperado: 10.25h)"),
+        (kpis['horas_extras'] == 18.0, f"Horas extras: {kpis['horas_extras']}h (esperado: 18.0h)"),
+        ('faltas_justificadas' in kpis, "KPI 'Faltas Justificadas' existe"),
+    ]
+    
+    for passou, mensagem in verificacoes:
+        print(f"    {'✅' if passou else '❌'} {mensagem}")
+        if not passou:
+            return False
+    
+    return True
+
+def teste_separacao_faltas():
+    """
+    Testa se a separação de faltas justificadas e não justificadas está funcionando
+    """
+    funcionario = Funcionario.query.filter_by(codigo='F0099').first()
+    if not funcionario:
+        return False
+    
+    data_inicio = date(2025, 6, 1)
+    data_fim = date(2025, 6, 30)
+    
+    # Contar faltas no banco
+    faltas_nao_justificadas = RegistroPonto.query.filter(
+        RegistroPonto.funcionario_id == funcionario.id,
+        RegistroPonto.data >= data_inicio,
+        RegistroPonto.data <= data_fim,
+        RegistroPonto.tipo_registro == 'falta'
+    ).count()
+    
+    faltas_justificadas = RegistroPonto.query.filter(
+        RegistroPonto.funcionario_id == funcionario.id,
+        RegistroPonto.data >= data_inicio,
+        RegistroPonto.data <= data_fim,
+        RegistroPonto.tipo_registro == 'falta_justificada'
+    ).count()
+    
+    kpis = calcular_kpis_funcionario_v3(funcionario.id, data_inicio, data_fim)
+    
+    verificacoes = [
+        (kpis['faltas'] == faltas_nao_justificadas, f"Faltas não justificadas: KPI={kpis['faltas']}, BD={faltas_nao_justificadas}"),
+        (kpis['faltas_justificadas'] == faltas_justificadas, f"Faltas justificadas: KPI={kpis['faltas_justificadas']}, BD={faltas_justificadas}"),
+        (faltas_nao_justificadas > 0, "Existem faltas não justificadas para testar"),
+    ]
+    
+    for passou, mensagem in verificacoes:
+        print(f"    {'✅' if passou else '❌'} {mensagem}")
+        if not passou:
+            return False
+    
+    return True
+
+def teste_calculo_absenteismo():
+    """
+    Testa se o cálculo do absenteísmo está correto
+    """
+    funcionario = Funcionario.query.filter_by(codigo='F0099').first()
+    if not funcionario:
+        return False
+    
+    data_inicio = date(2025, 6, 1)
+    data_fim = date(2025, 6, 30)
+    
+    kpis = calcular_kpis_funcionario_v3(funcionario.id, data_inicio, data_fim)
+    
+    # Calcular absenteísmo manualmente
+    dias_uteis = kpis['dias_uteis']
+    faltas_nao_justificadas = kpis['faltas']
+    absenteismo_esperado = (faltas_nao_justificadas / dias_uteis * 100) if dias_uteis > 0 else 0
+    
+    verificacoes = [
+        (abs(kpis['absenteismo'] - absenteismo_esperado) < 0.1, 
+         f"Absenteísmo: {kpis['absenteismo']}% vs esperado: {absenteismo_esperado:.1f}%"),
+        (kpis['absenteismo'] <= 100, f"Absenteísmo não pode ser > 100%: {kpis['absenteismo']}%"),
+        (kpis['absenteismo'] >= 0, f"Absenteísmo não pode ser negativo: {kpis['absenteismo']}%"),
+    ]
+    
+    for passou, mensagem in verificacoes:
+        print(f"    {'✅' if passou else '❌'} {mensagem}")
+        if not passou:
+            return False
+    
+    return True
+
+def teste_horas_perdidas():
+    """
+    Testa se o cálculo das horas perdidas está correto
+    """
+    funcionario = Funcionario.query.filter_by(codigo='F0099').first()
+    if not funcionario:
+        return False
+    
+    data_inicio = date(2025, 6, 1)
+    data_fim = date(2025, 6, 30)
+    
+    kpis = calcular_kpis_funcionario_v3(funcionario.id, data_inicio, data_fim)
+    
+    # Calcular horas perdidas manualmente
+    horas_perdidas_esperadas = (kpis['faltas'] * 8) + kpis['atrasos']
+    
+    verificacoes = [
+        (abs(kpis['horas_perdidas'] - horas_perdidas_esperadas) < 0.1,
+         f"Horas perdidas: {kpis['horas_perdidas']}h vs esperado: {horas_perdidas_esperadas:.1f}h"),
+        (kpis['horas_perdidas'] >= 0, f"Horas perdidas não pode ser negativo: {kpis['horas_perdidas']}h"),
+    ]
+    
+    for passou, mensagem in verificacoes:
+        print(f"    {'✅' if passou else '❌'} {mensagem}")
+        if not passou:
+            return False
+    
+    return True
+
+def teste_layout_kpis():
+    """
+    Testa se todos os KPIs necessários estão presentes
+    """
+    funcionario = Funcionario.query.filter_by(codigo='F0099').first()
+    if not funcionario:
+        return False
+    
+    data_inicio = date(2025, 6, 1)
+    data_fim = date(2025, 6, 30)
+    
+    kpis = calcular_kpis_funcionario_v3(funcionario.id, data_inicio, data_fim)
+    
+    # KPIs obrigatórios para layout 4-4-4-3
+    kpis_obrigatorios = [
+        # Linha 1: Básicos
+        'horas_trabalhadas', 'horas_extras', 'faltas', 'atrasos',
+        # Linha 2: Analíticos  
+        'produtividade', 'absenteismo', 'media_diaria', 'faltas_justificadas',
+        # Linha 3: Financeiros
+        'custo_mao_obra', 'custo_alimentacao', 'outros_custos',
+        # Linha 4: Resumo
+        'horas_perdidas'
+    ]
+    
+    verificacoes = []
+    for kpi in kpis_obrigatorios:
+        existe = kpi in kpis
+        verificacoes.append((existe, f"KPI '{kpi}' existe"))
+        print(f"    {'✅' if existe else '❌'} KPI '{kpi}': {'Existe' if existe else 'FALTANDO'}")
+        if not existe:
+            return False
+    
+    print(f"    ✅ Total de KPIs encontrados: {len([k for k in kpis_obrigatorios if k in kpis])}/{len(kpis_obrigatorios)}")
+    return True
+
+def teste_custos_funcionario():
+    """
+    Testa se os cálculos de custos estão corretos
+    """
+    funcionario = Funcionario.query.filter_by(codigo='F0099').first()
+    if not funcionario:
+        return False
+    
+    data_inicio = date(2025, 6, 1)
+    data_fim = date(2025, 6, 30)
+    
+    kpis = calcular_kpis_funcionario_v3(funcionario.id, data_inicio, data_fim)
+    
+    verificacoes = [
+        (kpis['custo_mao_obra'] > 0, f"Custo mão de obra: R$ {kpis['custo_mao_obra']:,.2f}"),
+        (kpis['custo_alimentacao'] >= 0, f"Custo alimentação: R$ {kpis['custo_alimentacao']:,.2f}"),
+        (kpis['outros_custos'] >= 0, f"Outros custos: R$ {kpis['outros_custos']:,.2f}"),
+        (isinstance(kpis['custo_mao_obra'], (int, float)), "Custo mão de obra é numérico"),
+    ]
+    
+    for passou, mensagem in verificacoes:
+        print(f"    {'✅' if passou else '❌'} {mensagem}")
+        if not passou:
+            return False
+    
+    return True
+
+def teste_dados_auxiliares():
+    """
+    Testa se os dados auxiliares estão corretos
+    """
+    funcionario = Funcionario.query.filter_by(codigo='F0099').first()
+    if not funcionario:
+        return False
+    
+    data_inicio = date(2025, 6, 1)
+    data_fim = date(2025, 6, 30)
+    
+    kpis = calcular_kpis_funcionario_v3(funcionario.id, data_inicio, data_fim)
+    
+    verificacoes = [
+        (kpis['dias_uteis'] == 20, f"Dias úteis junho/2025: {kpis['dias_uteis']} (esperado: 20)"),
+        (kpis['horas_esperadas'] == 160, f"Horas esperadas: {kpis['horas_esperadas']}h (esperado: 160h)"),
+        (kpis['dias_com_presenca'] > 0, f"Dias com presença: {kpis['dias_com_presenca']}"),
+        ('periodo' in kpis, "Campo 'periodo' existe"),
+    ]
+    
+    for passou, mensagem in verificacoes:
+        print(f"    {'✅' if passou else '❌'} {mensagem}")
+        if not passou:
+            return False
+    
+    return True
+
+def teste_edge_cases():
+    """
+    Testa casos extremos e validações
+    """
+    # Teste com funcionário sem registros
+    funcionario_sem_registros = Funcionario.query.filter(
+        ~Funcionario.id.in_(
+            db.session.query(RegistroPonto.funcionario_id).distinct()
+        )
+    ).first()
+    
+    if funcionario_sem_registros:
+        kpis_vazio = calcular_kpis_funcionario_v3(funcionario_sem_registros.id)
+        if kpis_vazio:
+            verificacoes = [
+                (kpis_vazio['horas_trabalhadas'] == 0, "Funcionário sem registros: 0 horas trabalhadas"),
+                (kpis_vazio['faltas'] == 0, "Funcionário sem registros: 0 faltas"),
+                (kpis_vazio['absenteismo'] == 0, "Funcionário sem registros: 0% absenteísmo"),
+            ]
+            
+            for passou, mensagem in verificacoes:
+                print(f"    {'✅' if passou else '❌'} {mensagem}")
+                if not passou:
+                    return False
+    
+    # Teste com período inválido
+    try:
+        kpis_periodo_invalido = calcular_kpis_funcionario_v3(1, date(2025, 12, 1), date(2025, 11, 1))
+        print("    ✅ Sistema lida com período inválido sem crash")
+    except:
+        print("    ❌ Sistema falha com período inválido")
+        return False
+    
+    return True
+
+if __name__ == "__main__":
+    executar_todos_os_testes()
+```
+
+#### **1.2 Como Executar o Teste**
+
+No terminal do Replit, execute:
+
+```bash
+# Navegar para o diretório do projeto
+cd /path/to/sige
+
+# Executar o teste
+python test_kpis_completo.py
+```
+
+**Resultado Esperado:**
+```
+🚀 INICIANDO TESTES COMPLETOS DO SIGE v6.0
+================================================================================
+
+🔍 Executando: teste_funcionario_joao
+    ✅ Faltas não justificadas: 1 (esperado: 1)
+    ✅ Absenteísmo: 5.0% (esperado: 5.0%)
+    ✅ Horas perdidas: 10.25h (esperado: 10.25h)
+    ✅ Horas extras: 18.0h (esperado: 18.0h)
+    ✅ KPI 'Faltas Justificadas' existe
+✅ teste_funcionario_joao: PASSOU
+
+[... outros testes ...]
+
+================================================================================
+📊 RELATÓRIO FINAL DOS TESTES
+================================================================================
+✅ Testes que passaram: 8/8
+❌ Testes que falharam: 0/8
+📈 Taxa de sucesso: 100.0%
+
+🎉 TODOS OS TESTES PASSARAM! Sistema funcionando corretamente.
+```
+
+---
+
+### **FASE 2: TESTES MANUAIS DA INTERFACE**
+
+#### **2.1 Teste do Perfil do Funcionário**
+
+**Passos:**
+1. Acesse: `http://localhost:5000/funcionarios/[ID_JOAO]/perfil`
+2. Verifique se o layout está organizado em **4-4-4-3**
+3. Confirme os valores dos KPIs:
+
+**Layout Esperado:**
+```
+┌─────────────┬─────────────┬─────────────┬─────────────┐
+│ 81.8h       │ 18.0h       │ 1           │ 2.25h       │
+│ Hrs Trab.   │ Hrs Extras  │ Faltas      │ Atrasos     │
+├─────────────┼─────────────┼─────────────┼─────────────┤
+│ 51.1%       │ 5.0%        │ 6.8h        │ 1           │
+│ Produtiv.   │ Absenteísmo │ Média Diária│ Faltas Just.│
+├─────────────┼─────────────┼─────────────┼─────────────┤
+│ R$ 928.98   │ R$ 171.00   │ R$ 0.00     │ R$ 825.80   │
+│ Custo M.O.  │ Custo Alim. │ Custo Transp│ Outros Cust.│
+├─────────────┼─────────────┼─────────────┴─────────────┤
+│ R$ 1.925.78 │ 48.5%       │ 10.25h                    │
+│ Custo Total │ Eficiência  │ Horas Perdidas            │
+└─────────────┴─────────────┴───────────────────────────┘
+```
+
+**Verificações:**
+- [ ] Layout está em 4 linhas
+- [ ] Primeira linha tem 4 KPIs
+- [ ] Segunda linha tem 4 KPIs
+- [ ] Terceira linha tem 4 KPIs
+- [ ] Quarta linha tem 3 KPIs
+- [ ] Não há KPIs duplicados
+- [ ] Cores estão diferenciadas por tipo
+- [ ] Valores estão corretos
+
+#### **2.2 Teste de Responsividade**
+
+**Passos:**
+1. Abra o perfil do funcionário
+2. Redimensione a janela do navegador
+3. Teste em diferentes tamanhos:
+   - Desktop (>1200px): 4-4-4-3
+   - Tablet (768-1200px): 2-2-2-2
+   - Mobile (<768px): 1-1-1-1
+
+**Verificações:**
+- [ ] Layout se adapta corretamente
+- [ ] Todos os KPIs permanecem visíveis
+- [ ] Não há sobreposição de elementos
+- [ ] Texto permanece legível
+
+#### **2.3 Teste de Filtros de Data**
+
+**Passos:**
+1. No perfil do funcionário, altere as datas:
+   - Data início: 01/06/2025
+   - Data fim: 30/06/2025
+2. Clique em "Aplicar"
+3. Verifique se os KPIs são recalculados
+
+**Verificações:**
+- [ ] KPIs são atualizados automaticamente
+- [ ] Valores correspondem ao período selecionado
+- [ ] Não há erros de JavaScript no console
+
+---
+
+### **FASE 3: TESTES DE INTEGRAÇÃO**
+
+#### **3.1 Teste de Criação de Registros**
+
+**Passos:**
+1. Acesse: `http://localhost:5000/funcionarios/[ID_JOAO]/ponto`
+2. Adicione um novo registro:
+   - Data: Hoje
+   - Tipo: trabalho_normal
+   - Entrada: 08:00
+   - Saída: 17:00
+   - Almoço: 12:00-13:00
+3. Salve o registro
+4. Volte ao perfil e verifique se os KPIs foram atualizados
+
+**Verificações:**
+- [ ] Registro é salvo corretamente
+- [ ] KPIs são recalculados automaticamente
+- [ ] Horas trabalhadas aumentaram em 8h
+- [ ] Produtividade foi recalculada
+
+#### **3.2 Teste de Faltas**
+
+**Passos:**
+1. Adicione uma falta não justificada:
+   - Data: Ontem
+   - Tipo: falta
+   - Observação: "Teste de falta"
+2. Adicione uma falta justificada:
+   - Data: Anteontem
+   - Tipo: falta_justificada
+   - Observação: "Teste de falta justificada"
+3. Verifique os KPIs
+
+**Verificações:**
+- [ ] KPI "Faltas" aumentou em 1
+- [ ] KPI "Faltas Justificadas" aumentou em 1
+- [ ] Absenteísmo foi recalculado corretamente
+- [ ] Horas perdidas incluem apenas a falta não justificada
+
+---
+
+### **FASE 4: TESTES DE PERFORMANCE**
+
+#### **4.1 Teste de Carga**
+
+Crie um script `test_performance.py`:
+
+```python
+import time
+from app import app
+from models import Funcionario
+from kpis_engine_v3 import calcular_kpis_funcionario_v3
+
+def teste_performance():
+    with app.app_context():
+        funcionarios = Funcionario.query.limit(10).all()
+        
+        inicio = time.time()
+        
+        for funcionario in funcionarios:
+            kpis = calcular_kpis_funcionario_v3(funcionario.id)
+        
+        fim = time.time()
+        tempo_total = fim - inicio
+        
+        print(f"Tempo para calcular KPIs de {len(funcionarios)} funcionários: {tempo_total:.2f}s")
+        print(f"Tempo médio por funcionário: {tempo_total/len(funcionarios):.2f}s")
+        
+        # Deve ser < 1s por funcionário
+        return tempo_total/len(funcionarios) < 1.0
+
+if __name__ == "__main__":
+    teste_performance()
+```
+
+**Verificações:**
+- [ ] Cálculo de KPIs é rápido (< 1s por funcionário)
+- [ ] Não há vazamentos de memória
+- [ ] Sistema responde adequadamente
+
+---
+
+### **FASE 5: TESTES DE DADOS**
+
+#### **5.1 Verificação de Dados do João**
+
+Execute no console Python do Replit:
+
+```python
+from app import app, db
+from models import *
+from datetime import date
+
+with app.app_context():
+    # Buscar João
+    joao = Funcionario.query.filter_by(codigo='F0099').first()
+    print(f"João encontrado: {joao.nome if joao else 'NÃO ENCONTRADO'}")
+    
+    # Verificar registros de ponto
+    registros = RegistroPonto.query.filter(
+        RegistroPonto.funcionario_id == joao.id,
+        RegistroPonto.data >= date(2025, 6, 1),
+        RegistroPonto.data <= date(2025, 6, 30)
+    ).all()
+    
+    print(f"Registros de ponto: {len(registros)}")
+    
+    # Contar por tipo
+    tipos = {}
+    for r in registros:
+        tipo = r.tipo_registro or 'trabalho_normal'
+        tipos[tipo] = tipos.get(tipo, 0) + 1
+    
+    print("Tipos de registro:")
+    for tipo, count in tipos.items():
+        print(f"  {tipo}: {count}")
+    
+    # Verificar dados específicos
+    faltas = [r for r in registros if r.tipo_registro == 'falta']
+    faltas_just = [r for r in registros if r.tipo_registro == 'falta_justificada']
+    
+    print(f"Faltas não justificadas: {len(faltas)}")
+    print(f"Faltas justificadas: {len(faltas_just)}")
+```
+
+**Resultado Esperado:**
+```
+João encontrado: João Silva dos Santos
+Registros de ponto: 14
+Tipos de registro:
+  trabalho_normal: 8
+  sabado_horas_extras: 1
+  domingo_horas_extras: 1
+  falta: 1
+  falta_justificada: 1
+  meio_periodo: 1
+  feriado_trabalhado: 1
+Faltas não justificadas: 1
+Faltas justificadas: 1
+```
+
+---
+
+## 🎯 CRITÉRIOS DE SUCESSO
+
+### **✅ SISTEMA FUNCIONANDO CORRETAMENTE SE:**
+
+1. **Testes Automatizados**: 100% dos testes passam
+2. **Interface**: Layout 4-4-4-3 exibido corretamente
+3. **KPIs Corretos**: 
+   - Faltas: 1 (não justificadas)
+   - Absenteísmo: 5.0%
+   - Horas perdidas: 10.25h
+   - Faltas justificadas: 1 (separado)
+4. **Responsividade**: Layout se adapta em diferentes telas
+5. **Performance**: < 1s para calcular KPIs por funcionário
+6. **Integração**: Novos registros atualizam KPIs automaticamente
+
+### **❌ PROBLEMAS A INVESTIGAR SE:**
+
+1. **Testes falharem**: Verificar logs de erro
+2. **Layout incorreto**: Verificar CSS e HTML
+3. **KPIs errados**: Verificar lógica de cálculo
+4. **Performance ruim**: Otimizar queries do banco
+5. **Erros de JavaScript**: Verificar console do navegador
+
+---
+
+## 🚀 EXECUÇÃO DOS TESTES
+
+### **Ordem Recomendada:**
+
+1. **Execute o teste automatizado** primeiro
+2. **Se passar**, continue com testes manuais
+3. **Se falhar**, corrija os problemas antes de continuar
+4. **Teste a interface** em diferentes navegadores
+5. **Verifique a responsividade** em dispositivos móveis
+6. **Teste a performance** com múltiplos funcionários
+
+### **Comandos Rápidos:**
+
+```bash
+# Teste automatizado completo
+python test_kpis_completo.py
+
+# Teste de performance
+python test_performance.py
+
+# Verificar dados no console
+python -c "from app import app; app.run(debug=True)"
+```
+
+---
+
+## 📋 RELATÓRIO FINAL
+
+Após executar todos os testes, documente:
+
+1. **Taxa de sucesso** dos testes automatizados
+2. **Problemas encontrados** e suas correções
+3. **Performance** do sistema
+4. **Compatibilidade** com diferentes navegadores
+5. **Responsividade** em dispositivos móveis
+
+**O sistema SIGE v6.0 estará 100% funcional quando todos os testes passarem!**
+

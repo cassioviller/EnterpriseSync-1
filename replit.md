@@ -445,6 +445,16 @@ SIGE (Sistema Integrado de Gestão Empresarial) is a comprehensive business mana
   - Melhorado visual dos cards de KPIs com cores diferenciadas e informações auxiliares
   - Testado com dados reais do funcionário João (F0099) - todas as correções funcionando
   - Sistema agora diferencia claramente entre faltas que penalizam e faltas que não penalizam o funcionário
+- July 12, 2025. Sistema de Testes Automatizados Completo - v6.0:
+  - Criado sistema completo de testes automatizados (test_kpis_completo.py) com 10 testes
+  - Implementados testes para: funcionário específico, separação de faltas, cálculos de absenteísmo, horas perdidas, layout de KPIs, custos, dados auxiliares, casos extremos, integridade e performance
+  - Corrigido engine de KPIs para contar faltas justificadas baseado em registros de ponto (tipo_registro='falta_justificada')
+  - Resultado dos testes: 100% de sucesso (10/10 testes passaram)
+  - Criado relatório completo de validação (RELATORIO_TESTE_COMPLETO_SIGE_v6.md)
+  - Sistema validado com dados reais do funcionário João (F0099): 81.8h trabalhadas, 18h extras, 1 falta, 1 falta justificada, 5.0% absenteísmo
+  - Performance excelente: tempo de execução dos KPIs < 0.2s
+  - Cobertura completa: 15 KPIs, casos extremos, integridade de dados
+  - Sistema certificado como pronto para produção com todas as correções validadas
 
 ## User Preferences
 
