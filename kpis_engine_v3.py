@@ -84,12 +84,21 @@ def calcular_kpis_funcionario_v3(funcionario_id, data_inicio=None, data_fim=None
         )
     ).scalar() or 0
     
-    # 3. FALTAS (apenas registros explícitos de falta no sistema)
+    # 3. FALTAS (separar justificadas de não justificadas)
+    # Faltas não justificadas (contam para absenteísmo)
     faltas = db.session.query(RegistroPonto).filter(
         RegistroPonto.funcionario_id == funcionario_id,
         RegistroPonto.data >= data_inicio,
         RegistroPonto.data <= data_fim,
-        RegistroPonto.tipo_registro.in_(['falta', 'falta_justificada'])
+        RegistroPonto.tipo_registro == 'falta'  # Apenas não justificadas
+    ).count()
+    
+    # Faltas justificadas (não contam para absenteísmo)
+    faltas_justificadas = db.session.query(RegistroPonto).filter(
+        RegistroPonto.funcionario_id == funcionario_id,
+        RegistroPonto.data >= data_inicio,
+        RegistroPonto.data <= data_fim,
+        RegistroPonto.tipo_registro == 'falta_justificada'
     ).count()
     
     # 4. ATRASOS (em horas)
@@ -112,14 +121,14 @@ def calcular_kpis_funcionario_v3(funcionario_id, data_inicio=None, data_fim=None
     horas_esperadas = dias_uteis * 8  # 8 horas por dia útil
     produtividade = (horas_trabalhadas / horas_esperadas * 100) if horas_esperadas > 0 else 0
     
-    # 6. ABSENTEÍSMO (faltas registradas/dias_úteis × 100)
+    # 6. ABSENTEÍSMO (apenas faltas não justificadas/dias_úteis × 100)
     absenteismo = (faltas / dias_uteis * 100) if dias_uteis > 0 else 0
     
     # 7. MÉDIA DIÁRIA (horas trabalhadas / dias com presença)
     media_diaria = (horas_trabalhadas / dias_com_presenca) if dias_com_presenca > 0 else 0
     
-    # 8. HORAS PERDIDAS (faltas registradas em horas + atrasos em horas)
-    horas_faltas = faltas * 8  # 8 horas por falta registrada no sistema
+    # 8. HORAS PERDIDAS (apenas faltas não justificadas em horas + atrasos em horas)
+    horas_faltas = faltas * 8  # 8 horas por falta não justificada
     horas_perdidas = horas_faltas + total_atrasos_horas
     
     # 9. CUSTO MÃO DE OBRA (horas trabalhadas + faltas justificadas)
@@ -148,10 +157,13 @@ def calcular_kpis_funcionario_v3(funcionario_id, data_inicio=None, data_fim=None
     
     faltas_justificadas = faltas_justificadas_count
     
-    # Calcular custo
+    # Calcular custos
     salario_hora = funcionario.salario / 220 if funcionario.salario else 0  # 220 horas/mês
-    horas_para_custo = horas_trabalhadas + (faltas_justificadas * 8)
-    custo_mao_obra = horas_para_custo * salario_hora
+    
+    # Custo mão de obra (incluindo horas extras)
+    custo_normal = horas_trabalhadas * salario_hora
+    custo_extras = horas_extras * salario_hora * 1.5  # 50% adicional médio
+    custo_mao_obra = custo_normal + custo_extras
     
     # 10. CUSTO ALIMENTAÇÃO
     custo_alimentacao = db.session.query(
@@ -179,24 +191,43 @@ def calcular_kpis_funcionario_v3(funcionario_id, data_inicio=None, data_fim=None
         )
     ).scalar() or 0
     
+    # 13. CUSTO TOTAL
+    custo_total = custo_mao_obra + custo_alimentacao + custo_transporte + outros_custos
+    
+    # 14. EFICIÊNCIA (produtividade ajustada por qualidade)
+    eficiencia = produtividade * (1 - (absenteismo / 100)) if absenteismo < 100 else 0
+    
     return {
         'funcionario': funcionario,
+        
+        # LINHA 1: KPIs Básicos (4)
         'horas_trabalhadas': float(horas_trabalhadas),
         'horas_extras': float(horas_extras),
-        'faltas': int(faltas),
+        'faltas': int(faltas),  # Apenas faltas não justificadas
         'atrasos': float(total_atrasos_horas),
+        
+        # LINHA 2: KPIs Analíticos (4)
         'produtividade': float(produtividade),
         'absenteismo': float(absenteismo),
         'media_diaria': float(media_diaria),
-        'horas_perdidas': float(horas_perdidas),
+        'faltas_justificadas': int(faltas_justificadas),
+        
+        # LINHA 3: KPIs Financeiros (4)
         'custo_mao_obra': float(custo_mao_obra),
         'custo_alimentacao': float(custo_alimentacao),
         'custo_transporte': float(custo_transporte),
         'outros_custos': float(outros_custos),
+        
+        # LINHA 4: KPIs Resumo (3)
+        'custo_total': float(custo_total),
+        'eficiencia': float(eficiencia),
+        'horas_perdidas': float(horas_perdidas),
+        
+        # Dados auxiliares
         'dias_uteis': dias_uteis,
         'dias_com_presenca': dias_com_presenca,
-        'faltas_justificadas': faltas_justificadas,
         'horas_esperadas': horas_esperadas,
+        'salario_hora': float(salario_hora),
         'periodo': f"{data_inicio.strftime('%d/%m/%Y')} a {data_fim.strftime('%d/%m/%Y')}"
     }
 

@@ -434,6 +434,17 @@ SIGE (Sistema Integrado de Gestão Empresarial) is a comprehensive business mana
   - Explicação detalhada de como cada campo do modelo RegistroPonto afeta os cálculos finais
   - Exemplo prático mostra 88.75h trabalhadas, 18h extras, 1 falta, 2.25h atrasos = custo total R$ 2.380,78
   - Documentação serve como referência completa para entender a lógica de negócio do sistema
+- July 12, 2025. Correções Específicas de KPIs e Layout 4-4-4-3 - v6.0:
+  - Implementada separação correta entre faltas justificadas e não justificadas no engine de KPIs
+  - Corrigido cálculo de absenteísmo para usar apenas faltas não justificadas
+  - Adicionado novo KPI "Faltas Justificadas" como indicador separado
+  - Implementado layout 4-4-4-3 com 15 KPIs organizados em 4 linhas (4+4+4+3)
+  - Criado documento técnico (COMO_FUNCIONAM_OS_CALCULOS.md) explicando todas as correções
+  - Adicionado KPI "Eficiência" (produtividade ajustada por qualidade)
+  - Corrigido cálculo de "Horas Perdidas" para não incluir faltas justificadas
+  - Melhorado visual dos cards de KPIs com cores diferenciadas e informações auxiliares
+  - Testado com dados reais do funcionário João (F0099) - todas as correções funcionando
+  - Sistema agora diferencia claramente entre faltas que penalizam e faltas que não penalizam o funcionário
 
 ## User Preferences
 
