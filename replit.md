@@ -409,6 +409,20 @@ SIGE (Sistema Integrado de Gestão Empresarial) is a comprehensive business mana
   - Script funcional (relatorio_funcionario_junho.py) para geração automatizada
   - Demonstração completa de como os dados são coletados, processados e exibidos nos KPIs
   - Relatório serve como modelo para análise detalhada de qualquer funcionário no sistema
+- July 12, 2025. Perfil Completo com Todos os Tipos de Lançamentos - v5.5:
+  - Criado funcionário João Silva dos Santos (F0099) com perfil completo demonstrando TODOS os tipos de lançamentos
+  - Script automatizado (criar_perfil_completo.py) para criação de dados completos
+  - Funcionário criado com 14 registros de ponto cobrindo todos os cenários possíveis:
+    * Trabalho normal, atrasos entrada/saída, sábado/domingo extras, falta/falta justificada
+    * Meio período, trabalho sem intervalo, horas extras, feriado trabalhado
+  - 10 registros de alimentação (almoço, lanche, jantar) totalizando R$ 171,00
+  - 6 registros de outros custos (vale transporte, alimentação, EPI, descontos) totalizando R$ 825,80
+  - Relatório técnico completo (RELATORIO_PERFIL_COMPLETO_JOAO.md) documentando:
+    * Detalhamento de todos os 14 registros de ponto com horários e observações
+    * Cálculo completo dos KPIs: 88.75h trabalhadas, 18h extras, 1 falta, 2.25h atrasos
+    * Demonstração de todas as funcionalidades do sistema de ponto e custos
+    * Custo total do funcionário: R$ 2.312,61 (junho/2025)
+  - Perfil serve como modelo completo para testes e demonstração de todas as funcionalidades
 
 ## User Preferences
 
