@@ -423,6 +423,17 @@ SIGE (Sistema Integrado de Gestão Empresarial) is a comprehensive business mana
     * Demonstração de todas as funcionalidades do sistema de ponto e custos
     * Custo total do funcionário: R$ 2.312,61 (junho/2025)
   - Perfil serve como modelo completo para testes e demonstração de todas as funcionalidades
+- July 12, 2025. Documentação Completa dos Cálculos com Exemplo Prático - v5.6:
+  - Criado documento detalhado (CALCULOS_JOAO_EXEMPLO_PRATICO.md) explicando como cada tipo de lançamento é processado
+  - Análise registro por registro do funcionário João (F0099) mostrando impacto de cada tipo nos KPIs
+  - Documentação completa dos cálculos incluindo:
+    * Como trabalho normal, atrasos, saídas antecipadas, sábado/domingo extras são processados
+    * Lógica específica para falta não justificada vs falta justificada
+    * Cálculo de custos por tipo: mão de obra normal, horas extras com percentuais
+    * Fórmulas de produtividade e absenteísmo com dados reais
+  - Explicação detalhada de como cada campo do modelo RegistroPonto afeta os cálculos finais
+  - Exemplo prático mostra 88.75h trabalhadas, 18h extras, 1 falta, 2.25h atrasos = custo total R$ 2.380,78
+  - Documentação serve como referência completa para entender a lógica de negócio do sistema
 
 ## User Preferences
 
