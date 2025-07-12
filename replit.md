@@ -396,6 +396,19 @@ SIGE (Sistema Integrado de Gestão Empresarial) is a comprehensive business mana
   - Todos os KPIs testados e funcionando corretamente
   - Funcionário Cássio com R$ 818,00 em outros custos (Vale Transporte + Vale Alimentação)
   - Sistema operacional com dados realistas para demonstração completa
+- July 12, 2025. Relatório Detalhado de Funcionário - Junho 2025 - v5.4:
+  - Criado relatório completo do funcionário Cássio Viller Silva de Azevedo para junho/2025
+  - Documento técnico detalhado (RELATORIO_FUNCIONARIO_CASSIO_JUNHO_2025.md) com:
+    * Dados básicos do funcionário (salário R$ 35.000,00, código F0006)
+    * Análise completa do período (20 dias úteis, 160h esperadas)
+    * Detalhamento de todos os 13 registros de ponto com horários e observações
+    * Registros de outros custos (R$ 818,00 total)
+    * Cálculo detalhado de todos os KPIs com fórmulas e valores
+    * Valores finais: 83h trabalhadas, 20h extras, 1 falta, 1h atrasos, 51.9% produtividade
+    * Custo total do funcionário: R$ 14.022,55 (mão de obra + outros custos)
+  - Script funcional (relatorio_funcionario_junho.py) para geração automatizada
+  - Demonstração completa de como os dados são coletados, processados e exibidos nos KPIs
+  - Relatório serve como modelo para análise detalhada de qualquer funcionário no sistema
 
 ## User Preferences
 
