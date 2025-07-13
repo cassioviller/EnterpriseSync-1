@@ -1,0 +1,407 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <h1 class="h3 mb-4">
+                <i class="fas fa-clock"></i> Controle de Ponto
+            </h1>
+        </div>
+    </div>
+
+    <!-- Filtros -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-filter"></i> Filtros
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <form method="GET" class="row g-3">
+                        <div class="col-md-3">
+                            <label for="funcionario_id" class="form-label">Funcionário</label>
+                            <select class="form-select" id="funcionario_id" name="funcionario_id">
+                                <option value="">Todos os funcionários</option>
+                                {% for funcionario in funcionarios %}
+                                <option value="{{ funcionario.id }}" {% if request.args.get('funcionario_id') == funcionario.id|string %}selected{% endif %}>
+                                    {{ funcionario.codigo }} - {{ funcionario.nome }}
+                                </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-md-3">
+                            <label for="data_inicio" class="form-label">Data Início</label>
+                            <input type="date" class="form-control" id="data_inicio" name="data_inicio" value="{{ request.args.get('data_inicio', '') }}">
+                        </div>
+                        <div class="col-md-3">
+                            <label for="data_fim" class="form-label">Data Fim</label>
+                            <input type="date" class="form-control" id="data_fim" name="data_fim" value="{{ request.args.get('data_fim', '') }}">
+                        </div>
+                        <div class="col-md-3">
+                            <label for="tipo_registro" class="form-label">Tipo</label>
+                            <select class="form-select" id="tipo_registro" name="tipo_registro">
+                                <option value="">Todos os tipos</option>
+                                <option value="trabalho_normal" {% if request.args.get('tipo_registro') == 'trabalho_normal' %}selected{% endif %}>Trabalho Normal</option>
+                                <option value="falta" {% if request.args.get('tipo_registro') == 'falta' %}selected{% endif %}>Falta</option>
+                                <option value="falta_justificada" {% if request.args.get('tipo_registro') == 'falta_justificada' %}selected{% endif %}>Falta Justificada</option>
+                                <option value="sabado_horas_extras" {% if request.args.get('tipo_registro') == 'sabado_horas_extras' %}selected{% endif %}>Sábado Horas Extras</option>
+                                <option value="domingo_horas_extras" {% if request.args.get('tipo_registro') == 'domingo_horas_extras' %}selected{% endif %}>Domingo Horas Extras</option>
+                                <option value="feriado_trabalhado" {% if request.args.get('tipo_registro') == 'feriado_trabalhado' %}selected{% endif %}>Feriado Trabalhado</option>
+                                <option value="meio_periodo" {% if request.args.get('tipo_registro') == 'meio_periodo' %}selected{% endif %}>Meio Período</option>
+                            </select>
+                        </div>
+                        <div class="col-12">
+                            <button type="submit" class="btn btn-primary">
+                                <i class="fas fa-search"></i> Filtrar
+                            </button>
+                            <a href="{{ url_for('main.controle_ponto') }}" class="btn btn-secondary">
+                                <i class="fas fa-times"></i> Limpar
+                            </a>
+                            <button type="button" class="btn btn-success" data-bs-toggle="modal" data-bs-target="#pontoModal">
+                                <i class="fas fa-plus"></i> Novo Registro
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Resumo -->
+    <div class="row mb-4">
+        <div class="col-md-3">
+            <div class="card bg-primary text-white">
+                <div class="card-body">
+                    <h5 class="card-title">Total de Registros</h5>
+                    <h3 class="mb-0">{{ registros|length }}</h3>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-success text-white">
+                <div class="card-body">
+                    <h5 class="card-title">Horas Trabalhadas</h5>
+                    <h3 class="mb-0">{{ '{:.1f}h'.format(registros|sum(attribute='horas_trabalhadas') or 0) }}</h3>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-warning text-white">
+                <div class="card-body">
+                    <h5 class="card-title">Horas Extras</h5>
+                    <h3 class="mb-0">{{ '{:.1f}h'.format(registros|sum(attribute='horas_extras') or 0) }}</h3>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-danger text-white">
+                <div class="card-body">
+                    <h5 class="card-title">Faltas</h5>
+                    <h3 class="mb-0">{{ registros|selectattr('tipo_registro', 'equalto', 'falta')|list|length }}</h3>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Tabela de Registros -->
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-table"></i> Registros de Ponto
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-striped" id="pontoTable">
+                            <thead>
+                                <tr>
+                                    <th>Funcionário</th>
+                                    <th>Data</th>
+                                    <th>Tipo</th>
+                                    <th>Entrada</th>
+                                    <th>Saída Almoço</th>
+                                    <th>Retorno Almoço</th>
+                                    <th>Saída</th>
+                                    <th>H. Trabalhadas</th>
+                                    <th>H. Extras</th>
+                                    <th>Atraso</th>
+                                    <th>Obra</th>
+                                    <th>Ações</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for registro in registros %}
+                                <tr>
+                                    <td>
+                                        <strong>{{ registro.funcionario.codigo }}</strong><br>
+                                        <small>{{ registro.funcionario.nome }}</small>
+                                    </td>
+                                    <td>
+                                        {{ registro.data.strftime('%d/%m/%Y') }}
+                                        {% if registro.tipo_registro == 'sabado_horas_extras' %}
+                                            <span class="badge bg-success ms-1">SÁBADO</span>
+                                        {% elif registro.tipo_registro == 'domingo_horas_extras' %}
+                                            <span class="badge bg-warning ms-1">DOMINGO</span>
+                                        {% elif registro.tipo_registro == 'feriado_trabalhado' %}
+                                            <span class="badge bg-info ms-1">FERIADO TRAB.</span>
+                                        {% elif registro.tipo_registro == 'falta_justificada' %}
+                                            <span class="badge bg-primary ms-1">JUSTIFICADA</span>
+                                        {% elif registro.tipo_registro == 'falta' %}
+                                            <span class="badge bg-danger ms-1">FALTA</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if registro.tipo_registro == 'trabalho_normal' %}
+                                            <span class="badge bg-secondary">Normal</span>
+                                        {% elif registro.tipo_registro == 'falta' %}
+                                            <span class="badge bg-danger">Falta</span>
+                                        {% elif registro.tipo_registro == 'falta_justificada' %}
+                                            <span class="badge bg-primary">Justificada</span>
+                                        {% elif registro.tipo_registro == 'sabado_horas_extras' %}
+                                            <span class="badge bg-success">Sábado Extras</span>
+                                        {% elif registro.tipo_registro == 'domingo_horas_extras' %}
+                                            <span class="badge bg-warning">Domingo Extras</span>
+                                        {% elif registro.tipo_registro == 'feriado_trabalhado' %}
+                                            <span class="badge bg-info">Feriado Trabalhado</span>
+                                        {% elif registro.tipo_registro == 'meio_periodo' %}
+                                            <span class="badge bg-secondary">Meio Período</span>
+                                        {% else %}
+                                            <span class="badge bg-secondary">{{ registro.tipo_registro or 'Normal' }}</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>{{ registro.entrada.strftime('%H:%M') if registro.entrada else '-' }}</td>
+                                    <td>{{ registro.saida_almoco.strftime('%H:%M') if registro.saida_almoco else '-' }}</td>
+                                    <td>{{ registro.retorno_almoco.strftime('%H:%M') if registro.retorno_almoco else '-' }}</td>
+                                    <td>{{ registro.saida.strftime('%H:%M') if registro.saida else '-' }}</td>
+                                    <td>{{ '{:.1f}h'.format(registro.horas_trabalhadas or 0) }}</td>
+                                    <td>{{ '{:.1f}h'.format(registro.horas_extras or 0) }}</td>
+                                    <td>{{ '{:.0f}min'.format(registro.total_atraso_minutos or 0) }}</td>
+                                    <td>{{ registro.obra.nome if registro.obra else '-' }}</td>
+                                    <td>
+                                        <button class="btn btn-sm btn-primary" onclick="editarRegistro({{ registro.id }})">
+                                            <i class="fas fa-edit"></i>
+                                        </button>
+                                        <button class="btn btn-sm btn-danger" onclick="excluirRegistro({{ registro.id }})">
+                                            <i class="fas fa-trash"></i>
+                                        </button>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal para Novo/Editar Registro -->
+<div class="modal fade" id="pontoModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="fas fa-clock"></i> <span id="modalTitle">Novo Registro de Ponto</span>
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form id="pontoForm" method="POST">
+                <div class="modal-body">
+                    <input type="hidden" id="registro_id" name="registro_id">
+                    
+                    <div class="row">
+                        <div class="col-md-6">
+                            <label for="funcionario_id_modal" class="form-label">Funcionário *</label>
+                            <select class="form-select" id="funcionario_id_modal" name="funcionario_id" required>
+                                <option value="">Selecione um funcionário</option>
+                                {% for funcionario in funcionarios %}
+                                <option value="{{ funcionario.id }}">{{ funcionario.codigo }} - {{ funcionario.nome }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label for="data_modal" class="form-label">Data *</label>
+                            <input type="date" class="form-control" id="data_modal" name="data" required>
+                        </div>
+                    </div>
+                    
+                    <div class="row mt-3">
+                        <div class="col-md-6">
+                            <label for="tipo_registro_modal" class="form-label">Tipo de Registro *</label>
+                            <select class="form-select" id="tipo_registro_modal" name="tipo_registro" required>
+                                <option value="trabalho_normal">Trabalho Normal</option>
+                                <option value="falta">Falta</option>
+                                <option value="falta_justificada">Falta Justificada</option>
+                                <option value="sabado_horas_extras">Sábado Horas Extras</option>
+                                <option value="domingo_horas_extras">Domingo Horas Extras</option>
+                                <option value="feriado_trabalhado">Feriado Trabalhado</option>
+                                <option value="meio_periodo">Meio Período</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label for="obra_id_modal" class="form-label">Obra</label>
+                            <select class="form-select" id="obra_id_modal" name="obra_id">
+                                <option value="">Selecione uma obra</option>
+                                {% for obra in obras %}
+                                <option value="{{ obra.id }}">{{ obra.nome }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <div id="horariosSection" class="mt-3">
+                        <h6>Horários</h6>
+                        <div class="row">
+                            <div class="col-md-3">
+                                <label for="entrada_modal" class="form-label">Entrada</label>
+                                <input type="time" class="form-control" id="entrada_modal" name="entrada">
+                            </div>
+                            <div class="col-md-3">
+                                <label for="saida_almoco_modal" class="form-label">Saída Almoço</label>
+                                <input type="time" class="form-control" id="saida_almoco_modal" name="saida_almoco">
+                            </div>
+                            <div class="col-md-3">
+                                <label for="retorno_almoco_modal" class="form-label">Retorno Almoço</label>
+                                <input type="time" class="form-control" id="retorno_almoco_modal" name="retorno_almoco">
+                            </div>
+                            <div class="col-md-3">
+                                <label for="saida_modal" class="form-label">Saída</label>
+                                <input type="time" class="form-control" id="saida_modal" name="saida">
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="row mt-3" id="percentualSection" style="display: none;">
+                        <div class="col-md-6">
+                            <label for="percentual_extras_modal" class="form-label">Percentual Extras (%)</label>
+                            <input type="number" class="form-control" id="percentual_extras_modal" name="percentual_extras" min="0" max="200" step="1" value="50">
+                        </div>
+                    </div>
+                    
+                    <div class="row mt-3">
+                        <div class="col-12">
+                            <label for="observacoes_modal" class="form-label">Observações</label>
+                            <textarea class="form-control" id="observacoes_modal" name="observacoes" rows="2"></textarea>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-save"></i> Salvar
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+$(document).ready(function() {
+    // Inicializar DataTable
+    $('#pontoTable').DataTable({
+        "language": {
+            "url": "//cdn.datatables.net/plug-ins/1.11.5/i18n/pt-BR.json"
+        },
+        "order": [[ 1, "desc" ]],
+        "pageLength": 25
+    });
+    
+    // Controlar exibição de campos baseado no tipo
+    $('#tipo_registro_modal').change(function() {
+        const tipo = $(this).val();
+        const horariosSection = $('#horariosSection');
+        const percentualSection = $('#percentualSection');
+        
+        if (tipo === 'falta' || tipo === 'falta_justificada') {
+            horariosSection.hide();
+            percentualSection.hide();
+        } else {
+            horariosSection.show();
+            if (tipo === 'sabado_horas_extras' || tipo === 'domingo_horas_extras' || tipo === 'feriado_trabalhado') {
+                percentualSection.show();
+            } else {
+                percentualSection.hide();
+            }
+        }
+    });
+    
+    // Limpar modal ao fechar
+    $('#pontoModal').on('hidden.bs.modal', function () {
+        $('#pontoForm')[0].reset();
+        $('#registro_id').val('');
+        $('#modalTitle').text('Novo Registro de Ponto');
+        $('#horariosSection').show();
+        $('#percentualSection').hide();
+    });
+});
+
+function editarRegistro(id) {
+    // Buscar dados do registro via AJAX
+    $.get(`/ponto/registro/${id}`, function(data) {
+        $('#registro_id').val(data.id);
+        $('#funcionario_id_modal').val(data.funcionario_id);
+        $('#data_modal').val(data.data);
+        $('#tipo_registro_modal').val(data.tipo_registro || 'trabalho_normal');
+        $('#obra_id_modal').val(data.obra_id || '');
+        $('#entrada_modal').val(data.entrada || '');
+        $('#saida_almoco_modal').val(data.saida_almoco || '');
+        $('#retorno_almoco_modal').val(data.retorno_almoco || '');
+        $('#saida_modal').val(data.saida || '');
+        $('#percentual_extras_modal').val(data.percentual_extras || 50);
+        $('#observacoes_modal').val(data.observacoes || '');
+        
+        $('#modalTitle').text('Editar Registro de Ponto');
+        $('#tipo_registro_modal').trigger('change');
+        $('#pontoModal').modal('show');
+    });
+}
+
+function excluirRegistro(id) {
+    if (confirm('Tem certeza que deseja excluir este registro?')) {
+        $.ajax({
+            url: `/ponto/registro/${id}`,
+            type: 'DELETE',
+            success: function() {
+                location.reload();
+            },
+            error: function() {
+                alert('Erro ao excluir registro');
+            }
+        });
+    }
+}
+
+// Envio do formulário via AJAX
+$('#pontoForm').submit(function(e) {
+    e.preventDefault();
+    
+    const formData = new FormData(this);
+    const registroId = $('#registro_id').val();
+    
+    const url = registroId ? `/ponto/registro/${registroId}` : '/ponto/registro';
+    const method = registroId ? 'PUT' : 'POST';
+    
+    $.ajax({
+        url: url,
+        type: method,
+        data: formData,
+        processData: false,
+        contentType: false,
+        success: function() {
+            $('#pontoModal').modal('hide');
+            location.reload();
+        },
+        error: function() {
+            alert('Erro ao salvar registro');
+        }
+    });
+});
+</script>
+{% endblock %}

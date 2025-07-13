@@ -1,0 +1,393 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <h1 class="h3 mb-4">
+                <i class="fas fa-utensils"></i> Controle de Alimentação
+            </h1>
+        </div>
+    </div>
+
+    <!-- Filtros -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-filter"></i> Filtros
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <form method="GET" class="row g-3">
+                        <div class="col-md-3">
+                            <label for="funcionario_id" class="form-label">Funcionário</label>
+                            <select class="form-select" id="funcionario_id" name="funcionario_id">
+                                <option value="">Todos os funcionários</option>
+                                {% for funcionario in funcionarios %}
+                                <option value="{{ funcionario.id }}" {% if request.args.get('funcionario_id') == funcionario.id|string %}selected{% endif %}>
+                                    {{ funcionario.codigo }} - {{ funcionario.nome }}
+                                </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-md-3">
+                            <label for="restaurante_id" class="form-label">Restaurante</label>
+                            <select class="form-select" id="restaurante_id" name="restaurante_id">
+                                <option value="">Todos os restaurantes</option>
+                                {% for restaurante in restaurantes %}
+                                <option value="{{ restaurante.id }}" {% if request.args.get('restaurante_id') == restaurante.id|string %}selected{% endif %}>
+                                    {{ restaurante.nome }}
+                                </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-md-2">
+                            <label for="data_inicio" class="form-label">Data Início</label>
+                            <input type="date" class="form-control" id="data_inicio" name="data_inicio" value="{{ request.args.get('data_inicio', '') }}">
+                        </div>
+                        <div class="col-md-2">
+                            <label for="data_fim" class="form-label">Data Fim</label>
+                            <input type="date" class="form-control" id="data_fim" name="data_fim" value="{{ request.args.get('data_fim', '') }}">
+                        </div>
+                        <div class="col-md-2">
+                            <label for="tipo_refeicao" class="form-label">Tipo</label>
+                            <select class="form-select" id="tipo_refeicao" name="tipo_refeicao">
+                                <option value="">Todos os tipos</option>
+                                <option value="Almoço" {% if request.args.get('tipo_refeicao') == 'Almoço' %}selected{% endif %}>Almoço</option>
+                                <option value="Jantar" {% if request.args.get('tipo_refeicao') == 'Jantar' %}selected{% endif %}>Jantar</option>
+                                <option value="Lanche" {% if request.args.get('tipo_refeicao') == 'Lanche' %}selected{% endif %}>Lanche</option>
+                                <option value="Café" {% if request.args.get('tipo_refeicao') == 'Café' %}selected{% endif %}>Café</option>
+                            </select>
+                        </div>
+                        <div class="col-12">
+                            <button type="submit" class="btn btn-primary">
+                                <i class="fas fa-search"></i> Filtrar
+                            </button>
+                            <a href="{{ url_for('main.controle_alimentacao') }}" class="btn btn-secondary">
+                                <i class="fas fa-times"></i> Limpar
+                            </a>
+                            <button type="button" class="btn btn-success" data-bs-toggle="modal" data-bs-target="#alimentacaoModal">
+                                <i class="fas fa-plus"></i> Novo Registro
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Resumo -->
+    <div class="row mb-4">
+        <div class="col-md-2">
+            <div class="card bg-primary text-white">
+                <div class="card-body">
+                    <h5 class="card-title">Total de Registros</h5>
+                    <h3 class="mb-0">{{ registros|length }}</h3>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-2">
+            <div class="card bg-success text-white">
+                <div class="card-body">
+                    <h5 class="card-title">Almoços</h5>
+                    <h3 class="mb-0">{{ registros|selectattr('tipo_refeicao', 'equalto', 'Almoço')|list|length }}</h3>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-2">
+            <div class="card bg-warning text-white">
+                <div class="card-body">
+                    <h5 class="card-title">Jantares</h5>
+                    <h3 class="mb-0">{{ registros|selectattr('tipo_refeicao', 'equalto', 'Jantar')|list|length }}</h3>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-2">
+            <div class="card bg-info text-white">
+                <div class="card-body">
+                    <h5 class="card-title">Lanches</h5>
+                    <h3 class="mb-0">{{ registros|selectattr('tipo_refeicao', 'equalto', 'Lanche')|list|length }}</h3>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-2">
+            <div class="card bg-secondary text-white">
+                <div class="card-body">
+                    <h5 class="card-title">Cafés</h5>
+                    <h3 class="mb-0">{{ registros|selectattr('tipo_refeicao', 'equalto', 'Café')|list|length }}</h3>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-2">
+            <div class="card bg-danger text-white">
+                <div class="card-body">
+                    <h5 class="card-title">Valor Total</h5>
+                    <h3 class="mb-0">R$ {{ '{:,.2f}'.format(registros|sum(attribute='valor') or 0) }}</h3>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Tabela de Registros -->
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-table"></i> Registros de Alimentação
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-striped" id="alimentacaoTable">
+                            <thead>
+                                <tr>
+                                    <th>Funcionário</th>
+                                    <th>Data</th>
+                                    <th>Restaurante</th>
+                                    <th>Tipo</th>
+                                    <th>Valor</th>
+                                    <th>Observações</th>
+                                    <th>Ações</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for registro in registros %}
+                                <tr>
+                                    <td>
+                                        <strong>{{ registro.funcionario.codigo }}</strong><br>
+                                        <small>{{ registro.funcionario.nome }}</small>
+                                    </td>
+                                    <td>{{ registro.data.strftime('%d/%m/%Y') }}</td>
+                                    <td>{{ registro.restaurante.nome }}</td>
+                                    <td>
+                                        {% if registro.tipo_refeicao == 'Almoço' %}
+                                            <span class="badge bg-success">{{ registro.tipo_refeicao }}</span>
+                                        {% elif registro.tipo_refeicao == 'Jantar' %}
+                                            <span class="badge bg-warning">{{ registro.tipo_refeicao }}</span>
+                                        {% elif registro.tipo_refeicao == 'Lanche' %}
+                                            <span class="badge bg-info">{{ registro.tipo_refeicao }}</span>
+                                        {% elif registro.tipo_refeicao == 'Café' %}
+                                            <span class="badge bg-secondary">{{ registro.tipo_refeicao }}</span>
+                                        {% else %}
+                                            <span class="badge bg-primary">{{ registro.tipo_refeicao }}</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>R$ {{ '{:,.2f}'.format(registro.valor) }}</td>
+                                    <td>{{ registro.observacoes or '-' }}</td>
+                                    <td>
+                                        <button class="btn btn-sm btn-primary" onclick="editarRegistro({{ registro.id }})">
+                                            <i class="fas fa-edit"></i>
+                                        </button>
+                                        <button class="btn btn-sm btn-danger" onclick="excluirRegistro({{ registro.id }})">
+                                            <i class="fas fa-trash"></i>
+                                        </button>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal para Novo/Editar Registro -->
+<div class="modal fade" id="alimentacaoModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="fas fa-utensils"></i> <span id="modalTitle">Novo Registro de Alimentação</span>
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form id="alimentacaoForm" method="POST">
+                <div class="modal-body">
+                    <input type="hidden" id="registro_id" name="registro_id">
+                    
+                    <div class="row">
+                        <div class="col-md-6">
+                            <label for="funcionario_id_modal" class="form-label">Funcionário *</label>
+                            <select class="form-select" id="funcionario_id_modal" name="funcionario_id" required>
+                                <option value="">Selecione um funcionário</option>
+                                {% for funcionario in funcionarios %}
+                                <option value="{{ funcionario.id }}">{{ funcionario.codigo }} - {{ funcionario.nome }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label for="data_modal" class="form-label">Data *</label>
+                            <input type="date" class="form-control" id="data_modal" name="data" required>
+                        </div>
+                    </div>
+                    
+                    <div class="row mt-3">
+                        <div class="col-md-6">
+                            <label for="restaurante_id_modal" class="form-label">Restaurante *</label>
+                            <select class="form-select" id="restaurante_id_modal" name="restaurante_id" required>
+                                <option value="">Selecione um restaurante</option>
+                                {% for restaurante in restaurantes %}
+                                <option value="{{ restaurante.id }}" data-valor-almoco="{{ restaurante.valor_almoco }}" data-valor-jantar="{{ restaurante.valor_jantar }}" data-valor-lanche="{{ restaurante.valor_lanche }}">
+                                    {{ restaurante.nome }}
+                                </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label for="tipo_refeicao_modal" class="form-label">Tipo de Refeição *</label>
+                            <select class="form-select" id="tipo_refeicao_modal" name="tipo_refeicao" required>
+                                <option value="">Selecione o tipo</option>
+                                <option value="Almoço">Almoço</option>
+                                <option value="Jantar">Jantar</option>
+                                <option value="Lanche">Lanche</option>
+                                <option value="Café">Café</option>
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <div class="row mt-3">
+                        <div class="col-md-6">
+                            <label for="valor_modal" class="form-label">Valor *</label>
+                            <div class="input-group">
+                                <span class="input-group-text">R$</span>
+                                <input type="number" class="form-control" id="valor_modal" name="valor" step="0.01" required>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <label for="quantidade_modal" class="form-label">Quantidade</label>
+                            <input type="number" class="form-control" id="quantidade_modal" name="quantidade" min="1" value="1">
+                        </div>
+                    </div>
+                    
+                    <div class="row mt-3">
+                        <div class="col-12">
+                            <label for="observacoes_modal" class="form-label">Observações</label>
+                            <textarea class="form-control" id="observacoes_modal" name="observacoes" rows="3" placeholder="Observações sobre a refeição..."></textarea>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-save"></i> Salvar
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+$(document).ready(function() {
+    // Inicializar DataTable
+    $('#alimentacaoTable').DataTable({
+        "language": {
+            "url": "//cdn.datatables.net/plug-ins/1.11.5/i18n/pt-BR.json"
+        },
+        "order": [[ 1, "desc" ]],
+        "pageLength": 25
+    });
+    
+    // Atualizar valor baseado no restaurante e tipo de refeição
+    function atualizarValor() {
+        const restaurante = $('#restaurante_id_modal option:selected');
+        const tipo = $('#tipo_refeicao_modal').val();
+        
+        if (restaurante.val() && tipo) {
+            let valor = 0;
+            if (tipo === 'Almoço') {
+                valor = restaurante.data('valor-almoco') || 0;
+            } else if (tipo === 'Jantar') {
+                valor = restaurante.data('valor-jantar') || 0;
+            } else if (tipo === 'Lanche') {
+                valor = restaurante.data('valor-lanche') || 0;
+            } else if (tipo === 'Café') {
+                valor = restaurante.data('valor-lanche') || 0; // Usar valor do lanche para café
+            }
+            
+            $('#valor_modal').val(valor.toFixed(2));
+        }
+    }
+    
+    $('#restaurante_id_modal, #tipo_refeicao_modal').change(atualizarValor);
+    
+    // Limpar modal ao fechar
+    $('#alimentacaoModal').on('hidden.bs.modal', function () {
+        $('#alimentacaoForm')[0].reset();
+        $('#registro_id').val('');
+        $('#modalTitle').text('Novo Registro de Alimentação');
+        $('#quantidade_modal').val(1);
+    });
+    
+    // Definir data atual por padrão
+    $('#alimentacaoModal').on('shown.bs.modal', function () {
+        if (!$('#data_modal').val()) {
+            $('#data_modal').val(new Date().toISOString().split('T')[0]);
+        }
+    });
+});
+
+function editarRegistro(id) {
+    // Buscar dados do registro via AJAX
+    $.get(`/alimentacao/registro/${id}`, function(data) {
+        $('#registro_id').val(data.id);
+        $('#funcionario_id_modal').val(data.funcionario_id);
+        $('#data_modal').val(data.data);
+        $('#restaurante_id_modal').val(data.restaurante_id);
+        $('#tipo_refeicao_modal').val(data.tipo_refeicao);
+        $('#valor_modal').val(data.valor);
+        $('#quantidade_modal').val(data.quantidade || 1);
+        $('#observacoes_modal').val(data.observacoes || '');
+        
+        $('#modalTitle').text('Editar Registro de Alimentação');
+        $('#alimentacaoModal').modal('show');
+    });
+}
+
+function excluirRegistro(id) {
+    if (confirm('Tem certeza que deseja excluir este registro?')) {
+        $.ajax({
+            url: `/alimentacao/registro/${id}`,
+            type: 'DELETE',
+            success: function() {
+                location.reload();
+            },
+            error: function() {
+                alert('Erro ao excluir registro');
+            }
+        });
+    }
+}
+
+// Envio do formulário via AJAX
+$('#alimentacaoForm').submit(function(e) {
+    e.preventDefault();
+    
+    const formData = new FormData(this);
+    const registroId = $('#registro_id').val();
+    
+    const url = registroId ? `/alimentacao/registro/${registroId}` : '/alimentacao/registro';
+    const method = registroId ? 'PUT' : 'POST';
+    
+    $.ajax({
+        url: url,
+        type: method,
+        data: formData,
+        processData: false,
+        contentType: false,
+        success: function() {
+            $('#alimentacaoModal').modal('hide');
+            location.reload();
+        },
+        error: function() {
+            alert('Erro ao salvar registro');
+        }
+    });
+});
+</script>
+{% endblock %}

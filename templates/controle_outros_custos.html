@@ -1,0 +1,345 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <h1 class="h3 mb-4">
+                <i class="fas fa-coins"></i> Controle de Outros Custos
+            </h1>
+        </div>
+    </div>
+
+    <!-- Filtros -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-filter"></i> Filtros
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <form method="GET" class="row g-3">
+                        <div class="col-md-3">
+                            <label for="funcionario_id" class="form-label">Funcionário</label>
+                            <select class="form-select" id="funcionario_id" name="funcionario_id">
+                                <option value="">Todos os funcionários</option>
+                                {% for funcionario in funcionarios %}
+                                <option value="{{ funcionario.id }}" {% if request.args.get('funcionario_id') == funcionario.id|string %}selected{% endif %}>
+                                    {{ funcionario.codigo }} - {{ funcionario.nome }}
+                                </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-md-3">
+                            <label for="data_inicio" class="form-label">Data Início</label>
+                            <input type="date" class="form-control" id="data_inicio" name="data_inicio" value="{{ request.args.get('data_inicio', '') }}">
+                        </div>
+                        <div class="col-md-3">
+                            <label for="data_fim" class="form-label">Data Fim</label>
+                            <input type="date" class="form-control" id="data_fim" name="data_fim" value="{{ request.args.get('data_fim', '') }}">
+                        </div>
+                        <div class="col-md-3">
+                            <label for="tipo" class="form-label">Tipo</label>
+                            <select class="form-select" id="tipo" name="tipo">
+                                <option value="">Todos os tipos</option>
+                                <option value="Vale Transporte" {% if request.args.get('tipo') == 'Vale Transporte' %}selected{% endif %}>Vale Transporte</option>
+                                <option value="Vale Alimentação" {% if request.args.get('tipo') == 'Vale Alimentação' %}selected{% endif %}>Vale Alimentação</option>
+                                <option value="EPI" {% if request.args.get('tipo') == 'EPI' %}selected{% endif %}>EPI</option>
+                                <option value="Desconto VT" {% if request.args.get('tipo') == 'Desconto VT' %}selected{% endif %}>Desconto VT</option>
+                                <option value="Desconto Alimentação" {% if request.args.get('tipo') == 'Desconto Alimentação' %}selected{% endif %}>Desconto Alimentação</option>
+                                <option value="Adiantamento" {% if request.args.get('tipo') == 'Adiantamento' %}selected{% endif %}>Adiantamento</option>
+                                <option value="Benefício" {% if request.args.get('tipo') == 'Benefício' %}selected{% endif %}>Benefício</option>
+                                <option value="Outros" {% if request.args.get('tipo') == 'Outros' %}selected{% endif %}>Outros</option>
+                            </select>
+                        </div>
+                        <div class="col-12">
+                            <button type="submit" class="btn btn-primary">
+                                <i class="fas fa-search"></i> Filtrar
+                            </button>
+                            <a href="{{ url_for('main.controle_outros_custos') }}" class="btn btn-secondary">
+                                <i class="fas fa-times"></i> Limpar
+                            </a>
+                            <button type="button" class="btn btn-success" data-bs-toggle="modal" data-bs-target="#custoModal">
+                                <i class="fas fa-plus"></i> Novo Custo
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Resumo -->
+    <div class="row mb-4">
+        <div class="col-md-3">
+            <div class="card bg-primary text-white">
+                <div class="card-body">
+                    <h5 class="card-title">Total de Registros</h5>
+                    <h3 class="mb-0">{{ custos|length }}</h3>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-success text-white">
+                <div class="card-body">
+                    <h5 class="card-title">Benefícios</h5>
+                    <h3 class="mb-0">R$ {{ '{:,.2f}'.format(custos|selectattr('valor', 'gt', 0)|sum(attribute='valor') or 0) }}</h3>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-danger text-white">
+                <div class="card-body">
+                    <h5 class="card-title">Descontos</h5>
+                    <h3 class="mb-0">R$ {{ '{:,.2f}'.format(custos|selectattr('valor', 'lt', 0)|sum(attribute='valor') or 0) }}</h3>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-info text-white">
+                <div class="card-body">
+                    <h5 class="card-title">Valor Total</h5>
+                    <h3 class="mb-0">R$ {{ '{:,.2f}'.format(custos|sum(attribute='valor') or 0) }}</h3>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Tabela de Custos -->
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-table"></i> Outros Custos
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-striped" id="custosTable">
+                            <thead>
+                                <tr>
+                                    <th>Funcionário</th>
+                                    <th>Data</th>
+                                    <th>Tipo</th>
+                                    <th>Valor</th>
+                                    <th>Descrição</th>
+                                    <th>Ações</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for custo in custos %}
+                                <tr>
+                                    <td>
+                                        <strong>{{ custo.funcionario.codigo }}</strong><br>
+                                        <small>{{ custo.funcionario.nome }}</small>
+                                    </td>
+                                    <td>{{ custo.data.strftime('%d/%m/%Y') }}</td>
+                                    <td>
+                                        {% if custo.valor > 0 %}
+                                            <span class="badge bg-success">{{ custo.tipo }}</span>
+                                        {% else %}
+                                            <span class="badge bg-danger">{{ custo.tipo }}</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if custo.valor > 0 %}
+                                            <span class="text-success">R$ {{ '{:,.2f}'.format(custo.valor) }}</span>
+                                        {% else %}
+                                            <span class="text-danger">R$ {{ '{:,.2f}'.format(custo.valor) }}</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>{{ custo.descricao or '-' }}</td>
+                                    <td>
+                                        <button class="btn btn-sm btn-primary" onclick="editarCusto({{ custo.id }})">
+                                            <i class="fas fa-edit"></i>
+                                        </button>
+                                        <button class="btn btn-sm btn-danger" onclick="excluirCusto({{ custo.id }})">
+                                            <i class="fas fa-trash"></i>
+                                        </button>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal para Novo/Editar Custo -->
+<div class="modal fade" id="custoModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="fas fa-coins"></i> <span id="modalTitle">Novo Custo</span>
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form id="custoForm" method="POST">
+                <div class="modal-body">
+                    <input type="hidden" id="custo_id" name="custo_id">
+                    
+                    <div class="row">
+                        <div class="col-md-6">
+                            <label for="funcionario_id_modal" class="form-label">Funcionário *</label>
+                            <select class="form-select" id="funcionario_id_modal" name="funcionario_id" required>
+                                <option value="">Selecione um funcionário</option>
+                                {% for funcionario in funcionarios %}
+                                <option value="{{ funcionario.id }}">{{ funcionario.codigo }} - {{ funcionario.nome }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label for="data_modal" class="form-label">Data *</label>
+                            <input type="date" class="form-control" id="data_modal" name="data" required>
+                        </div>
+                    </div>
+                    
+                    <div class="row mt-3">
+                        <div class="col-md-6">
+                            <label for="tipo_modal" class="form-label">Tipo *</label>
+                            <select class="form-select" id="tipo_modal" name="tipo" required>
+                                <option value="">Selecione o tipo</option>
+                                <optgroup label="Benefícios">
+                                    <option value="Vale Transporte">Vale Transporte</option>
+                                    <option value="Vale Alimentação">Vale Alimentação</option>
+                                    <option value="EPI">EPI</option>
+                                    <option value="Benefício">Benefício</option>
+                                    <option value="Outros">Outros</option>
+                                </optgroup>
+                                <optgroup label="Descontos">
+                                    <option value="Desconto VT">Desconto VT</option>
+                                    <option value="Desconto Alimentação">Desconto Alimentação</option>
+                                    <option value="Adiantamento">Adiantamento</option>
+                                </optgroup>
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label for="valor_modal" class="form-label">Valor *</label>
+                            <div class="input-group">
+                                <span class="input-group-text">R$</span>
+                                <input type="number" class="form-control" id="valor_modal" name="valor" step="0.01" required>
+                            </div>
+                            <small class="form-text text-muted">Use valores negativos para descontos</small>
+                        </div>
+                    </div>
+                    
+                    <div class="row mt-3">
+                        <div class="col-12">
+                            <label for="descricao_modal" class="form-label">Descrição</label>
+                            <textarea class="form-control" id="descricao_modal" name="descricao" rows="3" placeholder="Detalhes sobre o custo..."></textarea>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-save"></i> Salvar
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+$(document).ready(function() {
+    // Inicializar DataTable
+    $('#custosTable').DataTable({
+        "language": {
+            "url": "//cdn.datatables.net/plug-ins/1.11.5/i18n/pt-BR.json"
+        },
+        "order": [[ 1, "desc" ]],
+        "pageLength": 25
+    });
+    
+    // Ajustar valor baseado no tipo selecionado
+    $('#tipo_modal').change(function() {
+        const tipo = $(this).val();
+        const valorInput = $('#valor_modal');
+        
+        if (tipo.includes('Desconto') || tipo === 'Adiantamento') {
+            valorInput.attr('placeholder', 'Valor negativo (ex: -50.00)');
+        } else {
+            valorInput.attr('placeholder', 'Valor positivo (ex: 50.00)');
+        }
+    });
+    
+    // Limpar modal ao fechar
+    $('#custoModal').on('hidden.bs.modal', function () {
+        $('#custoForm')[0].reset();
+        $('#custo_id').val('');
+        $('#modalTitle').text('Novo Custo');
+    });
+    
+    // Definir data atual por padrão
+    $('#custoModal').on('shown.bs.modal', function () {
+        if (!$('#data_modal').val()) {
+            $('#data_modal').val(new Date().toISOString().split('T')[0]);
+        }
+    });
+});
+
+function editarCusto(id) {
+    // Buscar dados do custo via AJAX
+    $.get(`/outros-custos/custo/${id}`, function(data) {
+        $('#custo_id').val(data.id);
+        $('#funcionario_id_modal').val(data.funcionario_id);
+        $('#data_modal').val(data.data);
+        $('#tipo_modal').val(data.tipo);
+        $('#valor_modal').val(data.valor);
+        $('#descricao_modal').val(data.descricao || '');
+        
+        $('#modalTitle').text('Editar Custo');
+        $('#custoModal').modal('show');
+    });
+}
+
+function excluirCusto(id) {
+    if (confirm('Tem certeza que deseja excluir este custo?')) {
+        $.ajax({
+            url: `/outros-custos/custo/${id}`,
+            type: 'DELETE',
+            success: function() {
+                location.reload();
+            },
+            error: function() {
+                alert('Erro ao excluir custo');
+            }
+        });
+    }
+}
+
+// Envio do formulário via AJAX
+$('#custoForm').submit(function(e) {
+    e.preventDefault();
+    
+    const formData = new FormData(this);
+    const custoId = $('#custo_id').val();
+    
+    const url = custoId ? `/outros-custos/custo/${custoId}` : '/outros-custos/custo';
+    const method = custoId ? 'PUT' : 'POST';
+    
+    $.ajax({
+        url: url,
+        type: method,
+        data: formData,
+        processData: false,
+        contentType: false,
+        success: function() {
+            $('#custoModal').modal('hide');
+            location.reload();
+        },
+        error: function() {
+            alert('Erro ao salvar custo');
+        }
+    });
+});
+</script>
+{% endblock %}
