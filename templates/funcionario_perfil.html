@@ -334,7 +334,9 @@
                                 <td>
                                     {% if registro.tipo_registro == 'feriado' %}
                                         <span class="fw-bold" style="color: #6c757d;">Feriado</span>
-                                    {% elif registro.tipo_registro == 'falta' or registro.tipo_registro == 'falta_justificada' %}
+                                    {% elif registro.tipo_registro == 'falta_justificada' %}
+                                        <span class="fw-bold" style="color: #28a745;">Falta Justificada</span>
+                                    {% elif registro.tipo_registro == 'falta' %}
                                         <span class="fw-bold" style="color: #dc3545;">Falta</span>
                                     {% elif registro.hora_entrada %}
                                         <span class="badge bg-info">{{ registro.hora_entrada.strftime('%H:%M') }}</span>
@@ -345,7 +347,9 @@
                                 <td>
                                     {% if registro.tipo_registro == 'feriado' %}
                                         <span class="fw-bold" style="color: #6c757d;">Feriado</span>
-                                    {% elif registro.tipo_registro == 'falta' or registro.tipo_registro == 'falta_justificada' %}
+                                    {% elif registro.tipo_registro == 'falta_justificada' %}
+                                        <span class="fw-bold" style="color: #28a745;">Falta Justificada</span>
+                                    {% elif registro.tipo_registro == 'falta' %}
                                         <span class="fw-bold" style="color: #dc3545;">Falta</span>
                                     {% elif registro.hora_almoco_saida %}
                                         <span class="badge bg-warning">{{ registro.hora_almoco_saida.strftime('%H:%M') }}</span>
@@ -356,7 +360,9 @@
                                 <td>
                                     {% if registro.tipo_registro == 'feriado' %}
                                         <span class="fw-bold" style="color: #6c757d;">Feriado</span>
-                                    {% elif registro.tipo_registro == 'falta' or registro.tipo_registro == 'falta_justificada' %}
+                                    {% elif registro.tipo_registro == 'falta_justificada' %}
+                                        <span class="fw-bold" style="color: #28a745;">Falta Justificada</span>
+                                    {% elif registro.tipo_registro == 'falta' %}
                                         <span class="fw-bold" style="color: #dc3545;">Falta</span>
                                     {% elif registro.hora_almoco_retorno %}
                                         <span class="badge bg-info">{{ registro.hora_almoco_retorno.strftime('%H:%M') }}</span>
@@ -367,7 +373,9 @@
                                 <td>
                                     {% if registro.tipo_registro == 'feriado' %}
                                         <span class="fw-bold" style="color: #6c757d;">Feriado</span>
-                                    {% elif registro.tipo_registro == 'falta' or registro.tipo_registro == 'falta_justificada' %}
+                                    {% elif registro.tipo_registro == 'falta_justificada' %}
+                                        <span class="fw-bold" style="color: #28a745;">Falta Justificada</span>
+                                    {% elif registro.tipo_registro == 'falta' %}
                                         <span class="fw-bold" style="color: #dc3545;">Falta</span>
                                     {% elif registro.hora_saida %}
                                         <span class="badge bg-danger">{{ registro.hora_saida.strftime('%H:%M') }}</span>
@@ -378,7 +386,9 @@
                                 <td>
                                     {% if registro.tipo_registro == 'feriado' %}
                                         <span class="fw-bold" style="color: #6c757d;">Feriado</span>
-                                    {% elif registro.tipo_registro == 'falta' or registro.tipo_registro == 'falta_justificada' %}
+                                    {% elif registro.tipo_registro == 'falta_justificada' %}
+                                        <span class="fw-bold" style="color: #28a745;">Falta Justificada</span>
+                                    {% elif registro.tipo_registro == 'falta' %}
                                         <span class="fw-bold" style="color: #dc3545;">Falta</span>
                                     {% elif registro.horas_trabalhadas %}
                                         <span class="fw-bold text-primary">{{ '{:.2f}h'.format(registro.horas_trabalhadas) }}</span>
@@ -406,14 +416,12 @@
                                     {% endif %}
                                 </td>
                                 <td>
-                                    {% if registro.is_feriado %}
+                                    {% if registro.tipo_registro == 'feriado' %}
                                         <span class="fw-bold" style="color: #6c757d;">Feriado</span>
-                                    {% elif registro.is_falta %}
-                                        {% if registro.tipo_registro == 'falta_justificada' %}
-                                            <span class="fw-bold" style="color: #28a745;">Falta Justificada</span>
-                                        {% else %}
-                                            <span class="fw-bold" style="color: #dc3545;">Falta</span>
-                                        {% endif %}
+                                    {% elif registro.tipo_registro == 'falta_justificada' %}
+                                        <span class="fw-bold" style="color: #28a745;">Falta Justificada</span>
+                                    {% elif registro.tipo_registro == 'falta' %}
+                                        <span class="fw-bold" style="color: #dc3545;">Falta</span>
                                     {% elif registro.total_atraso_minutos and registro.total_atraso_minutos > 0 %}
                                         <span class="badge bg-danger">{{ '{:.0f}min'.format(registro.total_atraso_minutos) }}</span>
                                     {% else %}
