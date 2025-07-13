@@ -49,6 +49,8 @@
                                 <option value="falta_justificada" {% if request.args.get('tipo_registro') == 'falta_justificada' %}selected{% endif %}>Falta Justificada</option>
                                 <option value="sabado_horas_extras" {% if request.args.get('tipo_registro') == 'sabado_horas_extras' %}selected{% endif %}>Sábado Horas Extras</option>
                                 <option value="domingo_horas_extras" {% if request.args.get('tipo_registro') == 'domingo_horas_extras' %}selected{% endif %}>Domingo Horas Extras</option>
+                                <option value="sabado_nao_trabalhado" {% if request.args.get('tipo_registro') == 'sabado_nao_trabalhado' %}selected{% endif %}>Sábado Não Trabalhado</option>
+                                <option value="domingo_nao_trabalhado" {% if request.args.get('tipo_registro') == 'domingo_nao_trabalhado' %}selected{% endif %}>Domingo Não Trabalhado</option>
                                 <option value="feriado_trabalhado" {% if request.args.get('tipo_registro') == 'feriado_trabalhado' %}selected{% endif %}>Feriado Trabalhado</option>
                                 <option value="meio_periodo" {% if request.args.get('tipo_registro') == 'meio_periodo' %}selected{% endif %}>Meio Período</option>
                             </select>
@@ -166,6 +168,10 @@
                                             <span class="badge bg-success">Sábado Extras</span>
                                         {% elif registro.tipo_registro == 'domingo_horas_extras' %}
                                             <span class="badge bg-warning">Domingo Extras</span>
+                                        {% elif registro.tipo_registro == 'sabado_nao_trabalhado' %}
+                                            <span class="badge bg-secondary">Sábado Não Trabalhado</span>
+                                        {% elif registro.tipo_registro == 'domingo_nao_trabalhado' %}
+                                            <span class="badge bg-light text-dark">Domingo Não Trabalhado</span>
                                         {% elif registro.tipo_registro == 'feriado_trabalhado' %}
                                             <span class="badge bg-info">Feriado Trabalhado</span>
                                         {% elif registro.tipo_registro == 'meio_periodo' %}
@@ -240,6 +246,8 @@
                                 <option value="falta_justificada">Falta Justificada</option>
                                 <option value="sabado_horas_extras">Sábado Horas Extras</option>
                                 <option value="domingo_horas_extras">Domingo Horas Extras</option>
+                                <option value="sabado_nao_trabalhado">Sábado Não Trabalhado</option>
+                                <option value="domingo_nao_trabalhado">Domingo Não Trabalhado</option>
                                 <option value="feriado_trabalhado">Feriado Trabalhado</option>
                                 <option value="meio_periodo">Meio Período</option>
                             </select>

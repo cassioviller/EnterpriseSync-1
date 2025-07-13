@@ -320,6 +320,10 @@
                                             <span class="badge bg-success ms-2"><i class="fas fa-calendar-week"></i> SÁBADO</span>
                                         {% elif registro.tipo_registro == 'domingo_horas_extras' %}
                                             <span class="badge bg-warning ms-2"><i class="fas fa-sun"></i> DOMINGO</span>
+                                        {% elif registro.tipo_registro == 'sabado_nao_trabalhado' %}
+                                            <span class="badge bg-secondary ms-2"><i class="fas fa-calendar-times"></i> SÁB. FOLGA</span>
+                                        {% elif registro.tipo_registro == 'domingo_nao_trabalhado' %}
+                                            <span class="badge bg-light text-dark ms-2"><i class="fas fa-home"></i> DOM. FOLGA</span>
                                         {% elif registro.tipo_registro == 'feriado_trabalhado' %}
                                             <span class="badge bg-info ms-2"><i class="fas fa-star"></i> FERIADO TRAB.</span>
                                         {% elif registro.tipo_registro == 'feriado' %}

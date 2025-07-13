@@ -466,6 +466,18 @@ SIGE (Sistema Integrado de Gestão Empresarial) is a comprehensive business mana
   - Correção na exibição visual: faltas justificadas agora aparecem em verde "Falta Justificada" vs faltas em vermelho "Falta"
   - Sistema de teste automatizado (testar_kpis_corrigidos.py) validando todas as correções com 100% de sucesso
   - Engine v3.1 com fórmulas mais justas e precisas baseadas em dias efetivamente programados para trabalho
+- July 13, 2025. Novos Tipos de Lançamento e Mês Completo - v6.1:
+  - Implementados novos tipos de lançamento: "sabado_nao_trabalhado" e "domingo_nao_trabalhado"
+  - Adicionados aos templates controle_ponto.html e funcionario_perfil.html com badges visuais distintivos
+  - Atualizado engine de KPIs v3.1 para incluir os novos tipos nos cálculos de dias_com_lancamento
+  - Criado script popular_mes_completo_cassio.py para demonstrar todos os tipos de lançamento
+  - Populado mês completo de junho/2025 para Cássio: 30 registros cobrindo todos os tipos
+  - Tipos implementados: trabalho_normal (17), sabado_nao_trabalhado (2), domingo_nao_trabalhado (4), sabado_horas_extras (2), domingo_horas_extras (1), feriado_trabalhado (1), falta (1), falta_justificada (1), meio_periodo (1)
+  - Resultado final: 159,25h trabalhadas, 20h extras, 0,75h atrasos, produtividade 66,4%, absenteísmo 3,3%
+  - Criados relatórios completos: RELATORIO_CASSIO_MES_COMPLETO_JUNHO_2025.md e RELATORIO_JOAO_MES_COMPLETO_JUNHO_2025.md
+  - Sistema permite controle total de jornada incluindo dias de folga em fins de semana
+  - Badges visuais: "SÁB. FOLGA" (cinza) e "DOM. FOLGA" (claro) para identificação rápida
+  - Validação completa com dados reais demonstrando eficácia do sistema v6.1
 
 ## User Preferences
 
