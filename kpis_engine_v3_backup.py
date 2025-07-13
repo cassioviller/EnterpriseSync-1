@@ -231,6 +231,27 @@ def calcular_kpis_funcionario_v3(funcionario_id, data_inicio=None, data_fim=None
         'horas_esperadas': horas_esperadas,
         'periodo': f"{data_inicio.strftime('%d/%m/%Y')} a {data_fim.strftime('%d/%m/%Y')}"
     }
+        'media_diaria': float(media_diaria),
+        'faltas_justificadas': int(faltas_justificadas),
+        
+        # LINHA 3: KPIs Financeiros (4)
+        'custo_mao_obra': float(custo_mao_obra),
+        'custo_alimentacao': float(custo_alimentacao),
+        'custo_transporte': float(custo_transporte),
+        'outros_custos': float(outros_custos),
+        
+        # LINHA 4: KPIs Resumo (3)
+        'custo_total': float(custo_total),
+        'eficiencia': float(eficiencia),
+        'horas_perdidas': float(horas_perdidas),
+        
+        # Dados auxiliares
+        'dias_uteis': dias_uteis,
+        'dias_com_presenca': dias_com_presenca,
+        'horas_esperadas': horas_esperadas,
+        'salario_hora': float(salario_hora),
+        'periodo': f"{data_inicio.strftime('%d/%m/%Y')} a {data_fim.strftime('%d/%m/%Y')}"
+    }
 
 
 def calcular_dias_uteis(data_inicio, data_fim):
@@ -273,3 +294,152 @@ def calcular_dias_uteis(data_inicio, data_fim):
         data_atual += timedelta(days=1)
     
     return dias_uteis
+
+
+def atualizar_calculos_ponto(registro_ponto_id):
+    """
+    Atualiza cálculos automáticos de um registro de ponto
+    Implementa triggers para cálculo de atrasos e horas
+    
+    Args:
+        registro_ponto_id: ID do registro de ponto
+    """
+    from models import RegistroPonto, Funcionario
+    
+    registro = RegistroPonto.query.get(registro_ponto_id)
+    if not registro:
+        return
+    
+    funcionario = Funcionario.query.get(registro.funcionario_id)
+    if not funcionario:
+        return
+    
+    # Calcular horas trabalhadas
+    if registro.hora_entrada and registro.hora_saida:
+        entrada = datetime.combine(registro.data, registro.hora_entrada)
+        saida = datetime.combine(registro.data, registro.hora_saida)
+        
+        # Descontar almoço se houver
+        horas_almoco = 0
+        if registro.hora_almoco_saida and registro.hora_almoco_retorno:
+            saida_almoco = datetime.combine(registro.data, registro.hora_almoco_saida)
+            retorno_almoco = datetime.combine(registro.data, registro.hora_almoco_retorno)
+            horas_almoco = (retorno_almoco - saida_almoco).total_seconds() / 3600
+        
+        horas_trabalhadas = (saida - entrada).total_seconds() / 3600 - horas_almoco
+        registro.horas_trabalhadas = max(0, horas_trabalhadas)
+        
+        # Calcular horas extras (acima de 8 horas)
+        registro.horas_extras = max(0, horas_trabalhadas - 8)
+    
+    # Calcular atrasos usando horário de trabalho
+    minutos_atraso_entrada = 0
+    minutos_atraso_saida = 0
+    
+    if funcionario.horario_trabalho:
+        if registro.hora_entrada and funcionario.horario_trabalho.entrada:
+            if registro.hora_entrada > funcionario.horario_trabalho.entrada:
+                entrada_esperada = datetime.combine(registro.data, funcionario.horario_trabalho.entrada)
+                entrada_real = datetime.combine(registro.data, registro.hora_entrada)
+                minutos_atraso_entrada = (entrada_real - entrada_esperada).total_seconds() / 60
+        
+        if registro.hora_saida and funcionario.horario_trabalho.saida:
+            if registro.hora_saida < funcionario.horario_trabalho.saida:
+                saida_esperada = datetime.combine(registro.data, funcionario.horario_trabalho.saida)
+                saida_real = datetime.combine(registro.data, registro.hora_saida)
+                minutos_atraso_saida = (saida_esperada - saida_real).total_seconds() / 60
+    
+    # Atualizar campos calculados
+    registro.minutos_atraso_entrada = minutos_atraso_entrada
+    registro.minutos_atraso_saida = minutos_atraso_saida
+    registro.total_atraso_minutos = minutos_atraso_entrada + minutos_atraso_saida
+    registro.total_atraso_horas = (minutos_atraso_entrada + minutos_atraso_saida) / 60
+    
+    db.session.commit()
+
+
+def identificar_faltas_periodo(funcionario_id, data_inicio, data_fim):
+    """
+    Identifica dias de falta de um funcionário em um período específico
+    
+    Args:
+        funcionario_id: ID do funcionário
+        data_inicio: Data de início do período
+        data_fim: Data de fim do período
+    
+    Returns:
+        set: Conjunto de datas que são dias de falta
+    """
+    from models import RegistroPonto
+    
+    # Buscar registros de ponto do funcionário no período
+    registros_ponto = RegistroPonto.query.filter(
+        RegistroPonto.funcionario_id == funcionario_id,
+        RegistroPonto.data >= data_inicio,
+        RegistroPonto.data <= data_fim
+    ).all()
+    
+    # Criar conjunto de datas com registro de entrada
+    datas_com_entrada = {r.data for r in registros_ponto if r.hora_entrada}
+    
+    # Feriados nacionais completos para 2025
+    feriados_2025 = [
+        date(2025, 1, 1),   # Ano Novo
+        date(2025, 2, 17),  # Carnaval (Segunda-feira)
+        date(2025, 2, 18),  # Carnaval (Terça-feira)
+        date(2025, 4, 18),  # Paixão de Cristo (Sexta-feira Santa)
+        date(2025, 4, 21),  # Tiradentes
+        date(2025, 5, 1),   # Dia do Trabalhador
+        date(2025, 6, 19),  # Corpus Christi
+        date(2025, 9, 7),   # Independência
+        date(2025, 10, 12), # Nossa Senhora Aparecida
+        date(2025, 11, 2),  # Finados
+        date(2025, 11, 15), # Proclamação da República
+        date(2025, 12, 25), # Natal
+    ]
+    
+    # Identificar todos os dias úteis no período
+    dias_uteis_periodo = set()
+    data_atual = data_inicio
+    
+    while data_atual <= data_fim:
+        # Verificar se é dia útil (segunda a sexta e não é feriado)
+        if data_atual.weekday() < 5 and data_atual not in feriados_2025:
+            dias_uteis_periodo.add(data_atual)
+        data_atual += timedelta(days=1)
+    
+    # Faltas = dias úteis sem registro de entrada
+    faltas = dias_uteis_periodo - datas_com_entrada
+    
+    return faltas
+
+
+def processar_registros_ponto_com_faltas(funcionario_id, data_inicio, data_fim):
+    """
+    Processa registros de ponto adicionando informação sobre faltas
+    
+    Args:
+        funcionario_id: ID do funcionário
+        data_inicio: Data de início do período
+        data_fim: Data de fim do período
+    
+    Returns:
+        tuple: (registros_ponto, faltas_identificadas)
+    """
+    from models import RegistroPonto
+    
+    # Buscar registros de ponto
+    registros_ponto = RegistroPonto.query.filter(
+        RegistroPonto.funcionario_id == funcionario_id,
+        RegistroPonto.data >= data_inicio,
+        RegistroPonto.data <= data_fim
+    ).order_by(RegistroPonto.data.desc()).all()
+    
+    # Identificar faltas
+    faltas = identificar_faltas_periodo(funcionario_id, data_inicio, data_fim)
+    
+    # Adicionar propriedade is_falta aos registros
+    for registro in registros_ponto:
+        registro.is_falta = (registro.data in faltas)
+    
+    return registros_ponto, faltas

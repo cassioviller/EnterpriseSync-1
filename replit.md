@@ -455,6 +455,17 @@ SIGE (Sistema Integrado de Gestão Empresarial) is a comprehensive business mana
   - Performance excelente: tempo de execução dos KPIs < 0.2s
   - Cobertura completa: 15 KPIs, casos extremos, integridade de dados
   - Sistema certificado como pronto para produção com todas as correções validadas
+- July 13, 2025. Correção Completa dos KPIs - Engine v3.1:
+  - Implementada correção fundamental nos cálculos de KPIs: uso de dias_com_lancamento ao invés de dias_uteis
+  - Criadas funções auxiliares especializadas: contar_dias_com_lancamento(), contar_horas_trabalhadas(), contar_faltas(), contar_faltas_justificadas()
+  - Corrigidos 3 KPIs críticos baseados em dias_com_lancamento: Produtividade, Absenteísmo e Média Diária
+  - Lógica de dias_com_lancamento: conta apenas dias programados para trabalho (trabalho_normal, sabado_horas_extras, domingo_horas_extras, feriado_trabalhado, meio_periodo, falta, falta_justificada)
+  - Resultado validado com Cássio: Produtividade corrigida de 51.9% para 74.1% (83h ÷ 112h esperadas)
+  - Absenteísmo corrigido de 5.0% para 7.1% (1 falta ÷ 14 dias com lançamento)
+  - Média diária corrigida de 4.15h para 5.9h (83h ÷ 14 dias com lançamento)
+  - Correção na exibição visual: faltas justificadas agora aparecem em verde "Falta Justificada" vs faltas em vermelho "Falta"
+  - Sistema de teste automatizado (testar_kpis_corrigidos.py) validando todas as correções com 100% de sucesso
+  - Engine v3.1 com fórmulas mais justas e precisas baseadas em dias efetivamente programados para trabalho
 
 ## User Preferences
 
