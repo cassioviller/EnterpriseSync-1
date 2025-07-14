@@ -5,6 +5,7 @@ from models import *
 from models import OutroCusto
 from forms import *
 from utils import calcular_horas_trabalhadas, calcular_custo_real_obra, calcular_custos_mes, calcular_kpis_funcionarios_geral, calcular_kpis_funcionario_periodo, calcular_kpis_funcionario_completo, calcular_ocorrencias_funcionario, processar_meio_periodo_exemplo
+from kpis_engine_v3 import calcular_kpis_funcionario_v3, identificar_faltas_periodo, processar_registros_ponto_com_faltas
 from datetime import datetime, date
 from sqlalchemy import func
 from kpis_engine_simple import kpis_engine
@@ -535,7 +536,6 @@ def funcionario_perfil(id):
     kpis = calcular_kpis_funcionario_v3(id, data_inicio, data_fim)
     
     # Buscar registros de ponto com filtros e identificação de faltas
-    from kpis_engine_v3 import processar_registros_ponto_com_faltas
     
     if obra_filtro:
         # Se há filtro de obra, usar query tradicional
