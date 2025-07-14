@@ -532,7 +532,6 @@ def funcionario_perfil(id):
         data_fim = datetime.strptime(data_fim, '%Y-%m-%d').date()
     
     # Calcular KPIs individuais para o período (usando engine v3.0)
-    from kpis_engine_v3 import calcular_kpis_funcionario_v3
     kpis = calcular_kpis_funcionario_v3(id, data_inicio, data_fim)
     
     # Buscar registros de ponto com filtros e identificação de faltas
@@ -548,7 +547,6 @@ def funcionario_perfil(id):
         registros_ponto = query_ponto.order_by(RegistroPonto.data.desc()).all()
         
         # Adicionar informação de falta manualmente para registros filtrados por obra
-        from kpis_engine_v3 import identificar_faltas_periodo
         faltas = identificar_faltas_periodo(id, data_inicio, data_fim)
         
         # Lista de feriados 2025
