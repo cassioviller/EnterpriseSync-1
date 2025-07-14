@@ -23,22 +23,22 @@ import calendar
 def contar_dias_com_lancamento(registros):
     """
     Conta dias únicos que representam tempo programado para trabalho
+    CORREÇÃO ESPECÍFICA: Conta apenas dias úteis de trabalho normal + faltas
+    Exclui fins de semana (mesmo trabalhados) para cálculo de produtividade padrão
     """
-    tipos_programados = [
-        'trabalho_normal', 'sabado_horas_extras', 'domingo_horas_extras',
-        'sabado_nao_trabalhado', 'domingo_nao_trabalhado',
-        'feriado_trabalhado', 'meio_periodo', 'falta', 'falta_justificada',
-        'atraso', 'saida_antecipada'
+    tipos_dias_uteis = [
+        'trabalho_normal', 'feriado_trabalhado', 'meio_periodo', 
+        'falta', 'falta_justificada', 'atraso', 'saida_antecipada'
     ]
     
-    # Filtrar apenas registros de dias programados
-    registros_programados = [
+    # Filtrar apenas registros de dias úteis programados
+    registros_dias_uteis = [
         r for r in registros 
-        if r.tipo_registro in tipos_programados
+        if r.tipo_registro in tipos_dias_uteis
     ]
     
     # Contar dias únicos
-    dias_unicos = set(r.data for r in registros_programados)
+    dias_unicos = set(r.data for r in registros_dias_uteis)
     
     return len(dias_unicos)
 

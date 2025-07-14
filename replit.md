@@ -478,6 +478,18 @@ SIGE (Sistema Integrado de Gestão Empresarial) is a comprehensive business mana
   - Sistema permite controle total de jornada incluindo dias de folga em fins de semana
   - Badges visuais: "SÁB. FOLGA" (cinza) e "DOM. FOLGA" (claro) para identificação rápida
   - Validação completa com dados reais demonstrando eficácia do sistema v6.1
+- July 14, 2025. Correção Urgente do Filtro de Tipos de Registro nos KPIs - v6.1.1:
+  - Implementada correção crítica na função contar_dias_com_lancamento() no engine de KPIs v3.1
+  - Correção específica: agora conta apenas dias úteis (excluindo fins de semana) para cálculo de produtividade
+  - Tipos considerados para KPIs: trabalho_normal, feriado_trabalhado, meio_periodo, falta, falta_justificada
+  - Tipos excluídos dos KPIs: sabado_horas_extras, domingo_horas_extras, sabado_nao_trabalhado, domingo_nao_trabalhado
+  - Resultado corrigido para Cássio: produtividade de 66,4% → 94,8%, absenteísmo de 3,3% → 4,8%
+  - Dias com lançamento corrigidos: 30 dias → 21 dias úteis (método mais preciso)
+  - Horas esperadas corrigidas: 240h → 168h (21 dias × 8h/dia)
+  - Média diária corrigida: 5,3h → 7,6h (mais realista)
+  - Criados scripts de validação: debug_tipos_registro.py e testar_correcao_kpis.py
+  - Atualizado RELATORIO_CASSIO_ATUALIZADO_JUNHO_2025.md com valores corrigidos
+  - Sistema agora fornece KPIs mais precisos e justos baseados em dias úteis efetivos
 
 ## User Preferences
 

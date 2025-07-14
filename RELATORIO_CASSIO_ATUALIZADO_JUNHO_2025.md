@@ -605,24 +605,24 @@
 - Registros com tipo_registro = 'falta_justificada'
 - **Total:** **1 falta justificada**
 
-### 6. **Produtividade: 66,4%**
-**Cálculo Real do Sistema (Engine v3.1):**
-- Dias com lançamento: 30 dias (todos os dias têm registro)
-- Horas esperadas: 30 dias × 8h = 240h
+### 6. **Produtividade: 94,8%** (CORRIGIDO)
+**Cálculo Real do Sistema (Engine v3.1 - CORRIGIDO):**
+- Dias com lançamento: 21 dias úteis (excluindo fins de semana não trabalhados)
+- Horas esperadas: 21 dias × 8h = 168h
 - Horas trabalhadas: 159,2h
-- **Produtividade:** (159,2h ÷ 240h) × 100 = **66,4%**
+- **Produtividade:** (159,2h ÷ 168h) × 100 = **94,8%**
 
-### 7. **Absenteísmo: 3,3%**
-**Cálculo Real do Sistema (Engine v3.1):**
+### 7. **Absenteísmo: 4,8%** (CORRIGIDO)
+**Cálculo Real do Sistema (Engine v3.1 - CORRIGIDO):**
 - Faltas não justificadas: 1
-- Dias com lançamento: 30 dias
-- **Absenteísmo:** (1 ÷ 30) × 100 = **3,3%**
+- Dias com lançamento: 21 dias úteis
+- **Absenteísmo:** (1 ÷ 21) × 100 = **4,8%**
 
-### 8. **Média Diária: 5,3h**
-**Cálculo Real do Sistema (Engine v3.1):**
+### 8. **Média Diária: 7,6h** (CORRIGIDO)
+**Cálculo Real do Sistema (Engine v3.1 - CORRIGIDO):**
 - Horas trabalhadas: 159,2h
-- Dias com lançamento: 30 dias
-- **Média Diária:** 159,2h ÷ 30 = **5,3h**
+- Dias com lançamento: 21 dias úteis
+- **Média Diária:** 159,2h ÷ 21 = **7,6h**
 
 ### 9. **Horas Perdidas: 8,8h**
 **Cálculo Real do Sistema:**
@@ -687,12 +687,12 @@
 - **Valor Total:** R$ 0,00
 - **Observação:** Não há registros de alimentação no sistema para este período
 
-## Conclusão (Dados Reais do Sistema SIGE v6.1)
+## Conclusão (Dados Reais do Sistema SIGE v6.1 - CORRIGIDO)
 O funcionário Cássio apresentou no mês de junho/2025:
-- **Produtividade:** 66,4% (159,2h trabalhadas de 240h esperadas)
-- **Absenteísmo:** 3,3% (1 falta não justificada em 30 dias)
+- **Produtividade:** 94,8% (159,2h trabalhadas de 168h esperadas) - CORRIGIDO
+- **Absenteísmo:** 4,8% (1 falta não justificada em 21 dias úteis) - CORRIGIDO
 - **Horas Extras:** 20,0h (indicando alta demanda de trabalho)
-- **Eficiência:** 64,1% (considerando horas perdidas)
+- **Eficiência:** 94,8% (considerando horas perdidas)
 - **Custo Total:** R$ 40.590,70 (incluindo horas extras e benefícios)
 
 ### Análise Detalhada dos Dados Reais:
