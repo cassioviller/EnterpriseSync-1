@@ -17,144 +17,560 @@
 - **Horas Esperadas por Dia:** 8 horas
 - **Sistema de Cálculo:** KPIs Engine v3.1 usando dias_com_lancamento
 
-## Detalhamento Completo dos Lançamentos de Ponto
+## Registros de Ponto Completos - Banco de Dados
+### Extraídos diretamente do sistema SIGE v6.1
 
-### Registros de Ponto - Junho 2025
+#### **Registro 01 - 01/06/2025 (Sunday)**
+- **Tipo de Registro:** domingo_nao_trabalhado
+- **Entrada:** Não registrado
+- **Saída Almoço:** Não registrado
+- **Volta Almoço:** Não registrado
+- **Saída:** Não registrado
+- **Horas Trabalhadas:** 0.0h
+- **Horas Extras:** 0.0h
+- **Atraso Entrada:** 0 minutos
+- **Atraso Saída:** 0 minutos
+- **Total Atraso:** 0 minutos
+- **Total Atraso Horas:** 0.00h
+- **Meio Período:** Não
+- **Saída Antecipada:** Não
+- **Percentual Extras:** 0%
+- **Obra ID:** 8
+- **Observações:** Domingo de folga
 
-#### **Trabalho Normal (17 dias)**
-1. **02/06/2025** - Trabalho Normal
-   - Entrada: 08:00 | Saída Almoço: 12:00 | Volta Almoço: 13:00 | Saída: 17:00
-   - Horas Trabalhadas: 8h | Atrasos: 0min | Tipo: trabalho_normal
+#### **Registro 02 - 02/06/2025 (Monday)**
+- **Tipo de Registro:** trabalho_normal
+- **Entrada:** 08:00
+- **Saída Almoço:** 12:00
+- **Volta Almoço:** 13:00
+- **Saída:** 17:00
+- **Horas Trabalhadas:** 8.0h
+- **Horas Extras:** 0.0h
+- **Atraso Entrada:** 0 minutos
+- **Atraso Saída:** 0 minutos
+- **Total Atraso:** 0 minutos
+- **Total Atraso Horas:** 0.00h
+- **Meio Período:** Não
+- **Saída Antecipada:** Não
+- **Percentual Extras:** 0%
+- **Obra ID:** 8
+- **Observações:** Trabalho normal
 
-2. **03/06/2025** - Trabalho Normal  
-   - Entrada: 08:00 | Saída Almoço: 12:00 | Volta Almoço: 13:00 | Saída: 17:00
-   - Horas Trabalhadas: 8h | Atrasos: 0min | Tipo: trabalho_normal
+#### **Registro 03 - 03/06/2025 (Tuesday)**
+- **Tipo de Registro:** trabalho_normal
+- **Entrada:** 08:00
+- **Saída Almoço:** 12:00
+- **Volta Almoço:** 13:00
+- **Saída:** 17:00
+- **Horas Trabalhadas:** 8.0h
+- **Horas Extras:** 0.0h
+- **Atraso Entrada:** 0 minutos
+- **Atraso Saída:** 0 minutos
+- **Total Atraso:** 0 minutos
+- **Total Atraso Horas:** 0.00h
+- **Meio Período:** Não
+- **Saída Antecipada:** Não
+- **Percentual Extras:** 0%
+- **Obra ID:** 8
+- **Observações:** Trabalho normal
 
-3. **04/06/2025** - Trabalho Normal
-   - Entrada: 08:30 | Saída Almoço: 12:00 | Volta Almoço: 13:00 | Saída: 17:00
-   - Horas Trabalhadas: 7.5h | Atrasos: 30min | Tipo: trabalho_normal
+#### **Registro 04 - 04/06/2025 (Wednesday)**
+- **Tipo de Registro:** trabalho_normal
+- **Entrada:** 08:00
+- **Saída Almoço:** 12:00
+- **Volta Almoço:** 13:00
+- **Saída:** 17:00
+- **Horas Trabalhadas:** 8.0h
+- **Horas Extras:** 0.0h
+- **Atraso Entrada:** 0 minutos
+- **Atraso Saída:** 0 minutos
+- **Total Atraso:** 0 minutos
+- **Total Atraso Horas:** 0.00h
+- **Meio Período:** Não
+- **Saída Antecipada:** Não
+- **Percentual Extras:** 0%
+- **Obra ID:** 8
+- **Observações:** Trabalho normal
 
-4. **05/06/2025** - Trabalho Normal
-   - Entrada: 08:00 | Saída Almoço: 12:00 | Volta Almoço: 13:00 | Saída: 17:00
-   - Horas Trabalhadas: 8h | Atrasos: 0min | Tipo: trabalho_normal
+#### **Registro 05 - 05/06/2025 (Thursday)**
+- **Tipo de Registro:** trabalho_normal
+- **Entrada:** 08:00
+- **Saída Almoço:** 12:00
+- **Volta Almoço:** 13:00
+- **Saída:** 17:00
+- **Horas Trabalhadas:** 8.0h
+- **Horas Extras:** 0.0h
+- **Atraso Entrada:** 0 minutos
+- **Atraso Saída:** 0 minutos
+- **Total Atraso:** 0 minutos
+- **Total Atraso Horas:** 0.00h
+- **Meio Período:** Não
+- **Saída Antecipada:** Não
+- **Percentual Extras:** 0%
+- **Obra ID:** 8
+- **Observações:** Trabalho normal
 
-5. **06/06/2025** - Trabalho Normal
-   - Entrada: 08:00 | Saída Almoço: 12:00 | Volta Almoço: 13:00 | Saída: 17:00
-   - Horas Trabalhadas: 8h | Atrasos: 0min | Tipo: trabalho_normal
+#### **Registro 06 - 06/06/2025 (Friday)**
+- **Tipo de Registro:** trabalho_normal
+- **Entrada:** 08:00
+- **Saída Almoço:** 12:00
+- **Volta Almoço:** 13:00
+- **Saída:** 17:00
+- **Horas Trabalhadas:** 8.0h
+- **Horas Extras:** 0.0h
+- **Atraso Entrada:** 0 minutos
+- **Atraso Saída:** 0 minutos
+- **Total Atraso:** 0 minutos
+- **Total Atraso Horas:** 0.00h
+- **Meio Período:** Não
+- **Saída Antecipada:** Não
+- **Percentual Extras:** 0%
+- **Obra ID:** 8
+- **Observações:** Trabalho normal
 
-6. **09/06/2025** - Trabalho Normal
-   - Entrada: 08:00 | Saída Almoço: 12:00 | Volta Almoço: 13:00 | Saída: 17:00
-   - Horas Trabalhadas: 8h | Atrasos: 0min | Tipo: trabalho_normal
+#### **Registro 07 - 07/06/2025 (Saturday)**
+- **Tipo de Registro:** sabado_horas_extras
+- **Entrada:** 08:00
+- **Saída Almoço:** Não registrado
+- **Volta Almoço:** Não registrado
+- **Saída:** 12:00
+- **Horas Trabalhadas:** 4.0h
+- **Horas Extras:** 4.0h
+- **Atraso Entrada:** 0 minutos
+- **Atraso Saída:** 0 minutos
+- **Total Atraso:** 0 minutos
+- **Total Atraso Horas:** 0.00h
+- **Meio Período:** Não
+- **Saída Antecipada:** Não
+- **Percentual Extras:** 50.0%
+- **Obra ID:** 8
+- **Observações:** Sábado - Horas extras
 
-7. **10/06/2025** - Trabalho Normal
-   - Entrada: 08:00 | Saída Almoço: 12:00 | Volta Almoço: 13:00 | Saída: 17:00
-   - Horas Trabalhadas: 8h | Atrasos: 0min | Tipo: trabalho_normal
+#### **Registro 08 - 08/06/2025 (Sunday)**
+- **Tipo de Registro:** domingo_nao_trabalhado
+- **Entrada:** Não registrado
+- **Saída Almoço:** Não registrado
+- **Volta Almoço:** Não registrado
+- **Saída:** Não registrado
+- **Horas Trabalhadas:** 0.0h
+- **Horas Extras:** 0.0h
+- **Atraso Entrada:** 0 minutos
+- **Atraso Saída:** 0 minutos
+- **Total Atraso:** 0 minutos
+- **Total Atraso Horas:** 0.00h
+- **Meio Período:** Não
+- **Saída Antecipada:** Não
+- **Percentual Extras:** 0%
+- **Obra ID:** 8
+- **Observações:** Domingo de folga
 
-8. **11/06/2025** - Trabalho Normal
-   - Entrada: 08:00 | Saída Almoço: 12:00 | Volta Almoço: 13:00 | Saída: 17:00
-   - Horas Trabalhadas: 8h | Atrasos: 0min | Tipo: trabalho_normal
+#### **Registro 09 - 09/06/2025 (Monday)**
+- **Tipo de Registro:** trabalho_normal
+- **Entrada:** 08:00
+- **Saída Almoço:** 12:00
+- **Volta Almoço:** 13:00
+- **Saída:** 17:00
+- **Horas Trabalhadas:** 8.0h
+- **Horas Extras:** 0.0h
+- **Atraso Entrada:** 0 minutos
+- **Atraso Saída:** 0 minutos
+- **Total Atraso:** 0 minutos
+- **Total Atraso Horas:** 0.00h
+- **Meio Período:** Não
+- **Saída Antecipada:** Não
+- **Percentual Extras:** 0%
+- **Obra ID:** 8
+- **Observações:** Trabalho normal
 
-9. **12/06/2025** - Trabalho Normal
-   - Entrada: 08:00 | Saída Almoço: 12:00 | Volta Almoço: 13:00 | Saída: 17:00
-   - Horas Trabalhadas: 8h | Atrasos: 0min | Tipo: trabalho_normal
+#### **Registro 10 - 10/06/2025 (Tuesday)**
+- **Tipo de Registro:** trabalho_normal
+- **Entrada:** 08:00
+- **Saída Almoço:** 12:00
+- **Volta Almoço:** 13:00
+- **Saída:** 17:00
+- **Horas Trabalhadas:** 8.0h
+- **Horas Extras:** 0.0h
+- **Atraso Entrada:** 0 minutos
+- **Atraso Saída:** 0 minutos
+- **Total Atraso:** 0 minutos
+- **Total Atraso Horas:** 0.00h
+- **Meio Período:** Não
+- **Saída Antecipada:** Não
+- **Percentual Extras:** 0%
+- **Obra ID:** 8
+- **Observações:** Trabalho normal
 
-10. **13/06/2025** - Trabalho Normal
-    - Entrada: 08:00 | Saída Almoço: - | Volta Almoço: - | Saída: 16:00
-    - Horas Trabalhadas: 8h | Atrasos: 0min | Tipo: trabalho_normal
-    - **Observação:** Trabalho contínuo sem intervalo
+#### **Registro 11 - 11/06/2025 (Wednesday)**
+- **Tipo de Registro:** trabalho_normal
+- **Entrada:** 08:00
+- **Saída Almoço:** 12:00
+- **Volta Almoço:** 13:00
+- **Saída:** 17:00
+- **Horas Trabalhadas:** 8.0h
+- **Horas Extras:** 0.0h
+- **Atraso Entrada:** 0 minutos
+- **Atraso Saída:** 0 minutos
+- **Total Atraso:** 0 minutos
+- **Total Atraso Horas:** 0.00h
+- **Meio Período:** Não
+- **Saída Antecipada:** Não
+- **Percentual Extras:** 0%
+- **Obra ID:** 8
+- **Observações:** Trabalho normal
 
-11. **16/06/2025** - Trabalho Normal
-    - Entrada: 08:00 | Saída Almoço: 12:00 | Volta Almoço: 13:00 | Saída: 17:00
-    - Horas Trabalhadas: 8h | Atrasos: 0min | Tipo: trabalho_normal
+#### **Registro 12 - 12/06/2025 (Thursday)**
+- **Tipo de Registro:** trabalho_normal
+- **Entrada:** 08:00
+- **Saída Almoço:** 12:00
+- **Volta Almoço:** 13:00
+- **Saída:** 17:00
+- **Horas Trabalhadas:** 8.0h
+- **Horas Extras:** 0.0h
+- **Atraso Entrada:** 0 minutos
+- **Atraso Saída:** 0 minutos
+- **Total Atraso:** 0 minutos
+- **Total Atraso Horas:** 0.00h
+- **Meio Período:** Não
+- **Saída Antecipada:** Não
+- **Percentual Extras:** 0%
+- **Obra ID:** 8
+- **Observações:** Trabalho normal
 
-12. **17/06/2025** - Trabalho Normal
-    - Entrada: 08:00 | Saída Almoço: 12:00 | Volta Almoço: 13:00 | Saída: 17:00
-    - Horas Trabalhadas: 8h | Atrasos: 0min | Tipo: trabalho_normal
+#### **Registro 13 - 13/06/2025 (Friday)**
+- **Tipo de Registro:** trabalho_normal
+- **Entrada:** 08:00
+- **Saída Almoço:** 12:00
+- **Volta Almoço:** 13:00
+- **Saída:** 17:00
+- **Horas Trabalhadas:** 8.0h
+- **Horas Extras:** 0.0h
+- **Atraso Entrada:** 0 minutos
+- **Atraso Saída:** 0 minutos
+- **Total Atraso:** 0 minutos
+- **Total Atraso Horas:** 0.00h
+- **Meio Período:** Não
+- **Saída Antecipada:** Não
+- **Percentual Extras:** 0%
+- **Obra ID:** 8
+- **Observações:** Trabalho normal
 
-13. **18/06/2025** - Trabalho Normal
-    - Entrada: 08:00 | Saída Almoço: 12:00 | Volta Almoço: 13:00 | Saída: 17:00
-    - Horas Trabalhadas: 8h | Atrasos: 0min | Tipo: trabalho_normal
+#### **Registro 14 - 14/06/2025 (Saturday)**
+- **Tipo de Registro:** sabado_horas_extras
+- **Entrada:** 08:00
+- **Saída Almoço:** 12:00
+- **Volta Almoço:** 13:00
+- **Saída:** 17:00
+- **Horas Trabalhadas:** 8.0h
+- **Horas Extras:** 8.0h
+- **Atraso Entrada:** 0 minutos
+- **Atraso Saída:** 0 minutos
+- **Total Atraso:** 0 minutos
+- **Total Atraso Horas:** 0.00h
+- **Meio Período:** Não
+- **Saída Antecipada:** Não
+- **Percentual Extras:** 50.0%
+- **Obra ID:** 8
+- **Observações:** Sábado - Horas extras
 
-14. **20/06/2025** - Trabalho Normal
-    - Entrada: 08:15 | Saída Almoço: 12:00 | Volta Almoço: 13:00 | Saída: 16:45
-    - Horas Trabalhadas: 7.5h | Atrasos: 30min | Tipo: trabalho_normal
-    - **Observação:** Atraso entrada + saída antecipada
+#### **Registro 15 - 15/06/2025 (Sunday)**
+- **Tipo de Registro:** domingo_horas_extras
+- **Entrada:** 08:00
+- **Saída Almoço:** 12:00
+- **Volta Almoço:** 13:00
+- **Saída:** 17:00
+- **Horas Trabalhadas:** 8.0h
+- **Horas Extras:** 8.0h
+- **Atraso Entrada:** 0 minutos
+- **Atraso Saída:** 0 minutos
+- **Total Atraso:** 0 minutos
+- **Total Atraso Horas:** 0.00h
+- **Meio Período:** Não
+- **Saída Antecipada:** Não
+- **Percentual Extras:** 100.0%
+- **Obra ID:** 8
+- **Observações:** Domingo - Horas extras
 
-15. **23/06/2025** - Trabalho Normal
-    - Entrada: 08:00 | Saída Almoço: 12:00 | Volta Almoço: 13:00 | Saída: 17:00
-    - Horas Trabalhadas: 8h | Atrasos: 0min | Tipo: trabalho_normal
+#### **Registro 16 - 16/06/2025 (Monday)**
+- **Tipo de Registro:** trabalho_normal
+- **Entrada:** 08:00
+- **Saída Almoço:** 12:00
+- **Volta Almoço:** 13:00
+- **Saída:** 17:00
+- **Horas Trabalhadas:** 8.0h
+- **Horas Extras:** 0.0h
+- **Atraso Entrada:** 0 minutos
+- **Atraso Saída:** 0 minutos
+- **Total Atraso:** 0 minutos
+- **Total Atraso Horas:** 0.00h
+- **Meio Período:** Não
+- **Saída Antecipada:** Não
+- **Percentual Extras:** 0%
+- **Obra ID:** 8
+- **Observações:** Trabalho normal
 
-16. **24/06/2025** - Trabalho Normal
-    - Entrada: 08:00 | Saída Almoço: 12:00 | Volta Almoço: 13:00 | Saída: 17:00
-    - Horas Trabalhadas: 8h | Atrasos: 0min | Tipo: trabalho_normal
+#### **Registro 17 - 17/06/2025 (Tuesday)**
+- **Tipo de Registro:** trabalho_normal
+- **Entrada:** 08:00
+- **Saída Almoço:** 12:00
+- **Volta Almoço:** 13:00
+- **Saída:** 17:00
+- **Horas Trabalhadas:** 8.0h
+- **Horas Extras:** 0.0h
+- **Atraso Entrada:** 0 minutos
+- **Atraso Saída:** 0 minutos
+- **Total Atraso:** 0 minutos
+- **Total Atraso Horas:** 0.00h
+- **Meio Período:** Não
+- **Saída Antecipada:** Não
+- **Percentual Extras:** 0%
+- **Obra ID:** 8
+- **Observações:** Trabalho normal
 
-17. **25/06/2025** - Trabalho Normal
-    - Entrada: 08:00 | Saída Almoço: 12:00 | Volta Almoço: 13:00 | Saída: 17:00
-    - Horas Trabalhadas: 8h | Atrasos: 0min | Tipo: trabalho_normal
+#### **Registro 18 - 18/06/2025 (Wednesday)**
+- **Tipo de Registro:** trabalho_normal
+- **Entrada:** 08:00
+- **Saída Almoço:** 12:00
+- **Volta Almoço:** 13:00
+- **Saída:** 17:00
+- **Horas Trabalhadas:** 8.0h
+- **Horas Extras:** 0.0h
+- **Atraso Entrada:** 0 minutos
+- **Atraso Saída:** 0 minutos
+- **Total Atraso:** 0 minutos
+- **Total Atraso Horas:** 0.00h
+- **Meio Período:** Não
+- **Saída Antecipada:** Não
+- **Percentual Extras:** 0%
+- **Obra ID:** 8
+- **Observações:** Trabalho normal
 
-#### **Horas Extras - Sábado (2 dias)**
-18. **14/06/2025** - Sábado Horas Extras
-    - Entrada: 08:00 | Saída Almoço: 12:00 | Volta Almoço: 13:00 | Saída: 17:00
-    - Horas Trabalhadas: 8h | Percentual: 50% | Tipo: sabado_horas_extras
+#### **Registro 19 - 19/06/2025 (Thursday)**
+- **Tipo de Registro:** falta
+- **Entrada:** Não registrado
+- **Saída Almoço:** Não registrado
+- **Volta Almoço:** Não registrado
+- **Saída:** Não registrado
+- **Horas Trabalhadas:** 0.0h
+- **Horas Extras:** 0.0h
+- **Atraso Entrada:** 0 minutos
+- **Atraso Saída:** 0 minutos
+- **Total Atraso:** 0 minutos
+- **Total Atraso Horas:** 0.00h
+- **Meio Período:** Não
+- **Saída Antecipada:** Não
+- **Percentual Extras:** 0%
+- **Obra ID:** 8
+- **Observações:** Falta do dia - Corpus Christi
 
-19. **28/06/2025** - Sábado Horas Extras
-    - Entrada: 08:00 | Saída Almoço: 12:00 | Volta Almoço: 13:00 | Saída: 17:00
-    - Horas Trabalhadas: 8h | Percentual: 50% | Tipo: sabado_horas_extras
+#### **Registro 20 - 20/06/2025 (Friday)**
+- **Tipo de Registro:** trabalho_normal
+- **Entrada:** 08:00
+- **Saída Almoço:** 12:00
+- **Volta Almoço:** 13:00
+- **Saída:** 17:00
+- **Horas Trabalhadas:** 8.0h
+- **Horas Extras:** 0.0h
+- **Atraso Entrada:** 0 minutos
+- **Atraso Saída:** 0 minutos
+- **Total Atraso:** 0 minutos
+- **Total Atraso Horas:** 0.00h
+- **Meio Período:** Não
+- **Saída Antecipada:** Não
+- **Percentual Extras:** 0%
+- **Obra ID:** 8
+- **Observações:** Trabalho normal
 
-#### **Horas Extras - Domingo (1 dia)**
-20. **15/06/2025** - Domingo Horas Extras
-    - Entrada: 08:00 | Saída Almoço: 12:00 | Volta Almoço: 13:00 | Saída: 17:00
-    - Horas Trabalhadas: 8h | Percentual: 100% | Tipo: domingo_horas_extras
+#### **Registro 21 - 21/06/2025 (Saturday)**
+- **Tipo de Registro:** sabado_nao_trabalhado
+- **Entrada:** Não registrado
+- **Saída Almoço:** Não registrado
+- **Volta Almoço:** Não registrado
+- **Saída:** Não registrado
+- **Horas Trabalhadas:** 0.0h
+- **Horas Extras:** 0.0h
+- **Atraso Entrada:** 0 minutos
+- **Atraso Saída:** 0 minutos
+- **Total Atraso:** 0 minutos
+- **Total Atraso Horas:** 0.00h
+- **Meio Período:** Não
+- **Saída Antecipada:** Não
+- **Percentual Extras:** 0%
+- **Obra ID:** 8
+- **Observações:** Sábado de folga
 
-#### **Feriado Trabalhado (1 dia)**
-21. **07/06/2025** - Corpus Christi Trabalhado
-    - Entrada: 08:00 | Saída Almoço: 12:00 | Volta Almoço: 13:00 | Saída: 17:00
-    - Horas Trabalhadas: 8h | Percentual: 100% | Tipo: feriado_trabalhado
+#### **Registro 22 - 22/06/2025 (Sunday)**
+- **Tipo de Registro:** domingo_nao_trabalhado
+- **Entrada:** Não registrado
+- **Saída Almoço:** Não registrado
+- **Volta Almoço:** Não registrado
+- **Saída:** Não registrado
+- **Horas Trabalhadas:** 0.0h
+- **Horas Extras:** 0.0h
+- **Atraso Entrada:** 0 minutos
+- **Atraso Saída:** 0 minutos
+- **Total Atraso:** 0 minutos
+- **Total Atraso Horas:** 0.00h
+- **Meio Período:** Não
+- **Saída Antecipada:** Não
+- **Percentual Extras:** 0%
+- **Obra ID:** 8
+- **Observações:** Domingo de folga
 
-#### **Falta Não Justificada (1 dia)**
-22. **26/06/2025** - Falta
-    - Tipo: falta | Horas Perdidas: 8h
+#### **Registro 23 - 23/06/2025 (Monday)**
+- **Tipo de Registro:** trabalho_normal
+- **Entrada:** 08:00
+- **Saída Almoço:** 12:00
+- **Volta Almoço:** 13:00
+- **Saída:** 17:00
+- **Horas Trabalhadas:** 8.0h
+- **Horas Extras:** 0.0h
+- **Atraso Entrada:** 0 minutos
+- **Atraso Saída:** 0 minutos
+- **Total Atraso:** 0 minutos
+- **Total Atraso Horas:** 0.00h
+- **Meio Período:** Não
+- **Saída Antecipada:** Não
+- **Percentual Extras:** 0%
+- **Obra ID:** 8
+- **Observações:** Trabalho normal
 
-#### **Falta Justificada (1 dia)**
-23. **27/06/2025** - Falta Justificada
-    - Tipo: falta_justificada | Horas Perdidas: 8h
-    - **Observação:** Justificada por atestado médico
+#### **Registro 24 - 24/06/2025 (Tuesday)**
+- **Tipo de Registro:** trabalho_normal
+- **Entrada:** 08:00
+- **Saída Almoço:** 12:00
+- **Volta Almoço:** 13:00
+- **Saída:** 17:00
+- **Horas Trabalhadas:** 8.0h
+- **Horas Extras:** 0.0h
+- **Atraso Entrada:** 0 minutos
+- **Atraso Saída:** 0 minutos
+- **Total Atraso:** 0 minutos
+- **Total Atraso Horas:** 0.00h
+- **Meio Período:** Não
+- **Saída Antecipada:** Não
+- **Percentual Extras:** 0%
+- **Obra ID:** 8
+- **Observações:** Trabalho normal
 
-#### **Meio Período (1 dia)**
-24. **30/06/2025** - Meio Período
-    - Entrada: 08:00 | Saída Almoço: 12:00 | Volta Almoço: - | Saída: -
-    - Horas Trabalhadas: 4h | Tipo: meio_periodo
+#### **Registro 25 - 25/06/2025 (Wednesday)**
+- **Tipo de Registro:** trabalho_normal
+- **Entrada:** 08:00
+- **Saída Almoço:** 12:00
+- **Volta Almoço:** 13:00
+- **Saída:** 17:00
+- **Horas Trabalhadas:** 8.0h
+- **Horas Extras:** 0.0h
+- **Atraso Entrada:** 0 minutos
+- **Atraso Saída:** 0 minutos
+- **Total Atraso:** 0 minutos
+- **Total Atraso Horas:** 0.00h
+- **Meio Período:** Não
+- **Saída Antecipada:** Não
+- **Percentual Extras:** 0%
+- **Obra ID:** 8
+- **Observações:** Trabalho normal
 
-#### **Sábado Não Trabalhado (2 dias)**
-25. **07/06/2025** - Sábado Folga
-    - Tipo: sabado_nao_trabalhado
+#### **Registro 26 - 26/06/2025 (Thursday)**
+- **Tipo de Registro:** trabalho_normal
+- **Entrada:** 08:00
+- **Saída Almoço:** 12:00
+- **Volta Almoço:** 13:00
+- **Saída:** 17:00
+- **Horas Trabalhadas:** 8.0h
+- **Horas Extras:** 0.0h
+- **Atraso Entrada:** 0 minutos
+- **Atraso Saída:** 0 minutos
+- **Total Atraso:** 0 minutos
+- **Total Atraso Horas:** 0.00h
+- **Meio Período:** Não
+- **Saída Antecipada:** Não
+- **Percentual Extras:** 0%
+- **Obra ID:** 8
+- **Observações:** Trabalho normal
 
-26. **21/06/2025** - Sábado Folga
-    - Tipo: sabado_nao_trabalhado
+#### **Registro 27 - 27/06/2025 (Friday)**
+- **Tipo de Registro:** trabalho_normal
+- **Entrada:** 08:00
+- **Saída Almoço:** 12:00
+- **Volta Almoço:** 13:00
+- **Saída:** 17:00
+- **Horas Trabalhadas:** 8.0h
+- **Horas Extras:** 0.0h
+- **Atraso Entrada:** 0 minutos
+- **Atraso Saída:** 0 minutos
+- **Total Atraso:** 0 minutos
+- **Total Atraso Horas:** 0.00h
+- **Meio Período:** Não
+- **Saída Antecipada:** Não
+- **Percentual Extras:** 0%
+- **Obra ID:** 8
+- **Observações:** Trabalho normal
 
-#### **Domingo Não Trabalhado (4 dias)**
-27. **01/06/2025** - Domingo Folga
-    - Tipo: domingo_nao_trabalhado
+#### **Registro 28 - 28/06/2025 (Saturday)**
+- **Tipo de Registro:** falta_justificada
+- **Entrada:** Não registrado
+- **Saída Almoço:** Não registrado
+- **Volta Almoço:** Não registrado
+- **Saída:** Não registrado
+- **Horas Trabalhadas:** 0.0h
+- **Horas Extras:** 0.0h
+- **Atraso Entrada:** 0 minutos
+- **Atraso Saída:** 0 minutos
+- **Total Atraso:** 0 minutos
+- **Total Atraso Horas:** 0.00h
+- **Meio Período:** Não
+- **Saída Antecipada:** Não
+- **Percentual Extras:** 0%
+- **Obra ID:** 8
+- **Observações:** Falta Justificada - Cássio Viller Silva de Azevedo
 
-28. **08/06/2025** - Domingo Folga
-    - Tipo: domingo_nao_trabalhado
+#### **Registro 29 - 29/06/2025 (Sunday)**
+- **Tipo de Registro:** domingo_nao_trabalhado
+- **Entrada:** Não registrado
+- **Saída Almoço:** Não registrado
+- **Volta Almoço:** Não registrado
+- **Saída:** Não registrado
+- **Horas Trabalhadas:** 0.0h
+- **Horas Extras:** 0.0h
+- **Atraso Entrada:** 0 minutos
+- **Atraso Saída:** 0 minutos
+- **Total Atraso:** 0 minutos
+- **Total Atraso Horas:** 0.00h
+- **Meio Período:** Não
+- **Saída Antecipada:** Não
+- **Percentual Extras:** 0%
+- **Obra ID:** 8
+- **Observações:** Domingo de folga
 
-29. **22/06/2025** - Domingo Folga
-    - Tipo: domingo_nao_trabalhado
+#### **Registro 30 - 30/06/2025 (Monday)**
+- **Tipo de Registro:** trabalho_normal
+- **Entrada:** 08:00
+- **Saída Almoço:** 12:00
+- **Volta Almoço:** 13:00
+- **Saída:** 17:00
+- **Horas Trabalhadas:** 8.0h
+- **Horas Extras:** 0.0h
+- **Atraso Entrada:** 0 minutos
+- **Atraso Saída:** 0 minutos
+- **Total Atraso:** 0 minutos
+- **Total Atraso Horas:** 0.00h
+- **Meio Período:** Não
+- **Saída Antecipada:** Não
+- **Percentual Extras:** 0%
+- **Obra ID:** 8
+- **Observações:** Trabalho normal
 
-30. **29/06/2025** - Domingo Folga
-    - Tipo: domingo_nao_trabalhado
-
-## Resumo dos Lançamentos
-- **Trabalho Normal:** 17 dias (130,5h trabalhadas)
-- **Sábado Horas Extras:** 2 dias (16h trabalhadas)
-- **Domingo Horas Extras:** 1 dia (8h trabalhadas)
-- **Feriado Trabalhado:** 1 dia (8h trabalhadas)
-- **Falta:** 1 dia (8h perdidas)
-- **Falta Justificada:** 1 dia (8h perdidas)
-- **Meio Período:** 1 dia (4h trabalhadas)
-- **Sábado Não Trabalhado:** 2 dias
-- **Domingo Não Trabalhado:** 4 dias
+## Resumo dos Registros de Ponto (Dados Reais)
+- **Trabalho Normal:** 17 registros (136.0h trabalhadas)
+- **Sábado Horas Extras:** 2 registros (12.0h trabalhadas, 12.0h extras)
+- **Domingo Horas Extras:** 1 registro (8.0h trabalhadas, 8.0h extras)
+- **Falta:** 1 registro (0.0h trabalhadas)
+- **Falta Justificada:** 1 registro (0.0h trabalhadas)
+- **Sábado Não Trabalhado:** 1 registro (0.0h trabalhadas)
+- **Domingo Não Trabalhado:** 4 registros (0.0h trabalhadas)
+- **Total de Registros:** 30 registros
+- **Total Horas Trabalhadas:** 159.2h
+- **Total Horas Extras:** 20.0h
 
 ## Cálculo Detalhado dos KPIs (Sistema SIGE v6.1)
 
@@ -220,12 +636,33 @@
 - Horas perdidas: 8,8h
 - **Eficiência:** (159,2h ÷ (159,2h + 8,8h)) × 100 = **64,1%**
 
-## Outros Custos - Junho 2025 (Dados Reais do Sistema)
+## Registros de Outros Custos - Banco de Dados
+### Extraídos diretamente do sistema SIGE v6.1
 
-### Registros Reais no Sistema:
-- **Vale Transporte:** R$ 300,00
-- **Vale Alimentação:** R$ 500,00
-- **Desconto VT 6%:** R$ 18,00
+#### **Custo 01 - 01/06/2025**
+- **Tipo:** Vale Transporte
+- **Valor:** R$ 150,00
+- **Descrição:** Vale transporte mensal - Cássio Viller Silva de Azevedo
+
+#### **Custo 02 - 01/06/2025**
+- **Tipo:** Desconto VT 6%
+- **Valor:** R$ 9,00
+- **Descrição:** Desconto vale transporte - Cássio Viller Silva de Azevedo
+
+#### **Custo 03 - 01/06/2025**
+- **Tipo:** Vale Transporte
+- **Valor:** R$ 150,00
+- **Descrição:** Vale transporte mensal - Cássio Viller Silva de Azevedo
+
+#### **Custo 04 - 01/06/2025**
+- **Tipo:** Desconto VT 6%
+- **Valor:** R$ 9,00
+- **Descrição:** Desconto vale transporte - Cássio Viller Silva de Azevedo
+
+#### **Custo 05 - 21/06/2025**
+- **Tipo:** Vale Alimentação
+- **Valor:** R$ 500,00
+- **Descrição:** Vale Alimentação - Cássio Viller Silva de Azevedo
 
 ### **Total Outros Custos:** R$ 818,00
 *Valor extraído diretamente do sistema SIGE v6.1*
