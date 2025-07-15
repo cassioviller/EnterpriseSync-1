@@ -1,0 +1,885 @@
+{% extends "base.html" %}
+
+{% block title %}Novo RDO - Sistema SIGE{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-3">
+    <!-- Header do RDO -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card shadow">
+                <div class="card-header bg-primary text-white">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <h4 class="mb-0">
+                            <i class="fas fa-clipboard-list"></i> Novo RDO
+                        </h4>
+                        <div class="d-flex gap-2">
+                            <button class="btn btn-light btn-sm" onclick="salvarRascunho()">
+                                <i class="fas fa-save"></i> Salvar Rascunho
+                            </button>
+                            <button class="btn btn-success btn-sm" onclick="finalizarRDO()">
+                                <i class="fas fa-check"></i> Finalizar
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <form id="form_rdo">
+        <!-- Seção 1: Informações Gerais -->
+        <div class="row">
+            <div class="col-12">
+                <div class="section-header">
+                    <h5 class="mb-0"><i class="fas fa-info-circle"></i> Informações Gerais</h5>
+                </div>
+                <div class="section-body">
+                    <div class="row">
+                        <div class="col-md-4 mb-3">
+                            <label class="form-label">Data do Relatório *</label>
+                            <input type="date" class="form-control" id="data_relatorio" required>
+                        </div>
+                        <div class="col-md-8 mb-3">
+                            <label class="form-label">Obra *</label>
+                            <select class="form-select" id="obra_select" required>
+                                <option value="">Selecione a obra...</option>
+                            </select>
+                            <small class="text-muted">
+                                <i class="fas fa-info-circle"></i> 
+                                Digite para buscar por nome, código ou endereço
+                            </small>
+                        </div>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-4 mb-3">
+                            <label class="form-label">Tempo Manhã</label>
+                            <select class="form-select" id="tempo_manha">
+                                <option value="">Selecione...</option>
+                                <option value="ensolarado">☀️ Ensolarado</option>
+                                <option value="nublado">☁️ Nublado</option>
+                                <option value="parcialmente_nublado">⛅ Parcialmente Nublado</option>
+                                <option value="chuvoso">🌧️ Chuvoso</option>
+                                <option value="garoa">🌦️ Garoa</option>
+                                <option value="tempestade">⛈️ Tempestade</option>
+                            </select>
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <label class="form-label">Tempo Tarde</label>
+                            <select class="form-select" id="tempo_tarde">
+                                <option value="">Selecione...</option>
+                                <option value="ensolarado">☀️ Ensolarado</option>
+                                <option value="nublado">☁️ Nublado</option>
+                                <option value="parcialmente_nublado">⛅ Parcialmente Nublado</option>
+                                <option value="chuvoso">🌧️ Chuvoso</option>
+                                <option value="garoa">🌦️ Garoa</option>
+                                <option value="tempestade">⛈️ Tempestade</option>
+                            </select>
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <label class="form-label">Tempo Noite</label>
+                            <select class="form-select" id="tempo_noite">
+                                <option value="">Selecione...</option>
+                                <option value="ensolarado">☀️ Ensolarado</option>
+                                <option value="nublado">☁️ Nublado</option>
+                                <option value="parcialmente_nublado">⛅ Parcialmente Nublado</option>
+                                <option value="chuvoso">🌧️ Chuvoso</option>
+                                <option value="garoa">🌦️ Garoa</option>
+                                <option value="tempestade">⛈️ Tempestade</option>
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-12">
+                            <label class="form-label">Observações Meteorológicas</label>
+                            <textarea class="form-control" id="observacoes_meteorologicas" rows="2"
+                                      placeholder="Ex: Chuva forte pela manhã, trabalho interrompido das 9h às 11h..."></textarea>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Seção 2: Mão de Obra -->
+        <div class="row">
+            <div class="col-12">
+                <div class="section-header">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0"><i class="fas fa-users"></i> Mão de Obra</h5>
+                        <button type="button" class="btn btn-add-item" onclick="adicionarFuncionario()">
+                            <i class="fas fa-plus"></i>
+                        </button>
+                    </div>
+                </div>
+                <div class="section-body">
+                    <div id="container_funcionarios">
+                        <!-- Funcionários serão adicionados dinamicamente -->
+                    </div>
+                    
+                    <!-- Template de funcionário (hidden) -->
+                    <div id="template_funcionario" style="display: none;">
+                        <div class="item-card funcionario-item">
+                            <div class="row align-items-center">
+                                <div class="col-md-5 mb-2">
+                                    <label class="form-label">Funcionário</label>
+                                    <select class="form-select funcionario-select">
+                                        <option value="">Selecione o funcionário...</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-2 mb-2">
+                                    <label class="form-label">Horas</label>
+                                    <input type="number" class="form-control horas-input" min="0" max="24" step="0.5" placeholder="8.0">
+                                </div>
+                                <div class="col-md-3 mb-2">
+                                    <label class="form-label">Função Exercida</label>
+                                    <input type="text" class="form-control funcao-input" placeholder="Ex: Pedreiro">
+                                </div>
+                                <div class="col-md-1 mb-2">
+                                    <label class="form-label">Presente</label>
+                                    <div class="form-check">
+                                        <input class="form-check-input presente-check" type="checkbox" checked>
+                                    </div>
+                                </div>
+                                <div class="col-md-1 mb-2">
+                                    <label class="form-label">&nbsp;</label>
+                                    <button type="button" class="btn btn-outline-danger btn-sm w-100" onclick="removerFuncionario(this)">
+                                        <i class="fas fa-trash"></i>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Seção 3: Atividades Executadas -->
+        <div class="row">
+            <div class="col-12">
+                <div class="section-header">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0"><i class="fas fa-tasks"></i> Atividades Executadas</h5>
+                        <button type="button" class="btn btn-add-item" onclick="adicionarAtividade()">
+                            <i class="fas fa-plus"></i>
+                        </button>
+                    </div>
+                </div>
+                <div class="section-body">
+                    <div id="container_atividades">
+                        <!-- Atividades serão adicionadas dinamicamente -->
+                    </div>
+                    
+                    <!-- Template de atividade (hidden) -->
+                    <div id="template_atividade" style="display: none;">
+                        <div class="item-card atividade-item">
+                            <div class="row">
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label">Serviço</label>
+                                    <select class="form-select servico-select" onchange="carregarSubatividades(this)">
+                                        <option value="">Selecione o serviço...</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-3 mb-3">
+                                    <label class="form-label">Quantidade</label>
+                                    <div class="input-group">
+                                        <input type="number" class="form-control quantidade-input" min="0" step="0.01" placeholder="0.00">
+                                        <span class="input-group-text unidade-display">-</span>
+                                    </div>
+                                </div>
+                                <div class="col-md-2 mb-3">
+                                    <label class="form-label">Tempo (h)</label>
+                                    <input type="number" class="form-control tempo-input" min="0" step="0.5" placeholder="0.0">
+                                </div>
+                                <div class="col-md-1 mb-3">
+                                    <label class="form-label">&nbsp;</label>
+                                    <button type="button" class="btn btn-outline-danger btn-sm w-100" onclick="removerAtividade(this)">
+                                        <i class="fas fa-trash"></i>
+                                    </button>
+                                </div>
+                            </div>
+                            
+                            <!-- Subatividades (carregadas dinamicamente) -->
+                            <div class="subatividades-container" style="display: none;">
+                                <hr>
+                                <h6><i class="fas fa-list"></i> Subatividades</h6>
+                                <div class="row subatividades-list">
+                                    <!-- Subatividades serão carregadas aqui -->
+                                </div>
+                            </div>
+                            
+                            <div class="row">
+                                <div class="col-12">
+                                    <label class="form-label">Observações Técnicas</label>
+                                    <textarea class="form-control observacoes-input" rows="2" placeholder="Observações sobre a execução da atividade..."></textarea>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Seção 4: Equipamentos -->
+        <div class="row">
+            <div class="col-12">
+                <div class="section-header">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0"><i class="fas fa-truck"></i> Equipamentos</h5>
+                        <button type="button" class="btn btn-add-item" onclick="adicionarEquipamento()">
+                            <i class="fas fa-plus"></i>
+                        </button>
+                    </div>
+                </div>
+                <div class="section-body">
+                    <div id="container_equipamentos">
+                        <!-- Equipamentos serão adicionados dinamicamente -->
+                    </div>
+                    
+                    <!-- Template de equipamento (hidden) -->
+                    <div id="template_equipamento" style="display: none;">
+                        <div class="item-card equipamento-item">
+                            <div class="row align-items-center">
+                                <div class="col-md-4 mb-2">
+                                    <label class="form-label">Equipamento/Veículo</label>
+                                    <select class="form-select equipamento-select">
+                                        <option value="">Selecione...</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-2 mb-2">
+                                    <label class="form-label">Horas de Uso</label>
+                                    <input type="number" class="form-control horas-uso-input" min="0" max="24" step="0.5" placeholder="0.0">
+                                </div>
+                                <div class="col-md-3 mb-2">
+                                    <label class="form-label">Status</label>
+                                    <select class="form-select status-select">
+                                        <option value="operando">✅ Operando Normal</option>
+                                        <option value="manutencao">🔧 Em Manutenção</option>
+                                        <option value="problema">⚠️ Com Problema</option>
+                                        <option value="parado">⏸️ Parado</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-2 mb-2">
+                                    <label class="form-label">Observações</label>
+                                    <input type="text" class="form-control observacoes-equipamento-input" placeholder="Observações...">
+                                </div>
+                                <div class="col-md-1 mb-2">
+                                    <label class="form-label">&nbsp;</label>
+                                    <button type="button" class="btn btn-outline-danger btn-sm w-100" onclick="removerEquipamento(this)">
+                                        <i class="fas fa-trash"></i>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Seção 5: Ocorrências -->
+        <div class="row">
+            <div class="col-12">
+                <div class="section-header">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0"><i class="fas fa-exclamation-triangle"></i> Ocorrências</h5>
+                        <button type="button" class="btn btn-add-item" onclick="adicionarOcorrencia()">
+                            <i class="fas fa-plus"></i>
+                        </button>
+                    </div>
+                </div>
+                <div class="section-body">
+                    <div id="container_ocorrencias">
+                        <!-- Ocorrências serão adicionadas dinamicamente -->
+                    </div>
+                    
+                    <!-- Template de ocorrência (hidden) -->
+                    <div id="template_ocorrencia" style="display: none;">
+                        <div class="item-card ocorrencia-item">
+                            <div class="row">
+                                <div class="col-md-3 mb-2">
+                                    <label class="form-label">Tipo</label>
+                                    <select class="form-select tipo-ocorrencia-select">
+                                        <option value="atraso">⏰ Atraso</option>
+                                        <option value="problema_tecnico">🔧 Problema Técnico</option>
+                                        <option value="falta_material">📦 Falta de Material</option>
+                                        <option value="seguranca">⚠️ Segurança</option>
+                                        <option value="qualidade">🎯 Qualidade</option>
+                                        <option value="clima">🌧️ Clima</option>
+                                        <option value="outros">📝 Outros</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-2 mb-2">
+                                    <label class="form-label">Gravidade</label>
+                                    <select class="form-select gravidade-select">
+                                        <option value="baixa">🟢 Baixa</option>
+                                        <option value="media">🟡 Média</option>
+                                        <option value="alta">🔴 Alta</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-6 mb-2">
+                                    <label class="form-label">Descrição</label>
+                                    <textarea class="form-control descricao-ocorrencia-input" rows="2" placeholder="Descreva a ocorrência..."></textarea>
+                                </div>
+                                <div class="col-md-1 mb-2">
+                                    <label class="form-label">&nbsp;</label>
+                                    <button type="button" class="btn btn-outline-danger btn-sm w-100" onclick="removerOcorrencia(this)">
+                                        <i class="fas fa-trash"></i>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Seção 6: Comentários Gerais -->
+        <div class="row">
+            <div class="col-12">
+                <div class="section-header">
+                    <h5 class="mb-0"><i class="fas fa-comment"></i> Comentários Gerais</h5>
+                </div>
+                <div class="section-body">
+                    <textarea class="form-control" id="comentario_geral" rows="4"
+                              placeholder="Comentários gerais sobre o dia de trabalho, observações importantes, próximas atividades..."></textarea>
+                </div>
+            </div>
+        </div>
+
+        <!-- Botões de Ação -->
+        <div class="row mt-4">
+            <div class="col-12">
+                <div class="d-flex justify-content-between">
+                    <button type="button" class="btn btn-outline-secondary" onclick="voltarListagem()">
+                        <i class="fas fa-arrow-left"></i> Voltar
+                    </button>
+                    <div class="d-flex gap-2">
+                        <button type="button" class="btn btn-warning" onclick="salvarRascunho()">
+                            <i class="fas fa-save"></i> Salvar Rascunho
+                        </button>
+                        <button type="button" class="btn btn-success" onclick="finalizarRDO()">
+                            <i class="fas fa-check"></i> Finalizar RDO
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </form>
+</div>
+
+<style>
+    .section-header {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        padding: 15px;
+        border-radius: 10px 10px 0 0;
+        margin-bottom: 0;
+    }
+    .section-body {
+        border: 2px solid #667eea;
+        border-top: none;
+        border-radius: 0 0 10px 10px;
+        padding: 20px;
+        margin-bottom: 20px;
+    }
+    .select2-container {
+        width: 100% !important;
+    }
+    .btn-add-item {
+        background: #28a745;
+        border: none;
+        border-radius: 50px;
+        width: 40px;
+        height: 40px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: white;
+    }
+    .item-card {
+        border: 1px solid #dee2e6;
+        border-radius: 8px;
+        padding: 15px;
+        margin-bottom: 10px;
+        background: #f8f9fa;
+    }
+    .unidade-badge {
+        background: #17a2b8;
+        color: white;
+        padding: 4px 8px;
+        border-radius: 15px;
+        font-size: 0.8em;
+    }
+    @media (max-width: 768px) {
+        .container-fluid {
+            padding: 10px;
+        }
+        .section-body {
+            padding: 15px;
+        }
+    }
+</style>
+
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
+<link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet">
+
+<script>
+$(document).ready(function() {
+    // Inicializar data atual
+    document.getElementById('data_relatorio').value = new Date().toISOString().split('T')[0];
+    
+    // Inicializar dropdowns
+    inicializarDropdownObras();
+});
+
+// Dropdown de Obras com Autocomplete
+function inicializarDropdownObras() {
+    $('#obra_select').select2({
+        placeholder: 'Digite para buscar obra...',
+        allowClear: true,
+        ajax: {
+            url: '/api/obras/autocomplete',
+            dataType: 'json',
+            delay: 250,
+            data: function(params) {
+                return {
+                    q: params.term || '',
+                    status: 'ativo'
+                };
+            },
+            processResults: function(data) {
+                return {
+                    results: data.map(obra => ({
+                        id: obra.id,
+                        text: `${obra.nome} - ${obra.codigo}`,
+                        obra: obra
+                    }))
+                };
+            },
+            cache: true
+        },
+        minimumInputLength: 0
+    });
+}
+
+// Dropdown de Serviços com Unidades
+function inicializarDropdownServicos(elemento) {
+    $(elemento).select2({
+        placeholder: 'Digite para buscar serviço...',
+        allowClear: true,
+        ajax: {
+            url: '/api/servicos/autocomplete',
+            dataType: 'json',
+            delay: 250,
+            data: function(params) {
+                return {
+                    q: params.term || '',
+                    ativo: true
+                };
+            },
+            processResults: function(data) {
+                return {
+                    results: data.map(servico => ({
+                        id: servico.id,
+                        text: servico.nome,
+                        servico: servico
+                    }))
+                };
+            },
+            cache: true
+        },
+        minimumInputLength: 0
+    });
+}
+
+// Dropdown de Funcionários
+function inicializarDropdownFuncionarios(elemento) {
+    $(elemento).select2({
+        placeholder: 'Digite para buscar funcionário...',
+        allowClear: true,
+        ajax: {
+            url: '/api/funcionarios/autocomplete',
+            dataType: 'json',
+            delay: 250,
+            data: function(params) {
+                return {
+                    q: params.term || '',
+                    ativo: true
+                };
+            },
+            processResults: function(data) {
+                return {
+                    results: data.map(funcionario => ({
+                        id: funcionario.id,
+                        text: `${funcionario.nome} (${funcionario.codigo})`,
+                        funcionario: funcionario
+                    }))
+                };
+            },
+            cache: true
+        },
+        minimumInputLength: 0
+    });
+}
+
+// Dropdown de Equipamentos
+function inicializarDropdownEquipamentos(elemento) {
+    $(elemento).select2({
+        placeholder: 'Digite para buscar equipamento...',
+        allowClear: true,
+        ajax: {
+            url: '/api/equipamentos/autocomplete',
+            dataType: 'json',
+            delay: 250,
+            data: function(params) {
+                return {
+                    q: params.term || '',
+                    ativo: true
+                };
+            },
+            processResults: function(data) {
+                return {
+                    results: data.map(equipamento => ({
+                        id: equipamento.id,
+                        text: `${equipamento.nome} - ${equipamento.placa}`,
+                        equipamento: equipamento
+                    }))
+                };
+            },
+            cache: true
+        },
+        minimumInputLength: 0
+    });
+}
+
+// Carregar Subatividades Dinamicamente
+function carregarSubatividades(selectElement) {
+    const servicoId = selectElement.value;
+    const atividadeCard = selectElement.closest('.atividade-item');
+    const subatividadesContainer = atividadeCard.querySelector('.subatividades-container');
+    const subatividadesList = atividadeCard.querySelector('.subatividades-list');
+    const unidadeDisplay = atividadeCard.querySelector('.unidade-display');
+    const quantidadeInput = atividadeCard.querySelector('.quantidade-input');
+    
+    if (!servicoId) {
+        subatividadesContainer.style.display = 'none';
+        unidadeDisplay.textContent = '-';
+        return;
+    }
+    
+    // Buscar dados do serviço
+    fetch(`/api/servicos/${servicoId}`)
+        .then(response => response.json())
+        .then(servico => {
+            // Atualizar unidade
+            unidadeDisplay.textContent = servico.unidade_simbolo;
+            quantidadeInput.placeholder = `Quantidade em ${servico.unidade_simbolo}`;
+            
+            // Configurar validações baseadas na unidade
+            configurarValidacaoUnidade(quantidadeInput, servico.unidade_medida);
+            
+            // Carregar subatividades
+            if (servico.subatividades && servico.subatividades.length > 0) {
+                subatividadesList.innerHTML = '';
+                
+                servico.subatividades.forEach(sub => {
+                    const subDiv = document.createElement('div');
+                    subDiv.className = 'col-md-6 mb-2';
+                    subDiv.innerHTML = `
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" 
+                                   id="sub_${sub.id}" value="${sub.id}">
+                            <label class="form-check-label" for="sub_${sub.id}">
+                                <strong>${sub.nome}</strong><br>
+                                <small class="text-muted">${sub.descricao || ''}</small>
+                            </label>
+                        </div>
+                    `;
+                    subatividadesList.appendChild(subDiv);
+                });
+                
+                subatividadesContainer.style.display = 'block';
+            } else {
+                subatividadesContainer.style.display = 'none';
+            }
+        })
+        .catch(error => {
+            console.error('Erro ao carregar subatividades:', error);
+            subatividadesContainer.style.display = 'none';
+        });
+}
+
+// Configurar validação por unidade
+function configurarValidacaoUnidade(input, unidade) {
+    switch(unidade) {
+        case 'm2':
+        case 'm3':
+        case 'm':
+            input.step = '0.01';
+            input.min = '0.01';
+            break;
+        case 'kg':
+            input.step = '0.1';
+            input.min = '0.1';
+            break;
+        case 'ton':
+            input.step = '0.01';
+            input.min = '0.01';
+            break;
+        case 'un':
+            input.step = '1';
+            input.min = '1';
+            break;
+        case 'h':
+            input.step = '0.5';
+            input.min = '0.5';
+            break;
+        default:
+            input.step = '0.01';
+            input.min = '0.01';
+    }
+}
+
+// Funções de Adição de Itens
+function adicionarFuncionario() {
+    const container = document.getElementById('container_funcionarios');
+    const template = document.getElementById('template_funcionario');
+    const novoItem = template.cloneNode(true);
+    
+    novoItem.style.display = 'block';
+    novoItem.id = `funcionario_${Date.now()}`;
+    
+    container.appendChild(novoItem);
+    
+    // Inicializar Select2 no novo elemento
+    inicializarDropdownFuncionarios(novoItem.querySelector('.funcionario-select'));
+}
+
+function adicionarAtividade() {
+    const container = document.getElementById('container_atividades');
+    const template = document.getElementById('template_atividade');
+    const novoItem = template.cloneNode(true);
+    
+    novoItem.style.display = 'block';
+    novoItem.id = `atividade_${Date.now()}`;
+    
+    container.appendChild(novoItem);
+    
+    // Inicializar Select2 no novo elemento
+    inicializarDropdownServicos(novoItem.querySelector('.servico-select'));
+}
+
+function adicionarEquipamento() {
+    const container = document.getElementById('container_equipamentos');
+    const template = document.getElementById('template_equipamento');
+    const novoItem = template.cloneNode(true);
+    
+    novoItem.style.display = 'block';
+    novoItem.id = `equipamento_${Date.now()}`;
+    
+    container.appendChild(novoItem);
+    
+    // Inicializar Select2 no novo elemento
+    inicializarDropdownEquipamentos(novoItem.querySelector('.equipamento-select'));
+}
+
+function adicionarOcorrencia() {
+    const container = document.getElementById('container_ocorrencias');
+    const template = document.getElementById('template_ocorrencia');
+    const novoItem = template.cloneNode(true);
+    
+    novoItem.style.display = 'block';
+    novoItem.id = `ocorrencia_${Date.now()}`;
+    
+    container.appendChild(novoItem);
+}
+
+// Funções de Remoção
+function removerFuncionario(botao) {
+    if (confirm('Remover este funcionário?')) {
+        botao.closest('.funcionario-item').remove();
+    }
+}
+
+function removerAtividade(botao) {
+    if (confirm('Remover esta atividade?')) {
+        botao.closest('.atividade-item').remove();
+    }
+}
+
+function removerEquipamento(botao) {
+    if (confirm('Remover este equipamento?')) {
+        botao.closest('.equipamento-item').remove();
+    }
+}
+
+function removerOcorrencia(botao) {
+    if (confirm('Remover esta ocorrência?')) {
+        botao.closest('.ocorrencia-item').remove();
+    }
+}
+
+// Funções de Salvamento
+function salvarRascunho() {
+    const dados = coletarDadosRDO();
+    dados.status = 'Rascunho';
+    
+    fetch('/api/rdo/salvar', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(dados)
+    })
+    .then(response => response.json())
+    .then(result => {
+        if (result.success) {
+            alert('RDO salvo como rascunho!');
+        } else {
+            alert('Erro ao salvar: ' + result.message);
+        }
+    })
+    .catch(error => {
+        console.error('Erro:', error);
+        alert('Erro ao salvar RDO');
+    });
+}
+
+function finalizarRDO() {
+    if (!validarRDO()) {
+        return;
+    }
+    
+    const dados = coletarDadosRDO();
+    dados.status = 'Finalizado';
+    
+    fetch('/api/rdo/finalizar', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(dados)
+    })
+    .then(response => response.json())
+    .then(result => {
+        if (result.success) {
+            alert('RDO finalizado com sucesso!');
+            window.location.href = '/rdo';
+        } else {
+            alert('Erro ao finalizar: ' + result.message);
+        }
+    })
+    .catch(error => {
+        console.error('Erro:', error);
+        alert('Erro ao finalizar RDO');
+    });
+}
+
+function coletarDadosRDO() {
+    return {
+        data_relatorio: document.getElementById('data_relatorio').value,
+        obra_id: document.getElementById('obra_select').value,
+        tempo_manha: document.getElementById('tempo_manha').value,
+        tempo_tarde: document.getElementById('tempo_tarde').value,
+        tempo_noite: document.getElementById('tempo_noite').value,
+        observacoes_meteorologicas: document.getElementById('observacoes_meteorologicas').value,
+        comentario_geral: document.getElementById('comentario_geral').value,
+        funcionarios: coletarDadosFuncionarios(),
+        atividades: coletarDadosAtividades(),
+        equipamentos: coletarDadosEquipamentos(),
+        ocorrencias: coletarDadosOcorrencias()
+    };
+}
+
+function coletarDadosFuncionarios() {
+    const funcionarios = [];
+    document.querySelectorAll('.funcionario-item').forEach(item => {
+        const funcionario = {
+            funcionario_id: item.querySelector('.funcionario-select').value,
+            horas: item.querySelector('.horas-input').value,
+            funcao_exercida: item.querySelector('.funcao-input').value,
+            presente: item.querySelector('.presente-check').checked
+        };
+        if (funcionario.funcionario_id) {
+            funcionarios.push(funcionario);
+        }
+    });
+    return funcionarios;
+}
+
+function coletarDadosAtividades() {
+    const atividades = [];
+    document.querySelectorAll('.atividade-item').forEach(item => {
+        const atividade = {
+            servico_id: item.querySelector('.servico-select').value,
+            quantidade: item.querySelector('.quantidade-input').value,
+            tempo: item.querySelector('.tempo-input').value,
+            observacoes: item.querySelector('.observacoes-input').value,
+            subatividades: []
+        };
+        
+        // Coletar subatividades marcadas
+        item.querySelectorAll('.subatividades-list input[type="checkbox"]:checked').forEach(checkbox => {
+            atividade.subatividades.push(checkbox.value);
+        });
+        
+        if (atividade.servico_id) {
+            atividades.push(atividade);
+        }
+    });
+    return atividades;
+}
+
+function coletarDadosEquipamentos() {
+    const equipamentos = [];
+    document.querySelectorAll('.equipamento-item').forEach(item => {
+        const equipamento = {
+            equipamento_id: item.querySelector('.equipamento-select').value,
+            horas_uso: item.querySelector('.horas-uso-input').value,
+            status: item.querySelector('.status-select').value,
+            observacoes: item.querySelector('.observacoes-equipamento-input').value
+        };
+        if (equipamento.equipamento_id) {
+            equipamentos.push(equipamento);
+        }
+    });
+    return equipamentos;
+}
+
+function coletarDadosOcorrencias() {
+    const ocorrencias = [];
+    document.querySelectorAll('.ocorrencia-item').forEach(item => {
+        const ocorrencia = {
+            tipo: item.querySelector('.tipo-ocorrencia-select').value,
+            gravidade: item.querySelector('.gravidade-select').value,
+            descricao: item.querySelector('.descricao-ocorrencia-input').value
+        };
+        if (ocorrencia.tipo && ocorrencia.descricao) {
+            ocorrencias.push(ocorrencia);
+        }
+    });
+    return ocorrencias;
+}
+
+function validarRDO() {
+    // Validações básicas
+    if (!document.getElementById('data_relatorio').value) {
+        alert('Data do relatório é obrigatória');
+        return false;
+    }
+    
+    if (!document.getElementById('obra_select').value) {
+        alert('Obra é obrigatória');
+        return false;
+    }
+    
+    return true;
+}
+
+function voltarListagem() {
+    window.location.href = '/rdo';
+}
+</script>
+{% endblock %}

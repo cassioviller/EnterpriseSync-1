@@ -10,7 +10,9 @@ from datetime import datetime, date
 from sqlalchemy import func
 from kpis_engine_simple import kpis_engine
 import os
+import json
 from werkzeug.utils import secure_filename
+from sqlalchemy import or_
 
 main_bp = Blueprint('main', __name__)
 
@@ -1741,12 +1743,269 @@ def api_produtividade_servico(id):
     except Exception as e:
         return jsonify({'success': False, 'message': f'Erro ao obter produtividade: {str(e)}'})
 
+# ============================================================================
+# API ENDPOINTS PARA DROPDOWNS INTELIGENTES - RDO OPERACIONAL
+# ============================================================================
+
+@main_bp.route('/api/obras/autocomplete')
+@login_required
+def obras_autocomplete():
+    """API para autocomplete de obras"""
+    q = request.args.get('q', '')
+    obras = Obra.query.filter(
+        or_(
+            Obra.nome.ilike(f'%{q}%'),
+            Obra.codigo.ilike(f'%{q}%'),
+            Obra.endereco.ilike(f'%{q}%')
+        )
+    ).filter(Obra.ativo == True).limit(10).all()
+    
+    return jsonify([{
+        'id': obra.id,
+        'nome': obra.nome,
+        'codigo': obra.codigo,
+        'endereco': obra.endereco,
+        'area_total_m2': float(obra.area_total_m2) if obra.area_total_m2 else 0
+    } for obra in obras])
+
+@main_bp.route('/api/servicos/autocomplete')
+@login_required
+def servicos_autocomplete():
+    """API para autocomplete de serviços"""
+    q = request.args.get('q', '')
+    servicos = Servico.query.filter(
+        or_(
+            Servico.nome.ilike(f'%{q}%'),
+            Servico.categoria.ilike(f'%{q}%')
+        )
+    ).filter(Servico.ativo == True).limit(10).all()
+    
+    return jsonify([{
+        'id': servico.id,
+        'nome': servico.nome,
+        'categoria': servico.categoria,
+        'unidade_medida': servico.unidade_medida,
+        'unidade_simbolo': get_simbolo_unidade(servico.unidade_medida),
+        'complexidade': servico.complexidade
+    } for servico in servicos])
+
+@main_bp.route('/api/funcionarios/autocomplete')
+@login_required
+def funcionarios_autocomplete():
+    """API para autocomplete de funcionários"""
+    q = request.args.get('q', '')
+    funcionarios = Funcionario.query.filter(
+        or_(
+            Funcionario.nome.ilike(f'%{q}%'),
+            Funcionario.codigo.ilike(f'%{q}%')
+        )
+    ).filter(Funcionario.ativo == True).limit(10).all()
+    
+    return jsonify([{
+        'id': funcionario.id,
+        'nome': funcionario.nome,
+        'codigo': funcionario.codigo,
+        'funcao': funcionario.funcao.nome if funcionario.funcao else 'Sem função'
+    } for funcionario in funcionarios])
+
+@main_bp.route('/api/equipamentos/autocomplete')
+@login_required
+def equipamentos_autocomplete():
+    """API para autocomplete de equipamentos/veículos"""
+    q = request.args.get('q', '')
+    veiculos = Veiculo.query.filter(
+        or_(
+            Veiculo.nome.ilike(f'%{q}%'),
+            Veiculo.placa.ilike(f'%{q}%'),
+            Veiculo.tipo.ilike(f'%{q}%')
+        )
+    ).filter(Veiculo.ativo == True).limit(10).all()
+    
+    return jsonify([{
+        'id': veiculo.id,
+        'nome': veiculo.nome,
+        'placa': veiculo.placa,
+        'tipo': veiculo.tipo,
+        'status': veiculo.status
+    } for veiculo in veiculos])
+
+@main_bp.route('/api/servicos/<int:servico_id>')
+@login_required
+def servico_detalhes(servico_id):
+    """API para obter detalhes de um serviço com subatividades"""
+    servico = Servico.query.get_or_404(servico_id)
+    subatividades = SubAtividade.query.filter_by(
+        servico_id=servico_id, 
+        ativo=True
+    ).order_by(SubAtividade.ordem_execucao).all()
+    
+    return jsonify({
+        'id': servico.id,
+        'nome': servico.nome,
+        'unidade_medida': servico.unidade_medida,
+        'unidade_simbolo': get_simbolo_unidade(servico.unidade_medida),
+        'subatividades': [{
+            'id': sub.id,
+            'nome': sub.nome,
+            'descricao': sub.descricao,
+            'ordem_execucao': sub.ordem_execucao
+        } for sub in subatividades]
+    })
+
+@main_bp.route('/api/rdo/salvar', methods=['POST'])
+@login_required
+def salvar_rdo():
+    """API para salvar RDO como rascunho"""
+    try:
+        dados = request.get_json()
+        
+        # Validações básicas
+        if not dados.get('data_relatorio') or not dados.get('obra_id'):
+            return jsonify({'success': False, 'message': 'Data e obra são obrigatórias'})
+        
+        # Verificar se já existe RDO para esta data/obra
+        rdo_existente = RDO.query.filter_by(
+            data_relatorio=datetime.strptime(dados['data_relatorio'], '%Y-%m-%d').date(),
+            obra_id=dados['obra_id'],
+            funcionario_id=current_user.id
+        ).first()
+        
+        if rdo_existente:
+            # Atualizar RDO existente
+            rdo = rdo_existente
+        else:
+            # Criar novo RDO
+            rdo = RDO(
+                data_relatorio=datetime.strptime(dados['data_relatorio'], '%Y-%m-%d').date(),
+                obra_id=dados['obra_id'],
+                funcionario_id=current_user.id
+            )
+        
+        # Atualizar dados do RDO
+        rdo.tempo_manha = dados.get('tempo_manha', '')
+        rdo.tempo_tarde = dados.get('tempo_tarde', '')
+        rdo.tempo_noite = dados.get('tempo_noite', '')
+        rdo.observacoes_meteorologicas = dados.get('observacoes_meteorologicas', '')
+        rdo.comentario_geral = dados.get('comentario_geral', '')
+        rdo.status = dados.get('status', 'Rascunho')
+        
+        db.session.add(rdo)
+        db.session.flush()
+        
+        # Salvar dados das seções (JSON por simplicidade)
+        rdo.dados_funcionarios = json.dumps(dados.get('funcionarios', []))
+        rdo.dados_atividades = json.dumps(dados.get('atividades', []))
+        rdo.dados_equipamentos = json.dumps(dados.get('equipamentos', []))
+        rdo.dados_ocorrencias = json.dumps(dados.get('ocorrencias', []))
+        
+        db.session.commit()
+        
+        return jsonify({
+            'success': True,
+            'message': 'RDO salvo com sucesso!',
+            'rdo_id': rdo.id
+        })
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'message': f'Erro ao salvar RDO: {str(e)}'})
+
+@main_bp.route('/api/rdo/finalizar', methods=['POST'])
+@login_required
+def finalizar_rdo():
+    """API para finalizar RDO"""
+    try:
+        dados = request.get_json()
+        
+        # Primeiro salvar como rascunho
+        resultado_salvar = salvar_rdo()
+        if not resultado_salvar.get_json()['success']:
+            return resultado_salvar
+        
+        # Buscar RDO salvo
+        rdo = RDO.query.filter_by(
+            data_relatorio=datetime.strptime(dados['data_relatorio'], '%Y-%m-%d').date(),
+            obra_id=dados['obra_id'],
+            funcionario_id=current_user.id
+        ).first()
+        
+        if not rdo:
+            return jsonify({'success': False, 'message': 'RDO não encontrado'})
+        
+        # Atualizar status
+        rdo.status = 'Finalizado'
+        
+        # Processar dados de produtividade
+        processar_dados_produtividade(rdo.id)
+        
+        db.session.commit()
+        
+        return jsonify({
+            'success': True,
+            'message': 'RDO finalizado com sucesso!',
+            'rdo_id': rdo.id
+        })
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'message': f'Erro ao finalizar RDO: {str(e)}'})
+
 # Função auxiliar para processar dados de produtividade (chamada pelos RDOs)
 def processar_dados_produtividade(rdo_id):
     """Processa dados do RDO e gera histórico de produtividade"""
-    # Esta função será integrada com o sistema RDO
-    # Por enquanto, é uma função placeholder
-    pass
+    try:
+        rdo = RDO.query.get(rdo_id)
+        if not rdo:
+            return
+        
+        # Processar dados de atividades
+        if rdo.dados_atividades:
+            atividades = json.loads(rdo.dados_atividades)
+            
+            for atividade in atividades:
+                if atividade.get('servico_id') and atividade.get('quantidade'):
+                    # Calcular custo baseado nos funcionários que trabalharam
+                    custo_total = 0
+                    if rdo.dados_funcionarios:
+                        funcionarios = json.loads(rdo.dados_funcionarios)
+                        for func in funcionarios:
+                            if func.get('funcionario_id') and func.get('horas'):
+                                funcionario = Funcionario.query.get(func['funcionario_id'])
+                                if funcionario:
+                                    custo_hora = float(funcionario.salario) / 220  # 220 horas/mês
+                                    custo_total += custo_hora * float(func['horas'])
+                    
+                    # Criar registro de produtividade
+                    historico = HistoricoProdutividadeServico(
+                        servico_id=atividade['servico_id'],
+                        obra_id=rdo.obra_id,
+                        funcionario_id=rdo.funcionario_id,
+                        data_execucao=rdo.data_relatorio,
+                        quantidade_executada=float(atividade['quantidade']),
+                        tempo_execucao_horas=float(atividade.get('tempo', 0)),
+                        custo_mao_obra_real=custo_total,
+                        produtividade_hora=float(atividade['quantidade']) / max(float(atividade.get('tempo', 1)), 1)
+                    )
+                    
+                    db.session.add(historico)
+        
+        db.session.commit()
+        
+    except Exception as e:
+        print(f"Erro ao processar dados de produtividade: {str(e)}")
+
+def get_simbolo_unidade(unidade_medida):
+    """Retorna o símbolo da unidade de medida"""
+    simbolos = {
+        'm2': 'm²',
+        'm3': 'm³',
+        'kg': 'kg',
+        'ton': 'ton',
+        'un': 'un',
+        'm': 'm',
+        'h': 'h'
+    }
+    return simbolos.get(unidade_medida, unidade_medida)
 
 # Ponto
 @main_bp.route('/ponto')
@@ -2622,21 +2881,7 @@ def lista_rdos():
 @login_required
 def novo_rdo():
     """Formulário para criar novo RDO"""
-    from forms import RDOForm
-    
-    obra_id = request.args.get('obra_id')
-    form = RDOForm()
-    
-    # Dados para o formulário
-    obras = Obra.query.filter_by(status='Em andamento').all()
-    funcionarios = Funcionario.query.filter_by(ativo=True).all()
-    
-    return render_template('rdo/formulario_rdo.html', 
-                         form=form,
-                         obras=obras,
-                         funcionarios=funcionarios,
-                         obra_id_selecionada=obra_id,
-                         modo='criar')
+    return render_template('rdo_novo.html')
 
 @main_bp.route('/rdo/criar', methods=['POST'])
 @login_required
