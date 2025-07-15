@@ -3826,32 +3826,28 @@ def api_ponto_funcionario_data(funcionario_id, data):
         if registro_ponto:
             return jsonify({
                 "success": True,
-                "funcionario": {
-                    "id": funcionario.id,
-                    "nome": funcionario.nome,
-                    "codigo": funcionario.codigo,
-                    "funcao": funcionario.funcao.nome if funcionario.funcao else "Sem função"
-                },
                 "registro_ponto": {
+                    "id": registro_ponto.id,
                     "hora_entrada": registro_ponto.hora_entrada.strftime("%H:%M") if registro_ponto.hora_entrada else None,
                     "hora_saida": registro_ponto.hora_saida.strftime("%H:%M") if registro_ponto.hora_saida else None,
-                    "horas_trabalhadas": registro_ponto.horas_trabalhadas or 0,
-                    "tipo_registro": registro_ponto.tipo_registro
+                    "horas_trabalhadas": float(registro_ponto.horas_trabalhadas) if registro_ponto.horas_trabalhadas else 0,
+                    "tipo_registro": registro_ponto.tipo_registro or "trabalho_normal"
                 }
             })
         else:
             return jsonify({
                 "success": False,
-                "message": "Nenhum registro de ponto encontrado para esta data"
+                "message": "Registro de ponto não encontrado"
             })
-    
+            
     except Exception as e:
+        print(f"Erro ao buscar ponto: {str(e)}")
         return jsonify({
             "success": False,
-            "message": f"Erro ao buscar dados: {str(e)}"
+            "message": "Erro interno do servidor"
         }), 500
 
-@main_bp.route("/api/rdo/salvar", methods=["POST"])
+@main_bp.route("/rdo/salvar", methods=["POST"])
 @login_required
 def api_rdo_salvar():
     """API para salvar RDO como rascunho"""
@@ -3898,14 +3894,14 @@ def api_rdo_salvar():
             "message": f"Erro ao salvar RDO: {str(e)}"
         }), 500
 
-@main_bp.route("/api/rdo/finalizar", methods=["POST"])
+@main_bp.route("/rdo/finalizar", methods=["POST"])
 @login_required
-def api_rdo_finalizar():
-    """API para finalizar RDO"""
+def rdo_finalizar():
+    """Finalizar RDO"""
     try:
         dados = request.get_json()
         
-        # Validações obrigatórias
+        # Validações básicas
         if not dados.get("data_relatorio") or not dados.get("obra_id"):
             return jsonify({
                 "success": False,
@@ -3930,55 +3926,6 @@ def api_rdo_finalizar():
         )
         
         db.session.add(rdo)
-        db.session.flush()  # Para obter o ID do RDO
-        
-        # Salvar dados de mão de obra
-        for func_data in dados.get("funcionarios", []):
-            if func_data.get("funcionario_id"):
-                rdo_mao_obra = RDOMaoObra(
-                    rdo_id=rdo.id,
-                    funcionario_id=func_data["funcionario_id"],
-                    horas_trabalhadas=float(func_data.get("horas", 0)),
-                    funcao_exercida=func_data.get("funcao_exercida", ""),
-                    presente=func_data.get("presente", True)
-                )
-                db.session.add(rdo_mao_obra)
-        
-        # Salvar atividades
-        for ativ_data in dados.get("atividades", []):
-            if ativ_data.get("servico_id"):
-                rdo_atividade = RDOAtividade(
-                    rdo_id=rdo.id,
-                    servico_id=ativ_data["servico_id"],
-                    quantidade=float(ativ_data.get("quantidade", 0)),
-                    tempo_execucao=float(ativ_data.get("tempo", 0)),
-                    observacoes=ativ_data.get("observacoes", "")
-                )
-                db.session.add(rdo_atividade)
-        
-        # Salvar equipamentos
-        for equip_data in dados.get("equipamentos", []):
-            if equip_data.get("equipamento_id"):
-                rdo_equipamento = RDOEquipamento(
-                    rdo_id=rdo.id,
-                    veiculo_id=equip_data["equipamento_id"],
-                    horas_uso=float(equip_data.get("horas_uso", 0)),
-                    status=equip_data.get("status", "operando"),
-                    observacoes=equip_data.get("observacoes", "")
-                )
-                db.session.add(rdo_equipamento)
-        
-        # Salvar ocorrências
-        for ocorr_data in dados.get("ocorrencias", []):
-            if ocorr_data.get("tipo") and ocorr_data.get("descricao"):
-                rdo_ocorrencia = RDOOcorrencia(
-                    rdo_id=rdo.id,
-                    tipo=ocorr_data["tipo"],
-                    gravidade=ocorr_data.get("gravidade", "media"),
-                    descricao=ocorr_data["descricao"]
-                )
-                db.session.add(rdo_ocorrencia)
-        
         db.session.commit()
         
         return jsonify({
@@ -3993,4 +3940,3 @@ def api_rdo_finalizar():
             "success": False,
             "message": f"Erro ao finalizar RDO: {str(e)}"
         }), 500
-
