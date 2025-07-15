@@ -459,108 +459,217 @@ $(document).ready(function() {
     }, 100);
 });
 
-// Dropdown de Obras com Autocomplete
+// Dropdown de Obras - CORRIGIDO
 function inicializarDropdownObras() {
-    if (typeof $.fn.select2 === 'undefined') {
-        console.error('Select2 not loaded');
-        return;
-    }
+    console.log('Inicializando dropdown de obras...');
     
-    $('#obra_select').select2({
-        placeholder: 'Digite para buscar obra...',
-        allowClear: true,
-        ajax: {
-            url: '/api/obras/autocomplete',
-            dataType: 'json',
-            delay: 250,
-            data: function(params) {
-                return {
-                    q: params.term || '',
-                    status: 'Em andamento'
-                };
-            },
-            processResults: function(data) {
-                return {
-                    results: data.map(obra => ({
-                        id: obra.id,
-                        text: `${obra.nome} - ${obra.codigo}`,
-                        obra: obra
-                    }))
-                };
-            },
-            cache: true
-        },
-        minimumInputLength: 0
-    });
+    // Carregar todas as obras diretamente
+    $.get('/api/obras/todas')
+        .done(function(obras) {
+            console.log('Obras carregadas:', obras.length);
+            const obraSelect = $('#obra_select');
+            
+            // Limpar e popular
+            obraSelect.empty().append('<option value="">Selecione a obra...</option>');
+            
+            obras.forEach(function(obra) {
+                const opcao = new Option(
+                    `${obra.nome} (${obra.codigo})`, 
+                    obra.id
+                );
+                obraSelect.append(opcao);
+            });
+            
+            // Inicializar Select2 apenas se há obras
+            if (obras.length > 0) {
+                obraSelect.select2({
+                    placeholder: 'Selecione a obra...',
+                    allowClear: true,
+                    width: '100%'
+                });
+                console.log('Select2 inicializado para obras');
+            }
+        })
+        .fail(function(xhr, status, error) {
+            console.error('Erro ao carregar obras:', error);
+            $('#obra_select').empty().append('<option value="">Erro ao carregar obras</option>');
+        });
 }
 
-// Dropdown de Funcionários com integração de ponto
+// Dropdown de Funcionários - CORRIGIDO
 function inicializarDropdownFuncionarios(elemento) {
-    if (typeof $.fn.select2 === 'undefined') {
-        console.error('Select2 not loaded');
+    console.log('Inicializando dropdown de funcionários...');
+    const select = $(elemento).find('.funcionario-select');
+    
+    // Carregar todos os funcionários
+    $.get('/api/funcionarios/todos')
+        .done(function(funcionarios) {
+            console.log('Funcionários carregados:', funcionarios.length);
+            
+            // Popular select
+            select.empty().append('<option value="">Selecione o funcionário...</option>');
+            
+            funcionarios.forEach(function(func) {
+                select.append(new Option(
+                    `${func.nome} (${func.codigo})`, 
+                    func.id
+                ));
+            });
+            
+            // Inicializar Select2
+            if (funcionarios.length > 0) {
+                select.select2({
+                    placeholder: 'Digite para buscar funcionário...',
+                    allowClear: true,
+                    width: '100%'
+                });
+                
+                // Evento de seleção
+                select.on('select2:select', function(e) {
+                    const funcionarioId = e.params.data.id;
+                    const funcionarioCard = e.target.closest('.funcionario-item');
+                    carregarDadosPonto(funcionarioCard, funcionarioId);
+                });
+                
+                console.log('Select2 inicializado para funcionários');
+            }
+        })
+        .fail(function(xhr, status, error) {
+            console.error('Erro ao carregar funcionários:', error);
+            select.empty().append('<option value="">Erro ao carregar funcionários</option>');
+        });
+}
+
+// Dropdown de Serviços - CORRIGIDO
+function inicializarDropdownServicos(elemento) {
+    console.log('Inicializando dropdown de serviços...');
+    const select = $(elemento).find('.servico-select');
+    
+    // Carregar todos os serviços
+    $.get('/api/servicos/autocomplete?ativo=true')
+        .done(function(servicos) {
+            console.log('Serviços carregados:', servicos.length);
+            
+            // Popular select
+            select.empty().append('<option value="">Selecione o serviço...</option>');
+            
+            servicos.forEach(function(servico) {
+                select.append(new Option(
+                    `${servico.nome} (${servico.categoria})`, 
+                    servico.id
+                ));
+            });
+            
+            // Inicializar Select2
+            if (servicos.length > 0) {
+                select.select2({
+                    placeholder: 'Digite para buscar serviço...',
+                    allowClear: true,
+                    width: '100%'
+                });
+                
+                // Evento de seleção
+                select.on('select2:select', function(e) {
+                    const servicoId = e.params.data.id;
+                    const servicoCard = e.target.closest('.atividade-item');
+                    carregarSubatividades(servicoCard, servicoId);
+                });
+                
+                console.log('Select2 inicializado para serviços');
+            }
+        })
+        .fail(function(xhr, status, error) {
+            console.error('Erro ao carregar serviços:', error);
+            select.empty().append('<option value="">Erro ao carregar serviços</option>');
+        });
+}
+
+// Dropdown de Equipamentos - CORRIGIDO
+function inicializarDropdownEquipamentos(elemento) {
+    console.log('Inicializando dropdown de equipamentos...');
+    const select = $(elemento).find('.equipamento-select');
+    
+    // Carregar todos os equipamentos
+    $.get('/api/equipamentos/autocomplete?ativo=true')
+        .done(function(equipamentos) {
+            console.log('Equipamentos carregados:', equipamentos.length);
+            
+            // Popular select
+            select.empty().append('<option value="">Selecione o equipamento...</option>');
+            
+            equipamentos.forEach(function(equipamento) {
+                select.append(new Option(
+                    `${equipamento.nome} - ${equipamento.placa}`, 
+                    equipamento.id
+                ));
+            });
+            
+            // Inicializar Select2
+            if (equipamentos.length > 0) {
+                select.select2({
+                    placeholder: 'Digite para buscar equipamento...',
+                    allowClear: true,
+                    width: '100%'
+                });
+                
+                console.log('Select2 inicializado para equipamentos');
+            }
+        })
+        .fail(function(xhr, status, error) {
+            console.error('Erro ao carregar equipamentos:', error);
+            select.empty().append('<option value="">Erro ao carregar equipamentos</option>');
+        });
+}
+
+// Carregar subatividades quando serviço for selecionado
+function carregarSubatividades(servicoCard, servicoId) {
+    const subatividadeSelect = servicoCard.querySelector('.subatividade-select');
+    
+    if (!servicoId) {
+        if (subatividadeSelect) {
+            subatividadeSelect.innerHTML = '<option value="">Selecione uma subatividade...</option>';
+        }
         return;
     }
     
-    $(elemento).select2({
-        placeholder: 'Digite para buscar funcionário...',
-        allowClear: true,
-        ajax: {
-            url: '/api/funcionarios/rdo-autocomplete',
-            dataType: 'json',
-            delay: 250,
-            data: function(params) {
-                return {
-                    q: params.term || '',
-                    data_rdo: document.getElementById('data_relatorio').value,
-                    obra_id: document.getElementById('obra_select').value
-                };
-            },
-            processResults: function(data) {
-                return {
-                    results: data.map(funcionario => ({
-                        id: funcionario.id,
-                        text: `${funcionario.nome} (${funcionario.codigo})`,
-                        funcionario: funcionario
-                    }))
-                };
-            },
-            cache: true
-        },
-        minimumInputLength: 0,
-        templateResult: function(data) {
-            if (data.loading) return data.text;
-            
-            const funcionario = data.funcionario;
-            if (!funcionario) return data.text;
-            
-            return $(`
-                <div class="d-flex justify-content-between align-items-center">
-                    <div>
-                        <strong>${funcionario.nome}</strong><br>
-                        <small class="text-muted">${funcionario.codigo} - ${funcionario.funcao || 'Sem função'}</small>
-                    </div>
-                    <div class="text-end">
-                        <span class="badge ${funcionario.presente_hoje ? 'bg-success' : 'bg-warning'}">
-                            ${funcionario.presente_hoje ? 'Presente' : 'Ausente'}
-                        </span><br>
-                        <small class="text-muted">
-                            ${funcionario.horas_trabalhadas || '0.0'}h trabalhadas
-                        </small>
-                    </div>
-                </div>
-            `);
-        },
-        templateSelection: function(data) {
-            return data.text;
-        }
-    });
+    console.log('Carregando subatividades para serviço:', servicoId);
+    
+    // Buscar subatividades do serviço
+    fetch(`/api/servicos/${servicoId}`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.subatividades && subatividadeSelect) {
+                // Limpar e popular select de subatividades
+                subatividadeSelect.innerHTML = '<option value="">Selecione uma subatividade...</option>';
+                
+                data.subatividades.forEach(function(sub) {
+                    const option = new Option(sub.nome, sub.id);
+                    subatividadeSelect.appendChild(option);
+                });
+                
+                // Inicializar Select2 se não está inicializado
+                if (!$(subatividadeSelect).hasClass('select2-hidden-accessible')) {
+                    $(subatividadeSelect).select2({
+                        placeholder: 'Selecione uma subatividade...',
+                        allowClear: true,
+                        width: '100%'
+                    });
+                }
+                
+                console.log('Subatividades carregadas:', data.subatividades.length);
+            }
+        })
+        .catch(error => {
+            console.error('Erro ao carregar subatividades:', error);
+            if (subatividadeSelect) {
+                subatividadeSelect.innerHTML = '<option value="">Erro ao carregar subatividades</option>';
+            }
+        });
 }
 
 // Carregar dados do ponto quando funcionário for selecionado
-function carregarDadosPonto(selectElement) {
-    const funcionarioId = selectElement.value;
+function carregarDadosPonto(funcionarioCard, funcionarioId) {
     const dataRDO = document.getElementById('data_relatorio').value;
-    const funcionarioCard = selectElement.closest('.funcionario-item');
     
     if (!funcionarioId || !dataRDO) {
         limparDadosPonto(funcionarioCard);
@@ -794,7 +903,7 @@ function adicionarFuncionario() {
     container.appendChild(novoItem);
     
     // Inicializar Select2 no novo elemento
-    inicializarDropdownFuncionarios(novoItem.querySelector('.funcionario-select'));
+    inicializarDropdownFuncionarios(novoItem);
 }
 
 function adicionarAtividade() {
@@ -808,7 +917,7 @@ function adicionarAtividade() {
     container.appendChild(novoItem);
     
     // Inicializar Select2 no novo elemento
-    inicializarDropdownServicos(novoItem.querySelector('.servico-select'));
+    inicializarDropdownServicos(novoItem);
 }
 
 function adicionarEquipamento() {
@@ -822,7 +931,7 @@ function adicionarEquipamento() {
     container.appendChild(novoItem);
     
     // Inicializar Select2 no novo elemento
-    inicializarDropdownEquipamentos(novoItem.querySelector('.equipamento-select'));
+    inicializarDropdownEquipamentos(novoItem);
 }
 
 function adicionarOcorrencia() {
