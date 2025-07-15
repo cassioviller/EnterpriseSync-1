@@ -3589,3 +3589,346 @@ def excluir_registro_alimentacao(registro_id):
         return jsonify({'error': str(e)}), 500
 
 
+
+# API Endpoints para RDO
+@main_bp.route("/api/obras/autocomplete")
+@login_required
+def api_obras_autocomplete():
+    """API para autocomplete de obras"""
+    q = request.args.get("q", "")
+    status = request.args.get("status", "Em andamento")
+    
+    query = Obra.query.filter(Obra.status == status)
+    
+    if q:
+        query = query.filter(
+            or_(
+                Obra.nome.ilike(f"%{q}%"),
+                Obra.codigo.ilike(f"%{q}%"),
+                Obra.endereco.ilike(f"%{q}%")
+            )
+        )
+    
+    obras = query.limit(10).all()
+    
+    return jsonify([{
+        "id": obra.id,
+        "nome": obra.nome,
+        "codigo": obra.codigo,
+        "endereco": obra.endereco,
+        "status": obra.status
+    } for obra in obras])
+
+@main_bp.route("/api/funcionarios/rdo-autocomplete")
+@login_required
+def api_funcionarios_rdo_autocomplete():
+    """API para autocomplete de funcionários com dados de ponto"""
+    q = request.args.get("q", "")
+    data_rdo = request.args.get("data_rdo")
+    
+    query = Funcionario.query.filter(Funcionario.ativo == True)
+    
+    if q:
+        query = query.filter(
+            or_(
+                Funcionario.nome.ilike(f"%{q}%"),
+                Funcionario.codigo.ilike(f"%{q}%")
+            )
+        )
+    
+    funcionarios = query.limit(10).all()
+    
+    result = []
+    for funcionario in funcionarios:
+        # Buscar dados do ponto para a data
+        presente_hoje = False
+        horas_trabalhadas = 0
+        
+        if data_rdo:
+            try:
+                data_consulta = datetime.strptime(data_rdo, "%Y-%m-%d").date()
+                registro_ponto = RegistroPonto.query.filter_by(
+                    funcionario_id=funcionario.id,
+                    data=data_consulta
+                ).first()
+                
+                if registro_ponto:
+                    presente_hoje = bool(registro_ponto.hora_entrada)
+                    horas_trabalhadas = registro_ponto.horas_trabalhadas or 0
+            except:
+                pass
+        
+        result.append({
+            "id": funcionario.id,
+            "nome": funcionario.nome,
+            "codigo": funcionario.codigo,
+            "funcao": funcionario.funcao.nome if funcionario.funcao else "Sem função",
+            "presente_hoje": presente_hoje,
+            "horas_trabalhadas": horas_trabalhadas
+        })
+    
+    return jsonify(result)
+
+@main_bp.route("/api/servicos/autocomplete")
+@login_required
+def api_servicos_autocomplete():
+    """API para autocomplete de serviços"""
+    q = request.args.get("q", "")
+    ativo = request.args.get("ativo", "true").lower() == "true"
+    
+    query = Servico.query.filter(Servico.ativo == ativo)
+    
+    if q:
+        query = query.filter(
+            or_(
+                Servico.nome.ilike(f"%{q}%"),
+                Servico.categoria.ilike(f"%{q}%")
+            )
+        )
+    
+    servicos = query.limit(10).all()
+    
+    return jsonify([{
+        "id": servico.id,
+        "nome": servico.nome,
+        "categoria": servico.categoria,
+        "unidade_medida": servico.unidade_medida,
+        "unidade_simbolo": servico.unidade_simbolo,
+        "custo_unitario": float(servico.custo_unitario) if servico.custo_unitario else 0
+    } for servico in servicos])
+
+@main_bp.route("/api/servicos/<int:servico_id>")
+@login_required
+def api_servico_detalhes(servico_id):
+    """API para detalhes de um serviço específico com subatividades"""
+    servico = Servico.query.get_or_404(servico_id)
+    
+    subatividades = SubAtividade.query.filter_by(servico_id=servico_id).all()
+    
+    return jsonify({
+        "id": servico.id,
+        "nome": servico.nome,
+        "categoria": servico.categoria,
+        "unidade_medida": servico.unidade_medida,
+        "unidade_simbolo": servico.unidade_simbolo,
+        "custo_unitario": float(servico.custo_unitario) if servico.custo_unitario else 0,
+        "subatividades": [{
+            "id": sub.id,
+            "nome": sub.nome,
+            "descricao": sub.descricao
+        } for sub in subatividades]
+    })
+
+@main_bp.route("/api/equipamentos/autocomplete")
+@login_required
+def api_equipamentos_autocomplete():
+    """API para autocomplete de equipamentos/veículos"""
+    q = request.args.get("q", "")
+    ativo = request.args.get("ativo", "true").lower() == "true"
+    
+    query = Veiculo.query.filter(Veiculo.ativo == ativo)
+    
+    if q:
+        query = query.filter(
+            or_(
+                Veiculo.marca.ilike(f"%{q}%"),
+                Veiculo.modelo.ilike(f"%{q}%"),
+                Veiculo.placa.ilike(f"%{q}%"),
+                Veiculo.tipo.ilike(f"%{q}%")
+            )
+        )
+    
+    veiculos = query.limit(10).all()
+    
+    return jsonify([{
+        "id": veiculo.id,
+        "nome": f"{veiculo.marca} {veiculo.modelo}",
+        "placa": veiculo.placa,
+        "tipo": veiculo.tipo,
+        "status": veiculo.status
+    } for veiculo in veiculos])
+
+@main_bp.route("/api/ponto/funcionario/<int:funcionario_id>/data/<string:data>")
+@login_required
+def api_ponto_funcionario_data(funcionario_id, data):
+    """API para buscar dados de ponto de um funcionário em uma data específica"""
+    try:
+        funcionario = Funcionario.query.get_or_404(funcionario_id)
+        data_consulta = datetime.strptime(data, "%Y-%m-%d").date()
+        
+        registro_ponto = RegistroPonto.query.filter_by(
+            funcionario_id=funcionario_id,
+            data=data_consulta
+        ).first()
+        
+        if registro_ponto:
+            return jsonify({
+                "success": True,
+                "funcionario": {
+                    "id": funcionario.id,
+                    "nome": funcionario.nome,
+                    "codigo": funcionario.codigo,
+                    "funcao": funcionario.funcao.nome if funcionario.funcao else "Sem função"
+                },
+                "registro_ponto": {
+                    "hora_entrada": registro_ponto.hora_entrada.strftime("%H:%M") if registro_ponto.hora_entrada else None,
+                    "hora_saida": registro_ponto.hora_saida.strftime("%H:%M") if registro_ponto.hora_saida else None,
+                    "horas_trabalhadas": registro_ponto.horas_trabalhadas or 0,
+                    "tipo_registro": registro_ponto.tipo_registro
+                }
+            })
+        else:
+            return jsonify({
+                "success": False,
+                "message": "Nenhum registro de ponto encontrado para esta data"
+            })
+    
+    except Exception as e:
+        return jsonify({
+            "success": False,
+            "message": f"Erro ao buscar dados: {str(e)}"
+        }), 500
+
+@main_bp.route("/api/rdo/salvar", methods=["POST"])
+@login_required
+def api_rdo_salvar():
+    """API para salvar RDO como rascunho"""
+    try:
+        dados = request.get_json()
+        
+        # Validações básicas
+        if not dados.get("data_relatorio") or not dados.get("obra_id"):
+            return jsonify({
+                "success": False,
+                "message": "Data do relatório e obra são obrigatórios"
+            }), 400
+        
+        # Gerar número único do RDO
+        import uuid
+        numero_rdo = f"RDO-{datetime.now().year}-{str(uuid.uuid4())[:8].upper()}"
+        
+        rdo = RDO(
+            numero_rdo=numero_rdo,
+            data_relatorio=datetime.strptime(dados["data_relatorio"], "%Y-%m-%d").date(),
+            obra_id=dados["obra_id"],
+            criado_por_id=current_user.id,
+            tempo_manha=dados.get("tempo_manha", ""),
+            tempo_tarde=dados.get("tempo_tarde", ""),
+            tempo_noite=dados.get("tempo_noite", ""),
+            observacoes_meteorologicas=dados.get("observacoes_meteorologicas", ""),
+            comentario_geral=dados.get("comentario_geral", ""),
+            status="Rascunho"
+        )
+        
+        db.session.add(rdo)
+        db.session.commit()
+        
+        return jsonify({
+            "success": True,
+            "message": "RDO salvo como rascunho com sucesso",
+            "rdo_id": rdo.id
+        })
+    
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({
+            "success": False,
+            "message": f"Erro ao salvar RDO: {str(e)}"
+        }), 500
+
+@main_bp.route("/api/rdo/finalizar", methods=["POST"])
+@login_required
+def api_rdo_finalizar():
+    """API para finalizar RDO"""
+    try:
+        dados = request.get_json()
+        
+        # Validações obrigatórias
+        if not dados.get("data_relatorio") or not dados.get("obra_id"):
+            return jsonify({
+                "success": False,
+                "message": "Data do relatório e obra são obrigatórios"
+            }), 400
+        
+        # Gerar número único do RDO
+        import uuid
+        numero_rdo = f"RDO-{datetime.now().year}-{str(uuid.uuid4())[:8].upper()}"
+        
+        rdo = RDO(
+            numero_rdo=numero_rdo,
+            data_relatorio=datetime.strptime(dados["data_relatorio"], "%Y-%m-%d").date(),
+            obra_id=dados["obra_id"],
+            criado_por_id=current_user.id,
+            tempo_manha=dados.get("tempo_manha", ""),
+            tempo_tarde=dados.get("tempo_tarde", ""),
+            tempo_noite=dados.get("tempo_noite", ""),
+            observacoes_meteorologicas=dados.get("observacoes_meteorologicas", ""),
+            comentario_geral=dados.get("comentario_geral", ""),
+            status="Finalizado"
+        )
+        
+        db.session.add(rdo)
+        db.session.flush()  # Para obter o ID do RDO
+        
+        # Salvar dados de mão de obra
+        for func_data in dados.get("funcionarios", []):
+            if func_data.get("funcionario_id"):
+                rdo_mao_obra = RDOMaoObra(
+                    rdo_id=rdo.id,
+                    funcionario_id=func_data["funcionario_id"],
+                    horas_trabalhadas=float(func_data.get("horas", 0)),
+                    funcao_exercida=func_data.get("funcao_exercida", ""),
+                    presente=func_data.get("presente", True)
+                )
+                db.session.add(rdo_mao_obra)
+        
+        # Salvar atividades
+        for ativ_data in dados.get("atividades", []):
+            if ativ_data.get("servico_id"):
+                rdo_atividade = RDOAtividade(
+                    rdo_id=rdo.id,
+                    servico_id=ativ_data["servico_id"],
+                    quantidade=float(ativ_data.get("quantidade", 0)),
+                    tempo_execucao=float(ativ_data.get("tempo", 0)),
+                    observacoes=ativ_data.get("observacoes", "")
+                )
+                db.session.add(rdo_atividade)
+        
+        # Salvar equipamentos
+        for equip_data in dados.get("equipamentos", []):
+            if equip_data.get("equipamento_id"):
+                rdo_equipamento = RDOEquipamento(
+                    rdo_id=rdo.id,
+                    veiculo_id=equip_data["equipamento_id"],
+                    horas_uso=float(equip_data.get("horas_uso", 0)),
+                    status=equip_data.get("status", "operando"),
+                    observacoes=equip_data.get("observacoes", "")
+                )
+                db.session.add(rdo_equipamento)
+        
+        # Salvar ocorrências
+        for ocorr_data in dados.get("ocorrencias", []):
+            if ocorr_data.get("tipo") and ocorr_data.get("descricao"):
+                rdo_ocorrencia = RDOOcorrencia(
+                    rdo_id=rdo.id,
+                    tipo=ocorr_data["tipo"],
+                    gravidade=ocorr_data.get("gravidade", "media"),
+                    descricao=ocorr_data["descricao"]
+                )
+                db.session.add(rdo_ocorrencia)
+        
+        db.session.commit()
+        
+        return jsonify({
+            "success": True,
+            "message": "RDO finalizado com sucesso",
+            "rdo_id": rdo.id
+        })
+    
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({
+            "success": False,
+            "message": f"Erro ao finalizar RDO: {str(e)}"
+        }), 500
+

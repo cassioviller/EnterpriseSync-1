@@ -105,48 +105,69 @@
         <!-- Seção 2: Mão de Obra -->
         <div class="row">
             <div class="col-12">
-                <div class="section-header">
-                    <div class="d-flex justify-content-between align-items-center">
-                        <h5 class="mb-0"><i class="fas fa-users"></i> Mão de Obra</h5>
-                        <button type="button" class="btn btn-add-item" onclick="adicionarFuncionario()">
-                            <i class="fas fa-plus"></i>
-                        </button>
+                <div class="card shadow-sm mb-4">
+                    <div class="card-header bg-success text-white">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <h5 class="mb-0"><i class="fas fa-users"></i> Mão de Obra</h5>
+                            <button type="button" class="btn btn-light btn-sm" onclick="adicionarFuncionario()">
+                                <i class="fas fa-plus"></i> Adicionar
+                            </button>
+                        </div>
                     </div>
-                </div>
-                <div class="section-body">
-                    <div id="container_funcionarios">
-                        <!-- Funcionários serão adicionados dinamicamente -->
-                    </div>
-                    
-                    <!-- Template de funcionário (hidden) -->
-                    <div id="template_funcionario" style="display: none;">
-                        <div class="item-card funcionario-item">
-                            <div class="row align-items-center">
-                                <div class="col-md-5 mb-2">
-                                    <label class="form-label">Funcionário</label>
-                                    <select class="form-select funcionario-select">
-                                        <option value="">Selecione o funcionário...</option>
-                                    </select>
-                                </div>
-                                <div class="col-md-2 mb-2">
-                                    <label class="form-label">Horas</label>
-                                    <input type="number" class="form-control horas-input" min="0" max="24" step="0.5" placeholder="8.0">
-                                </div>
-                                <div class="col-md-3 mb-2">
-                                    <label class="form-label">Função Exercida</label>
-                                    <input type="text" class="form-control funcao-input" placeholder="Ex: Pedreiro">
-                                </div>
-                                <div class="col-md-1 mb-2">
-                                    <label class="form-label">Presente</label>
-                                    <div class="form-check">
-                                        <input class="form-check-input presente-check" type="checkbox" checked>
+                    <div class="card-body">
+                        <div id="container_funcionarios">
+                            <!-- Funcionários serão adicionados dinamicamente -->
+                        </div>
+                        
+                        <!-- Template de funcionário (hidden) -->
+                        <div id="template_funcionario" style="display: none;">
+                            <div class="card mb-3 funcionario-item border-success">
+                                <div class="card-body">
+                                    <div class="row align-items-center">
+                                        <div class="col-md-4 mb-2">
+                                            <label class="form-label fw-bold">Funcionário</label>
+                                            <select class="form-select funcionario-select" onchange="carregarDadosPonto(this)">
+                                                <option value="">Selecione o funcionário...</option>
+                                            </select>
+                                        </div>
+                                        <div class="col-md-2 mb-2">
+                                            <label class="form-label fw-bold">Entrada</label>
+                                            <input type="time" class="form-control hora-entrada" readonly>
+                                            <small class="text-muted">Do sistema de ponto</small>
+                                        </div>
+                                        <div class="col-md-2 mb-2">
+                                            <label class="form-label fw-bold">Saída</label>
+                                            <input type="time" class="form-control hora-saida" readonly>
+                                            <small class="text-muted">Do sistema de ponto</small>
+                                        </div>
+                                        <div class="col-md-2 mb-2">
+                                            <label class="form-label fw-bold">Total Horas</label>
+                                            <input type="text" class="form-control total-horas" readonly>
+                                            <small class="text-muted">Calculado automaticamente</small>
+                                        </div>
+                                        <div class="col-md-1 mb-2">
+                                            <label class="form-label fw-bold">Presente</label>
+                                            <div class="form-check d-flex justify-content-center">
+                                                <input class="form-check-input presente-check" type="checkbox" checked>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-1 mb-2">
+                                            <label class="form-label">&nbsp;</label>
+                                            <button type="button" class="btn btn-outline-danger btn-sm w-100" onclick="removerFuncionario(this)">
+                                                <i class="fas fa-trash"></i>
+                                            </button>
+                                        </div>
                                     </div>
-                                </div>
-                                <div class="col-md-1 mb-2">
-                                    <label class="form-label">&nbsp;</label>
-                                    <button type="button" class="btn btn-outline-danger btn-sm w-100" onclick="removerFuncionario(this)">
-                                        <i class="fas fa-trash"></i>
-                                    </button>
+                                    <div class="row">
+                                        <div class="col-md-6">
+                                            <label class="form-label fw-bold">Função Exercida</label>
+                                            <input type="text" class="form-control funcao-exercida" placeholder="Ex: Pedreiro, Ajudante, Eletricista">
+                                        </div>
+                                        <div class="col-md-6">
+                                            <label class="form-label fw-bold">Observações</label>
+                                            <input type="text" class="form-control observacoes-funcionario" placeholder="Observações sobre o funcionário no dia">
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -421,21 +442,30 @@
     }
 </style>
 
+<link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet">
 <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
-<link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet">
 
 <script>
 $(document).ready(function() {
-    // Inicializar data atual
-    document.getElementById('data_relatorio').value = new Date().toISOString().split('T')[0];
-    
-    // Inicializar dropdowns
-    inicializarDropdownObras();
+    // Aguardar carregamento completo do jQuery e Select2
+    setTimeout(function() {
+        // Inicializar data atual
+        document.getElementById('data_relatorio').value = new Date().toISOString().split('T')[0];
+        
+        // Inicializar dropdowns
+        inicializarDropdownObras();
+        console.log('RDO system initialized successfully');
+    }, 100);
 });
 
 // Dropdown de Obras com Autocomplete
 function inicializarDropdownObras() {
+    if (typeof $.fn.select2 === 'undefined') {
+        console.error('Select2 not loaded');
+        return;
+    }
+    
     $('#obra_select').select2({
         placeholder: 'Digite para buscar obra...',
         allowClear: true,
@@ -446,7 +476,7 @@ function inicializarDropdownObras() {
             data: function(params) {
                 return {
                     q: params.term || '',
-                    status: 'ativo'
+                    status: 'Em andamento'
                 };
             },
             processResults: function(data) {
@@ -464,8 +494,143 @@ function inicializarDropdownObras() {
     });
 }
 
+// Dropdown de Funcionários com integração de ponto
+function inicializarDropdownFuncionarios(elemento) {
+    if (typeof $.fn.select2 === 'undefined') {
+        console.error('Select2 not loaded');
+        return;
+    }
+    
+    $(elemento).select2({
+        placeholder: 'Digite para buscar funcionário...',
+        allowClear: true,
+        ajax: {
+            url: '/api/funcionarios/rdo-autocomplete',
+            dataType: 'json',
+            delay: 250,
+            data: function(params) {
+                return {
+                    q: params.term || '',
+                    data_rdo: document.getElementById('data_relatorio').value,
+                    obra_id: document.getElementById('obra_select').value
+                };
+            },
+            processResults: function(data) {
+                return {
+                    results: data.map(funcionario => ({
+                        id: funcionario.id,
+                        text: `${funcionario.nome} (${funcionario.codigo})`,
+                        funcionario: funcionario
+                    }))
+                };
+            },
+            cache: true
+        },
+        minimumInputLength: 0,
+        templateResult: function(data) {
+            if (data.loading) return data.text;
+            
+            const funcionario = data.funcionario;
+            if (!funcionario) return data.text;
+            
+            return $(`
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <strong>${funcionario.nome}</strong><br>
+                        <small class="text-muted">${funcionario.codigo} - ${funcionario.funcao || 'Sem função'}</small>
+                    </div>
+                    <div class="text-end">
+                        <span class="badge ${funcionario.presente_hoje ? 'bg-success' : 'bg-warning'}">
+                            ${funcionario.presente_hoje ? 'Presente' : 'Ausente'}
+                        </span><br>
+                        <small class="text-muted">
+                            ${funcionario.horas_trabalhadas || '0.0'}h trabalhadas
+                        </small>
+                    </div>
+                </div>
+            `);
+        },
+        templateSelection: function(data) {
+            return data.text;
+        }
+    });
+}
+
+// Carregar dados do ponto quando funcionário for selecionado
+function carregarDadosPonto(selectElement) {
+    const funcionarioId = selectElement.value;
+    const dataRDO = document.getElementById('data_relatorio').value;
+    const funcionarioCard = selectElement.closest('.funcionario-item');
+    
+    if (!funcionarioId || !dataRDO) {
+        limparDadosPonto(funcionarioCard);
+        return;
+    }
+    
+    // Buscar dados do ponto para a data do RDO
+    fetch(`/api/ponto/funcionario/${funcionarioId}/data/${dataRDO}`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.success && data.registro_ponto) {
+                const registro = data.registro_ponto;
+                
+                // Preencher campos automaticamente
+                funcionarioCard.querySelector('.hora-entrada').value = registro.hora_entrada || '';
+                funcionarioCard.querySelector('.hora-saida').value = registro.hora_saida || '';
+                funcionarioCard.querySelector('.total-horas').value = registro.horas_trabalhadas || '0.0';
+                funcionarioCard.querySelector('.funcao-exercida').value = data.funcionario.funcao || '';
+                
+                // Marcar como presente se tem registro
+                funcionarioCard.querySelector('.presente-check').checked = !!registro.hora_entrada;
+                
+                // Remover alerta anterior
+                const alertaExistente = funcionarioCard.querySelector('.alerta-sem-ponto');
+                if (alertaExistente) {
+                    alertaExistente.remove();
+                }
+            } else {
+                limparDadosPonto(funcionarioCard);
+                mostrarAlertaSemPonto(funcionarioCard);
+            }
+        })
+        .catch(error => {
+            console.error('Erro ao carregar dados do ponto:', error);
+            limparDadosPonto(funcionarioCard);
+            mostrarAlertaSemPonto(funcionarioCard);
+        });
+}
+
+function limparDadosPonto(funcionarioCard) {
+    funcionarioCard.querySelector('.hora-entrada').value = '';
+    funcionarioCard.querySelector('.hora-saida').value = '';
+    funcionarioCard.querySelector('.total-horas').value = '0.0';
+    funcionarioCard.querySelector('.presente-check').checked = false;
+}
+
+function mostrarAlertaSemPonto(funcionarioCard) {
+    // Remover alerta existente
+    const alertaExistente = funcionarioCard.querySelector('.alerta-sem-ponto');
+    if (alertaExistente) {
+        alertaExistente.remove();
+    }
+    
+    // Adicionar alerta visual
+    const alerta = document.createElement('div');
+    alerta.className = 'alert alert-warning alert-sm mt-2 alerta-sem-ponto';
+    alerta.innerHTML = `
+        <i class="fas fa-exclamation-triangle"></i> 
+        <small>Funcionário sem registro de ponto para esta data</small>
+    `;
+    funcionarioCard.querySelector('.card-body').appendChild(alerta);
+}
+
 // Dropdown de Serviços com Unidades
 function inicializarDropdownServicos(elemento) {
+    if (typeof $.fn.select2 === 'undefined') {
+        console.error('Select2 not loaded');
+        return;
+    }
+    
     $(elemento).select2({
         placeholder: 'Digite para buscar serviço...',
         allowClear: true,
@@ -494,38 +659,13 @@ function inicializarDropdownServicos(elemento) {
     });
 }
 
-// Dropdown de Funcionários
-function inicializarDropdownFuncionarios(elemento) {
-    $(elemento).select2({
-        placeholder: 'Digite para buscar funcionário...',
-        allowClear: true,
-        ajax: {
-            url: '/api/funcionarios/autocomplete',
-            dataType: 'json',
-            delay: 250,
-            data: function(params) {
-                return {
-                    q: params.term || '',
-                    ativo: true
-                };
-            },
-            processResults: function(data) {
-                return {
-                    results: data.map(funcionario => ({
-                        id: funcionario.id,
-                        text: `${funcionario.nome} (${funcionario.codigo})`,
-                        funcionario: funcionario
-                    }))
-                };
-            },
-            cache: true
-        },
-        minimumInputLength: 0
-    });
-}
-
 // Dropdown de Equipamentos
 function inicializarDropdownEquipamentos(elemento) {
+    if (typeof $.fn.select2 === 'undefined') {
+        console.error('Select2 not loaded');
+        return;
+    }
+    
     $(elemento).select2({
         placeholder: 'Digite para buscar equipamento...',
         allowClear: true,
