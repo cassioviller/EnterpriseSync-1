@@ -5,10 +5,10 @@ from models import *
 from models import OutroCusto
 from forms import *
 from utils import calcular_horas_trabalhadas, calcular_custo_real_obra, calcular_custos_mes, calcular_kpis_funcionarios_geral, calcular_kpis_funcionario_periodo, calcular_kpis_funcionario_completo, calcular_ocorrencias_funcionario, processar_meio_periodo_exemplo
-from kpis_engine_v3 import calcular_kpis_funcionario_v3, identificar_faltas_periodo, processar_registros_ponto_com_faltas
+from kpis_engine import KPIsEngine
 from datetime import datetime, date
 from sqlalchemy import func
-from kpis_engine_simple import kpis_engine
+
 import os
 import json
 from werkzeug.utils import secure_filename
@@ -308,12 +308,7 @@ def novo_ponto():
         db.session.commit()
         
         # Recalcular KPIs após inserção
-        try:
-            from kpis_engine_v3 import atualizar_calculos_ponto
-            atualizar_calculos_ponto(registro.id)
-        except ImportError:
-            # KPIs engine não disponível, continuar sem erro
-            pass
+        # Cálculos automáticos serão feitos pelo sistema principal
         
         flash(f'Registro de ponto ({tipo_lancamento}) criado com sucesso!', 'success')
         return redirect(request.referrer or url_for('main.funcionario_perfil', id=funcionario_id))
@@ -534,9 +529,9 @@ def funcionario_perfil(id):
     else:
         data_fim = datetime.strptime(data_fim, '%Y-%m-%d').date()
     
-    # Calcular KPIs individuais para o período (usando engine v4.0)
-    from kpis_engine_v4 import calcular_kpis_funcionario_v4
-    kpis = calcular_kpis_funcionario_v4(id, data_inicio, data_fim)
+    # Calcular KPIs individuais para o período (usando engine principal)
+    engine = KPIsEngine()
+    kpis = engine.calcular_kpis_funcionario(id, data_inicio, data_fim)
     
     # Buscar registros de ponto com filtros e identificação de faltas
     
@@ -550,7 +545,7 @@ def funcionario_perfil(id):
         registros_ponto = query_ponto.order_by(RegistroPonto.data.desc()).all()
         
         # Adicionar informação de falta manualmente para registros filtrados por obra
-        faltas = identificar_faltas_periodo(id, data_inicio, data_fim)
+        faltas = []  # Faltas serão identificadas pelo tipo_registro
         
         # Lista de feriados 2025
         feriados_2025 = {
@@ -573,9 +568,12 @@ def funcionario_perfil(id):
             registro.is_falta = (registro.tipo_registro in ['falta', 'falta_justificada'])
             registro.is_feriado = (registro.tipo_registro in ['feriado', 'feriado_trabalhado'])
     else:
-        # Usar função que já identifica faltas
-        registros_ponto = processar_registros_ponto_com_faltas(id, data_inicio, data_fim)
-        faltas = identificar_faltas_periodo(id, data_inicio, data_fim)
+        # Usar query padrão para registros de ponto
+        registros_ponto = RegistroPonto.query.filter_by(funcionario_id=id).filter(
+            RegistroPonto.data >= data_inicio,
+            RegistroPonto.data <= data_fim
+        ).order_by(RegistroPonto.data.desc()).all()
+        faltas = []  # Faltas serão identificadas pelo tipo_registro
         
         # Adicionar informação de feriado e faltas para todos os registros
         for registro in registros_ponto:
@@ -2046,8 +2044,7 @@ def novo_ponto_lista():
         db.session.commit()
         
         # Atualizar cálculos automáticos do registro
-        from kpis_engine_v3 import atualizar_calculos_ponto
-        atualizar_calculos_ponto(registro.id)
+        # Cálculos automáticos serão feitos pelo sistema principal
         
         flash('Registro de ponto adicionado com sucesso!', 'success')
         return redirect(url_for('main.ponto'))
