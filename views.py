@@ -5,7 +5,7 @@ from models import *
 from models import OutroCusto
 from forms import *
 from utils import calcular_horas_trabalhadas, calcular_custo_real_obra, calcular_custos_mes, calcular_kpis_funcionarios_geral, calcular_kpis_funcionario_periodo, calcular_kpis_funcionario_completo, calcular_ocorrencias_funcionario, processar_meio_periodo_exemplo
-from kpis_engine import KPIsEngine
+# from kpis_engine import KPIsEngine - Movido para dentro das funções para evitar importação circular
 from datetime import datetime, date
 from sqlalchemy import func
 
@@ -530,6 +530,7 @@ def funcionario_perfil(id):
         data_fim = datetime.strptime(data_fim, '%Y-%m-%d').date()
     
     # Calcular KPIs individuais para o período (usando engine principal)
+    from kpis_engine import KPIsEngine
     engine = KPIsEngine()
     kpis = engine.calcular_kpis_funcionario(id, data_inicio, data_fim)
     

@@ -523,6 +523,14 @@ SIGE (Sistema Integrado de Gestão Empresarial) is a comprehensive business mana
   - Removidos endpoints duplicados causando conflitos na inicialização
   - Sistema RDO com dropdowns inteligentes agora funcionando corretamente
   - Codebase limpo e otimizado para produção com arquivos essenciais apenas
+- July 15, 2025. Correção dos Cálculos de KPIs - v6.3.1:
+  - Corrigido cálculo de faltas para contar apenas registros explícitos de falta (tipo_registro='falta')
+  - Resolvido problema de importação circular movendo import do KPIsEngine para dentro das funções
+  - Corrigido cálculo de absenteísmo: agora usa faltas reais dividido por dias úteis
+  - Corrigido cálculo de horas perdidas: faltas × 8h + atrasos em horas
+  - Validado funcionamento correto com dados reais: Cássio (1 falta, 4.8% absenteísmo, 8.8h perdidas)
+  - Todos os KPIs agora calculando corretamente baseados em registros explícitos do sistema
+  - Engine de KPIs v3.1 com cálculos precisos e confiáveis
 
 ## User Preferences
 
