@@ -499,6 +499,18 @@ SIGE (Sistema Integrado de Gestão Empresarial) is a comprehensive business mana
   - Documentadas 7 páginas principais: Dashboard, Funcionários, Perfil, Veículos, Alimentação, Funções, Horários
   - Sistema de obras tratado como centros de custo com controle financeiro integrado
   - Todos os módulos integrados com filtros por centro de custo e análise de rentabilidade
+- July 15, 2025. Sistema de Horários de Trabalho Completo - v6.2.1:
+  - Implementado sistema completo de CRUD para horários de trabalho
+  - Corrigida rota de `/horarios-trabalho` para `/horarios` para consistência com templates
+  - Adicionadas rotas completas: criar (`/horarios/novo`), editar (`/horarios/editar/<id>`), excluir (`/horarios/excluir/<id>`)
+  - Implementado cálculo automático de horas diárias baseado em horários de entrada/saída e intervalos
+  - Adicionada validação para prevenir duplicatas de nomes de horários
+  - Implementadas verificações de segurança para prevenir exclusão de horários em uso por funcionários
+  - Corrigida navegação no template base.html para usar endpoint correto
+  - Modal JavaScript funcional para criação e edição com limpeza automática de formulários
+  - Sistema permite definir horários personalizados com entrada, saída, intervalo de almoço e dias da semana
+  - Integração completa com sistema de funcionários e cálculos de KPIs
+  - Interface responsiva com DataTables para listagem e controle de horários
 
 ## User Preferences
 
