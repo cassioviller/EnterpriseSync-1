@@ -2511,12 +2511,154 @@ def sincronizar_fluxo():
             flash(f'Erro ao sincronizar fluxo de caixa: {str(e)}', 'error')
             return redirect(url_for('main.fluxo_caixa'))
 
-@main_bp.route('/horarios-trabalho')
+@main_bp.route('/horarios')
 @login_required
-def horarios_trabalho():
+def horarios():
     """Página de gestão de horários de trabalho"""
     horarios = HorarioTrabalho.query.all()
-    return render_template('horarios_trabalho.html', horarios=horarios)
+    return render_template('horarios.html', horarios=horarios)
+
+@main_bp.route('/horarios/novo', methods=['POST'])
+@login_required
+def novo_horario():
+    """Criar novo horário de trabalho"""
+    try:
+        nome = request.form.get('nome')
+        entrada = request.form.get('entrada')
+        saida_almoco = request.form.get('saida_almoco')
+        retorno_almoco = request.form.get('retorno_almoco')
+        saida = request.form.get('saida')
+        dias_semana = request.form.get('dias_semana')
+        
+        # Verificar se já existe horário com o mesmo nome
+        horario_existente = HorarioTrabalho.query.filter_by(nome=nome).first()
+        if horario_existente:
+            flash('Já existe um horário com este nome!', 'error')
+            return redirect(url_for('main.horarios'))
+        
+        # Calcular horas diárias
+        entrada_time = datetime.strptime(entrada, '%H:%M').time()
+        saida_almoco_time = datetime.strptime(saida_almoco, '%H:%M').time()
+        retorno_almoco_time = datetime.strptime(retorno_almoco, '%H:%M').time()
+        saida_time = datetime.strptime(saida, '%H:%M').time()
+        
+        # Calcular horas trabalhadas (manhã + tarde)
+        manha_inicio = datetime.combine(date.today(), entrada_time)
+        manha_fim = datetime.combine(date.today(), saida_almoco_time)
+        tarde_inicio = datetime.combine(date.today(), retorno_almoco_time)
+        tarde_fim = datetime.combine(date.today(), saida_time)
+        
+        horas_manha = (manha_fim - manha_inicio).total_seconds() / 3600
+        horas_tarde = (tarde_fim - tarde_inicio).total_seconds() / 3600
+        horas_diarias = horas_manha + horas_tarde
+        
+        # Calcular valor da hora (baseado no salário mínimo padrão)
+        valor_hora = 12.00  # Valor padrão, pode ser ajustado
+        
+        # Criar horário
+        horario = HorarioTrabalho(
+            nome=nome,
+            entrada=entrada_time,
+            saida_almoco=saida_almoco_time,
+            retorno_almoco=retorno_almoco_time,
+            saida=saida_time,
+            dias_semana=dias_semana,
+            horas_diarias=horas_diarias,
+            valor_hora=valor_hora
+        )
+        
+        db.session.add(horario)
+        db.session.commit()
+        
+        flash('Horário de trabalho criado com sucesso!', 'success')
+        return redirect(url_for('main.horarios'))
+        
+    except Exception as e:
+        db.session.rollback()
+        flash(f'Erro ao criar horário: {str(e)}', 'error')
+        return redirect(url_for('main.horarios'))
+
+@main_bp.route('/horarios/editar/<int:id>', methods=['POST'])
+@login_required
+def editar_horario(id):
+    """Editar horário de trabalho"""
+    try:
+        horario = HorarioTrabalho.query.get_or_404(id)
+        
+        nome = request.form.get('nome')
+        entrada = request.form.get('entrada')
+        saida_almoco = request.form.get('saida_almoco')
+        retorno_almoco = request.form.get('retorno_almoco')
+        saida = request.form.get('saida')
+        dias_semana = request.form.get('dias_semana')
+        
+        # Verificar se já existe outro horário com o mesmo nome
+        horario_existente = HorarioTrabalho.query.filter(
+            HorarioTrabalho.nome == nome,
+            HorarioTrabalho.id != id
+        ).first()
+        if horario_existente:
+            flash('Já existe um horário com este nome!', 'error')
+            return redirect(url_for('main.horarios'))
+        
+        # Calcular horas diárias
+        entrada_time = datetime.strptime(entrada, '%H:%M').time()
+        saida_almoco_time = datetime.strptime(saida_almoco, '%H:%M').time()
+        retorno_almoco_time = datetime.strptime(retorno_almoco, '%H:%M').time()
+        saida_time = datetime.strptime(saida, '%H:%M').time()
+        
+        # Calcular horas trabalhadas (manhã + tarde)
+        manha_inicio = datetime.combine(date.today(), entrada_time)
+        manha_fim = datetime.combine(date.today(), saida_almoco_time)
+        tarde_inicio = datetime.combine(date.today(), retorno_almoco_time)
+        tarde_fim = datetime.combine(date.today(), saida_time)
+        
+        horas_manha = (manha_fim - manha_inicio).total_seconds() / 3600
+        horas_tarde = (tarde_fim - tarde_inicio).total_seconds() / 3600
+        horas_diarias = horas_manha + horas_tarde
+        
+        # Atualizar horário
+        horario.nome = nome
+        horario.entrada = entrada_time
+        horario.saida_almoco = saida_almoco_time
+        horario.retorno_almoco = retorno_almoco_time
+        horario.saida = saida_time
+        horario.dias_semana = dias_semana
+        horario.horas_diarias = horas_diarias
+        
+        db.session.commit()
+        
+        flash('Horário de trabalho atualizado com sucesso!', 'success')
+        return redirect(url_for('main.horarios'))
+        
+    except Exception as e:
+        db.session.rollback()
+        flash(f'Erro ao atualizar horário: {str(e)}', 'error')
+        return redirect(url_for('main.horarios'))
+
+@main_bp.route('/horarios/excluir/<int:id>', methods=['POST'])
+@login_required
+def excluir_horario(id):
+    """Excluir horário de trabalho"""
+    try:
+        horario = HorarioTrabalho.query.get_or_404(id)
+        
+        # Verificar se há funcionários usando este horário
+        funcionarios_usando = Funcionario.query.filter_by(horario_trabalho_id=id).count()
+        if funcionarios_usando > 0:
+            flash(f'Não é possível excluir. Existem {funcionarios_usando} funcionários usando este horário.', 'error')
+            return redirect(url_for('main.horarios'))
+        
+        db.session.delete(horario)
+        db.session.commit()
+        
+        flash('Horário de trabalho excluído com sucesso!', 'success')
+        return redirect(url_for('main.horarios'))
+        
+    except Exception as e:
+        db.session.rollback()
+        flash(f'Erro ao excluir horário: {str(e)}', 'error')
+        return redirect(url_for('main.horarios'))
 
 # ==========================================
 # MÓDULOS CRUD - CONTROLE DE PONTO, OUTROS CUSTOS E ALIMENTAÇÃO

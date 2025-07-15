@@ -97,7 +97,7 @@
 <div class="modal fade" id="horarioModal" tabindex="-1" aria-labelledby="horarioModalLabel" aria-hidden="true">
     <div class="modal-dialog">
         <div class="modal-content">
-            <form method="POST" id="horarioForm">
+            <form method="POST" id="horarioForm" action="{{ url_for('main.novo_horario') }}">
                 <div class="modal-header">
                     <h5 class="modal-title" id="horarioModalLabel">Novo Horário de Trabalho</h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
@@ -181,6 +181,11 @@
     });
 
     function editarHorario(id, nome, entrada, saida_almoco, retorno_almoco, saida, dias_semana) {
+        // Atualizar form action para edição
+        document.getElementById('horarioForm').action = '{{ url_for("main.editar_horario", id=0) }}'.replace('0', id);
+        document.getElementById('horarioModalLabel').textContent = 'Editar Horário de Trabalho';
+        
+        // Preencher campos
         document.getElementById('nome').value = nome;
         document.getElementById('entrada').value = entrada;
         document.getElementById('saida_almoco').value = saida_almoco;
@@ -188,9 +193,7 @@
         document.getElementById('saida').value = saida;
         document.getElementById('dias_semana').value = dias_semana;
         
-        document.getElementById('horarioForm').action = '{{ url_for("main.editar_horario", id=0) }}'.replace('0', id);
-        document.getElementById('horarioModalLabel').textContent = 'Editar Horário de Trabalho';
-        
+        // Mostrar modal
         const modal = new bootstrap.Modal(document.getElementById('horarioModal'));
         modal.show();
     }
