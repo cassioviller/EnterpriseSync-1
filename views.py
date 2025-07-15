@@ -3595,79 +3595,141 @@ def excluir_registro_alimentacao(registro_id):
 @login_required
 def api_obras_autocomplete():
     """API para autocomplete de obras"""
-    q = request.args.get("q", "")
-    status = request.args.get("status", "Em andamento")
-    
-    query = Obra.query.filter(Obra.status == status)
-    
-    if q:
-        query = query.filter(
-            or_(
-                Obra.nome.ilike(f"%{q}%"),
-                Obra.codigo.ilike(f"%{q}%"),
-                Obra.endereco.ilike(f"%{q}%")
+    try:
+        q = request.args.get("q", "").strip()
+        
+        # Query base - obras ativas
+        query = Obra.query.filter(Obra.ativo == True)
+        
+        # Se tem termo de busca, filtrar
+        if q:
+            query = query.filter(
+                or_(
+                    Obra.nome.ilike(f"%{q}%"),
+                    Obra.codigo.ilike(f"%{q}%"),
+                    Obra.endereco.ilike(f"%{q}%")
+                )
             )
-        )
-    
-    obras = query.limit(10).all()
-    
-    return jsonify([{
-        "id": obra.id,
-        "nome": obra.nome,
-        "codigo": obra.codigo,
-        "endereco": obra.endereco,
-        "status": obra.status
-    } for obra in obras])
+        
+        # Limitar resultados e ordenar
+        obras = query.order_by(Obra.nome).limit(20).all()
+        
+        # Debug - log para verificar
+        print(f"Buscando obras com termo: '{q}' - Encontradas: {len(obras)}")
+        
+        resultado = []
+        for obra in obras:
+            resultado.append({
+                "id": obra.id,
+                "nome": obra.nome,
+                "codigo": obra.codigo or "S/C",
+                "endereco": obra.endereco or "Endereço não informado",
+                "area_total_m2": float(obra.area_total_m2) if obra.area_total_m2 else 0,
+                "status": obra.status or "Em andamento"
+            })
+        
+        return jsonify(resultado)
+        
+    except Exception as e:
+        print(f"Erro no endpoint obras_autocomplete: {str(e)}")
+        return jsonify([]), 500
+
+@main_bp.route("/api/obras/todas")
+@login_required
+def api_obras_todas():
+    """API para carregar todas as obras (fallback)"""
+    try:
+        obras = Obra.query.filter(Obra.ativo == True).order_by(Obra.nome).all()
+        
+        return jsonify([{
+            "id": obra.id,
+            "nome": obra.nome,
+            "codigo": obra.codigo or "S/C",
+            "endereco": obra.endereco or "Endereço não informado"
+        } for obra in obras])
+        
+    except Exception as e:
+        print(f"Erro ao carregar todas as obras: {str(e)}")
+        return jsonify([]), 500
 
 @main_bp.route("/api/funcionarios/rdo-autocomplete")
 @login_required
 def api_funcionarios_rdo_autocomplete():
     """API para autocomplete de funcionários com dados de ponto"""
-    q = request.args.get("q", "")
-    data_rdo = request.args.get("data_rdo")
-    
-    query = Funcionario.query.filter(Funcionario.ativo == True)
-    
-    if q:
-        query = query.filter(
-            or_(
-                Funcionario.nome.ilike(f"%{q}%"),
-                Funcionario.codigo.ilike(f"%{q}%")
+    try:
+        q = request.args.get("q", "").strip()
+        data_rdo = request.args.get("data_rdo")
+        
+        # Query base - funcionários ativos
+        query = Funcionario.query.filter(Funcionario.ativo == True)
+        
+        # Se tem termo de busca
+        if q:
+            query = query.filter(
+                or_(
+                    Funcionario.nome.ilike(f"%{q}%"),
+                    Funcionario.codigo.ilike(f"%{q}%"),
+                    Funcionario.cpf.ilike(f"%{q}%")
+                )
             )
-        )
-    
-    funcionarios = query.limit(10).all()
-    
-    result = []
-    for funcionario in funcionarios:
-        # Buscar dados do ponto para a data
-        presente_hoje = False
-        horas_trabalhadas = 0
         
-        if data_rdo:
-            try:
-                data_consulta = datetime.strptime(data_rdo, "%Y-%m-%d").date()
-                registro_ponto = RegistroPonto.query.filter_by(
-                    funcionario_id=funcionario.id,
-                    data=data_consulta
-                ).first()
-                
-                if registro_ponto:
-                    presente_hoje = bool(registro_ponto.hora_entrada)
-                    horas_trabalhadas = registro_ponto.horas_trabalhadas or 0
-            except:
-                pass
+        funcionarios = query.order_by(Funcionario.nome).limit(20).all()
         
-        result.append({
-            "id": funcionario.id,
-            "nome": funcionario.nome,
-            "codigo": funcionario.codigo,
-            "funcao": funcionario.funcao.nome if funcionario.funcao else "Sem função",
-            "presente_hoje": presente_hoje,
-            "horas_trabalhadas": horas_trabalhadas
-        })
-    
-    return jsonify(result)
+        print(f"Buscando funcionários: '{q}' - Encontrados: {len(funcionarios)}")
+        
+        resultado = []
+        for func in funcionarios:
+            # Buscar dados do ponto para a data
+            presente_hoje = False
+            horas_trabalhadas = 0
+            
+            if data_rdo:
+                try:
+                    data_consulta = datetime.strptime(data_rdo, "%Y-%m-%d").date()
+                    registro_ponto = RegistroPonto.query.filter_by(
+                        funcionario_id=func.id,
+                        data=data_consulta
+                    ).first()
+                    
+                    if registro_ponto:
+                        presente_hoje = bool(registro_ponto.hora_entrada)
+                        horas_trabalhadas = registro_ponto.horas_trabalhadas or 0
+                except:
+                    pass
+            
+            resultado.append({
+                "id": func.id,
+                "nome": func.nome,
+                "codigo": func.codigo or f"F{func.id:03d}",
+                "funcao": func.funcao.nome if func.funcao else "Não definida",
+                "salario": float(func.salario) if func.salario else 0,
+                "presente_hoje": presente_hoje,
+                "horas_trabalhadas": horas_trabalhadas
+            })
+        
+        return jsonify(resultado)
+        
+    except Exception as e:
+        print(f"Erro no endpoint funcionarios_rdo_autocomplete: {str(e)}")
+        return jsonify([]), 500
+
+@main_bp.route("/api/funcionarios/todos")
+@login_required
+def api_funcionarios_todos():
+    """API para carregar todos os funcionários (fallback)"""
+    try:
+        funcionarios = Funcionario.query.filter(Funcionario.ativo == True).order_by(Funcionario.nome).all()
+        
+        return jsonify([{
+            "id": func.id,
+            "nome": func.nome,
+            "codigo": func.codigo or f"F{func.id:03d}",
+            "funcao": func.funcao.nome if func.funcao else "Não definida"
+        } for func in funcionarios])
+        
+    except Exception as e:
+        print(f"Erro ao carregar funcionários: {str(e)}")
+        return jsonify([]), 500
 
 @main_bp.route("/api/servicos/autocomplete")
 @login_required

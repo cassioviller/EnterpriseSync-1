@@ -70,12 +70,15 @@ class Funcionario(db.Model):
 class Obra(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     nome = db.Column(db.String(100), nullable=False)
+    codigo = db.Column(db.String(20), unique=True)  # Código único da obra
     endereco = db.Column(db.Text)
     data_inicio = db.Column(db.Date, nullable=False)
     data_previsao_fim = db.Column(db.Date)
     orcamento = db.Column(db.Float, default=0.0)
+    area_total_m2 = db.Column(db.Float, default=0.0)  # Área total da obra
     status = db.Column(db.String(20), default='Em andamento')
     responsavel_id = db.Column(db.Integer, db.ForeignKey('funcionario.id'))
+    ativo = db.Column(db.Boolean, default=True)  # Campo para controle de obras ativas
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     
     registros_ponto = db.relationship('RegistroPonto', backref='obra_ref', lazy=True, overlaps="obra_ref")
@@ -92,6 +95,7 @@ class Veiculo(db.Model):
     km_atual = db.Column(db.Integer, default=0)
     data_ultima_manutencao = db.Column(db.Date)
     data_proxima_manutencao = db.Column(db.Date)
+    ativo = db.Column(db.Boolean, default=True)  # Campo para controle de veículos ativos
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
 
@@ -103,6 +107,8 @@ class Servico(db.Model):
     descricao = db.Column(db.Text)
     categoria = db.Column(db.String(50), nullable=False)  # estrutura, alvenaria, acabamento, etc.
     unidade_medida = db.Column(db.String(10), nullable=False)  # m2, m3, kg, ton, un, m, h
+    unidade_simbolo = db.Column(db.String(10))  # Símbolo da unidade para exibição
+    custo_unitario = db.Column(db.Float, default=0.0)  # Custo unitário do serviço
     complexidade = db.Column(db.Integer, default=3)  # 1-5 para análise futura
     requer_especializacao = db.Column(db.Boolean, default=False)
     ativo = db.Column(db.Boolean, default=True)

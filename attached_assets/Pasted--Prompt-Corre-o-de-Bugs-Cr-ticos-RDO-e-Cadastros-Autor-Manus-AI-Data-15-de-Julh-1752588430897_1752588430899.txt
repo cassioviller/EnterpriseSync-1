@@ -1,0 +1,747 @@
+# Prompt: Correção de Bugs Críticos - RDO e Cadastros
+
+**Autor:** Manus AI  
+**Data:** 15 de Julho de 2025  
+**Prioridade:** CRÍTICA - Bugs que impedem funcionamento básico  
+**Objetivo:** Corrigir problemas específicos identificados pelo usuário
+
+---
+
+## BUGS IDENTIFICADOS E CORREÇÕES
+
+### BUG 1: Dropdown de Obras Não Carrega Dados
+
+**PROBLEMA:** Dropdown "Selecione a obra..." não mostra as 2 obras cadastradas
+**CAUSA:** Endpoint não está sendo chamado ou retornando dados vazios
+**CORREÇÃO:** Implementar carregamento correto das obras
+
+### BUG 2: Dropdown de Funcionários Vazio
+
+**PROBLEMA:** Dropdown "Selecione o funcionário..." não mostra funcionários
+**CAUSA:** Select2 não está sendo inicializado corretamente
+**CORREÇÃO:** Corrigir inicialização e endpoint
+
+### BUG 3: Lógica de Horários Inadequada
+
+**PROBLEMA:** Ponto pode ser lançado DEPOIS do RDO
+**CAUSA:** Sistema assume que ponto já existe
+**CORREÇÃO:** Permitir preenchimento manual com sincronização posterior
+
+### BUG 4: Cadastro de Serviços Criando Registros Vazios
+
+**PROBLEMA:** Cria ID 1 vazio, incrementa errado (4→5 ao editar 1)
+**CAUSA:** Validação inadequada no backend
+**CORREÇÃO:** Validar dados antes de salvar
+
+### BUG 5: Subatividades Não Aparecem no RDO
+
+**PROBLEMA:** Após selecionar serviço, subatividades não carregam
+**CAUSA:** Endpoint ou JavaScript com erro
+**CORREÇÃO:** Corrigir carregamento dinâmico
+
+---
+
+## Prompt: Correções de Bugs Críticos
+
+```
+Corrija os bugs críticos identificados no sistema RDO, focando em funcionalidade básica que está falhando.
+
+CORREÇÃO 1: DROPDOWN DE OBRAS - CARREGAMENTO CORRETO
+
+Problema: Obras cadastradas não aparecem no dropdown
+Solução: Corrigir endpoint e inicialização
+
+BACKEND - Endpoint de Obras:
+```python
+@app.route('/api/obras/autocomplete')
+def obras_autocomplete():
+    try:
+        q = request.args.get('q', '').strip()
+        
+        # Query base - obras ativas
+        query = Obra.query.filter(Obra.ativo == True)
+        
+        # Se tem termo de busca, filtrar
+        if q:
+            query = query.filter(
+                db.or_(
+                    Obra.nome.ilike(f'%{q}%'),
+                    Obra.codigo.ilike(f'%{q}%'),
+                    Obra.endereco.ilike(f'%{q}%')
+                )
+            )
+        
+        # Limitar resultados e ordenar
+        obras = query.order_by(Obra.nome).limit(20).all()
+        
+        # Debug - log para verificar
+        print(f"Buscando obras com termo: '{q}' - Encontradas: {len(obras)}")
+        
+        resultado = []
+        for obra in obras:
+            resultado.append({
+                'id': obra.id,
+                'nome': obra.nome,
+                'codigo': obra.codigo or 'S/C',
+                'endereco': obra.endereco or 'Endereço não informado',
+                'area_total_m2': float(obra.area_total_m2) if obra.area_total_m2 else 0,
+                'status': obra.status or 'Em andamento'
+            })
+        
+        return jsonify(resultado)
+        
+    except Exception as e:
+        print(f"Erro no endpoint obras_autocomplete: {str(e)}")
+        return jsonify([]), 500
+
+# Endpoint alternativo para carregar todas as obras (fallback)
+@app.route('/api/obras/todas')
+def obras_todas():
+    try:
+        obras = Obra.query.filter(Obra.ativo == True).order_by(Obra.nome).all()
+        
+        return jsonify([{
+            'id': obra.id,
+            'nome': obra.nome,
+            'codigo': obra.codigo or 'S/C',
+            'endereco': obra.endereco or 'Endereço não informado'
+        } for obra in obras])
+        
+    except Exception as e:
+        print(f"Erro ao carregar todas as obras: {str(e)}")
+        return jsonify([]), 500
+```
+
+FRONTEND - JavaScript Corrigido:
+```javascript
+// Inicializar dropdown de obras - VERSÃO CORRIGIDA
+function inicializarDropdownObras() {
+    const obraSelect = $('#obra_select');
+    
+    // Primeiro tentar carregar todas as obras (fallback)
+    $.get('/api/obras/todas')
+        .done(function(obras) {
+            console.log('Obras carregadas:', obras);
+            
+            // Limpar opções existentes
+            obraSelect.empty().append('<option value="">Selecione a obra...</option>');
+            
+            // Adicionar obras
+            obras.forEach(function(obra) {
+                obraSelect.append(new Option(
+                    `${obra.nome} - ${obra.codigo}`, 
+                    obra.id
+                ));
+            });
+            
+            // Se tem obras, inicializar Select2
+            if (obras.length > 0) {
+                obraSelect.select2({
+                    placeholder: 'Selecione a obra...',
+                    allowClear: true,
+                    templateResult: function(data) {
+                        if (!data.id) return data.text;
+                        
+                        const obra = obras.find(o => o.id == data.id);
+                        if (!obra) return data.text;
+                        
+                        return $(`
+                            <div>
+                                <strong>${obra.nome}</strong><br>
+                                <small class="text-muted">${obra.endereco}</small>
+                            </div>
+                        `);
+                    }
+                });
+            } else {
+                // Se não tem obras, mostrar mensagem
+                obraSelect.append('<option value="">Nenhuma obra cadastrada</option>');
+            }
+        })
+        .fail(function(xhr, status, error) {
+            console.error('Erro ao carregar obras:', error);
+            obraSelect.empty().append('<option value="">Erro ao carregar obras</option>');
+        });
+}
+
+// Chamar quando página carregar
+$(document).ready(function() {
+    inicializarDropdownObras();
+});
+```
+
+CORREÇÃO 2: DROPDOWN DE FUNCIONÁRIOS - INICIALIZAÇÃO CORRETA
+
+```python
+@app.route('/api/funcionarios/autocomplete')
+def funcionarios_autocomplete():
+    try:
+        q = request.args.get('q', '').strip()
+        
+        # Query base - funcionários ativos
+        query = Funcionario.query.filter(Funcionario.ativo == True)
+        
+        # Se tem termo de busca
+        if q:
+            query = query.filter(
+                db.or_(
+                    Funcionario.nome.ilike(f'%{q}%'),
+                    Funcionario.codigo.ilike(f'%{q}%'),
+                    Funcionario.cpf.ilike(f'%{q}%')
+                )
+            )
+        
+        funcionarios = query.order_by(Funcionario.nome).limit(20).all()
+        
+        print(f"Buscando funcionários: '{q}' - Encontrados: {len(funcionarios)}")
+        
+        resultado = []
+        for func in funcionarios:
+            resultado.append({
+                'id': func.id,
+                'nome': func.nome,
+                'codigo': func.codigo or f'F{func.id:03d}',
+                'funcao': func.funcao.nome if func.funcao else 'Não definida',
+                'salario': float(func.salario) if func.salario else 0,
+                'presente_hoje': True  # Por enquanto sempre true
+            })
+        
+        return jsonify(resultado)
+        
+    except Exception as e:
+        print(f"Erro no endpoint funcionarios_autocomplete: {str(e)}")
+        return jsonify([]), 500
+
+# Endpoint para todos os funcionários (fallback)
+@app.route('/api/funcionarios/todos')
+def funcionarios_todos():
+    try:
+        funcionarios = Funcionario.query.filter(Funcionario.ativo == True).order_by(Funcionario.nome).all()
+        
+        return jsonify([{
+            'id': func.id,
+            'nome': func.nome,
+            'codigo': func.codigo or f'F{func.id:03d}',
+            'funcao': func.funcao.nome if func.funcao else 'Não definida'
+        } for func in funcionarios])
+        
+    except Exception as e:
+        print(f"Erro ao carregar funcionários: {str(e)}")
+        return jsonify([]), 500
+```
+
+```javascript
+// Inicializar funcionários quando adicionar novo item
+function adicionarFuncionario() {
+    const container = document.getElementById('container_funcionarios');
+    const template = document.getElementById('template_funcionario');
+    const novoItem = template.cloneNode(true);
+    
+    novoItem.style.display = 'block';
+    novoItem.id = `funcionario_${Date.now()}`;
+    
+    container.appendChild(novoItem);
+    
+    // Inicializar Select2 no novo elemento - CORRIGIDO
+    const select = $(novoItem).find('.funcionario-select');
+    
+    // Primeiro carregar dados
+    $.get('/api/funcionarios/todos')
+        .done(function(funcionarios) {
+            console.log('Funcionários carregados:', funcionarios);
+            
+            // Limpar e adicionar opções
+            select.empty().append('<option value="">Selecione o funcionário...</option>');
+            
+            funcionarios.forEach(function(func) {
+                select.append(new Option(
+                    `${func.nome} (${func.codigo})`, 
+                    func.id
+                ));
+            });
+            
+            // Inicializar Select2
+            select.select2({
+                placeholder: 'Digite para buscar funcionário...',
+                allowClear: true,
+                templateResult: function(data) {
+                    if (!data.id) return data.text;
+                    
+                    const func = funcionarios.find(f => f.id == data.id);
+                    if (!func) return data.text;
+                    
+                    return $(`
+                        <div>
+                            <strong>${func.nome}</strong><br>
+                            <small class="text-muted">${func.codigo} - ${func.funcao}</small>
+                        </div>
+                    `);
+                }
+            });
+        })
+        .fail(function() {
+            select.empty().append('<option value="">Erro ao carregar funcionários</option>');
+        });
+}
+```
+
+CORREÇÃO 3: LÓGICA DE HORÁRIOS - PREENCHIMENTO FLEXÍVEL
+
+```javascript
+// Nova lógica para horários - permite manual ou automático
+function carregarDadosPonto(selectElement) {
+    const funcionarioId = selectElement.value;
+    const dataRDO = document.getElementById('data_relatorio').value;
+    const funcionarioCard = selectElement.closest('.funcionario-item');
+    
+    if (!funcionarioId || !dataRDO) {
+        habilitarPreenchimentoManual(funcionarioCard);
+        return;
+    }
+    
+    // Tentar buscar dados do ponto
+    fetch(`/api/ponto/funcionario/${funcionarioId}/data/${dataRDO}`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.success && data.registro_ponto) {
+                // Tem ponto - preencher automaticamente
+                preencherDadosPonto(funcionarioCard, data.registro_ponto);
+                mostrarMensagem(funcionarioCard, 'Dados do ponto carregados automaticamente', 'success');
+            } else {
+                // Não tem ponto - permitir preenchimento manual
+                habilitarPreenchimentoManual(funcionarioCard);
+                mostrarMensagem(funcionarioCard, 'Ponto não encontrado - preencha manualmente', 'warning');
+            }
+        })
+        .catch(error => {
+            console.error('Erro ao buscar ponto:', error);
+            habilitarPreenchimentoManual(funcionarioCard);
+            mostrarMensagem(funcionarioCard, 'Erro ao buscar ponto - preencha manualmente', 'warning');
+        });
+}
+
+function preencherDadosPonto(card, registro) {
+    card.querySelector('.hora-entrada').value = registro.hora_entrada || '';
+    card.querySelector('.hora-saida').value = registro.hora_saida || '';
+    card.querySelector('.total-horas').value = registro.horas_trabalhadas || '0.0';
+    
+    // Campos readonly quando vem do ponto
+    card.querySelector('.hora-entrada').readOnly = true;
+    card.querySelector('.hora-saida').readOnly = true;
+    card.querySelector('.total-horas').readOnly = true;
+    
+    card.querySelector('input[type="checkbox"]').checked = true;
+}
+
+function habilitarPreenchimentoManual(card) {
+    // Limpar campos
+    card.querySelector('.hora-entrada').value = '';
+    card.querySelector('.hora-saida').value = '';
+    card.querySelector('.total-horas').value = '';
+    
+    // Habilitar edição manual
+    card.querySelector('.hora-entrada').readOnly = false;
+    card.querySelector('.hora-saida').readOnly = false;
+    card.querySelector('.total-horas').readOnly = false;
+    
+    // Adicionar eventos para calcular horas automaticamente
+    const entradaInput = card.querySelector('.hora-entrada');
+    const saidaInput = card.querySelector('.hora-saida');
+    const totalInput = card.querySelector('.total-horas');
+    
+    function calcularHoras() {
+        const entrada = entradaInput.value;
+        const saida = saidaInput.value;
+        
+        if (entrada && saida) {
+            const [hE, mE] = entrada.split(':').map(Number);
+            const [hS, mS] = saida.split(':').map(Number);
+            
+            const minutosEntrada = hE * 60 + mE;
+            const minutosSaida = hS * 60 + mS;
+            
+            let diferencaMinutos = minutosSaida - minutosEntrada;
+            if (diferencaMinutos < 0) diferencaMinutos += 24 * 60; // Passou da meia-noite
+            
+            const horas = (diferencaMinutos / 60).toFixed(1);
+            totalInput.value = horas;
+        }
+    }
+    
+    entradaInput.addEventListener('change', calcularHoras);
+    saidaInput.addEventListener('change', calcularHoras);
+}
+
+function mostrarMensagem(card, texto, tipo) {
+    // Remove mensagem anterior
+    const msgAnterior = card.querySelector('.mensagem-ponto');
+    if (msgAnterior) msgAnterior.remove();
+    
+    // Adiciona nova mensagem
+    const alerta = document.createElement('div');
+    alerta.className = `alert alert-${tipo} alert-sm mt-2 mensagem-ponto`;
+    alerta.innerHTML = `<small><i class="fas fa-info-circle"></i> ${texto}</small>`;
+    
+    card.querySelector('.card-body').appendChild(alerta);
+    
+    // Remove após 5 segundos
+    setTimeout(() => {
+        if (alerta.parentNode) alerta.remove();
+    }, 5000);
+}
+```
+
+CORREÇÃO 4: CADASTRO DE SERVIÇOS - VALIDAÇÃO ADEQUADA
+
+```python
+@app.route('/api/servicos', methods=['POST'])
+def criar_servico():
+    try:
+        dados = request.get_json()
+        
+        # VALIDAÇÃO CRÍTICA - não salvar se dados obrigatórios estão vazios
+        if not dados.get('nome', '').strip():
+            return jsonify({
+                'success': False,
+                'message': 'Nome do serviço é obrigatório'
+            }), 400
+            
+        if not dados.get('categoria', '').strip():
+            return jsonify({
+                'success': False,
+                'message': 'Categoria é obrigatória'
+            }), 400
+            
+        if not dados.get('unidade_medida', '').strip():
+            return jsonify({
+                'success': False,
+                'message': 'Unidade de medida é obrigatória'
+            }), 400
+        
+        # Verificar se já existe serviço com mesmo nome
+        servico_existente = Servico.query.filter_by(
+            nome=dados['nome'].strip(),
+            ativo=True
+        ).first()
+        
+        if servico_existente:
+            return jsonify({
+                'success': False,
+                'message': 'Já existe um serviço com este nome'
+            }), 400
+        
+        # Criar serviço
+        servico = Servico(
+            nome=dados['nome'].strip(),
+            descricao=dados.get('descricao', '').strip(),
+            categoria=dados['categoria'].strip(),
+            unidade_medida=dados['unidade_medida'].strip(),
+            complexidade=int(dados.get('complexidade', 3)),
+            requer_especializacao=bool(dados.get('requer_especializacao', False)),
+            ativo=True
+        )
+        
+        db.session.add(servico)
+        db.session.flush()  # Para obter o ID
+        
+        # Adicionar subatividades se existirem
+        subatividades_dados = dados.get('subatividades', [])
+        for sub_dados in subatividades_dados:
+            if sub_dados.get('nome', '').strip():  # Só adicionar se tem nome
+                subatividade = SubAtividade(
+                    servico_id=servico.id,
+                    nome=sub_dados['nome'].strip(),
+                    descricao=sub_dados.get('descricao', '').strip(),
+                    ordem_execucao=sub_dados.get('ordem_execucao', 1),
+                    ferramentas_necessarias=sub_dados.get('ferramentas_necessarias', '').strip(),
+                    materiais_principais=sub_dados.get('materiais_principais', '').strip(),
+                    requer_aprovacao=bool(sub_dados.get('requer_aprovacao', False)),
+                    pode_executar_paralelo=bool(sub_dados.get('pode_executar_paralelo', True)),
+                    qualificacao_minima=sub_dados.get('qualificacao_minima', '').strip(),
+                    ativo=True
+                )
+                db.session.add(subatividade)
+        
+        db.session.commit()
+        
+        return jsonify({
+            'success': True,
+            'message': 'Serviço criado com sucesso',
+            'servico_id': servico.id
+        })
+        
+    except Exception as e:
+        db.session.rollback()
+        print(f"Erro ao criar serviço: {str(e)}")
+        return jsonify({
+            'success': False,
+            'message': f'Erro interno: {str(e)}'
+        }), 500
+
+@app.route('/api/servicos/<int:servico_id>', methods=['PUT'])
+def editar_servico(servico_id):
+    try:
+        servico = Servico.query.get_or_404(servico_id)
+        dados = request.get_json()
+        
+        # Mesmas validações do POST
+        if not dados.get('nome', '').strip():
+            return jsonify({
+                'success': False,
+                'message': 'Nome do serviço é obrigatório'
+            }), 400
+        
+        # Verificar nome duplicado (exceto o próprio)
+        servico_existente = Servico.query.filter(
+            Servico.nome == dados['nome'].strip(),
+            Servico.id != servico_id,
+            Servico.ativo == True
+        ).first()
+        
+        if servico_existente:
+            return jsonify({
+                'success': False,
+                'message': 'Já existe outro serviço com este nome'
+            }), 400
+        
+        # Atualizar dados
+        servico.nome = dados['nome'].strip()
+        servico.descricao = dados.get('descricao', '').strip()
+        servico.categoria = dados['categoria'].strip()
+        servico.unidade_medida = dados['unidade_medida'].strip()
+        servico.complexidade = int(dados.get('complexidade', 3))
+        servico.requer_especializacao = bool(dados.get('requer_especializacao', False))
+        
+        # Remover subatividades antigas
+        SubAtividade.query.filter_by(servico_id=servico_id).delete()
+        
+        # Adicionar novas subatividades
+        subatividades_dados = dados.get('subatividades', [])
+        for sub_dados in subatividades_dados:
+            if sub_dados.get('nome', '').strip():
+                subatividade = SubAtividade(
+                    servico_id=servico.id,
+                    nome=sub_dados['nome'].strip(),
+                    descricao=sub_dados.get('descricao', '').strip(),
+                    ordem_execucao=sub_dados.get('ordem_execucao', 1),
+                    ferramentas_necessarias=sub_dados.get('ferramentas_necessarias', '').strip(),
+                    materiais_principais=sub_dados.get('materiais_principais', '').strip(),
+                    requer_aprovacao=bool(sub_dados.get('requer_aprovacao', False)),
+                    pode_executar_paralelo=bool(sub_dados.get('pode_executar_paralelo', True)),
+                    qualificacao_minima=sub_dados.get('qualificacao_minima', '').strip(),
+                    ativo=True
+                )
+                db.session.add(subatividade)
+        
+        db.session.commit()
+        
+        return jsonify({
+            'success': True,
+            'message': 'Serviço atualizado com sucesso'
+        })
+        
+    except Exception as e:
+        db.session.rollback()
+        print(f"Erro ao editar serviço: {str(e)}")
+        return jsonify({
+            'success': False,
+            'message': f'Erro interno: {str(e)}'
+        }), 500
+```
+
+CORREÇÃO 5: SUBATIVIDADES NO RDO - CARREGAMENTO CORRETO
+
+```javascript
+// Inicializar dropdown de serviços quando adicionar atividade
+function adicionarAtividade() {
+    const container = document.getElementById('container_atividades');
+    const template = document.getElementById('template_atividade');
+    const novoItem = template.cloneNode(true);
+    
+    novoItem.style.display = 'block';
+    novoItem.id = `atividade_${Date.now()}`;
+    
+    container.appendChild(novoItem);
+    
+    // Inicializar dropdown de serviços - CORRIGIDO
+    const select = $(novoItem).find('.servico-select');
+    
+    $.get('/api/servicos/todos')
+        .done(function(servicos) {
+            console.log('Serviços carregados:', servicos);
+            
+            select.empty().append('<option value="">Selecione o serviço...</option>');
+            
+            servicos.forEach(function(servico) {
+                select.append(new Option(servico.nome, servico.id));
+            });
+            
+            select.select2({
+                placeholder: 'Digite para buscar serviço...',
+                allowClear: true
+            });
+        })
+        .fail(function() {
+            select.empty().append('<option value="">Erro ao carregar serviços</option>');
+        });
+}
+
+// Endpoint para todos os serviços
+@app.route('/api/servicos/todos')
+def servicos_todos():
+    try:
+        servicos = Servico.query.filter(Servico.ativo == True).order_by(Servico.nome).all()
+        
+        return jsonify([{
+            'id': servico.id,
+            'nome': servico.nome,
+            'categoria': servico.categoria,
+            'unidade_medida': servico.unidade_medida
+        } for servico in servicos])
+        
+    except Exception as e:
+        print(f"Erro ao carregar serviços: {str(e)}")
+        return jsonify([]), 500
+
+// Carregar subatividades - VERSÃO CORRIGIDA
+function carregarSubatividades(selectElement) {
+    const servicoId = selectElement.value;
+    const atividadeCard = selectElement.closest('.atividade-item');
+    const subatividadesContainer = atividadeCard.querySelector('.subatividades-container');
+    const subatividadesList = atividadeCard.querySelector('.subatividades-list');
+    const unidadeDisplay = atividadeCard.querySelector('.unidade-display');
+    
+    console.log('Carregando subatividades para serviço:', servicoId);
+    
+    if (!servicoId) {
+        subatividadesContainer.style.display = 'none';
+        unidadeDisplay.textContent = '-';
+        return;
+    }
+    
+    // Mostrar loading
+    subatividadesList.innerHTML = '<div class="text-center p-3"><i class="fas fa-spinner fa-spin"></i> Carregando subatividades...</div>';
+    subatividadesContainer.style.display = 'block';
+    
+    // Buscar dados do serviço
+    fetch(`/api/servicos/${servicoId}/completo`)
+        .then(response => {
+            console.log('Response status:', response.status);
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}`);
+            }
+            return response.json();
+        })
+        .then(servico => {
+            console.log('Serviço carregado:', servico);
+            
+            // Atualizar unidade
+            const simbolos = {
+                'm2': 'm²', 'm3': 'm³', 'kg': 'kg', 'ton': 'ton', 
+                'un': 'un', 'm': 'm', 'h': 'h'
+            };
+            
+            const simbolo = simbolos[servico.unidade_medida] || servico.unidade_medida;
+            unidadeDisplay.textContent = simbolo;
+            
+            // Carregar subatividades
+            if (servico.subatividades && servico.subatividades.length > 0) {
+                subatividadesList.innerHTML = '';
+                
+                servico.subatividades.forEach(sub => {
+                    const subDiv = document.createElement('div');
+                    subDiv.className = 'col-md-6 mb-2';
+                    subDiv.innerHTML = `
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" 
+                                   id="sub_${sub.id}_${Date.now()}" value="${sub.id}">
+                            <label class="form-check-label" for="sub_${sub.id}_${Date.now()}">
+                                <strong>${sub.nome}</strong>
+                                ${sub.ordem_execucao ? `<span class="badge bg-secondary ms-1">${sub.ordem_execucao}</span>` : ''}
+                                <br>
+                                <small class="text-muted">${sub.descricao || 'Sem descrição'}</small>
+                            </label>
+                        </div>
+                    `;
+                    subatividadesList.appendChild(subDiv);
+                });
+                
+                console.log(`${servico.subatividades.length} subatividades carregadas`);
+            } else {
+                subatividadesList.innerHTML = `
+                    <div class="col-12">
+                        <div class="alert alert-info">
+                            <i class="fas fa-info-circle"></i> 
+                            Este serviço não possui subatividades cadastradas.
+                        </div>
+                    </div>
+                `;
+            }
+        })
+        .catch(error => {
+            console.error('Erro ao carregar subatividades:', error);
+            subatividadesList.innerHTML = `
+                <div class="col-12">
+                    <div class="alert alert-danger">
+                        <i class="fas fa-exclamation-triangle"></i> 
+                        Erro ao carregar subatividades: ${error.message}
+                    </div>
+                </div>
+            `;
+        });
+}
+```
+
+TESTES DE VALIDAÇÃO:
+
+```javascript
+// Função para testar se os endpoints estão funcionando
+function testarEndpoints() {
+    console.log('=== TESTANDO ENDPOINTS ===');
+    
+    // Testar obras
+    fetch('/api/obras/todas')
+        .then(r => r.json())
+        .then(data => console.log('Obras:', data))
+        .catch(e => console.error('Erro obras:', e));
+    
+    // Testar funcionários
+    fetch('/api/funcionarios/todos')
+        .then(r => r.json())
+        .then(data => console.log('Funcionários:', data))
+        .catch(e => console.error('Erro funcionários:', e));
+    
+    // Testar serviços
+    fetch('/api/servicos/todos')
+        .then(r => r.json())
+        .then(data => console.log('Serviços:', data))
+        .catch(e => console.error('Erro serviços:', e));
+}
+
+// Chamar no console do navegador para testar
+// testarEndpoints();
+```
+
+CRITÉRIOS DE SUCESSO:
+- [ ] Dropdown de obras mostra as 2 obras cadastradas
+- [ ] Dropdown de funcionários carrega e funciona
+- [ ] Horários podem ser preenchidos manual ou automaticamente
+- [ ] Cadastro de serviços não cria registros vazios
+- [ ] Subatividades aparecem após selecionar serviço
+- [ ] Todos os endpoints retornam dados corretos
+- [ ] Console do navegador sem erros JavaScript
+
+COMANDOS PARA DEBUG:
+```bash
+# Verificar dados no banco
+SELECT id, nome, ativo FROM obra WHERE ativo = true;
+SELECT id, nome, ativo FROM funcionario WHERE ativo = true;
+SELECT id, nome, ativo FROM servico WHERE ativo = true;
+SELECT * FROM sub_atividade WHERE ativo = true;
+```
+```
+
+---
+
+**RESULTADO**: Correções específicas para todos os bugs identificados, com validações adequadas, endpoints corrigidos e logs para debug.
+

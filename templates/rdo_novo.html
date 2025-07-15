@@ -1023,3 +1023,206 @@ function voltarListagem() {
 }
 </script>
 {% endblock %}
+// ===== CORREÇÕES CRÍTICAS RDO =====
+
+// Inicializar dropdown de obra - CORRIGIDO
+function inicializarDropdownObraCorrigido() {
+    const obraSelect = $("#obra_select");
+    
+    // Primeiro tentar carregar todas as obras (fallback)
+    $.get("/api/obras/todas")
+        .done(function(obras) {
+            console.log("Obras carregadas:", obras);
+            
+            // Limpar opções existentes
+            obraSelect.empty().append("<option value=\"\">Selecione a obra...</option>");
+            
+            // Adicionar obras
+            obras.forEach(function(obra) {
+                obraSelect.append(new Option(
+                    `${obra.nome} - ${obra.codigo}`, 
+                    obra.id
+                ));
+            });
+            
+            // Se tem obras, inicializar Select2
+            if (obras.length > 0) {
+                obraSelect.select2({
+                    placeholder: "Selecione a obra...",
+                    allowClear: true,
+                    templateResult: function(data) {
+                        if (!data.id) return data.text;
+                        
+                        const obra = obras.find(o => o.id == data.id);
+                        if (!obra) return data.text;
+                        
+                        return $(`
+                            <div>
+                                <strong>${obra.nome}</strong><br>
+                                <small class="text-muted">${obra.endereco}</small>
+                            </div>
+                        `);
+                    }
+                });
+            } else {
+                // Se não tem obras, mostrar mensagem
+                obraSelect.append("<option value=\"\">Nenhuma obra cadastrada</option>");
+            }
+        })
+        .fail(function(xhr, status, error) {
+            console.error("Erro ao carregar obras:", error);
+            obraSelect.empty().append("<option value=\"\">Erro ao carregar obras</option>");
+        });
+}
+
+// Corrigir carregamento de funcionários
+function adicionarFuncionarioCorrigido() {
+    const container = document.getElementById("container_funcionarios");
+    const template = document.getElementById("template_funcionario");
+    const novoItem = template.cloneNode(true);
+    
+    novoItem.style.display = "block";
+    novoItem.id = `funcionario_${Date.now()}`;
+    
+    container.appendChild(novoItem);
+    
+    // Inicializar Select2 no novo elemento - CORRIGIDO
+    const select = $(novoItem).find(".funcionario-select");
+    
+    // Primeiro carregar dados
+    $.get("/api/funcionarios/todos")
+        .done(function(funcionarios) {
+            console.log("Funcionários carregados:", funcionarios);
+            
+            // Limpar e adicionar opções
+            select.empty().append("<option value=\"\">Selecione o funcionário...</option>");
+            
+            funcionarios.forEach(function(func) {
+                select.append(new Option(
+                    `${func.nome} (${func.codigo})`, 
+                    func.id
+                ));
+            });
+            
+            // Inicializar Select2
+            select.select2({
+                placeholder: "Digite para buscar funcionário...",
+                allowClear: true,
+                templateResult: function(data) {
+                    if (!data.id) return data.text;
+                    
+                    const func = funcionarios.find(f => f.id == data.id);
+                    if (!func) return data.text;
+                    
+                    return $(`
+                        <div>
+                            <strong>${func.nome}</strong><br>
+                            <small class="text-muted">${func.codigo} - ${func.funcao}</small>
+                        </div>
+                    `);
+                }
+            });
+            
+            // Evento de seleção
+            select.on("select2:select", function(e) {
+                const funcionarioCard = e.target.closest(".funcionario-item");
+                const funcionarioId = e.params.data.id;
+                
+                // Carregar dados do ponto
+                carregarDadosPontoCorrigido(funcionarioCard, funcionarioId);
+            });
+        })
+        .fail(function() {
+            select.empty().append("<option value=\"\">Erro ao carregar funcionários</option>");
+        });
+}
+
+// Carregar dados do ponto com lógica flexível
+function carregarDadosPontoCorrigido(funcionarioCard, funcionarioId) {
+    const dataRDO = document.getElementById("data_relatorio").value;
+    
+    if (!funcionarioId || !dataRDO) {
+        habilitarPreenchimentoManual(funcionarioCard);
+        return;
+    }
+    
+    // Tentar buscar dados do ponto
+    fetch(`/api/ponto/funcionario/${funcionarioId}/data/${dataRDO}`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.success && data.registro_ponto) {
+                // Tem ponto - preencher automaticamente
+                preencherDadosPonto(funcionarioCard, data.registro_ponto);
+                mostrarMensagem(funcionarioCard, "Dados do ponto carregados automaticamente", "success");
+            } else {
+                // Não tem ponto - permitir preenchimento manual
+                habilitarPreenchimentoManual(funcionarioCard);
+                mostrarMensagem(funcionarioCard, "Ponto não encontrado - preencha manualmente", "warning");
+            }
+        })
+        .catch(error => {
+            console.error("Erro ao buscar ponto:", error);
+            habilitarPreenchimentoManual(funcionarioCard);
+            mostrarMensagem(funcionarioCard, "Erro ao buscar ponto - preencha manualmente", "warning");
+        });
+}
+
+function preencherDadosPonto(card, registro) {
+    card.querySelector(".hora-entrada").value = registro.hora_entrada || "";
+    card.querySelector(".hora-saida").value = registro.hora_saida || "";
+    card.querySelector(".total-horas").value = registro.horas_trabalhadas || "0.0";
+    
+    // Campos readonly quando vem do ponto
+    card.querySelector(".hora-entrada").readOnly = true;
+    card.querySelector(".hora-saida").readOnly = true;
+    card.querySelector(".total-horas").readOnly = true;
+    
+    card.querySelector("input[type=\"checkbox\"]").checked = true;
+}
+
+function habilitarPreenchimentoManual(card) {
+    // Limpar campos
+    card.querySelector(".hora-entrada").value = "";
+    card.querySelector(".hora-saida").value = "";
+    card.querySelector(".total-horas").value = "";
+    
+    // Habilitar edição manual
+    card.querySelector(".hora-entrada").readOnly = false;
+    card.querySelector(".hora-saida").readOnly = false;
+    card.querySelector(".total-horas").readOnly = false;
+    
+    card.querySelector("input[type=\"checkbox\"]").checked = false;
+}
+
+function mostrarMensagem(card, mensagem, tipo) {
+    // Remover mensagem anterior
+    const mensagemAnterior = card.querySelector(".mensagem-status");
+    if (mensagemAnterior) {
+        mensagemAnterior.remove();
+    }
+    
+    // Adicionar nova mensagem
+    const div = document.createElement("div");
+    div.className = `alert alert-${tipo} alert-sm mt-2 mensagem-status`;
+    div.innerHTML = `<small>${mensagem}</small>`;
+    card.querySelector(".card-body").appendChild(div);
+    
+    // Remover após 5 segundos
+    setTimeout(() => {
+        div.remove();
+    }, 5000);
+}
+
+// Aplicar correções na inicialização
+$(document).ready(function() {
+    // Aguardar carregamento completo
+    setTimeout(function() {
+        inicializarDropdownObraCorrigido();
+        
+        // Sobrescrever função original
+        window.adicionarFuncionario = adicionarFuncionarioCorrigido;
+        
+        console.log("Correções RDO aplicadas!");
+    }, 500);
+});
+
