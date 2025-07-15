@@ -97,11 +97,61 @@ class Veiculo(db.Model):
 
 
 class Servico(db.Model):
+    """Serviços para coleta de dados reais via RDO - SIGE v6.3"""
     id = db.Column(db.Integer, primary_key=True)
     nome = db.Column(db.String(100), nullable=False)
     descricao = db.Column(db.Text)
-    preco_unitario = db.Column(db.Float, default=0.0)
+    categoria = db.Column(db.String(50), nullable=False)  # estrutura, alvenaria, acabamento, etc.
+    unidade_medida = db.Column(db.String(10), nullable=False)  # m2, m3, kg, ton, un, m, h
+    complexidade = db.Column(db.Integer, default=3)  # 1-5 para análise futura
+    requer_especializacao = db.Column(db.Boolean, default=False)
+    ativo = db.Column(db.Boolean, default=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    # Relacionamentos
+    subatividades = db.relationship('SubAtividade', backref='servico', cascade='all, delete-orphan', lazy=True)
+    historico_produtividade = db.relationship('HistoricoProdutividadeServico', backref='servico', lazy=True)
+
+class SubAtividade(db.Model):
+    """Subatividades de um serviço para coleta detalhada de dados"""
+    __tablename__ = 'sub_atividade'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    servico_id = db.Column(db.Integer, db.ForeignKey('servico.id'), nullable=False)
+    nome = db.Column(db.String(100), nullable=False)
+    descricao = db.Column(db.Text)
+    ordem_execucao = db.Column(db.Integer, nullable=False)
+    ferramentas_necessarias = db.Column(db.Text)
+    materiais_principais = db.Column(db.Text)
+    requer_aprovacao = db.Column(db.Boolean, default=False)
+    pode_executar_paralelo = db.Column(db.Boolean, default=True)
+    qualificacao_minima = db.Column(db.String(50))  # ajudante, meio_oficial, oficial, especialista
+    ativo = db.Column(db.Boolean, default=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    
+    # Relacionamentos
+    historico_produtividade = db.relationship('HistoricoProdutividadeServico', backref='sub_atividade', lazy=True)
+
+class HistoricoProdutividadeServico(db.Model):
+    """Histórico de produtividade coletado via RDO"""
+    __tablename__ = 'historico_produtividade_servico'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    servico_id = db.Column(db.Integer, db.ForeignKey('servico.id'), nullable=False)
+    sub_atividade_id = db.Column(db.Integer, db.ForeignKey('sub_atividade.id'))
+    obra_id = db.Column(db.Integer, db.ForeignKey('obra.id'), nullable=False)
+    funcionario_id = db.Column(db.Integer, db.ForeignKey('funcionario.id'), nullable=False)
+    data_execucao = db.Column(db.Date, nullable=False)
+    quantidade_executada = db.Column(db.Numeric(10, 4), nullable=False)
+    tempo_execucao_horas = db.Column(db.Numeric(8, 2), nullable=False)
+    custo_mao_obra_real = db.Column(db.Numeric(10, 2), nullable=False)  # calculado automaticamente
+    produtividade_hora = db.Column(db.Numeric(8, 4), nullable=False)  # quantidade/hora
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    
+    # Relacionamentos
+    obra = db.relationship('Obra', backref='historico_produtividade', lazy=True)
+    funcionario = db.relationship('Funcionario', backref='historico_produtividade', lazy=True)
 
 class RegistroPonto(db.Model):
     id = db.Column(db.Integer, primary_key=True)

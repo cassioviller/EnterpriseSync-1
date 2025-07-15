@@ -1443,55 +1443,310 @@ def novo_custo_veiculo_lista():
     
     return redirect(url_for('main.veiculos'))
 
-# Serviços
+# ============================================================================
+# MÓDULO DE SERVIÇOS - SIGE v6.3
+# Sistema de cadastro de serviços para coleta de dados reais via RDO
+# ============================================================================
+
 @main_bp.route('/servicos')
 @login_required
 def servicos():
-    servicos = Servico.query.all()
-    return render_template('servicos.html', servicos=servicos)
+    """Página de listagem de serviços com filtros"""
+    # Filtros
+    categoria = request.args.get('categoria')
+    ativo = request.args.get('ativo')
+    
+    # Query base
+    query = Servico.query
+    
+    # Aplicar filtros
+    if categoria:
+        query = query.filter(Servico.categoria == categoria)
+    if ativo:
+        query = query.filter(Servico.ativo == (ativo == 'true'))
+    
+    # Ordenar e buscar
+    servicos = query.order_by(Servico.nome).all()
+    
+    # Dados para filtros
+    categorias = db.session.query(Servico.categoria).distinct().all()
+    categorias = [cat[0] for cat in categorias if cat[0]]
+    
+    return render_template('servicos.html', 
+                         servicos=servicos, 
+                         categorias=categorias,
+                         filtros={'categoria': categoria, 'ativo': ativo})
 
-@main_bp.route('/servicos/novo', methods=['GET', 'POST'])
+@main_bp.route('/api/servicos', methods=['POST'])
 @login_required
-def novo_servico():
-    form = ServicoForm()
-    if form.validate_on_submit():
+def api_criar_servico():
+    """API para criar serviço com subatividades"""
+    try:
+        dados = request.get_json()
+        
+        # Validar dados obrigatórios
+        if not dados.get('nome') or not dados.get('categoria') or not dados.get('unidade_medida'):
+            return jsonify({'success': False, 'message': 'Campos obrigatórios não preenchidos'})
+        
+        # Verificar se já existe serviço com mesmo nome
+        servico_existente = Servico.query.filter_by(nome=dados['nome']).first()
+        if servico_existente:
+            return jsonify({'success': False, 'message': 'Já existe um serviço com este nome'})
+        
+        # Criar serviço
         servico = Servico(
-            nome=form.nome.data,
-            descricao=form.descricao.data,
-            preco_unitario=form.preco_unitario.data or 0.0
+            nome=dados['nome'],
+            descricao=dados.get('descricao', ''),
+            categoria=dados['categoria'],
+            unidade_medida=dados['unidade_medida'],
+            complexidade=int(dados.get('complexidade', 3)),
+            requer_especializacao=dados.get('requer_especializacao', False),
+            ativo=True
         )
+        
         db.session.add(servico)
-        db.session.commit()
-        flash('Serviço cadastrado com sucesso!', 'success')
-        return redirect(url_for('main.servicos'))
-    
-    return render_template('servicos.html', form=form, servicos=Servico.query.all())
-
-@main_bp.route('/servicos/<int:id>/editar', methods=['GET', 'POST'])
-@login_required
-def editar_servico(id):
-    servico = Servico.query.get_or_404(id)
-    form = ServicoForm(obj=servico)
-    
-    if form.validate_on_submit():
-        servico.nome = form.nome.data
-        servico.descricao = form.descricao.data
-        servico.preco_unitario = form.preco_unitario.data or 0.0
+        db.session.flush()  # Para obter o ID do serviço
+        
+        # Criar subatividades
+        for i, sub_dados in enumerate(dados.get('subatividades', [])):
+            if sub_dados.get('nome'):
+                subatividade = SubAtividade(
+                    servico_id=servico.id,
+                    nome=sub_dados['nome'],
+                    descricao=sub_dados.get('descricao', ''),
+                    ordem_execucao=i + 1,
+                    ferramentas_necessarias=sub_dados.get('ferramentas_necessarias', ''),
+                    materiais_principais=sub_dados.get('materiais_principais', ''),
+                    requer_aprovacao=sub_dados.get('requer_aprovacao', False),
+                    pode_executar_paralelo=sub_dados.get('pode_executar_paralelo', True),
+                    qualificacao_minima=sub_dados.get('qualificacao_minima', ''),
+                    ativo=True
+                )
+                db.session.add(subatividade)
         
         db.session.commit()
-        flash('Serviço atualizado com sucesso!', 'success')
-        return redirect(url_for('main.servicos'))
-    
-    return render_template('servicos.html', form=form, servico=servico, servicos=Servico.query.all())
+        
+        return jsonify({
+            'success': True, 
+            'message': 'Serviço criado com sucesso!',
+            'servico_id': servico.id
+        })
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'message': f'Erro ao criar serviço: {str(e)}'})
 
-@main_bp.route('/servicos/<int:id>/excluir', methods=['POST'])
+@main_bp.route('/api/servicos/<int:id>', methods=['GET'])
 @login_required
-def excluir_servico(id):
-    servico = Servico.query.get_or_404(id)
-    db.session.delete(servico)
-    db.session.commit()
-    flash('Serviço excluído com sucesso!', 'success')
-    return redirect(url_for('main.servicos'))
+def api_obter_servico(id):
+    """API para obter dados de um serviço com subatividades"""
+    try:
+        servico = Servico.query.get_or_404(id)
+        
+        # Buscar subatividades
+        subatividades = SubAtividade.query.filter_by(servico_id=id).order_by(SubAtividade.ordem_execucao).all()
+        
+        dados = {
+            'id': servico.id,
+            'nome': servico.nome,
+            'descricao': servico.descricao,
+            'categoria': servico.categoria,
+            'unidade_medida': servico.unidade_medida,
+            'complexidade': servico.complexidade,
+            'requer_especializacao': servico.requer_especializacao,
+            'ativo': servico.ativo,
+            'subatividades': []
+        }
+        
+        for sub in subatividades:
+            dados['subatividades'].append({
+                'id': sub.id,
+                'nome': sub.nome,
+                'descricao': sub.descricao,
+                'ordem_execucao': sub.ordem_execucao,
+                'ferramentas_necessarias': sub.ferramentas_necessarias,
+                'materiais_principais': sub.materiais_principais,
+                'requer_aprovacao': sub.requer_aprovacao,
+                'pode_executar_paralelo': sub.pode_executar_paralelo,
+                'qualificacao_minima': sub.qualificacao_minima
+            })
+        
+        return jsonify({'success': True, 'dados': dados})
+        
+    except Exception as e:
+        return jsonify({'success': False, 'message': f'Erro ao obter serviço: {str(e)}'})
+
+@main_bp.route('/api/servicos/<int:id>', methods=['PUT'])
+@login_required
+def api_atualizar_servico(id):
+    """API para atualizar serviço com subatividades"""
+    try:
+        servico = Servico.query.get_or_404(id)
+        dados = request.get_json()
+        
+        # Validar dados obrigatórios
+        if not dados.get('nome') or not dados.get('categoria') or not dados.get('unidade_medida'):
+            return jsonify({'success': False, 'message': 'Campos obrigatórios não preenchidos'})
+        
+        # Verificar se já existe outro serviço com mesmo nome
+        servico_existente = Servico.query.filter(
+            Servico.nome == dados['nome'],
+            Servico.id != id
+        ).first()
+        if servico_existente:
+            return jsonify({'success': False, 'message': 'Já existe um serviço com este nome'})
+        
+        # Atualizar serviço
+        servico.nome = dados['nome']
+        servico.descricao = dados.get('descricao', '')
+        servico.categoria = dados['categoria']
+        servico.unidade_medida = dados['unidade_medida']
+        servico.complexidade = int(dados.get('complexidade', 3))
+        servico.requer_especializacao = dados.get('requer_especializacao', False)
+        servico.updated_at = datetime.utcnow()
+        
+        # Remover subatividades antigas
+        SubAtividade.query.filter_by(servico_id=id).delete()
+        
+        # Criar novas subatividades
+        for i, sub_dados in enumerate(dados.get('subatividades', [])):
+            if sub_dados.get('nome'):
+                subatividade = SubAtividade(
+                    servico_id=servico.id,
+                    nome=sub_dados['nome'],
+                    descricao=sub_dados.get('descricao', ''),
+                    ordem_execucao=i + 1,
+                    ferramentas_necessarias=sub_dados.get('ferramentas_necessarias', ''),
+                    materiais_principais=sub_dados.get('materiais_principais', ''),
+                    requer_aprovacao=sub_dados.get('requer_aprovacao', False),
+                    pode_executar_paralelo=sub_dados.get('pode_executar_paralelo', True),
+                    qualificacao_minima=sub_dados.get('qualificacao_minima', ''),
+                    ativo=True
+                )
+                db.session.add(subatividade)
+        
+        db.session.commit()
+        
+        return jsonify({
+            'success': True, 
+            'message': 'Serviço atualizado com sucesso!'
+        })
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'message': f'Erro ao atualizar serviço: {str(e)}'})
+
+@main_bp.route('/api/servicos/<int:id>', methods=['DELETE'])
+@login_required
+def api_excluir_servico(id):
+    """API para excluir serviço"""
+    try:
+        servico = Servico.query.get_or_404(id)
+        
+        # Verificar se há histórico de produtividade
+        historico_count = HistoricoProdutividadeServico.query.filter_by(servico_id=id).count()
+        if historico_count > 0:
+            return jsonify({
+                'success': False, 
+                'message': f'Não é possível excluir. Existem {historico_count} registros de produtividade vinculados a este serviço.'
+            })
+        
+        db.session.delete(servico)
+        db.session.commit()
+        
+        return jsonify({
+            'success': True, 
+            'message': 'Serviço excluído com sucesso!'
+        })
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'message': f'Erro ao excluir serviço: {str(e)}'})
+
+@main_bp.route('/api/servicos/<int:id>/toggle-ativo', methods=['POST'])
+@login_required
+def api_toggle_ativo_servico(id):
+    """API para ativar/desativar serviço"""
+    try:
+        servico = Servico.query.get_or_404(id)
+        servico.ativo = not servico.ativo
+        servico.updated_at = datetime.utcnow()
+        
+        db.session.commit()
+        
+        status = 'ativado' if servico.ativo else 'desativado'
+        return jsonify({
+            'success': True, 
+            'message': f'Serviço {status} com sucesso!',
+            'ativo': servico.ativo
+        })
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'message': f'Erro ao alterar status: {str(e)}'})
+
+@main_bp.route('/api/servicos/<int:id>/produtividade', methods=['GET'])
+@login_required
+def api_produtividade_servico(id):
+    """API para obter dados de produtividade do serviço"""
+    try:
+        servico = Servico.query.get_or_404(id)
+        
+        # Buscar histórico de produtividade
+        historicos = HistoricoProdutividadeServico.query.filter_by(servico_id=id).all()
+        
+        if not historicos:
+            return jsonify({
+                'success': True,
+                'dados': {
+                    'servico': servico.nome,
+                    'unidade_medida': servico.unidade_medida,
+                    'total_execucoes': 0,
+                    'estimativas': None,
+                    'historico': []
+                }
+            })
+        
+        # Calcular estimativas
+        tempo_medio = sum(float(h.tempo_execucao_horas) for h in historicos) / len(historicos)
+        custo_medio = sum(float(h.custo_mao_obra_real) for h in historicos) / len(historicos)
+        produtividade_media = sum(float(h.produtividade_hora) for h in historicos) / len(historicos)
+        
+        dados = {
+            'servico': servico.nome,
+            'unidade_medida': servico.unidade_medida,
+            'total_execucoes': len(historicos),
+            'estimativas': {
+                'tempo_medio_por_unidade': round(tempo_medio, 2),
+                'custo_medio_por_unidade': round(custo_medio, 2),
+                'produtividade_media': round(produtividade_media, 4)
+            },
+            'historico': []
+        }
+        
+        # Histórico detalhado
+        for h in historicos[-10:]:  # Últimos 10 registros
+            dados['historico'].append({
+                'data': h.data_execucao.strftime('%d/%m/%Y'),
+                'obra': h.obra.nome,
+                'funcionario': h.funcionario.nome,
+                'quantidade': float(h.quantidade_executada),
+                'tempo_horas': float(h.tempo_execucao_horas),
+                'custo_real': float(h.custo_mao_obra_real),
+                'produtividade': float(h.produtividade_hora)
+            })
+        
+        return jsonify({'success': True, 'dados': dados})
+        
+    except Exception as e:
+        return jsonify({'success': False, 'message': f'Erro ao obter produtividade: {str(e)}'})
+
+# Função auxiliar para processar dados de produtividade (chamada pelos RDOs)
+def processar_dados_produtividade(rdo_id):
+    """Processa dados do RDO e gera histórico de produtividade"""
+    # Esta função será integrada com o sistema RDO
+    # Por enquanto, é uma função placeholder
+    pass
 
 # Ponto
 @main_bp.route('/ponto')
