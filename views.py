@@ -1766,6 +1766,19 @@ def obras_autocomplete():
         'area_total_m2': float(obra.area_total_m2) if obra.area_total_m2 else 0
     } for obra in obras])
 
+@main_bp.route('/api/obras/todas')
+@login_required
+def api_obras_todas():
+    """API para carregar todas as obras (fallback)"""
+    obras = Obra.query.filter(Obra.ativo == True).order_by(Obra.nome).all()
+    return jsonify([{
+        'id': obra.id,
+        'nome': obra.nome,
+        'codigo': obra.codigo,
+        'endereco': obra.endereco,
+        'area_total_m2': float(obra.area_total_m2) if obra.area_total_m2 else 0
+    } for obra in obras])
+
 @main_bp.route('/api/servicos/autocomplete')
 @login_required
 def servicos_autocomplete():
@@ -1799,6 +1812,18 @@ def funcionarios_autocomplete():
         )
     ).filter(Funcionario.ativo == True).limit(10).all()
     
+    return jsonify([{
+        'id': funcionario.id,
+        'nome': funcionario.nome,
+        'codigo': funcionario.codigo,
+        'funcao': funcionario.funcao.nome if funcionario.funcao else 'Sem função'
+    } for funcionario in funcionarios])
+
+@main_bp.route('/api/funcionarios/todos')
+@login_required
+def api_funcionarios_todos():
+    """API para carregar todos os funcionários (fallback)"""
+    funcionarios = Funcionario.query.filter(Funcionario.ativo == True).order_by(Funcionario.nome).all()
     return jsonify([{
         'id': funcionario.id,
         'nome': funcionario.nome,
@@ -3631,23 +3656,7 @@ def api_obras_autocomplete():
         print(f"Erro no endpoint obras_autocomplete: {str(e)}")
         return jsonify([]), 500
 
-@main_bp.route("/api/obras/todas")
-@login_required
-def api_obras_todas():
-    """API para carregar todas as obras (fallback)"""
-    try:
-        obras = Obra.query.filter(Obra.ativo == True).order_by(Obra.nome).all()
-        
-        return jsonify([{
-            "id": obra.id,
-            "nome": obra.nome,
-            "codigo": obra.codigo or "S/C",
-            "endereco": obra.endereco or "Endereço não informado"
-        } for obra in obras])
-        
-    except Exception as e:
-        print(f"Erro ao carregar todas as obras: {str(e)}")
-        return jsonify([]), 500
+# Endpoint duplicado removido - já existe na linha 1771
 
 @main_bp.route("/api/funcionarios/rdo-autocomplete")
 @login_required
@@ -3710,23 +3719,7 @@ def api_funcionarios_rdo_autocomplete():
         print(f"Erro no endpoint funcionarios_rdo_autocomplete: {str(e)}")
         return jsonify([]), 500
 
-@main_bp.route("/api/funcionarios/todos")
-@login_required
-def api_funcionarios_todos():
-    """API para carregar todos os funcionários (fallback)"""
-    try:
-        funcionarios = Funcionario.query.filter(Funcionario.ativo == True).order_by(Funcionario.nome).all()
-        
-        return jsonify([{
-            "id": func.id,
-            "nome": func.nome,
-            "codigo": func.codigo or f"F{func.id:03d}",
-            "funcao": func.funcao.nome if func.funcao else "Não definida"
-        } for func in funcionarios])
-        
-    except Exception as e:
-        print(f"Erro ao carregar funcionários: {str(e)}")
-        return jsonify([]), 500
+# Endpoint duplicado removido - já existe na linha 1824
 
 @main_bp.route("/api/servicos/autocomplete")
 @login_required

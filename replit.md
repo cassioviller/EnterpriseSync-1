@@ -511,6 +511,18 @@ SIGE (Sistema Integrado de Gestão Empresarial) is a comprehensive business mana
   - Sistema permite definir horários personalizados com entrada, saída, intervalo de almoço e dias da semana
   - Integração completa com sistema de funcionários e cálculos de KPIs
   - Interface responsiva com DataTables para listagem e controle de horários
+- July 15, 2025. Limpeza Completa e Correções Críticas - v6.3:
+  - Realizou limpeza completa do sistema removendo todos os arquivos duplicados e desnecessários
+  - Removidos 17 relatórios em markdown, 35+ scripts de teste/debug, pasta attached_assets
+  - Removidos engines de KPI duplicados (kpis_engine_v3, kpis_engine_v4, kpis_engine_simple)
+  - Mantido apenas kpis_engine.py principal com layout 4-4-2 funcional
+  - Corrigido relacionamento Funcionario.funcao no modelo de dados
+  - Corrigidas importações quebradas de engines removidos no views.py
+  - Ajustado template funcionario_perfil.html para usar apenas KPIs disponíveis
+  - Criadas rotas API faltantes: /api/obras/todas e /api/funcionarios/todos
+  - Removidos endpoints duplicados causando conflitos na inicialização
+  - Sistema RDO com dropdowns inteligentes agora funcionando corretamente
+  - Codebase limpo e otimizado para produção com arquivos essenciais apenas
 
 ## User Preferences
 
