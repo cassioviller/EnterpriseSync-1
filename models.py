@@ -37,6 +37,8 @@ class HorarioTrabalho(db.Model):
     retorno_almoco = db.Column(db.Time, nullable=False)
     saida = db.Column(db.Time, nullable=False)
     dias_semana = db.Column(db.String(20), nullable=False)  # Ex: "1,2,3,4,5" (Segunda=1, Domingo=7)
+    horas_diarias = db.Column(db.Float, default=8.0)  # Horas trabalhadas por dia
+    valor_hora = db.Column(db.Float, default=12.0)  # Valor por hora
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     
     def __repr__(self):
