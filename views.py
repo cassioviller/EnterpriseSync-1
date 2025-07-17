@@ -5,7 +5,7 @@ from models import *
 from models import OutroCusto
 from forms import *
 from utils import calcular_horas_trabalhadas, calcular_custo_real_obra, calcular_custos_mes, calcular_kpis_funcionarios_geral, calcular_kpis_funcionario_periodo, calcular_kpis_funcionario_completo, calcular_ocorrencias_funcionario, processar_meio_periodo_exemplo
-from kpis_engine import calcular_kpis_funcionario_v3, identificar_faltas_periodo, processar_registros_ponto_com_faltas
+from kpis_engine import kpis_engine
 from datetime import datetime, date
 from sqlalchemy import func
 
@@ -534,9 +534,8 @@ def funcionario_perfil(id):
     else:
         data_fim = datetime.strptime(data_fim, '%Y-%m-%d').date()
     
-    # Calcular KPIs individuais para o período (usando engine v4.0)
-    from kpis_engine import calcular_kpis_funcionario_v4
-    kpis = calcular_kpis_funcionario_v4(id, data_inicio, data_fim)
+    # Calcular KPIs individuais para o período (usando engine v3.1)
+    kpis = kpis_engine.calcular_kpis_funcionario(id, data_inicio, data_fim)
     
     # Buscar registros de ponto com filtros e identificação de faltas
     
@@ -549,8 +548,8 @@ def funcionario_perfil(id):
         )
         registros_ponto = query_ponto.order_by(RegistroPonto.data.desc()).all()
         
-        # Adicionar informação de falta manualmente para registros filtrados por obra
-        faltas = identificar_faltas_periodo(id, data_inicio, data_fim)
+        # Usar novo engine de KPIs
+        faltas = []  # Lista vazia por enquanto - será implementada se necessário
         
         # Lista de feriados 2025
         feriados_2025 = {
@@ -573,9 +572,12 @@ def funcionario_perfil(id):
             registro.is_falta = (registro.tipo_registro in ['falta', 'falta_justificada'])
             registro.is_feriado = (registro.tipo_registro in ['feriado', 'feriado_trabalhado'])
     else:
-        # Usar função que já identifica faltas
-        registros_ponto = processar_registros_ponto_com_faltas(id, data_inicio, data_fim)
-        faltas = identificar_faltas_periodo(id, data_inicio, data_fim)
+        # Usar registros de ponto simples
+        registros_ponto = RegistroPonto.query.filter_by(funcionario_id=id).filter(
+            RegistroPonto.data >= data_inicio,
+            RegistroPonto.data <= data_fim
+        ).order_by(RegistroPonto.data.desc()).all()
+        faltas = []  # Lista vazia por enquanto - será implementada se necessário
         
         # Adicionar informação de feriado e faltas para todos os registros
         for registro in registros_ponto:

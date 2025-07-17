@@ -1,0 +1,218 @@
+# Análise dos Cálculos de Horas Extras - SIGE v6.2
+
+## 🎯 PROBLEMA IDENTIFICADO
+
+Baseado na descrição do sistema SIGE v6.2, há uma questão crítica nos cálculos de horas extras:
+
+**SITUAÇÃO ATUAL**: As horas extras podem estar sendo calculadas de forma genérica, sem considerar o horário específico de cada funcionário.
+
+**PROBLEMA**: Funcionários com horários diferentes (estagiário, gerente, 7h12-17h, 7h-12h) podem ter cálculos incorretos de horas extras.
+
+---
+
+## 🔍 ANÁLISE TÉCNICA
+
+### 1. **Horários Diferentes Identificados**
+- **Estagiário**: Provavelmente meio período (4h/dia)
+- **Gerente**: Possivelmente horário flexível ou diferenciado
+- **7h12 às 17h**: Jornada de 8h48min (com intervalo)
+- **7h às 12h**: Meio período de 5h
+
+### 2. **Cálculo Correto de Horas Extras**
+Para cada funcionário, as horas extras devem ser calculadas como:
+```
+Horas Extras = Horas Trabalhadas - Horas do Horário Padrão
+```
+
+**Exemplo Prático**:
+- **Funcionário A** (Horário 8h/dia): Trabalhou 10h → 2h extras
+- **Funcionário B** (Horário 4h/dia): Trabalhou 6h → 2h extras
+- **Funcionário C** (Horário 5h/dia): Trabalhou 7h → 2h extras
+
+### 3. **Integração com Tabela HorarioTrabalho**
+O sistema deve usar a tabela `HorarioTrabalho` para:
+- Buscar o horário específico do funcionário
+- Calcular as horas diárias esperadas
+- Aplicar a diferença para determinar horas extras
+
+---
+
+## 🛠️ CORREÇÕES NECESSÁRIAS
+
+### 1. **Engine de KPIs v4.0 - Função de Horas Extras**
+```python
+def calcular_horas_extras_correto(funcionario_id, data_inicio, data_fim):
+    # 1. Buscar horário de trabalho do funcionário
+    funcionario = Funcionario.query.get(funcionario_id)
+    horario_trabalho = funcionario.horario_trabalho
+    horas_diarias_padrao = horario_trabalho.horas_diarias
+    
+    # 2. Buscar registros de ponto no período
+    registros = RegistroPonto.query.filter(
+        RegistroPonto.funcionario_id == funcionario_id,
+        RegistroPonto.data.between(data_inicio, data_fim)
+    ).all()
+    
+    total_horas_extras = 0
+    
+    for registro in registros:
+        if registro.horas_trabalhadas_calculadas > horas_diarias_padrao:
+            horas_extras_dia = registro.horas_trabalhadas_calculadas - horas_diarias_padrao
+            total_horas_extras += horas_extras_dia
+    
+    return total_horas_extras
+```
+
+### 2. **Cálculo de Custo de Horas Extras**
+```python
+def calcular_custo_horas_extras(funcionario_id, data_inicio, data_fim):
+    funcionario = Funcionario.query.get(funcionario_id)
+    horario_trabalho = funcionario.horario_trabalho
+    valor_hora_normal = horario_trabalho.valor_hora or (funcionario.salario / (horario_trabalho.horas_diarias * 22))
+    
+    # Buscar registros com horas extras
+    registros = RegistroPonto.query.filter(
+        RegistroPonto.funcionario_id == funcionario_id,
+        RegistroPonto.data.between(data_inicio, data_fim),
+        RegistroPonto.horas_trabalhadas_calculadas > horario_trabalho.horas_diarias
+    ).all()
+    
+    custo_total_extras = 0
+    
+    for registro in registros:
+        horas_extras = registro.horas_trabalhadas_calculadas - horario_trabalho.horas_diarias
+        
+        # Aplicar percentual correto baseado no tipo
+        if registro.tipo_registro == 'sabado_horas_extras':
+            percentual = 1.5  # 50% adicional
+        elif registro.tipo_registro in ['domingo_horas_extras', 'feriado_trabalhado']:
+            percentual = 2.0  # 100% adicional
+        else:
+            percentual = 1.5  # Padrão 50%
+        
+        custo_extras = horas_extras * valor_hora_normal * percentual
+        custo_total_extras += custo_extras
+    
+    return custo_total_extras
+```
+
+### 3. **Validação de Horários Específicos**
+```python
+def validar_calculos_por_horario():
+    """Função para validar se os cálculos estão corretos para cada tipo de horário"""
+    
+    horarios = HorarioTrabalho.query.all()
+    
+    for horario in horarios:
+        print(f"\n=== HORÁRIO: {horario.nome} ===")
+        print(f"Horas diárias: {horario.horas_diarias}h")
+        print(f"Entrada: {horario.entrada}")
+        print(f"Saída: {horario.saida}")
+        
+        funcionarios = Funcionario.query.filter_by(horario_trabalho_id=horario.id).all()
+        
+        for funcionario in funcionarios:
+            print(f"\nFuncionário: {funcionario.nome}")
+            
+            # Buscar último registro
+            ultimo_registro = RegistroPonto.query.filter_by(
+                funcionario_id=funcionario.id
+            ).order_by(RegistroPonto.data.desc()).first()
+            
+            if ultimo_registro:
+                horas_trabalhadas = ultimo_registro.horas_trabalhadas_calculadas
+                horas_extras_calculadas = max(0, horas_trabalhadas - horario.horas_diarias)
+                
+                print(f"  Horas trabalhadas: {horas_trabalhadas}h")
+                print(f"  Horas extras: {horas_extras_calculadas}h")
+                print(f"  Correto: {horas_extras_calculadas == ultimo_registro.horas_extras_calculadas}")
+```
+
+---
+
+## 🧪 TESTES NECESSÁRIOS
+
+### 1. **Teste por Tipo de Horário**
+```python
+def testar_calculos_por_horario():
+    # Teste 1: Funcionário 8h/dia trabalhando 10h
+    # Resultado esperado: 2h extras
+    
+    # Teste 2: Estagiário 4h/dia trabalhando 6h
+    # Resultado esperado: 2h extras
+    
+    # Teste 3: Meio período 5h/dia trabalhando 7h
+    # Resultado esperado: 2h extras
+    
+    # Teste 4: Horário 7h12-17h (8h48min) trabalhando 10h
+    # Resultado esperado: 1h12min extras
+```
+
+### 2. **Validação de KPIs**
+- **Horas Extras**: Deve somar apenas as horas que excedem o horário padrão
+- **Custo Horas Extras**: Deve usar valor/hora específico do horário
+- **Produtividade**: Deve ser baseada nas horas esperadas do horário específico
+
+---
+
+## 📊 EXEMPLO PRÁTICO DE CORREÇÃO
+
+### Cenário: 3 Funcionários com Horários Diferentes
+
+#### **Funcionário A - Horário Comercial (8h/dia)**
+- Trabalhou: 10h
+- Horas extras: 10h - 8h = **2h extras**
+- Custo extra: 2h × R$ 25/h × 1.5 = **R$ 75,00**
+
+#### **Funcionário B - Estagiário (4h/dia)**
+- Trabalhou: 6h
+- Horas extras: 6h - 4h = **2h extras**
+- Custo extra: 2h × R$ 15/h × 1.5 = **R$ 45,00**
+
+#### **Funcionário C - Meio Período (5h/dia)**
+- Trabalhou: 7h
+- Horas extras: 7h - 5h = **2h extras**
+- Custo extra: 2h × R$ 20/h × 1.5 = **R$ 60,00**
+
+---
+
+## ✅ CHECKLIST DE VERIFICAÇÃO
+
+### 1. **Verificar Integração com HorarioTrabalho**
+- [ ] Engine de KPIs busca horário específico do funcionário
+- [ ] Cálculo de horas extras usa `horas_diarias` do horário
+- [ ] Valor/hora é específico por horário ou calculado corretamente
+
+### 2. **Validar Cálculos**
+- [ ] Funcionário com 4h/dia: extras calculadas corretamente
+- [ ] Funcionário com 5h/dia: extras calculadas corretamente
+- [ ] Funcionário com 8h/dia: extras calculadas corretamente
+- [ ] Funcionário com 8h48min/dia: extras calculadas corretamente
+
+### 3. **Testar KPIs**
+- [ ] KPI "Horas Extras" mostra valor correto
+- [ ] KPI "Valor Horas Extras" usa percentual correto
+- [ ] KPI "Produtividade" usa horas esperadas corretas
+- [ ] KPI "Custo Mão de Obra" inclui extras corretas
+
+### 4. **Verificar Tipos de Lançamento**
+- [ ] Sábado: 50% adicional aplicado corretamente
+- [ ] Domingo: 100% adicional aplicado corretamente
+- [ ] Feriado trabalhado: 100% adicional aplicado corretamente
+
+---
+
+## 🎯 CONCLUSÃO
+
+**PROBLEMA CRÍTICO IDENTIFICADO**: O sistema pode estar calculando horas extras de forma genérica, sem considerar o horário específico de cada funcionário.
+
+**SOLUÇÃO**: Integrar completamente os cálculos com a tabela `HorarioTrabalho`, usando as `horas_diarias` específicas de cada funcionário como base para determinar quando há horas extras.
+
+**IMPACTO**: Funcionários com horários reduzidos (estagiários, meio período) podem estar tendo horas extras calculadas incorretamente, afetando custos e KPIs.
+
+**URGÊNCIA**: Alta - Afeta diretamente os custos de mão de obra e a precisão dos KPIs financeiros.
+
+---
+
+**Próximo Passo**: Implementar as correções no Engine de KPIs v4.0 e executar testes com funcionários de diferentes horários para validar os cálculos.
+

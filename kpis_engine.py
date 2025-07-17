@@ -97,7 +97,8 @@ class KPIsEngine:
             'periodo': {
                 'inicio': data_inicio,
                 'fim': data_fim,
-                'dias_uteis': self._calcular_dias_uteis(data_inicio, data_fim)
+                'dias_uteis': self._calcular_dias_uteis(data_inicio, data_fim),
+                'dias_com_lancamento': self._calcular_dias_com_lancamento(funcionario_id, data_inicio, data_fim)
             },
             'funcionario': {
                 'id': funcionario.id,
@@ -119,15 +120,40 @@ class KPIsEngine:
         return total or 0.0
     
     def _calcular_horas_extras(self, funcionario_id, data_inicio, data_fim):
-        """2. Horas Extras: Horas trabalhadas acima da jornada normal"""
-        total = db.session.query(func.sum(RegistroPonto.horas_extras)).filter(
+        """2. Horas Extras: Horas trabalhadas acima da jornada específica do funcionário"""
+        # Buscar funcionário e seu horário de trabalho
+        funcionario = Funcionario.query.get(funcionario_id)
+        if not funcionario or not funcionario.horario_trabalho:
+            # Se não tem horário específico, usar o campo horas_extras do registro
+            total = db.session.query(func.sum(RegistroPonto.horas_extras)).filter(
+                RegistroPonto.funcionario_id == funcionario_id,
+                RegistroPonto.data >= data_inicio,
+                RegistroPonto.data <= data_fim,
+                RegistroPonto.horas_extras.isnot(None)
+            ).scalar()
+            return total or 0.0
+        
+        # Usar horas diárias específicas do horário de trabalho
+        horas_diarias_padrao = funcionario.horario_trabalho.horas_diarias
+        
+        # Buscar registros de ponto no período
+        registros = db.session.query(RegistroPonto).filter(
             RegistroPonto.funcionario_id == funcionario_id,
             RegistroPonto.data >= data_inicio,
             RegistroPonto.data <= data_fim,
-            RegistroPonto.horas_extras.isnot(None)
-        ).scalar()
+            RegistroPonto.horas_trabalhadas.isnot(None)
+        ).all()
         
-        return total or 0.0
+        total_horas_extras = 0.0
+        
+        for registro in registros:
+            # Calcular horas extras baseado no horário específico
+            horas_trabalhadas = registro.horas_trabalhadas or 0
+            if horas_trabalhadas > horas_diarias_padrao:
+                horas_extras_dia = horas_trabalhadas - horas_diarias_padrao
+                total_horas_extras += horas_extras_dia
+        
+        return total_horas_extras
     
     def _calcular_faltas(self, funcionario_id, data_inicio, data_fim):
         """3. Faltas: Número de faltas não justificadas registradas"""
@@ -157,15 +183,22 @@ class KPIsEngine:
         if not funcionario or not funcionario.salario:
             return 0.0
         
-        # Calcular valor hora (considerando 220 horas/mês)
-        valor_hora = funcionario.salario / 220
+        # Calcular valor hora baseado no horário específico ou padrão
+        if funcionario.horario_trabalho and funcionario.horario_trabalho.valor_hora:
+            valor_hora = funcionario.horario_trabalho.valor_hora
+        elif funcionario.horario_trabalho and funcionario.horario_trabalho.horas_diarias:
+            # Calcular valor/hora baseado nas horas diárias específicas
+            horas_mensais = funcionario.horario_trabalho.horas_diarias * 22  # 22 dias úteis/mês
+            valor_hora = funcionario.salario / horas_mensais
+        else:
+            # Padrão: 220 horas/mês
+            valor_hora = funcionario.salario / 220
         
         # Horas trabalhadas
         horas_trabalhadas = self._calcular_horas_trabalhadas(funcionario_id, data_inicio, data_fim)
         
-        # Horas extras (com adicional de 50%)
-        horas_extras = self._calcular_horas_extras(funcionario_id, data_inicio, data_fim)
-        custo_extras = horas_extras * valor_hora * 1.5
+        # Horas extras com percentuais específicos por tipo
+        custo_extras = self._calcular_custo_horas_extras_especifico(funcionario_id, data_inicio, data_fim, valor_hora)
         
         # Faltas justificadas (ocorrências aprovadas que afetam custo)
         horas_faltas_justificadas = self._calcular_horas_faltas_justificadas(
@@ -190,6 +223,44 @@ class KPIsEngine:
         ).scalar()
         
         return faltas_justificadas or 0
+    
+    def _calcular_custo_horas_extras_especifico(self, funcionario_id, data_inicio, data_fim, valor_hora):
+        """Calcular custo de horas extras com percentuais específicos por tipo"""
+        funcionario = Funcionario.query.get(funcionario_id)
+        if not funcionario or not funcionario.horario_trabalho:
+            # Fallback para cálculo simples se não tem horário específico
+            horas_extras = self._calcular_horas_extras(funcionario_id, data_inicio, data_fim)
+            return horas_extras * valor_hora * 1.5
+        
+        horas_diarias_padrao = funcionario.horario_trabalho.horas_diarias
+        
+        # Buscar registros de ponto no período
+        registros = db.session.query(RegistroPonto).filter(
+            RegistroPonto.funcionario_id == funcionario_id,
+            RegistroPonto.data >= data_inicio,
+            RegistroPonto.data <= data_fim,
+            RegistroPonto.horas_trabalhadas.isnot(None)
+        ).all()
+        
+        custo_total_extras = 0.0
+        
+        for registro in registros:
+            horas_trabalhadas = registro.horas_trabalhadas or 0
+            if horas_trabalhadas > horas_diarias_padrao:
+                horas_extras = horas_trabalhadas - horas_diarias_padrao
+                
+                # Aplicar percentual correto baseado no tipo de lançamento
+                if registro.tipo_registro == 'sabado_horas_extras':
+                    percentual = 1.5  # 50% adicional
+                elif registro.tipo_registro in ['domingo_horas_extras', 'feriado_trabalhado']:
+                    percentual = 2.0  # 100% adicional
+                else:
+                    percentual = 1.5  # Padrão 50%
+                
+                custo_extras = horas_extras * valor_hora * percentual
+                custo_total_extras += custo_extras
+        
+        return custo_total_extras
     
     def _calcular_custo_transporte(self, funcionario_id, data_inicio, data_fim):
         """Calcular custo de transporte (vale transporte)"""
@@ -297,12 +368,20 @@ class KPIsEngine:
         return faltas_horas + atrasos_horas
     
     def _calcular_produtividade(self, funcionario_id, data_inicio, data_fim):
-        """9. Produtividade: Percentual de eficiência (horas_trabalhadas/horas_esperadas × 100)"""
+        """9. Produtividade: Percentual de eficiência baseado no horário específico do funcionário"""
         horas_trabalhadas = self._calcular_horas_trabalhadas(funcionario_id, data_inicio, data_fim)
-        dias_uteis = self._calcular_dias_uteis(data_inicio, data_fim)
         
-        # Horas esperadas (8h/dia útil)
-        horas_esperadas = dias_uteis * 8
+        # Buscar funcionário e seu horário de trabalho
+        funcionario = Funcionario.query.get(funcionario_id)
+        if not funcionario or not funcionario.horario_trabalho:
+            # Se não tem horário específico, usar padrão de 8h/dia
+            dias_uteis = self._calcular_dias_uteis(data_inicio, data_fim)
+            horas_esperadas = dias_uteis * 8
+        else:
+            # Usar horas diárias específicas do horário de trabalho
+            horas_diarias_padrao = funcionario.horario_trabalho.horas_diarias
+            dias_uteis = self._calcular_dias_uteis(data_inicio, data_fim)
+            horas_esperadas = dias_uteis * horas_diarias_padrao
         
         if horas_esperadas == 0:
             return 0.0
@@ -358,6 +437,31 @@ class KPIsEngine:
             data_atual += timedelta(days=1)
             
         return dias_uteis
+    
+    def _calcular_dias_com_lancamento(self, funcionario_id, data_inicio, data_fim):
+        """
+        Calcula número de dias com lançamento no período
+        Conta apenas dias úteis (excluindo fins de semana não trabalhados)
+        """
+        # Buscar registros de ponto no período
+        registros = db.session.query(RegistroPonto).filter(
+            RegistroPonto.funcionario_id == funcionario_id,
+            RegistroPonto.data >= data_inicio,
+            RegistroPonto.data <= data_fim
+        ).all()
+        
+        # Tipos considerados para KPIs (apenas dias úteis)
+        tipos_uteis = {
+            'trabalho_normal', 'feriado_trabalhado', 'meio_periodo', 
+            'falta', 'falta_justificada'
+        }
+        
+        dias_com_lancamento = 0
+        for registro in registros:
+            if registro.tipo_registro in tipos_uteis:
+                dias_com_lancamento += 1
+        
+        return dias_com_lancamento
     
     def calcular_e_atualizar_ponto(self, registro_ponto_id):
         """
