@@ -1,0 +1,714 @@
+# Conteúdo e Funcionalidades das Páginas do Sistema Integrado de Gestão Empresarial - Estruturas do Vale
+
+## Introdução
+
+Este documento detalha o conteúdo e as funcionalidades esperadas para cada página do Sistema Integrado de Gestão Empresarial (SIGE) 'Estruturas do Vale'. A análise foi baseada nas imagens fornecidas, que representam o estado atual do desenvolvimento no Replit, e nos prompts anteriores que descrevem as funcionalidades desejadas. O objetivo é fornecer um guia claro sobre o que cada página deve apresentar e quais interações e dados devem estar disponíveis, com a exclusão explícita das seções de fornecedores, clientes e materiais.
+
+## Estrutura do Sistema e Páginas
+
+O sistema é organizado em módulos principais, cada um contendo páginas específicas:
+
+*   **Dashboard**
+*   **Cadastros** (Funcionários, Funções, Departamentos, Obras, Veículos, Serviços, Unidades de Medida, Centros de Custo, Contas Contábeis, Tipos de Documento, Métodos de Pagamento, Condições de Pagamento, Bancos, Agências, Contas Bancárias)
+*   **Ponto** (Controle de Ponto, Registros de Ponto, Ocorrências)
+*   **Alimentação** (Controle de Alimentação)
+*   **Relatórios** (Relatórios e Dashboards)
+
+A seguir, detalharemos cada uma dessas páginas, descrevendo o que já está visível nas imagens e o que precisa ser implementado ou aprimorado.
+
+
+
+
+## Detalhamento das Páginas
+
+### 1. Dashboard
+
+**Visão Geral e Funcionalidades Existentes (Baseado nas Imagens)**:
+
+A página de dashboard atual serve como uma central de informações rápidas. Ela já possui:
+
+*   **Cards de KPIs**: Quatro cards principais que exibem:
+    *   Funcionários Ativos (atualmente 0)
+    *   Obras Ativas (atualmente 0)
+    *   Veículos (atualmente 0)
+    *   Custos do Mês (atualmente R$ 0.00)
+*   **Seções de Gráficos e Listas (Placeholders)**:
+    *   Funcionários por Departamento (gráfico de pizza ou barras)
+    *   Custos por Obra (gráfico de barras)
+    *   Obras em Andamento (lista)
+    *   Custos Recentes (lista)
+
+**Funcionalidades a Adicionar ou Aprimorar (Baseado nos Prompts)**:
+
+*   **Dados Dinâmicos**: Todos os cards e gráficos devem ser alimentados dinamicamente pelo banco de dados.
+*   **Gráfico de Funcionários por Departamento**: Implementar o gráfico de pizza ou barras para mostrar a distribuição de funcionários por departamento.
+*   **Gráfico de Custos por Obra**: Implementar o gráfico de barras para comparar os custos totais de cada obra ativa.
+*   **Lista de Obras em Andamento**: Popular a lista com as obras que têm o status "Em Andamento", mostrando o nome da obra, o responsável e o percentual de conclusão (se disponível).
+*   **Lista de Custos Recentes**: Exibir as últimas 5-10 despesas registradas no sistema, independentemente do tipo (obra, alimentação, veículo), com data, valor e descrição.
+*   **Interatividade**: Os cards e gráficos podem ser clicáveis, levando o usuário para a respectiva seção de relatórios ou cadastros para mais detalhes.
+
+
+
+
+### 2. Cadastros
+
+Esta seção abrange as páginas de cadastro de entidades mestras do sistema. As imagens mostram um padrão de listagem e um formulário modal para adição/edição.
+
+#### 2.1. Funcionários
+
+**Visão Geral e Funcionalidades Existentes (Baseado nas Imagens)**:
+
+A página de Funcionários já apresenta uma estrutura de listagem com:
+
+*   **Tabela de Registros**: Colunas para Nome, CPF, Departamento, Função, Salário, Status e Ações.
+*   **Controles de Paginação**: Botões Anterior e Próximo.
+*   **Controle de Exibição**: Campo para definir quantos resultados por página (Exibir 25).
+*   **Pesquisa**: Campo para buscar registros.
+*   **Botão "+ Novo Funcionário"**: Para abrir o formulário de cadastro.
+
+O formulário modal para "Novo Funcionário" (e presumivelmente para edição) inclui campos para:
+
+*   Nome (obrigatório)
+*   CPF (obrigatório)
+*   RG
+*   Data de Nascimento
+*   Endereço
+*   Telefone
+*   Email
+*   Data de Admissão (obrigatório)
+*   Salário
+*   Departamento (dropdown)
+*   Função (dropdown)
+*   Checkbox "Funcionário Ativo"
+*   Botões Cancelar e Salvar
+
+**Funcionalidades a Adicionar ou Aprimorar (Baseado nos Prompts)**:
+
+*   **Preenchimento de Dropdowns**: Os campos "Departamento" e "Função" devem ser preenchidos dinamicamente com dados dos respectivos cadastros (Departamentos e Funções).
+*   **Validações de Campo**: Implementar validações para CPF (formato e unicidade), Email (formato e unicidade), datas (formato válido).
+*   **Campo de Foto**: Adicionar um campo para upload e gerenciamento da foto do colaborador, conforme detalhado no prompt de Gestão de Pessoas (Módulo Avançado). Isso inclui:
+    *   Botão para upload de imagem.
+    *   Visualização da imagem carregada.
+    *   Validações de tipo e tamanho de arquivo.
+    *   Armazenamento seguro do caminho da imagem no banco de dados.
+*   **Ações na Tabela**: Adicionar ícones ou botões na coluna "Ações" para:
+    *   **Editar**: Abrir o formulário modal com os dados do funcionário para edição.
+    *   **Excluir**: Remover o registro do funcionário (com confirmação).
+    *   **Visualizar Detalhes/Perfil**: Um link para uma página de perfil individual do funcionário (conforme o módulo avançado de RH), onde se pode ver o histórico de ponto, ocorrências, KPIs individuais, etc.
+*   **Filtros Avançados**: Além da pesquisa textual, considerar filtros por Departamento, Função e Status (Ativo/Inativo) na listagem.
+*   **Ordenação**: Permitir a ordenação da tabela clicando nos cabeçalhos das colunas (Nome, CPF, Departamento, Função, Salário, Status).
+
+
+
+
+#### 2.2. Departamentos
+
+**Visão Geral e Funcionalidades Existentes (Baseado nas Imagens)**:
+
+A página de Departamentos segue o mesmo padrão de listagem dos Funcionários, com:
+
+*   **Tabela de Registros**: Colunas para Nome e Descrição.
+*   **Controles de Paginação**: Botões Anterior e Próximo.
+*   **Controle de Exibição**: Campo para definir quantos resultados por página.
+*   **Pesquisa**: Campo para buscar registros.
+*   **Botão "+ Novo Departamento"**: Para abrir o formulário de cadastro.
+
+O formulário modal para "Novo Departamento" (e edição) inclui campos para:
+
+*   Nome (obrigatório)
+*   Descrição
+*   Botões Cancelar e Salvar
+
+**Funcionalidades a Adicionar ou Aprimorar (Baseado nos Prompts)**:
+
+*   **Validações de Campo**: Implementar validação para o Nome (unicidade).
+*   **Ações na Tabela**: Adicionar ícones ou botões na coluna "Ações" para:
+    *   **Editar**: Abrir o formulário modal com os dados do departamento para edição.
+    *   **Excluir**: Remover o registro do departamento (com confirmação). Deve-se considerar a impossibilidade de excluir um departamento que possua funcionários associados, ou apresentar um aviso sobre a realocação de funcionários antes da exclusão.
+*   **Ordenação**: Permitir a ordenação da tabela clicando nos cabeçalhos das colunas (Nome, Descrição).
+
+
+
+
+#### 2.3. Funções
+
+**Visão Geral e Funcionalidades Existentes (Baseado nas Imagens)**:
+
+A página de Funções segue o mesmo padrão de listagem, com:
+
+*   **Tabela de Registros**: Colunas para Nome, Descrição e Salário Base.
+*   **Controles de Paginação**: Botões Anterior e Próximo.
+*   **Controle de Exibição**: Campo para definir quantos resultados por página.
+*   **Pesquisa**: Campo para buscar registros.
+*   **Botão "+ Nova Função"**: Para abrir o formulário de cadastro.
+
+O formulário modal para "Nova Função" (e edição) inclui campos para:
+
+*   Nome (obrigatório)
+*   Descrição
+*   Salário Base
+*   Botões Cancelar e Salvar
+
+**Funcionalidades a Adicionar ou Aprimorar (Baseado nos Prompts)**:
+
+*   **Validações de Campo**: Implementar validação para o Nome (unicidade) e Salário Base (numérico).
+*   **Ações na Tabela**: Adicionar ícones ou botões na coluna "Ações" para:
+    *   **Editar**: Abrir o formulário modal com os dados da função para edição.
+    *   **Excluir**: Remover o registro da função (com confirmação). Deve-se considerar a impossibilidade de excluir uma função que possua funcionários associados, ou apresentar um aviso sobre a realocação de funcionários antes da exclusão.
+*   **Ordenação**: Permitir a ordenação da tabela clicando nos cabeçalhos das colunas (Nome, Descrição, Salário Base).
+
+
+
+
+#### 2.4. Obras
+
+**Visão Geral e Funcionalidades Existentes (Baseado nas Imagens)**:
+
+A página de Obras segue o padrão de listagem, com:
+
+*   **Tabela de Registros**: Colunas para Nome, Endereço, Início, Previsão Fim, Orçamento, Status e Responsável.
+*   **Controles de Paginação**: Botões Anterior e Próximo.
+*   **Controle de Exibição**: Campo para definir quantos resultados por página.
+*   **Pesquisa**: Campo para buscar registros.
+*   **Botão "+ Nova Obra"**: Para abrir o formulário de cadastro.
+
+O formulário modal para "Nova Obra" (e edição) não foi explicitamente mostrado na imagem, mas, com base no schema e nos prompts, deve incluir campos para:
+
+*   Nome (obrigatório)
+*   Endereço
+*   Data de Início (obrigatório)
+*   Previsão de Término
+*   Orçamento
+*   Status (dropdown: Em Andamento, Concluída, Pausada, Cancelada)
+*   Responsável (autocomplete/dropdown de Funcionários)
+*   Botões Cancelar e Salvar
+
+**Funcionalidades a Adicionar ou Aprimorar (Baseado nos Prompts)**:
+
+*   **Preenchimento de Dropdowns/Autocomplete**: O campo "Responsável" deve ser preenchido dinamicamente com dados dos funcionários, idealmente com um autocomplete inteligente.
+*   **Validações de Campo**: Implementar validações para datas (formato válido, data de início anterior à previsão de término), Orçamento (numérico).
+*   **Ações na Tabela**: Adicionar ícones ou botões na coluna "Ações" para:
+    *   **Editar**: Abrir o formulário modal com os dados da obra para edição.
+    *   **Excluir**: Remover o registro da obra (com confirmação). Deve-se considerar a impossibilidade de excluir uma obra que possua despesas ou receitas associadas.
+    *   **Visualizar Detalhes/Acompanhamento**: Um link para uma página de detalhes da obra, onde se pode ver o acompanhamento físico-financeiro, registro de despesas, receitas, alocação de recursos, etc.
+*   **Filtros Avançados**: Além da pesquisa textual, considerar filtros por Status e Responsável na listagem.
+*   **Ordenação**: Permitir a ordenação da tabela clicando nos cabeçalhos das colunas (Nome, Início, Previsão Fim, Orçamento, Status).
+
+
+
+
+#### 2.5. Veículos
+
+**Visão Geral e Funcionalidades Existentes (Baseado nas Imagens)**:
+
+A página de Veículos segue o padrão de listagem, com:
+
+*   **Tabela de Registros**: Colunas para Placa, Marca/Modelo, Ano, Tipo, KM Atual, Status e Próxima Manutenção.
+*   **Controles de Paginação**: Botões Anterior e Próximo.
+*   **Controle de Exibição**: Campo para definir quantos resultados por página.
+*   **Pesquisa**: Campo para buscar registros.
+*   **Botão "+ Novo Veículo"**: Para abrir o formulário de cadastro.
+
+O formulário modal para "Novo Veículo" (e edição) não foi explicitamente mostrado na imagem, mas, com base no schema e nos prompts, deve incluir campos para:
+
+*   Placa (obrigatório)
+*   Marca
+*   Modelo
+*   Ano de Fabricação
+*   Tipo de Veículo (dropdown: Carro, Caminhão, Moto, etc.)
+*   KM Atual
+*   Status (dropdown: Disponível, Em Manutenção, Em Uso, Indisponível)
+*   Data da Última Manutenção
+*   Data da Próxima Manutenção
+*   Botões Cancelar e Salvar
+
+**Funcionalidades a Adicionar ou Aprimorar (Baseado nos Prompts)**:
+
+*   **Validações de Campo**: Implementar validações para Placa (formato e unicidade), Ano de Fabricação (numérico, ano válido), KM Atual (numérico).
+*   **Ações na Tabela**: Adicionar ícones ou botões na coluna "Ações" para:
+    *   **Editar**: Abrir o formulário modal com os dados do veículo para edição.
+    *   **Excluir**: Remover o registro do veículo (com confirmação). Deve-se considerar a impossibilidade de excluir um veículo que possua histórico de manutenção, abastecimento ou multas.
+    *   **Visualizar Detalhes/Histórico**: Um link para uma página de detalhes do veículo, onde se pode ver o histórico de manutenção, abastecimentos, multas, alocação, etc.
+*   **Filtros Avançados**: Além da pesquisa textual, considerar filtros por Tipo de Veículo e Status na listagem.
+*   **Ordenação**: Permitir a ordenação da tabela clicando nos cabeçalhos das colunas (Placa, Marca/Modelo, Ano, KM Atual, Status, Próxima Manutenção).
+
+
+
+
+#### 2.6. Serviços
+
+**Visão Geral e Funcionalidades Esperadas (Baseado nos Prompts)**:
+
+Esta página seguirá o padrão de listagem e formulário modal para cadastro de serviços.
+
+*   **Tabela de Registros**: Colunas para Nome, Descrição e Preço Unitário.
+*   **Controles de Paginação, Exibição e Pesquisa**: Padrão do sistema.
+*   **Botão "+ Novo Serviço"**: Para abrir o formulário de cadastro.
+
+O formulário modal para "Novo Serviço" (e edição) deve incluir campos para:
+
+*   Nome (obrigatório)
+*   Descrição
+*   Preço Unitário (obrigatório)
+*   Botões Cancelar e Salvar
+
+**Funcionalidades a Adicionar ou Aprimorar**:
+
+*   **Validações de Campo**: Implementar validação para o Nome (unicidade) e Preço Unitário (numérico, maior que zero).
+*   **Ações na Tabela**: Adicionar ícones ou botões na coluna "Ações" para:
+    *   **Editar**: Abrir o formulário modal com os dados do serviço para edição.
+    *   **Excluir**: Remover o registro do serviço (com confirmação). Deve-se considerar a impossibilidade de excluir um serviço que esteja associado a despesas de obras.
+*   **Ordenação**: Permitir a ordenação da tabela clicando nos cabeçalhos das colunas (Nome, Preço Unitário).
+
+
+
+
+#### 2.7. Unidades de Medida
+
+**Visão Geral e Funcionalidades Esperadas (Baseado nos Prompts)**:
+
+Esta página seguirá o padrão de listagem e formulário modal para cadastro de unidades de medida.
+
+*   **Tabela de Registros**: Colunas para Nome e Símbolo.
+*   **Controles de Paginação, Exibição e Pesquisa**: Padrão do sistema.
+*   **Botão "+ Nova Unidade de Medida"**: Para abrir o formulário de cadastro.
+
+O formulário modal para "Nova Unidade de Medida" (e edição) deve incluir campos para:
+
+*   Nome (obrigatório)
+*   Símbolo (obrigatório)
+*   Botões Cancelar e Salvar
+
+**Funcionalidades a Adicionar ou Aprimorar**:
+
+*   **Validações de Campo**: Implementar validação para o Nome e Símbolo (unicidade).
+*   **Ações na Tabela**: Adicionar ícones ou botões na coluna "Ações" para:
+    *   **Editar**: Abrir o formulário modal com os dados da unidade de medida para edição.
+    *   **Excluir**: Remover o registro da unidade de medida (com confirmação). Deve-se considerar a impossibilidade de excluir uma unidade de medida que esteja associada a materiais.
+*   **Ordenação**: Permitir a ordenação da tabela clicando nos cabeçalhos das colunas (Nome, Símbolo).
+
+
+
+
+#### 2.8. Centros de Custo
+
+**Visão Geral e Funcionalidades Esperadas (Baseado nos Prompts)**:
+
+Esta página seguirá o padrão de listagem e formulário modal para cadastro de centros de custo.
+
+*   **Tabela de Registros**: Colunas para Nome e Descrição.
+*   **Controles de Paginação, Exibição e Pesquisa**: Padrão do sistema.
+*   **Botão "+ Novo Centro de Custo"**: Para abrir o formulário de cadastro.
+
+O formulário modal para "Novo Centro de Custo" (e edição) deve incluir campos para:
+
+*   Nome (obrigatório)
+*   Descrição
+*   Botões Cancelar e Salvar
+
+**Funcionalidades a Adicionar ou Aprimorar**:
+
+*   **Validações de Campo**: Implementar validação para o Nome (unicidade).
+*   **Ações na Tabela**: Adicionar ícones ou botões na coluna "Ações" para:
+    *   **Editar**: Abrir o formulário modal com os dados do centro de custo para edição.
+    *   **Excluir**: Remover o registro do centro de custo (com confirmação). Deve-se considerar a impossibilidade de excluir um centro de custo que esteja associado a despesas.
+*   **Ordenação**: Permitir a ordenação da tabela clicando nos cabeçalhos das colunas (Nome, Descrição).
+
+
+
+
+#### 2.9. Contas Contábeis
+
+**Visão Geral e Funcionalidades Esperadas (Baseado nos Prompts)**:
+
+Esta página seguirá o padrão de listagem e formulário modal para cadastro de contas contábeis.
+
+*   **Tabela de Registros**: Colunas para Número da Conta, Nome e Tipo.
+*   **Controles de Paginação, Exibição e Pesquisa**: Padrão do sistema.
+*   **Botão "+ Nova Conta Contábil"**: Para abrir o formulário de cadastro.
+
+O formulário modal para "Nova Conta Contábil" (e edição) deve incluir campos para:
+
+*   Número da Conta (obrigatório)
+*   Nome (obrigatório)
+*   Tipo (dropdown: Ativo, Passivo, Receita, Despesa)
+*   Botões Cancelar e Salvar
+
+**Funcionalidades a Adicionar ou Aprimorar**:
+
+*   **Validações de Campo**: Implementar validação para o Número da Conta (unicidade).
+*   **Ações na Tabela**: Adicionar ícones ou botões na coluna "Ações" para:
+    *   **Editar**: Abrir o formulário modal com os dados da conta contábil para edição.
+    *   **Excluir**: Remover o registro da conta contábil (com confirmação). Deve-se considerar a impossibilidade de excluir uma conta contábil que esteja associada a despesas ou receitas.
+*   **Ordenação**: Permitir a ordenação da tabela clicando nos cabeçalhos das colunas (Número da Conta, Nome, Tipo).
+
+
+
+
+#### 2.10. Tipos de Documento
+
+**Visão Geral e Funcionalidades Esperadas (Baseado nos Prompts)**:
+
+Esta página seguirá o padrão de listagem e formulário modal para cadastro de tipos de documento.
+
+*   **Tabela de Registros**: Colunas para Nome e Descrição.
+*   **Controles de Paginação, Exibição e Pesquisa**: Padrão do sistema.
+*   **Botão "+ Novo Tipo de Documento"**: Para abrir o formulário de cadastro.
+
+O formulário modal para "Novo Tipo de Documento" (e edição) deve incluir campos para:
+
+*   Nome (obrigatório)
+*   Descrição
+*   Botões Cancelar e Salvar
+
+**Funcionalidades a Adicionar ou Aprimorar**:
+
+*   **Validações de Campo**: Implementar validação para o Nome (unicidade).
+*   **Ações na Tabela**: Adicionar ícones ou botões na coluna "Ações" para:
+    *   **Editar**: Abrir o formulário modal com os dados do tipo de documento para edição.
+    *   **Excluir**: Remover o registro do tipo de documento (com confirmação). Deve-se considerar a impossibilidade de excluir um tipo de documento que esteja associado a despesas ou receitas.
+*   **Ordenação**: Permitir a ordenação da tabela clicando nos cabeçalhos das colunas (Nome, Descrição).
+
+
+
+
+#### 2.11. Métodos de Pagamento
+
+**Visão Geral e Funcionalidades Esperadas (Baseado nos Prompts)**:
+
+Esta página seguirá o padrão de listagem e formulário modal para cadastro de métodos de pagamento.
+
+*   **Tabela de Registros**: Colunas para Nome e Descrição.
+*   **Controles de Paginação, Exibição e Pesquisa**: Padrão do sistema.
+*   **Botão "+ Novo Método de Pagamento"**: Para abrir o formulário de cadastro.
+
+O formulário modal para "Novo Método de Pagamento" (e edição) deve incluir campos para:
+
+*   Nome (obrigatório)
+*   Descrição
+*   Botões Cancelar e Salvar
+
+**Funcionalidades a Adicionar ou Aprimorar**:
+
+*   **Validações de Campo**: Implementar validação para o Nome (unicidade).
+*   **Ações na Tabela**: Adicionar ícones ou botões na coluna "Ações" para:
+    *   **Editar**: Abrir o formulário modal com os dados do método de pagamento para edição.
+    *   **Excluir**: Remover o registro do método de pagamento (com confirmação). Deve-se considerar a impossibilidade de excluir um método de pagamento que esteja associado a receitas.
+*   **Ordenação**: Permitir a ordenação da tabela clicando nos cabeçalhos das colunas (Nome, Descrição).
+
+
+
+
+#### 2.12. Condições de Pagamento
+
+**Visão Geral e Funcionalidades Esperadas (Baseado nos Prompts)**:
+
+Esta página seguirá o padrão de listagem e formulário modal para cadastro de condições de pagamento.
+
+*   **Tabela de Registros**: Colunas para Nome, Descrição e Número de Parcelas.
+*   **Controles de Paginação, Exibição e Pesquisa**: Padrão do sistema.
+*   **Botão "+ Nova Condição de Pagamento"**: Para abrir o formulário de cadastro.
+
+O formulário modal para "Nova Condição de Pagamento" (e edição) deve incluir campos para:
+
+*   Nome (obrigatório)
+*   Descrição
+*   Número de Parcelas
+*   Botões Cancelar e Salvar
+
+**Funcionalidades a Adicionar ou Aprimorar**:
+
+*   **Validações de Campo**: Implementar validação para o Nome (unicidade) e Número de Parcelas (numérico, maior ou igual a 1).
+*   **Ações na Tabela**: Adicionar ícones ou botões na coluna "Ações" para:
+    *   **Editar**: Abrir o formulário modal com os dados da condição de pagamento para edição.
+    *   **Excluir**: Remover o registro da condição de pagamento (com confirmação). Deve-se considerar a impossibilidade de excluir uma condição de pagamento que esteja associada a receitas.
+*   **Ordenação**: Permitir a ordenação da tabela clicando nos cabeçalhos das colunas (Nome, Número de Parcelas).
+
+
+
+
+#### 2.13. Bancos
+
+**Visão Geral e Funcionalidades Esperadas (Baseado nos Prompts)**:
+
+Esta página seguirá o padrão de listagem e formulário modal para cadastro de bancos.
+
+*   **Tabela de Registros**: Colunas para Nome e Código.
+*   **Controles de Paginação, Exibição e Pesquisa**: Padrão do sistema.
+*   **Botão "+ Novo Banco"**: Para abrir o formulário de cadastro.
+
+O formulário modal para "Novo Banco" (e edição) deve incluir campos para:
+
+*   Nome (obrigatório)
+*   Código (obrigatório)
+*   Botões Cancelar e Salvar
+
+**Funcionalidades a Adicionar ou Aprimorar**:
+
+*   **Validações de Campo**: Implementar validação para o Nome e Código (unicidade).
+*   **Ações na Tabela**: Adicionar ícones ou botões na coluna "Ações" para:
+    *   **Editar**: Abrir o formulário modal com os dados do banco para edição.
+    *   **Excluir**: Remover o registro do banco (com confirmação). Deve-se considerar a impossibilidade de excluir um banco que possua agências ou contas bancárias associadas.
+*   **Ordenação**: Permitir a ordenação da tabela clicando nos cabeçalhos das colunas (Nome, Código).
+
+
+
+
+#### 2.14. Agências
+
+**Visão Geral e Funcionalidades Esperadas (Baseado nos Prompts)**:
+
+Esta página seguirá o padrão de listagem e formulário modal para cadastro de agências bancárias.
+
+*   **Tabela de Registros**: Colunas para Número, Nome e Banco Associado.
+*   **Controles de Paginação, Exibição e Pesquisa**: Padrão do sistema.
+*   **Botão "+ Nova Agência"**: Para abrir o formulário de cadastro.
+
+O formulário modal para "Nova Agência" (e edição) deve incluir campos para:
+
+*   Número (obrigatório)
+*   Nome
+*   Banco Associado (dropdown/autocomplete de Bancos)
+*   Botões Cancelar e Salvar
+
+**Funcionalidades a Adicionar ou Aprimorar**:
+
+*   **Validações de Campo**: Implementar validação para o Número (unicidade dentro do mesmo banco).
+*   **Ações na Tabela**: Adicionar ícones ou botões na coluna "Ações" para:
+    *   **Editar**: Abrir o formulário modal com os dados da agência para edição.
+    *   **Excluir**: Remover o registro da agência (com confirmação). Deve-se considerar a impossibilidade de excluir uma agência que possua contas bancárias associadas.
+*   **Ordenação**: Permitir a ordenação da tabela clicando nos cabeçalhos das colunas (Número, Nome, Banco Associado).
+
+
+
+
+#### 2.15. Contas Bancárias
+
+**Visão Geral e Funcionalidades Esperadas (Baseado nos Prompts)**:
+
+Esta página seguirá o padrão de listagem e formulário modal para cadastro de contas bancárias da empresa.
+
+*   **Tabela de Registros**: Colunas para Número da Conta, Agência Associada, Banco Associado, Tipo de Conta e Saldo Inicial.
+*   **Controles de Paginação, Exibição e Pesquisa**: Padrão do sistema.
+*   **Botão "+ Nova Conta Bancária"**: Para abrir o formulário de cadastro.
+
+O formulário modal para "Nova Conta Bancária" (e edição) deve incluir campos para:
+
+*   Número da Conta (obrigatório)
+*   Agência Associada (dropdown/autocomplete de Agências)
+*   Banco Associado (dropdown/autocomplete de Bancos, preenchido automaticamente ao selecionar a agência ou selecionável independentemente)
+*   Tipo de Conta (dropdown: Corrente, Poupança)
+*   Saldo Inicial (obrigatório)
+*   Botões Cancelar e Salvar
+
+**Funcionalidades a Adicionar ou Aprimorar**:
+
+*   **Validações de Campo**: Implementar validação para o Número da Conta (unicidade), Saldo Inicial (numérico).
+*   **Ações na Tabela**: Adicionar ícones ou botões na coluna "Ações" para:
+    *   **Editar**: Abrir o formulário modal com os dados da conta bancária para edição.
+    *   **Excluir**: Remover o registro da conta bancária (com confirmação). Deve-se considerar a impossibilidade de excluir uma conta bancária que esteja associada a receitas.
+*   **Ordenação**: Permitir a ordenação da tabela clicando nos cabeçalhos das colunas (Número da Conta, Tipo de Conta, Saldo Inicial).
+
+
+
+
+### 3. Ponto
+
+Esta seção detalha as páginas relacionadas ao controle de ponto dos funcionários.
+
+#### 3.1. Controle de Ponto (Registro Rápido)
+
+**Visão Geral e Funcionalidades Existentes (Baseado nas Imagens)**:
+
+A página de Controle de Ponto é a interface principal para o registro de ponto. Ela já apresenta:
+
+*   **Relógio Digital**: Exibindo a hora atual (15:10:50) e a data (quinta-feira, 3 de julho de 2025).
+*   **Botões de Registro Rápido**: Entrada, Saída Almoço, Retorno Almoço, Saída.
+*   **Tabela de Registros Recentes**: Colunas para Funcionário, Data, Entrada, Saída Almoço, Retorno Almoço, Saída, Horas Trabalhadas, Horas Extras, Obra e Ações.
+*   **Controles de Paginação, Exibição e Pesquisa**: Padrão do sistema.
+*   **Botão "+ Novo Registro"**: Para abrir o formulário de registro manual.
+
+O formulário modal para "Novo Registro" (registro manual) inclui campos para:
+
+*   Funcionário (dropdown/autocomplete)
+*   Obra (dropdown/autocomplete)
+*   Data (obrigatório)
+*   Hora de Entrada
+*   Hora de Saída
+*   Saída para Almoço
+*   Retorno do Almoço
+*   Observações
+*   Botões Cancelar e Salvar
+
+**Funcionalidades a Adicionar ou Aprimorar (Baseado nos Prompts)**:
+
+*   **Funcionalidade dos Botões de Registro Rápido**: Implementar a lógica para que, ao clicar nos botões (Entrada, Saída Almoço, etc.), o sistema registre automaticamente o ponto para o funcionário logado (ou selecionado, se for um terminal compartilhado) com a data e hora atuais.
+*   **Validações de Registro Rápido**: Garantir que um funcionário não possa registrar duas entradas consecutivas, ou uma saída antes de uma entrada, etc.
+*   **Preenchimento Automático do Formulário Manual**: Ao abrir o formulário "Novo Registro", a data deve vir preenchida com a data atual. Os campos de hora devem ser preenchidos com a hora atual ou permitir a seleção manual.
+*   **Autocomplete de Funcionário e Obra**: O campo "Funcionário" e "Obra" no formulário manual devem usar autocomplete para facilitar a seleção.
+*   **Cálculo de Horas**: A tabela de registros recentes deve exibir as "Horas Trabalhadas" e "Horas Extras" calculadas automaticamente com base nos registros de ponto.
+*   **Ações na Tabela de Registros Recentes**: Adicionar ícones ou botões na coluna "Ações" para:
+    *   **Editar**: Abrir o formulário modal com os dados do registro de ponto para correção (com justificativa).
+    *   **Excluir**: Remover o registro de ponto (com confirmação).
+*   **Filtros Avançados**: Adicionar filtros por Funcionário, Obra e Período na tabela de registros recentes.
+
+#### 3.2. Registros de Ponto (Gestão)
+
+**Visão Geral e Funcionalidades Esperadas (Baseado nos Prompts)**:
+
+Esta página (que pode ser uma extensão da anterior ou uma página separada para administradores) deve permitir uma gestão mais aprofundada dos registros de ponto.
+
+*   **Listagem Completa**: Exibir todos os registros de ponto, com filtros avançados por funcionário, data, tipo de registro, status (aprovado/pendente).
+*   **Edição e Aprovação**: Interface para que administradores possam editar registros (com justificativa e histórico de alterações) e aprovar/rejeitar alterações ou ocorrências.
+*   **Relatórios de Ponto**: Geração de relatórios de horas trabalhadas, horas extras, faltas e atrasos por funcionário e período.
+
+#### 3.3. Ocorrências
+
+**Visão Geral e Funcionalidades Esperadas (Baseado nos Prompts)**:
+
+Esta página é para o gerenciamento de ocorrências relacionadas aos funcionários (atestados, licenças, atrasos justificados, etc.).
+
+*   **Listagem de Ocorrências**: Tabela com colunas para Funcionário, Tipo de Ocorrência, Data Início, Data Fim, Descrição, Status e Anexo.
+*   **Formulário de Cadastro/Edição**: Campos para:
+    *   Funcionário (autocomplete)
+    *   Tipo de Ocorrência (dropdown: Atestado Médico, Licença, Atraso Justificado, etc.)
+    *   Data Início e Data Fim
+    *   Descrição
+    *   Status (Pendente, Aprovada, Rejeitada)
+    *   Upload de Anexo (e.g., foto do atestado)
+*   **Ações na Tabela**: Editar, Excluir, Visualizar Anexo, Alterar Status.
+*   **Cadastro de Tipos de Ocorrência**: Uma sub-página ou modal para gerenciar os tipos de ocorrência (Nome, Descrição).
+
+
+
+
+### 4. Alimentação
+
+Esta seção detalha a página de controle de despesas com alimentação.
+
+#### 4.1. Controle de Alimentação
+
+**Visão Geral e Funcionalidades Existentes (Baseado nas Imagens)**:
+
+A página de Controle de Alimentação já apresenta:
+
+*   **Cards de KPIs**: Três cards principais que exibem:
+    *   Total do Mês (atualmente R$ 0.00)
+    *   Registros Hoje (atualmente 0)
+    *   Média Diária (atualmente R$ 0.00)
+    *   Funcionários (atualmente 0)
+*   **Tabela de Registros de Alimentação**: Colunas para Funcionário, Data, Tipo, Valor, Obra e Observações.
+*   **Controles de Paginação, Exibição e Pesquisa**: Padrão do sistema.
+*   **Botão "+ Novo Registro"**: Para abrir o formulário de registro.
+
+O formulário modal para "Novo Registro" inclui campos para:
+
+*   Funcionário (dropdown/autocomplete)
+*   Data (obrigatório)
+*   Tipo (dropdown: Refeição, Lanche, Vale-Refeição, Outros)
+*   Valor (obrigatório)
+*   Obra (dropdown/autocomplete)
+*   Observações
+*   Botões Cancelar e Salvar
+
+**Funcionalidades a Adicionar ou Aprimorar (Baseado nos Prompts)**:
+
+*   **Dados Dinâmicos**: Todos os cards devem ser alimentados dinamicamente pelo banco de dados.
+*   **Preenchimento de Dropdowns/Autocomplete**: Os campos "Funcionário" e "Obra" devem ser preenchidos dinamicamente com dados dos respectivos cadastros, idealmente com autocomplete inteligente.
+*   **Validações de Campo**: Implementar validações para Valor (numérico, maior que zero), Data (formato válido).
+*   **Ações na Tabela**: Adicionar ícones ou botões na coluna "Ações" para:
+    *   **Editar**: Abrir o formulário modal com os dados do registro de alimentação para edição.
+    *   **Excluir**: Remover o registro de alimentação (com confirmação).
+*   **Filtros Avançados**: Adicionar filtros por Funcionário, Obra, Tipo e Período na listagem.
+*   **Ordenação**: Permitir a ordenação da tabela clicando nos cabeçalhos das colunas (Funcionário, Data, Tipo, Valor).
+
+
+
+
+### 5. Relatórios e Dashboards
+
+Esta seção é o centro de análise do sistema, onde os dados de todos os módulos são consolidados e apresentados de forma visual e tabular para auxiliar na tomada de decisões.
+
+#### 5.1. Relatórios e Dashboards (Visão Geral)
+
+**Visão Geral e Funcionalidades Existentes (Baseado nas Imagens)**:
+
+A página de Relatórios e Dashboards já apresenta uma estrutura robusta com:
+
+*   **Filtros Globais**: Campos para Data Início, Data Fim, Obra (dropdown/autocomplete) e Departamento (dropdown/autocomplete).
+    *   Botões "Aplicar Filtros" e "Limpar".
+*   **Seções de Relatórios**: Organizadas por categorias:
+    *   **Relatórios de Pessoal**:
+        *   Lista de Funcionários
+        *   Relatório de Ponto
+        *   Horas Extras
+        *   Relatório de Alimentação
+    *   **Relatórios de Obras**:
+        *   Lista de Obras
+        *   Custos por Obra
+        *   Progresso das Obras
+        *   Rentabilidade
+    *   **Relatórios Gerenciais**:
+        *   Relatório de Veículos
+        *   Dashboard Estoque (Esta será removida, pois a seção de materiais foi excluída)
+*   **Gráficos de Análise (Placeholders)**:
+    *   Evolução de Custos (gráfico de linha)
+    *   Produtividade por Departamento (gráfico de barras)
+    *   Distribuição de Custos (gráfico de pizza)
+    *   Horas Trabalhadas vs Extras (gráfico de linha)
+
+**Funcionalidades a Adicionar ou Aprimorar (Baseado nos Prompts)**:
+
+*   **Implementação dos Filtros Globais**: Garantir que os filtros de Data Início, Data Fim, Obra e Departamento funcionem corretamente, aplicando-se a todos os relatórios e gráficos da página. A persistência dos filtros (manter a seleção ao navegar) é crucial.
+*   **Preenchimento de Dropdowns/Autocomplete**: Os campos "Obra" e "Departamento" nos filtros devem ser preenchidos dinamicamente com dados dos respectivos cadastros, idealmente com autocomplete inteligente.
+*   **Relatórios de Pessoal**: Implementar os relatórios detalhados:
+    *   **Lista de Funcionários**: Uma listagem completa dos funcionários, com opção de exportação.
+    *   **Relatório de Ponto**: Detalhamento dos registros de ponto por funcionário e período, incluindo horas trabalhadas, horas extras, faltas e atrasos.
+    *   **Horas Extras**: Relatório específico de horas extras por funcionário, com totalização e custos associados.
+    *   **Relatório de Alimentação**: Consolidação dos gastos com alimentação por funcionário, obra ou período.
+*   **Relatórios de Obras**: Implementar os relatórios detalhados:
+    *   **Lista de Obras**: Listagem completa das obras, com seus status e informações básicas.
+    *   **Custos por Obra**: Relatório detalhado de todas as despesas associadas a cada obra, permitindo a visualização do custo real.
+    *   **Progresso das Obras**: Relatório ou dashboard visual do progresso físico e financeiro das obras.
+    *   **Rentabilidade**: Análise da rentabilidade de cada obra, comparando receitas e despesas.
+*   **Relatórios Gerenciais**: Implementar os relatórios detalhados:
+    *   **Relatório de Veículos**: Consolidação de dados sobre a frota, incluindo custos de manutenção, abastecimento, multas e alocação.
+    *   **Remoção de 'Dashboard Estoque'**: Conforme solicitado, esta seção será removida.
+*   **Implementação dos Gráficos**: Todos os gráficos devem ser dinâmicos e interativos, refletindo os dados filtrados:
+    *   **Evolução de Custos**: Gráfico de linha mostrando a evolução dos custos totais ao longo do tempo, com drill-down por categoria de custo.
+    *   **Produtividade por Departamento**: Gráfico de barras comparando a produtividade entre departamentos (se métricas de produtividade forem implementadas).
+    *   **Distribuição de Custos**: Gráfico de pizza ou barras mostrando a proporção dos custos por categoria (Mão de Obra, Alimentação, Outros).
+    *   **Horas Trabalhadas vs Extras**: Gráfico de linha comparando as horas normais e extras ao longo do tempo.
+*   **Exportação de Relatórios**: Todos os relatórios devem ter a opção de exportação para formatos comuns (CSV, PDF, Excel).
+
+#### 5.2. Relatórios Avançados de Gestão de Pessoas (Módulo RH Avançado)
+
+Esta subseção de relatórios é dedicada às funcionalidades avançadas de RH, conforme detalhado no prompt de Gestão de Pessoas (Versão Profissional).
+
+*   **Dashboard Geral de RH**: Uma página dedicada com KPIs obrigatórios:
+    *   **Colaboradores por Função/Departamento**: Gráficos de distribuição.
+    *   **Faltas e Atrasos**: Métricas e gráficos de frequência.
+    *   **Absenteísmo**: Taxa de ausências justificadas e injustificadas, com análise temporal e por função/departamento.
+    *   **Produtividade**: Indicadores de desempenho (se aplicável e configurado).
+    *   **Filtros Globais de Período**: Seletores de data personalizados, filtros rápidos (últimos 7 dias, 30 dias, mês atual, ano atual) e persistência dos filtros.
+    *   **Análise Temporal**: Gráficos de linha ou área mostrando a evolução de faltas, absenteísmo e frequência ao longo do tempo.
+    *   **Análise por Função/Departamento**: Comparativos de absenteísmo e produtividade entre diferentes funções ou departamentos, com rankings.
+*   **Dashboard Individual por Colaborador**: Uma página de perfil para cada funcionário, acessível a partir da lista de funcionários ou do dashboard de RH, contendo:
+    *   Dados cadastrais e foto.
+    *   Histórico detalhado de ponto, faltas, atrasos e ocorrências.
+    *   KPIs individuais de absenteísmo, frequência e horas extras.
+    *   Gráficos de desempenho individual ao longo do tempo.
+*   **Relatórios de Absenteísmo e Frequência**: Relatórios detalhados com filtros avançados, permitindo a análise das causas do absenteísmo e da assiduidade dos colaboradores.
+*   **Cálculos e Regras de Negócio**: O backend deve implementar as lógicas para calcular absenteísmo, frequência, produtividade, impacto financeiro e horas trabalhadas, com validações automáticas e alertas.
+*   **Sistema de Upload e Gerenciamento de Fotos**: Integrado ao cadastro de funcionários, garantindo o upload, armazenamento e exibição otimizada das fotos dos colaboradores.
+
+
+
+
+## Conclusão
+
+Este documento detalhou o conteúdo e as funcionalidades esperadas para cada página do Sistema Integrado de Gestão Empresarial (SIGE) 'Estruturas do Vale', combinando a análise das imagens fornecidas com os requisitos abrangentes dos prompts anteriores. O foco foi em aprimorar as funcionalidades existentes e adicionar as necessárias para um sistema robusto de gestão de pessoas, obras, veículos e alimentação, com a exclusão das seções de fornecedores, clientes e materiais, conforme solicitado.
+
+O sistema proposto visa ser uma ferramenta completa para a gestão empresarial, oferecendo desde cadastros mestres e controle operacional até dashboards analíticos e relatórios detalhados. A integração entre os módulos, a automação de cálculos e a ênfase na usabilidade e na integridade dos dados são pilares para o sucesso do SIGE. Com esta especificação detalhada, o desenvolvimento pode prosseguir com clareza e foco, garantindo que o produto final atenda às expectativas e necessidades da 'Estruturas do Vale'.
+
+

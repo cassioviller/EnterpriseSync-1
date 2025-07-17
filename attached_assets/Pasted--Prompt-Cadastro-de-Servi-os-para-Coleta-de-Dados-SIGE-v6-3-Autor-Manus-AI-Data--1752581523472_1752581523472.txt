@@ -1,0 +1,538 @@
+# Prompt: Cadastro de Serviços para Coleta de Dados - SIGE v6.3
+
+**Autor:** Manus AI  
+**Data:** 15 de Julho de 2025  
+**Módulo:** Configurações → Serviços  
+**Objetivo:** Estruturar serviços para coleta de dados reais via RDO
+
+---
+
+## CONTEXTO ESTRATÉGICO CORRIGIDO
+
+O módulo de cadastro de serviços serve para ESTRUTURAR e ORGANIZAR os tipos de trabalho da empresa, SEM estimativas prévias. O objetivo é criar uma base padronizada para que os RDOs coletam dados reais de tempo e produtividade. Com esses dados coletados, o sistema gerará automaticamente as estimativas e análises de custo baseadas em:
+
+- **Custo real da mão de obra** (salários dos funcionários já cadastrados)
+- **Tempo real de execução** (coletado via RDO)
+- **Produtividade real** (quantidade executada vs. tempo gasto)
+
+---
+
+## Prompt: Cadastro de Serviços para Coleta de Dados Reais
+
+```
+Desenvolva módulo de cadastro de serviços focado em estruturação para coleta de dados reais, SEM estimativas prévias.
+
+CONTEXTO CORRIGIDO:
+- Objetivo: Estruturar serviços para padronizar coleta de dados
+- NÃO incluir: Estimativas de tempo, custo ou preços
+- Foco: Organização, categorização e unidades de medida
+- Dados reais: Serão coletados via RDO e calculados automaticamente
+
+FUNCIONALIDADES DO MÓDULO:
+
+1. **CRUD Completo de Serviços:**
+   - Listagem com filtros e busca
+   - Cadastro de novos serviços
+   - Edição de serviços existentes
+   - Exclusão com validação de uso
+   - Ativação/desativação de serviços
+
+2. **Estruturação Básica:**
+   - Nome e descrição do serviço
+   - Categoria de trabalho
+   - Unidade de medida
+   - Nível de complexidade (para análise futura)
+
+3. **Gestão de Subatividades:**
+   - Decomposição do serviço em etapas
+   - Sequência de execução
+   - Descrição de cada subatividade
+   - Base para coleta detalhada de dados
+
+INTERFACE SIMPLIFICADA:
+
+```html
+<div class="modal fade" id="modalServico" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="fas fa-tools"></i> <span id="titulo_modal">Novo Serviço</span>
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="form_servico">
+                    <!-- Aba 1: Dados Básicos -->
+                    <ul class="nav nav-tabs" id="tabs_servico">
+                        <li class="nav-item">
+                            <a class="nav-link active" data-bs-toggle="tab" href="#tab_basicos">
+                                <i class="fas fa-info-circle"></i> Dados Básicos
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" data-bs-toggle="tab" href="#tab_subatividades">
+                                <i class="fas fa-list"></i> Subatividades
+                                <span class="badge bg-primary" id="count_subatividades">0</span>
+                            </a>
+                        </li>
+                    </ul>
+                    
+                    <div class="tab-content mt-3">
+                        <!-- Tab Dados Básicos -->
+                        <div class="tab-pane fade show active" id="tab_basicos">
+                            <div class="row">
+                                <div class="col-md-8">
+                                    <label class="form-label">Nome do Serviço *</label>
+                                    <input type="text" class="form-control" id="nome_servico" 
+                                           placeholder="Ex: Alvenaria de Vedação" required>
+                                </div>
+                                <div class="col-md-4">
+                                    <label class="form-label">Categoria *</label>
+                                    <select class="form-select" id="categoria_servico" required>
+                                        <option value="">Selecione...</option>
+                                        <option value="estrutura">Estrutura</option>
+                                        <option value="alvenaria">Alvenaria</option>
+                                        <option value="acabamento">Acabamento</option>
+                                        <option value="instalacoes">Instalações</option>
+                                        <option value="cobertura">Cobertura</option>
+                                        <option value="fundacao">Fundação</option>
+                                        <option value="impermeabilizacao">Impermeabilização</option>
+                                        <option value="pintura">Pintura</option>
+                                        <option value="esquadrias">Esquadrias</option>
+                                        <option value="pisos">Pisos e Revestimentos</option>
+                                    </select>
+                                </div>
+                            </div>
+                            
+                            <div class="row mt-3">
+                                <div class="col-12">
+                                    <label class="form-label">Descrição</label>
+                                    <textarea class="form-control" id="descricao_servico" rows="3"
+                                              placeholder="Descrição detalhada do serviço e como deve ser executado..."></textarea>
+                                </div>
+                            </div>
+                            
+                            <div class="row mt-3">
+                                <div class="col-md-6">
+                                    <label class="form-label">Unidade de Medida *</label>
+                                    <select class="form-select" id="unidade_medida" required 
+                                            onchange="atualizarPreviewUnidade()">
+                                        <option value="">Selecione...</option>
+                                        <option value="m2">Metro Quadrado (m²)</option>
+                                        <option value="m3">Metro Cúbico (m³)</option>
+                                        <option value="kg">Quilograma (kg)</option>
+                                        <option value="ton">Tonelada (ton)</option>
+                                        <option value="un">Unidade (un)</option>
+                                        <option value="m">Metro Linear (m)</option>
+                                        <option value="h">Hora (h)</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-3">
+                                    <label class="form-label">Complexidade</label>
+                                    <select class="form-select" id="complexidade">
+                                        <option value="1">1 - Muito Simples</option>
+                                        <option value="2">2 - Simples</option>
+                                        <option value="3" selected>3 - Médio</option>
+                                        <option value="4">4 - Complexo</option>
+                                        <option value="5">5 - Muito Complexo</option>
+                                    </select>
+                                    <small class="text-muted">Para análise futura de produtividade</small>
+                                </div>
+                                <div class="col-md-3">
+                                    <div class="form-check mt-4">
+                                        <input class="form-check-input" type="checkbox" id="requer_especializacao">
+                                        <label class="form-check-label">
+                                            Requer Especialização
+                                        </label>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <!-- Preview da unidade -->
+                            <div class="alert alert-info mt-3" id="preview_unidade" style="display: none;">
+                                <i class="fas fa-eye"></i> <strong>Preview RDO:</strong> 
+                                "Quantidade executada: <span id="preview_texto"></span>"
+                            </div>
+                            
+                            <!-- Informação sobre coleta de dados -->
+                            <div class="alert alert-warning mt-3">
+                                <i class="fas fa-info-circle"></i> <strong>Importante:</strong> 
+                                Os dados de tempo e custo serão coletados automaticamente através dos RDOs. 
+                                O sistema calculará produtividade e custos baseados nos salários dos funcionários 
+                                e tempo real de execução.
+                            </div>
+                        </div>
+                        
+                        <!-- Tab Subatividades -->
+                        <div class="tab-pane fade" id="tab_subatividades">
+                            <div class="d-flex justify-content-between mb-3">
+                                <div>
+                                    <h6><i class="fas fa-list"></i> Subatividades do Serviço</h6>
+                                    <small class="text-muted">
+                                        Decomponha o serviço em etapas para coleta detalhada de dados
+                                    </small>
+                                </div>
+                                <button type="button" class="btn btn-sm btn-success" onclick="adicionarSubatividade()">
+                                    <i class="fas fa-plus"></i> Adicionar Subatividade
+                                </button>
+                            </div>
+                            
+                            <div id="container_subatividades">
+                                <!-- Subatividades serão adicionadas dinamicamente -->
+                            </div>
+                            
+                            <!-- Template de subatividade (hidden) -->
+                            <div id="template_subatividade" style="display: none;">
+                                <div class="card mb-3 subatividade-card">
+                                    <div class="card-header d-flex justify-content-between align-items-center">
+                                        <div class="d-flex align-items-center">
+                                            <span class="badge bg-primary me-2 ordem-badge">1</span>
+                                            <input type="text" class="form-control form-control-sm" 
+                                                   placeholder="Nome da subatividade" style="width: 350px;">
+                                        </div>
+                                        <div>
+                                            <button type="button" class="btn btn-sm btn-outline-secondary me-1" 
+                                                    onclick="moverSubatividade(this, 'up')" title="Mover para cima">
+                                                <i class="fas fa-arrow-up"></i>
+                                            </button>
+                                            <button type="button" class="btn btn-sm btn-outline-secondary me-1" 
+                                                    onclick="moverSubatividade(this, 'down')" title="Mover para baixo">
+                                                <i class="fas fa-arrow-down"></i>
+                                            </button>
+                                            <button type="button" class="btn btn-sm btn-outline-danger" 
+                                                    onclick="removerSubatividade(this)" title="Remover">
+                                                <i class="fas fa-trash"></i>
+                                            </button>
+                                        </div>
+                                    </div>
+                                    <div class="card-body">
+                                        <div class="row">
+                                            <div class="col-md-12 mb-3">
+                                                <label class="form-label">Descrição da Subatividade</label>
+                                                <textarea class="form-control form-control-sm" rows="2" 
+                                                          placeholder="Descreva detalhadamente esta etapa do serviço..."></textarea>
+                                            </div>
+                                        </div>
+                                        <div class="row">
+                                            <div class="col-md-6">
+                                                <label class="form-label">Ferramentas Necessárias</label>
+                                                <input type="text" class="form-control form-control-sm" 
+                                                       placeholder="Ex: Furadeira, Nível, Esquadro">
+                                            </div>
+                                            <div class="col-md-6">
+                                                <label class="form-label">Materiais Principais</label>
+                                                <input type="text" class="form-control form-control-sm" 
+                                                       placeholder="Ex: Blocos, Argamassa, Arame">
+                                            </div>
+                                        </div>
+                                        <div class="row mt-2">
+                                            <div class="col-md-4">
+                                                <div class="form-check">
+                                                    <input class="form-check-input" type="checkbox">
+                                                    <label class="form-check-label">Requer Aprovação</label>
+                                                </div>
+                                            </div>
+                                            <div class="col-md-4">
+                                                <div class="form-check">
+                                                    <input class="form-check-input" type="checkbox" checked>
+                                                    <label class="form-check-label">Execução Paralela</label>
+                                                </div>
+                                            </div>
+                                            <div class="col-md-4">
+                                                <label class="form-label">Qualificação Mínima</label>
+                                                <select class="form-select form-select-sm">
+                                                    <option value="">Nenhuma</option>
+                                                    <option value="ajudante">Ajudante</option>
+                                                    <option value="meio_oficial">Meio Oficial</option>
+                                                    <option value="oficial">Oficial</option>
+                                                    <option value="especialista">Especialista</option>
+                                                </select>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <!-- Informação sobre coleta de dados -->
+                            <div class="alert alert-info mt-3">
+                                <i class="fas fa-chart-line"></i> <strong>Coleta de Dados:</strong> 
+                                No RDO, os funcionários poderão selecionar quais subatividades foram executadas. 
+                                O sistema calculará automaticamente:
+                                <ul class="mb-0 mt-2">
+                                    <li>Tempo gasto em cada subatividade</li>
+                                    <li>Custo real baseado no salário dos funcionários</li>
+                                    <li>Produtividade por subatividade</li>
+                                    <li>Percentual de tempo de cada etapa</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                    <i class="fas fa-times"></i> Cancelar
+                </button>
+                <button type="button" class="btn btn-primary" onclick="salvarServico()">
+                    <i class="fas fa-save"></i> Salvar Serviço
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+```
+
+MODELO DE DADOS SIMPLIFICADO:
+
+```sql
+-- Tabela principal de serviços (SEM estimativas)
+CREATE TABLE servico (
+    id SERIAL PRIMARY KEY,
+    nome VARCHAR(100) NOT NULL,
+    descricao TEXT,
+    categoria VARCHAR(50) NOT NULL,
+    unidade_medida VARCHAR(10) NOT NULL, -- m2, m3, kg, ton, un, m, h
+    complexidade INTEGER DEFAULT 3, -- 1-5 para análise futura
+    requer_especializacao BOOLEAN DEFAULT FALSE,
+    ativo BOOLEAN DEFAULT TRUE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Tabela de subatividades (SEM percentuais de tempo/custo)
+CREATE TABLE sub_atividade (
+    id SERIAL PRIMARY KEY,
+    servico_id INTEGER REFERENCES servico(id) ON DELETE CASCADE,
+    nome VARCHAR(100) NOT NULL,
+    descricao TEXT,
+    ordem_execucao INTEGER NOT NULL,
+    ferramentas_necessarias TEXT,
+    materiais_principais TEXT,
+    requer_aprovacao BOOLEAN DEFAULT FALSE,
+    pode_executar_paralelo BOOLEAN DEFAULT TRUE,
+    qualificacao_minima VARCHAR(50),
+    ativo BOOLEAN DEFAULT TRUE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Tabela para armazenar dados COLETADOS (gerada automaticamente pelos RDOs)
+CREATE TABLE historico_produtividade_servico (
+    id SERIAL PRIMARY KEY,
+    servico_id INTEGER REFERENCES servico(id),
+    sub_atividade_id INTEGER REFERENCES sub_atividade(id),
+    obra_id INTEGER REFERENCES obra(id),
+    funcionario_id INTEGER REFERENCES funcionario(id),
+    data_execucao DATE,
+    quantidade_executada DECIMAL(10,4),
+    tempo_execucao_horas DECIMAL(8,2),
+    custo_mao_obra_real DECIMAL(10,2), -- calculado automaticamente
+    produtividade_hora DECIMAL(8,4), -- quantidade/hora
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+```
+
+JAVASCRIPT SIMPLIFICADO:
+
+```javascript
+// Funções básicas sem cálculos de estimativas
+function adicionarSubatividade() {
+    const container = document.getElementById('container_subatividades');
+    const template = document.getElementById('template_subatividade');
+    const novaSubatividade = template.cloneNode(true);
+    
+    novaSubatividade.style.display = 'block';
+    novaSubatividade.id = `subatividade_${Date.now()}`;
+    
+    container.appendChild(novaSubatividade);
+    atualizarOrdemSubatividades();
+    atualizarContadorSubatividades();
+}
+
+function atualizarOrdemSubatividades() {
+    const cards = document.querySelectorAll('.subatividade-card');
+    cards.forEach((card, index) => {
+        const badge = card.querySelector('.ordem-badge');
+        badge.textContent = index + 1;
+    });
+}
+
+function atualizarContadorSubatividades() {
+    const count = document.querySelectorAll('.subatividade-card').length;
+    document.getElementById('count_subatividades').textContent = count;
+}
+
+function atualizarPreviewUnidade() {
+    const unidade = document.getElementById('unidade_medida').value;
+    const preview = document.getElementById('preview_unidade');
+    const previewTexto = document.getElementById('preview_texto');
+    
+    const unidades = {
+        'm2': '_____ m² executados',
+        'm3': '_____ m³ executados',
+        'kg': '_____ kg executados',
+        'ton': '_____ toneladas executadas',
+        'un': '_____ unidades executadas',
+        'm': '_____ metros executados',
+        'h': '_____ horas trabalhadas'
+    };
+    
+    if (unidade && unidades[unidade]) {
+        previewTexto.textContent = unidades[unidade];
+        preview.style.display = 'block';
+    } else {
+        preview.style.display = 'none';
+    }
+}
+
+function salvarServico() {
+    const dados = {
+        nome: document.getElementById('nome_servico').value,
+        descricao: document.getElementById('descricao_servico').value,
+        categoria: document.getElementById('categoria_servico').value,
+        unidade_medida: document.getElementById('unidade_medida').value,
+        complexidade: document.getElementById('complexidade').value,
+        requer_especializacao: document.getElementById('requer_especializacao').checked,
+        subatividades: coletarSubatividades()
+    };
+    
+    // Validações básicas
+    if (!dados.nome || !dados.categoria || !dados.unidade_medida) {
+        alert('Preencha todos os campos obrigatórios');
+        return;
+    }
+    
+    fetch('/api/servicos', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(dados)
+    })
+    .then(response => response.json())
+    .then(result => {
+        if (result.success) {
+            alert('Serviço salvo com sucesso!');
+            location.reload();
+        } else {
+            alert('Erro ao salvar: ' + result.message);
+        }
+    })
+    .catch(error => {
+        console.error('Erro:', error);
+        alert('Erro ao salvar serviço');
+    });
+}
+
+function coletarSubatividades() {
+    const cards = document.querySelectorAll('.subatividade-card');
+    const subatividades = [];
+    
+    cards.forEach((card, index) => {
+        const nome = card.querySelector('input[placeholder="Nome da subatividade"]').value;
+        const descricao = card.querySelector('textarea').value;
+        const ferramentas = card.querySelector('input[placeholder*="Furadeira"]').value;
+        const materiais = card.querySelector('input[placeholder*="Blocos"]').value;
+        const requerAprovacao = card.querySelector('input[type="checkbox"]').checked;
+        const execucaoParalela = card.querySelectorAll('input[type="checkbox"]')[1].checked;
+        const qualificacao = card.querySelector('select').value;
+        
+        if (nome.trim()) {
+            subatividades.push({
+                nome: nome,
+                descricao: descricao,
+                ordem_execucao: index + 1,
+                ferramentas_necessarias: ferramentas,
+                materiais_principais: materiais,
+                requer_aprovacao: requerAprovacao,
+                pode_executar_paralelo: execucaoParalela,
+                qualificacao_minima: qualificacao
+            });
+        }
+    });
+    
+    return subatividades;
+}
+```
+
+BACKEND PARA COLETA DE DADOS:
+
+```python
+# Função que será chamada quando RDO for finalizado
+def processar_dados_produtividade(rdo_id):
+    """
+    Processa dados do RDO e gera histórico de produtividade
+    """
+    rdo = RDOOperacional.query.get(rdo_id)
+    
+    for atividade in rdo.atividades:
+        for funcionario in atividade.funcionarios:
+            # Calcular custo real da mão de obra
+            custo_hora = funcionario.salario / 220  # 220 horas/mês aproximadamente
+            custo_total = custo_hora * atividade.tempo_execucao_horas
+            
+            # Calcular produtividade
+            produtividade = atividade.quantidade_executada / atividade.tempo_execucao_horas
+            
+            # Salvar no histórico
+            historico = HistoricoProdutividadeServico(
+                servico_id=atividade.servico_id,
+                sub_atividade_id=atividade.sub_atividade_id,
+                obra_id=rdo.obra_id,
+                funcionario_id=funcionario.id,
+                data_execucao=rdo.data_relatorio,
+                quantidade_executada=atividade.quantidade_executada,
+                tempo_execucao_horas=atividade.tempo_execucao_horas,
+                custo_mao_obra_real=custo_total,
+                produtividade_hora=produtividade
+            )
+            
+            db.session.add(historico)
+    
+    db.session.commit()
+
+# Função para gerar estimativas baseadas em dados coletados
+def gerar_estimativas_servico(servico_id):
+    """
+    Gera estimativas baseadas em dados históricos coletados
+    """
+    historicos = HistoricoProdutividadeServico.query.filter_by(
+        servico_id=servico_id
+    ).all()
+    
+    if not historicos:
+        return None
+    
+    # Calcular médias
+    tempo_medio = sum(h.tempo_execucao_horas for h in historicos) / len(historicos)
+    custo_medio = sum(h.custo_mao_obra_real for h in historicos) / len(historicos)
+    produtividade_media = sum(h.produtividade_hora for h in historicos) / len(historicos)
+    
+    return {
+        'tempo_medio_por_unidade': tempo_medio,
+        'custo_medio_por_unidade': custo_medio,
+        'produtividade_media': produtividade_media,
+        'base_dados': len(historicos)
+    }
+```
+
+CRITÉRIOS DE SUCESSO:
+- [ ] Interface simplificada sem estimativas prévias
+- [ ] Estruturação clara de serviços e subatividades
+- [ ] Configuração correta de unidades de medida
+- [ ] Sistema preparado para coleta de dados via RDO
+- [ ] Cálculos automáticos baseados em dados reais
+- [ ] Histórico de produtividade sendo gerado
+
+BENEFÍCIOS:
+- **Dados Reais**: Estimativas baseadas em execução real
+- **Aprendizado**: Sistema melhora com o tempo
+- **Precisão**: Custos calculados com salários reais
+- **Flexibilidade**: Sem limitações de estimativas prévias
+- **Inteligência**: Análises baseadas em dados coletados
+```
+
+---
+
+**RESULTADO**: Sistema de cadastro de serviços focado em estruturação para coleta de dados reais, que gerará automaticamente estimativas e análises baseadas nos dados coletados via RDO e custos reais de mão de obra.
+

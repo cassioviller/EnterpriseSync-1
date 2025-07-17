@@ -1,0 +1,555 @@
+# Prompt Completo: KPIs Integrados com Horários de Trabalho
+## Sistema SIGE v6.2 - Engine de KPIs v4.0
+
+---
+
+## 🎯 **OBJETIVO**
+
+Implementar sistema completo de KPIs que:
+- ✅ **Integra** com horários de trabalho cadastrados
+- ✅ **Calcula** custo real de mão de obra
+- ✅ **Quantifica** valor das faltas justificadas
+- ✅ **Gera** métricas precisas e justas
+
+---
+
+## 📊 **ESTRUTURA COMPLETA DOS KPIs**
+
+### **Layout 4-4-4-3 (15 KPIs):**
+
+#### **LINHA 1: KPIs Básicos (4)**
+1. **Horas Trabalhadas** - Total de horas efetivamente trabalhadas
+2. **Horas Extras** - Horas acima do horário padrão
+3. **Faltas** - Faltas não justificadas (penalizam)
+4. **Atrasos** - Entrada atrasada + saída antecipada (em horas)
+
+#### **LINHA 2: KPIs Analíticos (4)**
+5. **Produtividade** - (Horas trabalhadas ÷ Horas esperadas) × 100
+6. **Absenteísmo** - (Faltas não justificadas ÷ Dias programados) × 100
+7. **Média Diária** - Horas trabalhadas ÷ Dias com lançamento
+8. **Faltas Justificadas** - Faltas que não penalizam (informativo)
+
+#### **LINHA 3: KPIs Financeiros (4)**
+9. **Custo Mão de Obra** - Valor total pago (salário + extras)
+10. **Custo Alimentação** - Valor gasto com alimentação
+11. **Custo Transporte** - Valor gasto com transporte
+12. **Outros Custos** - Demais custos operacionais
+
+#### **LINHA 4: KPIs Resumo (3)**
+13. **Horas Perdidas** - (Faltas × Horas/dia) + Atrasos
+14. **Eficiência** - Produtividade ajustada por qualidade
+15. **Valor Falta Justificada** - Impacto financeiro das faltas justificadas
+
+---
+
+## 🔧 **IMPLEMENTAÇÃO COMPLETA**
+
+### **1. Função Principal Atualizada:**
+
+```python
+def calcular_kpis_funcionario_v4(funcionario_id, data_inicio=None, data_fim=None):
+    """
+    Engine de KPIs v4.0 - INTEGRADO COM HORÁRIOS DE TRABALHO
+    
+    Calcula todos os 15 KPIs baseados no horário específico do funcionário
+    """
+    try:
+        from datetime import datetime, date, time
+        from models import Funcionario, HorarioTrabalho, RegistroPonto
+        
+        # 1. BUSCAR FUNCIONÁRIO E HORÁRIO
+        funcionario = Funcionario.query.get(funcionario_id)
+        if not funcionario:
+            return None
+        
+        # 2. OBTER HORÁRIO DE TRABALHO ESPECÍFICO
+        horario_info = obter_horario_funcionario(funcionario)
+        
+        # 3. DEFINIR PERÍODO
+        if not data_inicio:
+            data_inicio = date.today().replace(day=1)
+        if not data_fim:
+            data_fim = date.today()
+        
+        # 4. BUSCAR REGISTROS DO PERÍODO
+        registros = RegistroPonto.query.filter(
+            RegistroPonto.funcionario_id == funcionario_id,
+            RegistroPonto.data >= data_inicio,
+            RegistroPonto.data <= data_fim
+        ).all()
+        
+        # 5. PROCESSAR REGISTROS
+        dados_processados = processar_registros_com_horario(registros, horario_info)
+        
+        # 6. CALCULAR KPIs BÁSICOS
+        kpis_basicos = calcular_kpis_basicos(dados_processados, horario_info)
+        
+        # 7. CALCULAR KPIs ANALÍTICOS
+        kpis_analiticos = calcular_kpis_analiticos(dados_processados, horario_info)
+        
+        # 8. CALCULAR KPIs FINANCEIROS
+        kpis_financeiros = calcular_kpis_financeiros(funcionario, dados_processados, horario_info)
+        
+        # 9. CALCULAR KPIs RESUMO
+        kpis_resumo = calcular_kpis_resumo(funcionario, dados_processados, horario_info)
+        
+        # 10. CONSOLIDAR RESULTADO
+        return {
+            **kpis_basicos,
+            **kpis_analiticos, 
+            **kpis_financeiros,
+            **kpis_resumo,
+            'horario_info': horario_info,
+            'periodo': f"{data_inicio.strftime('%d/%m/%Y')} a {data_fim.strftime('%d/%m/%Y')}"
+        }
+        
+    except Exception as e:
+        print(f"Erro ao calcular KPIs v4.0: {str(e)}")
+        return None
+
+def obter_horario_funcionario(funcionario):
+    """
+    Obtém informações do horário de trabalho do funcionário
+    """
+    # Valores padrão
+    horario_info = {
+        'nome': 'Padrão',
+        'entrada': time(8, 0),
+        'saida': time(17, 0),
+        'almoco_inicio': time(12, 0),
+        'almoco_fim': time(13, 0),
+        'horas_diarias': 8.0,
+        'dias_semana': 'seg-sex',
+        'valor_hora': 0.0
+    }
+    
+    # Buscar horário específico
+    if hasattr(funcionario, 'horario_trabalho_id') and funcionario.horario_trabalho_id:
+        horario = HorarioTrabalho.query.get(funcionario.horario_trabalho_id)
+        if horario:
+            # Calcular horas líquidas
+            total_horas = calcular_diferenca_horas(horario.entrada, horario.saida)
+            almoco_horas = calcular_diferenca_horas(horario.saida_almoco, horario.retorno_almoco)
+            horas_liquidas = total_horas - almoco_horas
+            
+            horario_info.update({
+                'nome': horario.nome,
+                'entrada': horario.entrada,
+                'saida': horario.saida,
+                'almoco_inicio': horario.saida_almoco,
+                'almoco_fim': horario.retorno_almoco,
+                'horas_diarias': horas_liquidas,
+                'dias_semana': horario.dias_semana or 'seg-sex'
+            })
+    
+    # Calcular valor/hora baseado no horário específico
+    if funcionario.salario and horario_info['horas_diarias'] > 0:
+        # Considerar 22 dias úteis médios por mês
+        horas_mensais = horario_info['horas_diarias'] * 22
+        horario_info['valor_hora'] = funcionario.salario / horas_mensais
+    
+    return horario_info
+
+def calcular_diferenca_horas(hora_inicio, hora_fim):
+    """
+    Calcula diferença entre horários considerando virada de dia
+    """
+    inicio_decimal = hora_inicio.hour + hora_inicio.minute / 60
+    fim_decimal = hora_fim.hour + hora_fim.minute / 60
+    
+    if fim_decimal < inicio_decimal:  # Virada de dia (ex: 22:00 - 06:00)
+        return (24 - inicio_decimal) + fim_decimal
+    else:
+        return fim_decimal - inicio_decimal
+
+def processar_registros_com_horario(registros, horario_info):
+    """
+    Processa registros considerando horário específico
+    """
+    # Tipos que contam como dias programados
+    tipos_programados = [
+        'trabalho_normal', 'sabado_horas_extras', 'domingo_horas_extras',
+        'feriado_trabalhado', 'meio_periodo', 'falta', 'falta_justificada',
+        'atraso', 'saida_antecipada'
+    ]
+    
+    dados = {
+        'registros_programados': [],
+        'horas_trabalhadas': 0.0,
+        'horas_extras': 0.0,
+        'faltas_nao_justificadas': 0,
+        'faltas_justificadas': 0,
+        'atrasos_total': 0.0,
+        'dias_com_lancamento': 0
+    }
+    
+    for registro in registros:
+        # Contar apenas tipos programados
+        if registro.tipo_registro in tipos_programados:
+            dados['registros_programados'].append(registro)
+            dados['dias_com_lancamento'] += 1
+        
+        # Somar horas trabalhadas
+        if registro.horas_trabalhadas:
+            dados['horas_trabalhadas'] += registro.horas_trabalhadas
+        
+        # Identificar horas extras
+        if registro.horas_extras:
+            dados['horas_extras'] += registro.horas_extras
+        elif registro.tipo_registro in ['sabado_horas_extras', 'domingo_horas_extras', 'feriado_trabalhado']:
+            # Todas as horas destes tipos são extras
+            dados['horas_extras'] += registro.horas_trabalhadas or 0
+        
+        # Contar faltas
+        if registro.tipo_registro == 'falta':
+            dados['faltas_nao_justificadas'] += 1
+        elif registro.tipo_registro == 'falta_justificada':
+            dados['faltas_justificadas'] += 1
+        
+        # Calcular atrasos baseado no horário específico
+        if registro.hora_entrada and horario_info['entrada']:
+            if registro.hora_entrada > horario_info['entrada']:
+                atraso_minutos = (registro.hora_entrada - horario_info['entrada']).total_seconds() / 60
+                dados['atrasos_total'] += atraso_minutos / 60
+        
+        if registro.hora_saida and horario_info['saida']:
+            if registro.hora_saida < horario_info['saida']:
+                saida_antecipada_minutos = (horario_info['saida'] - registro.hora_saida).total_seconds() / 60
+                dados['atrasos_total'] += saida_antecipada_minutos / 60
+    
+    return dados
+
+def calcular_kpis_basicos(dados, horario_info):
+    """
+    Calcula KPIs básicos (linha 1)
+    """
+    return {
+        'horas_trabalhadas': round(dados['horas_trabalhadas'], 1),
+        'horas_extras': round(dados['horas_extras'], 1),
+        'faltas': dados['faltas_nao_justificadas'],
+        'atrasos': round(dados['atrasos_total'], 2)
+    }
+
+def calcular_kpis_analiticos(dados, horario_info):
+    """
+    Calcula KPIs analíticos (linha 2)
+    """
+    dias_programados = dados['dias_com_lancamento']
+    horas_trabalhadas = dados['horas_trabalhadas']
+    
+    if dias_programados > 0:
+        # Usar horário específico para calcular horas esperadas
+        horas_esperadas = dias_programados * horario_info['horas_diarias']
+        produtividade = (horas_trabalhadas / horas_esperadas) * 100 if horas_esperadas > 0 else 0
+        absenteismo = (dados['faltas_nao_justificadas'] / dias_programados) * 100
+        media_diaria = horas_trabalhadas / dias_programados
+    else:
+        produtividade = 0
+        absenteismo = 0
+        media_diaria = 0
+    
+    return {
+        'produtividade': round(produtividade, 1),
+        'absenteismo': round(absenteismo, 1),
+        'media_diaria': round(media_diaria, 1),
+        'faltas_justificadas': dados['faltas_justificadas']
+    }
+
+def calcular_kpis_financeiros(funcionario, dados, horario_info):
+    """
+    Calcula KPIs financeiros (linha 3)
+    """
+    valor_hora = horario_info['valor_hora']
+    horas_trabalhadas = dados['horas_trabalhadas']
+    horas_extras = dados['horas_extras']
+    
+    # Custo mão de obra = salário base - desconto faltas + adicional extras
+    custo_base = funcionario.salario or 0
+    
+    # Desconto por faltas não justificadas
+    desconto_faltas = dados['faltas_nao_justificadas'] * horario_info['horas_diarias'] * valor_hora
+    
+    # Adicional por horas extras (assumindo 50% de adicional)
+    adicional_extras = horas_extras * valor_hora * 0.5
+    
+    custo_mao_obra = custo_base - desconto_faltas + adicional_extras
+    
+    return {
+        'custo_mao_obra': round(custo_mao_obra, 2),
+        'custo_alimentacao': 0.0,  # Implementar conforme necessário
+        'custo_transporte': 0.0,   # Implementar conforme necessário
+        'outros_custos': 0.0       # Implementar conforme necessário
+    }
+
+def calcular_kpis_resumo(funcionario, dados, horario_info):
+    """
+    Calcula KPIs resumo (linha 4)
+    """
+    # Horas perdidas = faltas × horas/dia + atrasos
+    horas_perdidas = (dados['faltas_nao_justificadas'] * horario_info['horas_diarias']) + dados['atrasos_total']
+    
+    # Eficiência = produtividade (pode ser expandido com outros fatores)
+    dias_programados = dados['dias_com_lancamento']
+    if dias_programados > 0:
+        horas_esperadas = dias_programados * horario_info['horas_diarias']
+        eficiencia = (dados['horas_trabalhadas'] / horas_esperadas) * 100 if horas_esperadas > 0 else 0
+    else:
+        eficiencia = 0
+    
+    # Valor da falta justificada = faltas justificadas × horas/dia × valor/hora
+    valor_falta_justificada = dados['faltas_justificadas'] * horario_info['horas_diarias'] * horario_info['valor_hora']
+    
+    return {
+        'horas_perdidas': round(horas_perdidas, 1),
+        'eficiencia': round(eficiencia, 1),
+        'valor_falta_justificada': round(valor_falta_justificada, 2)
+    }
+```
+
+---
+
+## 🧪 **SCRIPT DE TESTE COMPLETO**
+
+```python
+def testar_kpis_integrados():
+    """
+    Testa KPIs integrados com horários
+    """
+    from datetime import date
+    from app import app
+    from models import Funcionario
+    
+    with app.app_context():
+        # Buscar Cássio
+        cassio = Funcionario.query.filter_by(nome__icontains='Cássio').first()
+        
+        if cassio:
+            print(f"=== TESTE KPIs v4.0 - {cassio.nome} ===")
+            
+            # Calcular KPIs
+            kpis = calcular_kpis_funcionario_v4(
+                cassio.id,
+                date(2025, 6, 1),
+                date(2025, 6, 30)
+            )
+            
+            if kpis:
+                horario = kpis['horario_info']
+                
+                print(f"\n📋 HORÁRIO DE TRABALHO:")
+                print(f"Nome: {horario['nome']}")
+                print(f"Horário: {horario['entrada'].strftime('%H:%M')} às {horario['saida'].strftime('%H:%M')}")
+                print(f"Almoço: {horario['almoco_inicio'].strftime('%H:%M')} às {horario['almoco_fim'].strftime('%H:%M')}")
+                print(f"Horas/dia: {horario['horas_diarias']}h")
+                print(f"Valor/hora: R$ {horario['valor_hora']:.2f}")
+                
+                print(f"\n📊 KPIs BÁSICOS:")
+                print(f"Horas Trabalhadas: {kpis['horas_trabalhadas']}h")
+                print(f"Horas Extras: {kpis['horas_extras']}h")
+                print(f"Faltas: {kpis['faltas']}")
+                print(f"Atrasos: {kpis['atrasos']}h")
+                
+                print(f"\n📈 KPIs ANALÍTICOS:")
+                print(f"Produtividade: {kpis['produtividade']}%")
+                print(f"Absenteísmo: {kpis['absenteismo']}%")
+                print(f"Média Diária: {kpis['media_diaria']}h")
+                print(f"Faltas Justificadas: {kpis['faltas_justificadas']}")
+                
+                print(f"\n💰 KPIs FINANCEIROS:")
+                print(f"Custo Mão de Obra: R$ {kpis['custo_mao_obra']:.2f}")
+                print(f"Custo Alimentação: R$ {kpis['custo_alimentacao']:.2f}")
+                print(f"Custo Transporte: R$ {kpis['custo_transporte']:.2f}")
+                print(f"Outros Custos: R$ {kpis['outros_custos']:.2f}")
+                
+                print(f"\n🎯 KPIs RESUMO:")
+                print(f"Horas Perdidas: {kpis['horas_perdidas']}h")
+                print(f"Eficiência: {kpis['eficiencia']}%")
+                print(f"Valor Falta Justificada: R$ {kpis['valor_falta_justificada']:.2f}")
+                
+                print(f"\n✅ TESTE CONCLUÍDO COM SUCESSO!")
+                return True
+            else:
+                print("❌ Erro ao calcular KPIs")
+                return False
+        else:
+            print("❌ Funcionário não encontrado")
+            return False
+
+# Executar teste
+testar_kpis_integrados()
+```
+
+---
+
+## 📋 **TEMPLATE HTML ATUALIZADO**
+
+```html
+<!-- KPIs Grid 4-4-4-3 -->
+<div class="kpis-grid">
+    <!-- Linha 1: KPIs Básicos -->
+    <div class="kpi-card">
+        <div class="kpi-value">{{ kpis.horas_trabalhadas }}h</div>
+        <div class="kpi-label">Horas Trabalhadas</div>
+    </div>
+    <div class="kpi-card">
+        <div class="kpi-value">{{ kpis.horas_extras }}h</div>
+        <div class="kpi-label">Horas Extras</div>
+    </div>
+    <div class="kpi-card">
+        <div class="kpi-value">{{ kpis.faltas }}</div>
+        <div class="kpi-label">Faltas</div>
+    </div>
+    <div class="kpi-card">
+        <div class="kpi-value">{{ kpis.atrasos }}h</div>
+        <div class="kpi-label">Atrasos</div>
+    </div>
+    
+    <!-- Linha 2: KPIs Analíticos -->
+    <div class="kpi-card">
+        <div class="kpi-value">{{ kpis.produtividade }}%</div>
+        <div class="kpi-label">Produtividade</div>
+        <div class="kpi-detail">Base: {{ kpis.horario_info.horas_diarias }}h/dia</div>
+    </div>
+    <div class="kpi-card">
+        <div class="kpi-value">{{ kpis.absenteismo }}%</div>
+        <div class="kpi-label">Absenteísmo</div>
+    </div>
+    <div class="kpi-card">
+        <div class="kpi-value">{{ kpis.media_diaria }}h</div>
+        <div class="kpi-label">Média Diária</div>
+    </div>
+    <div class="kpi-card">
+        <div class="kpi-value">{{ kpis.faltas_justificadas }}</div>
+        <div class="kpi-label">Faltas Justificadas</div>
+    </div>
+    
+    <!-- Linha 3: KPIs Financeiros -->
+    <div class="kpi-card">
+        <div class="kpi-value">R$ {{ "%.2f"|format(kpis.custo_mao_obra) }}</div>
+        <div class="kpi-label">Custo Mão de Obra</div>
+        <div class="kpi-detail">R$ {{ "%.2f"|format(kpis.horario_info.valor_hora) }}/h</div>
+    </div>
+    <div class="kpi-card">
+        <div class="kpi-value">R$ {{ "%.2f"|format(kpis.custo_alimentacao) }}</div>
+        <div class="kpi-label">Custo Alimentação</div>
+    </div>
+    <div class="kpi-card">
+        <div class="kpi-value">R$ {{ "%.2f"|format(kpis.custo_transporte) }}</div>
+        <div class="kpi-label">Custo Transporte</div>
+    </div>
+    <div class="kpi-card">
+        <div class="kpi-value">R$ {{ "%.2f"|format(kpis.outros_custos) }}</div>
+        <div class="kpi-label">Outros Custos</div>
+    </div>
+    
+    <!-- Linha 4: KPIs Resumo -->
+    <div class="kpi-card">
+        <div class="kpi-value">{{ kpis.horas_perdidas }}h</div>
+        <div class="kpi-label">Horas Perdidas</div>
+    </div>
+    <div class="kpi-card">
+        <div class="kpi-value">{{ kpis.eficiencia }}%</div>
+        <div class="kpi-label">Eficiência</div>
+    </div>
+    <div class="kpi-card highlight">
+        <div class="kpi-value">R$ {{ "%.2f"|format(kpis.valor_falta_justificada) }}</div>
+        <div class="kpi-label">Valor Falta Justificada</div>
+        <div class="kpi-detail">Perda de produtividade</div>
+    </div>
+</div>
+
+<!-- Informações do Horário -->
+<div class="horario-info">
+    <h4>📋 Horário de Trabalho: {{ kpis.horario_info.nome }}</h4>
+    <p>
+        <strong>Horário:</strong> {{ kpis.horario_info.entrada.strftime('%H:%M') }} às {{ kpis.horario_info.saida.strftime('%H:%M') }} |
+        <strong>Almoço:</strong> {{ kpis.horario_info.almoco_inicio.strftime('%H:%M') }} às {{ kpis.horario_info.almoco_fim.strftime('%H:%M') }} |
+        <strong>Horas/dia:</strong> {{ kpis.horario_info.horas_diarias }}h |
+        <strong>Valor/hora:</strong> R$ {{ "%.2f"|format(kpis.horario_info.valor_hora) }}
+    </p>
+</div>
+```
+
+---
+
+## 🎯 **RESULTADOS ESPERADOS**
+
+### **Para Cássio com horário "Obra" (7h-16h, 8h/dia):**
+```
+📋 HORÁRIO: Obra - Segunda a Sábado
+⏰ 07:00 às 16:00 (8h/dia)
+💰 Valor/hora: R$ 198,86 (R$ 35.000 ÷ 176h/mês)
+
+📊 KPIs CALCULADOS:
+- Produtividade: 92.9% (156h ÷ 168h esperadas)
+- Custo Mão de Obra: R$ 35.954,54
+- Valor Falta Justificada: R$ 1.590,88 (1 × 8h × R$ 198,86)
+- Horas Perdidas: 8.8h (1 falta × 8h + 0.8h atrasos)
+```
+
+### **Para Cássio com horário "Noturno" (22h-6h, 7h/dia):**
+```
+📋 HORÁRIO: Noturno - Segunda a Sexta  
+⏰ 22:00 às 06:00 (7h/dia)
+💰 Valor/hora: R$ 227,27 (R$ 35.000 ÷ 154h/mês)
+
+📊 KPIs CALCULADOS:
+- Produtividade: 106.1% (156h ÷ 147h esperadas)
+- Custo Mão de Obra: R$ 35.954,54
+- Valor Falta Justificada: R$ 1.590,89 (1 × 7h × R$ 227,27)
+- Horas Perdidas: 7.8h (1 falta × 7h + 0.8h atrasos)
+```
+
+---
+
+## 📋 **CHECKLIST DE IMPLEMENTAÇÃO**
+
+### **1. PREPARAÇÃO:**
+- [ ] Verificar se tabela `horarios_trabalho` existe
+- [ ] Verificar se funcionários têm `horario_trabalho_id`
+- [ ] Backup da função atual de KPIs
+
+### **2. IMPLEMENTAÇÃO:**
+- [ ] Implementar função `calcular_kpis_funcionario_v4`
+- [ ] Implementar funções auxiliares
+- [ ] Atualizar templates HTML
+- [ ] Atualizar rotas Flask
+
+### **3. TESTE:**
+- [ ] Executar script de teste
+- [ ] Verificar KPIs de Cássio
+- [ ] Comparar com valores anteriores
+- [ ] Validar cálculos financeiros
+
+### **4. VALIDAÇÃO:**
+- [ ] Produtividade baseada em horário específico
+- [ ] Valor/hora correto por horário
+- [ ] Falta justificada quantificada
+- [ ] Layout 4-4-4-3 funcionando
+
+---
+
+## 🎯 **BENEFÍCIOS DA IMPLEMENTAÇÃO**
+
+### **✅ PRECISÃO:**
+- KPIs baseados em horários reais
+- Cálculos justos por tipo de jornada
+- Valor/hora específico por horário
+
+### **✅ TRANSPARÊNCIA:**
+- Valor das faltas justificadas quantificado
+- Base de cálculo visível
+- Métricas compreensíveis
+
+### **✅ GESTÃO:**
+- Comparação justa entre funcionários
+- Custos reais de mão de obra
+- Impacto financeiro das ausências
+
+### **✅ FLEXIBILIDADE:**
+- Suporte a múltiplos horários
+- Horários noturnos e especiais
+- Escalas diferenciadas
+
+**Execute a implementação para ter KPIs precisos e integrados com os horários cadastrados!**
+

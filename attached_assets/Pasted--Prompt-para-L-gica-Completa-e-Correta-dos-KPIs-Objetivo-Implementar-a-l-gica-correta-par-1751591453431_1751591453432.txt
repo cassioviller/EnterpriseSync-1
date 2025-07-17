@@ -1,0 +1,514 @@
+# Prompt para Lógica Completa e Correta dos KPIs
+
+## 🎯 Objetivo
+Implementar a lógica correta para **8 KPIs** baseado na análise detalhada da imagem, incluindo a detecção de "sair mais cedo" como atraso.
+
+## 📊 Análise Completa da Imagem - 8 KPIs Identificados
+
+### **KPIs Principais (8 indicadores):**
+1. **Horas Trabalhadas**: 100.9h
+2. **Horas Extras**: 0.0h  
+3. **Faltas**: 0
+4. **Atrasos**: 12
+5. **Meio Período**: 0
+6. **Absenteísmo**: 8.7%
+7. **Média Diária**: 4.8h
+8. **Horas Perdidas**: 14.6h
+
+### **Situações Identificadas nos Registros:**
+
+#### **1. Linhas Vazias = FALTA**
+- **Dias**: 30/06, 23/06, 19/06
+- **Características**: Todos os campos vazios
+- **Impacto**: +1 Falta, +8h perdidas
+
+#### **2. Atrasos na Entrada**
+- **Dias**: 26/06 (9min), 25/06 (116min), 24/06 (59min), 20/06 (70min), 18/06 (116min), 17/06 (56min)
+- **Características**: Entrada após horário padrão
+- **Impacto**: +1 Atraso, +minutos perdidos
+
+#### **3. Saída Antecipada (NOVO)**
+- **Dias**: Vários dias com saída antes de 17:00
+- **Características**: Saída antes do horário padrão
+- **Impacto**: +1 Atraso, +minutos perdidos
+
+---
+
+## 🔧 Implementação da Lógica Correta
+
+### **1. Função Principal para Detectar Todas as Ocorrências**
+
+```python
+def processar_registros_completo(funcionario_id, ano, mes):
+    """
+    Processa registros detectando TODAS as situações:
+    - Faltas (linhas vazias)
+    - Atrasos na entrada
+    - Saídas antecipadas
+    - Meio período
+    """
+    from datetime import datetime, date, time
+    import calendar
+    
+    conn = get_db()
+    
+    # Buscar registros do mês
+    registros = conn.execute('''
+        SELECT * FROM registros_ponto 
+        WHERE funcionario_id = ? 
+        AND strftime('%Y', data) = ? 
+        AND strftime('%m', data) = ?
+        ORDER BY data
+    ''', [funcionario_id, str(ano), f'{mes:02d}']).fetchall()
+    
+    # Buscar configurações do funcionário
+    funcionario = conn.execute('''
+        SELECT f.*, ht.entrada_padrao, ht.saida_padrao, ht.tolerancia_entrada
+        FROM funcionarios f
+        LEFT JOIN horarios_trabalho ht ON f.horario_trabalho_id = ht.id
+        WHERE f.id = ?
+    ''', [funcionario_id]).fetchone()
+    
+    # Configurações padrão
+    entrada_padrao = funcionario['entrada_padrao'] or '08:00'
+    saida_padrao = funcionario['saida_padrao'] or '17:00'
+    tolerancia = funcionario['tolerancia_entrada'] or 10  # 10 minutos
+    
+    # Gerar dias úteis do mês
+    dias_uteis = gerar_dias_uteis_mes(ano, mes)
+    
+    # Contadores
+    faltas = 0
+    atrasos = 0
+    meio_periodo = 0
+    total_minutos_atraso_entrada = 0
+    total_minutos_saida_antecipada = 0
+    horas_trabalhadas = 0
+    horas_extras = 0
+    
+    # Limpar ocorrências automáticas anteriores
+    conn.execute('''
+        DELETE FROM ocorrencias 
+        WHERE funcionario_id = ? 
+        AND strftime('%Y-%m', data) = ?
+        AND motivo = 'Detectado automaticamente'
+    ''', [funcionario_id, f'{ano}-{mes:02d}'])
+    
+    # Processar cada dia útil
+    for dia_util in dias_uteis:
+        data_str = dia_util.strftime('%Y-%m-%d')
+        
+        # Buscar registro do dia
+        registro = next((r for r in registros if r['data'] == data_str), None)
+        
+        if not registro or not registro['entrada'] or not registro['saida']:
+            # SITUAÇÃO 1: FALTA (linha vazia ou incompleta)
+            faltas += 1
+            registrar_ocorrencia_auto(funcionario_id, data_str, 'FALTA', 8.0, 0)
+            
+        else:
+            # Tem registro completo - analisar detalhes
+            entrada = datetime.strptime(registro['entrada'], '%H:%M').time()
+            saida = datetime.strptime(registro['saida'], '%H:%M').time()
+            entrada_esperada = datetime.strptime(entrada_padrao, '%H:%M').time()
+            saida_esperada = datetime.strptime(saida_padrao, '%H:%M').time()
+            
+            # Calcular horas trabalhadas do dia
+            horas_dia = float(registro['horas_trabalhadas'] or 0)
+            horas_trabalhadas += horas_dia
+            
+            # Verificar horas extras (acima de 8h)
+            if horas_dia > 8:
+                horas_extras += (horas_dia - 8)
+            
+            # SITUAÇÃO 2: ATRASO NA ENTRADA
+            entrada_min = entrada.hour * 60 + entrada.minute
+            entrada_esperada_min = entrada_esperada.hour * 60 + entrada_esperada.minute
+            minutos_atraso_entrada = entrada_min - entrada_esperada_min
+            
+            if minutos_atraso_entrada > tolerancia:
+                atrasos += 1
+                total_minutos_atraso_entrada += minutos_atraso_entrada
+                registrar_ocorrencia_auto(funcionario_id, data_str, 'ATRASO_ENTRADA', 0, minutos_atraso_entrada)
+            
+            # SITUAÇÃO 3: SAÍDA ANTECIPADA (NOVO)
+            saida_min = saida.hour * 60 + saida.minute
+            saida_esperada_min = saida_esperada.hour * 60 + saida_esperada.minute
+            minutos_saida_antecipada = saida_esperada_min - saida_min
+            
+            if minutos_saida_antecipada > tolerancia:
+                atrasos += 1  # Conta como atraso também
+                total_minutos_saida_antecipada += minutos_saida_antecipada
+                registrar_ocorrencia_auto(funcionario_id, data_str, 'SAIDA_ANTECIPADA', 0, minutos_saida_antecipada)
+            
+            # SITUAÇÃO 4: MEIO PERÍODO
+            if horas_dia <= 4:
+                meio_periodo += 1
+                registrar_ocorrencia_auto(funcionario_id, data_str, 'MEIO_PERIODO', 4.0, 0)
+    
+    conn.commit()
+    conn.close()
+    
+    # Calcular totais
+    total_minutos_perdidos = total_minutos_atraso_entrada + total_minutos_saida_antecipada
+    horas_perdidas_atrasos = total_minutos_perdidos / 60.0
+    horas_perdidas_faltas = faltas * 8.0
+    horas_perdidas_meio_periodo = meio_periodo * 4.0
+    horas_perdidas_total = horas_perdidas_faltas + horas_perdidas_atrasos + horas_perdidas_meio_periodo
+    
+    return {
+        'horas_trabalhadas': horas_trabalhadas,
+        'horas_extras': horas_extras,
+        'faltas': faltas,
+        'atrasos': atrasos,
+        'meio_periodo': meio_periodo,
+        'horas_perdidas_total': horas_perdidas_total,
+        'detalhes': {
+            'minutos_atraso_entrada': total_minutos_atraso_entrada,
+            'minutos_saida_antecipada': total_minutos_saida_antecipada,
+            'horas_perdidas_faltas': horas_perdidas_faltas,
+            'horas_perdidas_atrasos': horas_perdidas_atrasos,
+            'horas_perdidas_meio_periodo': horas_perdidas_meio_periodo
+        }
+    }
+
+def registrar_ocorrencia_auto(funcionario_id, data, tipo, horas_perdidas, minutos):
+    """
+    Registra ocorrência automaticamente
+    """
+    conn = get_db()
+    
+    try:
+        conn.execute('''
+            INSERT INTO ocorrencias (
+                funcionario_id, data, tipo, horas_perdidas, minutos_atraso,
+                motivo, justificado
+            ) VALUES (?, ?, ?, ?, ?, 'Detectado automaticamente', 0)
+        ''', [funcionario_id, data, tipo, horas_perdidas, minutos])
+    except Exception as e:
+        print(f"Erro ao registrar {tipo}: {e}")
+    finally:
+        conn.close()
+```
+
+### **2. Função para Calcular os 8 KPIs**
+
+```python
+def calcular_8_kpis_funcionario(funcionario_id, ano=None, mes=None):
+    """
+    Calcula os 8 KPIs completos do funcionário
+    """
+    from datetime import datetime
+    
+    if not ano or not mes:
+        hoje = datetime.now()
+        ano = hoje.year
+        mes = hoje.month
+    
+    # Processar registros e detectar ocorrências
+    dados = processar_registros_completo(funcionario_id, ano, mes)
+    
+    # Buscar calendário do mês
+    conn = get_db()
+    calendario = conn.execute('''
+        SELECT horas_esperadas, dias_uteis FROM calendario_mensal 
+        WHERE ano = ? AND mes = ?
+    ''', [ano, mes]).fetchone()
+    
+    # Contar dias trabalhados
+    dias_trabalhados = conn.execute('''
+        SELECT COUNT(DISTINCT data) as dias
+        FROM registros_ponto 
+        WHERE funcionario_id = ? 
+        AND strftime('%Y', data) = ? 
+        AND strftime('%m', data) = ?
+        AND entrada IS NOT NULL 
+        AND saida IS NOT NULL
+    ''', [funcionario_id, str(ano), f'{mes:02d}']).fetchone()['dias']
+    
+    conn.close()
+    
+    # Calcular KPIs
+    horas_esperadas = float(calendario['horas_esperadas'] if calendario else 0)
+    
+    # 1. Horas Trabalhadas
+    horas_trabalhadas = round(dados['horas_trabalhadas'], 1)
+    
+    # 2. Horas Extras
+    horas_extras = round(dados['horas_extras'], 1)
+    
+    # 3. Faltas
+    faltas = dados['faltas']
+    
+    # 4. Atrasos (entrada + saída antecipada)
+    atrasos = dados['atrasos']
+    
+    # 5. Meio Período
+    meio_periodo = dados['meio_periodo']
+    
+    # 6. Absenteísmo
+    absenteismo = 0.0
+    if horas_esperadas > 0:
+        absenteismo = round((dados['horas_perdidas_total'] / horas_esperadas) * 100, 1)
+    
+    # 7. Média Diária
+    media_diaria = 0.0
+    if dias_trabalhados > 0:
+        media_diaria = round(horas_trabalhadas / dias_trabalhados, 1)
+    
+    # 8. Horas Perdidas
+    horas_perdidas = round(dados['horas_perdidas_total'], 1)
+    
+    return {
+        'horas_trabalhadas': horas_trabalhadas,
+        'horas_extras': horas_extras,
+        'faltas': faltas,
+        'atrasos': atrasos,
+        'meio_periodo': meio_periodo,
+        'absenteismo': absenteismo,
+        'media_diaria': media_diaria,
+        'horas_perdidas': horas_perdidas,
+        
+        # Dados auxiliares
+        'dias_trabalhados': dias_trabalhados,
+        'horas_esperadas': horas_esperadas,
+        'detalhes': dados['detalhes']
+    }
+```
+
+### **3. Rota Flask Atualizada**
+
+```python
+@app.route('/funcionarios/<int:funcionario_id>/perfil')
+def perfil_funcionario_completo(funcionario_id):
+    """
+    Perfil com os 8 KPIs corretos
+    """
+    conn = get_db()
+    
+    # Dados básicos
+    funcionario = conn.execute('''
+        SELECT f.*, fn.nome as funcao_nome, d.nome as departamento_nome
+        FROM funcionarios f
+        JOIN funcoes fn ON f.funcao_id = fn.id
+        LEFT JOIN departamentos d ON f.departamento_id = d.id
+        WHERE f.id = ?
+    ''', [funcionario_id]).fetchone()
+    
+    if not funcionario:
+        flash('Funcionário não encontrado', 'error')
+        return redirect(url_for('funcionarios'))
+    
+    # Calcular 8 KPIs
+    kpis = calcular_8_kpis_funcionario(funcionario_id)
+    
+    # Histórico de ocorrências detalhado
+    ocorrencias = conn.execute('''
+        SELECT 
+            data, tipo, horas_perdidas, minutos_atraso,
+            CASE tipo
+                WHEN 'FALTA' THEN 'Falta'
+                WHEN 'ATRASO_ENTRADA' THEN 'Atraso Entrada'
+                WHEN 'SAIDA_ANTECIPADA' THEN 'Saída Antecipada'
+                WHEN 'MEIO_PERIODO' THEN 'Meio Período'
+                ELSE tipo
+            END as tipo_descricao
+        FROM ocorrencias 
+        WHERE funcionario_id = ? 
+        AND strftime('%Y-%m', data) = strftime('%Y-%m', date('now'))
+        ORDER BY data DESC
+    ''', [funcionario_id]).fetchall()
+    
+    conn.close()
+    
+    return render_template('funcionarios/perfil_completo.html',
+                         funcionario=funcionario,
+                         kpis=kpis,
+                         ocorrencias=ocorrencias)
+
+@app.route('/api/funcionarios/<int:funcionario_id>/recalcular-8-kpis', methods=['POST'])
+def recalcular_8_kpis(funcionario_id):
+    """
+    Recalcula os 8 KPIs detectando todas as situações
+    """
+    try:
+        kpis = calcular_8_kpis_funcionario(funcionario_id)
+        
+        return jsonify({
+            'success': True,
+            'kpis': kpis,
+            'message': f'KPIs recalculadas: {kpis["faltas"]} faltas, {kpis["atrasos"]} atrasos, {kpis["meio_periodo"]} meio período'
+        })
+        
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+```
+
+### **4. Template HTML para 8 KPIs**
+
+```html
+<!-- Grid com os 8 KPIs -->
+<div class="kpis-container">
+    <h3>📊 Indicadores de Desempenho (Mês Atual)</h3>
+    
+    <div class="kpis-grid-8">
+        <!-- 1. Horas Trabalhadas -->
+        <div class="kpi-card primary">
+            <div class="kpi-valor">{{ "%.1f"|format(kpis.horas_trabalhadas) }}h</div>
+            <div class="kpi-label">Horas Trabalhadas</div>
+        </div>
+        
+        <!-- 2. Horas Extras -->
+        <div class="kpi-card {{ 'warning' if kpis.horas_extras > 0 else 'neutral' }}">
+            <div class="kpi-valor">{{ "%.1f"|format(kpis.horas_extras) }}h</div>
+            <div class="kpi-label">Horas Extras</div>
+        </div>
+        
+        <!-- 3. Faltas -->
+        <div class="kpi-card {{ 'danger' if kpis.faltas > 0 else 'success' }}">
+            <div class="kpi-valor">{{ kpis.faltas }}</div>
+            <div class="kpi-label">Faltas</div>
+        </div>
+        
+        <!-- 4. Atrasos -->
+        <div class="kpi-card {{ 'info' if kpis.atrasos > 0 else 'neutral' }}">
+            <div class="kpi-valor">{{ kpis.atrasos }}</div>
+            <div class="kpi-label">Atrasos</div>
+        </div>
+        
+        <!-- 5. Meio Período -->
+        <div class="kpi-card {{ 'warning' if kpis.meio_periodo > 0 else 'neutral' }}">
+            <div class="kpi-valor">{{ kpis.meio_periodo }}</div>
+            <div class="kpi-label">Meio Período</div>
+        </div>
+        
+        <!-- 6. Absenteísmo -->
+        <div class="kpi-card info">
+            <div class="kpi-valor">{{ "%.1f"|format(kpis.absenteismo) }}%</div>
+            <div class="kpi-label">Absenteísmo</div>
+        </div>
+        
+        <!-- 7. Média Diária -->
+        <div class="kpi-card success">
+            <div class="kpi-valor">{{ "%.1f"|format(kpis.media_diaria) }}h</div>
+            <div class="kpi-label">Média Diária</div>
+        </div>
+        
+        <!-- 8. Horas Perdidas -->
+        <div class="kpi-card danger">
+            <div class="kpi-valor">{{ "%.1f"|format(kpis.horas_perdidas) }}h</div>
+            <div class="kpi-label">Horas Perdidas</div>
+        </div>
+    </div>
+    
+    <!-- Detalhamento das Horas Perdidas -->
+    <div class="horas-perdidas-detalhes">
+        <h4>📋 Composição das Horas Perdidas ({{ "%.1f"|format(kpis.horas_perdidas) }}h)</h4>
+        <div class="detalhes-grid">
+            <div class="detalhe-item">
+                <span class="label">Faltas:</span>
+                <span class="valor">{{ "%.1f"|format(kpis.detalhes.horas_perdidas_faltas) }}h</span>
+            </div>
+            <div class="detalhe-item">
+                <span class="label">Atrasos:</span>
+                <span class="valor">{{ "%.1f"|format(kpis.detalhes.horas_perdidas_atrasos) }}h</span>
+            </div>
+            <div class="detalhe-item">
+                <span class="label">Meio Período:</span>
+                <span class="valor">{{ "%.1f"|format(kpis.detalhes.horas_perdidas_meio_periodo) }}h</span>
+            </div>
+            <div class="detalhe-item">
+                <span class="label">Atraso Entrada:</span>
+                <span class="valor">{{ kpis.detalhes.minutos_atraso_entrada }}min</span>
+            </div>
+            <div class="detalhe-item">
+                <span class="label">Saída Antecipada:</span>
+                <span class="valor">{{ kpis.detalhes.minutos_saida_antecipada }}min</span>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Botão Recalcular -->
+    <div class="acoes-kpis">
+        <button onclick="recalcular8KPIs({{ funcionario.id }})" class="btn btn-primary">
+            🔄 Recalcular 8 KPIs
+        </button>
+    </div>
+</div>
+
+<style>
+.kpis-grid-8 {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 1rem;
+    margin-bottom: 2rem;
+}
+
+@media (max-width: 768px) {
+    .kpis-grid-8 {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
+
+.kpi-card.primary { border-left-color: #007bff; background: #e3f2fd; }
+.kpi-card.neutral { border-left-color: #6c757d; background: #f8f9fa; }
+.kpi-card.success { border-left-color: #28a745; background: #d4edda; }
+.kpi-card.warning { border-left-color: #ffc107; background: #fff3cd; }
+.kpi-card.danger { border-left-color: #dc3545; background: #f8d7da; }
+.kpi-card.info { border-left-color: #17a2b8; background: #d1ecf1; }
+</style>
+
+<script>
+async function recalcular8KPIs(funcionarioId) {
+    try {
+        const response = await fetch(`/api/funcionarios/${funcionarioId}/recalcular-8-kpis`, {
+            method: 'POST'
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+            alert(result.message);
+            location.reload();
+        } else {
+            alert('Erro: ' + result.error);
+        }
+    } catch (error) {
+        alert('Erro ao recalcular KPIs');
+    }
+}
+</script>
+```
+
+---
+
+## 🎯 Lógica Resumida Correta
+
+### **Detecção de Situações:**
+1. **Falta**: Linha vazia OU entrada/saída nulas
+2. **Atraso Entrada**: Entrada > horário padrão + tolerância  
+3. **Saída Antecipada**: Saída < horário padrão - tolerância (**NOVO**)
+4. **Meio Período**: Horas trabalhadas ≤ 4h
+
+### **Cálculo dos 8 KPIs:**
+1. **Horas Trabalhadas**: Soma das horas dos registros válidos
+2. **Horas Extras**: Soma das horas > 8h por dia
+3. **Faltas**: Contagem de dias sem registro
+4. **Atrasos**: Atraso entrada + saída antecipada
+5. **Meio Período**: Dias com ≤ 4h trabalhadas
+6. **Absenteísmo**: (Horas perdidas ÷ Horas esperadas) × 100
+7. **Média Diária**: Horas trabalhadas ÷ Dias trabalhados
+8. **Horas Perdidas**: Faltas + Atrasos + Meio período
+
+## ✅ Resultado Esperado
+
+Com esta lógica correta:
+- **Faltas**: 3 (linhas vazias)
+- **Atrasos**: 12 (entrada + saída antecipada)
+- **Absenteísmo**: 8.7%
+- **Horas Perdidas**: 14.6h
+- **Detecção automática** de todas as situações
+

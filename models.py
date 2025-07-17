@@ -27,7 +27,7 @@ class Funcao(db.Model):
     salario_base = db.Column(db.Float, default=0.0)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     
-    # Relacionamento será definido no modelo Funcionario
+    funcionarios = db.relationship('Funcionario', backref='funcao_ref', lazy=True)
 
 class HorarioTrabalho(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -66,7 +66,6 @@ class Funcionario(db.Model):
     # Relacionamentos
     registros_ponto = db.relationship('RegistroPonto', backref='funcionario_ref', lazy=True, overlaps="funcionario_ref")
     horario_trabalho = db.relationship('HorarioTrabalho', backref='funcionarios', lazy=True, overlaps="funcionarios")
-    funcao = db.relationship('Funcao', lazy=True)
 
 class Obra(db.Model):
     id = db.Column(db.Integer, primary_key=True)

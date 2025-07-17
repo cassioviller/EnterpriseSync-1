@@ -1,0 +1,34 @@
+No sistema SIGE v3.0, na página de perfil do funcionário Pedro Lima Sousa (`/funcionarios/{id}/perfil`), identificamos problemas críticos nos cálculos dos KPIs e na exibição dos dados de ponto. O objetivo é corrigir esses cálculos e garantir a precisão das informações.
+
+Por favor, revise e ajuste a lógica de cálculo na função `calcular_kpis_funcionario_v3` no arquivo `kpis_engine_v3.py` e, crucialmente, na função `atualizar_calculos_ponto(registro_ponto_id)` para os seguintes KPIs e dados:
+
+1.  **Cálculo e Exibição de Atrasos:**
+    *   **Problema:** A coluna "Atraso" na tabela de ponto está vazia, mas há atrasos claros nos registros de entrada/saída do Pedro Lima Sousa (ex: entradas após 08:00, saídas antes de 17:00). O KPI de Atrasos também está incorreto (exibindo 0.0).
+    *   **Correção:**
+        *   Ajuste a função `atualizar_calculos_ponto(registro_ponto_id)` para calcular corretamente `minutos_atraso_entrada`, `minutos_atraso_saida`, `total_atraso_minutos` e `total_atraso_horas` com base no `HorarioTrabalho` do funcionário (Comercial - Segunda a Sexta: 08:00-12:00, 13:00-17:00).
+        *   Garanta que esses valores calculados sejam persistidos na tabela `RegistroPonto` e exibidos corretamente na coluna "Atraso" da tabela de ponto na interface.
+        *   Assegure que o KPI de Atrasos (`total_atraso_horas`) some corretamente esses valores.
+
+2.  **Contagem de Faltas:**
+    *   **Problema:** O KPI de Faltas está exibindo 5, mas a análise da tabela de ponto revela 6 faltas (dias úteis sem registro de entrada).
+    *   **Correção:** Ajuste a lógica no `kpis_engine_v3.py` para que o KPI de Faltas conte corretamente os dias úteis sem registro de entrada, considerando a função `calcular_dias_uteis` e os feriados de 2025.
+
+3.  **KPI de Absenteísmo (%):**
+    *   **Problema:** Depende da contagem de faltas, portanto, está incorreto.
+    *   **Correção:** O cálculo (`(faltas / dias_úteis) × 100`) deve refletir a contagem correta de faltas (6 faltas para o Pedro).
+
+4.  **KPI de Horas Perdidas:**
+    *   **Problema:** O cálculo atual não está somando as horas de falta corretamente e está usando uma contagem de faltas incorreta.
+    *   **Correção:** Ajuste o cálculo para `(faltas × 8) + total_atrasos_horas`, utilizando os valores corretos de faltas (6 faltas) e os `total_atrasos_horas` calculados corretamente.
+
+5.  **Custo Mão de Obra (R$):**
+    *   **Problema:** A validação depende da correção da lógica de faltas justificadas/injustificadas.
+    *   **Correção:** Revise a lógica de inclusão de faltas justificadas no cálculo do Custo Mão de Obra. Confirme que a `Ocorrencia` com `status` 'Aprovado' seja considerada uma falta justificada e que o cálculo `(horas_trabalhadas + faltas_justificadas × 8) × salario_hora` seja preciso.
+
+**Verificação Geral:**
+
+*   Garanta que todos os KPIs sejam calculados com base no `HorarioTrabalho` específico do funcionário (Comercial - Segunda a Sexta para Pedro Lima Sousa), conforme a regra de negócio.
+*   Verifique se a exibição de todos os KPIs na interface está correta e consistente com os cálculos revisados.
+
+O objetivo é que os dados de ponto e os KPIs para o Pedro Lima Sousa sejam exibidos com total precisão, refletindo corretamente as horas trabalhadas, horas extras, faltas, atrasos e custos, de acordo com as regras de negócio do SIGE v3.0.
+

@@ -116,15 +116,18 @@ class KPIsEngine:
         return total or 0.0
     
     def _calcular_faltas(self, funcionario_id, data_inicio, data_fim):
-        """3. Faltas: Número de registros explícitos de falta (não justificada)"""
-        faltas_count = db.session.query(func.count(RegistroPonto.id)).filter(
+        """3. Faltas: Número absoluto de dias úteis sem presença"""
+        dias_uteis = self._calcular_dias_uteis(data_inicio, data_fim)
+        
+        # Contar dias com presença (registro de entrada)
+        dias_presenca = db.session.query(func.count(RegistroPonto.id)).filter(
             RegistroPonto.funcionario_id == funcionario_id,
             RegistroPonto.data >= data_inicio,
             RegistroPonto.data <= data_fim,
-            RegistroPonto.tipo_registro == 'falta'
+            RegistroPonto.hora_entrada.isnot(None)
         ).scalar()
         
-        return faltas_count or 0
+        return max(0, dias_uteis - (dias_presenca or 0))
     
     def _calcular_atrasos_horas(self, funcionario_id, data_inicio, data_fim):
         """4. Atrasos: Total de horas de atraso (entrada + saída antecipada)"""

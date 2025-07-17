@@ -1,0 +1,433 @@
+# Prompt para Sistema de Gestão de Pessoas - Estruturas do Vale (Versão 3.0 - Corrigida)
+
+## Visão Geral do Sistema
+
+Desenvolver um sistema web moderno de gestão de pessoas baseado nas melhores práticas de HRIS, com **regras de negócio específicas** para cálculo correto de KPIs de presença, atrasos e custos.
+
+**Tecnologias**: Flask (backend) + HTML/CSS/JavaScript (frontend) para deploy no Replit.
+
+## Regras de Negócio Fundamentais (CRÍTICAS)
+
+### 1. Faltas
+```
+REGRA: Linhas em branco no controle de ponto = Faltas
+- Contar dias úteis sem registro de entrada como faltas
+- Cada dia sem presença = 1 falta
+- Faltas são contadas em QUANTIDADE (não horas)
+```
+
+### 2. Atrasos (em HORAS, não quantidade)
+```
+REGRA: Atraso = Entrada tardia + Saída antecipada (em HORAS)
+- Entrada após horário previsto: calcular diferença em minutos
+- Saída antes do horário previsto: calcular diferença em minutos  
+- Somar TODOS os minutos de atraso e converter para horas
+- Exemplo: 93min + 116min + 73min = 282min = 4.7h
+```
+
+### 3. Horas Perdidas
+```
+REGRA: Horas Perdidas = Tempo de Faltas + Tempo de Atrasos
+- Faltas em horas: número_faltas × 8 horas
+- Atrasos em horas: soma de todos os atrasos convertidos
+- Total: faltas_horas + atrasos_horas
+```
+
+### 4. Custo Mão de obra (substitui Meio Período)
+```
+REGRA: Custo Mensal = Tempo trabalhado + Faltas justificadas
+- Incluir horas efetivamente trabalhadas × valor/hora
+- Incluir faltas com justificativa (atestado) × valor/hora
+- Não incluir faltas injustificadas no custo, as que estão em branco
+```
+
+## Indicadores-Chave (KPIs) - Layout 4-4-2
+
+### Sistema de Filtros Globais
+**Todos os dashboards, gráficos e indicadores devem ter:**
+1. **Filtro de Período Personalizado**: Data inicial + Data final
+2. **Filtros Rápidos**: Último mês, trimestre, semestre, ano
+3. **Persistência**: Filtros mantidos durante navegação
+
+### Dashboard Individual - 10 Indicadores (4-4-2)
+
+#### Primeira Linha (4 indicadores)
+1. **Horas Trabalhadas**: Soma das horas efetivamente trabalhadas no período
+2. **Horas Extras**: Horas trabalhadas acima da jornada normal (8h/dia)
+3. **Faltas**: Número absoluto de dias sem presença
+4. **Atrasos**: Total de horas de atraso (entrada + saída antecipada)
+
+#### Segunda Linha (4 indicadores)  
+5. **Produtividade**: Percentual de eficiência (horas_trabalhadas/horas_esperadas × 100)
+6. **Absenteísmo**: Percentual de ausências (faltas/dias_úteis × 100)
+7. **Média Diária**: Média de horas trabalhadas por dia presente
+8. **Horas Perdidas**: Faltas + Atrasos convertidos em horas
+
+#### Terceira Linha (2 indicadores)
+9. **Custo Mão de obra**: Valor total incluindo trabalho + faltas justificadas
+10. **Custo Alimentação**: Gasto total com alimentação no período
+
+## Schema do Banco de Dados (Corrigido)
+
+### Tabelas Principais
+
+```sql
+-- Funcionários (dados mestres)
+CREATE TABLE funcionarios (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    codigo VARCHAR(10) UNIQUE NOT NULL, -- ex: F0005
+    nome VARCHAR(255) NOT NULL,
+    cpf VARCHAR(14) UNIQUE,
+    rg VARCHAR(20),
+    data_nascimento DATE,
+    telefone VARCHAR(20),
+    email VARCHAR(255),
+    endereco TEXT,
+    funcao_id INTEGER NOT NULL,
+    departamento_id INTEGER,
+    data_admissao DATE NOT NULL,
+    salario_mensal DECIMAL(10,2),
+    salario_hora DECIMAL(10,2), -- calculado: salario_mensal / 220
+    carga_horaria_semanal INTEGER DEFAULT 40,
+    horario_entrada TIME DEFAULT '08:00:00',
+    horario_saida TIME DEFAULT '17:00:00',
+    foto_url VARCHAR(500),
+    foto_nome_original VARCHAR(255),
+    foto_tamanho INTEGER,
+    foto_upload_data TIMESTAMP,
+    ativo BOOLEAN DEFAULT TRUE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    
+    FOREIGN KEY (funcao_id) REFERENCES funcoes(id),
+    FOREIGN KEY (departamento_id) REFERENCES departamentos(id)
+);
+
+-- Registros de Ponto (corrigido)
+CREATE TABLE registros_ponto (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    funcionario_id INTEGER NOT NULL,
+    data DATE NOT NULL,
+    entrada TIME,
+    saida_almoco TIME,
+    retorno_almoco TIME,
+    saida TIME,
+    -- Cálculos automáticos
+    horas_trabalhadas DECIMAL(4,2) DEFAULT 0,
+    horas_extras DECIMAL(4,2) DEFAULT 0,
+    minutos_atraso_entrada INTEGER DEFAULT 0, -- entrada após horário
+    minutos_atraso_saida INTEGER DEFAULT 0,   -- saída antes do horário
+    total_atraso_minutos INTEGER DEFAULT 0,   -- soma dos atrasos
+    total_atraso_horas DECIMAL(4,2) DEFAULT 0, -- atrasos em horas
+    obra VARCHAR(100),
+    observacoes TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    
+    FOREIGN KEY (funcionario_id) REFERENCES funcionarios(id),
+    UNIQUE(funcionario_id, data)
+);
+
+-- Ocorrências (novo módulo)
+CREATE TABLE ocorrencias (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    funcionario_id INTEGER NOT NULL,
+    tipo_ocorrencia VARCHAR(50) NOT NULL, -- Atestado, Atraso Justificado, Falta Justificada, etc.
+    data_inicio DATE NOT NULL,
+    data_fim DATE,
+    status VARCHAR(20) DEFAULT 'Pendente', -- Pendente, Aprovado, Rejeitado
+    descricao TEXT,
+    documento_anexo VARCHAR(500), -- caminho para arquivo anexo
+    aprovado_por INTEGER, -- ID do usuário que aprovou
+    data_aprovacao TIMESTAMP,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    
+    FOREIGN KEY (funcionario_id) REFERENCES funcionarios(id),
+    FOREIGN KEY (aprovado_por) REFERENCES usuarios(id)
+);
+
+-- Tipos de Ocorrência
+CREATE TABLE tipos_ocorrencia (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    nome VARCHAR(50) UNIQUE NOT NULL, -- Atestado Médico, Atraso Justificado, etc.
+    descricao TEXT,
+    requer_documento BOOLEAN DEFAULT FALSE,
+    afeta_custo BOOLEAN DEFAULT FALSE, -- se deve ser incluído no custo mensal
+    ativo BOOLEAN DEFAULT TRUE
+);
+
+-- Calendário de Dias Úteis
+CREATE TABLE calendario_util (
+    data DATE PRIMARY KEY,
+    dia_semana INTEGER, -- 1=Segunda, 7=Domingo
+    eh_util BOOLEAN DEFAULT TRUE,
+    eh_feriado BOOLEAN DEFAULT FALSE,
+    descricao_feriado VARCHAR(100)
+);
+
+-- Custos de Alimentação
+CREATE TABLE custos_alimentacao (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    funcionario_id INTEGER NOT NULL,
+    data DATE NOT NULL,
+    tipo_refeicao VARCHAR(20), -- Almoço, Jantar, Lanche
+    valor DECIMAL(8,2) NOT NULL,
+    local VARCHAR(100),
+    observacoes TEXT,
+    
+    FOREIGN KEY (funcionario_id) REFERENCES funcionarios(id)
+);
+```
+
+## Cálculos e Regras de Negócio (Corrigidos)
+
+### Fórmulas Principais
+
+#### 1. Faltas
+```sql
+-- Contar dias úteis sem registro de entrada
+SELECT COUNT(*) as total_faltas
+FROM calendario_util c
+LEFT JOIN registros_ponto r ON c.data = r.data AND r.funcionario_id = :funcionario_id
+WHERE c.data BETWEEN :data_inicio AND :data_fim
+AND c.eh_util = TRUE
+AND r.entrada IS NULL;
+```
+
+#### 2. Atrasos (em horas)
+```sql
+-- Somar todos os atrasos em horas
+SELECT 
+    SUM(total_atraso_horas) as total_atrasos_horas,
+    COUNT(*) as dias_com_atraso
+FROM registros_ponto
+WHERE funcionario_id = :funcionario_id
+AND data BETWEEN :data_inicio AND :data_fim
+AND total_atraso_minutos > 0;
+```
+
+#### 3. Horas Perdidas
+```sql
+-- Faltas + Atrasos em horas
+SELECT 
+    (faltas.total * 8) + COALESCE(atrasos.total_horas, 0) as horas_perdidas
+FROM 
+    (SELECT COUNT(*) as total FROM dias_falta) faltas,
+    (SELECT SUM(total_atraso_horas) as total_horas FROM registros_atraso) atrasos;
+```
+
+#### 4. Custo Mensal
+```sql
+-- Horas trabalhadas + faltas justificadas
+SELECT 
+    (horas_trabalhadas + horas_faltas_justificadas) * salario_hora as custo_mensal
+FROM (
+    SELECT 
+        SUM(r.horas_trabalhadas) as horas_trabalhadas,
+        COALESCE(SUM(CASE WHEN o.afeta_custo = TRUE THEN 8 ELSE 0 END), 0) as horas_faltas_justificadas,
+        f.salario_hora
+    FROM funcionarios f
+    LEFT JOIN registros_ponto r ON f.id = r.funcionario_id
+    LEFT JOIN ocorrencias o ON f.id = o.funcionario_id AND o.status = 'Aprovado'
+    WHERE f.id = :funcionario_id
+    AND r.data BETWEEN :data_inicio AND :data_fim
+    GROUP BY f.id
+) calc;
+```
+
+### Triggers para Cálculos Automáticos
+
+```sql
+-- Trigger para calcular atrasos automaticamente
+CREATE TRIGGER calcular_atrasos_insert
+AFTER INSERT ON registros_ponto
+BEGIN
+    UPDATE registros_ponto SET
+        minutos_atraso_entrada = CASE 
+            WHEN NEW.entrada > (SELECT horario_entrada FROM funcionarios WHERE id = NEW.funcionario_id)
+            THEN (strftime('%s', NEW.entrada) - strftime('%s', (SELECT horario_entrada FROM funcionarios WHERE id = NEW.funcionario_id))) / 60
+            ELSE 0
+        END,
+        minutos_atraso_saida = CASE 
+            WHEN NEW.saida < (SELECT horario_saida FROM funcionarios WHERE id = NEW.funcionario_id)
+            THEN (strftime('%s', (SELECT horario_saida FROM funcionarios WHERE id = NEW.funcionario_id)) - strftime('%s', NEW.saida)) / 60
+            ELSE 0
+        END
+    WHERE id = NEW.id;
+    
+    UPDATE registros_ponto SET
+        total_atraso_minutos = minutos_atraso_entrada + minutos_atraso_saida,
+        total_atraso_horas = ROUND((minutos_atraso_entrada + minutos_atraso_saida) / 60.0, 2)
+    WHERE id = NEW.id;
+END;
+```
+
+## Módulo de Ocorrências
+
+### Interface de Cadastro
+```html
+<form id="novaOcorrencia">
+    <div class="form-group">
+        <label>Tipo de Ocorrência *</label>
+        <select name="tipo_ocorrencia" required>
+            <option value="">Selecione...</option>
+            <option value="Atestado Médico">Atestado Médico</option>
+            <option value="Atraso Justificado">Atraso Justificado</option>
+            <option value="Falta Justificada">Falta Justificada</option>
+            <option value="Licença Médica">Licença Médica</option>
+            <option value="Falta Abonada">Falta Abonada</option>
+        </select>
+    </div>
+    
+    <div class="form-group">
+        <label>Data Início *</label>
+        <input type="date" name="data_inicio" required />
+    </div>
+    
+    <div class="form-group">
+        <label>Data Fim</label>
+        <input type="date" name="data_fim" />
+    </div>
+    
+    <div class="form-group">
+        <label>Status</label>
+        <select name="status">
+            <option value="Pendente">Pendente</option>
+            <option value="Aprovado">Aprovado</option>
+            <option value="Rejeitado">Rejeitado</option>
+        </select>
+    </div>
+    
+    <div class="form-group">
+        <label>Descrição</label>
+        <textarea name="descricao" rows="3"></textarea>
+    </div>
+    
+    <div class="form-group">
+        <label>Documento Anexo</label>
+        <input type="file" name="documento" accept=".pdf,.jpg,.png" />
+    </div>
+    
+    <button type="submit">Salvar Ocorrência</button>
+</form>
+```
+
+## Layout dos Dashboards (Corrigido)
+
+### Dashboard Individual - Layout 4-4-2
+```html
+<div class="dashboard-individual">
+    <!-- Cabeçalho com foto -->
+    <div class="header-funcionario">
+        <div class="info-principal">
+            <h1>F0005 - Pedro Lima Sousa</h1>
+            <h2>Contador</h2>
+        </div>
+        <div class="foto-funcionario">
+            <img src="/uploads/pedro.jpg" alt="Pedro Lima Sousa" />
+        </div>
+    </div>
+    
+    <!-- Filtros de período -->
+    <div class="filtros-periodo">
+        <input type="date" id="dataInicio" />
+        <input type="date" id="dataFim" />
+        <button onclick="aplicarFiltros()">Aplicar</button>
+    </div>
+    
+    <!-- Primeira linha - 4 indicadores -->
+    <div class="kpis-linha-1">
+        <div class="kpi-card">
+            <h3>Horas Trabalhadas</h3>
+            <span class="valor">95.5h</span>
+        </div>
+        <div class="kpi-card">
+            <h3>Horas Extras</h3>
+            <span class="valor">0.0h</span>
+        </div>
+        <div class="kpi-card">
+            <h3>Faltas</h3>
+            <span class="valor">6</span>
+        </div>
+        <div class="kpi-card">
+            <h3>Atrasos</h3>
+            <span class="valor">14.4h</span>
+        </div>
+    </div>
+    
+    <!-- Segunda linha - 4 indicadores -->
+    <div class="kpis-linha-2">
+        <div class="kpi-card">
+            <h3>Custo Mensal</h3>
+            <span class="valor">R$ 4.200,00</span>
+        </div>
+        <div class="kpi-card">
+            <h3>Absenteísmo</h3>
+            <span class="valor">28.6%</span>
+        </div>
+        <div class="kpi-card">
+            <h3>Média Diária</h3>
+            <span class="valor">6.4h</span>
+        </div>
+        <div class="kpi-card">
+            <h3>Horas Perdidas</h3>
+            <span class="valor">62.4h</span>
+        </div>
+    </div>
+    
+    <!-- Terceira linha - 2 indicadores -->
+    <div class="kpis-linha-3">
+        <div class="kpi-card-large">
+            <h3>Produtividade</h3>
+            <span class="valor">56.8%</span>
+        </div>
+        <div class="kpi-card-large">
+            <h3>Custo Alimentação</h3>
+            <span class="valor">R$ 450,00</span>
+        </div>
+    </div>
+</div>
+```
+
+## Dados Iniciais (Seeds)
+
+### Tipos de Ocorrência
+```sql
+INSERT INTO tipos_ocorrencia (nome, descricao, requer_documento, afeta_custo) VALUES
+('Atestado Médico', 'Falta por motivo de saúde com atestado', TRUE, TRUE),
+('Atraso Justificado', 'Atraso com justificativa válida', FALSE, TRUE),
+('Falta Justificada', 'Falta com justificativa válida', FALSE, TRUE),
+('Licença Médica', 'Licença médica prolongada', TRUE, TRUE),
+('Falta Abonada', 'Falta abonada pela empresa', FALSE, TRUE),
+('Falta Injustificada', 'Falta sem justificativa', FALSE, FALSE),
+('Atraso Injustificado', 'Atraso sem justificativa', FALSE, FALSE);
+```
+
+Este prompt corrige todos os problemas identificados nas imagens e implementa as regras de negócio específicas solicitadas.
+
+
+
+#### 5. Produtividade
+```sql
+-- Percentual de eficiência do funcionário
+SELECT 
+    ROUND((SUM(horas_trabalhadas) / (dias_uteis * 8)) * 100, 1) as produtividade_pct
+FROM registros_ponto r
+CROSS JOIN (
+    SELECT COUNT(*) as dias_uteis 
+    FROM calendario_util 
+    WHERE data BETWEEN :data_inicio AND :data_fim 
+    AND eh_util = TRUE
+) c
+WHERE r.funcionario_id = :funcionario_id
+AND r.data BETWEEN :data_inicio AND :data_fim;
+```
+
+### Exemplo de Cálculo (Pedro Lima Sousa)
+```
+Horas Trabalhadas: 95.5h
+Dias Úteis no Período: 21 dias
+Horas Esperadas: 21 × 8h = 168h
+Produtividade: (95.5h / 168h) × 100 = 56.8%
+```
+

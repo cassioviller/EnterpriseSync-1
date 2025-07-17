@@ -1,0 +1,243 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard KPIs - {{ funcionario.nome }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid mt-4">
+    <!-- Header do Dashboard -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <h2 class="mb-1">Dashboard de KPIs v3.0</h2>
+                    <p class="text-muted mb-0">
+                        {{ funcionario.nome }} - Código: {{ funcionario.codigo }}
+                    </p>
+                </div>
+                <div>
+                    <a href="{{ url_for('main.exportar_relatorio_funcionario', id=funcionario.id, data_inicio=periodo.inicio, data_fim=periodo.fim) }}" class="btn btn-outline-secondary me-2">
+                        <i class="fas fa-download"></i> Exportar CSV
+                    </a>
+                    <a href="{{ url_for('main.funcionario_perfil', id=funcionario.id) }}" class="btn btn-secondary">
+                        <i class="fas fa-arrow-left"></i> Voltar
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Filtros de Período -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-body py-3">
+                    <form method="GET" class="row g-3 align-items-end">
+                        <div class="col-md-4">
+                            <label class="form-label">Data de Início</label>
+                            <input type="date" name="data_inicio" class="form-control" 
+                                   value="{{ periodo.inicio.strftime('%Y-%m-%d') if periodo.inicio else '' }}">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Data de Fim</label>
+                            <input type="date" name="data_fim" class="form-control" 
+                                   value="{{ periodo.fim.strftime('%Y-%m-%d') if periodo.fim else '' }}">
+                        </div>
+                        <div class="col-md-4">
+                            <button type="submit" class="btn btn-primary w-100">
+                                <i class="fas fa-filter"></i> Filtrar
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Layout 4-4-2 dos KPIs -->
+    <div class="row g-4">
+        <!-- Primeira linha: 4 KPIs -->
+        <div class="col-lg-3 col-md-6">
+            <div class="card h-100">
+                <div class="card-body text-center">
+                    <div class="display-4 text-primary mb-2">
+                        {{ "%.1f"|format(kpis.horas_trabalhadas) }}
+                    </div>
+                    <h6 class="card-title">Horas Trabalhadas</h6>
+                    <small class="text-muted">Total no período</small>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-lg-3 col-md-6">
+            <div class="card h-100">
+                <div class="card-body text-center">
+                    <div class="display-4 text-warning mb-2">
+                        {{ "%.1f"|format(kpis.horas_extras) }}
+                    </div>
+                    <h6 class="card-title">Horas Extras</h6>
+                    <small class="text-muted">Acima da jornada</small>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-lg-3 col-md-6">
+            <div class="card h-100">
+                <div class="card-body text-center">
+                    <div class="display-4 text-danger mb-2">
+                        {{ kpis.faltas }}
+                    </div>
+                    <h6 class="card-title">Faltas</h6>
+                    <small class="text-muted">Dias ausentes</small>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-lg-3 col-md-6">
+            <div class="card h-100">
+                <div class="card-body text-center">
+                    <div class="display-4 text-warning mb-2">
+                        {{ "%.1f"|format(kpis.atrasos_horas) }}
+                    </div>
+                    <h6 class="card-title">Atrasos</h6>
+                    <small class="text-muted">Horas de atraso</small>
+                </div>
+            </div>
+        </div>
+
+        <!-- Segunda linha: 4 KPIs -->
+        <div class="col-lg-3 col-md-6">
+            <div class="card h-100">
+                <div class="card-body text-center">
+                    <div class="display-4 text-success mb-2">
+                        R$ {{ "%.2f"|format(kpis.custo_mensal) }}
+                    </div>
+                    <h6 class="card-title">Custo Mensal</h6>
+                    <small class="text-muted">Valor total</small>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-lg-3 col-md-6">
+            <div class="card h-100">
+                <div class="card-body text-center">
+                    <div class="display-4 text-info mb-2">
+                        {{ "%.1f"|format(kpis.absenteismo) }}%
+                    </div>
+                    <h6 class="card-title">Absenteísmo</h6>
+                    <small class="text-muted">Taxa de ausências</small>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-lg-3 col-md-6">
+            <div class="card h-100">
+                <div class="card-body text-center">
+                    <div class="display-4 text-primary mb-2">
+                        {{ "%.1f"|format(kpis.media_diaria) }}h
+                    </div>
+                    <h6 class="card-title">Média Diária</h6>
+                    <small class="text-muted">Horas por dia</small>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-lg-3 col-md-6">
+            <div class="card h-100">
+                <div class="card-body text-center">
+                    <div class="display-4 text-danger mb-2">
+                        {{ "%.1f"|format(kpis.horas_perdidas) }}
+                    </div>
+                    <h6 class="card-title">Horas Perdidas</h6>
+                    <small class="text-muted">Faltas + Atrasos</small>
+                </div>
+            </div>
+        </div>
+
+        <!-- Terceira linha: 2 KPIs grandes -->
+        <div class="col-lg-6">
+            <div class="card h-100">
+                <div class="card-body text-center">
+                    <div class="display-3 text-success mb-3">
+                        {{ "%.1f"|format(kpis.produtividade) }}%
+                    </div>
+                    <h5 class="card-title">Produtividade</h5>
+                    <p class="text-muted mb-0">Eficiência do funcionário</p>
+                    <div class="progress mt-3" style="height: 20px;">
+                        <div class="progress-bar bg-success" role="progressbar" 
+                             style="width: {{ kpis.produtividade }}%" 
+                             aria-valuenow="{{ kpis.produtividade }}" 
+                             aria-valuemin="0" aria-valuemax="100">
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-lg-6">
+            <div class="card h-100">
+                <div class="card-body text-center">
+                    <div class="display-3 text-info mb-3">
+                        R$ {{ "%.2f"|format(kpis.custo_alimentacao) }}
+                    </div>
+                    <h5 class="card-title">Custo Alimentação</h5>
+                    <p class="text-muted mb-0">Gastos com refeições</p>
+                    <small class="text-muted">
+                        Período: {{ periodo.inicio.strftime('%d/%m/%Y') }} a {{ periodo.fim.strftime('%d/%m/%Y') }}
+                    </small>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Informações do Período -->
+    <div class="row mt-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-body">
+                    <h6 class="card-title">Informações do Período</h6>
+                    <div class="row">
+                        <div class="col-md-4">
+                            <strong>Período:</strong> {{ periodo.inicio.strftime('%d/%m/%Y') }} a {{ periodo.fim.strftime('%d/%m/%Y') }}
+                        </div>
+                        <div class="col-md-4">
+                            <strong>Dias Úteis:</strong> {{ periodo.dias_uteis }} dias
+                        </div>
+                        <div class="col-md-4">
+                            <strong>Última Atualização:</strong> {{ moment().format('DD/MM/YYYY HH:mm') }}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// Auto-refresh dos KPIs a cada 5 minutos
+setTimeout(function() {
+    location.reload();
+}, 300000);
+
+// Atualização em tempo real via AJAX (opcional)
+function atualizarKPIs() {
+    const urlParams = new URLSearchParams(window.location.search);
+    const dataInicio = urlParams.get('data_inicio') || '';
+    const dataFim = urlParams.get('data_fim') || '';
+    
+    fetch(`/api/funcionario/{{ funcionario.id }}/kpis?data_inicio=${dataInicio}&data_fim=${dataFim}`)
+        .then(response => response.json())
+        .then(data => {
+            if (!data.error) {
+                // Atualizar valores na tela
+                console.log('KPIs atualizados:', data);
+            }
+        })
+        .catch(error => {
+            console.error('Erro ao atualizar KPIs:', error);
+        });
+}
+
+// Executar atualização a cada 2 minutos
+setInterval(atualizarKPIs, 120000);
+</script>
+{% endblock %}

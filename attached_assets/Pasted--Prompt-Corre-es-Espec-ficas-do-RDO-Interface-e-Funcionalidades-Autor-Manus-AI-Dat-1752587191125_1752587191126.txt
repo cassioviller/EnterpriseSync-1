@@ -1,0 +1,657 @@
+# Prompt: Correções Específicas do RDO - Interface e Funcionalidades
+
+**Autor:** Manus AI  
+**Data:** 15 de Julho de 2025  
+**Objetivo:** Corrigir problemas específicos identificados no RDO atual  
+**Prioridade:** CRÍTICA - Correções para funcionalidade básica
+
+---
+
+## PROBLEMAS IDENTIFICADOS E CORREÇÕES
+
+### 1. Mão de Obra - Dropdown de Funcionários Não Implementado
+
+**PROBLEMA:** Dropdown de funcionários não está funcionando com autocomplete
+**SOLUÇÃO:** Implementar dropdown funcional com integração ao sistema de ponto
+
+### 2. Horários - Integração com Sistema de Ponto
+
+**PROBLEMA:** Campo de horas manual, sem integração com ponto
+**SOLUÇÃO:** Buscar automaticamente dados do ponto da data do RDO
+
+### 3. Atividades - Fluxo Serviço → Subatividades
+
+**PROBLEMA:** Subatividades não aparecem após selecionar serviço
+**SOLUÇÃO:** Carregamento dinâmico correto das subatividades
+
+### 4. Layout - Cores e Visual
+
+**PROBLEMA:** Cores inadequadas, contraste ruim
+**SOLUÇÃO:** Melhorar paleta de cores e usabilidade
+
+---
+
+## Prompt: Correções Críticas do RDO
+
+```
+Corrija os problemas específicos identificados no RDO operacional, focando em funcionalidade e usabilidade.
+
+CORREÇÃO 1: DROPDOWN DE FUNCIONÁRIOS COM INTEGRAÇÃO DE PONTO
+
+Problema: Dropdown "Selecione o funcionário..." não funciona
+Solução: Implementar dropdown funcional que busca dados do ponto
+
+```html
+<!-- Seção Mão de Obra CORRIGIDA -->
+<div class="row">
+    <div class="col-12">
+        <div class="card shadow-sm mb-4">
+            <div class="card-header bg-success text-white">
+                <div class="d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0"><i class="fas fa-users"></i> Mão de Obra</h5>
+                    <button type="button" class="btn btn-light btn-sm" onclick="adicionarFuncionario()">
+                        <i class="fas fa-plus"></i> Adicionar
+                    </button>
+                </div>
+            </div>
+            <div class="card-body">
+                <div id="container_funcionarios">
+                    <!-- Funcionários serão adicionados dinamicamente -->
+                </div>
+                
+                <!-- Template CORRIGIDO de funcionário -->
+                <div id="template_funcionario" style="display: none;">
+                    <div class="card mb-3 funcionario-item border-success">
+                        <div class="card-body">
+                            <div class="row align-items-center">
+                                <div class="col-md-4 mb-2">
+                                    <label class="form-label fw-bold">Funcionário</label>
+                                    <select class="form-select funcionario-select" onchange="carregarDadosPonto(this)">
+                                        <option value="">Selecione o funcionário...</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-2 mb-2">
+                                    <label class="form-label fw-bold">Entrada</label>
+                                    <input type="time" class="form-control hora-entrada" readonly>
+                                    <small class="text-muted">Do sistema de ponto</small>
+                                </div>
+                                <div class="col-md-2 mb-2">
+                                    <label class="form-label fw-bold">Saída</label>
+                                    <input type="time" class="form-control hora-saida" readonly>
+                                    <small class="text-muted">Do sistema de ponto</small>
+                                </div>
+                                <div class="col-md-2 mb-2">
+                                    <label class="form-label fw-bold">Total Horas</label>
+                                    <input type="text" class="form-control total-horas" readonly>
+                                    <small class="text-muted">Calculado automaticamente</small>
+                                </div>
+                                <div class="col-md-1 mb-2">
+                                    <label class="form-label fw-bold">Presente</label>
+                                    <div class="form-check d-flex justify-content-center">
+                                        <input class="form-check-input" type="checkbox" checked>
+                                    </div>
+                                </div>
+                                <div class="col-md-1 mb-2">
+                                    <label class="form-label">&nbsp;</label>
+                                    <button type="button" class="btn btn-outline-danger btn-sm w-100" 
+                                            onclick="removerFuncionario(this)">
+                                        <i class="fas fa-trash"></i>
+                                    </button>
+                                </div>
+                            </div>
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <label class="form-label fw-bold">Função Exercida</label>
+                                    <input type="text" class="form-control funcao-exercida" 
+                                           placeholder="Ex: Pedreiro, Ajudante, Eletricista">
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label fw-bold">Observações</label>
+                                    <input type="text" class="form-control observacoes-funcionario" 
+                                           placeholder="Observações sobre o funcionário no dia">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+```
+
+JAVASCRIPT PARA DROPDOWN DE FUNCIONÁRIOS:
+
+```javascript
+// Inicializar dropdown de funcionários com dados do ponto
+function inicializarDropdownFuncionarios() {
+    $(document).on('select2:open', '.funcionario-select', function() {
+        // Configurar Select2 quando o dropdown for aberto
+        if (!$(this).hasClass('select2-initialized')) {
+            $(this).select2({
+                placeholder: 'Digite para buscar funcionário...',
+                allowClear: true,
+                ajax: {
+                    url: '/api/funcionarios/rdo-autocomplete',
+                    dataType: 'json',
+                    delay: 250,
+                    data: function(params) {
+                        return {
+                            q: params.term,
+                            data_rdo: document.getElementById('data_relatorio').value,
+                            obra_id: document.getElementById('obra_select').value
+                        };
+                    },
+                    processResults: function(data) {
+                        return {
+                            results: data.map(funcionario => ({
+                                id: funcionario.id,
+                                text: `${funcionario.nome} (${funcionario.codigo})`,
+                                html: `
+                                    <div class="d-flex justify-content-between align-items-center">
+                                        <div>
+                                            <strong>${funcionario.nome}</strong><br>
+                                            <small class="text-muted">${funcionario.codigo} - ${funcionario.funcao}</small>
+                                        </div>
+                                        <div class="text-end">
+                                            <span class="badge ${funcionario.presente_hoje ? 'bg-success' : 'bg-warning'}">
+                                                ${funcionario.presente_hoje ? 'Presente' : 'Ausente'}
+                                            </span><br>
+                                            <small class="text-muted">
+                                                ${funcionario.horas_trabalhadas || '0.0'}h trabalhadas
+                                            </small>
+                                        </div>
+                                    </div>
+                                `,
+                                funcionario: funcionario
+                            }))
+                        };
+                    },
+                    cache: true
+                },
+                templateResult: function(data) {
+                    if (data.loading) return data.text;
+                    return $(data.html);
+                },
+                templateSelection: function(data) {
+                    return data.text;
+                }
+            }).addClass('select2-initialized');
+        }
+    });
+}
+
+// Carregar dados do ponto quando funcionário for selecionado
+function carregarDadosPonto(selectElement) {
+    const funcionarioId = selectElement.value;
+    const dataRDO = document.getElementById('data_relatorio').value;
+    const funcionarioCard = selectElement.closest('.funcionario-item');
+    
+    if (!funcionarioId || !dataRDO) {
+        limparDadosPonto(funcionarioCard);
+        return;
+    }
+    
+    // Buscar dados do ponto para a data do RDO
+    fetch(`/api/ponto/funcionario/${funcionarioId}/data/${dataRDO}`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.success && data.registro_ponto) {
+                const registro = data.registro_ponto;
+                
+                // Preencher campos automaticamente
+                funcionarioCard.querySelector('.hora-entrada').value = registro.hora_entrada || '';
+                funcionarioCard.querySelector('.hora-saida').value = registro.hora_saida || '';
+                funcionarioCard.querySelector('.total-horas').value = registro.horas_trabalhadas || '0.0';
+                funcionarioCard.querySelector('.funcao-exercida').value = data.funcionario.funcao || '';
+                
+                // Marcar como presente se tem registro
+                funcionarioCard.querySelector('input[type="checkbox"]').checked = !!registro.hora_entrada;
+                
+                // Adicionar badge de status
+                adicionarBadgeStatus(funcionarioCard, registro);
+            } else {
+                limparDadosPonto(funcionarioCard);
+                // Mostrar que não há registro de ponto
+                mostrarAlertaSemPonto(funcionarioCard);
+            }
+        })
+        .catch(error => {
+            console.error('Erro ao carregar dados do ponto:', error);
+            limparDadosPonto(funcionarioCard);
+        });
+}
+
+function limparDadosPonto(funcionarioCard) {
+    funcionarioCard.querySelector('.hora-entrada').value = '';
+    funcionarioCard.querySelector('.hora-saida').value = '';
+    funcionarioCard.querySelector('.total-horas').value = '';
+    funcionarioCard.querySelector('input[type="checkbox"]').checked = false;
+}
+
+function mostrarAlertaSemPonto(funcionarioCard) {
+    // Adicionar alerta visual
+    const alertaExistente = funcionarioCard.querySelector('.alerta-sem-ponto');
+    if (!alertaExistente) {
+        const alerta = document.createElement('div');
+        alerta.className = 'alert alert-warning alert-sm mt-2 alerta-sem-ponto';
+        alerta.innerHTML = `
+            <i class="fas fa-exclamation-triangle"></i> 
+            <small>Funcionário sem registro de ponto para esta data</small>
+        `;
+        funcionarioCard.querySelector('.card-body').appendChild(alerta);
+    }
+}
+```
+
+CORREÇÃO 2: ATIVIDADES EXECUTADAS COM SUBATIVIDADES
+
+```html
+<!-- Seção Atividades CORRIGIDA -->
+<div class="row">
+    <div class="col-12">
+        <div class="card shadow-sm mb-4">
+            <div class="card-header bg-primary text-white">
+                <div class="d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0"><i class="fas fa-tasks"></i> Atividades Executadas</h5>
+                    <button type="button" class="btn btn-light btn-sm" onclick="adicionarAtividade()">
+                        <i class="fas fa-plus"></i> Adicionar
+                    </button>
+                </div>
+            </div>
+            <div class="card-body">
+                <div id="container_atividades">
+                    <!-- Atividades serão adicionadas dinamicamente -->
+                </div>
+                
+                <!-- Template CORRIGIDO de atividade -->
+                <div id="template_atividade" style="display: none;">
+                    <div class="card mb-3 atividade-item border-primary">
+                        <div class="card-body">
+                            <div class="row">
+                                <div class="col-md-5 mb-3">
+                                    <label class="form-label fw-bold">Serviço</label>
+                                    <select class="form-select servico-select" onchange="carregarSubatividades(this)">
+                                        <option value="">Selecione o serviço...</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-3 mb-3">
+                                    <label class="form-label fw-bold">Quantidade</label>
+                                    <div class="input-group">
+                                        <input type="number" class="form-control quantidade-input" 
+                                               min="0" step="0.01" placeholder="0.00">
+                                        <span class="input-group-text unidade-display bg-info text-white">-</span>
+                                    </div>
+                                </div>
+                                <div class="col-md-2 mb-3">
+                                    <label class="form-label fw-bold">Tempo (h)</label>
+                                    <input type="number" class="form-control tempo-input" min="0" step="0.5" 
+                                           placeholder="0.0">
+                                </div>
+                                <div class="col-md-1 mb-3">
+                                    <label class="form-label fw-bold">% Concluído</label>
+                                    <input type="number" class="form-control percentual-input" min="0" max="100" 
+                                           placeholder="100">
+                                </div>
+                                <div class="col-md-1 mb-3">
+                                    <label class="form-label">&nbsp;</label>
+                                    <button type="button" class="btn btn-outline-danger btn-sm w-100" 
+                                            onclick="removerAtividade(this)">
+                                        <i class="fas fa-trash"></i>
+                                    </button>
+                                </div>
+                            </div>
+                            
+                            <!-- Subatividades (carregadas dinamicamente) -->
+                            <div class="subatividades-container" style="display: none;">
+                                <hr class="border-primary">
+                                <div class="d-flex align-items-center mb-3">
+                                    <h6 class="mb-0 me-3">
+                                        <i class="fas fa-list text-primary"></i> Subatividades Executadas
+                                    </h6>
+                                    <button type="button" class="btn btn-outline-primary btn-sm" 
+                                            onclick="selecionarTodasSubatividades(this)">
+                                        <i class="fas fa-check-double"></i> Selecionar Todas
+                                    </button>
+                                </div>
+                                <div class="row subatividades-list">
+                                    <!-- Subatividades serão carregadas aqui -->
+                                </div>
+                            </div>
+                            
+                            <div class="row mt-3">
+                                <div class="col-12">
+                                    <label class="form-label fw-bold">Observações Técnicas</label>
+                                    <textarea class="form-control observacoes-atividade" rows="2" 
+                                              placeholder="Observações sobre a execução da atividade, problemas encontrados, qualidade..."></textarea>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+```
+
+JAVASCRIPT PARA SUBATIVIDADES:
+
+```javascript
+// Carregar subatividades quando serviço for selecionado
+function carregarSubatividades(selectElement) {
+    const servicoId = selectElement.value;
+    const atividadeCard = selectElement.closest('.atividade-item');
+    const subatividadesContainer = atividadeCard.querySelector('.subatividades-container');
+    const subatividadesList = atividadeCard.querySelector('.subatividades-list');
+    const unidadeDisplay = atividadeCard.querySelector('.unidade-display');
+    const quantidadeInput = atividadeCard.querySelector('.quantidade-input');
+    
+    if (!servicoId) {
+        subatividadesContainer.style.display = 'none';
+        unidadeDisplay.textContent = '-';
+        unidadeDisplay.className = 'input-group-text bg-secondary text-white';
+        return;
+    }
+    
+    // Mostrar loading
+    subatividadesList.innerHTML = '<div class="text-center"><i class="fas fa-spinner fa-spin"></i> Carregando...</div>';
+    
+    // Buscar dados do serviço e subatividades
+    fetch(`/api/servicos/${servicoId}/completo`)
+        .then(response => response.json())
+        .then(servico => {
+            // Atualizar unidade
+            const simbolosUnidade = {
+                'm2': 'm²', 'm3': 'm³', 'kg': 'kg', 'ton': 'ton', 
+                'un': 'un', 'm': 'm', 'h': 'h'
+            };
+            
+            const simbolo = simbolosUnidade[servico.unidade_medida] || servico.unidade_medida;
+            unidadeDisplay.textContent = simbolo;
+            unidadeDisplay.className = 'input-group-text bg-info text-white';
+            quantidadeInput.placeholder = `Quantidade em ${simbolo}`;
+            
+            // Configurar validações baseadas na unidade
+            configurarValidacaoUnidade(quantidadeInput, servico.unidade_medida);
+            
+            // Carregar subatividades
+            if (servico.subatividades && servico.subatividades.length > 0) {
+                subatividadesList.innerHTML = '';
+                
+                servico.subatividades.forEach((sub, index) => {
+                    const subDiv = document.createElement('div');
+                    subDiv.className = 'col-md-6 mb-2';
+                    subDiv.innerHTML = `
+                        <div class="card border-light">
+                            <div class="card-body p-2">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" 
+                                           id="sub_${sub.id}_${Date.now()}" value="${sub.id}">
+                                    <label class="form-check-label" for="sub_${sub.id}_${Date.now()}">
+                                        <strong>${sub.nome}</strong>
+                                        ${sub.ordem_execucao ? `<span class="badge bg-secondary ms-1">${sub.ordem_execucao}</span>` : ''}
+                                        <br>
+                                        <small class="text-muted">${sub.descricao || 'Sem descrição'}</small>
+                                        ${sub.ferramentas_necessarias ? `<br><small class="text-info"><i class="fas fa-tools"></i> ${sub.ferramentas_necessarias}</small>` : ''}
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                    subatividadesList.appendChild(subDiv);
+                });
+                
+                subatividadesContainer.style.display = 'block';
+            } else {
+                subatividadesList.innerHTML = `
+                    <div class="col-12">
+                        <div class="alert alert-info">
+                            <i class="fas fa-info-circle"></i> 
+                            Este serviço não possui subatividades cadastradas.
+                        </div>
+                    </div>
+                `;
+                subatividadesContainer.style.display = 'block';
+            }
+        })
+        .catch(error => {
+            console.error('Erro ao carregar subatividades:', error);
+            subatividadesList.innerHTML = `
+                <div class="col-12">
+                    <div class="alert alert-danger">
+                        <i class="fas fa-exclamation-triangle"></i> 
+                        Erro ao carregar subatividades. Tente novamente.
+                    </div>
+                </div>
+            `;
+            subatividadesContainer.style.display = 'block';
+        });
+}
+
+function selecionarTodasSubatividades(botao) {
+    const atividadeCard = botao.closest('.atividade-item');
+    const checkboxes = atividadeCard.querySelectorAll('.subatividades-list input[type="checkbox"]');
+    const todasSelecionadas = Array.from(checkboxes).every(cb => cb.checked);
+    
+    checkboxes.forEach(checkbox => {
+        checkbox.checked = !todasSelecionadas;
+    });
+    
+    // Atualizar texto do botão
+    botao.innerHTML = todasSelecionadas ? 
+        '<i class="fas fa-check-double"></i> Selecionar Todas' : 
+        '<i class="fas fa-times"></i> Desmarcar Todas';
+}
+```
+
+CORREÇÃO 3: MELHORIAS DE LAYOUT E CORES
+
+```css
+/* CSS CORRIGIDO para melhor visual */
+.section-header {
+    background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+    color: white;
+    padding: 15px 20px;
+    border-radius: 10px 10px 0 0;
+    margin-bottom: 0;
+}
+
+.section-header.bg-primary {
+    background: linear-gradient(135deg, #007bff 0%, #6610f2 100%);
+}
+
+.section-header.bg-warning {
+    background: linear-gradient(135deg, #ffc107 0%, #fd7e14 100%);
+    color: #212529;
+}
+
+.section-header.bg-info {
+    background: linear-gradient(135deg, #17a2b8 0%, #6f42c1 100%);
+}
+
+.card {
+    border: none;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    border-radius: 10px;
+}
+
+.card-header {
+    border-radius: 10px 10px 0 0 !important;
+    border-bottom: none;
+}
+
+.funcionario-item {
+    border-left: 4px solid #28a745;
+}
+
+.atividade-item {
+    border-left: 4px solid #007bff;
+}
+
+.equipamento-item {
+    border-left: 4px solid #ffc107;
+}
+
+.ocorrencia-item {
+    border-left: 4px solid #dc3545;
+}
+
+.form-label {
+    font-weight: 600;
+    color: #495057;
+    margin-bottom: 5px;
+}
+
+.btn-add-item {
+    background: #28a745;
+    border: none;
+    border-radius: 50%;
+    width: 35px;
+    height: 35px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    box-shadow: 0 2px 4px rgba(40, 167, 69, 0.3);
+}
+
+.btn-add-item:hover {
+    background: #218838;
+    transform: scale(1.05);
+}
+
+.unidade-display {
+    font-weight: bold;
+    min-width: 50px;
+    text-align: center;
+}
+
+.alert-sm {
+    padding: 8px 12px;
+    font-size: 0.875rem;
+}
+
+/* Melhorar Select2 */
+.select2-container--default .select2-selection--single {
+    height: 38px;
+    border: 1px solid #ced4da;
+    border-radius: 6px;
+}
+
+.select2-container--default .select2-selection--single .select2-selection__rendered {
+    line-height: 36px;
+    padding-left: 12px;
+}
+
+.select2-container--default .select2-selection--single .select2-selection__arrow {
+    height: 36px;
+}
+
+/* Responsividade */
+@media (max-width: 768px) {
+    .container-fluid {
+        padding: 10px;
+    }
+    
+    .card-body {
+        padding: 15px;
+    }
+    
+    .btn-add-item {
+        width: 30px;
+        height: 30px;
+    }
+}
+```
+
+ENDPOINT DA API PARA DADOS DO PONTO:
+
+```python
+@app.route('/api/ponto/funcionario/<int:funcionario_id>/data/<data>')
+def dados_ponto_funcionario(funcionario_id, data):
+    try:
+        # Buscar registro de ponto para a data específica
+        registro = RegistroPonto.query.filter_by(
+            funcionario_id=funcionario_id,
+            data=datetime.strptime(data, '%Y-%m-%d').date()
+        ).first()
+        
+        funcionario = Funcionario.query.get(funcionario_id)
+        
+        if registro:
+            return jsonify({
+                'success': True,
+                'registro_ponto': {
+                    'hora_entrada': registro.hora_entrada.strftime('%H:%M') if registro.hora_entrada else None,
+                    'hora_saida': registro.hora_saida.strftime('%H:%M') if registro.hora_saida else None,
+                    'horas_trabalhadas': float(registro.horas_trabalhadas) if registro.horas_trabalhadas else 0.0,
+                    'tipo_registro': registro.tipo_registro,
+                    'presente': True
+                },
+                'funcionario': {
+                    'nome': funcionario.nome,
+                    'funcao': funcionario.funcao.nome if funcionario.funcao else 'Não definida'
+                }
+            })
+        else:
+            return jsonify({
+                'success': False,
+                'message': 'Sem registro de ponto para esta data',
+                'funcionario': {
+                    'nome': funcionario.nome,
+                    'funcao': funcionario.funcao.nome if funcionario.funcao else 'Não definida'
+                }
+            })
+            
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'message': f'Erro ao buscar dados: {str(e)}'
+        }), 500
+
+@app.route('/api/servicos/<int:servico_id>/completo')
+def servico_completo(servico_id):
+    servico = Servico.query.get_or_404(servico_id)
+    subatividades = SubAtividade.query.filter_by(
+        servico_id=servico_id, 
+        ativo=True
+    ).order_by(SubAtividade.ordem_execucao).all()
+    
+    return jsonify({
+        'id': servico.id,
+        'nome': servico.nome,
+        'categoria': servico.categoria,
+        'unidade_medida': servico.unidade_medida,
+        'complexidade': servico.complexidade,
+        'subatividades': [{
+            'id': sub.id,
+            'nome': sub.nome,
+            'descricao': sub.descricao,
+            'ordem_execucao': sub.ordem_execucao,
+            'ferramentas_necessarias': sub.ferramentas_necessarias,
+            'materiais_principais': sub.materiais_principais,
+            'qualificacao_minima': sub.qualificacao_minima
+        } for sub in subatividades]
+    })
+```
+
+CRITÉRIOS DE SUCESSO:
+- [ ] Dropdown de funcionários funcional com autocomplete
+- [ ] Integração automática com dados do sistema de ponto
+- [ ] Carregamento correto de subatividades após selecionar serviço
+- [ ] Layout com cores adequadas e boa usabilidade
+- [ ] Interface responsiva para tablets
+- [ ] Validações automáticas funcionando
+
+RESULTADO ESPERADO:
+- Interface RDO totalmente funcional
+- Integração completa com sistemas existentes
+- Visual profissional e intuitivo
+- Performance adequada para uso em campo
+```
+
+---
+
+**RESULTADO**: Correções específicas para os problemas identificados, com foco em funcionalidade completa e interface profissional.
+
