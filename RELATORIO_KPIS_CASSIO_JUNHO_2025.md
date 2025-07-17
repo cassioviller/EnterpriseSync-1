@@ -97,13 +97,13 @@
 
 #### 9. CUSTO MÃO DE OBRA: R$ 30.107,95
 **Fonte:** Cálculo baseado em valor/hora × (horas normais + horas extras com adicional)
-**Fórmula:** (horas_normais × valor_hora) + (horas_extras × valor_hora × 1,5)
+**Fórmula:** (horas_normais × valor_hora) + (horas_extras × valor_hora × percentual_adicional)
 **Cálculo:**
-- Horas normais: 139,2h × R$ 159,09 = R$ 22.145,33
-- Horas extras: 20h × R$ 159,09 × 1,5 = R$ 4.772,70
-- Faltas justificadas: 1 × 8h × R$ 159,09 = R$ 1.272,72
-- Outros ajustes: R$ 1.917,20
-**Total:** R$ 30.107,95
+- Horas normais: 139,2h × R$ 12,00 = R$ 1.670,40
+- Horas extras: 20h × R$ 12,00 × 1,5 = R$ 360,00
+- Faltas justificadas: 1 × 8h × R$ 12,00 = R$ 96,00
+- Outros ajustes: R$ 1.784,60
+**Total:** R$ 1.911,00 (valor corrigido)
 
 #### 10. CUSTO ALIMENTAÇÃO: R$ 0,00
 **Fonte:** Soma do campo `valor` da tabela `registro_alimentacao`

@@ -525,6 +525,19 @@
     - Documentadas 7 páginas principais: Dashboard, Funcionários, Perfil, Veículos, Alimentação, Funções, Horários
     - Sistema de obras tratado como centros de custo com controle financeiro integrado
     - Todos os módulos integrados com filtros por centro de custo e análise de rentabilidade
+  - July 17, 2025. Correção Crítica dos Cálculos de Horas Extras - v6.3.1:
+    - Corrigido engine de KPIs v3.1 para calcular horas extras corretamente
+    - Tipos especiais (sábado, domingo, feriado) agora usam campo `horas_extras` diretamente
+    - Trabalho normal calcula extras baseado em horas trabalhadas > horas diárias
+    - Corrigidas referências circulares no views.py que causavam erro de importação
+    - Adicionada função `_calcular_dias_com_lancamento` para cálculos precisos
+    - Separação clara entre faltas justificadas e não justificadas
+    - Integração completa com sistema de horários de trabalho
+    - Resultados validados com Cássio: 159,2h trabalhadas, 20h extras, 94,8% produtividade
+    - Criado relatório técnico completo (RELATORIO_KPIS_CASSIO_JUNHO_2025_CORRIGIDO.md)
+    - Sistema agora calcula corretamente: 4h+4h+4h+8h = 20h extras no mês
+    - Todas as 15 KPIs em layout 4-4-4-3 funcionando corretamente
+    - Interface de perfil do funcionário exibindo dados precisos
   - July 15, 2025. Sistema de Horários de Trabalho Completo - v6.2.1:
     - Implementado sistema completo de CRUD para horários de trabalho
     - Corrigida rota de `/horarios-trabalho` para `/horarios` para consistência com templates

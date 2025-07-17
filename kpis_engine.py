@@ -120,38 +120,33 @@ class KPIsEngine:
         return total or 0.0
     
     def _calcular_horas_extras(self, funcionario_id, data_inicio, data_fim):
-        """2. Horas Extras: Horas trabalhadas acima da jornada específica do funcionário"""
-        # Buscar funcionário e seu horário de trabalho
+        """2. Horas Extras: Soma das horas extras registradas no sistema"""
+        # Para tipos especiais (sábado, domingo, feriado), usar campo horas_extras
+        # Para trabalho normal, calcular baseado em horas trabalhadas > horas diárias
+        
         funcionario = Funcionario.query.get(funcionario_id)
-        if not funcionario or not funcionario.horario_trabalho:
-            # Se não tem horário específico, usar o campo horas_extras do registro
-            total = db.session.query(func.sum(RegistroPonto.horas_extras)).filter(
-                RegistroPonto.funcionario_id == funcionario_id,
-                RegistroPonto.data >= data_inicio,
-                RegistroPonto.data <= data_fim,
-                RegistroPonto.horas_extras.isnot(None)
-            ).scalar()
-            return total or 0.0
+        horas_diarias_padrao = 8.0  # Padrão
         
-        # Usar horas diárias específicas do horário de trabalho
-        horas_diarias_padrao = funcionario.horario_trabalho.horas_diarias
+        if funcionario and funcionario.horario_trabalho:
+            horas_diarias_padrao = funcionario.horario_trabalho.horas_diarias
         
-        # Buscar registros de ponto no período
+        # Buscar todos os registros do período
         registros = db.session.query(RegistroPonto).filter(
             RegistroPonto.funcionario_id == funcionario_id,
             RegistroPonto.data >= data_inicio,
-            RegistroPonto.data <= data_fim,
-            RegistroPonto.horas_trabalhadas.isnot(None)
+            RegistroPonto.data <= data_fim
         ).all()
         
         total_horas_extras = 0.0
         
         for registro in registros:
-            # Calcular horas extras baseado no horário específico
-            horas_trabalhadas = registro.horas_trabalhadas or 0
-            if horas_trabalhadas > horas_diarias_padrao:
-                horas_extras_dia = horas_trabalhadas - horas_diarias_padrao
-                total_horas_extras += horas_extras_dia
+            # Para tipos especiais, usar campo horas_extras diretamente
+            if registro.tipo_registro in ['sabado_horas_extras', 'domingo_horas_extras', 'feriado_trabalhado']:
+                total_horas_extras += registro.horas_extras or 0
+            else:
+                # Para trabalho normal, calcular baseado em horas trabalhadas
+                if registro.horas_trabalhadas and registro.horas_trabalhadas > horas_diarias_padrao:
+                    total_horas_extras += registro.horas_trabalhadas - horas_diarias_padrao
         
         return total_horas_extras
     
