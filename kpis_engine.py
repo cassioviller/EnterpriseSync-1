@@ -46,38 +46,52 @@ class KPIsEngine:
         if not funcionario:
             return None
         
-        # Layout 4-4-2: Primeira linha (4 indicadores)
+        # Layout 4-4-4-3: Primeira linha (4 indicadores)
         horas_trabalhadas = self._calcular_horas_trabalhadas(funcionario_id, data_inicio, data_fim)
         horas_extras = self._calcular_horas_extras(funcionario_id, data_inicio, data_fim)
         faltas = self._calcular_faltas(funcionario_id, data_inicio, data_fim)
         atrasos_horas = self._calcular_atrasos_horas(funcionario_id, data_inicio, data_fim)
         
-        # Layout 4-4-2: Segunda linha (4 indicadores)
-        custo_mensal = self._calcular_custo_mensal(funcionario_id, data_inicio, data_fim)
+        # Layout 4-4-4-3: Segunda linha (4 indicadores)
+        produtividade = self._calcular_produtividade(funcionario_id, data_inicio, data_fim)
         absenteismo = self._calcular_absenteismo(funcionario_id, data_inicio, data_fim)
         media_diaria = self._calcular_media_horas_diarias(funcionario_id, data_inicio, data_fim)
-        horas_perdidas = self._calcular_horas_perdidas(funcionario_id, data_inicio, data_fim)
+        faltas_justificadas = self._calcular_faltas_justificadas(funcionario_id, data_inicio, data_fim)
         
-        # Layout 4-4-2: Terceira linha (2 indicadores)
-        produtividade = self._calcular_produtividade(funcionario_id, data_inicio, data_fim)
+        # Layout 4-4-4-3: Terceira linha (4 indicadores)
+        custo_mao_obra = self._calcular_custo_mensal(funcionario_id, data_inicio, data_fim)
         custo_alimentacao = self._calcular_custo_alimentacao(funcionario_id, data_inicio, data_fim)
+        custo_transporte = self._calcular_custo_transporte(funcionario_id, data_inicio, data_fim)
+        outros_custos = self._calcular_outros_custos(funcionario_id, data_inicio, data_fim)
+        
+        # Layout 4-4-4-3: Quarta linha (3 indicadores)
+        horas_perdidas = self._calcular_horas_perdidas(funcionario_id, data_inicio, data_fim)
+        eficiencia = self._calcular_eficiencia(funcionario_id, data_inicio, data_fim)
+        valor_falta_justificada = self._calcular_valor_falta_justificada(funcionario_id, data_inicio, data_fim)
         
         return {
-            # Primeira linha
+            # Primeira linha (4 indicadores)
             'horas_trabalhadas': round(horas_trabalhadas, 1),
             'horas_extras': round(horas_extras, 1),
             'faltas': faltas,
             'atrasos_horas': round(atrasos_horas, 1),
             
-            # Segunda linha  
-            'custo_mensal': round(custo_mensal, 2),
+            # Segunda linha (4 indicadores)
+            'produtividade': round(produtividade, 1),
             'absenteismo': round(absenteismo, 1),
             'media_diaria': round(media_diaria, 1),
-            'horas_perdidas': round(horas_perdidas, 1),
+            'faltas_justificadas': faltas_justificadas,
             
-            # Terceira linha
-            'produtividade': round(produtividade, 1),
+            # Terceira linha (4 indicadores)
+            'custo_mao_obra': round(custo_mao_obra, 2),
             'custo_alimentacao': round(custo_alimentacao, 2),
+            'custo_transporte': round(custo_transporte, 2),
+            'outros_custos': round(outros_custos, 2),
+            
+            # Quarta linha (3 indicadores)
+            'horas_perdidas': round(horas_perdidas, 1),
+            'eficiencia': round(eficiencia, 1),
+            'valor_falta_justificada': round(valor_falta_justificada, 2),
             
             # Dados auxiliares
             'periodo': {
@@ -168,6 +182,78 @@ class KPIsEngine:
         )
         
         return custo_total
+    
+    def _calcular_faltas_justificadas(self, funcionario_id, data_inicio, data_fim):
+        """Calcular faltas justificadas (com ocorrências aprovadas)"""
+        faltas_justificadas = db.session.query(func.count(RegistroPonto.id)).filter(
+            RegistroPonto.funcionario_id == funcionario_id,
+            RegistroPonto.data >= data_inicio,
+            RegistroPonto.data <= data_fim,
+            RegistroPonto.tipo_registro == 'falta_justificada'
+        ).scalar()
+        
+        return faltas_justificadas or 0
+    
+    def _calcular_custo_transporte(self, funcionario_id, data_inicio, data_fim):
+        """Calcular custo de transporte (vale transporte)"""
+        if not hasattr(self, 'OutroCusto'):
+            try:
+                from models import OutroCusto
+                self.OutroCusto = OutroCusto
+            except ImportError:
+                return 0.0
+        
+        total = db.session.query(func.sum(self.OutroCusto.valor)).filter(
+            self.OutroCusto.funcionario_id == funcionario_id,
+            self.OutroCusto.data >= data_inicio,
+            self.OutroCusto.data <= data_fim,
+            self.OutroCusto.tipo.ilike('%transporte%')
+        ).scalar()
+        
+        return total or 0.0
+    
+    def _calcular_outros_custos(self, funcionario_id, data_inicio, data_fim):
+        """Calcular outros custos (vale alimentação, EPIs, etc.)"""
+        if not hasattr(self, 'OutroCusto'):
+            try:
+                from models import OutroCusto
+                self.OutroCusto = OutroCusto
+            except ImportError:
+                return 0.0
+        
+        total = db.session.query(func.sum(self.OutroCusto.valor)).filter(
+            self.OutroCusto.funcionario_id == funcionario_id,
+            self.OutroCusto.data >= data_inicio,
+            self.OutroCusto.data <= data_fim,
+            ~self.OutroCusto.tipo.ilike('%transporte%')
+        ).scalar()
+        
+        return total or 0.0
+    
+    def _calcular_eficiencia(self, funcionario_id, data_inicio, data_fim):
+        """Calcular eficiência (produtividade ajustada por qualidade)"""
+        produtividade = self._calcular_produtividade(funcionario_id, data_inicio, data_fim)
+        faltas = self._calcular_faltas(funcionario_id, data_inicio, data_fim)
+        
+        # Eficiência = Produtividade - penalização por faltas
+        penalizacao_faltas = min(faltas * 5, 20)  # Máximo 20% de penalização
+        eficiencia = max(0, produtividade - penalizacao_faltas)
+        
+        return eficiencia
+    
+    def _calcular_valor_falta_justificada(self, funcionario_id, data_inicio, data_fim):
+        """Calcular valor pago em faltas justificadas"""
+        funcionario = Funcionario.query.get(funcionario_id)
+        if not funcionario or not funcionario.salario:
+            return 0.0
+        
+        valor_hora = funcionario.salario / 220  # 220 horas/mês
+        faltas_justificadas = self._calcular_faltas_justificadas(funcionario_id, data_inicio, data_fim)
+        
+        # Assumir 8 horas por dia de falta justificada
+        valor_total = faltas_justificadas * 8 * valor_hora
+        
+        return valor_total
     
     def _calcular_absenteismo(self, funcionario_id, data_inicio, data_fim):
         """6. Absenteísmo: Percentual de ausências em relação aos dias úteis"""
