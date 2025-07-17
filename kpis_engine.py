@@ -130,18 +130,15 @@ class KPIsEngine:
         return total or 0.0
     
     def _calcular_faltas(self, funcionario_id, data_inicio, data_fim):
-        """3. Faltas: Número absoluto de dias úteis sem presença"""
-        dias_uteis = self._calcular_dias_uteis(data_inicio, data_fim)
-        
-        # Contar dias com presença (registro de entrada)
-        dias_presenca = db.session.query(func.count(RegistroPonto.id)).filter(
+        """3. Faltas: Número de faltas não justificadas registradas"""
+        faltas = db.session.query(func.count(RegistroPonto.id)).filter(
             RegistroPonto.funcionario_id == funcionario_id,
             RegistroPonto.data >= data_inicio,
             RegistroPonto.data <= data_fim,
-            RegistroPonto.hora_entrada.isnot(None)
+            RegistroPonto.tipo_registro == 'falta'
         ).scalar()
         
-        return max(0, dias_uteis - (dias_presenca or 0))
+        return faltas or 0
     
     def _calcular_atrasos_horas(self, funcionario_id, data_inicio, data_fim):
         """4. Atrasos: Total de horas de atraso (entrada + saída antecipada)"""
@@ -256,14 +253,22 @@ class KPIsEngine:
         return valor_total
     
     def _calcular_absenteismo(self, funcionario_id, data_inicio, data_fim):
-        """6. Absenteísmo: Percentual de ausências em relação aos dias úteis"""
-        dias_uteis = self._calcular_dias_uteis(data_inicio, data_fim)
+        """6. Absenteísmo: Percentual de faltas não justificadas em relação aos dias com lançamento"""
+        # Contar dias com lançamento (trabalho programado)
+        dias_com_lancamento = db.session.query(func.count(RegistroPonto.id)).filter(
+            RegistroPonto.funcionario_id == funcionario_id,
+            RegistroPonto.data >= data_inicio,
+            RegistroPonto.data <= data_fim,
+            RegistroPonto.tipo_registro.in_(['trabalho_normal', 'feriado_trabalhado', 'meio_periodo', 'falta', 'falta_justificada'])
+        ).scalar()
+        
+        # Contar faltas não justificadas
         faltas = self._calcular_faltas(funcionario_id, data_inicio, data_fim)
         
-        if dias_uteis == 0:
+        if dias_com_lancamento == 0:
             return 0.0
             
-        return (faltas / dias_uteis) * 100
+        return (faltas / dias_com_lancamento) * 100
     
     def _calcular_media_horas_diarias(self, funcionario_id, data_inicio, data_fim):
         """7. Média Diária: Média de horas trabalhadas por dia presente"""
