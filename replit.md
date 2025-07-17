@@ -166,6 +166,19 @@ SIGE (Sistema Integrado de Gestão Empresarial) is a comprehensive business mana
   - Sistema RDO com dropdowns inteligentes completamente funcional
   - Codebase limpo e otimizado, focado apenas no essencial
   - Redução significativa de complexidade sem perda de funcionalidade
+- July 17, 2025. Correções Críticas nos Cálculos de KPIs - v6.3.1:
+  - Corrigido cálculo de faltas: agora usa apenas registros tipo_registro = 'falta' ao invés de calcular por ausência
+  - Corrigido cálculo de absenteísmo: baseado em dias com lançamento ao invés de dias úteis totais
+  - Separação clara entre faltas justificadas e não justificadas nos cálculos
+  - Faltas justificadas não penalizam mais a produtividade nem o absenteísmo
+  - Criado relatório técnico completo (RELATORIO_KPIS_CASSIO_JUNHO_2025.md) documentando:
+    * Detalhamento de todas as 15 KPIs do layout 4-4-4-3
+    * Fórmulas de cálculo e fontes de dados exatas
+    * 30 registros de ponto do funcionário Cássio com todos os tipos de lançamento
+    * Resultados: 159,2h trabalhadas, 20h extras, 94,8% produtividade, 4,8% absenteísmo
+    * Custo total: R$ 30.925,95 (mão de obra + transporte + outros custos)
+  - Engine de KPIs v3.1 com lógica correta e precisa
+  - Sistema validado com dados reais e funcionando corretamente
 - July 03, 2025. Initial setup
 - July 03, 2025. Enhanced employee management with photo upload and real-time validation
 - July 03, 2025. Implemented comprehensive employee profile page with KPIs, time tracking history, and occurrence management
