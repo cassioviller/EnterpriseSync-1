@@ -391,3 +391,38 @@ def gerar_calendario_util(ano):
 
 # Instância global do engine
 kpis_engine = KPIsEngine()
+
+# Funções de compatibilidade para as views
+def calcular_kpis_funcionario_v3(funcionario_id, data_inicio=None, data_fim=None):
+    """Função de compatibilidade para calcular KPIs v3"""
+    return kpis_engine.calcular_kpis_funcionario(funcionario_id, data_inicio, data_fim)
+
+def calcular_kpis_funcionario_v4(funcionario_id, data_inicio=None, data_fim=None):
+    """Função de compatibilidade para calcular KPIs v4"""
+    return kpis_engine.calcular_kpis_funcionario(funcionario_id, data_inicio, data_fim)
+
+def identificar_faltas_periodo(funcionario_id, data_inicio, data_fim):
+    """Identifica faltas no período especificado"""
+    return kpis_engine._calcular_faltas(funcionario_id, data_inicio, data_fim)
+
+def processar_registros_ponto_com_faltas(funcionario_id, data_inicio, data_fim):
+    """Processa registros de ponto incluindo identificação de faltas"""
+    registros = RegistroPonto.query.filter_by(funcionario_id=funcionario_id).filter(
+        RegistroPonto.data.between(data_inicio, data_fim)
+    ).order_by(RegistroPonto.data).all()
+    
+    # Adicionar informações de faltas
+    for registro in registros:
+        if not registro.hora_entrada:
+            registro.eh_falta = True
+        else:
+            registro.eh_falta = False
+    
+    return registros
+
+def atualizar_calculos_ponto(registro_ponto_id):
+    """Atualiza cálculos automáticos de um registro de ponto"""
+    registro = RegistroPonto.query.get(registro_ponto_id)
+    if registro:
+        return kpis_engine.calcular_e_atualizar_ponto(registro_ponto_id)
+    return None

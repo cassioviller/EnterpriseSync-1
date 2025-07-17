@@ -153,6 +153,19 @@ SIGE (Sistema Integrado de Gestão Empresarial) is a comprehensive business mana
 
 ## Changelog
 
+- July 17, 2025. Sistema de Limpeza Completa - v6.3:
+  - Limpeza abrangente de scripts de desenvolvimento e testes desnecessários
+  - Removidos 50+ arquivos de scripts temporários (debug, test, seed, popular, migrar, etc.)
+  - Removidos 16 relatórios de texto temporários (RELATORIO_*.md, CALCULOS_*.md)
+  - Removidos engines de KPIs duplicados, mantendo apenas kpis_engine.py principal
+  - Removidos templates duplicados (dashboard_funcionario_v3.html, horarios_trabalho.html)
+  - Consolidadas funções de compatibilidade no kpis_engine.py único
+  - Corrigidas todas as referências a arquivos removidos no views.py
+  - Mantidas integralmente as 15 KPIs do perfil do funcionário
+  - Preservadas todas as funcionalidades operacionais do sistema
+  - Sistema RDO com dropdowns inteligentes completamente funcional
+  - Codebase limpo e otimizado, focado apenas no essencial
+  - Redução significativa de complexidade sem perda de funcionalidade
 - July 03, 2025. Initial setup
 - July 03, 2025. Enhanced employee management with photo upload and real-time validation
 - July 03, 2025. Implemented comprehensive employee profile page with KPIs, time tracking history, and occurrence management

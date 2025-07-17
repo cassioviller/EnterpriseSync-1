@@ -5,10 +5,10 @@ from models import *
 from models import OutroCusto
 from forms import *
 from utils import calcular_horas_trabalhadas, calcular_custo_real_obra, calcular_custos_mes, calcular_kpis_funcionarios_geral, calcular_kpis_funcionario_periodo, calcular_kpis_funcionario_completo, calcular_ocorrencias_funcionario, processar_meio_periodo_exemplo
-from kpis_engine_v3 import calcular_kpis_funcionario_v3, identificar_faltas_periodo, processar_registros_ponto_com_faltas
+from kpis_engine import calcular_kpis_funcionario_v3, identificar_faltas_periodo, processar_registros_ponto_com_faltas
 from datetime import datetime, date
 from sqlalchemy import func
-from kpis_engine_simple import kpis_engine
+
 import os
 import json
 from werkzeug.utils import secure_filename
@@ -309,7 +309,7 @@ def novo_ponto():
         
         # Recalcular KPIs após inserção
         try:
-            from kpis_engine_v3 import atualizar_calculos_ponto
+            from kpis_engine import atualizar_calculos_ponto
             atualizar_calculos_ponto(registro.id)
         except ImportError:
             # KPIs engine não disponível, continuar sem erro
@@ -535,7 +535,7 @@ def funcionario_perfil(id):
         data_fim = datetime.strptime(data_fim, '%Y-%m-%d').date()
     
     # Calcular KPIs individuais para o período (usando engine v4.0)
-    from kpis_engine_v4 import calcular_kpis_funcionario_v4
+    from kpis_engine import calcular_kpis_funcionario_v4
     kpis = calcular_kpis_funcionario_v4(id, data_inicio, data_fim)
     
     # Buscar registros de ponto com filtros e identificação de faltas
@@ -2046,7 +2046,7 @@ def novo_ponto_lista():
         db.session.commit()
         
         # Atualizar cálculos automáticos do registro
-        from kpis_engine_v3 import atualizar_calculos_ponto
+        from kpis_engine import atualizar_calculos_ponto
         atualizar_calculos_ponto(registro.id)
         
         flash('Registro de ponto adicionado com sucesso!', 'success')
