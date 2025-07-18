@@ -46,25 +46,49 @@
         }
 
         html[data-bs-theme="dark"] .form-control,
-        html[data-bs-theme="dark"] .form-select {
+        html[data-bs-theme="dark"] .form-select,
+        html[data-bs-theme="dark"] input[type="text"],
+        html[data-bs-theme="dark"] input[type="email"],
+        html[data-bs-theme="dark"] input[type="password"],
+        html[data-bs-theme="dark"] input[type="tel"],
+        html[data-bs-theme="dark"] input[type="date"],
+        html[data-bs-theme="dark"] input[type="datetime-local"],
+        html[data-bs-theme="dark"] input[type="number"],
+        html[data-bs-theme="dark"] input[type="search"],
+        html[data-bs-theme="dark"] textarea,
+        html[data-bs-theme="dark"] select {
             background-color: #000000 !important;
             color: #ffffff !important;
             border: 1px solid #4a5568 !important;
         }
 
         html[data-bs-theme="dark"] .form-control:focus,
-        html[data-bs-theme="dark"] .form-select:focus {
+        html[data-bs-theme="dark"] .form-select:focus,
+        html[data-bs-theme="dark"] input[type="text"]:focus,
+        html[data-bs-theme="dark"] input[type="email"]:focus,
+        html[data-bs-theme="dark"] input[type="password"]:focus,
+        html[data-bs-theme="dark"] input[type="tel"]:focus,
+        html[data-bs-theme="dark"] input[type="date"]:focus,
+        html[data-bs-theme="dark"] input[type="datetime-local"]:focus,
+        html[data-bs-theme="dark"] input[type="number"]:focus,
+        html[data-bs-theme="dark"] input[type="search"]:focus,
+        html[data-bs-theme="dark"] textarea:focus,
+        html[data-bs-theme="dark"] select:focus {
             background-color: #000000 !important;
             color: #ffffff !important;
             border: 1px solid #667eea !important;
             box-shadow: 0 0 0 0.2rem rgba(102, 126, 234, 0.25) !important;
         }
 
-        html[data-bs-theme="dark"] .form-control::placeholder {
+        html[data-bs-theme="dark"] .form-control::placeholder,
+        html[data-bs-theme="dark"] input::placeholder,
+        html[data-bs-theme="dark"] textarea::placeholder {
             color: #a0aec0 !important;
         }
 
-        html[data-bs-theme="dark"] .form-control[readonly] {
+        html[data-bs-theme="dark"] .form-control[readonly],
+        html[data-bs-theme="dark"] input[readonly],
+        html[data-bs-theme="dark"] textarea[readonly] {
             background-color: #1a1a1a !important;
             color: #a0aec0 !important;
             opacity: 0.8;
@@ -127,25 +151,49 @@
         }
 
         html[data-bs-theme="light"] .form-control,
-        html[data-bs-theme="light"] .form-select {
+        html[data-bs-theme="light"] .form-select,
+        html[data-bs-theme="light"] input[type="text"],
+        html[data-bs-theme="light"] input[type="email"],
+        html[data-bs-theme="light"] input[type="password"],
+        html[data-bs-theme="light"] input[type="tel"],
+        html[data-bs-theme="light"] input[type="date"],
+        html[data-bs-theme="light"] input[type="datetime-local"],
+        html[data-bs-theme="light"] input[type="number"],
+        html[data-bs-theme="light"] input[type="search"],
+        html[data-bs-theme="light"] textarea,
+        html[data-bs-theme="light"] select {
             background-color: #ffffff !important;
             color: #333333 !important;
             border: 1px solid #dee2e6 !important;
         }
 
         html[data-bs-theme="light"] .form-control:focus,
-        html[data-bs-theme="light"] .form-select:focus {
+        html[data-bs-theme="light"] .form-select:focus,
+        html[data-bs-theme="light"] input[type="text"]:focus,
+        html[data-bs-theme="light"] input[type="email"]:focus,
+        html[data-bs-theme="light"] input[type="password"]:focus,
+        html[data-bs-theme="light"] input[type="tel"]:focus,
+        html[data-bs-theme="light"] input[type="date"]:focus,
+        html[data-bs-theme="light"] input[type="datetime-local"]:focus,
+        html[data-bs-theme="light"] input[type="number"]:focus,
+        html[data-bs-theme="light"] input[type="search"]:focus,
+        html[data-bs-theme="light"] textarea:focus,
+        html[data-bs-theme="light"] select:focus {
             background-color: #ffffff !important;
             color: #333333 !important;
             border: 1px solid #86b7fe !important;
             box-shadow: 0 0 0 0.2rem rgba(13, 110, 253, 0.25) !important;
         }
 
-        html[data-bs-theme="light"] .form-control::placeholder {
+        html[data-bs-theme="light"] .form-control::placeholder,
+        html[data-bs-theme="light"] input::placeholder,
+        html[data-bs-theme="light"] textarea::placeholder {
             color: #6c757d !important;
         }
 
-        html[data-bs-theme="light"] .form-control[readonly] {
+        html[data-bs-theme="light"] .form-control[readonly],
+        html[data-bs-theme="light"] input[readonly],
+        html[data-bs-theme="light"] textarea[readonly] {
             background-color: #e9ecef !important;
             color: #6c757d !important;
             opacity: 1;
@@ -485,16 +533,42 @@
             setStoredTheme(newTheme);
             setTheme(newTheme);
             
+            // Force update all form fields immediately
+            applyThemeToFields(newTheme);
+            
             // Force reload to ensure all styles are applied correctly
             setTimeout(() => {
                 window.location.reload();
             }, 100);
         }
 
+        // Apply theme to form fields
+        function applyThemeToFields(theme) {
+            const selectors = '.form-control, .form-select, input[type="text"], input[type="email"], input[type="password"], input[type="tel"], input[type="date"], input[type="datetime-local"], input[type="number"], input[type="search"], textarea, select';
+            const elements = document.querySelectorAll(selectors);
+            
+            elements.forEach(el => {
+                if (theme === 'dark') {
+                    el.style.backgroundColor = '#000000';
+                    el.style.color = '#ffffff';
+                    el.style.borderColor = '#4a5568';
+                } else {
+                    el.style.backgroundColor = '#ffffff';
+                    el.style.color = '#333333';
+                    el.style.borderColor = '#dee2e6';
+                }
+            });
+        }
+
         // Initialize theme when DOM is ready
         document.addEventListener('DOMContentLoaded', () => {
             const theme = getPreferredTheme();
             setTheme(theme);
+            
+            // Apply theme to form fields on page load
+            setTimeout(() => {
+                applyThemeToFields(theme);
+            }, 200);
         });
     </script>
     
