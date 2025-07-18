@@ -20,57 +20,123 @@
     <!-- Custom CSS -->
     <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
     
-    <!-- Global Form Styling -->
+    <!-- Global Theme Styling -->
     <style>
-        /* Global styles for form elements in dark mode */
-        .form-control,
-        .form-select {
+        /* ===== DARK MODE (Default) ===== */
+        html[data-bs-theme="dark"] body {
+            background-color: #1a1a1a !important;
+            color: #ffffff !important;
+        }
+
+        html[data-bs-theme="dark"] .card {
+            background-color: #2d3748 !important;
+            border-color: #4a5568 !important;
+            color: #ffffff !important;
+        }
+
+        html[data-bs-theme="dark"] .card-header {
+            background-color: #374151 !important;
+            border-color: #4a5568 !important;
+            color: #ffffff !important;
+        }
+
+        html[data-bs-theme="dark"] .card-body {
+            background-color: #2d3748 !important;
+            color: #ffffff !important;
+        }
+
+        html[data-bs-theme="dark"] .form-control,
+        html[data-bs-theme="dark"] .form-select {
             background-color: #000000 !important;
-            color: white !important;
+            color: #ffffff !important;
             border: 1px solid #4a5568 !important;
         }
 
-        .form-control:focus,
-        .form-select:focus {
+        html[data-bs-theme="dark"] .form-control:focus,
+        html[data-bs-theme="dark"] .form-select:focus {
             background-color: #000000 !important;
-            color: white !important;
+            color: #ffffff !important;
             border: 1px solid #667eea !important;
             box-shadow: 0 0 0 0.2rem rgba(102, 126, 234, 0.25) !important;
         }
 
-        .form-control::placeholder {
+        html[data-bs-theme="dark"] .form-control::placeholder {
             color: #a0aec0 !important;
         }
 
-        .form-control[readonly] {
-            background-color: #000000 !important;
-            color: white !important;
+        html[data-bs-theme="dark"] .form-control[readonly] {
+            background-color: #1a1a1a !important;
+            color: #a0aec0 !important;
             opacity: 0.8;
         }
 
-        .input-group-text {
-            background-color: #2d3748 !important;
-            color: white !important;
+        html[data-bs-theme="dark"] .input-group-text {
+            background-color: #374151 !important;
+            color: #ffffff !important;
             border: 1px solid #4a5568 !important;
         }
 
-        option {
+        html[data-bs-theme="dark"] option {
             background-color: #000000 !important;
-            color: white !important;
+            color: #ffffff !important;
         }
 
-        /* Light mode styles */
+        html[data-bs-theme="dark"] .form-label {
+            color: #ffffff !important;
+        }
+
+        html[data-bs-theme="dark"] .text-muted {
+            color: #a0aec0 !important;
+        }
+
+        html[data-bs-theme="dark"] .table {
+            color: #ffffff !important;
+        }
+
+        html[data-bs-theme="dark"] .table-striped > tbody > tr:nth-of-type(odd) > td,
+        html[data-bs-theme="dark"] .table-striped > tbody > tr:nth-of-type(odd) > th {
+            background-color: #374151 !important;
+        }
+
+        html[data-bs-theme="dark"] .navbar-brand,
+        html[data-bs-theme="dark"] .nav-link {
+            color: #ffffff !important;
+        }
+
+        /* ===== LIGHT MODE ===== */
+        html[data-bs-theme="light"] body {
+            background-color: #ffffff !important;
+            color: #333333 !important;
+        }
+
+        html[data-bs-theme="light"] .card {
+            background-color: #ffffff !important;
+            border-color: #dee2e6 !important;
+            color: #333333 !important;
+        }
+
+        html[data-bs-theme="light"] .card-header {
+            background-color: #f8f9fa !important;
+            border-color: #dee2e6 !important;
+            color: #333333 !important;
+        }
+
+        html[data-bs-theme="light"] .card-body {
+            background-color: #ffffff !important;
+            color: #333333 !important;
+        }
+
         html[data-bs-theme="light"] .form-control,
         html[data-bs-theme="light"] .form-select {
-            background-color: white !important;
-            color: #333 !important;
+            background-color: #ffffff !important;
+            color: #333333 !important;
             border: 1px solid #dee2e6 !important;
         }
 
         html[data-bs-theme="light"] .form-control:focus,
         html[data-bs-theme="light"] .form-select:focus {
-            background-color: white !important;
-            color: #333 !important;
+            background-color: #ffffff !important;
+            color: #333333 !important;
             border: 1px solid #86b7fe !important;
             box-shadow: 0 0 0 0.2rem rgba(13, 110, 253, 0.25) !important;
         }
@@ -92,26 +158,151 @@
         }
 
         html[data-bs-theme="light"] option {
-            background-color: white !important;
-            color: #333 !important;
+            background-color: #ffffff !important;
+            color: #333333 !important;
         }
 
-        /* Fix for navbar theme toggle button */
-        .navbar-dark .btn-outline-secondary {
-            color: #6c757d;
-            border-color: #6c757d;
+        html[data-bs-theme="light"] .form-label {
+            color: #333333 !important;
         }
 
-        .navbar-dark .btn-outline-secondary:hover {
-            color: #fff;
-            background-color: #6c757d;
-            border-color: #6c757d;
+        html[data-bs-theme="light"] .text-muted {
+            color: #6c757d !important;
+        }
+
+        html[data-bs-theme="light"] .table {
+            color: #333333 !important;
+        }
+
+        html[data-bs-theme="light"] .table-striped > tbody > tr:nth-of-type(odd) > td,
+        html[data-bs-theme="light"] .table-striped > tbody > tr:nth-of-type(odd) > th {
+            background-color: #f8f9fa !important;
+        }
+
+        html[data-bs-theme="light"] .navbar {
+            background-color: #ffffff !important;
+            border-bottom: 1px solid #dee2e6 !important;
+        }
+
+        html[data-bs-theme="light"] .navbar-brand,
+        html[data-bs-theme="light"] .nav-link {
+            color: #333333 !important;
+        }
+
+        html[data-bs-theme="light"] .navbar-toggler {
+            border-color: #dee2e6 !important;
+        }
+
+        html[data-bs-theme="light"] .dropdown-menu {
+            background-color: #ffffff !important;
+            border-color: #dee2e6 !important;
+        }
+
+        html[data-bs-theme="light"] .dropdown-item {
+            color: #333333 !important;
+        }
+
+        html[data-bs-theme="light"] .dropdown-item:hover {
+            background-color: #f8f9fa !important;
+            color: #333333 !important;
+        }
+
+        /* Theme toggle button styles */
+        .navbar .btn-outline-secondary {
+            color: #6c757d !important;
+            border-color: #6c757d !important;
+        }
+
+        .navbar .btn-outline-secondary:hover {
+            color: #fff !important;
+            background-color: #6c757d !important;
+            border-color: #6c757d !important;
+        }
+
+        html[data-bs-theme="light"] .navbar .btn-outline-secondary {
+            color: #495057 !important;
+            border-color: #495057 !important;
+        }
+
+        html[data-bs-theme="light"] .navbar .btn-outline-secondary:hover {
+            color: #fff !important;
+            background-color: #495057 !important;
+            border-color: #495057 !important;
+        }
+
+        /* Fix for footer in light mode */
+        html[data-bs-theme="light"] footer {
+            background-color: #f8f9fa !important;
+            color: #333333 !important;
+        }
+
+        /* DataTables styling */
+        html[data-bs-theme="dark"] .dataTables_wrapper {
+            color: #ffffff !important;
+        }
+
+        html[data-bs-theme="light"] .dataTables_wrapper {
+            color: #333333 !important;
+        }
+
+        html[data-bs-theme="dark"] .dataTables_wrapper .dataTables_filter input {
+            background-color: #000000 !important;
+            color: #ffffff !important;
+            border: 1px solid #4a5568 !important;
+        }
+
+        html[data-bs-theme="light"] .dataTables_wrapper .dataTables_filter input {
+            background-color: #ffffff !important;
+            color: #333333 !important;
+            border: 1px solid #dee2e6 !important;
+        }
+
+        html[data-bs-theme="dark"] .dataTables_wrapper .dataTables_length select {
+            background-color: #000000 !important;
+            color: #ffffff !important;
+            border: 1px solid #4a5568 !important;
+        }
+
+        html[data-bs-theme="light"] .dataTables_wrapper .dataTables_length select {
+            background-color: #ffffff !important;
+            color: #333333 !important;
+            border: 1px solid #dee2e6 !important;
+        }
+
+        /* Alert styling */
+        html[data-bs-theme="light"] .alert {
+            color: #333333 !important;
+        }
+
+        html[data-bs-theme="dark"] .alert {
+            color: #ffffff !important;
+        }
+
+        /* Modal styling */
+        html[data-bs-theme="light"] .modal-content {
+            background-color: #ffffff !important;
+            color: #333333 !important;
+        }
+
+        html[data-bs-theme="dark"] .modal-content {
+            background-color: #2d3748 !important;
+            color: #ffffff !important;
+        }
+
+        html[data-bs-theme="light"] .modal-header {
+            background-color: #f8f9fa !important;
+            border-bottom-color: #dee2e6 !important;
+        }
+
+        html[data-bs-theme="dark"] .modal-header {
+            background-color: #374151 !important;
+            border-bottom-color: #4a5568 !important;
         }
     </style>
 </head>
 <body>
     <!-- Navigation -->
-    <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+    <nav class="navbar navbar-expand-lg">
         <div class="container">
             <a class="navbar-brand fw-bold" href="{{ url_for('main.dashboard') }}">
                 <i class="fas fa-building me-2"></i>SIGE
@@ -227,7 +418,7 @@
     </main>
     
     <!-- Footer -->
-    <footer class="bg-dark text-center py-3 mt-5">
+    <footer class="text-center py-3 mt-5">
         <div class="container">
             <p class="mb-0">&copy; 2024 SIGE - Estruturas do Vale. Todos os direitos reservados.</p>
         </div>
@@ -294,31 +485,16 @@
             setStoredTheme(newTheme);
             setTheme(newTheme);
             
-            // Force refresh of form elements styles
+            // Force reload to ensure all styles are applied correctly
             setTimeout(() => {
-                const formElements = document.querySelectorAll('.form-control, .form-select');
-                formElements.forEach(el => {
-                    el.style.backgroundColor = newTheme === 'dark' ? '#000000' : '#ffffff';
-                    el.style.color = newTheme === 'dark' ? '#ffffff' : '#333333';
-                    el.style.borderColor = newTheme === 'dark' ? '#4a5568' : '#dee2e6';
-                });
-            }, 50);
+                window.location.reload();
+            }, 100);
         }
 
         // Initialize theme when DOM is ready
         document.addEventListener('DOMContentLoaded', () => {
             const theme = getPreferredTheme();
             setTheme(theme);
-            
-            // Apply styles to existing form elements
-            setTimeout(() => {
-                const formElements = document.querySelectorAll('.form-control, .form-select');
-                formElements.forEach(el => {
-                    el.style.backgroundColor = theme === 'dark' ? '#000000' : '#ffffff';
-                    el.style.color = theme === 'dark' ? '#ffffff' : '#333333';
-                    el.style.borderColor = theme === 'dark' ? '#4a5568' : '#dee2e6';
-                });
-            }, 100);
         });
     </script>
     
