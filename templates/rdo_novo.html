@@ -3,6 +3,43 @@
 {% block title %}Novo RDO - SIGE{% endblock %}
 
 {% block content %}
+<style>
+/* Estilo global para todos os campos de formulário do RDO */
+.form-control, .form-select {
+    background-color: #000000 !important;
+    color: white !important;
+    border: 1px solid #4a5568 !important;
+}
+
+.form-control:focus, .form-select:focus {
+    background-color: #000000 !important;
+    color: white !important;
+    border: 1px solid #667eea !important;
+    box-shadow: 0 0 0 0.2rem rgba(102, 126, 234, 0.25) !important;
+}
+
+.form-control::placeholder {
+    color: #a0aec0 !important;
+}
+
+.form-control[readonly] {
+    background-color: #000000 !important;
+    color: white !important;
+    opacity: 0.8;
+}
+
+.input-group-text {
+    background-color: #2d3748 !important;
+    color: white !important;
+    border: 1px solid #4a5568 !important;
+}
+
+option {
+    background-color: #000000 !important;
+    color: white !important;
+}
+</style>
+
 <div class="container-fluid">
     <div class="row">
         <div class="col-12">
@@ -28,11 +65,11 @@
             <div class="row">
                 <div class="col-md-3">
                     <label class="form-label">Data do Relatório</label>
-                    <input type="date" class="form-control" style="background-color: #000000; color: white; border: 1px solid #4a5568;" id="data_relatorio" value="{{ data_hoje }}" required>
+                    <input type="date" class="form-control" id="data_relatorio" value="{{ data_hoje }}" required>
                 </div>
                 <div class="col-md-3">
                     <label class="form-label">Obra</label>
-                    <select class="form-select" style="background-color: #000000; color: white; border: 1px solid #4a5568;" id="obra_id" required>
+                    <select class="form-select" id="obra_id" required>
                         <option value="">Selecione a obra...</option>
                         {% for obra in obras %}
                         <option value="{{ obra.id }}">{{ obra.nome }}</option>
@@ -41,14 +78,14 @@
                 </div>
                 <div class="col-md-3">
                     <label class="form-label">Status</label>
-                    <select class="form-select" style="background-color: #000000; color: white; border: 1px solid #4a5568;" id="status">
+                    <select class="form-select" id="status">
                         <option value="Rascunho">Rascunho</option>
                         <option value="Finalizado">Finalizado</option>
                     </select>
                 </div>
                 <div class="col-md-3">
                     <label class="form-label">Responsável</label>
-                    <input type="text" class="form-control" style="background-color: #000000; color: white; border: 1px solid #4a5568;" value="{{ current_user.nome }}" readonly>
+                    <input type="text" class="form-control" value="{{ current_user.nome }}" readonly>
                 </div>
             </div>
         </div>
@@ -65,7 +102,7 @@
             <div class="row">
                 <div class="col-md-4">
                     <label class="form-label">Tempo Manhã</label>
-                    <select class="form-select" style="background-color: #000000; color: white; border: 1px solid #4a5568;" id="tempo_manha">
+                    <select class="form-select" id="tempo_manha">
                         <option value="Ensolarado">Ensolarado</option>
                         <option value="Parcialmente Nublado">Parcialmente Nublado</option>
                         <option value="Nublado">Nublado</option>
@@ -74,7 +111,7 @@
                 </div>
                 <div class="col-md-4">
                     <label class="form-label">Tempo Tarde</label>
-                    <select class="form-select" style="background-color: #000000; color: white; border: 1px solid #4a5568;" id="tempo_tarde">
+                    <select class="form-select" id="tempo_tarde">
                         <option value="Ensolarado">Ensolarado</option>
                         <option value="Parcialmente Nublado">Parcialmente Nublado</option>
                         <option value="Nublado">Nublado</option>
@@ -83,7 +120,7 @@
                 </div>
                 <div class="col-md-4">
                     <label class="form-label">Tempo Noite</label>
-                    <select class="form-select" style="background-color: #000000; color: white; border: 1px solid #4a5568;" id="tempo_noite">
+                    <select class="form-select" id="tempo_noite">
                         <option value="Ensolarado">Ensolarado</option>
                         <option value="Parcialmente Nublado">Parcialmente Nublado</option>
                         <option value="Nublado">Nublado</option>
@@ -264,23 +301,23 @@ function adicionarMaoObra() {
             <div class="row">
                 <div class="col-md-4">
                     <label class="form-label">Funcionário</label>
-                    <select class="form-select" style="background-color: #000000; color: white; border: 1px solid #4a5568;" name="funcionario_${contadorMaoObra}" onchange="preencherDadosFuncionario(this, ${contadorMaoObra})" required>
+                    <select class="form-select" name="funcionario_${contadorMaoObra}" onchange="preencherDadosFuncionario(this, ${contadorMaoObra})" required>
                         <option value="">Selecione o funcionário...</option>
                     </select>
                 </div>
                 <div class="col-md-4">
                     <label class="form-label">Entrada</label>
-                    <input type="time" class="form-control" style="background-color: #000000; color: white; border: 1px solid #4a5568;" name="entrada_${contadorMaoObra}" value="07:00" onchange="calcularTotalHoras(${contadorMaoObra})">
+                    <input type="time" class="form-control" name="entrada_${contadorMaoObra}" value="07:00" onchange="calcularTotalHoras(${contadorMaoObra})">
                 </div>
                 <div class="col-md-4">
                     <label class="form-label">Saída</label>
-                    <input type="time" class="form-control" style="background-color: #000000; color: white; border: 1px solid #4a5568;" name="saida_${contadorMaoObra}" value="17:00" onchange="calcularTotalHoras(${contadorMaoObra})">
+                    <input type="time" class="form-control" name="saida_${contadorMaoObra}" value="17:00" onchange="calcularTotalHoras(${contadorMaoObra})">
                 </div>
             </div>
             <div class="row mt-2">
                 <div class="col-md-4">
                     <label class="form-label">Total Horas</label>
-                    <input type="text" class="form-control" style="background-color: #000000; color: white; border: 1px solid #4a5568;" name="total_horas_${contadorMaoObra}" value="Calculado automaticamente" readonly>
+                    <input type="text" class="form-control" name="total_horas_${contadorMaoObra}" value="Calculado automaticamente" readonly>
                 </div>
                 <div class="col-md-4">
                     <label class="form-label">Presente</label>
@@ -300,13 +337,13 @@ function adicionarMaoObra() {
             <div class="row mt-2">
                 <div class="col-12">
                     <label class="form-label">Função Exercida</label>
-                    <input type="text" class="form-control" style="background-color: #000000; color: white; border: 1px solid #4a5568;" name="funcao_${contadorMaoObra}" placeholder="Ex: Pedreiro, Ajudante, Eletricista">
+                    <input type="text" class="form-control" name="funcao_${contadorMaoObra}" placeholder="Ex: Pedreiro, Ajudante, Eletricista">
                 </div>
             </div>
             <div class="row mt-2">
                 <div class="col-12">
                     <label class="form-label">Observações sobre o funcionário no dia</label>
-                    <textarea class="form-control" style="background-color: #000000; color: white; border: 1px solid #4a5568;" name="observacoes_${contadorMaoObra}" rows="2" placeholder="Observações específicas..."></textarea>
+                    <textarea class="form-control" name="observacoes_${contadorMaoObra}" rows="2" placeholder="Observações específicas..."></textarea>
                 </div>
             </div>
         </div>
@@ -345,17 +382,17 @@ function adicionarAtividade() {
             <div class="row">
                 <div class="col-md-6">
                     <label class="form-label">Serviço</label>
-                    <select class="form-select" style="background-color: #000000; color: white; border: 1px solid #4a5568;" name="servico_${contadorAtividades}" onchange="carregarSubatividades(this, ${contadorAtividades})" required>
+                    <select class="form-select" name="servico_${contadorAtividades}" onchange="carregarSubatividades(this, ${contadorAtividades})" required>
                         <option value="">Selecione o serviço...</option>
                     </select>
                 </div>
                 <div class="col-md-3">
                     <label class="form-label">Quantidade</label>
-                    <input type="number" class="form-control" style="background-color: #000000; color: white; border: 1px solid #4a5568;" name="quantidade_${contadorAtividades}" step="0.01" min="0" required>
+                    <input type="number" class="form-control" name="quantidade_${contadorAtividades}" step="0.01" min="0" required>
                 </div>
                 <div class="col-md-3">
                     <label class="form-label">Unidade</label>
-                    <input type="text" class="form-control" style="background-color: #000000; color: white; border: 1px solid #4a5568;" name="unidade_${contadorAtividades}" readonly>
+                    <input type="text" class="form-control" name="unidade_${contadorAtividades}" readonly>
                 </div>
             </div>
             <!-- Container para subatividades -->
@@ -373,7 +410,7 @@ function adicionarAtividade() {
             <div class="row mt-2">
                 <div class="col-12">
                     <label class="form-label">Observações sobre a execução da atividade</label>
-                    <textarea class="form-control" style="background-color: #000000; color: white; border: 1px solid #4a5568;" name="observacoes_atividade_${contadorAtividades}" rows="2" placeholder="Observações específicas da atividade..."></textarea>
+                    <textarea class="form-control" name="observacoes_atividade_${contadorAtividades}" rows="2" placeholder="Observações específicas da atividade..."></textarea>
                 </div>
             </div>
         </div>
@@ -565,7 +602,6 @@ function carregarSubatividades(selectElement, contadorAtividades) {
                     <div class="col-md-4">
                         <div class="input-group">
                             <input type="number" class="form-control form-control-sm" 
-                                   style="background-color: #000000; color: white; border: 1px solid #4a5568;"
                                    name="subatividade_percentual_${contadorAtividades}[]" 
                                    min="0" max="100" step="1" value="0"
                                    placeholder="0">
