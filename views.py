@@ -1807,7 +1807,7 @@ def funcionarios_autocomplete():
         'id': funcionario.id,
         'nome': funcionario.nome,
         'codigo': funcionario.codigo,
-        'funcao': funcionario.funcao.nome if funcionario.funcao else 'Sem função'
+        'funcao': funcionario.funcao_ref.nome if funcionario.funcao_ref else 'Sem função'
     } for funcionario in funcionarios])
 
 @main_bp.route('/api/equipamentos/autocomplete')
@@ -2883,7 +2883,15 @@ def lista_rdos():
 @login_required
 def novo_rdo():
     """Formulário para criar novo RDO"""
-    return render_template('rdo_novo.html')
+    # Dados para template
+    obras = Obra.query.filter_by(ativo=True).all()
+    funcionarios = Funcionario.query.filter_by(ativo=True).all()
+    servicos = Servico.query.filter_by(ativo=True).all()
+    
+    return render_template('rdo_novo.html', 
+                         obras=obras,
+                         funcionarios=funcionarios,
+                         servicos=servicos)
 
 @main_bp.route('/rdo/criar', methods=['POST'])
 @login_required

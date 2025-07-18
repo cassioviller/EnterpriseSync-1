@@ -1,1337 +1,455 @@
 {% extends "base.html" %}
 
-{% block title %}Novo RDO - Sistema SIGE{% endblock %}
+{% block title %}Novo RDO - SIGE{% endblock %}
 
 {% block content %}
-<div class="container-fluid py-3">
-    <!-- Header do RDO -->
-    <div class="row mb-4">
+<div class="container-fluid">
+    <div class="row">
         <div class="col-12">
-            <div class="card shadow">
-                <div class="card-header bg-primary text-white">
-                    <div class="d-flex justify-content-between align-items-center">
-                        <h4 class="mb-0">
-                            <i class="fas fa-clipboard-list"></i> Novo RDO
-                        </h4>
-                        <div class="d-flex gap-2">
-                            <button class="btn btn-light btn-sm" onclick="salvarRascunho()">
-                                <i class="fas fa-save"></i> Salvar Rascunho
-                            </button>
-                            <button class="btn btn-success btn-sm" onclick="finalizarRDO()">
-                                <i class="fas fa-check"></i> Finalizar
-                            </button>
-                        </div>
-                    </div>
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h1 class="h3">
+                    <i class="fas fa-clipboard-list"></i> Novo RDO
+                </h1>
+                <a href="{{ url_for('main.lista_rdos') }}" class="btn btn-outline-secondary">
+                    <i class="fas fa-arrow-left"></i> Voltar
+                </a>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Informações Gerais -->
+    <div class="card mb-4">
+        <div class="card-header">
+            <h5 class="mb-0">
+                <i class="fas fa-info-circle"></i> Informações Gerais
+            </h5>
+        </div>
+        <div class="card-body">
+            <div class="row">
+                <div class="col-md-3">
+                    <label class="form-label">Data do Relatório</label>
+                    <input type="date" class="form-control" id="data_relatorio" value="{{ date.today() }}" required>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">Obra</label>
+                    <select class="form-select" id="obra_id" required>
+                        <option value="">Selecione a obra...</option>
+                        {% for obra in obras %}
+                        <option value="{{ obra.id }}">{{ obra.nome }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">Status</label>
+                    <select class="form-select" id="status">
+                        <option value="Rascunho">Rascunho</option>
+                        <option value="Finalizado">Finalizado</option>
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">Responsável</label>
+                    <input type="text" class="form-control" value="{{ current_user.nome }}" readonly>
                 </div>
             </div>
         </div>
     </div>
 
-    <form id="form_rdo">
-        <!-- Seção 1: Informações Gerais -->
-        <div class="row">
-            <div class="col-12">
-                <div class="section-header">
-                    <h5 class="mb-0"><i class="fas fa-info-circle"></i> Informações Gerais</h5>
+    <!-- Condições Climáticas -->
+    <div class="card mb-4">
+        <div class="card-header">
+            <h5 class="mb-0">
+                <i class="fas fa-cloud-sun"></i> Condições Climáticas
+            </h5>
+        </div>
+        <div class="card-body">
+            <div class="row">
+                <div class="col-md-4">
+                    <label class="form-label">Tempo Manhã</label>
+                    <select class="form-select" id="tempo_manha">
+                        <option value="Ensolarado">Ensolarado</option>
+                        <option value="Parcialmente Nublado">Parcialmente Nublado</option>
+                        <option value="Nublado">Nublado</option>
+                        <option value="Chuvoso">Chuvoso</option>
+                    </select>
                 </div>
-                <div class="section-body">
-                    <div class="row">
-                        <div class="col-md-4 mb-3">
-                            <label class="form-label">Data do Relatório *</label>
-                            <input type="date" class="form-control" id="data_relatorio" required>
-                        </div>
-                        <div class="col-md-8 mb-3">
-                            <label class="form-label">Obra *</label>
-                            <select class="form-select" id="obra_select" required>
-                                <option value="">Selecione a obra...</option>
-                            </select>
-                            <small class="text-muted">
-                                <i class="fas fa-info-circle"></i> 
-                                Digite para buscar por nome, código ou endereço
-                            </small>
-                        </div>
-                    </div>
-                    
-                    <div class="row">
-                        <div class="col-md-4 mb-3">
-                            <label class="form-label">Tempo Manhã</label>
-                            <select class="form-select" id="tempo_manha">
-                                <option value="">Selecione...</option>
-                                <option value="ensolarado">☀️ Ensolarado</option>
-                                <option value="nublado">☁️ Nublado</option>
-                                <option value="parcialmente_nublado">⛅ Parcialmente Nublado</option>
-                                <option value="chuvoso">🌧️ Chuvoso</option>
-                                <option value="garoa">🌦️ Garoa</option>
-                                <option value="tempestade">⛈️ Tempestade</option>
-                            </select>
-                        </div>
-                        <div class="col-md-4 mb-3">
-                            <label class="form-label">Tempo Tarde</label>
-                            <select class="form-select" id="tempo_tarde">
-                                <option value="">Selecione...</option>
-                                <option value="ensolarado">☀️ Ensolarado</option>
-                                <option value="nublado">☁️ Nublado</option>
-                                <option value="parcialmente_nublado">⛅ Parcialmente Nublado</option>
-                                <option value="chuvoso">🌧️ Chuvoso</option>
-                                <option value="garoa">🌦️ Garoa</option>
-                                <option value="tempestade">⛈️ Tempestade</option>
-                            </select>
-                        </div>
-                        <div class="col-md-4 mb-3">
-                            <label class="form-label">Tempo Noite</label>
-                            <select class="form-select" id="tempo_noite">
-                                <option value="">Selecione...</option>
-                                <option value="ensolarado">☀️ Ensolarado</option>
-                                <option value="nublado">☁️ Nublado</option>
-                                <option value="parcialmente_nublado">⛅ Parcialmente Nublado</option>
-                                <option value="chuvoso">🌧️ Chuvoso</option>
-                                <option value="garoa">🌦️ Garoa</option>
-                                <option value="tempestade">⛈️ Tempestade</option>
-                            </select>
-                        </div>
-                    </div>
-                    
-                    <div class="row">
-                        <div class="col-12">
-                            <label class="form-label">Observações Meteorológicas</label>
-                            <textarea class="form-control" id="observacoes_meteorologicas" rows="2"
-                                      placeholder="Ex: Chuva forte pela manhã, trabalho interrompido das 9h às 11h..."></textarea>
-                        </div>
-                    </div>
+                <div class="col-md-4">
+                    <label class="form-label">Tempo Tarde</label>
+                    <select class="form-select" id="tempo_tarde">
+                        <option value="Ensolarado">Ensolarado</option>
+                        <option value="Parcialmente Nublado">Parcialmente Nublado</option>
+                        <option value="Nublado">Nublado</option>
+                        <option value="Chuvoso">Chuvoso</option>
+                    </select>
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label">Tempo Noite</label>
+                    <select class="form-select" id="tempo_noite">
+                        <option value="Ensolarado">Ensolarado</option>
+                        <option value="Parcialmente Nublado">Parcialmente Nublado</option>
+                        <option value="Nublado">Nublado</option>
+                        <option value="Chuvoso">Chuvoso</option>
+                    </select>
                 </div>
             </div>
         </div>
+    </div>
 
-        <!-- Seção 2: Mão de Obra -->
-        <div class="row">
-            <div class="col-12">
-                <div class="card shadow-sm mb-4">
-                    <div class="card-header bg-success text-white">
-                        <div class="d-flex justify-content-between align-items-center">
-                            <h5 class="mb-0"><i class="fas fa-users"></i> Mão de Obra</h5>
-                            <button type="button" class="btn btn-light btn-sm" onclick="adicionarFuncionario()">
-                                <i class="fas fa-plus"></i> Adicionar
-                            </button>
-                        </div>
-                    </div>
-                    <div class="card-body">
-                        <div id="container_funcionarios">
-                            <!-- Funcionários serão adicionados dinamicamente -->
-                        </div>
-                        
-                        <!-- Template de funcionário (hidden) -->
-                        <div id="template_funcionario" style="display: none;">
-                            <div class="card mb-3 funcionario-item border-success">
-                                <div class="card-body">
-                                    <div class="row align-items-center">
-                                        <div class="col-md-4 mb-2">
-                                            <label class="form-label fw-bold">Funcionário</label>
-                                            <select class="form-select funcionario-select" onchange="carregarDadosPonto(this)">
-                                                <option value="">Selecione o funcionário...</option>
-                                            </select>
-                                        </div>
-                                        <div class="col-md-2 mb-2">
-                                            <label class="form-label fw-bold">Entrada</label>
-                                            <input type="time" class="form-control hora-entrada" readonly>
-                                            <small class="text-muted">Do sistema de ponto</small>
-                                        </div>
-                                        <div class="col-md-2 mb-2">
-                                            <label class="form-label fw-bold">Saída</label>
-                                            <input type="time" class="form-control hora-saida" readonly>
-                                            <small class="text-muted">Do sistema de ponto</small>
-                                        </div>
-                                        <div class="col-md-2 mb-2">
-                                            <label class="form-label fw-bold">Total Horas</label>
-                                            <input type="text" class="form-control total-horas" readonly>
-                                            <small class="text-muted">Calculado automaticamente</small>
-                                        </div>
-                                        <div class="col-md-1 mb-2">
-                                            <label class="form-label fw-bold">Presente</label>
-                                            <div class="form-check d-flex justify-content-center">
-                                                <input class="form-check-input presente-check" type="checkbox" checked>
-                                            </div>
-                                        </div>
-                                        <div class="col-md-1 mb-2">
-                                            <label class="form-label">&nbsp;</label>
-                                            <button type="button" class="btn btn-outline-danger btn-sm w-100" onclick="removerFuncionario(this)">
-                                                <i class="fas fa-trash"></i>
-                                            </button>
-                                        </div>
-                                    </div>
-                                    <div class="row">
-                                        <div class="col-md-6">
-                                            <label class="form-label fw-bold">Função Exercida</label>
-                                            <input type="text" class="form-control funcao-exercida" placeholder="Ex: Pedreiro, Ajudante, Eletricista">
-                                        </div>
-                                        <div class="col-md-6">
-                                            <label class="form-label fw-bold">Observações</label>
-                                            <input type="text" class="form-control observacoes-funcionario" placeholder="Observações sobre o funcionário no dia">
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
+    <!-- Mão de Obra -->
+    <div class="card mb-4" style="background: linear-gradient(135deg, #4CAF50 0%, #45a049 100%);">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <h5 class="mb-0 text-white">
+                <i class="fas fa-users"></i> Mão de Obra
+            </h5>
+            <button type="button" class="btn btn-light" onclick="adicionarMaoObra()">
+                <i class="fas fa-plus"></i> Adicionar
+            </button>
+        </div>
+        <div class="card-body">
+            <div id="mao-obra-container">
+                <!-- Funcionários serão adicionados dinamicamente aqui -->
+            </div>
+            <div class="text-muted" id="mao-obra-vazio">
+                <i class="fas fa-info-circle"></i> Nenhum funcionário adicionado. Clique em "Adicionar" para incluir funcionários.
             </div>
         </div>
+    </div>
 
-        <!-- Seção 3: Atividades Executadas -->
-        <div class="row">
-            <div class="col-12">
-                <div class="section-header">
-                    <div class="d-flex justify-content-between align-items-center">
-                        <h5 class="mb-0"><i class="fas fa-tasks"></i> Atividades Executadas</h5>
-                        <button type="button" class="btn btn-add-item" onclick="adicionarAtividade()">
-                            <i class="fas fa-plus"></i>
-                        </button>
-                    </div>
-                </div>
-                <div class="section-body">
-                    <div id="container_atividades">
-                        <!-- Atividades serão adicionadas dinamicamente -->
-                    </div>
-                    
-                    <!-- Template de atividade (hidden) -->
-                    <div id="template_atividade" style="display: none;">
-                        <div class="item-card atividade-item">
-                            <div class="row">
-                                <div class="col-md-6 mb-3">
-                                    <label class="form-label">Serviço</label>
-                                    <select class="form-select servico-select" onchange="carregarSubatividades(this)">
-                                        <option value="">Selecione o serviço...</option>
-                                    </select>
-                                </div>
-                                <div class="col-md-3 mb-3">
-                                    <label class="form-label">Quantidade</label>
-                                    <div class="input-group">
-                                        <input type="number" class="form-control quantidade-input" min="0" step="0.01" placeholder="0.00">
-                                        <span class="input-group-text unidade-display">-</span>
-                                    </div>
-                                </div>
-                                <div class="col-md-2 mb-3">
-                                    <label class="form-label">Tempo (h)</label>
-                                    <input type="number" class="form-control tempo-input" min="0" step="0.5" placeholder="0.0">
-                                </div>
-                                <div class="col-md-1 mb-3">
-                                    <label class="form-label">&nbsp;</label>
-                                    <button type="button" class="btn btn-outline-danger btn-sm w-100" onclick="removerAtividade(this)">
-                                        <i class="fas fa-trash"></i>
-                                    </button>
-                                </div>
-                            </div>
-                            
-                            <!-- Subatividades (carregadas dinamicamente) -->
-                            <div class="subatividades-container" style="display: none;">
-                                <hr>
-                                <h6><i class="fas fa-list"></i> Subatividades</h6>
-                                <div class="row subatividades-list">
-                                    <!-- Subatividades serão carregadas aqui -->
-                                </div>
-                            </div>
-                            
-                            <div class="row">
-                                <div class="col-12">
-                                    <label class="form-label">Observações Técnicas</label>
-                                    <textarea class="form-control observacoes-input" rows="2" placeholder="Observações sobre a execução da atividade..."></textarea>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
+    <!-- Atividades Executadas -->
+    <div class="card mb-4" style="background: linear-gradient(135deg, #6A5ACD 0%, #483D8B 100%);">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <h5 class="mb-0 text-white">
+                <i class="fas fa-tasks"></i> Atividades Executadas
+            </h5>
+            <button type="button" class="btn btn-light" onclick="adicionarAtividade()">
+                <i class="fas fa-plus"></i> Adicionar
+            </button>
+        </div>
+        <div class="card-body">
+            <div id="atividades-container">
+                <!-- Atividades serão adicionadas dinamicamente aqui -->
+            </div>
+            <div class="text-muted" id="atividades-vazio">
+                <i class="fas fa-info-circle"></i> Nenhuma atividade adicionada. Clique em "Adicionar" para incluir atividades.
             </div>
         </div>
+    </div>
 
-        <!-- Seção 4: Equipamentos -->
-        <div class="row">
-            <div class="col-12">
-                <div class="section-header">
-                    <div class="d-flex justify-content-between align-items-center">
-                        <h5 class="mb-0"><i class="fas fa-truck"></i> Equipamentos</h5>
-                        <button type="button" class="btn btn-add-item" onclick="adicionarEquipamento()">
-                            <i class="fas fa-plus"></i>
-                        </button>
-                    </div>
-                </div>
-                <div class="section-body">
-                    <div id="container_equipamentos">
-                        <!-- Equipamentos serão adicionados dinamicamente -->
-                    </div>
-                    
-                    <!-- Template de equipamento (hidden) -->
-                    <div id="template_equipamento" style="display: none;">
-                        <div class="item-card equipamento-item">
-                            <div class="row align-items-center">
-                                <div class="col-md-4 mb-2">
-                                    <label class="form-label">Equipamento/Veículo</label>
-                                    <select class="form-select equipamento-select">
-                                        <option value="">Selecione...</option>
-                                    </select>
-                                </div>
-                                <div class="col-md-2 mb-2">
-                                    <label class="form-label">Horas de Uso</label>
-                                    <input type="number" class="form-control horas-uso-input" min="0" max="24" step="0.5" placeholder="0.0">
-                                </div>
-                                <div class="col-md-3 mb-2">
-                                    <label class="form-label">Status</label>
-                                    <select class="form-select status-select">
-                                        <option value="operando">✅ Operando Normal</option>
-                                        <option value="manutencao">🔧 Em Manutenção</option>
-                                        <option value="problema">⚠️ Com Problema</option>
-                                        <option value="parado">⏸️ Parado</option>
-                                    </select>
-                                </div>
-                                <div class="col-md-2 mb-2">
-                                    <label class="form-label">Observações</label>
-                                    <input type="text" class="form-control observacoes-equipamento-input" placeholder="Observações...">
-                                </div>
-                                <div class="col-md-1 mb-2">
-                                    <label class="form-label">&nbsp;</label>
-                                    <button type="button" class="btn btn-outline-danger btn-sm w-100" onclick="removerEquipamento(this)">
-                                        <i class="fas fa-trash"></i>
-                                    </button>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
+    <!-- Equipamentos -->
+    <div class="card mb-4">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <h5 class="mb-0">
+                <i class="fas fa-tools"></i> Equipamentos
+            </h5>
+            <button type="button" class="btn btn-outline-primary" onclick="adicionarEquipamento()">
+                <i class="fas fa-plus"></i> Adicionar
+            </button>
+        </div>
+        <div class="card-body">
+            <div id="equipamentos-container">
+                <!-- Equipamentos serão adicionados dinamicamente aqui -->
+            </div>
+            <div class="text-muted" id="equipamentos-vazio">
+                <i class="fas fa-info-circle"></i> Nenhum equipamento adicionado. Clique em "Adicionar" para incluir equipamentos.
             </div>
         </div>
+    </div>
 
-        <!-- Seção 5: Ocorrências -->
-        <div class="row">
-            <div class="col-12">
-                <div class="section-header">
-                    <div class="d-flex justify-content-between align-items-center">
-                        <h5 class="mb-0"><i class="fas fa-exclamation-triangle"></i> Ocorrências</h5>
-                        <button type="button" class="btn btn-add-item" onclick="adicionarOcorrencia()">
-                            <i class="fas fa-plus"></i>
-                        </button>
-                    </div>
-                </div>
-                <div class="section-body">
-                    <div id="container_ocorrencias">
-                        <!-- Ocorrências serão adicionadas dinamicamente -->
-                    </div>
-                    
-                    <!-- Template de ocorrência (hidden) -->
-                    <div id="template_ocorrencia" style="display: none;">
-                        <div class="item-card ocorrencia-item">
-                            <div class="row">
-                                <div class="col-md-3 mb-2">
-                                    <label class="form-label">Tipo</label>
-                                    <select class="form-select tipo-ocorrencia-select">
-                                        <option value="atraso">⏰ Atraso</option>
-                                        <option value="problema_tecnico">🔧 Problema Técnico</option>
-                                        <option value="falta_material">📦 Falta de Material</option>
-                                        <option value="seguranca">⚠️ Segurança</option>
-                                        <option value="qualidade">🎯 Qualidade</option>
-                                        <option value="clima">🌧️ Clima</option>
-                                        <option value="outros">📝 Outros</option>
-                                    </select>
-                                </div>
-                                <div class="col-md-2 mb-2">
-                                    <label class="form-label">Gravidade</label>
-                                    <select class="form-select gravidade-select">
-                                        <option value="baixa">🟢 Baixa</option>
-                                        <option value="media">🟡 Média</option>
-                                        <option value="alta">🔴 Alta</option>
-                                    </select>
-                                </div>
-                                <div class="col-md-6 mb-2">
-                                    <label class="form-label">Descrição</label>
-                                    <textarea class="form-control descricao-ocorrencia-input" rows="2" placeholder="Descreva a ocorrência..."></textarea>
-                                </div>
-                                <div class="col-md-1 mb-2">
-                                    <label class="form-label">&nbsp;</label>
-                                    <button type="button" class="btn btn-outline-danger btn-sm w-100" onclick="removerOcorrencia(this)">
-                                        <i class="fas fa-trash"></i>
-                                    </button>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
+    <!-- Observações Gerais -->
+    <div class="card mb-4">
+        <div class="card-header">
+            <h5 class="mb-0">
+                <i class="fas fa-comments"></i> Observações Gerais
+            </h5>
         </div>
-
-        <!-- Seção 6: Comentários Gerais -->
-        <div class="row">
-            <div class="col-12">
-                <div class="section-header">
-                    <h5 class="mb-0"><i class="fas fa-comment"></i> Comentários Gerais</h5>
-                </div>
-                <div class="section-body">
-                    <textarea class="form-control" id="comentario_geral" rows="4"
-                              placeholder="Comentários gerais sobre o dia de trabalho, observações importantes, próximas atividades..."></textarea>
-                </div>
-            </div>
+        <div class="card-body">
+            <textarea class="form-control" id="observacoes_gerais" rows="4" placeholder="Observações gerais sobre o dia de trabalho..."></textarea>
         </div>
+    </div>
 
-        <!-- Botões de Ação -->
-        <div class="row mt-4">
-            <div class="col-12">
-                <div class="d-flex justify-content-between">
-                    <button type="button" class="btn btn-outline-secondary" onclick="voltarListagem()">
-                        <i class="fas fa-arrow-left"></i> Voltar
+    <!-- Botões de Ação -->
+    <div class="card">
+        <div class="card-body">
+            <div class="d-flex justify-content-between">
+                <div>
+                    <button type="button" class="btn btn-secondary" onclick="salvarRascunho()">
+                        <i class="fas fa-save"></i> Salvar Rascunho
                     </button>
-                    <div class="d-flex gap-2">
-                        <button type="button" class="btn btn-warning" onclick="salvarRascunho()">
-                            <i class="fas fa-save"></i> Salvar Rascunho
-                        </button>
-                        <button type="button" class="btn btn-success" onclick="finalizarRDO()">
-                            <i class="fas fa-check"></i> Finalizar RDO
-                        </button>
-                    </div>
+                </div>
+                <div>
+                    <button type="button" class="btn btn-success" onclick="finalizarRDO()">
+                        <i class="fas fa-check"></i> Finalizar RDO
+                    </button>
                 </div>
             </div>
         </div>
-    </form>
+    </div>
 </div>
 
-<style>
-    .section-header {
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-        color: white;
-        padding: 15px;
-        border-radius: 10px 10px 0 0;
-        margin-bottom: 0;
-    }
-    .section-body {
-        border: 2px solid #667eea;
-        border-top: none;
-        border-radius: 0 0 10px 10px;
-        padding: 20px;
-        margin-bottom: 20px;
-    }
-    .select2-container {
-        width: 100% !important;
-    }
-    .btn-add-item {
-        background: #28a745;
-        border: none;
-        border-radius: 50px;
-        width: 40px;
-        height: 40px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        color: white;
-    }
-    .item-card {
-        border: 1px solid #dee2e6;
-        border-radius: 8px;
-        padding: 15px;
-        margin-bottom: 10px;
-        background: #f8f9fa;
-    }
-    .unidade-badge {
-        background: #17a2b8;
-        color: white;
-        padding: 4px 8px;
-        border-radius: 15px;
-        font-size: 0.8em;
-    }
-    @media (max-width: 768px) {
-        .container-fluid {
-            padding: 10px;
-        }
-        .section-body {
-            padding: 15px;
-        }
-    }
-</style>
-
-<link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet">
-<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
-
 <script>
-$(document).ready(function() {
-    // Aguardar carregamento completo do jQuery e Select2
-    setTimeout(function() {
-        // Inicializar data atual
-        document.getElementById('data_relatorio').value = new Date().toISOString().split('T')[0];
-        
-        // Inicializar dropdowns
-        inicializarDropdownObras();
-        console.log('RDO system initialized successfully');
-    }, 100);
+// Variáveis globais
+let contadorMaoObra = 0;
+let contadorAtividades = 0;
+let contadorEquipamentos = 0;
+
+// Dados dos funcionários (carregados do backend)
+let funcionarios = [];
+let servicos = [];
+
+// Inicializar a página
+document.addEventListener('DOMContentLoaded', function() {
+    console.log('Inicializando RDO...');
+    
+    // Carregar dados iniciais
+    carregarFuncionarios();
+    carregarServicos();
+    
+    // Configurar obra pré-selecionada se houver
+    const urlParams = new URLSearchParams(window.location.search);
+    const obraId = urlParams.get('obra_id');
+    if (obraId) {
+        document.getElementById('obra_id').value = obraId;
+    }
+    
+    console.log('RDO inicializado com sucesso!');
 });
 
-// Dropdown de Obras - CORRIGIDO
-function inicializarDropdownObras() {
-    console.log('Inicializando dropdown de obras...');
-    
-    // Carregar todas as obras diretamente
-    $.get('/api/obras/todas')
-        .done(function(obras) {
-            console.log('Obras carregadas:', obras.length);
-            const obraSelect = $('#obra_select');
-            
-            // Limpar e popular
-            obraSelect.empty().append('<option value="">Selecione a obra...</option>');
-            
-            obras.forEach(function(obra) {
-                const opcao = new Option(
-                    `${obra.nome} (${obra.codigo})`, 
-                    obra.id
-                );
-                obraSelect.append(opcao);
-            });
-            
-            // Inicializar Select2 apenas se há obras
-            if (obras.length > 0) {
-                obraSelect.select2({
-                    placeholder: 'Selecione a obra...',
-                    allowClear: true,
-                    width: '100%'
-                });
-                console.log('Select2 inicializado para obras');
-            }
-        })
-        .fail(function(xhr, status, error) {
-            console.error('Erro ao carregar obras:', error);
-            $('#obra_select').empty().append('<option value="">Erro ao carregar obras</option>');
-        });
-}
-
-// Dropdown de Funcionários - CORRIGIDO
-function inicializarDropdownFuncionarios(elemento) {
-    console.log('Inicializando dropdown de funcionários...');
-    const select = $(elemento).find('.funcionario-select');
-    
-    // Carregar todos os funcionários
-    $.get('/api/funcionarios/todos')
-        .done(function(funcionarios) {
+// Carregar funcionários via API
+async function carregarFuncionarios() {
+    try {
+        console.log('Carregando funcionários...');
+        const response = await fetch('/api/funcionarios/autocomplete');
+        if (response.ok) {
+            funcionarios = await response.json();
             console.log('Funcionários carregados:', funcionarios.length);
-            
-            // Popular select
-            select.empty().append('<option value="">Selecione o funcionário...</option>');
-            
-            funcionarios.forEach(function(func) {
-                select.append(new Option(
-                    `${func.nome} (${func.codigo})`, 
-                    func.id
-                ));
-            });
-            
-            // Inicializar Select2
-            if (funcionarios.length > 0) {
-                select.select2({
-                    placeholder: 'Digite para buscar funcionário...',
-                    allowClear: true,
-                    width: '100%'
-                });
-                
-                // Evento de seleção
-                select.on('select2:select', function(e) {
-                    const funcionarioId = e.params.data.id;
-                    const funcionarioCard = e.target.closest('.funcionario-item');
-                    carregarDadosPonto(funcionarioCard, funcionarioId);
-                });
-                
-                console.log('Select2 inicializado para funcionários');
-            }
-        })
-        .fail(function(xhr, status, error) {
-            console.error('Erro ao carregar funcionários:', error);
-            select.empty().append('<option value="">Erro ao carregar funcionários</option>');
-        });
+        } else {
+            console.error('Erro ao carregar funcionários:', response.statusText);
+            alert('Erro ao carregar funcionários');
+        }
+    } catch (error) {
+        console.error('Erro ao carregar funcionários:', error);
+        alert('Erro ao carregar funcionários');
+    }
 }
 
-// Dropdown de Serviços - CORRIGIDO
-function inicializarDropdownServicos(elemento) {
-    console.log('Inicializando dropdown de serviços...');
-    const select = $(elemento).find('.servico-select');
-    
-    // Carregar todos os serviços
-    $.get('/api/servicos/autocomplete?ativo=true')
-        .done(function(servicos) {
+// Carregar serviços via API
+async function carregarServicos() {
+    try {
+        console.log('Carregando serviços...');
+        const response = await fetch('/api/servicos/autocomplete');
+        if (response.ok) {
+            servicos = await response.json();
             console.log('Serviços carregados:', servicos.length);
-            
-            // Popular select
-            select.empty().append('<option value="">Selecione o serviço...</option>');
-            
-            servicos.forEach(function(servico) {
-                select.append(new Option(
-                    `${servico.nome} (${servico.categoria})`, 
-                    servico.id
-                ));
-            });
-            
-            // Inicializar Select2
-            if (servicos.length > 0) {
-                select.select2({
-                    placeholder: 'Digite para buscar serviço...',
-                    allowClear: true,
-                    width: '100%'
-                });
-                
-                // Evento de seleção
-                select.on('select2:select', function(e) {
-                    const servicoId = e.params.data.id;
-                    const servicoCard = e.target.closest('.atividade-item');
-                    carregarSubatividades(servicoCard, servicoId);
-                });
-                
-                console.log('Select2 inicializado para serviços');
-            }
-        })
-        .fail(function(xhr, status, error) {
-            console.error('Erro ao carregar serviços:', error);
-            select.empty().append('<option value="">Erro ao carregar serviços</option>');
-        });
-}
-
-// Dropdown de Equipamentos - CORRIGIDO
-function inicializarDropdownEquipamentos(elemento) {
-    console.log('Inicializando dropdown de equipamentos...');
-    const select = $(elemento).find('.equipamento-select');
-    
-    // Carregar todos os equipamentos
-    $.get('/api/equipamentos/autocomplete?ativo=true')
-        .done(function(equipamentos) {
-            console.log('Equipamentos carregados:', equipamentos.length);
-            
-            // Popular select
-            select.empty().append('<option value="">Selecione o equipamento...</option>');
-            
-            equipamentos.forEach(function(equipamento) {
-                select.append(new Option(
-                    `${equipamento.nome} - ${equipamento.placa}`, 
-                    equipamento.id
-                ));
-            });
-            
-            // Inicializar Select2
-            if (equipamentos.length > 0) {
-                select.select2({
-                    placeholder: 'Digite para buscar equipamento...',
-                    allowClear: true,
-                    width: '100%'
-                });
-                
-                console.log('Select2 inicializado para equipamentos');
-            }
-        })
-        .fail(function(xhr, status, error) {
-            console.error('Erro ao carregar equipamentos:', error);
-            select.empty().append('<option value="">Erro ao carregar equipamentos</option>');
-        });
-}
-
-// Carregar subatividades quando serviço for selecionado
-function carregarSubatividades(servicoCard, servicoId) {
-    const subatividadeSelect = servicoCard.querySelector('.subatividade-select');
-    
-    if (!servicoId) {
-        if (subatividadeSelect) {
-            subatividadeSelect.innerHTML = '<option value="">Selecione uma subatividade...</option>';
+        } else {
+            console.error('Erro ao carregar serviços:', response.statusText);
+            alert('Erro ao carregar serviços');
         }
-        return;
+    } catch (error) {
+        console.error('Erro ao carregar serviços:', error);
+        alert('Erro ao carregar serviços');
     }
-    
-    console.log('Carregando subatividades para serviço:', servicoId);
-    
-    // Buscar subatividades do serviço
-    fetch(`/api/servicos/${servicoId}`)
-        .then(response => response.json())
-        .then(data => {
-            if (data.subatividades && subatividadeSelect) {
-                // Limpar e popular select de subatividades
-                subatividadeSelect.innerHTML = '<option value="">Selecione uma subatividade...</option>';
-                
-                data.subatividades.forEach(function(sub) {
-                    const option = new Option(sub.nome, sub.id);
-                    subatividadeSelect.appendChild(option);
-                });
-                
-                // Inicializar Select2 se não está inicializado
-                if (!$(subatividadeSelect).hasClass('select2-hidden-accessible')) {
-                    $(subatividadeSelect).select2({
-                        placeholder: 'Selecione uma subatividade...',
-                        allowClear: true,
-                        width: '100%'
-                    });
-                }
-                
-                console.log('Subatividades carregadas:', data.subatividades.length);
-            }
-        })
-        .catch(error => {
-            console.error('Erro ao carregar subatividades:', error);
-            if (subatividadeSelect) {
-                subatividadeSelect.innerHTML = '<option value="">Erro ao carregar subatividades</option>';
-            }
-        });
 }
 
-// Carregar dados do ponto quando funcionário for selecionado
-function carregarDadosPonto(funcionarioCard, funcionarioId) {
-    const dataRDO = document.getElementById('data_relatorio').value;
-    
-    if (!funcionarioId || !dataRDO) {
-        limparDadosPonto(funcionarioCard);
-        return;
-    }
-    
-    // Buscar dados do ponto para a data do RDO
-    fetch(`/api/ponto/funcionario/${funcionarioId}/data/${dataRDO}`)
-        .then(response => response.json())
-        .then(data => {
-            if (data.success && data.registro_ponto) {
-                const registro = data.registro_ponto;
-                
-                // Preencher campos automaticamente
-                funcionarioCard.querySelector('.hora-entrada').value = registro.hora_entrada || '';
-                funcionarioCard.querySelector('.hora-saida').value = registro.hora_saida || '';
-                funcionarioCard.querySelector('.total-horas').value = registro.horas_trabalhadas || '0.0';
-                funcionarioCard.querySelector('.funcao-exercida').value = data.funcionario.funcao || '';
-                
-                // Marcar como presente se tem registro
-                funcionarioCard.querySelector('.presente-check').checked = !!registro.hora_entrada;
-                
-                // Remover alerta anterior
-                const alertaExistente = funcionarioCard.querySelector('.alerta-sem-ponto');
-                if (alertaExistente) {
-                    alertaExistente.remove();
-                }
-            } else {
-                limparDadosPonto(funcionarioCard);
-                mostrarAlertaSemPonto(funcionarioCard);
-            }
-        })
-        .catch(error => {
-            console.error('Erro ao carregar dados do ponto:', error);
-            limparDadosPonto(funcionarioCard);
-            mostrarAlertaSemPonto(funcionarioCard);
-        });
-}
-
-function limparDadosPonto(funcionarioCard) {
-    funcionarioCard.querySelector('.hora-entrada').value = '';
-    funcionarioCard.querySelector('.hora-saida').value = '';
-    funcionarioCard.querySelector('.total-horas').value = '0.0';
-    funcionarioCard.querySelector('.presente-check').checked = false;
-}
-
-function mostrarAlertaSemPonto(funcionarioCard) {
-    // Remover alerta existente
-    const alertaExistente = funcionarioCard.querySelector('.alerta-sem-ponto');
-    if (alertaExistente) {
-        alertaExistente.remove();
-    }
-    
-    // Adicionar alerta visual
-    const alerta = document.createElement('div');
-    alerta.className = 'alert alert-warning alert-sm mt-2 alerta-sem-ponto';
-    alerta.innerHTML = `
-        <i class="fas fa-exclamation-triangle"></i> 
-        <small>Funcionário sem registro de ponto para esta data</small>
+// Adicionar funcionário
+function adicionarMaoObra() {
+    contadorMaoObra++;
+    const container = document.getElementById('mao-obra-container');
+    const html = `
+        <div class="border rounded p-3 mb-3 bg-light" id="mao-obra-${contadorMaoObra}">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h6 class="mb-0">Funcionário #${contadorMaoObra}</h6>
+                <button type="button" class="btn btn-sm btn-outline-danger" onclick="removerItem('mao-obra-${contadorMaoObra}')">
+                    <i class="fas fa-trash"></i>
+                </button>
+            </div>
+            <div class="row">
+                <div class="col-md-4">
+                    <label class="form-label">Funcionário</label>
+                    <select class="form-select" name="funcionario_${contadorMaoObra}" required>
+                        <option value="">Erro ao carregar funcionários</option>
+                    </select>
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label">Entrada</label>
+                    <input type="time" class="form-control" name="entrada_${contadorMaoObra}" value="--:--">
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label">Saída</label>
+                    <input type="time" class="form-control" name="saida_${contadorMaoObra}" value="--:--">
+                </div>
+            </div>
+            <div class="row mt-2">
+                <div class="col-md-4">
+                    <label class="form-label">Total Horas</label>
+                    <input type="text" class="form-control" name="total_horas_${contadorMaoObra}" value="Calculado automaticamente" readonly>
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label">Presente</label>
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" name="presente_${contadorMaoObra}" checked>
+                        <label class="form-check-label">
+                            Funcionário presente
+                        </label>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <button type="button" class="btn btn-sm btn-outline-danger">
+                        <i class="fas fa-trash"></i> Excluir
+                    </button>
+                </div>
+            </div>
+            <div class="row mt-2">
+                <div class="col-12">
+                    <label class="form-label">Função Exercida</label>
+                    <input type="text" class="form-control" name="funcao_${contadorMaoObra}" placeholder="Ex: Pedreiro, Ajudante, Eletricista">
+                </div>
+            </div>
+            <div class="row mt-2">
+                <div class="col-12">
+                    <label class="form-label">Observações sobre o funcionário no dia</label>
+                    <textarea class="form-control" name="observacoes_${contadorMaoObra}" rows="2" placeholder="Observações específicas..."></textarea>
+                </div>
+            </div>
+        </div>
     `;
-    funcionarioCard.querySelector('.card-body').appendChild(alerta);
-}
-
-// Dropdown de Serviços com Unidades
-function inicializarDropdownServicos(elemento) {
-    if (typeof $.fn.select2 === 'undefined') {
-        console.error('Select2 not loaded');
-        return;
-    }
+    container.insertAdjacentHTML('beforeend', html);
     
-    $(elemento).select2({
-        placeholder: 'Digite para buscar serviço...',
-        allowClear: true,
-        ajax: {
-            url: '/api/servicos/autocomplete',
-            dataType: 'json',
-            delay: 250,
-            data: function(params) {
-                return {
-                    q: params.term || '',
-                    ativo: true
-                };
-            },
-            processResults: function(data) {
-                return {
-                    results: data.map(servico => ({
-                        id: servico.id,
-                        text: servico.nome,
-                        servico: servico
-                    }))
-                };
-            },
-            cache: true
-        },
-        minimumInputLength: 0
+    // Popular o dropdown de funcionários
+    const select = document.querySelector(`select[name="funcionario_${contadorMaoObra}"]`);
+    select.innerHTML = '<option value="">Selecione o funcionário...</option>';
+    
+    funcionarios.forEach(funcionario => {
+        const option = document.createElement('option');
+        option.value = funcionario.id;
+        option.textContent = `${funcionario.nome} (${funcionario.codigo})`;
+        select.appendChild(option);
     });
+    
+    document.getElementById('mao-obra-vazio').style.display = 'none';
 }
 
-// Dropdown de Equipamentos
-function inicializarDropdownEquipamentos(elemento) {
-    if (typeof $.fn.select2 === 'undefined') {
-        console.error('Select2 not loaded');
-        return;
-    }
-    
-    $(elemento).select2({
-        placeholder: 'Digite para buscar equipamento...',
-        allowClear: true,
-        ajax: {
-            url: '/api/equipamentos/autocomplete',
-            dataType: 'json',
-            delay: 250,
-            data: function(params) {
-                return {
-                    q: params.term || '',
-                    ativo: true
-                };
-            },
-            processResults: function(data) {
-                return {
-                    results: data.map(equipamento => ({
-                        id: equipamento.id,
-                        text: `${equipamento.nome} - ${equipamento.placa}`,
-                        equipamento: equipamento
-                    }))
-                };
-            },
-            cache: true
-        },
-        minimumInputLength: 0
-    });
-}
-
-// Carregar Subatividades Dinamicamente
-function carregarSubatividades(selectElement) {
-    const servicoId = selectElement.value;
-    const atividadeCard = selectElement.closest('.atividade-item');
-    const subatividadesContainer = atividadeCard.querySelector('.subatividades-container');
-    const subatividadesList = atividadeCard.querySelector('.subatividades-list');
-    const unidadeDisplay = atividadeCard.querySelector('.unidade-display');
-    const quantidadeInput = atividadeCard.querySelector('.quantidade-input');
-    
-    if (!servicoId) {
-        subatividadesContainer.style.display = 'none';
-        unidadeDisplay.textContent = '-';
-        return;
-    }
-    
-    // Buscar dados do serviço
-    fetch(`/api/servicos/${servicoId}`)
-        .then(response => response.json())
-        .then(servico => {
-            // Atualizar unidade
-            unidadeDisplay.textContent = servico.unidade_simbolo;
-            quantidadeInput.placeholder = `Quantidade em ${servico.unidade_simbolo}`;
-            
-            // Configurar validações baseadas na unidade
-            configurarValidacaoUnidade(quantidadeInput, servico.unidade_medida);
-            
-            // Carregar subatividades
-            if (servico.subatividades && servico.subatividades.length > 0) {
-                subatividadesList.innerHTML = '';
-                
-                servico.subatividades.forEach(sub => {
-                    const subDiv = document.createElement('div');
-                    subDiv.className = 'col-md-6 mb-2';
-                    subDiv.innerHTML = `
-                        <div class="form-check">
-                            <input class="form-check-input" type="checkbox" 
-                                   id="sub_${sub.id}" value="${sub.id}">
-                            <label class="form-check-label" for="sub_${sub.id}">
-                                <strong>${sub.nome}</strong><br>
-                                <small class="text-muted">${sub.descricao || ''}</small>
-                            </label>
-                        </div>
-                    `;
-                    subatividadesList.appendChild(subDiv);
-                });
-                
-                subatividadesContainer.style.display = 'block';
-            } else {
-                subatividadesContainer.style.display = 'none';
-            }
-        })
-        .catch(error => {
-            console.error('Erro ao carregar subatividades:', error);
-            subatividadesContainer.style.display = 'none';
-        });
-}
-
-// Configurar validação por unidade
-function configurarValidacaoUnidade(input, unidade) {
-    switch(unidade) {
-        case 'm2':
-        case 'm3':
-        case 'm':
-            input.step = '0.01';
-            input.min = '0.01';
-            break;
-        case 'kg':
-            input.step = '0.1';
-            input.min = '0.1';
-            break;
-        case 'ton':
-            input.step = '0.01';
-            input.min = '0.01';
-            break;
-        case 'un':
-            input.step = '1';
-            input.min = '1';
-            break;
-        case 'h':
-            input.step = '0.5';
-            input.min = '0.5';
-            break;
-        default:
-            input.step = '0.01';
-            input.min = '0.01';
-    }
-}
-
-// Funções de Adição de Itens
-function adicionarFuncionario() {
-    const container = document.getElementById('container_funcionarios');
-    const template = document.getElementById('template_funcionario');
-    const novoItem = template.cloneNode(true);
-    
-    novoItem.style.display = 'block';
-    novoItem.id = `funcionario_${Date.now()}`;
-    
-    container.appendChild(novoItem);
-    
-    // Inicializar Select2 no novo elemento
-    inicializarDropdownFuncionarios(novoItem);
-}
-
+// Adicionar atividade
 function adicionarAtividade() {
-    const container = document.getElementById('container_atividades');
-    const template = document.getElementById('template_atividade');
-    const novoItem = template.cloneNode(true);
+    contadorAtividades++;
+    const container = document.getElementById('atividades-container');
+    const html = `
+        <div class="border rounded p-3 mb-3 bg-light" id="atividade-${contadorAtividades}">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h6 class="mb-0">Atividade #${contadorAtividades}</h6>
+                <button type="button" class="btn btn-sm btn-outline-danger" onclick="removerItem('atividade-${contadorAtividades}')">
+                    <i class="fas fa-trash"></i>
+                </button>
+            </div>
+            <div class="row">
+                <div class="col-md-6">
+                    <label class="form-label">Serviço</label>
+                    <select class="form-select" name="servico_${contadorAtividades}" required>
+                        <option value="">Selecione o serviço...</option>
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">Quantidade</label>
+                    <input type="number" class="form-control" name="quantidade_${contadorAtividades}" step="0.01" min="0" required>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">Unidade</label>
+                    <input type="text" class="form-control" name="unidade_${contadorAtividades}" readonly>
+                </div>
+            </div>
+            <div class="row mt-2">
+                <div class="col-12">
+                    <label class="form-label">Observações sobre a execução da atividade</label>
+                    <textarea class="form-control" name="observacoes_atividade_${contadorAtividades}" rows="2" placeholder="Observações específicas da atividade..."></textarea>
+                </div>
+            </div>
+        </div>
+    `;
+    container.insertAdjacentHTML('beforeend', html);
     
-    novoItem.style.display = 'block';
-    novoItem.id = `atividade_${Date.now()}`;
+    // Popular o dropdown de serviços
+    const select = document.querySelector(`select[name="servico_${contadorAtividades}"]`);
+    servicos.forEach(servico => {
+        const option = document.createElement('option');
+        option.value = servico.id;
+        option.textContent = `${servico.nome} (${servico.categoria})`;
+        option.dataset.unidade = servico.unidade_simbolo;
+        select.appendChild(option);
+    });
     
-    container.appendChild(novoItem);
+    // Atualizar unidade quando serviço for selecionado
+    select.addEventListener('change', function() {
+        const unidadeInput = document.querySelector(`input[name="unidade_${contadorAtividades}"]`);
+        const selectedOption = this.options[this.selectedIndex];
+        unidadeInput.value = selectedOption.dataset.unidade || '';
+    });
     
-    // Inicializar Select2 no novo elemento
-    inicializarDropdownServicos(novoItem);
+    document.getElementById('atividades-vazio').style.display = 'none';
 }
 
+// Adicionar equipamento
 function adicionarEquipamento() {
-    const container = document.getElementById('container_equipamentos');
-    const template = document.getElementById('template_equipamento');
-    const novoItem = template.cloneNode(true);
+    contadorEquipamentos++;
+    const container = document.getElementById('equipamentos-container');
+    const html = `
+        <div class="border rounded p-3 mb-3 bg-light" id="equipamento-${contadorEquipamentos}">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h6 class="mb-0">Equipamento #${contadorEquipamentos}</h6>
+                <button type="button" class="btn btn-sm btn-outline-danger" onclick="removerItem('equipamento-${contadorEquipamentos}')">
+                    <i class="fas fa-trash"></i>
+                </button>
+            </div>
+            <div class="row">
+                <div class="col-md-4">
+                    <label class="form-label">Nome do Equipamento</label>
+                    <input type="text" class="form-control" name="equipamento_nome_${contadorEquipamentos}" required>
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label">Quantidade</label>
+                    <input type="number" class="form-control" name="equipamento_quantidade_${contadorEquipamentos}" min="1" required>
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label">Horas de Uso</label>
+                    <input type="number" class="form-control" name="equipamento_horas_${contadorEquipamentos}" step="0.5" min="0" required>
+                </div>
+            </div>
+        </div>
+    `;
+    container.insertAdjacentHTML('beforeend', html);
+    document.getElementById('equipamentos-vazio').style.display = 'none';
+}
+
+// Remover item
+function removerItem(id) {
+    document.getElementById(id).remove();
+    verificarVazios();
+}
+
+// Verificar se containers estão vazios
+function verificarVazios() {
+    const containers = [
+        { container: 'mao-obra-container', vazio: 'mao-obra-vazio' },
+        { container: 'atividades-container', vazio: 'atividades-vazio' },
+        { container: 'equipamentos-container', vazio: 'equipamentos-vazio' }
+    ];
     
-    novoItem.style.display = 'block';
-    novoItem.id = `equipamento_${Date.now()}`;
-    
-    container.appendChild(novoItem);
-    
-    // Inicializar Select2 no novo elemento
-    inicializarDropdownEquipamentos(novoItem);
+    containers.forEach(item => {
+        const container = document.getElementById(item.container);
+        const vazio = document.getElementById(item.vazio);
+        if (container.children.length === 0) {
+            vazio.style.display = 'block';
+        } else {
+            vazio.style.display = 'none';
+        }
+    });
 }
 
-function adicionarOcorrencia() {
-    const container = document.getElementById('container_ocorrencias');
-    const template = document.getElementById('template_ocorrencia');
-    const novoItem = template.cloneNode(true);
-    
-    novoItem.style.display = 'block';
-    novoItem.id = `ocorrencia_${Date.now()}`;
-    
-    container.appendChild(novoItem);
-}
-
-// Funções de Remoção
-function removerFuncionario(botao) {
-    if (confirm('Remover este funcionário?')) {
-        botao.closest('.funcionario-item').remove();
-    }
-}
-
-function removerAtividade(botao) {
-    if (confirm('Remover esta atividade?')) {
-        botao.closest('.atividade-item').remove();
-    }
-}
-
-function removerEquipamento(botao) {
-    if (confirm('Remover este equipamento?')) {
-        botao.closest('.equipamento-item').remove();
-    }
-}
-
-function removerOcorrencia(botao) {
-    if (confirm('Remover esta ocorrência?')) {
-        botao.closest('.ocorrencia-item').remove();
-    }
-}
-
-// Funções de Salvamento
+// Salvar rascunho
 function salvarRascunho() {
-    const dados = coletarDadosRDO();
-    dados.status = 'Rascunho';
-    
-    fetch('/api/rdo/salvar', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(dados)
-    })
-    .then(response => response.json())
-    .then(result => {
-        if (result.success) {
-            alert('RDO salvo como rascunho!');
-        } else {
-            alert('Erro ao salvar: ' + result.message);
-        }
-    })
-    .catch(error => {
-        console.error('Erro:', error);
-        alert('Erro ao salvar RDO');
-    });
+    alert('Funcionalidade em desenvolvimento');
 }
 
+// Finalizar RDO
 function finalizarRDO() {
-    if (!validarRDO()) {
-        return;
-    }
-    
-    const dados = coletarDadosRDO();
-    dados.status = 'Finalizado';
-    
-    fetch('/api/rdo/finalizar', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(dados)
-    })
-    .then(response => response.json())
-    .then(result => {
-        if (result.success) {
-            alert('RDO finalizado com sucesso!');
-            window.location.href = '/rdo';
-        } else {
-            alert('Erro ao finalizar: ' + result.message);
-        }
-    })
-    .catch(error => {
-        console.error('Erro:', error);
-        alert('Erro ao finalizar RDO');
-    });
-}
-
-function coletarDadosRDO() {
-    return {
-        data_relatorio: document.getElementById('data_relatorio').value,
-        obra_id: document.getElementById('obra_select').value,
-        tempo_manha: document.getElementById('tempo_manha').value,
-        tempo_tarde: document.getElementById('tempo_tarde').value,
-        tempo_noite: document.getElementById('tempo_noite').value,
-        observacoes_meteorologicas: document.getElementById('observacoes_meteorologicas').value,
-        comentario_geral: document.getElementById('comentario_geral').value,
-        funcionarios: coletarDadosFuncionarios(),
-        atividades: coletarDadosAtividades(),
-        equipamentos: coletarDadosEquipamentos(),
-        ocorrencias: coletarDadosOcorrencias()
-    };
-}
-
-function coletarDadosFuncionarios() {
-    const funcionarios = [];
-    document.querySelectorAll('.funcionario-item').forEach(item => {
-        const funcionario = {
-            funcionario_id: item.querySelector('.funcionario-select').value,
-            horas: item.querySelector('.horas-input').value,
-            funcao_exercida: item.querySelector('.funcao-input').value,
-            presente: item.querySelector('.presente-check').checked
-        };
-        if (funcionario.funcionario_id) {
-            funcionarios.push(funcionario);
-        }
-    });
-    return funcionarios;
-}
-
-function coletarDadosAtividades() {
-    const atividades = [];
-    document.querySelectorAll('.atividade-item').forEach(item => {
-        const atividade = {
-            servico_id: item.querySelector('.servico-select').value,
-            quantidade: item.querySelector('.quantidade-input').value,
-            tempo: item.querySelector('.tempo-input').value,
-            observacoes: item.querySelector('.observacoes-input').value,
-            subatividades: []
-        };
-        
-        // Coletar subatividades marcadas
-        item.querySelectorAll('.subatividades-list input[type="checkbox"]:checked').forEach(checkbox => {
-            atividade.subatividades.push(checkbox.value);
-        });
-        
-        if (atividade.servico_id) {
-            atividades.push(atividade);
-        }
-    });
-    return atividades;
-}
-
-function coletarDadosEquipamentos() {
-    const equipamentos = [];
-    document.querySelectorAll('.equipamento-item').forEach(item => {
-        const equipamento = {
-            equipamento_id: item.querySelector('.equipamento-select').value,
-            horas_uso: item.querySelector('.horas-uso-input').value,
-            status: item.querySelector('.status-select').value,
-            observacoes: item.querySelector('.observacoes-equipamento-input').value
-        };
-        if (equipamento.equipamento_id) {
-            equipamentos.push(equipamento);
-        }
-    });
-    return equipamentos;
-}
-
-function coletarDadosOcorrencias() {
-    const ocorrencias = [];
-    document.querySelectorAll('.ocorrencia-item').forEach(item => {
-        const ocorrencia = {
-            tipo: item.querySelector('.tipo-ocorrencia-select').value,
-            gravidade: item.querySelector('.gravidade-select').value,
-            descricao: item.querySelector('.descricao-ocorrencia-input').value
-        };
-        if (ocorrencia.tipo && ocorrencia.descricao) {
-            ocorrencias.push(ocorrencia);
-        }
-    });
-    return ocorrencias;
-}
-
-function validarRDO() {
-    // Validações básicas
-    if (!document.getElementById('data_relatorio').value) {
-        alert('Data do relatório é obrigatória');
-        return false;
-    }
-    
-    if (!document.getElementById('obra_select').value) {
-        alert('Obra é obrigatória');
-        return false;
-    }
-    
-    return true;
-}
-
-function voltarListagem() {
-    window.location.href = '/rdo';
+    alert('Funcionalidade em desenvolvimento');
 }
 </script>
 {% endblock %}
-// ===== CORREÇÕES CRÍTICAS RDO =====
-
-// Inicializar dropdown de obra - CORRIGIDO
-function inicializarDropdownObraCorrigido() {
-    const obraSelect = $("#obra_select");
-    
-    // Primeiro tentar carregar todas as obras (fallback)
-    $.get("/api/obras/todas")
-        .done(function(obras) {
-            console.log("Obras carregadas:", obras);
-            
-            // Limpar opções existentes
-            obraSelect.empty().append("<option value=\"\">Selecione a obra...</option>");
-            
-            // Adicionar obras
-            obras.forEach(function(obra) {
-                obraSelect.append(new Option(
-                    `${obra.nome} - ${obra.codigo}`, 
-                    obra.id
-                ));
-            });
-            
-            // Se tem obras, inicializar Select2
-            if (obras.length > 0) {
-                obraSelect.select2({
-                    placeholder: "Selecione a obra...",
-                    allowClear: true,
-                    templateResult: function(data) {
-                        if (!data.id) return data.text;
-                        
-                        const obra = obras.find(o => o.id == data.id);
-                        if (!obra) return data.text;
-                        
-                        return $(`
-                            <div>
-                                <strong>${obra.nome}</strong><br>
-                                <small class="text-muted">${obra.endereco}</small>
-                            </div>
-                        `);
-                    }
-                });
-            } else {
-                // Se não tem obras, mostrar mensagem
-                obraSelect.append("<option value=\"\">Nenhuma obra cadastrada</option>");
-            }
-        })
-        .fail(function(xhr, status, error) {
-            console.error("Erro ao carregar obras:", error);
-            obraSelect.empty().append("<option value=\"\">Erro ao carregar obras</option>");
-        });
-}
-
-// Corrigir carregamento de funcionários
-function adicionarFuncionarioCorrigido() {
-    const container = document.getElementById("container_funcionarios");
-    const template = document.getElementById("template_funcionario");
-    const novoItem = template.cloneNode(true);
-    
-    novoItem.style.display = "block";
-    novoItem.id = `funcionario_${Date.now()}`;
-    
-    container.appendChild(novoItem);
-    
-    // Inicializar Select2 no novo elemento - CORRIGIDO
-    const select = $(novoItem).find(".funcionario-select");
-    
-    // Primeiro carregar dados
-    $.get("/api/funcionarios/todos")
-        .done(function(funcionarios) {
-            console.log("Funcionários carregados:", funcionarios);
-            
-            // Limpar e adicionar opções
-            select.empty().append("<option value=\"\">Selecione o funcionário...</option>");
-            
-            funcionarios.forEach(function(func) {
-                select.append(new Option(
-                    `${func.nome} (${func.codigo})`, 
-                    func.id
-                ));
-            });
-            
-            // Inicializar Select2
-            select.select2({
-                placeholder: "Digite para buscar funcionário...",
-                allowClear: true,
-                templateResult: function(data) {
-                    if (!data.id) return data.text;
-                    
-                    const func = funcionarios.find(f => f.id == data.id);
-                    if (!func) return data.text;
-                    
-                    return $(`
-                        <div>
-                            <strong>${func.nome}</strong><br>
-                            <small class="text-muted">${func.codigo} - ${func.funcao}</small>
-                        </div>
-                    `);
-                }
-            });
-            
-            // Evento de seleção
-            select.on("select2:select", function(e) {
-                const funcionarioCard = e.target.closest(".funcionario-item");
-                const funcionarioId = e.params.data.id;
-                
-                // Carregar dados do ponto
-                carregarDadosPontoCorrigido(funcionarioCard, funcionarioId);
-            });
-        })
-        .fail(function() {
-            select.empty().append("<option value=\"\">Erro ao carregar funcionários</option>");
-        });
-}
-
-// Carregar dados do ponto com lógica flexível
-function carregarDadosPontoCorrigido(funcionarioCard, funcionarioId) {
-    const dataRDO = document.getElementById("data_relatorio").value;
-    
-    if (!funcionarioId || !dataRDO) {
-        habilitarPreenchimentoManual(funcionarioCard);
-        return;
-    }
-    
-    // Tentar buscar dados do ponto
-    fetch(`/api/ponto/funcionario/${funcionarioId}/data/${dataRDO}`)
-        .then(response => response.json())
-        .then(data => {
-            if (data.success && data.registro_ponto) {
-                // Tem ponto - preencher automaticamente
-                preencherDadosPonto(funcionarioCard, data.registro_ponto);
-                mostrarMensagem(funcionarioCard, "Dados do ponto carregados automaticamente", "success");
-            } else {
-                // Não tem ponto - permitir preenchimento manual
-                habilitarPreenchimentoManual(funcionarioCard);
-                mostrarMensagem(funcionarioCard, "Ponto não encontrado - preencha manualmente", "warning");
-            }
-        })
-        .catch(error => {
-            console.error("Erro ao buscar ponto:", error);
-            habilitarPreenchimentoManual(funcionarioCard);
-            mostrarMensagem(funcionarioCard, "Erro ao buscar ponto - preencha manualmente", "warning");
-        });
-}
-
-function preencherDadosPonto(card, registro) {
-    card.querySelector(".hora-entrada").value = registro.hora_entrada || "";
-    card.querySelector(".hora-saida").value = registro.hora_saida || "";
-    card.querySelector(".total-horas").value = registro.horas_trabalhadas || "0.0";
-    
-    // Campos readonly quando vem do ponto
-    card.querySelector(".hora-entrada").readOnly = true;
-    card.querySelector(".hora-saida").readOnly = true;
-    card.querySelector(".total-horas").readOnly = true;
-    
-    card.querySelector("input[type=\"checkbox\"]").checked = true;
-}
-
-function habilitarPreenchimentoManual(card) {
-    // Limpar campos
-    card.querySelector(".hora-entrada").value = "";
-    card.querySelector(".hora-saida").value = "";
-    card.querySelector(".total-horas").value = "";
-    
-    // Habilitar edição manual
-    card.querySelector(".hora-entrada").readOnly = false;
-    card.querySelector(".hora-saida").readOnly = false;
-    card.querySelector(".total-horas").readOnly = false;
-    
-    card.querySelector("input[type=\"checkbox\"]").checked = false;
-}
-
-function mostrarMensagem(card, mensagem, tipo) {
-    // Remover mensagem anterior
-    const mensagemAnterior = card.querySelector(".mensagem-status");
-    if (mensagemAnterior) {
-        mensagemAnterior.remove();
-    }
-    
-    // Adicionar nova mensagem
-    const div = document.createElement("div");
-    div.className = `alert alert-${tipo} alert-sm mt-2 mensagem-status`;
-    div.innerHTML = `<small>${mensagem}</small>`;
-    card.querySelector(".card-body").appendChild(div);
-    
-    // Remover após 5 segundos
-    setTimeout(() => {
-        div.remove();
-    }, 5000);
-}
-
-// Aplicar correções na inicialização
-$(document).ready(function() {
-    // Aguardar carregamento completo
-    setTimeout(function() {
-        inicializarDropdownObraCorrigido();
-        
-        // Sobrescrever função original
-        window.adicionarFuncionario = adicionarFuncionarioCorrigido;
-        
-        console.log("Correções RDO aplicadas!");
-    }, 500);
-});
-
