@@ -443,9 +443,9 @@
                                         {% endif %}
                                     {% elif registro.horas_extras and registro.horas_extras > 0 %}
                                         {% if registro.percentual_extras %}
-                                            <span class="badge bg-warning">{{ '{:.0f}h - {:.0f}%'.format(registro.horas_extras, registro.percentual_extras) }}</span>
+                                            <span class="badge bg-warning">{{ '{:.1f}h - {:.0f}%'.format(registro.horas_extras, registro.percentual_extras) }}</span>
                                         {% else %}
-                                            <span class="badge bg-warning">{{ '{:.0f}h'.format(registro.horas_extras) }}</span>
+                                            <span class="badge bg-warning">{{ '{:.1f}h'.format(registro.horas_extras) }}</span>
                                         {% endif %}
                                     {% else %}
                                         <span class="text-muted">-</span>

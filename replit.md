@@ -571,6 +571,7 @@
     - Produtividade 107.2% correta (acima de 100% devido às horas extras)
     - Relatório RELATORIO_KPIS_CAIO_JUNHO_2025.md atualizado com dados corretos
     - Confirmação: não há necessidade de correção, sistema já opera corretamente
+    - Correção visual: template funcionario_perfil.html atualizado para exibir horas extras com 1 casa decimal ({:.1f}h)
   
   ## User Preferences
   
