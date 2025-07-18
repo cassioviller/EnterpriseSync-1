@@ -2891,7 +2891,8 @@ def novo_rdo():
     return render_template('rdo_novo.html', 
                          obras=obras,
                          funcionarios=funcionarios,
-                         servicos=servicos)
+                         servicos=servicos,
+                         data_hoje=datetime.now().strftime('%Y-%m-%d'))
 
 @main_bp.route('/rdo/criar', methods=['POST'])
 @login_required
