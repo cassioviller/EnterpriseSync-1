@@ -585,6 +585,17 @@
     - Criados relatórios detalhados: RELATORIO_REVISAO_GERAL_SIGE.md e RELATORIO_CUSTO_MAO_OBRA_CAIO_DETALHADO.md
     - Scripts de análise: analisar_custo_mao_obra_caio.py e ajustes_sistema.py
     - Sistema validado e pronto para produção com todas as funcionalidades operacionais
+  - July 18, 2025. Sistema de Temas Dark/Light Mode Completo - v6.3.5:
+    - Implementado botão de alternância de tema no navbar (sol/lua)
+    - CSS global para campos de formulário com fundo preto (#000000) no modo escuro
+    - Modo claro com campos brancos padrão para contraste
+    - Persistência de tema via localStorage do navegador
+    - Remoção de estilos conflitantes do static/css/styles.css
+    - Aplicação automática a campos dinâmicos criados via JavaScript
+    - Funciona em todas as páginas: RDO, Dashboard, Funcionários, Controle de Ponto, etc.
+    - Ícones adaptativos: sol (modo escuro ativo), lua (modo claro ativo)
+    - Compatibilidade total com Bootstrap 5 e tema Replit
+    - Sistema responsivo com alternância instantânea entre temas
   
   ## User Preferences
   
