@@ -560,6 +560,17 @@
     - Sistema de custos de transporte identificado corretamente na tabela outro_custo (Vale Transporte/Desconto VT)
     - Gerado relatório técnico completo (RELATORIO_KPIS_CAIO_JUNHO_2025.md) documentando todos os cálculos
     - Validação final: sistema funciona perfeitamente com diferentes horários de trabalho e cálculos precisos
+  - July 18, 2025. Confirmação de Cálculos de Horas Extras em Dias Normais - v6.3.3:
+    - Investigado possível problema no cálculo de horas extras para dias normais
+    - Confirmado que sistema já calcula corretamente horas extras baseadas no horário específico do funcionário
+    - Validação completa com registros 28/06 (1.0h extra) e 29/06 (0.5h extra) funcionando corretamente
+    - Engine de KPIs v3.1 soma corretamente: 25.4h (tipos especiais) + 1.5h (dias normais) = 26.9h extras
+    - Criado script testar_horas_extras_corrigidas.py para validação automatizada
+    - Função _calcular_horas_extras() no kpis_engine.py funcionando adequadamente
+    - Sistema respeita horário específico de 8.8h diárias vs padrão de 8.0h
+    - Produtividade 107.2% correta (acima de 100% devido às horas extras)
+    - Relatório RELATORIO_KPIS_CAIO_JUNHO_2025.md atualizado com dados corretos
+    - Confirmação: não há necessidade de correção, sistema já opera corretamente
   
   ## User Preferences
   

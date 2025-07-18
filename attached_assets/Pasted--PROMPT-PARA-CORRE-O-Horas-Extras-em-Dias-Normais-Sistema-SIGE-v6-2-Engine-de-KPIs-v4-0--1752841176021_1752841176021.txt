@@ -1,0 +1,277 @@
+# PROMPT PARA CORREÇÃO - Horas Extras em Dias Normais
+## Sistema SIGE v6.2 - Engine de KPIs v4.0
+
+---
+
+## 🎯 OBJETIVO
+
+Corrigir o cálculo de horas extras para funcionários que trabalham além do horário padrão em dias normais, especificamente para o funcionário Caio Fabio Silva de Azevedo (F0100) e aplicar a correção para todo o sistema.
+
+---
+
+## 🚨 PROBLEMA IDENTIFICADO
+
+### **Registro com Erro:**
+- **Data**: 29/06/2025
+- **Funcionário**: Caio Fabio Silva de Azevedo (F0100)
+- **Horário Padrão**: 7h12 às 17h (8,8h diárias)
+- **Horário Trabalhado**: 7h12 às 17h30 (9,3h)
+- **Horas Extras Calculadas**: 0h ❌
+- **Horas Extras Corretas**: 0,5h ✅
+
+### **Causa do Problema:**
+O sistema não está calculando horas extras para registros do tipo `trabalho_normal` quando o funcionário trabalha além do horário padrão.
+
+---
+
+## 🛠️ CORREÇÃO NECESSÁRIA
+
+### **1. Atualizar Engine de KPIs v4.0**
+
+Localizar a função de cálculo de horas extras no arquivo `kpis_engine.py` ou similar e implementar a seguinte lógica:
+
+```python
+def calcular_horas_extras_funcionario(funcionario_id, data_inicio, data_fim):
+    """
+    Calcula horas extras considerando o horário específico do funcionário
+    """
+    funcionario = Funcionario.query.get(funcionario_id)
+    horario_trabalho = funcionario.horario_trabalho
+    horas_diarias_padrao = horario_trabalho.horas_diarias
+    
+    registros = RegistroPonto.query.filter(
+        RegistroPonto.funcionario_id == funcionario_id,
+        RegistroPonto.data.between(data_inicio, data_fim)
+    ).all()
+    
+    total_horas_extras = 0
+    
+    for registro in registros:
+        horas_trabalhadas = registro.horas_trabalhadas_calculadas or 0
+        
+        if registro.tipo_registro in ['sabado_horas_extras', 'domingo_horas_extras', 'feriado_trabalhado']:
+            # Para fins de semana e feriados, todas as horas são extras
+            horas_extras = horas_trabalhadas
+        else:
+            # Para dias normais, calcular extras baseado no horário padrão
+            horas_extras = max(0, horas_trabalhadas - horas_diarias_padrao)
+        
+        total_horas_extras += horas_extras
+    
+    return total_horas_extras
+```
+
+### **2. Corrigir Função de Cálculo Individual**
+
+Adicionar ou corrigir a função que calcula horas extras para um registro específico:
+
+```python
+def calcular_horas_extras_registro(registro_ponto):
+    """
+    Calcula horas extras para um registro específico
+    """
+    funcionario = registro_ponto.funcionario
+    horario_trabalho = funcionario.horario_trabalho
+    horas_diarias_padrao = horario_trabalho.horas_diarias
+    horas_trabalhadas = registro_ponto.horas_trabalhadas_calculadas or 0
+    
+    if registro_ponto.tipo_registro in ['sabado_horas_extras', 'domingo_horas_extras', 'feriado_trabalhado']:
+        # Fins de semana e feriados: todas as horas são extras
+        return horas_trabalhadas
+    else:
+        # Dias normais: extras = trabalhadas - padrão
+        return max(0, horas_trabalhadas - horas_diarias_padrao)
+```
+
+### **3. Atualizar Trigger de Cálculo**
+
+Modificar a função que é chamada ao salvar/atualizar registros de ponto:
+
+```python
+def atualizar_calculos_registro_ponto(registro_id):
+    """
+    Recalcula horas trabalhadas e horas extras para um registro
+    """
+    registro = RegistroPonto.query.get(registro_id)
+    
+    if registro:
+        # Recalcular horas trabalhadas (se necessário)
+        if registro.hora_entrada and registro.hora_saida:
+            horas_trabalhadas = calcular_horas_trabalhadas(
+                registro.hora_entrada,
+                registro.hora_saida,
+                registro.hora_almoco_saida,
+                registro.hora_almoco_retorno
+            )
+            registro.horas_trabalhadas_calculadas = horas_trabalhadas
+        
+        # Recalcular horas extras usando a nova lógica
+        horas_extras = calcular_horas_extras_registro(registro)
+        registro.horas_extras_calculadas = horas_extras
+        
+        db.session.commit()
+```
+
+---
+
+## 🔧 SCRIPT DE CORREÇÃO IMEDIATA
+
+### **Corrigir Registro Específico do Caio (29/06/2025):**
+
+```python
+def corrigir_registro_caio_29_06():
+    """
+    Correção específica para o registro do Caio em 29/06/2025
+    """
+    from datetime import date
+    
+    # Buscar o registro
+    registro = RegistroPonto.query.join(Funcionario).filter(
+        Funcionario.codigo == 'F0100',
+        RegistroPonto.data == date(2025, 6, 29)
+    ).first()
+    
+    if registro:
+        print(f"Registro encontrado: {registro.data}")
+        print(f"Horas trabalhadas: {registro.horas_trabalhadas_calculadas}h")
+        print(f"Horas extras antes: {registro.horas_extras_calculadas}h")
+        
+        # Aplicar correção
+        horario_padrao = registro.funcionario.horario_trabalho.horas_diarias
+        horas_extras_corretas = max(0, registro.horas_trabalhadas_calculadas - horario_padrao)
+        
+        registro.horas_extras_calculadas = horas_extras_corretas
+        db.session.commit()
+        
+        print(f"Horas extras corrigidas: {registro.horas_extras_calculadas}h")
+        print("Correção aplicada com sucesso!")
+    else:
+        print("Registro não encontrado")
+
+# Executar correção
+corrigir_registro_caio_29_06()
+```
+
+### **Recalcular Todos os Registros do Caio:**
+
+```python
+def recalcular_todos_registros_caio():
+    """
+    Recalcula horas extras para todos os registros do Caio
+    """
+    funcionario = Funcionario.query.filter_by(codigo='F0100').first()
+    
+    if funcionario:
+        registros = RegistroPonto.query.filter_by(funcionario_id=funcionario.id).all()
+        horario_padrao = funcionario.horario_trabalho.horas_diarias
+        
+        print(f"Recalculando {len(registros)} registros do funcionário {funcionario.nome}")
+        print(f"Horário padrão: {horario_padrao}h diárias")
+        
+        for registro in registros:
+            horas_trabalhadas = registro.horas_trabalhadas_calculadas or 0
+            
+            if registro.tipo_registro in ['sabado_horas_extras', 'domingo_horas_extras', 'feriado_trabalhado']:
+                horas_extras = horas_trabalhadas
+            else:
+                horas_extras = max(0, horas_trabalhadas - horario_padrao)
+            
+            if registro.horas_extras_calculadas != horas_extras:
+                print(f"Corrigindo {registro.data}: {registro.horas_extras_calculadas}h → {horas_extras}h")
+                registro.horas_extras_calculadas = horas_extras
+        
+        db.session.commit()
+        print("Recálculo concluído!")
+    else:
+        print("Funcionário F0100 não encontrado")
+
+# Executar recálculo
+recalcular_todos_registros_caio()
+```
+
+---
+
+## 🧪 VALIDAÇÃO DA CORREÇÃO
+
+### **Teste 1: Registro Específico (29/06/2025)**
+```python
+def validar_correcao_29_06():
+    registro = RegistroPonto.query.join(Funcionario).filter(
+        Funcionario.codigo == 'F0100',
+        RegistroPonto.data == date(2025, 6, 29)
+    ).first()
+    
+    if registro:
+        print(f"Data: {registro.data}")
+        print(f"Horas trabalhadas: {registro.horas_trabalhadas_calculadas}h")
+        print(f"Horas extras: {registro.horas_extras_calculadas}h")
+        print(f"Esperado: 0.5h")
+        print(f"Correto: {registro.horas_extras_calculadas == 0.5}")
+    
+validar_correcao_29_06()
+```
+
+### **Teste 2: KPIs Atualizados**
+```python
+def validar_kpis_caio():
+    from datetime import date
+    
+    # Calcular KPIs para junho/2025
+    kpis = calcular_kpis_funcionario_v4('F0100', date(2025, 6, 1), date(2025, 6, 30))
+    
+    print("KPIs após correção:")
+    print(f"Horas trabalhadas: {kpis['horas_trabalhadas']}h")
+    print(f"Horas extras: {kpis['horas_extras']}h")
+    print(f"Valor horas extras: R$ {kpis['valor_horas_extras']:.2f}")
+    
+validar_kpis_caio()
+```
+
+---
+
+## 📋 CHECKLIST DE IMPLEMENTAÇÃO
+
+### **1. Correção do Engine**
+- [ ] Localizar função de cálculo de horas extras
+- [ ] Implementar lógica que considera horário específico do funcionário
+- [ ] Testar com registro do Caio (29/06/2025)
+
+### **2. Correção de Dados**
+- [ ] Executar script de correção para registro específico
+- [ ] Recalcular todos os registros do Caio
+- [ ] Verificar se outros funcionários têm o mesmo problema
+
+### **3. Validação**
+- [ ] Confirmar que registro 29/06 mostra 0,5h extras
+- [ ] Verificar se KPIs são atualizados corretamente
+- [ ] Testar interface para ver se mostra valores corretos
+
+### **4. Testes Adicionais**
+- [ ] Testar com funcionário de horário diferente
+- [ ] Validar cálculo para sábados/domingos (deve continuar igual)
+- [ ] Confirmar que valores financeiros são recalculados
+
+---
+
+## 🎯 RESULTADO ESPERADO
+
+Após a implementação:
+
+### **Registro 29/06/2025 - Caio:**
+- **Horas trabalhadas**: 9,3h
+- **Horas extras**: 0,5h ✅
+- **Valor extra**: 0,5h × R$ 15,00 × 1,5 = R$ 11,25
+
+### **KPIs Atualizados:**
+- **Total horas extras**: 25,4h + 0,5h = 25,9h
+- **Valor total extras**: R$ 682,50 + R$ 11,25 = R$ 693,75
+
+### **Sistema Corrigido:**
+- ✅ Calcula extras para dias normais quando necessário
+- ✅ Mantém cálculo correto para sábados/domingos
+- ✅ Usa horário específico de cada funcionário
+- ✅ KPIs refletem valores corretos
+
+---
+
+**Este prompt deve ser implementado para corrigir o cálculo de horas extras em dias normais no sistema SIGE v6.2.**
