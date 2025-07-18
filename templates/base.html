@@ -23,75 +23,75 @@
     <!-- Global Form Styling -->
     <style>
         /* Global styles for form elements in dark mode */
-        [data-bs-theme="dark"] .form-control,
-        [data-bs-theme="dark"] .form-select {
+        .form-control,
+        .form-select {
             background-color: #000000 !important;
             color: white !important;
             border: 1px solid #4a5568 !important;
         }
 
-        [data-bs-theme="dark"] .form-control:focus,
-        [data-bs-theme="dark"] .form-select:focus {
+        .form-control:focus,
+        .form-select:focus {
             background-color: #000000 !important;
             color: white !important;
             border: 1px solid #667eea !important;
             box-shadow: 0 0 0 0.2rem rgba(102, 126, 234, 0.25) !important;
         }
 
-        [data-bs-theme="dark"] .form-control::placeholder {
+        .form-control::placeholder {
             color: #a0aec0 !important;
         }
 
-        [data-bs-theme="dark"] .form-control[readonly] {
+        .form-control[readonly] {
             background-color: #000000 !important;
             color: white !important;
             opacity: 0.8;
         }
 
-        [data-bs-theme="dark"] .input-group-text {
+        .input-group-text {
             background-color: #2d3748 !important;
             color: white !important;
             border: 1px solid #4a5568 !important;
         }
 
-        [data-bs-theme="dark"] option {
+        option {
             background-color: #000000 !important;
             color: white !important;
         }
 
         /* Light mode styles */
-        [data-bs-theme="light"] .form-control,
-        [data-bs-theme="light"] .form-select {
+        html[data-bs-theme="light"] .form-control,
+        html[data-bs-theme="light"] .form-select {
             background-color: white !important;
             color: #333 !important;
             border: 1px solid #dee2e6 !important;
         }
 
-        [data-bs-theme="light"] .form-control:focus,
-        [data-bs-theme="light"] .form-select:focus {
+        html[data-bs-theme="light"] .form-control:focus,
+        html[data-bs-theme="light"] .form-select:focus {
             background-color: white !important;
             color: #333 !important;
             border: 1px solid #86b7fe !important;
             box-shadow: 0 0 0 0.2rem rgba(13, 110, 253, 0.25) !important;
         }
 
-        [data-bs-theme="light"] .form-control::placeholder {
+        html[data-bs-theme="light"] .form-control::placeholder {
             color: #6c757d !important;
         }
 
-        [data-bs-theme="light"] .form-control[readonly] {
+        html[data-bs-theme="light"] .form-control[readonly] {
             background-color: #e9ecef !important;
             color: #6c757d !important;
             opacity: 1;
         }
 
-        [data-bs-theme="light"] .input-group-text {
+        html[data-bs-theme="light"] .input-group-text {
             background-color: #e9ecef !important;
             color: #495057 !important;
             border: 1px solid #dee2e6 !important;
         }
 
-        [data-bs-theme="light"] option {
+        html[data-bs-theme="light"] option {
             background-color: white !important;
             color: #333 !important;
         }
@@ -289,15 +289,36 @@
 
         // Theme toggle function
         function toggleTheme() {
-            const currentTheme = document.documentElement.getAttribute('data-bs-theme');
+            const currentTheme = document.documentElement.getAttribute('data-bs-theme') || 'dark';
             const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
             setStoredTheme(newTheme);
             setTheme(newTheme);
+            
+            // Force refresh of form elements styles
+            setTimeout(() => {
+                const formElements = document.querySelectorAll('.form-control, .form-select');
+                formElements.forEach(el => {
+                    el.style.backgroundColor = newTheme === 'dark' ? '#000000' : '#ffffff';
+                    el.style.color = newTheme === 'dark' ? '#ffffff' : '#333333';
+                    el.style.borderColor = newTheme === 'dark' ? '#4a5568' : '#dee2e6';
+                });
+            }, 50);
         }
 
         // Initialize theme when DOM is ready
         document.addEventListener('DOMContentLoaded', () => {
-            setTheme(getPreferredTheme());
+            const theme = getPreferredTheme();
+            setTheme(theme);
+            
+            // Apply styles to existing form elements
+            setTimeout(() => {
+                const formElements = document.querySelectorAll('.form-control, .form-select');
+                formElements.forEach(el => {
+                    el.style.backgroundColor = theme === 'dark' ? '#000000' : '#ffffff';
+                    el.style.color = theme === 'dark' ? '#ffffff' : '#333333';
+                    el.style.borderColor = theme === 'dark' ? '#4a5568' : '#dee2e6';
+                });
+            }, 100);
         });
     </script>
     
