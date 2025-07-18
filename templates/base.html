@@ -19,6 +19,95 @@
     
     <!-- Custom CSS -->
     <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
+    
+    <!-- Global Form Styling -->
+    <style>
+        /* Global styles for form elements in dark mode */
+        [data-bs-theme="dark"] .form-control,
+        [data-bs-theme="dark"] .form-select {
+            background-color: #000000 !important;
+            color: white !important;
+            border: 1px solid #4a5568 !important;
+        }
+
+        [data-bs-theme="dark"] .form-control:focus,
+        [data-bs-theme="dark"] .form-select:focus {
+            background-color: #000000 !important;
+            color: white !important;
+            border: 1px solid #667eea !important;
+            box-shadow: 0 0 0 0.2rem rgba(102, 126, 234, 0.25) !important;
+        }
+
+        [data-bs-theme="dark"] .form-control::placeholder {
+            color: #a0aec0 !important;
+        }
+
+        [data-bs-theme="dark"] .form-control[readonly] {
+            background-color: #000000 !important;
+            color: white !important;
+            opacity: 0.8;
+        }
+
+        [data-bs-theme="dark"] .input-group-text {
+            background-color: #2d3748 !important;
+            color: white !important;
+            border: 1px solid #4a5568 !important;
+        }
+
+        [data-bs-theme="dark"] option {
+            background-color: #000000 !important;
+            color: white !important;
+        }
+
+        /* Light mode styles */
+        [data-bs-theme="light"] .form-control,
+        [data-bs-theme="light"] .form-select {
+            background-color: white !important;
+            color: #333 !important;
+            border: 1px solid #dee2e6 !important;
+        }
+
+        [data-bs-theme="light"] .form-control:focus,
+        [data-bs-theme="light"] .form-select:focus {
+            background-color: white !important;
+            color: #333 !important;
+            border: 1px solid #86b7fe !important;
+            box-shadow: 0 0 0 0.2rem rgba(13, 110, 253, 0.25) !important;
+        }
+
+        [data-bs-theme="light"] .form-control::placeholder {
+            color: #6c757d !important;
+        }
+
+        [data-bs-theme="light"] .form-control[readonly] {
+            background-color: #e9ecef !important;
+            color: #6c757d !important;
+            opacity: 1;
+        }
+
+        [data-bs-theme="light"] .input-group-text {
+            background-color: #e9ecef !important;
+            color: #495057 !important;
+            border: 1px solid #dee2e6 !important;
+        }
+
+        [data-bs-theme="light"] option {
+            background-color: white !important;
+            color: #333 !important;
+        }
+
+        /* Fix for navbar theme toggle button */
+        .navbar-dark .btn-outline-secondary {
+            color: #6c757d;
+            border-color: #6c757d;
+        }
+
+        .navbar-dark .btn-outline-secondary:hover {
+            color: #fff;
+            background-color: #6c757d;
+            border-color: #6c757d;
+        }
+    </style>
 </head>
 <body>
     <!-- Navigation -->
@@ -100,13 +189,18 @@
                 </ul>
                 
                 <ul class="navbar-nav">
+                    <li class="nav-item">
+                        <button class="btn btn-outline-secondary me-2" id="theme-toggle" onclick="toggleTheme()" title="Alternar tema">
+                            <i class="fas fa-sun"></i>
+                        </button>
+                    </li>
                     <li class="nav-item dropdown">
-                        <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown">
-                            <i class="fas fa-user"></i> {{ current_user.nome }}
+                        <a class="nav-link dropdown-toggle" href="#" id="navbarDropdown" role="button" data-bs-toggle="dropdown">
+                            <i class="fas fa-user me-1"></i> {{ current_user.nome }}
                         </a>
                         <ul class="dropdown-menu">
                             <li><a class="dropdown-item" href="{{ url_for('auth.logout') }}">
-                                <i class="fas fa-sign-out-alt"></i> Sair
+                                <i class="fas fa-sign-out-alt me-2"></i> Sair
                             </a></li>
                         </ul>
                     </li>
@@ -155,6 +249,57 @@
     <!-- Custom JS -->
     <script src="{{ url_for('static', filename='js/charts.js') }}"></script>
     <script src="{{ url_for('static', filename='js/app.js') }}"></script>
+    
+    <!-- Theme Toggle Script -->
+    <script>
+        // Theme management
+        const getStoredTheme = () => localStorage.getItem('theme');
+        const setStoredTheme = theme => localStorage.setItem('theme', theme);
+        const getPreferredTheme = () => {
+            const storedTheme = getStoredTheme();
+            if (storedTheme) {
+                return storedTheme;
+            }
+            return 'dark'; // Default to dark theme
+        };
+
+        const setTheme = theme => {
+            if (theme === 'auto') {
+                document.documentElement.setAttribute('data-bs-theme', (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'));
+            } else {
+                document.documentElement.setAttribute('data-bs-theme', theme);
+            }
+            
+            // Update theme toggle button
+            const themeToggle = document.querySelector('#theme-toggle');
+            if (themeToggle) {
+                const icon = themeToggle.querySelector('i');
+                if (theme === 'light') {
+                    icon.className = 'fas fa-moon';
+                    themeToggle.setAttribute('title', 'Alternar para modo escuro');
+                } else {
+                    icon.className = 'fas fa-sun';
+                    themeToggle.setAttribute('title', 'Alternar para modo claro');
+                }
+            }
+        };
+
+        // Initialize theme on page load
+        setTheme(getPreferredTheme());
+
+        // Theme toggle function
+        function toggleTheme() {
+            const currentTheme = document.documentElement.getAttribute('data-bs-theme');
+            const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
+            setStoredTheme(newTheme);
+            setTheme(newTheme);
+        }
+
+        // Initialize theme when DOM is ready
+        document.addEventListener('DOMContentLoaded', () => {
+            setTheme(getPreferredTheme());
+        });
+    </script>
     
     {% block scripts %}{% endblock %}
 </body>
