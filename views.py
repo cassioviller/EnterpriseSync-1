@@ -1807,7 +1807,9 @@ def funcionarios_autocomplete():
         'id': funcionario.id,
         'nome': funcionario.nome,
         'codigo': funcionario.codigo,
-        'funcao': funcionario.funcao_ref.nome if funcionario.funcao_ref else 'Sem função'
+        'funcao': funcionario.funcao_ref.nome if funcionario.funcao_ref else 'Sem função',
+        'entrada': funcionario.horario_trabalho.entrada.strftime('%H:%M') if funcionario.horario_trabalho else '07:00',
+        'saida': funcionario.horario_trabalho.saida.strftime('%H:%M') if funcionario.horario_trabalho else '17:00'
     } for funcionario in funcionarios])
 
 @main_bp.route('/api/equipamentos/autocomplete')

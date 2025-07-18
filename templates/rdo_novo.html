@@ -264,35 +264,35 @@ function adicionarMaoObra() {
             <div class="row">
                 <div class="col-md-4">
                     <label class="form-label">Funcionário</label>
-                    <select class="form-select" name="funcionario_${contadorMaoObra}" required>
-                        <option value="">Erro ao carregar funcionários</option>
+                    <select class="form-select bg-white" name="funcionario_${contadorMaoObra}" onchange="preencherDadosFuncionario(this, ${contadorMaoObra})" required>
+                        <option value="">Selecione o funcionário...</option>
                     </select>
                 </div>
                 <div class="col-md-4">
                     <label class="form-label">Entrada</label>
-                    <input type="time" class="form-control" name="entrada_${contadorMaoObra}" value="07:00">
+                    <input type="time" class="form-control bg-white" name="entrada_${contadorMaoObra}" value="07:00" onchange="calcularTotalHoras(${contadorMaoObra})">
                 </div>
                 <div class="col-md-4">
                     <label class="form-label">Saída</label>
-                    <input type="time" class="form-control" name="saida_${contadorMaoObra}" value="17:00">
+                    <input type="time" class="form-control bg-white" name="saida_${contadorMaoObra}" value="17:00" onchange="calcularTotalHoras(${contadorMaoObra})">
                 </div>
             </div>
             <div class="row mt-2">
                 <div class="col-md-4">
                     <label class="form-label">Total Horas</label>
-                    <input type="text" class="form-control" name="total_horas_${contadorMaoObra}" value="Calculado automaticamente" readonly>
+                    <input type="text" class="form-control bg-white" name="total_horas_${contadorMaoObra}" value="Calculado automaticamente" readonly>
                 </div>
                 <div class="col-md-4">
                     <label class="form-label">Presente</label>
                     <div class="form-check">
                         <input class="form-check-input" type="checkbox" name="presente_${contadorMaoObra}" checked>
-                        <label class="form-check-label">
+                        <label class="form-check-label text-dark">
                             Funcionário presente
                         </label>
                     </div>
                 </div>
                 <div class="col-md-4">
-                    <button type="button" class="btn btn-sm btn-outline-danger">
+                    <button type="button" class="btn btn-sm btn-outline-danger" onclick="removerItem('mao-obra-${contadorMaoObra}')">
                         <i class="fas fa-trash"></i> Excluir
                     </button>
                 </div>
@@ -300,13 +300,13 @@ function adicionarMaoObra() {
             <div class="row mt-2">
                 <div class="col-12">
                     <label class="form-label">Função Exercida</label>
-                    <input type="text" class="form-control" name="funcao_${contadorMaoObra}" placeholder="Ex: Pedreiro, Ajudante, Eletricista">
+                    <input type="text" class="form-control bg-white" name="funcao_${contadorMaoObra}" placeholder="Ex: Pedreiro, Ajudante, Eletricista">
                 </div>
             </div>
             <div class="row mt-2">
                 <div class="col-12">
                     <label class="form-label">Observações sobre o funcionário no dia</label>
-                    <textarea class="form-control" name="observacoes_${contadorMaoObra}" rows="2" placeholder="Observações específicas..."></textarea>
+                    <textarea class="form-control bg-white" name="observacoes_${contadorMaoObra}" rows="2" placeholder="Observações específicas..."></textarea>
                 </div>
             </div>
         </div>
@@ -321,6 +321,9 @@ function adicionarMaoObra() {
         const option = document.createElement('option');
         option.value = funcionario.id;
         option.textContent = `${funcionario.nome} (${funcionario.codigo})`;
+        option.dataset.funcao = funcionario.funcao;
+        option.dataset.entrada = funcionario.entrada;
+        option.dataset.saida = funcionario.saida;
         select.appendChild(option);
     });
     
@@ -342,23 +345,23 @@ function adicionarAtividade() {
             <div class="row">
                 <div class="col-md-6">
                     <label class="form-label">Serviço</label>
-                    <select class="form-select" name="servico_${contadorAtividades}" required>
+                    <select class="form-select bg-white" name="servico_${contadorAtividades}" required>
                         <option value="">Selecione o serviço...</option>
                     </select>
                 </div>
                 <div class="col-md-3">
                     <label class="form-label">Quantidade</label>
-                    <input type="number" class="form-control" name="quantidade_${contadorAtividades}" step="0.01" min="0" required>
+                    <input type="number" class="form-control bg-white" name="quantidade_${contadorAtividades}" step="0.01" min="0" required>
                 </div>
                 <div class="col-md-3">
                     <label class="form-label">Unidade</label>
-                    <input type="text" class="form-control" name="unidade_${contadorAtividades}" readonly>
+                    <input type="text" class="form-control bg-white" name="unidade_${contadorAtividades}" readonly>
                 </div>
             </div>
             <div class="row mt-2">
                 <div class="col-12">
                     <label class="form-label">Observações sobre a execução da atividade</label>
-                    <textarea class="form-control" name="observacoes_atividade_${contadorAtividades}" rows="2" placeholder="Observações específicas da atividade..."></textarea>
+                    <textarea class="form-control bg-white" name="observacoes_atividade_${contadorAtividades}" rows="2" placeholder="Observações específicas da atividade..."></textarea>
                 </div>
             </div>
         </div>
@@ -445,6 +448,69 @@ function verificarVazios() {
 // Salvar rascunho
 function salvarRascunho() {
     alert('Funcionalidade em desenvolvimento');
+}
+
+// Preencher dados do funcionário automaticamente
+function preencherDadosFuncionario(select, contador) {
+    const funcionarioId = select.value;
+    if (!funcionarioId) return;
+    
+    const selectedOption = select.options[select.selectedIndex];
+    const funcao = selectedOption.dataset.funcao;
+    const entrada = selectedOption.dataset.entrada;
+    const saida = selectedOption.dataset.saida;
+    
+    // Preencher função
+    const inputFuncao = document.querySelector(`input[name="funcao_${contador}"]`);
+    if (inputFuncao && funcao) {
+        inputFuncao.value = funcao;
+    }
+    
+    // Preencher horários
+    const inputEntrada = document.querySelector(`input[name="entrada_${contador}"]`);
+    const inputSaida = document.querySelector(`input[name="saida_${contador}"]`);
+    
+    if (inputEntrada && entrada) {
+        inputEntrada.value = entrada;
+    }
+    if (inputSaida && saida) {
+        inputSaida.value = saida;
+    }
+    
+    // Calcular total de horas
+    calcularTotalHoras(contador);
+}
+
+// Calcular total de horas trabalhadas
+function calcularTotalHoras(contador) {
+    const inputEntrada = document.querySelector(`input[name="entrada_${contador}"]`);
+    const inputSaida = document.querySelector(`input[name="saida_${contador}"]`);
+    const inputTotal = document.querySelector(`input[name="total_horas_${contador}"]`);
+    
+    if (inputEntrada && inputSaida && inputTotal) {
+        const entrada = inputEntrada.value;
+        const saida = inputSaida.value;
+        
+        if (entrada && saida) {
+            const [horaEntrada, minutoEntrada] = entrada.split(':').map(Number);
+            const [horaSaida, minutoSaida] = saida.split(':').map(Number);
+            
+            const minutosEntrada = horaEntrada * 60 + minutoEntrada;
+            const minutosSaida = horaSaida * 60 + minutoSaida;
+            
+            let totalMinutos = minutosSaida - minutosEntrada;
+            
+            // Considerar intervalo de almoço (1 hora)
+            if (totalMinutos > 240) { // Mais de 4 horas
+                totalMinutos -= 60; // Subtrair 1 hora de almoço
+            }
+            
+            const horas = Math.floor(totalMinutos / 60);
+            const minutos = totalMinutos % 60;
+            
+            inputTotal.value = `${horas}h${minutos > 0 ? minutos + 'min' : ''}`;
+        }
+    }
 }
 
 // Finalizar RDO
