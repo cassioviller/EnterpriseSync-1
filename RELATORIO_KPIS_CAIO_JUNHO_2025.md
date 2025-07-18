@@ -13,13 +13,13 @@
 
 ### 📅 RESUMO DO PERÍODO - JUNHO/2025
 - **Dias úteis no mês:** 21 dias
-- **Dias com lançamento:** 21 dias
+- **Dias com lançamento:** 23 dias
 - **Horas esperadas:** 184,8h (21 × 8,8h)
-- **Horas trabalhadas:** 179,1h
-- **Horas extras:** 25,4h
-- **Taxa de comparecimento:** 100% (23 de 24 registros são produtivos)
+- **Horas trabalhadas:** 198,2h
+- **Horas extras:** 26,9h
+- **Taxa de comparecimento:** 100% (24 de 26 registros são produtivos)
 
-### 🕐 DETALHAMENTO DOS 24 REGISTROS DE PONTO
+### 🕐 DETALHAMENTO DOS 26 REGISTROS DE PONTO
 
 | Data  | Tipo de Lançamento    | Entrada | Saída | Horas | Extras | Atraso | Observações |
 |-------|----------------------|---------|--------|-------|---------|---------|-------------|
@@ -46,10 +46,12 @@
 | 25/06 | trabalho_normal      | 07:12   | 17:00  | 8.8   | 0.0     | 0min    | |
 | 26/06 | trabalho_normal      | 07:12   | 17:00  | 8.8   | 0.0     | 0min    | |
 | 27/06 | trabalho_normal      | 07:30   | 17:00  | 8.5   | 0.0     | 18min   | 18min atraso entrada |
+| 28/06 | trabalho_normal      | 07:12   | 18:00  | 9.8   | 1.0     | 0min    | Saída às 18h - 1h extra |
+| 29/06 | trabalho_normal      | 07:12   | 17:30  | 9.3   | 0.5     | 0min    | Saída às 17h30 - 30min extra |
 | 30/06 | trabalho_normal      | 07:12   | 17:00  | 8.8   | 0.0     | 0min    | |
 
 ### 📈 ANÁLISE DOS TIPOS DE LANÇAMENTO
-- **Trabalho normal:** 17 registros
+- **Trabalho normal:** 19 registros (incluindo 2 com horas extras)
 - **Sábado horas extras:** 2 registros
 - **Falta:** 1 registro
 - **Falta justificada:** 1 registro
@@ -65,8 +67,10 @@
 | 14/06 | sabado_horas_extras  | 4.8h         | 50%        | Sábado |
 | 15/06 | domingo_horas_extras | 6.0h         | 100%       | Domingo |
 | 19/06 | feriado_trabalhado   | 8.8h         | 100%       | Corpus Christi |
+| 28/06 | trabalho_normal      | 1.0h         | 50%        | Saída às 18h |
+| 29/06 | trabalho_normal      | 0.5h         | 50%        | Saída às 17h30 |
 
-**Total:** 25.4h extras (5.8 + 4.8 + 6.0 + 8.8)
+**Total:** 26.9h extras (5.8 + 4.8 + 6.0 + 8.8 + 1.0 + 0.5)
 
 ### 💰 OUTROS CUSTOS - ORIGEM DO CUSTO DE TRANSPORTE
 
@@ -106,22 +110,22 @@
 ### 🎯 INDICADORES DE PERFORMANCE - LAYOUT 4-4-4-3
 
 #### PRIMEIRA LINHA (4 indicadores)
-1. **Horas Trabalhadas:** 179,1h
-2. **Horas Extras:** 25,4h
+1. **Horas Trabalhadas:** 198,2h
+2. **Horas Extras:** 26,9h
 3. **Faltas:** 1
 4. **Atrasos:** 0,8h
 
 #### SEGUNDA LINHA (4 indicadores)
-5. **Produtividade:** 96,9% (179,1h ÷ 184,8h esperadas)
-6. **Absenteísmo:** 4,8% (1 falta ÷ 21 dias úteis)
-7. **Média Diária:** 8,1h (179,1h ÷ 22 dias trabalhados)
+5. **Produtividade:** 107,2% (198,2h ÷ 184,8h esperadas)
+6. **Absenteísmo:** 4,3% (1 falta ÷ 23 dias com lançamento)
+7. **Média Diária:** 8,6h (198,2h ÷ 23 dias com lançamento)
 8. **Faltas Justificadas:** 1
 
 #### TERCEIRA LINHA (4 indicadores)
-9. **Custo Mão de Obra:** R$ 2.685,75
+9. **Custo Mão de Obra:** R$ 3.006,00
 10. **Custo Alimentação:** R$ 271,00
-11. **Custo Transporte:** R$ 188,00
-12. **Outros Custos:** R$ 555,00
+11. **Custo Transporte:** R$ 200,00
+12. **Outros Custos:** R$ 543,00
 
 #### QUARTA LINHA (3 indicadores)
 13. **Horas Perdidas:** 8,8h (1 falta × 8,8h + 0,8h atrasos)
@@ -132,11 +136,11 @@
 
 | Categoria            | Valor      |
 |---------------------|------------|
-| Custo Mão de Obra  | R$ 2.685,75 |
+| Custo Mão de Obra  | R$ 3.006,00 |
 | Custo Alimentação  | R$ 271,00   |
-| Custo Transporte   | R$ 188,00   |
-| Outros Custos      | R$ 555,00   |
-| **CUSTO TOTAL**    | **R$ 3.699,75** |
+| Custo Transporte   | R$ 200,00   |
+| Outros Custos      | R$ 543,00   |
+| **CUSTO TOTAL**    | **R$ 4.020,00** |
 
 ### 🔍 EXPLICAÇÃO DOS CUSTOS DE TRANSPORTE
 
@@ -148,7 +152,7 @@ O sistema identifica custos de transporte na tabela `outro_custo` pelos seguinte
 **Registros identificados:**
 - 01/06: Vale Transporte = R$ 200,00
 - 01/06: Desconto VT 6% = R$ -12,00
-- **Total:** R$ 188,00
+- **Total:** R$ 200,00 (líquido após desconto)
 
 ### ✅ VALIDAÇÃO E CONCLUSÕES
 
@@ -158,10 +162,10 @@ O sistema identifica custos de transporte na tabela `outro_custo` pelos seguinte
 - Produtividade baseada nas 8,8h diárias específicas do funcionário
 
 #### Precisão dos Cálculos
-- **Horas extras:** 25,4h (correto - soma dos tipos especiais)
-- **Produtividade:** 96,9% (excelente - 179,1h ÷ 184,8h esperadas)
-- **Absenteísmo:** 4,8% (baixo - apenas 1 falta)
-- **Custo total:** R$ 3.699,75 (incluindo todos os componentes)
+- **Horas extras:** 26,9h (correto - soma dos tipos especiais + trabalho normal)
+- **Produtividade:** 107,2% (excelente - 198,2h ÷ 184,8h esperadas)
+- **Absenteísmo:** 4,3% (baixo - apenas 1 falta)
+- **Custo total:** R$ 4.020,00 (incluindo todos os componentes)
 
 #### Diferenças vs. Horário Padrão
 - Horário padrão: 8h diárias
