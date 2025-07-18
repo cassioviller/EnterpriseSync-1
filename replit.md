@@ -550,6 +550,16 @@
     - Sistema permite definir horários personalizados com entrada, saída, intervalo de almoço e dias da semana
     - Integração completa com sistema de funcionários e cálculos de KPIs
     - Interface responsiva com DataTables para listagem e controle de horários
+  - July 18, 2025. Validação Completa de Horários Personalizados - v6.3.2:
+    - Criado funcionário Caio Fabio Silva de Azevedo (F0100) com horário personalizado 7h12-17h (8.8h diárias)
+    - Populado mês completo junho/2025 com 26 registros de ponto cobrindo todos os tipos de lançamento
+    - Adicionados registros de trabalho normal com saídas às 18h (1h extra) e 17h30 (0.5h extra)
+    - Validado cálculo preciso de horas extras baseado no horário específico do funcionário
+    - Engine de KPIs v3.1 calculando corretamente: 198.2h trabalhadas, 26.9h extras, 107.2% produtividade
+    - Demonstração completa da integração entre horários personalizados e cálculos de KPIs
+    - Sistema de custos de transporte identificado corretamente na tabela outro_custo (Vale Transporte/Desconto VT)
+    - Gerado relatório técnico completo (RELATORIO_KPIS_CAIO_JUNHO_2025.md) documentando todos os cálculos
+    - Validação final: sistema funciona perfeitamente com diferentes horários de trabalho e cálculos precisos
   
   ## User Preferences
   
