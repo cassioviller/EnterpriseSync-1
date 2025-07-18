@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="100" height="100">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#4a90e2;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#357abd;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+  
+  <!-- Background -->
+  <rect width="100" height="100" fill="url(#bg)"/>
+  
+  <!-- Person silhouette -->
+  <g transform="translate(50, 50)">
+    <!-- Head -->
+    <circle cx="0" cy="-15" r="12" fill="white" opacity="0.9"/>
+    
+    <!-- Body -->
+    <ellipse cx="0" cy="10" rx="18" ry="20" fill="white" opacity="0.9"/>
+    
+    <!-- Arms -->
+    <ellipse cx="-15" cy="5" rx="8" ry="15" fill="white" opacity="0.9"/>
+    <ellipse cx="15" cy="5" rx="8" ry="15" fill="white" opacity="0.9"/>
+  </g>
+  
+  <!-- Initials -->
+  <text x="50" y="55" text-anchor="middle" fill="white" font-family="Arial, sans-serif" font-size="16" font-weight="bold">
+    JS
+  </text>
+</svg>
