@@ -100,6 +100,27 @@ def criar_admin():
     flash(f'Admin {nome} criado com sucesso!', 'success')
     return redirect(url_for('main.super_admin_dashboard'))
 
+@main_bp.route('/super-admin/toggle-status/<int:admin_id>', methods=['POST'])
+@super_admin_required
+def toggle_admin_status(admin_id):
+    try:
+        data = request.get_json()
+        ativo = data.get('ativo')
+        
+        admin = Usuario.query.get(admin_id)
+        if not admin or admin.tipo_usuario != TipoUsuario.ADMIN:
+            return jsonify({'success': False, 'message': 'Admin não encontrado'})
+        
+        admin.ativo = ativo
+        db.session.commit()
+        
+        status = 'ativado' if ativo else 'desativado'
+        return jsonify({'success': True, 'message': f'Admin {status} com sucesso'})
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'message': 'Erro interno do servidor'})
+
 # ===== ROTAS ADMIN =====
 @main_bp.route('/admin/acessos')
 @admin_required

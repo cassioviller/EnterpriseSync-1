@@ -636,6 +636,15 @@
     - Decorators de segurança: super_admin_required, admin_required, funcionario_required
     - Página de login profissional com tema dark/light e informações de acesso
     - Sistema de badges visuais no menu para identificar tipo de usuário
+  - July 21, 2025. Correção Menu Multi-Tenant e Rotas Super Admin - v6.4.1:
+    - Corrigido menu baseado no tipo de usuário com lógica condicional no template base.html
+    - Super Admin: apenas "Gerenciar Administradores" no menu principal
+    - Admin: menu completo com dropdown "Acessos" em Configurações para gerenciar funcionários
+    - Funcionário: apenas dashboard, RDO e veículos
+    - Adicionada rota toggle_admin_status para ativar/desativar admins pelo Super Admin
+    - Corrigidas URLs do JavaScript no template super_admin_dashboard.html
+    - Sistema multi-tenant completamente funcional com controle rigoroso de acesso
+    - Senhas atualizadas: admin/admin123, axiom/cassio123
   
   ## User Preferences
   
