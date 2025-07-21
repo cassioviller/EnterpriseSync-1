@@ -115,11 +115,38 @@
 
         html[data-bs-theme="dark"] .table {
             color: #ffffff !important;
+            background-color: #2d3748 !important;
+        }
+
+        html[data-bs-theme="dark"] .table th,
+        html[data-bs-theme="dark"] .table td {
+            color: #ffffff !important;
+            background-color: #2d3748 !important;
+            border-color: #4a5568 !important;
+        }
+
+        html[data-bs-theme="dark"] .table thead th {
+            background-color: #374151 !important;
+            color: #ffffff !important;
+            border-color: #4a5568 !important;
         }
 
         html[data-bs-theme="dark"] .table-striped > tbody > tr:nth-of-type(odd) > td,
         html[data-bs-theme="dark"] .table-striped > tbody > tr:nth-of-type(odd) > th {
             background-color: #374151 !important;
+            color: #ffffff !important;
+        }
+
+        html[data-bs-theme="dark"] .table-striped > tbody > tr:nth-of-type(even) > td,
+        html[data-bs-theme="dark"] .table-striped > tbody > tr:nth-of-type(even) > th {
+            background-color: #2d3748 !important;
+            color: #ffffff !important;
+        }
+
+        html[data-bs-theme="dark"] .table-hover > tbody > tr:hover > td,
+        html[data-bs-theme="dark"] .table-hover > tbody > tr:hover > th {
+            background-color: #4a5568 !important;
+            color: #ffffff !important;
         }
 
         html[data-bs-theme="dark"] .navbar-brand,
@@ -220,11 +247,50 @@
 
         html[data-bs-theme="light"] .table {
             color: #333333 !important;
+            background-color: #ffffff !important;
+        }
+
+        html[data-bs-theme="light"] .table th,
+        html[data-bs-theme="light"] .table td {
+            color: #333333 !important;
+            background-color: #ffffff !important;
+            border-color: #dee2e6 !important;
+        }
+
+        html[data-bs-theme="light"] .table thead th {
+            background-color: #f8f9fa !important;
+            color: #333333 !important;
+            border-color: #dee2e6 !important;
         }
 
         html[data-bs-theme="light"] .table-striped > tbody > tr:nth-of-type(odd) > td,
         html[data-bs-theme="light"] .table-striped > tbody > tr:nth-of-type(odd) > th {
             background-color: #f8f9fa !important;
+            color: #333333 !important;
+        }
+
+        html[data-bs-theme="light"] .table-striped > tbody > tr:nth-of-type(even) > td,
+        html[data-bs-theme="light"] .table-striped > tbody > tr:nth-of-type(even) > th {
+            background-color: #ffffff !important;
+            color: #333333 !important;
+        }
+
+        html[data-bs-theme="light"] .table-hover > tbody > tr:hover > td,
+        html[data-bs-theme="light"] .table-hover > tbody > tr:hover > th {
+            background-color: #e9ecef !important;
+            color: #333333 !important;
+        }
+
+        html[data-bs-theme="light"] .table-dark {
+            background-color: #f8f9fa !important;
+            color: #333333 !important;
+        }
+
+        html[data-bs-theme="light"] .table-dark th,
+        html[data-bs-theme="light"] .table-dark td {
+            background-color: #f8f9fa !important;
+            color: #333333 !important;
+            border-color: #dee2e6 !important;
         }
 
         html[data-bs-theme="light"] .navbar {
@@ -821,8 +887,38 @@
             tables.forEach(table => {
                 if (theme === 'dark') {
                     table.style.color = '#ffffff';
+                    table.style.backgroundColor = '#2d3748';
                 } else {
                     table.style.color = '#333333';
+                    table.style.backgroundColor = '#ffffff';
+                }
+            });
+
+            // Table cells
+            const tableCells = document.querySelectorAll('.table th, .table td');
+            tableCells.forEach(cell => {
+                if (theme === 'dark') {
+                    cell.style.color = '#ffffff';
+                    cell.style.backgroundColor = '#2d3748';
+                    cell.style.borderColor = '#4a5568';
+                } else {
+                    cell.style.color = '#333333';
+                    cell.style.backgroundColor = '#ffffff';
+                    cell.style.borderColor = '#dee2e6';
+                }
+            });
+
+            // Table headers
+            const tableHeaders = document.querySelectorAll('.table thead th');
+            tableHeaders.forEach(header => {
+                if (theme === 'dark') {
+                    header.style.backgroundColor = '#374151';
+                    header.style.color = '#ffffff';
+                    header.style.borderColor = '#4a5568';
+                } else {
+                    header.style.backgroundColor = '#f8f9fa';
+                    header.style.color = '#333333';
+                    header.style.borderColor = '#dee2e6';
                 }
             });
 

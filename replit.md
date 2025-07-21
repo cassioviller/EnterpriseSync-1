@@ -606,6 +606,14 @@
     - Remoção de classes fixas (bg-dark, navbar-dark) para total adaptabilidade
     - Reload automático após mudança de tema para garantir aplicação completa
     - Sistema profissional com excelente legibilidade e contraste em ambos os modos
+  - July 21, 2025. Correção Completa de Tabelas no Modo Claro - v6.3.7:
+    - Corrigido styling completo de tabelas para modo claro com fundo branco
+    - CSS específico para th, td, thead com cores apropriadas
+    - Tabelas striped e hover com cores corretas em ambos os modos
+    - JavaScript expandido para aplicar estilos a células e headers de tabela
+    - Correção de table-dark para modo claro com styling adequado
+    - Sistema de tabelas agora totalmente funcional com contraste perfeito
+    - Todas as linhas de tabela agora mudam corretamente entre os temas
   
   ## User Preferences
   
