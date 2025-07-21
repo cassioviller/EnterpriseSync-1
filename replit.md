@@ -653,6 +653,14 @@
     - Super Admin agora tem apenas: estatísticas básicas, lista de admins e formulário de criação
     - Corrigida lógica de tipos de usuário usando .name ao invés de .value no template
     - Sistema multi-tenant funcional sem erros de JavaScript ou rotas
+  - July 21, 2025. Isolamento Completo do Super Admin - v6.4.3:
+    - Implementado isolamento total do Super Admin dos dados operacionais
+    - Dashboard principal (/) redireciona Super Admin para sua página específica
+    - Super Admin não acessa mais dados de funcionários ou obras, apenas administradores
+    - Corrigido link quebrado 'lista_restaurantes' → 'alimentacao' no menu
+    - Link da marca SIGE adapta-se dinamicamente ao tipo de usuário
+    - Removida dependência do jQuery, usando JavaScript vanilla no Super Admin
+    - Sistema multi-tenant com separação rigorosa de responsabilidades
   
   ## User Preferences
   

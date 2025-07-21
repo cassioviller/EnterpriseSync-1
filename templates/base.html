@@ -703,29 +703,15 @@
                         </li>
                         
                         <li class="nav-item">
-                            <a class="nav-link" href="{{ url_for('main.lista_restaurantes') }}">
+                            <a class="nav-link" href="{{ url_for('main.alimentacao') }}">
                                 <i class="fas fa-utensils me-1"></i> Alimentação
                             </a>
                         </li>
                         
-                        <li class="nav-item dropdown">
-                            <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown">
+                        <li class="nav-item">
+                            <a class="nav-link" href="{{ url_for('main.financeiro_dashboard') }}">
                                 <i class="fas fa-dollar-sign me-1"></i> Financeiro
                             </a>
-                            <ul class="dropdown-menu">
-                                <li><a class="dropdown-item" href="{{ url_for('main.dashboard_financeiro') }}">
-                                    <i class="fas fa-chart-line me-2"></i> Dashboard
-                                </a></li>
-                                <li><a class="dropdown-item" href="{{ url_for('main.receitas') }}">
-                                    <i class="fas fa-coins me-2"></i> Receitas
-                                </a></li>
-                                <li><a class="dropdown-item" href="{{ url_for('main.fluxo_caixa') }}">
-                                    <i class="fas fa-exchange-alt me-2"></i> Fluxo de Caixa
-                                </a></li>
-                                <li><a class="dropdown-item" href="{{ url_for('main.centros_custo') }}">
-                                    <i class="fas fa-tags me-2"></i> Centros de Custo
-                                </a></li>
-                            </ul>
                         </li>
                         
                         <li class="nav-item">
