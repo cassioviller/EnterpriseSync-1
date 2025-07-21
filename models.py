@@ -83,6 +83,24 @@ class Obra(db.Model):
     
     registros_ponto = db.relationship('RegistroPonto', backref='obra_ref', lazy=True, overlaps="obra_ref")
     custos = db.relationship('CustoObra', backref='obra_ref', lazy=True, overlaps="obra_ref")
+    servicos_obra = db.relationship('ServicoObra', backref='obra', cascade='all, delete-orphan', lazy=True)
+
+class ServicoObra(db.Model):
+    """Relacionamento entre Serviços e Obras com quantidade planejada"""
+    __tablename__ = 'servico_obra'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    obra_id = db.Column(db.Integer, db.ForeignKey('obra.id'), nullable=False)
+    servico_id = db.Column(db.Integer, db.ForeignKey('servico.id'), nullable=False)
+    quantidade_planejada = db.Column(db.Numeric(10, 4), nullable=False)  # Quantidade total planejada
+    quantidade_executada = db.Column(db.Numeric(10, 4), default=0.0)  # Quantidade já executada
+    observacoes = db.Column(db.Text)  # Observações específicas para este serviço na obra
+    ativo = db.Column(db.Boolean, default=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    # Unique constraint para evitar duplicatas
+    __table_args__ = (db.UniqueConstraint('obra_id', 'servico_id', name='_obra_servico_uc'),)
 
 class Veiculo(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -118,6 +136,7 @@ class Servico(db.Model):
     # Relacionamentos
     subatividades = db.relationship('SubAtividade', backref='servico', cascade='all, delete-orphan', lazy=True)
     historico_produtividade = db.relationship('HistoricoProdutividadeServico', backref='servico', lazy=True)
+    servicos_obra = db.relationship('ServicoObra', backref='servico', lazy=True)
 
 class SubAtividade(db.Model):
     """Subatividades de um serviço para coleta detalhada de dados"""

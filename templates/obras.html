@@ -304,19 +304,46 @@
                     </div>
                     
                     <div class="row">
-                        <div class="col-md-6">
+                        <div class="col-md-4">
                             <div class="mb-3">
                                 <label for="orcamento" class="form-label">Orçamento</label>
                                 <input type="number" class="form-control" id="orcamento" name="orcamento" step="0.01" min="0">
                             </div>
                         </div>
-                        <div class="col-md-6">
+                        <div class="col-md-4">
+                            <div class="mb-3">
+                                <label for="area_total_m2" class="form-label">Área Total (m²)</label>
+                                <input type="number" class="form-control" id="area_total_m2" name="area_total_m2" step="0.01" min="0">
+                            </div>
+                        </div>
+                        <div class="col-md-4">
                             <div class="mb-3">
                                 <label for="responsavel_id" class="form-label">Responsável</label>
                                 <select class="form-select" id="responsavel_id" name="responsavel_id">
                                     <option value="">Selecione...</option>
                                     <!-- Options will be populated by JavaScript -->
                                 </select>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Seção de Serviços -->
+                    <div class="mb-3">
+                        <h6 class="mb-3">
+                            <i class="fas fa-tools"></i> Serviços da Obra
+                            <small class="text-muted">(Para pré-seleção automática no RDO)</small>
+                        </h6>
+                        
+                        <div id="servicosContainer">
+                            <div class="d-flex justify-content-between align-items-center mb-2">
+                                <small class="text-muted">Selecione os serviços e defina as quantidades planejadas</small>
+                                <button type="button" class="btn btn-sm btn-outline-primary" onclick="adicionarServicoObra()">
+                                    <i class="fas fa-plus"></i> Adicionar Serviço
+                                </button>
+                            </div>
+                            
+                            <div id="servicosLista">
+                                <!-- Serviços serão adicionados dinamicamente aqui -->
                             </div>
                         </div>
                     </div>
@@ -374,6 +401,158 @@
 
 {% block scripts %}
 <script>
+// Variáveis globais
+let obraAtual = null;
+let servicosDisponiveis = [];
+
+document.addEventListener('DOMContentLoaded', function() {
+    // Configuração do DataTable
+    if ($.fn.DataTable) {
+        $('#obrasTable').DataTable({
+            language: {
+                url: '//cdn.datatables.net/plug-ins/1.13.1/i18n/pt-BR.json'
+            },
+            pageLength: 10,
+            responsive: true
+        });
+    }
+    
+    // Configuração de tooltips
+    var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+    var tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
+        return new bootstrap.Tooltip(tooltipTriggerEl);
+    });
+    
+    // Carregar dados
+    carregarFuncionarios();
+    carregarServicos();
+    
+    // Configurar formulário
+    const form = document.getElementById('obraForm');
+    if (form) {
+        form.addEventListener('submit', function(e) {
+            processarFormulario();
+        });
+    }
+});
+
+function carregarFuncionarios() {
+    fetch('/api/funcionarios')
+        .then(response => response.json())
+        .then(data => {
+            const select = document.getElementById('responsavel_id');
+            select.innerHTML = '<option value="">Selecione...</option>';
+            data.forEach(funcionario => {
+                select.innerHTML += `<option value="${funcionario.id}">${funcionario.nome}</option>`;
+            });
+        })
+        .catch(error => console.error('Erro ao carregar funcionários:', error));
+}
+
+function carregarServicos() {
+    fetch('/api/servicos')
+        .then(response => response.json())
+        .then(data => {
+            servicosDisponiveis = data;
+        })
+        .catch(error => console.error('Erro ao carregar serviços:', error));
+}
+
+// Função para adicionar linha de serviço
+function adicionarServicoObra() {
+    const container = document.getElementById('servicosLista');
+    const index = container.children.length;
+    
+    let servicosOptions = '<option value="">Selecione o serviço...</option>';
+    servicosDisponiveis.forEach(servico => {
+        servicosOptions += `<option value="${servico.id}" data-unidade="${servico.unidade_medida}" data-simbolo="${servico.unidade_simbolo}">
+            ${servico.nome} (${servico.categoria})
+        </option>`;
+    });
+    
+    const servicoHtml = `
+        <div class="row mb-2 servico-linha" data-index="${index}">
+            <div class="col-md-4">
+                <select class="form-select form-select-sm" name="servico_${index}" onchange="atualizarUnidadeServico(${index})">
+                    ${servicosOptions}
+                </select>
+            </div>
+            <div class="col-md-3">
+                <div class="input-group input-group-sm">
+                    <input type="number" class="form-control" name="quantidade_${index}" 
+                           placeholder="Quantidade" step="0.01" min="0">
+                    <span class="input-group-text" id="unidade_${index}">un</span>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <input type="text" class="form-control form-control-sm" name="observacoes_${index}" 
+                       placeholder="Observações (opcional)">
+            </div>
+            <div class="col-md-1">
+                <button type="button" class="btn btn-sm btn-outline-danger" onclick="removerServicoObra(${index})">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+        </div>
+    `;
+    
+    container.insertAdjacentHTML('beforeend', servicoHtml);
+}
+
+// Função para atualizar unidade de medida
+function atualizarUnidadeServico(index) {
+    const select = document.querySelector(`select[name="servico_${index}"]`);
+    const unidadeSpan = document.getElementById(`unidade_${index}`);
+    
+    if (select.selectedOptions[0]) {
+        const simbolo = select.selectedOptions[0].getAttribute('data-simbolo') || 'un';
+        unidadeSpan.textContent = simbolo;
+    }
+}
+
+// Função para remover linha de serviço
+function removerServicoObra(index) {
+    const linha = document.querySelector(`.servico-linha[data-index="${index}"]`);
+    if (linha) {
+        linha.remove();
+    }
+}
+
+// Função para processar dados antes do envio
+function processarFormulario() {
+    const servicosData = [];
+    const linhas = document.querySelectorAll('.servico-linha');
+    
+    linhas.forEach((linha) => {
+        const servicoSelect = linha.querySelector('select[name^="servico_"]');
+        const quantidadeInput = linha.querySelector('input[name^="quantidade_"]');
+        const observacoesInput = linha.querySelector('input[name^="observacoes_"]');
+        
+        if (servicoSelect.value && quantidadeInput.value) {
+            servicosData.push({
+                servico_id: servicoSelect.value,
+                quantidade: quantidadeInput.value,
+                observacoes: observacoesInput.value || ''
+            });
+        }
+    });
+    
+    // Adicionar dados dos serviços como campo hidden
+    const form = document.getElementById('obraForm');
+    let hiddenInput = form.querySelector('input[name="servicos_data"]');
+    if (!hiddenInput) {
+        hiddenInput = document.createElement('input');
+        hiddenInput.type = 'hidden';
+        hiddenInput.name = 'servicos_data';
+        form.appendChild(hiddenInput);
+    }
+    hiddenInput.value = JSON.stringify(servicosData);
+    
+    return true;
+}
+
+// Outras funções existentes...
+
 let isCardsView = true;
 
 $(document).ready(function() {

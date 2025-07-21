@@ -941,25 +941,105 @@ def obras():
 @main_bp.route('/obras/novo', methods=['GET', 'POST'])
 @login_required
 def nova_obra():
+    from models import Servico, ServicoObra
+    import json
+    
     form = ObraForm()
     form.responsavel_id.choices = [(0, 'Selecione...')] + [(f.id, f.nome) for f in Funcionario.query.filter_by(ativo=True).all()]
     
-    if form.validate_on_submit():
-        obra = Obra(
-            nome=form.nome.data,
-            endereco=form.endereco.data,
-            data_inicio=form.data_inicio.data,
-            data_previsao_fim=form.data_previsao_fim.data,
-            orcamento=form.orcamento.data or 0.0,
-            status=form.status.data,
-            responsavel_id=form.responsavel_id.data if form.responsavel_id.data > 0 else None
-        )
-        db.session.add(obra)
-        db.session.commit()
-        flash('Obra cadastrada com sucesso!', 'success')
-        return redirect(url_for('main.obras'))
+    if request.method == 'POST':
+        if form.validate_on_submit():
+            # Criar obra
+            obra = Obra(
+                nome=form.nome.data,
+                endereco=form.endereco.data,
+                data_inicio=form.data_inicio.data,
+                data_previsao_fim=form.data_previsao_fim.data,
+                orcamento=form.orcamento.data or 0.0,
+                area_total_m2=form.area_total_m2.data or 0.0,
+                status=form.status.data,
+                responsavel_id=form.responsavel_id.data if form.responsavel_id.data > 0 else None
+            )
+            db.session.add(obra)
+            db.session.flush()  # Para obter o ID
+            
+            # Processar serviços da obra
+            servicos_data = request.form.get('servicos_data')
+            if servicos_data:
+                try:
+                    servicos_list = json.loads(servicos_data)
+                    for servico_item in servicos_list:
+                        if servico_item.get('servico_id') and servico_item.get('quantidade'):
+                            servico_obra = ServicoObra(
+                                obra_id=obra.id,
+                                servico_id=int(servico_item['servico_id']),
+                                quantidade_planejada=float(servico_item['quantidade']),
+                                observacoes=servico_item.get('observacoes', '')
+                            )
+                            db.session.add(servico_obra)
+                except (json.JSONDecodeError, ValueError) as e:
+                    flash(f'Erro ao processar serviços: {str(e)}', 'warning')
+            
+            db.session.commit()
+            flash('Obra cadastrada com sucesso!', 'success')
+            return redirect(url_for('main.obras'))
     
-    return render_template('obras.html', form=form, obras=Obra.query.all())
+    # Buscar dados para o formulário
+    servicos = Servico.query.filter_by(ativo=True).order_by(Servico.categoria, Servico.nome).all()
+    obras = Obra.query.all()
+    
+    return render_template('obras.html', 
+                         form=form, 
+                         obras=obras,
+                         servicos=servicos)
+
+# API para buscar serviços (para JavaScript)
+@main_bp.route('/api/servicos')
+@login_required
+def api_servicos():
+    from models import Servico
+    servicos = Servico.query.filter_by(ativo=True).order_by(Servico.categoria, Servico.nome).all()
+    
+    return jsonify([{
+        'id': s.id,
+        'nome': s.nome,
+        'categoria': s.categoria,
+        'unidade_medida': s.unidade_medida,
+        'unidade_simbolo': s.unidade_simbolo or s.unidade_medida,
+        'custo_unitario': float(s.custo_unitario or 0)
+    } for s in servicos])
+
+# API para buscar serviços de uma obra específica
+@main_bp.route('/api/obras/<int:obra_id>/servicos')
+@login_required
+def api_servicos_obra(obra_id):
+    """API para buscar serviços de uma obra específica"""
+    from models import ServicoObra, Servico
+    
+    servicos_obra = db.session.query(ServicoObra, Servico).join(
+        Servico, ServicoObra.servico_id == Servico.id
+    ).filter(
+        ServicoObra.obra_id == obra_id,
+        ServicoObra.ativo == True,
+        Servico.ativo == True
+    ).all()
+    
+    return jsonify([{
+        'id': servico.id,
+        'nome': servico.nome,
+        'categoria': servico.categoria,
+        'unidade_medida': servico.unidade_medida,
+        'unidade_simbolo': servico.unidade_simbolo or servico.unidade_medida,
+        'quantidade_planejada': float(servico_obra.quantidade_planejada),
+        'quantidade_executada': float(servico_obra.quantidade_executada),
+        'observacoes': servico_obra.observacoes or '',
+        'subatividades': [{
+            'id': sub.id,
+            'nome': sub.nome,
+            'descricao': sub.descricao,
+            'ordem_execucao': sub.ordem_execucao
+        } for sub in servico.subatividades if sub.ativo]
+    } for servico_obra, servico in servicos_obra])
 
 @main_bp.route('/obras/<int:id>/editar', methods=['GET', 'POST'])
 @login_required
@@ -2906,15 +2986,30 @@ def lista_rdos():
 @login_required
 def novo_rdo():
     """Formulário para criar novo RDO"""
+    from models import ServicoObra
+    
     # Dados para template
     obras = Obra.query.filter_by(ativo=True).all()
     funcionarios = Funcionario.query.filter_by(ativo=True).all()
     servicos = Servico.query.filter_by(ativo=True).all()
     
+    # Obter obra pré-selecionada se houver
+    obra_id = request.args.get('obra_id')
+    servicos_obra = []
+    if obra_id:
+        servicos_obra = db.session.query(ServicoObra, Servico).join(
+            Servico, ServicoObra.servico_id == Servico.id
+        ).filter(
+            ServicoObra.obra_id == obra_id,
+            ServicoObra.ativo == True
+        ).all()
+    
     return render_template('rdo_novo.html', 
                          obras=obras,
                          funcionarios=funcionarios,
                          servicos=servicos,
+                         servicos_obra=servicos_obra,
+                         obra_id=obra_id,
                          data_hoje=datetime.now().strftime('%Y-%m-%d'))
 
 @main_bp.route('/rdo/criar', methods=['POST'])

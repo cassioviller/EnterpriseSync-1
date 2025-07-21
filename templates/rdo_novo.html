@@ -208,6 +208,8 @@ document.addEventListener('DOMContentLoaded', function() {
     const obraId = urlParams.get('obra_id');
     if (obraId) {
         document.getElementById('obra_id').value = obraId;
+        // Carregar serviços da obra automaticamente
+        carregarServicosObra(obraId);
     }
     
     console.log('RDO inicializado com sucesso!');
@@ -246,6 +248,73 @@ async function carregarServicos() {
     } catch (error) {
         console.error('Erro ao carregar serviços:', error);
         alert('Erro ao carregar serviços');
+    }
+}
+
+// Carregar serviços específicos de uma obra
+async function carregarServicosObra(obraId) {
+    try {
+        console.log('Carregando serviços da obra:', obraId);
+        const response = await fetch(`/api/obras/${obraId}/servicos`);
+        if (response.ok) {
+            const servicosObra = await response.json();
+            console.log('Serviços da obra carregados:', servicosObra.length);
+            
+            // Pré-popular atividades com os serviços da obra
+            servicosObra.forEach((servicoData, index) => {
+                setTimeout(() => {
+                    adicionarAtividade();
+                    const novaAtividade = document.querySelector(`#atividade-${contadorAtividades}`);
+                    
+                    // Pré-selecionar o serviço
+                    const servicoSelect = novaAtividade.querySelector('select[name^="servico_"]');
+                    servicoSelect.innerHTML = `<option value="${servicoData.id}" selected>
+                        ${servicoData.nome} (${servicoData.categoria}) - ${servicoData.quantidade_planejada} ${servicoData.unidade_simbolo}
+                    </option>`;
+                    
+                    // Pré-popular subatividades se houver
+                    if (servicoData.subatividades && servicoData.subatividades.length > 0) {
+                        const subatividadesContainer = novaAtividade.querySelector('.subatividades-container');
+                        subatividadesContainer.innerHTML = '';
+                        
+                        servicoData.subatividades.forEach(sub => {
+                            const subHtml = `
+                                <div class="row mb-2">
+                                    <div class="col-md-6">
+                                        <input type="text" class="form-control form-control-sm" 
+                                               value="${sub.nome}" readonly>
+                                    </div>
+                                    <div class="col-md-3">
+                                        <div class="input-group input-group-sm">
+                                            <input type="number" class="form-control" 
+                                                   name="percentual_${contadorAtividades}_${sub.id}" 
+                                                   placeholder="%" step="0.1" min="0" max="100">
+                                            <span class="input-group-text">%</span>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-3">
+                                        <input type="text" class="form-control form-control-sm" 
+                                               name="obs_sub_${contadorAtividades}_${sub.id}" 
+                                               placeholder="Observações">
+                                    </div>
+                                </div>
+                            `;
+                            subatividadesContainer.insertAdjacentHTML('beforeend', subHtml);
+                        });
+                    }
+                    
+                    // Adicionar observações se houver
+                    if (servicoData.observacoes) {
+                        const obsTextarea = novaAtividade.querySelector('textarea[name^="observacoes_"]');
+                        obsTextarea.value = `Planejado: ${servicoData.quantidade_planejada} ${servicoData.unidade_simbolo}. ${servicoData.observacoes}`;
+                    }
+                }, index * 100); // Delay para evitar conflitos
+            });
+        } else {
+            console.error('Erro ao carregar serviços da obra:', response.statusText);
+        }
+    } catch (error) {
+        console.error('Erro ao carregar serviços da obra:', error);
     }
 }
 

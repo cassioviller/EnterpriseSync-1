@@ -35,6 +35,7 @@ class ObraForm(FlaskForm):
     data_inicio = DateField('Data de Início', validators=[DataRequired()], default=date.today)
     data_previsao_fim = DateField('Data de Previsão de Fim', validators=[Optional()])
     orcamento = FloatField('Orçamento', validators=[Optional(), NumberRange(min=0)])
+    area_total_m2 = FloatField('Área Total (m²)', validators=[Optional(), NumberRange(min=0)])
     status = SelectField('Status', choices=[
         ('Em andamento', 'Em andamento'),
         ('Concluída', 'Concluída'),
@@ -70,7 +71,34 @@ class VeiculoForm(FlaskForm):
 class ServicoForm(FlaskForm):
     nome = StringField('Nome', validators=[DataRequired(), Length(max=100)])
     descricao = TextAreaField('Descrição')
-    preco_unitario = FloatField('Preço Unitário', validators=[Optional(), NumberRange(min=0)])
+    categoria = SelectField('Categoria', choices=[
+        ('estrutura', 'Estrutura'),
+        ('alvenaria', 'Alvenaria'),
+        ('revestimento', 'Revestimento'),
+        ('acabamento', 'Acabamento'),
+        ('instalacoes', 'Instalações'),
+        ('outros', 'Outros')
+    ], validators=[DataRequired()])
+    unidade_medida = SelectField('Unidade de Medida', choices=[
+        ('m2', 'Metro Quadrado (m²)'),
+        ('m3', 'Metro Cúbico (m³)'),
+        ('m', 'Metro Linear (m)'),
+        ('kg', 'Quilograma (kg)'),
+        ('ton', 'Tonelada (ton)'),
+        ('un', 'Unidade (un)'),
+        ('h', 'Hora (h)')
+    ], validators=[DataRequired()])
+    unidade_simbolo = StringField('Símbolo da Unidade', validators=[Optional(), Length(max=10)])
+    custo_unitario = FloatField('Custo Unitário', validators=[Optional(), NumberRange(min=0)])
+    complexidade = SelectField('Complexidade', choices=[
+        (1, 'Muito Baixa'),
+        (2, 'Baixa'),
+        (3, 'Média'),
+        (4, 'Alta'),
+        (5, 'Muito Alta')
+    ], coerce=int, default=3)
+    requer_especializacao = BooleanField('Requer Especialização', default=False)
+    ativo = BooleanField('Ativo', default=True)
 
 class RegistroPontoForm(FlaskForm):
     funcionario_id = SelectField('Funcionário', coerce=int, validators=[DataRequired()])
