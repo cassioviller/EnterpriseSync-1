@@ -956,7 +956,6 @@ def nova_obra():
                 data_inicio=form.data_inicio.data,
                 data_previsao_fim=form.data_previsao_fim.data,
                 orcamento=form.orcamento.data or 0.0,
-                area_total_m2=form.area_total_m2.data or 0.0,
                 status=form.status.data,
                 responsavel_id=form.responsavel_id.data if form.responsavel_id.data > 0 else None
             )
@@ -1068,8 +1067,17 @@ def editar_obra(id):
 def detalhes_obra(id):
     from datetime import datetime, date, timedelta
     from sqlalchemy import func
+    from models import ServicoObra, Servico
     
     obra = Obra.query.get_or_404(id)
+    
+    # Buscar serviços da obra
+    servicos_obra = db.session.query(ServicoObra, Servico).join(
+        Servico, ServicoObra.servico_id == Servico.id
+    ).filter(
+        ServicoObra.obra_id == id,
+        ServicoObra.ativo == True
+    ).order_by(Servico.categoria, Servico.nome).all()
     
     # Obter filtros de data da query string
     data_inicio_filtro = request.args.get('data_inicio')
@@ -1214,6 +1222,7 @@ def detalhes_obra(id):
     
     return render_template('obras/detalhes_obra.html', 
                          obra=obra,
+                         servicos_obra=servicos_obra,
                          kpis=kpis,
                          custos_obra=custos_obra,
                          custos_transporte=custos_transporte,

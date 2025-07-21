@@ -35,7 +35,7 @@ class ObraForm(FlaskForm):
     data_inicio = DateField('Data de Início', validators=[DataRequired()], default=date.today)
     data_previsao_fim = DateField('Data de Previsão de Fim', validators=[Optional()])
     orcamento = FloatField('Orçamento', validators=[Optional(), NumberRange(min=0)])
-    area_total_m2 = FloatField('Área Total (m²)', validators=[Optional(), NumberRange(min=0)])
+
     status = SelectField('Status', choices=[
         ('Em andamento', 'Em andamento'),
         ('Concluída', 'Concluída'),

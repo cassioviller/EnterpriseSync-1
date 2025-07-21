@@ -332,10 +332,36 @@
                             {% endif %}
                         </p>
                     </div>
-                    <div class="col-12">
+                    <div class="col-12 mb-3">
                         <label class="form-label fw-bold">Endereço:</label>
                         <p class="mb-0">{{ obra.endereco if obra.endereco else '-' }}</p>
                     </div>
+                    
+                    <!-- Serviços da Obra -->
+                    {% if servicos_obra %}
+                    <div class="col-12">
+                        <label class="form-label fw-bold">Serviços da Obra:</label>
+                        <div class="row">
+                            {% for servico_obra, servico in servicos_obra %}
+                            <div class="col-md-6 mb-2">
+                                <div class="d-flex align-items-center">
+                                    <span class="badge bg-secondary me-2">{{ servico.categoria }}</span>
+                                    <div class="flex-grow-1">
+                                        <strong>{{ servico.nome }}</strong>
+                                        <br>
+                                        <small class="text-muted">
+                                            {{ servico_obra.quantidade_planejada }} {{ servico.unidade_simbolo }}
+                                            {% if servico_obra.quantidade_executada > 0 %}
+                                                ({{ servico_obra.quantidade_executada }} {{ servico.unidade_simbolo }} executados)
+                                            {% endif %}
+                                        </small>
+                                    </div>
+                                </div>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                    {% endif %}
                 </div>
             </div>
         </div>
