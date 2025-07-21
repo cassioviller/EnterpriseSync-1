@@ -332,24 +332,32 @@ async function carregarServicosObra(obraId) {
                     // Verificar se há valores anteriores para este serviço
                     const valoresAnteriores = ultimosValores[servicoData.id];
                     
-                    // Preencher quantidade: últimos valores ou zero
+                    // Preencher quantidade planejada (fixo - não editável) e percentual executado
                     const inputQuantidade = novaAtividade.querySelector(`input[name="quantidade_${contadorAtividades}"]`);
-                    if (valoresAnteriores && valoresAnteriores.quantidade) {
-                        inputQuantidade.value = valoresAnteriores.quantidade;
-                        console.log(`Preenchido quantidade anterior: ${valoresAnteriores.quantidade}`);
-                    } else {
-                        inputQuantidade.value = '0';
-                        console.log('Preenchido quantidade zero (primeira vez)');
-                    }
+                    const inputUnidade = novaAtividade.querySelector(`input[name="unidade_${contadorAtividades}"]`);
                     
+                    // Quantidade planejada fixa da obra
                     if (servicoData.quantidade_planejada) {
-                        inputQuantidade.placeholder = `Planejado: ${servicoData.quantidade_planejada} ${servicoData.unidade_simbolo}`;
+                        inputQuantidade.value = servicoData.quantidade_planejada;
+                        inputQuantidade.readOnly = true;
+                        inputQuantidade.style.backgroundColor = '#e9ecef';
+                        inputQuantidade.title = 'Quantidade planejada na obra (não editável)';
                     }
                     
-                    // Atualizar label da unidade
-                    const labelUnidade = novaAtividade.querySelector('.label-unidade');
-                    if (labelUnidade) {
-                        labelUnidade.textContent = `Unidade (${servicoData.unidade_simbolo})`;
+                    // Unidade fixa da obra
+                    inputUnidade.value = servicoData.unidade_simbolo;
+                    inputUnidade.readOnly = true;
+                    inputUnidade.style.backgroundColor = '#e9ecef';
+                    inputUnidade.title = 'Unidade do serviço (não editável)';
+                    
+                    // Preencher percentual executado se houver valores anteriores
+                    const inputPercentual = novaAtividade.querySelector(`input[name="percentual_${contadorAtividades}"]`);
+                    if (valoresAnteriores && valoresAnteriores.percentual) {
+                        inputPercentual.value = valoresAnteriores.percentual;
+                        console.log(`Preenchido percentual anterior: ${valoresAnteriores.percentual}%`);
+                    } else {
+                        inputPercentual.value = '0';
+                        console.log('Preenchido percentual zero (primeira vez)');
                     }
                     
                     // Carregar subatividades
@@ -509,13 +517,20 @@ function adicionarAtividade() {
                         <option value="">Selecione o serviço...</option>
                     </select>
                 </div>
-                <div class="col-md-3">
-                    <label class="form-label">Quantidade</label>
-                    <input type="number" class="form-control" name="quantidade_${contadorAtividades}" step="0.01" min="0" required>
+                <div class="col-md-2">
+                    <label class="form-label">Qtd. Planejada</label>
+                    <input type="number" class="form-control" name="quantidade_${contadorAtividades}" step="0.01" min="0" readonly style="background-color: #e9ecef;">
                 </div>
-                <div class="col-md-3">
+                <div class="col-md-2">
                     <label class="form-label">Unidade</label>
-                    <input type="text" class="form-control" name="unidade_${contadorAtividades}" readonly>
+                    <input type="text" class="form-control" name="unidade_${contadorAtividades}" readonly style="background-color: #e9ecef;">
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label">% Executado</label>
+                    <div class="input-group">
+                        <input type="number" class="form-control" name="percentual_${contadorAtividades}" min="0" max="100" step="0.1" placeholder="0.0">
+                        <span class="input-group-text">%</span>
+                    </div>
                 </div>
             </div>
             <!-- Container para subatividades -->

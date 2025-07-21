@@ -4174,6 +4174,7 @@ def api_ultimo_rdo_obra(obra_id):
                     if atividade.get('servico_id'):
                         atividades[str(atividade['servico_id'])] = {
                             'quantidade': atividade.get('quantidade', 0),
+                            'percentual': atividade.get('percentual', 0),
                             'observacoes': atividade.get('observacoes', ''),
                             'tempo': atividade.get('tempo', 0)
                         }
