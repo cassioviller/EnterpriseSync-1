@@ -1889,17 +1889,20 @@ def api_subatividades_servico(servico_id):
     """API para buscar subatividades de um serviço"""
     subatividades = SubAtividade.query.filter_by(servico_id=servico_id, ativo=True).order_by(SubAtividade.ordem_execucao).all()
     
-    return jsonify([{
-        'id': sub.id,
-        'nome': sub.nome,
-        'descricao': sub.descricao,
-        'ordem_execucao': sub.ordem_execucao,
-        'ferramentas_necessarias': sub.ferramentas_necessarias,
-        'materiais_principais': sub.materiais_principais,
-        'requer_aprovacao': sub.requer_aprovacao,
-        'pode_executar_paralelo': sub.pode_executar_paralelo,
-        'qualificacao_minima': sub.qualificacao_minima
-    } for sub in subatividades])
+    return jsonify({
+        'success': True,
+        'subatividades': [{
+            'id': sub.id,
+            'nome': sub.nome,
+            'descricao': sub.descricao,
+            'ordem_execucao': sub.ordem_execucao,
+            'ferramentas_necessarias': sub.ferramentas_necessarias,
+            'materiais_principais': sub.materiais_principais,
+            'requer_aprovacao': sub.requer_aprovacao,
+            'pode_executar_paralelo': sub.pode_executar_paralelo,
+            'qualificacao_minima': sub.qualificacao_minima
+        } for sub in subatividades]
+    })
 
 @main_bp.route('/api/funcionarios/autocomplete')
 @login_required
