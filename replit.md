@@ -645,6 +645,14 @@
     - Corrigidas URLs do JavaScript no template super_admin_dashboard.html
     - Sistema multi-tenant completamente funcional com controle rigoroso de acesso
     - Senhas atualizadas: admin/admin123, axiom/cassio123
+  - July 21, 2025. Dashboard Super Admin Simplificado - v6.4.2:
+    - Removido dashboard complexo do Super Admin que causava erros de URL
+    - Criada página simples apenas para cadastrar novos administradores
+    - Removidas funcionalidades de ativar/desativar que causavam conflitos
+    - Template super_admin_dashboard.html completamente reescrito com foco na simplicidade
+    - Super Admin agora tem apenas: estatísticas básicas, lista de admins e formulário de criação
+    - Corrigida lógica de tipos de usuário usando .name ao invés de .value no template
+    - Sistema multi-tenant funcional sem erros de JavaScript ou rotas
   
   ## User Preferences
   
