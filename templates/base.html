@@ -656,14 +656,14 @@
             
             <div class="collapse navbar-collapse" id="navbarNav">
                 <ul class="navbar-nav me-auto">
-                    {% if current_user.tipo_usuario.value == 'SUPER_ADMIN' %}
+                    {% if current_user.tipo_usuario.name == 'SUPER_ADMIN' %}
                         <!-- Super Admin Menu - Apenas Cadastro de Admins -->
                         <li class="nav-item">
                             <a class="nav-link" href="{{ url_for('main.super_admin_dashboard') }}">
                                 <i class="fas fa-users-cog me-1"></i> Gerenciar Administradores
                             </a>
                         </li>
-                    {% elif current_user.tipo_usuario.value == 'ADMIN' %}
+                    {% elif current_user.tipo_usuario.name == 'ADMIN' %}
                         <!-- Admin Menu - Acesso Completo -->
                         <li class="nav-item">
                             <a class="nav-link" href="{{ url_for('main.dashboard') }}">
@@ -788,20 +788,20 @@
                     <li class="nav-item dropdown">
                         <a class="nav-link dropdown-toggle" href="#" id="navbarDropdown" role="button" data-bs-toggle="dropdown">
                             <i class="fas fa-user me-1"></i> {{ current_user.nome }}
-                            {% if current_user.tipo_usuario.value == 'SUPER_ADMIN' %}
+                            {% if current_user.tipo_usuario.name == 'SUPER_ADMIN' %}
                                 <span class="badge bg-warning ms-1">Super Admin</span>
-                            {% elif current_user.tipo_usuario.value == 'ADMIN' %}
+                            {% elif current_user.tipo_usuario.name == 'ADMIN' %}
                                 <span class="badge bg-primary ms-1">Admin</span>
                             {% else %}
                                 <span class="badge bg-secondary ms-1">Funcionário</span>
                             {% endif %}
                         </a>
                         <ul class="dropdown-menu">
-                            {% if current_user.tipo_usuario.value == 'SUPER_ADMIN' %}
+                            {% if current_user.tipo_usuario.name == 'SUPER_ADMIN' %}
                                 <li><a class="dropdown-item" href="{{ url_for('main.super_admin_dashboard') }}">
                                     <i class="fas fa-crown me-2"></i> Painel Super Admin
                                 </a></li>
-                            {% elif current_user.tipo_usuario.value == 'ADMIN' %}
+                            {% elif current_user.tipo_usuario.name == 'ADMIN' %}
                                 <li><a class="dropdown-item" href="{{ url_for('main.admin_acessos') }}">
                                     <i class="fas fa-users-cog me-2"></i> Gerenciar Acessos
                                 </a></li>
