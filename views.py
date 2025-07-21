@@ -53,16 +53,13 @@ def logout():
 @main_bp.route('/super-admin')
 @super_admin_required
 def super_admin_dashboard():
+    # Super Admin só acessa dados de administradores
     admins = Usuario.query.filter_by(tipo_usuario=TipoUsuario.ADMIN).all()
     total_admins = len(admins)
-    total_funcionarios = Usuario.query.filter_by(tipo_usuario=TipoUsuario.FUNCIONARIO).count()
-    total_obras = Obra.query.filter_by(ativo=True).count()
     
     return render_template('super_admin_dashboard.html', 
                          admins=admins, 
-                         total_admins=total_admins,
-                         total_funcionarios=total_funcionarios, 
-                         total_obras=total_obras)
+                         total_admins=total_admins)
 
 @main_bp.route('/super-admin/criar-admin', methods=['POST'])
 @super_admin_required
@@ -184,6 +181,18 @@ def funcionario_dashboard():
 @main_bp.route('/')
 @login_required
 def dashboard():
+    # Super Admin deve ser redirecionado para sua própria página
+    if current_user.tipo_usuario == TipoUsuario.SUPER_ADMIN:
+        return redirect(url_for('main.super_admin_dashboard'))
+    
+    # Funcionário deve ser redirecionado para sua própria página
+    if current_user.tipo_usuario == TipoUsuario.FUNCIONARIO:
+        return redirect(url_for('main.funcionario_dashboard'))
+    
+    # Apenas Admin acessa o dashboard operacional
+    if current_user.tipo_usuario != TipoUsuario.ADMIN:
+        return redirect(url_for('main.login'))
+    
     # Filtros de data dos parâmetros
     data_inicio = request.args.get('data_inicio')
     data_fim = request.args.get('data_fim')
