@@ -955,7 +955,68 @@
             setTimeout(() => {
                 applyThemeToFields(theme);
             }, 200);
+            
+            // Set default date filters
+            setDefaultDateFilters();
         });
+
+        // Set default date filters to beginning of current month and today
+        function setDefaultDateFilters() {
+            const dataInicioInputs = document.querySelectorAll('input[name="data_inicio"]');
+            const dataFimInputs = document.querySelectorAll('input[name="data_fim"]');
+            
+            // Get current date
+            const today = new Date();
+            const firstDayOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+            
+            // Format dates as YYYY-MM-DD
+            const todayStr = today.toISOString().split('T')[0];
+            const firstDayStr = firstDayOfMonth.toISOString().split('T')[0];
+            
+            // Set values if inputs are empty
+            dataInicioInputs.forEach(input => {
+                if (!input.value) {
+                    input.value = firstDayStr;
+                }
+            });
+            
+            dataFimInputs.forEach(input => {
+                if (!input.value) {
+                    input.value = todayStr;
+                }
+            });
+        }
+
+        // Date range helper functions
+        function setDateRange(type) {
+            const dataInicioInput = document.querySelector('input[name="data_inicio"]');
+            const dataFimInput = document.querySelector('input[name="data_fim"]');
+            
+            if (!dataInicioInput || !dataFimInput) return;
+            
+            const today = new Date();
+            let startDate, endDate = today;
+            
+            switch(type) {
+                case 'ultimo_mes':
+                    startDate = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+                    endDate = new Date(today.getFullYear(), today.getMonth(), 0);
+                    break;
+                case 'ultimos_3_meses':
+                    startDate = new Date(today.getFullYear(), today.getMonth() - 3, 1);
+                    break;
+                case 'ano_atual':
+                    startDate = new Date(today.getFullYear(), 0, 1);
+                    break;
+                case 'mes_atual':
+                default:
+                    startDate = new Date(today.getFullYear(), today.getMonth(), 1);
+                    break;
+            }
+            
+            dataInicioInput.value = startDate.toISOString().split('T')[0];
+            dataFimInput.value = endDate.toISOString().split('T')[0];
+        }
     </script>
     
     {% block scripts %}{% endblock %}

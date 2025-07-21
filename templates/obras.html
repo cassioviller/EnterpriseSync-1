@@ -44,18 +44,21 @@
                 </select>
             </div>
             
-            <div class="col-md-5">
-                <label class="form-label">Período</label>
-                <div class="btn-group d-flex" role="group">
-                    <button type="button" class="btn btn-outline-secondary btn-periodo" data-periodo="7">7 dias</button>
-                    <button type="button" class="btn btn-outline-secondary btn-periodo" data-periodo="30">30 dias</button>
-                    <button type="button" class="btn btn-outline-secondary btn-periodo active" data-periodo="30">Último mês</button>
-                    <button type="button" class="btn btn-outline-secondary btn-periodo" data-periodo="trimestre">Trimestre</button>
-                    <button type="button" class="btn btn-outline-secondary btn-periodo" data-periodo="semestre">Semestre</button>
-                    <button type="button" class="btn btn-outline-secondary btn-periodo" data-periodo="ano">Ano</button>
-                </div>
-                <input type="hidden" id="data_inicio" name="data_inicio" value="{{ filtros.data_inicio }}">
-                <input type="hidden" id="data_fim" name="data_fim" value="{{ filtros.data_fim }}">
+            <div class="col-md-2">
+                <label for="data_inicio" class="form-label">Data Inicial</label>
+                <input type="date" class="form-control" id="data_inicio" name="data_inicio" 
+                       value="{{ filtros.data_inicio }}">
+            </div>
+            
+            <div class="col-md-2">
+                <label for="data_fim" class="form-label">Data Final</label>
+                <input type="date" class="form-control" id="data_fim" name="data_fim" 
+                       value="{{ filtros.data_fim }}">
+            </div>
+            
+            <div class="col-md-1">
+                <button type="button" class="btn btn-outline-secondary btn-sm" 
+                        onclick="setDateRange('mes_atual')">Mês Atual</button>
             </div>
         </form>
         

@@ -995,12 +995,15 @@ def detalhes_obra(id):
     data_inicio_filtro = request.args.get('data_inicio')
     data_fim_filtro = request.args.get('data_fim')
     
-    # Definir período padrão (últimos 30 dias)
-    if not data_inicio_filtro or not data_fim_filtro:
-        data_fim = date.today()
-        data_inicio = data_fim - timedelta(days=30)
+    # Definir período padrão (mês atual)
+    if not data_inicio_filtro:
+        data_inicio = date.today().replace(day=1)
     else:
         data_inicio = datetime.strptime(data_inicio_filtro, '%Y-%m-%d').date()
+    
+    if not data_fim_filtro:
+        data_fim = date.today()
+    else:
         data_fim = datetime.strptime(data_fim_filtro, '%Y-%m-%d').date()
     
     # ===== CÁLCULO DOS KPIS =====

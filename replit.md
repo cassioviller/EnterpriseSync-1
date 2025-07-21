@@ -614,6 +614,15 @@
     - Correção de table-dark para modo claro com styling adequado
     - Sistema de tabelas agora totalmente funcional com contraste perfeito
     - Todas as linhas de tabela agora mudam corretamente entre os temas
+  - July 21, 2025. Filtros de Data Pré-definidos em Todo o Sistema - v6.3.8:
+    - Implementado JavaScript global para definir filtros de data automaticamente
+    - Configuração padrão: início do mês atual até o dia atual
+    - Funções setDefaultDateFilters() e setDateRange() no template base
+    - Atualizado backend views.py para usar período padrão (mês atual)
+    - Corrigidos templates: dashboard.html, funcionarios.html, obras.html
+    - Botões de período rápido incluindo "Mês Atual" em todas as páginas
+    - Sistema aplica automaticamente datas aos campos vazios ao carregar página
+    - Filtros consistentes em todo o sistema: Dashboard, Funcionários, Obras, RDO, Financeiro
   
   ## User Preferences
   
