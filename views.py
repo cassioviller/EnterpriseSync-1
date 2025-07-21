@@ -171,8 +171,9 @@ def funcionario_dashboard():
     if current_user.tipo_usuario != TipoUsuario.FUNCIONARIO:
         return redirect(url_for('main.dashboard'))
     
-    # Mostrar apenas RDO e veículos
-    rdos_recentes = RDO.query.filter_by(funcionario_id=current_user.id).order_by(RDO.data.desc()).limit(5).all()
+    # Mostrar apenas RDO e veículos - O funcionário logado é um Usuario do tipo FUNCIONARIO
+    # Precisamos encontrar o Funcionario relacionado ou usar current_user.id diretamente
+    rdos_recentes = RDO.query.filter_by(criado_por_id=current_user.id).order_by(RDO.data_relatorio.desc()).limit(5).all()
     
     return render_template('funcionario_dashboard.html', rdos_recentes=rdos_recentes)
 

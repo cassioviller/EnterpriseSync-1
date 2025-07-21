@@ -389,7 +389,7 @@ class RDO(db.Model):
     numero_rdo = db.Column(db.String(20), unique=True, nullable=False)  # Auto-gerado
     data_relatorio = db.Column(db.Date, nullable=False)
     obra_id = db.Column(db.Integer, db.ForeignKey('obra.id'), nullable=False)
-    criado_por_id = db.Column(db.Integer, db.ForeignKey('funcionario.id'), nullable=False)
+    criado_por_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False)
     
     # Condições climáticas
     tempo_manha = db.Column(db.String(50))
@@ -407,7 +407,7 @@ class RDO(db.Model):
     
     # Relacionamentos
     obra = db.relationship('Obra', backref='rdos', overlaps="rdos")
-    criado_por = db.relationship('Funcionario', backref='rdos_criados', overlaps="rdos_criados")
+    criado_por = db.relationship('Usuario', backref='rdos_criados', overlaps="rdos_criados")
     mao_obra = db.relationship('RDOMaoObra', backref='rdo_ref', cascade='all, delete-orphan', overlaps="rdo_ref")
     equipamentos = db.relationship('RDOEquipamento', backref='rdo_ref', cascade='all, delete-orphan', overlaps="rdo_ref")
     atividades = db.relationship('RDOAtividade', backref='rdo_ref', cascade='all, delete-orphan', overlaps="rdo_ref")
