@@ -161,6 +161,166 @@
     </div>
 </div>
 
+<!-- Informações Gerais da Obra -->
+<div class="row mb-4">
+    <div class="col-lg-8">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">
+                    <i class="fas fa-info-circle"></i> Informações Gerais
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label fw-bold">Nome da Obra:</label>
+                        <p class="mb-0">{{ obra.nome }}</p>
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label fw-bold">Status:</label>
+                        <p class="mb-0">
+                            {% if obra.status == 'Em andamento' %}
+                                <span class="badge bg-primary">{{ obra.status }}</span>
+                            {% elif obra.status == 'Concluída' %}
+                                <span class="badge bg-success">{{ obra.status }}</span>
+                            {% elif obra.status == 'Pausada' %}
+                                <span class="badge bg-warning">{{ obra.status }}</span>
+                            {% else %}
+                                <span class="badge bg-danger">{{ obra.status }}</span>
+                            {% endif %}
+                        </p>
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label fw-bold">Data de Início:</label>
+                        <p class="mb-0">{{ obra.data_inicio.strftime('%d/%m/%Y') }}</p>
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label fw-bold">Previsão de Fim:</label>
+                        <p class="mb-0">{{ obra.data_previsao_fim.strftime('%d/%m/%Y') if obra.data_previsao_fim else '-' }}</p>
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label fw-bold">Orçamento:</label>
+                        <p class="mb-0">{{ "R$ {:,.2f}".format(obra.orcamento).replace(',', ' ').replace('.', ',').replace(' ', '.') if obra.orcamento else '-' }}</p>
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label fw-bold">Responsável:</label>
+                        <p class="mb-0">
+                            {% if obra.responsavel %}
+                                <i class="fas fa-user text-primary me-1"></i>
+                                {{ obra.responsavel.nome }}
+                            {% else %}
+                                -
+                            {% endif %}
+                        </p>
+                    </div>
+                    <div class="col-12 mb-3">
+                        <label class="form-label fw-bold">Endereço:</label>
+                        <p class="mb-0">{{ obra.endereco if obra.endereco else '-' }}</p>
+                    </div>
+                    
+                    <!-- Serviços da Obra -->
+                    {% if servicos_obra %}
+                    <div class="col-12">
+                        <label class="form-label fw-bold">Serviços da Obra:</label>
+                        <div class="table-responsive">
+                            <table class="table table-sm table-striped">
+                                <thead>
+                                    <tr>
+                                        <th>Categoria</th>
+                                        <th>Serviço</th>
+                                        <th>Quantidade</th>
+                                        <th>Unidade</th>
+                                        <th>Executado</th>
+                                        <th>% Concluído</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for servico_obra, servico in servicos_obra %}
+                                    <tr>
+                                        <td><span class="badge bg-secondary">{{ servico.categoria }}</span></td>
+                                        <td><strong>{{ servico.nome }}</strong></td>
+                                        <td>{{ servico_obra.quantidade_planejada }}</td>
+                                        <td>{{ servico.unidade_simbolo }}</td>
+                                        <td>
+                                            {% if servico_obra.quantidade_executada > 0 %}
+                                                {{ servico_obra.quantidade_executada }}
+                                            {% else %}
+                                                <span class="text-muted">-</span>
+                                            {% endif %}
+                                        </td>
+                                        <td>
+                                            {% if servico_obra.quantidade_planejada > 0 %}
+                                                {% set percentual = (servico_obra.quantidade_executada / servico_obra.quantidade_planejada * 100) %}
+                                                <div class="progress" style="height: 20px;">
+                                                    <div class="progress-bar 
+                                                        {% if percentual >= 90 %}bg-success
+                                                        {% elif percentual >= 70 %}bg-warning
+                                                        {% elif percentual >= 30 %}bg-info
+                                                        {% else %}bg-danger{% endif %}" 
+                                                         role="progressbar" 
+                                                         style="width: {{ percentual|round(1) }}%">
+                                                        {{ percentual|round(1) }}%
+                                                    </div>
+                                                </div>
+                                            {% else %}
+                                                <span class="text-muted">0%</span>
+                                            {% endif %}
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Ações Rápidas RDO -->
+    <div class="col-lg-4">
+        <div class="card border-primary">
+            <div class="card-header bg-primary text-white">
+                <h5 class="mb-0">
+                    <i class="fas fa-clipboard-list"></i> Relatórios Diários (RDO)
+                </h5>
+            </div>
+            <div class="card-body text-center">
+                <div class="mb-3">
+                    <p class="text-muted">Gerencie os relatórios diários desta obra</p>
+                </div>
+                <div class="d-grid gap-2">
+                    <a href="{{ url_for('main.novo_rdo', obra_id=obra.id) }}" 
+                       class="btn btn-primary btn-lg">
+                        <i class="fas fa-plus-circle me-2"></i>
+                        Novo RDO
+                    </a>
+                    <a href="{{ url_for('main.lista_rdos') }}?obra_id={{ obra.id }}" 
+                       class="btn btn-outline-primary">
+                        <i class="fas fa-list me-2"></i>
+                        Ver Todos os RDOs
+                    </a>
+                </div>
+                
+                <!-- Estatísticas Rápidas -->
+                <div class="row mt-4 text-center">
+                    <div class="col-6">
+                        <div class="border-end">
+                            <h4 class="text-primary mb-0">{{ total_rdos }}</h4>
+                            <small class="text-muted">RDOs Criados</small>
+                        </div>
+                    </div>
+                    <div class="col-6">
+                        <h4 class="text-success mb-0">{{ rdos_finalizados }}</h4>
+                        <small class="text-muted">Finalizados</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
 <!-- RDOs do Período -->
 <div class="row mb-4">
     <div class="col-12">
@@ -280,135 +440,7 @@
 </div>
 {% endif %}
 
-<!-- Informações Gerais da Obra -->
-<div class="row mb-4">
-    <div class="col-lg-8">
-        <div class="card">
-            <div class="card-header">
-                <h5 class="mb-0">
-                    <i class="fas fa-info-circle"></i> Informações Gerais
-                </h5>
-            </div>
-            <div class="card-body">
-                <div class="row">
-                    <div class="col-md-6 mb-3">
-                        <label class="form-label fw-bold">Nome da Obra:</label>
-                        <p class="mb-0">{{ obra.nome }}</p>
-                    </div>
-                    <div class="col-md-6 mb-3">
-                        <label class="form-label fw-bold">Status:</label>
-                        <p class="mb-0">
-                            {% if obra.status == 'Em andamento' %}
-                                <span class="badge bg-primary">{{ obra.status }}</span>
-                            {% elif obra.status == 'Concluída' %}
-                                <span class="badge bg-success">{{ obra.status }}</span>
-                            {% elif obra.status == 'Pausada' %}
-                                <span class="badge bg-warning">{{ obra.status }}</span>
-                            {% else %}
-                                <span class="badge bg-danger">{{ obra.status }}</span>
-                            {% endif %}
-                        </p>
-                    </div>
-                    <div class="col-md-6 mb-3">
-                        <label class="form-label fw-bold">Data de Início:</label>
-                        <p class="mb-0">{{ obra.data_inicio.strftime('%d/%m/%Y') }}</p>
-                    </div>
-                    <div class="col-md-6 mb-3">
-                        <label class="form-label fw-bold">Previsão de Fim:</label>
-                        <p class="mb-0">{{ obra.data_previsao_fim.strftime('%d/%m/%Y') if obra.data_previsao_fim else '-' }}</p>
-                    </div>
-                    <div class="col-md-6 mb-3">
-                        <label class="form-label fw-bold">Orçamento:</label>
-                        <p class="mb-0">{{ "R$ {:,.2f}".format(obra.orcamento).replace(',', ' ').replace('.', ',').replace(' ', '.') if obra.orcamento else '-' }}</p>
-                    </div>
-                    <div class="col-md-6 mb-3">
-                        <label class="form-label fw-bold">Responsável:</label>
-                        <p class="mb-0">
-                            {% if obra.responsavel %}
-                                <i class="fas fa-user text-primary me-1"></i>
-                                {{ obra.responsavel.nome }}
-                            {% else %}
-                                -
-                            {% endif %}
-                        </p>
-                    </div>
-                    <div class="col-12 mb-3">
-                        <label class="form-label fw-bold">Endereço:</label>
-                        <p class="mb-0">{{ obra.endereco if obra.endereco else '-' }}</p>
-                    </div>
-                    
-                    <!-- Serviços da Obra -->
-                    {% if servicos_obra %}
-                    <div class="col-12">
-                        <label class="form-label fw-bold">Serviços da Obra:</label>
-                        <div class="row">
-                            {% for servico_obra, servico in servicos_obra %}
-                            <div class="col-md-6 mb-2">
-                                <div class="d-flex align-items-center">
-                                    <span class="badge bg-secondary me-2">{{ servico.categoria }}</span>
-                                    <div class="flex-grow-1">
-                                        <strong>{{ servico.nome }}</strong>
-                                        <br>
-                                        <small class="text-muted">
-                                            {{ servico_obra.quantidade_planejada }} {{ servico.unidade_simbolo }}
-                                            {% if servico_obra.quantidade_executada > 0 %}
-                                                ({{ servico_obra.quantidade_executada }} {{ servico.unidade_simbolo }} executados)
-                                            {% endif %}
-                                        </small>
-                                    </div>
-                                </div>
-                            </div>
-                            {% endfor %}
-                        </div>
-                    </div>
-                    {% endif %}
-                </div>
-            </div>
-        </div>
-    </div>
-    
-    <!-- Ações Rápidas RDO -->
-    <div class="col-lg-4">
-        <div class="card border-primary">
-            <div class="card-header bg-primary text-white">
-                <h5 class="mb-0">
-                    <i class="fas fa-clipboard-list"></i> Relatórios Diários (RDO)
-                </h5>
-            </div>
-            <div class="card-body text-center">
-                <div class="mb-3">
-                    <p class="text-muted">Gerencie os relatórios diários desta obra</p>
-                </div>
-                <div class="d-grid gap-2">
-                    <a href="{{ url_for('main.novo_rdo', obra_id=obra.id) }}" 
-                       class="btn btn-primary btn-lg">
-                        <i class="fas fa-plus-circle me-2"></i>
-                        Novo RDO
-                    </a>
-                    <a href="{{ url_for('main.lista_rdos') }}?obra_id={{ obra.id }}" 
-                       class="btn btn-outline-primary">
-                        <i class="fas fa-list me-2"></i>
-                        Ver Todos os RDOs
-                    </a>
-                </div>
-                
-                <!-- Estatísticas Rápidas -->
-                <div class="row mt-4 text-center">
-                    <div class="col-6">
-                        <div class="border-end">
-                            <h4 class="text-primary mb-0">{{ total_rdos }}</h4>
-                            <small class="text-muted">RDOs Criados</small>
-                        </div>
-                    </div>
-                    <div class="col-6">
-                        <h4 class="text-success mb-0">{{ rdos_finalizados }}</h4>
-                        <small class="text-muted">Finalizados</small>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-</div>
+
 
 <!-- Custos Detalhados por Tipo -->
 <div class="card mb-4">
