@@ -1008,37 +1008,7 @@ def api_servicos():
         'custo_unitario': float(s.custo_unitario or 0)
     } for s in servicos])
 
-# API para buscar serviços de uma obra específica
-@main_bp.route('/api/obras/<int:obra_id>/servicos')
-@login_required
-def api_servicos_obra(obra_id):
-    """API para buscar serviços de uma obra específica"""
-    from models import ServicoObra, Servico
-    
-    servicos_obra = db.session.query(ServicoObra, Servico).join(
-        Servico, ServicoObra.servico_id == Servico.id
-    ).filter(
-        ServicoObra.obra_id == obra_id,
-        ServicoObra.ativo == True,
-        Servico.ativo == True
-    ).all()
-    
-    return jsonify([{
-        'id': servico.id,
-        'nome': servico.nome,
-        'categoria': servico.categoria,
-        'unidade_medida': servico.unidade_medida,
-        'unidade_simbolo': servico.unidade_simbolo or servico.unidade_medida,
-        'quantidade_planejada': float(servico_obra.quantidade_planejada),
-        'quantidade_executada': float(servico_obra.quantidade_executada),
-        'observacoes': servico_obra.observacoes or '',
-        'subatividades': [{
-            'id': sub.id,
-            'nome': sub.nome,
-            'descricao': sub.descricao,
-            'ordem_execucao': sub.ordem_execucao
-        } for sub in servico.subatividades if sub.ativo]
-    } for servico_obra, servico in servicos_obra])
+# API removida - função duplicada
 
 @main_bp.route('/obras/<int:id>/editar', methods=['GET', 'POST'])
 @login_required
@@ -4133,5 +4103,93 @@ def api_rdo_finalizar():
         return jsonify({
             "success": False,
             "message": f"Erro ao finalizar RDO: {str(e)}"
+        }), 500
+
+# API para carregar serviços de uma obra específica
+@main_bp.route('/api/obras/<int:obra_id>/servicos')
+@login_required
+def api_servicos_obra(obra_id):
+    """API para carregar serviços associados a uma obra"""
+    try:
+        servicos_obra = db.session.query(
+            Servico.id,
+            Servico.nome,
+            Servico.categoria,
+            Servico.unidade_medida,
+            ServicoObra.quantidade_planejada,
+            ServicoObra.observacoes
+        ).join(
+            ServicoObra, Servico.id == ServicoObra.servico_id
+        ).filter(
+            ServicoObra.obra_id == obra_id,
+            Servico.ativo == True
+        ).order_by(Servico.nome).all()
+        
+        servicos_data = []
+        for servico in servicos_obra:
+            servicos_data.append({
+                'id': servico.id,
+                'nome': servico.nome,
+                'categoria': servico.categoria,
+                'unidade_medida': servico.unidade_medida,
+                'unidade_simbolo': get_simbolo_unidade(servico.unidade_medida),
+                'quantidade_planejada': float(servico.quantidade_planejada) if servico.quantidade_planejada else 0,
+                'observacoes': servico.observacoes
+            })
+        
+        return jsonify({
+            'success': True,
+            'servicos': servicos_data
+        })
+        
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+# API para buscar último RDO de uma obra
+@main_bp.route('/api/obras/<int:obra_id>/ultimo-rdo')
+@login_required
+def api_ultimo_rdo_obra(obra_id):
+    """API para buscar o último RDO de uma obra para pré-popular valores"""
+    try:
+        # Buscar o RDO mais recente desta obra
+        ultimo_rdo = RegistroRDO.query.filter_by(
+            obra_id=obra_id
+        ).order_by(RegistroRDO.data_relatorio.desc()).first()
+        
+        if not ultimo_rdo:
+            return jsonify({
+                'success': False,
+                'message': 'Nenhum RDO anterior encontrado'
+            })
+        
+        # Extrair atividades do JSON armazenado
+        atividades = {}
+        if ultimo_rdo.dados_atividades:
+            try:
+                atividades_json = json.loads(ultimo_rdo.dados_atividades)
+                for atividade in atividades_json:
+                    if atividade.get('servico_id'):
+                        atividades[str(atividade['servico_id'])] = {
+                            'quantidade': atividade.get('quantidade', 0),
+                            'observacoes': atividade.get('observacoes', ''),
+                            'tempo': atividade.get('tempo', 0)
+                        }
+            except json.JSONDecodeError:
+                pass
+        
+        return jsonify({
+            'success': True,
+            'rdo_id': ultimo_rdo.id,
+            'data_relatorio': ultimo_rdo.data_relatorio.isoformat(),
+            'atividades': atividades
+        })
+        
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e)
         }), 500
 

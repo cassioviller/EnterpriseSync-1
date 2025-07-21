@@ -203,6 +203,20 @@ document.addEventListener('DOMContentLoaded', function() {
     carregarFuncionarios();
     carregarServicos();
     
+    // Configurar evento de mudança de obra
+    document.getElementById('obra_id').addEventListener('change', function() {
+        const obraId = this.value;
+        if (obraId) {
+            console.log('Obra selecionada:', obraId);
+            carregarServicosObra(obraId);
+        } else {
+            // Limpar atividades se nenhuma obra estiver selecionada
+            document.getElementById('atividades-container').innerHTML = '';
+            contadorAtividades = 0;
+            document.getElementById('atividades-vazio').style.display = 'block';
+        }
+    });
+    
     // Configurar obra pré-selecionada se houver
     const urlParams = new URLSearchParams(window.location.search);
     const obraId = urlParams.get('obra_id');
@@ -253,69 +267,146 @@ async function carregarServicos() {
 
 // Carregar serviços específicos de uma obra
 async function carregarServicosObra(obraId) {
+    if (!obraId) {
+        return;
+    }
+    
+    console.log('Carregando serviços da obra:', obraId);
+    
     try {
-        console.log('Carregando serviços da obra:', obraId);
+        // Primeiro, verificar se já existe RDO anterior para esta obra
+        const rdoAnteriorResponse = await fetch(`/api/obras/${obraId}/ultimo-rdo`);
+        let ultimosValores = {};
+        
+        if (rdoAnteriorResponse.ok) {
+            const rdoData = await rdoAnteriorResponse.json();
+            if (rdoData.success && rdoData.atividades) {
+                ultimosValores = rdoData.atividades;
+                console.log('RDO anterior encontrado, carregando últimos valores:', ultimosValores);
+            }
+        }
+        
+        // Carregar serviços da obra
         const response = await fetch(`/api/obras/${obraId}/servicos`);
         if (response.ok) {
-            const servicosObra = await response.json();
-            console.log('Serviços da obra carregados:', servicosObra.length);
+            const data = await response.json();
+            const servicosObra = data.servicos || [];
             
-            // Pré-popular atividades com os serviços da obra
+            console.log('Serviços encontrados:', servicosObra.length);
+            
+            // Limpar atividades existentes
+            const container = document.getElementById('atividades-container');
+            container.innerHTML = '';
+            contadorAtividades = 0;
+            
+            if (servicosObra.length === 0) {
+                document.getElementById('atividades-vazio').style.display = 'block';
+                mostrarAlerta('warning', 'Nenhum serviço encontrado para esta obra. Adicione atividades manualmente.');
+                return;
+            }
+            
+            document.getElementById('atividades-vazio').style.display = 'none';
+            
+            // Para cada serviço, adicionar automaticamente uma atividade
             servicosObra.forEach((servicoData, index) => {
                 setTimeout(() => {
                     adicionarAtividade();
-                    const novaAtividade = document.querySelector(`#atividade-${contadorAtividades}`);
                     
-                    // Pré-selecionar o serviço
-                    const servicoSelect = novaAtividade.querySelector('select[name^="servico_"]');
-                    servicoSelect.innerHTML = `<option value="${servicoData.id}" selected>
-                        ${servicoData.nome} (${servicoData.categoria}) - ${servicoData.quantidade_planejada} ${servicoData.unidade_simbolo}
-                    </option>`;
+                    // Preencher o select com o serviço atual
+                    const selectServico = document.querySelector(`select[name="servico_${contadorAtividades}"]`);
+                    const novaAtividade = document.getElementById(`atividade-${contadorAtividades}`);
                     
-                    // Pré-popular subatividades se houver
-                    if (servicoData.subatividades && servicoData.subatividades.length > 0) {
-                        const subatividadesContainer = novaAtividade.querySelector('.subatividades-container');
-                        subatividadesContainer.innerHTML = '';
-                        
-                        servicoData.subatividades.forEach(sub => {
-                            const subHtml = `
-                                <div class="row mb-2">
-                                    <div class="col-md-6">
-                                        <input type="text" class="form-control form-control-sm" 
-                                               value="${sub.nome}" readonly>
-                                    </div>
-                                    <div class="col-md-3">
-                                        <div class="input-group input-group-sm">
-                                            <input type="number" class="form-control" 
-                                                   name="percentual_${contadorAtividades}_${sub.id}" 
-                                                   placeholder="%" step="0.1" min="0" max="100">
-                                            <span class="input-group-text">%</span>
-                                        </div>
-                                    </div>
-                                    <div class="col-md-3">
-                                        <input type="text" class="form-control form-control-sm" 
-                                               name="obs_sub_${contadorAtividades}_${sub.id}" 
-                                               placeholder="Observações">
-                                    </div>
-                                </div>
-                            `;
-                            subatividadesContainer.insertAdjacentHTML('beforeend', subHtml);
-                        });
+                    // Popular dropdown de serviços com todos os serviços
+                    selectServico.innerHTML = '<option value="">Selecione o serviço...</option>';
+                    servicosObra.forEach(servico => {
+                        const option = document.createElement('option');
+                        option.value = servico.id;
+                        option.textContent = `${servico.nome} (${servico.unidade_simbolo})`;
+                        option.dataset.unidade = servico.unidade_simbolo;
+                        selectServico.appendChild(option);
+                    });
+                    
+                    // Selecionar o serviço atual
+                    selectServico.value = servicoData.id;
+                    
+                    // Verificar se há valores anteriores para este serviço
+                    const valoresAnteriores = ultimosValores[servicoData.id];
+                    
+                    // Preencher quantidade: últimos valores ou zero
+                    const inputQuantidade = novaAtividade.querySelector(`input[name="quantidade_${contadorAtividades}"]`);
+                    if (valoresAnteriores && valoresAnteriores.quantidade) {
+                        inputQuantidade.value = valoresAnteriores.quantidade;
+                        console.log(`Preenchido quantidade anterior: ${valoresAnteriores.quantidade}`);
+                    } else {
+                        inputQuantidade.value = '0';
+                        console.log('Preenchido quantidade zero (primeira vez)');
                     }
                     
-                    // Adicionar observações se houver
-                    if (servicoData.observacoes) {
+                    if (servicoData.quantidade_planejada) {
+                        inputQuantidade.placeholder = `Planejado: ${servicoData.quantidade_planejada} ${servicoData.unidade_simbolo}`;
+                    }
+                    
+                    // Atualizar label da unidade
+                    const labelUnidade = novaAtividade.querySelector('.label-unidade');
+                    if (labelUnidade) {
+                        labelUnidade.textContent = `Unidade (${servicoData.unidade_simbolo})`;
+                    }
+                    
+                    // Carregar subatividades
+                    carregarSubatividades(selectServico, contadorAtividades, valoresAnteriores);
+                    
+                    // Adicionar observações anteriores ou placeholder
+                    if (valoresAnteriores && valoresAnteriores.observacoes) {
                         const obsTextarea = novaAtividade.querySelector('textarea[name^="observacoes_"]');
-                        obsTextarea.value = `Planejado: ${servicoData.quantidade_planejada} ${servicoData.unidade_simbolo}. ${servicoData.observacoes}`;
+                        if (obsTextarea) obsTextarea.value = valoresAnteriores.observacoes;
+                    } else if (servicoData.observacoes) {
+                        const obsTextarea = novaAtividade.querySelector('textarea[name^="observacoes_"]');
+                        if (obsTextarea) obsTextarea.placeholder = `Planejado: ${servicoData.quantidade_planejada} ${servicoData.unidade_simbolo}. ${servicoData.observacoes}`;
                     }
+                    
                 }, index * 100); // Delay para evitar conflitos
             });
+            
+            // Mostrar mensagem informativa
+            setTimeout(() => {
+                if (Object.keys(ultimosValores).length > 0) {
+                    mostrarAlerta('info', 'Valores anteriores carregados: Encontramos um RDO anterior para esta obra. Os últimos valores foram preenchidos automaticamente.');
+                } else {
+                    mostrarAlerta('success', 'Primeira vez nesta obra: Todas as atividades foram criadas com valores zero. Preencha as quantidades executadas.');
+                }
+            }, servicosObra.length * 100 + 500);
+            
         } else {
             console.error('Erro ao carregar serviços da obra:', response.statusText);
+            mostrarAlerta('danger', 'Erro ao carregar serviços da obra. Tente novamente.');
         }
     } catch (error) {
         console.error('Erro ao carregar serviços da obra:', error);
+        mostrarAlerta('danger', 'Erro ao carregar serviços da obra. Verifique a conexão.');
     }
+}
+
+// Função para mostrar alertas
+function mostrarAlerta(tipo, mensagem) {
+    const alertDiv = document.createElement('div');
+    alertDiv.className = `alert alert-${tipo} alert-dismissible fade show mt-3`;
+    alertDiv.innerHTML = `
+        <i class="fas fa-${tipo === 'success' ? 'check-circle' : tipo === 'info' ? 'info-circle' : tipo === 'warning' ? 'exclamation-triangle' : 'exclamation-circle'} me-2"></i>
+        ${mensagem}
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    `;
+    
+    // Inserir no topo da página
+    const container = document.querySelector('.container-fluid');
+    const firstCard = container.querySelector('.card');
+    container.insertBefore(alertDiv, firstCard);
+    
+    // Remover automaticamente após 8 segundos
+    setTimeout(() => {
+        if (alertDiv.parentNode) {
+            alertDiv.remove();
+        }
+    }, 8000);
 }
 
 // Adicionar funcionário
@@ -595,32 +686,35 @@ function calcularTotalHoras(contador) {
 }
 
 // Carregar subatividades quando um serviço é selecionado
-function carregarSubatividades(selectElement, contadorAtividades) {
+function carregarSubatividades(selectElement, contadorAtividades, valoresAnteriores = {}) {
     const servicoId = selectElement.value;
     const container = document.getElementById(`subatividades-container-${contadorAtividades}`);
     const list = document.getElementById(`subatividades-list-${contadorAtividades}`);
     
     if (!servicoId) {
-        container.style.display = 'none';
-        list.innerHTML = '';
+        if (container) container.style.display = 'none';
+        if (list) list.innerHTML = '';
         return;
     }
     
     // Buscar subatividades do serviço
     fetch(`/api/servicos/${servicoId}/subatividades`)
         .then(response => response.json())
-        .then(subatividades => {
+        .then(data => {
+            const subatividades = data.subatividades || [];
+            
             if (subatividades.length === 0) {
-                container.style.display = 'none';
-                list.innerHTML = '';
+                if (container) container.style.display = 'none';
+                if (list) list.innerHTML = '';
                 return;
             }
             
             // Limpar lista anterior
-            list.innerHTML = '';
+            if (list) list.innerHTML = '';
             
             // Criar inputs para cada subatividade
             subatividades.forEach(sub => {
+                const valorAnterior = valoresAnteriores.subatividades && valoresAnteriores.subatividades[sub.id];
                 const subDiv = document.createElement('div');
                 subDiv.className = 'row mb-2';
                 subDiv.innerHTML = `
