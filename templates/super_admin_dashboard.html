@@ -131,7 +131,7 @@
                 <h5 class="modal-title"><i class="fas fa-user-plus"></i> Novo Administrador</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
-            <form method="POST" action="{{ url_for('criar_admin') }}">
+            <form method="POST" action="{{ url_for('main.criar_admin') }}">
                 <div class="modal-body">
                     <div class="mb-3">
                         <label class="form-label">Nome Completo</label>
@@ -182,7 +182,7 @@ function editarAdmin(adminId) {
 
 function toggleStatusAdmin(adminId, ativo) {
     if (confirm(ativo ? 'Ativar este admin?' : 'Desativar este admin?')) {
-        fetch(`/super-admin/toggle-status/${adminId}`, {
+        fetch(`{{ url_for('main.toggle_admin_status', admin_id='') }}${adminId}`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
