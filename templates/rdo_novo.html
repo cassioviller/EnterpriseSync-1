@@ -350,15 +350,13 @@ async function carregarServicosObra(obraId) {
                     inputUnidade.style.backgroundColor = '#e9ecef';
                     inputUnidade.title = 'Unidade do serviço (não editável)';
                     
-                    // Preencher percentual executado se houver valores anteriores
+                    // Configurar campo percentual como readonly (será calculado automaticamente)
                     const inputPercentual = novaAtividade.querySelector(`input[name="percentual_${contadorAtividades}"]`);
-                    if (valoresAnteriores && valoresAnteriores.percentual) {
-                        inputPercentual.value = valoresAnteriores.percentual;
-                        console.log(`Preenchido percentual anterior: ${valoresAnteriores.percentual}%`);
-                    } else {
-                        inputPercentual.value = '0';
-                        console.log('Preenchido percentual zero (primeira vez)');
-                    }
+                    inputPercentual.readOnly = true;
+                    inputPercentual.style.backgroundColor = '#e9ecef';
+                    inputPercentual.title = 'Calculado automaticamente pela média das subatividades';
+                    inputPercentual.value = '0';
+                    console.log('Campo percentual configurado para cálculo automático');
                     
                     // Carregar subatividades
                     carregarSubatividades(selectServico, contadorAtividades, valoresAnteriores);
@@ -528,7 +526,7 @@ function adicionarAtividade() {
                 <div class="col-md-2">
                     <label class="form-label">% Executado</label>
                     <div class="input-group">
-                        <input type="number" class="form-control" name="percentual_${contadorAtividades}" min="0" max="100" step="0.1" placeholder="0.0">
+                        <input type="number" class="form-control" name="percentual_${contadorAtividades}" min="0" max="100" step="0.1" placeholder="0.0" readonly style="background-color: #e9ecef;" title="Calculado automaticamente pela média das subatividades">
                         <span class="input-group-text">%</span>
                     </div>
                 </div>
@@ -742,10 +740,13 @@ function carregarSubatividades(selectElement, contadorAtividades, valoresAnterio
                     </div>
                     <div class="col-md-4">
                         <div class="input-group">
-                            <input type="number" class="form-control form-control-sm" 
+                            <input type="number" class="form-control form-control-sm subatividade-percentual" 
                                    name="subatividade_percentual_${contadorAtividades}[]" 
+                                   data-atividade="${contadorAtividades}"
                                    min="0" max="100" step="1" value="0"
-                                   placeholder="0">
+                                   placeholder="0"
+                                   onchange="calcularPercentualAtividade(${contadorAtividades})"
+                                   onkeyup="calcularPercentualAtividade(${contadorAtividades})">
                             <span class="input-group-text">%</span>
                         </div>
                     </div>
@@ -761,6 +762,37 @@ function carregarSubatividades(selectElement, contadorAtividades, valoresAnterio
             container.style.display = 'none';
             list.innerHTML = '';
         });
+}
+
+// Calcular percentual da atividade baseado na média das subatividades
+function calcularPercentualAtividade(atividadeId) {
+    // Buscar todos os inputs de percentual das subatividades desta atividade
+    const subatividadesInputs = document.querySelectorAll(`input[data-atividade="${atividadeId}"].subatividade-percentual`);
+    const percentualAtividadeInput = document.querySelector(`input[name="percentual_${atividadeId}"]`);
+    
+    if (!subatividadesInputs.length || !percentualAtividadeInput) {
+        return;
+    }
+    
+    let totalPercentual = 0;
+    let countValidos = 0;
+    
+    // Somar todos os percentuais válidos
+    subatividadesInputs.forEach(input => {
+        const valor = parseFloat(input.value) || 0;
+        if (valor >= 0 && valor <= 100) {
+            totalPercentual += valor;
+            countValidos++;
+        }
+    });
+    
+    // Calcular média
+    const mediaPercentual = countValidos > 0 ? (totalPercentual / countValidos) : 0;
+    
+    // Atualizar campo de percentual da atividade
+    percentualAtividadeInput.value = mediaPercentual.toFixed(1);
+    
+    console.log(`Atividade ${atividadeId}: ${countValidos} subatividades, média ${mediaPercentual.toFixed(1)}%`);
 }
 
 // Finalizar RDO
