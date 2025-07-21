@@ -1497,7 +1497,7 @@ def detalhes_veiculo(id):
         'total': sum([uso[1] for uso in uso_por_obra])
     }
     
-    return render_template('detalhes_veiculo.html', 
+    return render_template('veiculos/detalhes_veiculo.html', 
                          veiculo=veiculo, 
                          usos=usos, 
                          custos=custos,
