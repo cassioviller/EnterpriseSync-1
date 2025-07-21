@@ -1,29 +1,68 @@
-from flask import Blueprint, render_template, request, redirect, url_for, flash
-from flask_login import login_user, logout_user, login_required, current_user
-from werkzeug.security import check_password_hash, generate_password_hash
-from models import Usuario
-from app import db
+from functools import wraps
+from flask import session, redirect, url_for, flash, abort
+from flask_login import current_user
+from models import TipoUsuario
 
-auth_bp = Blueprint('auth', __name__)
+def super_admin_required(f):
+    """Decorator para rotas que requerem acesso de super admin"""
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if not current_user.is_authenticated:
+            flash('Acesso negado. Faça login primeiro.', 'danger')
+            return redirect(url_for('login'))
+        
+        if current_user.tipo_usuario != TipoUsuario.SUPER_ADMIN:
+            flash('Acesso negado. Apenas super admin pode acessar esta página.', 'danger')
+            return redirect(url_for('dashboard'))
+        
+        return f(*args, **kwargs)
+    return decorated_function
 
-@auth_bp.route('/login', methods=['GET', 'POST'])
-def login():
-    if request.method == 'POST':
-        username = request.form.get('username')
-        password = request.form.get('password')
+def admin_required(f):
+    """Decorator para rotas que requerem acesso de admin ou superior"""
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if not current_user.is_authenticated:
+            flash('Acesso negado. Faça login primeiro.', 'danger')
+            return redirect(url_for('login'))
         
-        user = Usuario.query.filter_by(username=username).first()
+        if current_user.tipo_usuario not in [TipoUsuario.SUPER_ADMIN, TipoUsuario.ADMIN]:
+            flash('Acesso negado. Acesso restrito a administradores.', 'danger')
+            return redirect(url_for('dashboard'))
         
-        if user and check_password_hash(user.password_hash, password):
-            login_user(user)
-            return redirect(url_for('main.dashboard'))
-        else:
-            flash('Usuário ou senha inválidos.', 'error')
+        return f(*args, **kwargs)
+    return decorated_function
+
+def funcionario_required(f):
+    """Decorator para rotas que requerem autenticação básica"""
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if not current_user.is_authenticated:
+            flash('Acesso negado. Faça login primeiro.', 'danger')
+            return redirect(url_for('login'))
+        
+        return f(*args, **kwargs)
+    return decorated_function
+
+def get_tenant_filter():
+    """Retorna filtro para isolar dados do tenant atual"""
+    if current_user.is_authenticated:
+        if current_user.tipo_usuario == TipoUsuario.SUPER_ADMIN:
+            return None  # Super admin vê tudo
+        elif current_user.tipo_usuario == TipoUsuario.ADMIN:
+            return current_user.id  # Admin vê seus dados
+        else:  # FUNCIONARIO
+            return current_user.admin_id  # Funcionário vê dados do seu admin
+    return None
+
+def can_access_data(admin_id):
+    """Verifica se o usuário atual pode acessar dados de um determinado admin"""
+    if not current_user.is_authenticated:
+        return False
     
-    return render_template('login.html')
-
-@auth_bp.route('/logout')
-@login_required
-def logout():
-    logout_user()
-    return redirect(url_for('auth.login'))
+    if current_user.tipo_usuario == TipoUsuario.SUPER_ADMIN:
+        return True
+    elif current_user.tipo_usuario == TipoUsuario.ADMIN:
+        return current_user.id == admin_id
+    else:  # FUNCIONARIO
+        return current_user.admin_id == admin_id

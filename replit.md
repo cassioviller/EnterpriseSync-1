@@ -623,6 +623,19 @@
     - Botões de período rápido incluindo "Mês Atual" em todas as páginas
     - Sistema aplica automaticamente datas aos campos vazios ao carregar página
     - Filtros consistentes em todo o sistema: Dashboard, Funcionários, Obras, RDO, Financeiro
+  - July 21, 2025. Sistema Multi-Tenant Completo - v6.4:
+    - Implementado sistema multi-tenant com 3 níveis de acesso hierárquicos
+    - Super Admin (axiom/cassio123): gerencia administradores, acesso global
+    - Admin: acesso completo ao sistema + criação de funcionários na página "Acessos"
+    - Funcionário: acesso restrito apenas a RDO e registro de uso de veículos
+    - Criados modelos Usuario com TipoUsuario enum (SUPER_ADMIN, ADMIN, FUNCIONARIO)
+    - Sistema de autenticação com Flask-Login e redirecionamento baseado em papel
+    - Menu dinâmico que se adapta ao tipo de usuário logado
+    - Isolamento de dados por tenant: funcionários veem apenas dados do seu admin
+    - Templates específicos: super_admin_dashboard.html, admin_acessos.html, funcionario_dashboard.html
+    - Decorators de segurança: super_admin_required, admin_required, funcionario_required
+    - Página de login profissional com tema dark/light e informações de acesso
+    - Sistema de badges visuais no menu para identificar tipo de usuário
   
   ## User Preferences
   

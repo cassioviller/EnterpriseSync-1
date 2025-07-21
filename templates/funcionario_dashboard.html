@@ -1,0 +1,106 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard Funcionário{% endblock %}
+
+{% block content %}
+<div class="container-fluid mt-4">
+    <div class="row">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h2><i class="fas fa-tachometer-alt"></i> Dashboard - {{ current_user.nome }}</h2>
+                <div>
+                    <span class="badge bg-secondary fs-6">Funcionário</span>
+                </div>
+            </div>
+
+            <!-- Ações Rápidas -->
+            <div class="row mb-4">
+                <div class="col-md-6">
+                    <div class="card h-100">
+                        <div class="card-body text-center">
+                            <i class="fas fa-clipboard-list fa-3x text-primary mb-3"></i>
+                            <h5>Novo RDO</h5>
+                            <p class="text-muted">Criar Relatório Diário de Obra</p>
+                            <a href="{{ url_for('main.novo_rdo') }}" class="btn btn-primary">
+                                <i class="fas fa-plus"></i> Novo RDO
+                            </a>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="card h-100">
+                        <div class="card-body text-center">
+                            <i class="fas fa-car fa-3x text-success mb-3"></i>
+                            <h5>Uso de Veículo</h5>
+                            <p class="text-muted">Registrar uso de veículos</p>
+                            <a href="{{ url_for('main.veiculos') }}" class="btn btn-success">
+                                <i class="fas fa-plus"></i> Registrar Uso
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- RDOs Recentes -->
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="fas fa-history"></i> Meus RDOs Recentes</h5>
+                </div>
+                <div class="card-body">
+                    {% if rdos_recentes %}
+                        <div class="table-responsive">
+                            <table class="table table-striped">
+                                <thead>
+                                    <tr>
+                                        <th>Data</th>
+                                        <th>Obra</th>
+                                        <th>Atividades</th>
+                                        <th>Status</th>
+                                        <th>Ações</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for rdo in rdos_recentes %}
+                                    <tr>
+                                        <td>{{ rdo.data.strftime('%d/%m/%Y') }}</td>
+                                        <td>{{ rdo.obra.nome }}</td>
+                                        <td>{{ rdo.atividades|length }} atividades</td>
+                                        <td>
+                                            <span class="badge bg-success">Finalizado</span>
+                                        </td>
+                                        <td>
+                                            <a href="{{ url_for('main.visualizar_rdo', id=rdo.id) }}" class="btn btn-sm btn-primary">
+                                                <i class="fas fa-eye"></i> Ver
+                                            </a>
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    {% else %}
+                        <div class="text-center text-muted py-4">
+                            <i class="fas fa-clipboard-list fa-3x mb-3"></i>
+                            <h5>Nenhum RDO encontrado</h5>
+                            <p>Você ainda não criou nenhum RDO.</p>
+                            <a href="{{ url_for('main.novo_rdo') }}" class="btn btn-primary">
+                                <i class="fas fa-plus"></i> Criar Primeiro RDO
+                            </a>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Informações do Sistema -->
+            <div class="alert alert-info mt-4">
+                <h6><i class="fas fa-info-circle"></i> Informações Importantes</h6>
+                <ul class="mb-0">
+                    <li><strong>RDO:</strong> Você pode criar novos relatórios diários de obra</li>
+                    <li><strong>Veículos:</strong> Registre o uso de veículos da empresa</li>
+                    <li><strong>Acesso:</strong> Você tem acesso limitado apenas às suas próprias informações</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

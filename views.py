@@ -1,11 +1,13 @@
 from flask import Blueprint, render_template, request, redirect, url_for, flash, jsonify
-from flask_login import login_required, current_user
+from flask_login import login_required, current_user, login_user, logout_user
+from werkzeug.security import check_password_hash, generate_password_hash
 from app import db
 from models import *
 from models import OutroCusto
 from forms import *
 from utils import calcular_horas_trabalhadas, calcular_custo_real_obra, calcular_custos_mes, calcular_kpis_funcionarios_geral, calcular_kpis_funcionario_periodo, calcular_kpis_funcionario_completo, calcular_ocorrencias_funcionario, processar_meio_periodo_exemplo
 from kpis_engine import kpis_engine
+from auth import super_admin_required, admin_required, funcionario_required, get_tenant_filter, can_access_data
 from datetime import datetime, date
 from sqlalchemy import func
 
@@ -15,6 +17,146 @@ from werkzeug.utils import secure_filename
 from sqlalchemy import or_
 
 main_bp = Blueprint('main', __name__)
+
+# ===== ROTAS DE AUTENTICAÇÃO =====
+@main_bp.route('/login', methods=['GET', 'POST'])
+def login():
+    if request.method == 'POST':
+        username = request.form['username']
+        password = request.form['password']
+        
+        user = Usuario.query.filter_by(username=username, ativo=True).first()
+        
+        if user and check_password_hash(user.password_hash, password):
+            login_user(user)
+            
+            # Redirect baseado no tipo de usuário
+            if user.tipo_usuario == TipoUsuario.SUPER_ADMIN:
+                return redirect(url_for('main.super_admin_dashboard'))
+            elif user.tipo_usuario == TipoUsuario.ADMIN:
+                return redirect(url_for('main.dashboard'))
+            else:  # FUNCIONARIO
+                return redirect(url_for('main.funcionario_dashboard'))
+        else:
+            flash('Username ou senha inválidos.', 'danger')
+    
+    return render_template('login.html')
+
+@main_bp.route('/logout')
+@login_required
+def logout():
+    logout_user()
+    flash('Você saiu do sistema.', 'info')
+    return redirect(url_for('main.login'))
+
+# ===== ROTAS SUPER ADMIN =====
+@main_bp.route('/super-admin')
+@super_admin_required
+def super_admin_dashboard():
+    admins = Usuario.query.filter_by(tipo_usuario=TipoUsuario.ADMIN).all()
+    total_admins = len(admins)
+    total_funcionarios = Usuario.query.filter_by(tipo_usuario=TipoUsuario.FUNCIONARIO).count()
+    total_obras = Obra.query.filter_by(ativo=True).count()
+    
+    return render_template('super_admin_dashboard.html', 
+                         admins=admins, 
+                         total_admins=total_admins,
+                         total_funcionarios=total_funcionarios, 
+                         total_obras=total_obras)
+
+@main_bp.route('/super-admin/criar-admin', methods=['POST'])
+@super_admin_required
+def criar_admin():
+    nome = request.form['nome']
+    username = request.form['username']
+    email = request.form['email']
+    senha = request.form['senha']
+    confirmar_senha = request.form['confirmar_senha']
+    
+    if senha != confirmar_senha:
+        flash('Senhas não conferem.', 'danger')
+        return redirect(url_for('main.super_admin_dashboard'))
+    
+    if Usuario.query.filter_by(username=username).first():
+        flash('Username já existe.', 'danger')
+        return redirect(url_for('main.super_admin_dashboard'))
+    
+    if Usuario.query.filter_by(email=email).first():
+        flash('Email já existe.', 'danger')
+        return redirect(url_for('main.super_admin_dashboard'))
+    
+    admin = Usuario(
+        nome=nome,
+        username=username,
+        email=email,
+        password_hash=generate_password_hash(senha),
+        tipo_usuario=TipoUsuario.ADMIN,
+        ativo=True
+    )
+    
+    db.session.add(admin)
+    db.session.commit()
+    
+    flash(f'Admin {nome} criado com sucesso!', 'success')
+    return redirect(url_for('main.super_admin_dashboard'))
+
+# ===== ROTAS ADMIN =====
+@main_bp.route('/admin/acessos')
+@admin_required
+def admin_acessos():
+    funcionarios_acesso = Usuario.query.filter_by(
+        tipo_usuario=TipoUsuario.FUNCIONARIO,
+        admin_id=current_user.id
+    ).all()
+    
+    total_funcionarios = len(funcionarios_acesso)
+    funcionarios_ativos = len([f for f in funcionarios_acesso if f.ativo])
+    
+    return render_template('admin_acessos.html',
+                         funcionarios_acesso=funcionarios_acesso,
+                         total_funcionarios=total_funcionarios,
+                         funcionarios_ativos=funcionarios_ativos)
+
+@main_bp.route('/admin/criar-funcionario-acesso', methods=['POST'])
+@admin_required
+def criar_funcionario_acesso():
+    nome = request.form['nome']
+    username = request.form['username']
+    email = request.form['email']
+    senha = request.form['senha']
+    
+    if Usuario.query.filter_by(username=username).first():
+        flash('Username já existe.', 'danger')
+        return redirect(url_for('main.admin_acessos'))
+    
+    funcionario = Usuario(
+        nome=nome,
+        username=username,
+        email=email,
+        password_hash=generate_password_hash(senha),
+        tipo_usuario=TipoUsuario.FUNCIONARIO,
+        admin_id=current_user.id,
+        ativo=True
+    )
+    
+    db.session.add(funcionario)
+    db.session.commit()
+    
+    flash(f'Acesso criado para {nome}!', 'success')
+    return redirect(url_for('main.admin_acessos'))
+
+# ===== DASHBOARD FUNCIONÁRIO =====
+@main_bp.route('/funcionario-dashboard')
+@funcionario_required
+def funcionario_dashboard():
+    # Funcionários só veem suas próprias ações
+    if current_user.tipo_usuario != TipoUsuario.FUNCIONARIO:
+        return redirect(url_for('main.dashboard'))
+    
+    # Mostrar apenas RDO e veículos
+    rdos_recentes = RDO.query.filter_by(funcionario_id=current_user.id).order_by(RDO.data.desc()).limit(5).all()
+    
+    return render_template('funcionario_dashboard.html', rdos_recentes=rdos_recentes)
 
 # Rotas adicionais de veículos serão adicionadas diretamente aqui
 

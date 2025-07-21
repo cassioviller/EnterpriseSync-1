@@ -30,17 +30,17 @@ app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {
 # initialize extensions
 db.init_app(app)
 login_manager.init_app(app)
-login_manager.login_view = 'auth.login'
+login_manager.login_view = 'main.login'
 login_manager.login_message = 'Por favor, faça login para acessar esta página.'
 
 # Import models and views
 from models import *
-from auth import auth_bp
+# from auth import auth_bp  # Removido temporariamente
 from views import main_bp
 from relatorios_funcionais import relatorios_bp
 
 # Register blueprints
-app.register_blueprint(auth_bp, url_prefix='/auth')
+# app.register_blueprint(auth_bp, url_prefix='/auth')  # Removido temporariamente
 app.register_blueprint(main_bp)
 app.register_blueprint(relatorios_bp, url_prefix='/relatorios')
 

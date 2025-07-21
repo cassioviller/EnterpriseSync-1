@@ -2,6 +2,12 @@ from app import db
 from flask_login import UserMixin
 from datetime import datetime, date
 from sqlalchemy import func
+from enum import Enum
+
+class TipoUsuario(Enum):
+    SUPER_ADMIN = "super_admin"
+    ADMIN = "admin" 
+    FUNCIONARIO = "funcionario"
 
 class Usuario(UserMixin, db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -10,7 +16,12 @@ class Usuario(UserMixin, db.Model):
     password_hash = db.Column(db.String(256))
     nome = db.Column(db.String(100), nullable=False)
     ativo = db.Column(db.Boolean, default=True)
+    tipo_usuario = db.Column(db.Enum(TipoUsuario), default=TipoUsuario.FUNCIONARIO, nullable=False)
+    admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=True)  # Para funcionários, referencia seu admin
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    
+    # Relacionamentos
+    funcionarios = db.relationship('Usuario', backref=db.backref('admin', remote_side=[id]), lazy='dynamic')
 
 class Departamento(db.Model):
     id = db.Column(db.Integer, primary_key=True)
