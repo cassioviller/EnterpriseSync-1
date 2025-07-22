@@ -249,6 +249,229 @@ def dashboard():
                          funcionarios_dept=funcionarios_dept,
                          custos_recentes=custos_recentes)
 
+@main_bp.route('/api/dashboard/dados')
+@login_required
+def api_dashboard_dados():
+    """API para obter dados do dashboard via AJAX"""
+    if current_user.tipo_usuario != TipoUsuario.ADMIN:
+        return jsonify({'success': False, 'message': 'Acesso negado'}), 403
+    
+    data_inicio_param = request.args.get('data_inicio')
+    data_fim_param = request.args.get('data_fim')
+    
+    try:
+        data_inicio = datetime.strptime(data_inicio_param, '%Y-%m-%d').date() if data_inicio_param else date.today().replace(day=1)
+        data_fim = datetime.strptime(data_fim_param, '%Y-%m-%d').date() if data_fim_param else date.today()
+    except:
+        data_inicio = date.today().replace(day=1)
+        data_fim = date.today()
+    
+    # KPIs básicos atualizados
+    funcionarios_ativos = Funcionario.query.filter_by(ativo=True).count()
+    obras_ativas = Obra.query.filter_by(status='Em andamento').count()
+    veiculos_ativos = Veiculo.query.filter_by(status='Ativo').count()
+    
+    # Custos do período
+    custos_periodo = db.session.query(func.sum(CustoObra.valor)).filter(
+        CustoObra.data.between(data_inicio, data_fim)
+    ).scalar() or 0
+    
+    # Horas trabalhadas do período
+    horas_periodo = db.session.query(func.sum(RegistroPonto.horas_trabalhadas)).filter(
+        RegistroPonto.data.between(data_inicio, data_fim)
+    ).scalar() or 0
+    
+    # Dados para gráfico de custos por dia (últimos 30 dias)
+    custos_timeline = db.session.query(
+        CustoObra.data,
+        func.sum(CustoObra.valor).label('total')
+    ).filter(
+        CustoObra.data >= (data_fim - timedelta(days=30))
+    ).group_by(CustoObra.data).order_by(CustoObra.data).all()
+    
+    # Top 5 funcionários mais produtivos do período
+    top_funcionarios = db.session.query(
+        Funcionario.nome,
+        Funcionario.codigo,
+        func.sum(RegistroPonto.horas_trabalhadas).label('total_horas'),
+        func.count(RegistroPonto.id).label('dias_trabalhados')
+    ).join(RegistroPonto).filter(
+        Funcionario.ativo == True,
+        RegistroPonto.data.between(data_inicio, data_fim)
+    ).group_by(Funcionario.id, Funcionario.nome, Funcionario.codigo).order_by(
+        desc('total_horas')
+    ).limit(5).all()
+    
+    # Obras com alertas (sem RDO há mais de 7 dias)
+    data_limite_rdo = data_fim - timedelta(days=7)
+    obras_sem_rdo = db.session.query(Obra).filter(
+        Obra.status == 'Em andamento'
+    ).outerjoin(RDO).group_by(Obra.id).having(
+        or_(
+            func.max(RDO.data) < data_limite_rdo,
+            func.max(RDO.data).is_(None)
+        )
+    ).limit(5).all()
+    
+    dados_resposta = {
+        'kpis': {
+            'funcionarios_ativos': funcionarios_ativos,
+            'obras_ativas': obras_ativas,
+            'veiculos_ativos': veiculos_ativos,
+            'custos_periodo': float(custos_periodo),
+            'horas_periodo': float(horas_periodo),
+            'alertas_obras': len(obras_sem_rdo)
+        },
+        'graficos': {
+            'custos_timeline': {
+                'labels': [c.data.strftime('%d/%m') for c in custos_timeline],
+                'data': [float(c.total) for c in custos_timeline]
+            }
+        },
+        'top_funcionarios': [
+            {
+                'nome': f.nome,
+                'codigo': f.codigo,
+                'horas': float(f.total_horas or 0),
+                'dias': f.dias_trabalhados,
+                'media_diaria': float(f.total_horas or 0) / f.dias_trabalhados if f.dias_trabalhados > 0 else 0
+            } for f in top_funcionarios
+        ],
+        'obras_alerta': [
+            {
+                'nome': obra.nome,
+                'status': obra.status,
+                'ultimo_rdo': 'Nunca' if not hasattr(obra, 'ultimo_rdo') else 'Há mais de 7 dias'
+            } for obra in obras_sem_rdo
+        ],
+        'periodo': {
+            'data_inicio': data_inicio.strftime('%Y-%m-%d'),
+            'data_fim': data_fim.strftime('%Y-%m-%d'),
+            'dias': (data_fim - data_inicio).days
+        },
+        'timestamp': datetime.now().isoformat()
+    }
+    
+    return jsonify(dados_resposta)
+
+@main_bp.route('/api/alertas/verificar')
+@login_required
+def api_verificar_alertas():
+    """API para verificar alertas em tempo real"""
+    if current_user.tipo_usuario != TipoUsuario.ADMIN:
+        return jsonify({'success': False, 'message': 'Acesso negado'}), 403
+    
+    try:
+        alertas = []
+        hoje = date.today()
+        
+        # Verificar funcionários com problemas de produtividade (últimos 30 dias)
+        funcionarios_problema = db.session.query(
+            Funcionario.nome,
+            func.avg(RegistroPonto.horas_trabalhadas).label('media_horas'),
+            func.count(RegistroPonto.id).label('dias_trabalhados')
+        ).join(RegistroPonto).filter(
+            Funcionario.ativo == True,
+            RegistroPonto.data >= (hoje - timedelta(days=30))
+        ).group_by(Funcionario.id, Funcionario.nome).having(
+            func.avg(RegistroPonto.horas_trabalhadas) < 6.0  # Menos de 6h/dia em média
+        ).all()
+        
+        for func_problema in funcionarios_problema:
+            alertas.append({
+                'tipo': 'PRODUTIVIDADE_BAIXA',
+                'prioridade': 'MEDIA',
+                'titulo': f'Produtividade baixa: {func_problema.nome}',
+                'descricao': f'Média de {func_problema.media_horas:.1f}h/dia nos últimos 30 dias',
+                'categoria': 'RH',
+                'data': datetime.now().isoformat()
+            })
+        
+        # Verificar obras sem RDO
+        obras_sem_rdo = db.session.query(Obra).filter(
+            Obra.status == 'Em andamento'
+        ).outerjoin(RDO).group_by(Obra.id).having(
+            or_(
+                func.max(RDO.data) < (hoje - timedelta(days=7)),
+                func.max(RDO.data).is_(None)
+            )
+        ).limit(10).all()
+        
+        for obra in obras_sem_rdo:
+            alertas.append({
+                'tipo': 'OBRA_SEM_RDO',
+                'prioridade': 'ALTA',
+                'titulo': f'Obra sem RDO: {obra.nome}',
+                'descricao': 'Sem relatório diário há mais de 7 dias',
+                'categoria': 'OPERACIONAL',
+                'data': datetime.now().isoformat()
+            })
+        
+        # Verificar veículos com custos altos (últimos 30 dias)
+        veiculos_custo_alto = db.session.query(
+            Veiculo.modelo,
+            Veiculo.placa,
+            func.sum(CustoVeiculo.valor).label('custo_total')
+        ).join(CustoVeiculo).filter(
+            CustoVeiculo.data >= (hoje - timedelta(days=30))
+        ).group_by(Veiculo.id, Veiculo.modelo, Veiculo.placa).having(
+            func.sum(CustoVeiculo.valor) > 2000
+        ).all()
+        
+        for veiculo in veiculos_custo_alto:
+            alertas.append({
+                'tipo': 'CUSTO_VEICULO_ALTO',
+                'prioridade': 'BAIXA',
+                'titulo': f'Custo alto: {veiculo.modelo}',
+                'descricao': f'R$ {veiculo.custo_total:,.2f} nos últimos 30 dias',
+                'categoria': 'FINANCEIRO',
+                'data': datetime.now().isoformat()
+            })
+        
+        # Organizar por prioridade
+        alertas_organizados = {
+            'ALTA': [a for a in alertas if a['prioridade'] == 'ALTA'],
+            'MEDIA': [a for a in alertas if a['prioridade'] == 'MEDIA'],
+            'BAIXA': [a for a in alertas if a['prioridade'] == 'BAIXA']
+        }
+        
+        estatisticas = {
+            'total': len(alertas),
+            'criticos': len(alertas_organizados['ALTA']),
+            'importantes': len(alertas_organizados['MEDIA']),
+            'informativos': len(alertas_organizados['BAIXA'])
+        }
+        
+        return jsonify({
+            'success': True,
+            'alertas': alertas_organizados,
+            'estatisticas': estatisticas,
+            'timestamp': datetime.now().isoformat()
+        })
+        
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'message': f'Erro ao verificar alertas: {str(e)}'
+        }), 500
+
+@main_bp.route('/api/dashboard/refresh')
+@login_required
+def api_dashboard_refresh():
+    """API para refresh automático do dashboard"""
+    if current_user.tipo_usuario != TipoUsuario.ADMIN:
+        return jsonify({'success': False, 'message': 'Acesso negado'}), 403
+    
+    # Dados básicos para refresh rápido
+    dados_refresh = {
+        'funcionarios_online': Funcionario.query.filter_by(ativo=True).count(),
+        'obras_ativas': Obra.query.filter_by(status='Em andamento').count(),
+        'ultima_atualizacao': datetime.now().strftime('%H:%M:%S'),
+        'alertas_pendentes': 0  # Implementar contagem rápida de alertas
+    }
+    
+    return jsonify(dados_refresh)
+
 # Funcionários
 @main_bp.route('/funcionarios')
 @login_required

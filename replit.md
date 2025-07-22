@@ -671,6 +671,19 @@
     - Campos "Obra" e "Restaurante" tornados obrigatórios para controle adequado de custos e KPIs
     - Validação frontend e backend garantindo preenchimento correto dos campos obrigatórios
     - Sistema permite lançar alimentação para vários funcionários simultaneamente com controle rigoroso
+  - July 22, 2025. Sistema de Alertas Inteligentes e Dashboard Interativo - v6.5.1:
+    - Implementado sistema completo de alertas inteligentes (alertas_inteligentes.py)
+    - Monitoramento automático de KPIs críticos: produtividade, absenteísmo, horas extras, custos
+    - Dashboard interativo avançado (dashboard_interativo.py) com drill-down e filtros
+    - APIs RESTful: /api/dashboard/dados, /api/alertas/verificar, /api/dashboard/refresh
+    - Auto-refresh do dashboard a cada 5 minutos e verificação de alertas a cada 2 minutos
+    - Top funcionários produtivos e obras que precisam de atenção
+    - Alertas organizados por prioridade (ALTA, MEDIA, BAIXA) e categoria (RH, OPERACIONAL, FINANCEIRO)
+    - Interface JavaScript interativa com loading states e feedback visual
+    - Documentação completa gerada (DOCUMENTACAO_COMPLETA_SIGE_v6.5.md)
+    - Script de testes das melhorias implementadas (testar_melhorias_implementadas.py)
+    - Correção de erro no relatório de ponto (referências de funcionário)
+    - Base sólida implementada para futuras melhorias: mobile app, IA, automações
   
   ## User Preferences
   
