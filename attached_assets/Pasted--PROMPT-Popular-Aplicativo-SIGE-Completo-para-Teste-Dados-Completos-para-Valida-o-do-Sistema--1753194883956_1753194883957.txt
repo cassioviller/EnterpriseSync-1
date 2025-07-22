@@ -1,0 +1,837 @@
+# PROMPT: Popular Aplicativo SIGE Completo para Teste
+## Dados Completos para Validação do Sistema
+
+---
+
+## 🎯 OBJETIVO
+
+Popular completamente o aplicativo SIGE com dados realistas de uma nova empresa para testar todas as funcionalidades do sistema, incluindo diferentes horários de trabalho, lançamentos diversos e relatórios.
+
+---
+
+## 🏢 1. CONFIGURAÇÃO DA EMPRESA
+
+### **Dados da Empresa:**
+```
+Nome: Construtora Vale Verde Ltda
+CNPJ: 12.345.678/0001-90
+Endereço: Rua das Obras, 123 - Centro - Belo Horizonte/MG
+Telefone: (31) 3333-4444
+Email: contato@valeverde.com.br
+```
+
+### **Configurações Iniciais:**
+- Criar usuário admin: `admin@valeverde.com.br` / senha: `admin123`
+- Configurar logo da empresa
+- Definir moeda: Real (R$)
+- Fuso horário: America/Sao_Paulo
+
+---
+
+## 👥 2. HORÁRIOS DE TRABALHO
+
+### **Horário Comercial:**
+```
+Nome: Comercial
+Descrição: Horário padrão administrativo
+Segunda a Sexta: 07:12 às 17:00
+Intervalo almoço: 12:00 às 13:00
+Horas diárias: 8,8h
+Horas semanais: 44h
+```
+
+### **Horário Estagiário:**
+```
+Nome: Estagiário
+Descrição: Meio período manhã
+Segunda a Sexta: 07:12 às 12:12
+Sem intervalo almoço
+Horas diárias: 5h
+Horas semanais: 25h
+```
+
+### **Horário Obra (Adicional):**
+```
+Nome: Obra
+Descrição: Horário de campo
+Segunda a Sexta: 07:00 às 17:00
+Sábado: 07:00 às 12:00
+Intervalo almoço: 12:00 às 13:00
+Horas diárias: 9h (seg-sex), 5h (sáb)
+```
+
+---
+
+## 🏗️ 3. DEPARTAMENTOS E FUNÇÕES
+
+### **Departamentos:**
+1. **Administrativo**
+   - Gerência
+   - Recursos Humanos
+   - Financeiro
+
+2. **Operacional**
+   - Engenharia
+   - Obras
+   - Manutenção
+
+3. **Comercial**
+   - Vendas
+   - Atendimento
+
+### **Funções:**
+1. **Gerente Geral** (Administrativo)
+2. **Analista RH** (Administrativo)
+3. **Assistente Financeiro** (Administrativo)
+4. **Engenheiro Civil** (Operacional)
+5. **Mestre de Obras** (Operacional)
+6. **Pedreiro** (Operacional)
+7. **Servente** (Operacional)
+8. **Vendedor** (Comercial)
+9. **Estagiário** (Administrativo)
+
+---
+
+## 👨‍💼 4. FUNCIONÁRIOS
+
+### **Funcionários Administrativos (Horário Comercial):**
+
+**1. João Silva Santos** (F0001)
+```
+CPF: 123.456.789-01
+Email: joao.silva@valeverde.com.br
+Telefone: (31) 99999-1111
+Data Admissão: 01/01/2024
+Salário: R$ 8.500,00
+Departamento: Administrativo
+Função: Gerente Geral
+Horário: Comercial
+```
+
+**2. Maria Oliveira Costa** (F0002)
+```
+CPF: 234.567.890-12
+Email: maria.oliveira@valeverde.com.br
+Telefone: (31) 99999-2222
+Data Admissão: 15/02/2024
+Salário: R$ 4.500,00
+Departamento: Administrativo
+Função: Analista RH
+Horário: Comercial
+```
+
+**3. Carlos Pereira Lima** (F0003)
+```
+CPF: 345.678.901-23
+Email: carlos.pereira@valeverde.com.br
+Telefone: (31) 99999-3333
+Data Admissão: 01/03/2024
+Salário: R$ 3.800,00
+Departamento: Administrativo
+Função: Assistente Financeiro
+Horário: Comercial
+```
+
+### **Funcionários Operacionais (Horário Comercial/Obra):**
+
+**4. Ana Paula Rodrigues** (F0004)
+```
+CPF: 456.789.012-34
+Email: ana.rodrigues@valeverde.com.br
+Telefone: (31) 99999-4444
+Data Admissão: 10/01/2024
+Salário: R$ 7.200,00
+Departamento: Operacional
+Função: Engenheiro Civil
+Horário: Comercial
+```
+
+**5. Roberto Alves Souza** (F0005)
+```
+CPF: 567.890.123-45
+Email: roberto.alves@valeverde.com.br
+Telefone: (31) 99999-5555
+Data Admissão: 20/01/2024
+Salário: R$ 4.200,00
+Departamento: Operacional
+Função: Mestre de Obras
+Horário: Obra
+```
+
+**6. José Carlos Ferreira** (F0006)
+```
+CPF: 678.901.234-56
+Email: jose.ferreira@valeverde.com.br
+Telefone: (31) 99999-6666
+Data Admissão: 05/02/2024
+Salário: R$ 2.800,00
+Departamento: Operacional
+Função: Pedreiro
+Horário: Obra
+```
+
+**7. Antônio Silva Nunes** (F0007)
+```
+CPF: 789.012.345-67
+Email: antonio.nunes@valeverde.com.br
+Telefone: (31) 99999-7777
+Data Admissão: 15/02/2024
+Salário: R$ 1.800,00
+Departamento: Operacional
+Função: Servente
+Horário: Obra
+```
+
+### **Funcionários Comerciais (Horário Comercial):**
+
+**8. Fernanda Costa Almeida** (F0008)
+```
+CPF: 890.123.456-78
+Email: fernanda.almeida@valeverde.com.br
+Telefone: (31) 99999-8888
+Data Admissão: 01/02/2024
+Salário: R$ 3.500,00
+Departamento: Comercial
+Função: Vendedor
+Horário: Comercial
+```
+
+### **Estagiários (Horário Estagiário):**
+
+**9. Lucas Mendes Oliveira** (F0009)
+```
+CPF: 901.234.567-89
+Email: lucas.mendes@valeverde.com.br
+Telefone: (31) 99999-9999
+Data Admissão: 01/03/2024
+Salário: R$ 1.200,00
+Departamento: Administrativo
+Função: Estagiário
+Horário: Estagiário
+```
+
+**10. Juliana Santos Lima** (F0010)
+```
+CPF: 012.345.678-90
+Email: juliana.santos@valeverde.com.br
+Telefone: (31) 99999-0000
+Data Admissão: 15/03/2024
+Salário: R$ 1.200,00
+Departamento: Operacional
+Função: Estagiário
+Horário: Estagiário
+```
+
+---
+
+## 🏗️ 5. OBRAS/PROJETOS
+
+### **Obra 1: Residencial Jardim das Flores**
+```
+Nome: Residencial Jardim das Flores
+Descrição: Condomínio residencial com 50 apartamentos
+Data Início: 01/01/2024
+Data Fim Prevista: 31/12/2024
+Orçamento Total: R$ 2.500.000,00
+Cliente: Incorporadora Belo Horizonte Ltda
+Localização: Bairro Jardim das Flores - BH/MG
+Status: Em andamento
+Responsável: Ana Paula Rodrigues (F0004)
+```
+
+**Serviços da Obra:**
+1. Fundação
+2. Estrutura de Concreto
+3. Alvenaria
+4. Instalações Elétricas
+5. Instalações Hidráulicas
+6. Revestimentos
+7. Pintura
+8. Acabamentos
+
+### **Obra 2: Galpão Industrial Zona Norte**
+```
+Nome: Galpão Industrial Zona Norte
+Descrição: Galpão industrial de 2.000m²
+Data Início: 15/02/2024
+Data Fim Prevista: 15/08/2024
+Orçamento Total: R$ 800.000,00
+Cliente: Indústria Metalúrgica Norte Ltda
+Localização: Distrito Industrial - Contagem/MG
+Status: Em andamento
+Responsável: Roberto Alves Souza (F0005)
+```
+
+**Serviços da Obra:**
+1. Terraplanagem
+2. Fundação
+3. Estrutura Metálica
+4. Cobertura
+5. Instalações Industriais
+
+### **Obra 3: Reforma Escritório Central**
+```
+Nome: Reforma Escritório Central
+Descrição: Reforma completa do escritório administrativo
+Data Início: 01/03/2024
+Data Fim Prevista: 30/04/2024
+Orçamento Total: R$ 150.000,00
+Cliente: Construtora Vale Verde (própria)
+Localização: Rua das Obras, 123 - BH/MG
+Status: Em andamento
+Responsável: José Carlos Ferreira (F0006)
+```
+
+---
+
+## 🚗 6. VEÍCULOS
+
+### **Veículo 1: Caminhão**
+```
+Marca: Mercedes-Benz
+Modelo: Accelo 815
+Ano: 2020
+Placa: ABC-1234
+Cor: Branco
+Combustível: Diesel
+Status: Ativo
+Responsável: Roberto Alves Souza (F0005)
+```
+
+### **Veículo 2: Van**
+```
+Marca: Fiat
+Modelo: Ducato
+Ano: 2021
+Placa: DEF-5678
+Cor: Branco
+Combustível: Diesel
+Status: Ativo
+Responsável: José Carlos Ferreira (F0006)
+```
+
+### **Veículo 3: Carro**
+```
+Marca: Volkswagen
+Modelo: Saveiro
+Ano: 2022
+Placa: GHI-9012
+Cor: Branco
+Combustível: Flex
+Status: Ativo
+Responsável: João Silva Santos (F0001)
+```
+
+### **Veículo 4: Moto**
+```
+Marca: Honda
+Modelo: CG 160
+Ano: 2023
+Placa: JKL-3456
+Cor: Vermelha
+Combustível: Gasolina
+Status: Manutenção
+Responsável: Antônio Silva Nunes (F0007)
+```
+
+---
+
+## 🍽️ 7. RESTAURANTES
+
+### **Restaurante 1:**
+```
+Nome: Restaurante do Zé
+Endereço: Rua da Comida, 456 - Centro - BH/MG
+Telefone: (31) 3333-5555
+Especialidade: Comida caseira
+```
+
+### **Restaurante 2:**
+```
+Nome: Lanchonete da Obra
+Endereço: Av. Industrial, 789 - Contagem/MG
+Telefone: (31) 3333-6666
+Especialidade: Lanches e marmitas
+```
+
+### **Restaurante 3:**
+```
+Nome: Cantina Central
+Endereço: Rua das Obras, 200 - Centro - BH/MG
+Telefone: (31) 3333-7777
+Especialidade: Self-service
+```
+
+---
+
+## 📊 8. LANÇAMENTOS DE PONTO (JULHO 2024)
+
+### **Semana 1 (01/07 a 05/07/2024):**
+
+**Segunda-feira (01/07/2024):**
+- **João Silva (F0001)** - Comercial
+  - Entrada: 07:12, Almoço: 12:00-13:00, Saída: 17:00
+  - Horas: 8,8h, Extras: 0h
+  
+- **Maria Oliveira (F0002)** - Comercial
+  - Entrada: 07:15, Almoço: 12:00-13:00, Saída: 17:00
+  - Horas: 8,75h, Extras: 0h, Atraso: 3min
+  
+- **Carlos Pereira (F0003)** - Comercial
+  - Entrada: 07:12, Almoço: 12:00-13:00, Saída: 18:00
+  - Horas: 9,8h, Extras: 1h
+  
+- **Ana Paula (F0004)** - Comercial
+  - Entrada: 07:12, Almoço: 12:00-13:00, Saída: 17:00
+  - Horas: 8,8h, Extras: 0h
+  
+- **Roberto Alves (F0005)** - Obra
+  - Entrada: 07:00, Almoço: 12:00-13:00, Saída: 17:00
+  - Horas: 9h, Extras: 0h
+  
+- **José Carlos (F0006)** - Obra
+  - Entrada: 07:00, Almoço: 12:00-13:00, Saída: 17:30
+  - Horas: 9,5h, Extras: 0,5h
+  
+- **Antônio Silva (F0007)** - Obra
+  - Entrada: 07:05, Almoço: 12:00-13:00, Saída: 17:00
+  - Horas: 8,92h, Extras: 0h, Atraso: 5min
+  
+- **Fernanda Costa (F0008)** - Comercial
+  - Entrada: 07:12, Almoço: 12:00-13:00, Saída: 17:00
+  - Horas: 8,8h, Extras: 0h
+  
+- **Lucas Mendes (F0009)** - Estagiário
+  - Entrada: 07:12, Saída: 12:12
+  - Horas: 5h, Extras: 0h
+  
+- **Juliana Santos (F0010)** - Estagiário
+  - Entrada: 07:15, Saída: 12:12
+  - Horas: 4,95h, Extras: 0h, Atraso: 3min
+
+**Terça-feira (02/07/2024):**
+- Repetir padrão similar com pequenas variações
+- Adicionar 1 falta: Antônio Silva (F0007) - Falta não justificada
+
+**Quarta-feira (03/07/2024):**
+- Padrão normal
+- Carlos Pereira (F0003): 2h extras (saída 19:00)
+
+**Quinta-feira (04/07/2024):**
+- Padrão normal
+- Maria Oliveira (F0002): Falta justificada (atestado médico)
+
+**Sexta-feira (05/07/2024):**
+- Padrão normal
+- Roberto Alves (F0005): Trabalho no sábado (06/07) - 5h extras
+
+### **Continuar padrão para todo o mês de julho com variações:**
+- 2-3 faltas não justificadas por funcionário
+- 1-2 faltas justificadas por funcionário
+- Horas extras variadas
+- Alguns atrasos esporádicos
+- Trabalho em alguns sábados
+
+---
+
+## 🍽️ 9. LANÇAMENTOS DE ALIMENTAÇÃO
+
+### **Semana 1 (01/07 a 05/07/2024):**
+
+**Segunda-feira (01/07/2024):**
+```
+Restaurante: Restaurante do Zé
+Tipo: Almoço
+Valor unitário: R$ 18,50
+Obra: Residencial Jardim das Flores
+Funcionários: João Silva, Maria Oliveira, Ana Paula, Roberto Alves, José Carlos
+Total: 5 funcionários × R$ 18,50 = R$ 92,50
+```
+
+**Terça-feira (02/07/2024):**
+```
+Restaurante: Lanchonete da Obra
+Tipo: Almoço
+Valor unitário: R$ 15,00
+Obra: Galpão Industrial Zona Norte
+Funcionários: Roberto Alves, José Carlos, Antônio Silva
+Total: 3 funcionários × R$ 15,00 = R$ 45,00
+```
+
+**Quarta-feira (03/07/2024):**
+```
+Restaurante: Cantina Central
+Tipo: Almoço
+Valor unitário: R$ 22,00
+Obra: Reforma Escritório Central
+Funcionários: Carlos Pereira, Fernanda Costa, Lucas Mendes, Juliana Santos
+Total: 4 funcionários × R$ 22,00 = R$ 88,00
+```
+
+**Continuar padrão para o mês inteiro:**
+- 3-4 lançamentos por semana
+- Variar restaurantes e obras
+- Incluir diferentes tipos (almoço, lanche, jantar)
+- Valores entre R$ 12,00 e R$ 25,00
+
+---
+
+## 🚗 10. USO DE VEÍCULOS
+
+### **Registros de Uso - Julho 2024:**
+
+**01/07/2024 - Caminhão (ABC-1234):**
+```
+Funcionário: Roberto Alves (F0005)
+Obra: Residencial Jardim das Flores
+Km Inicial: 45.230
+Km Final: 45.280
+Km Rodados: 50
+Combustível: R$ 120,00
+Finalidade: Transporte de materiais
+```
+
+**02/07/2024 - Van (DEF-5678):**
+```
+Funcionário: José Carlos (F0006)
+Obra: Galpão Industrial Zona Norte
+Km Inicial: 32.150
+Km Final: 32.220
+Km Rodados: 70
+Combustível: R$ 95,00
+Finalidade: Transporte de equipe
+```
+
+**03/07/2024 - Carro (GHI-9012):**
+```
+Funcionário: João Silva (F0001)
+Obra: Reforma Escritório Central
+Km Inicial: 28.500
+Km Final: 28.530
+Km Rodados: 30
+Combustível: R$ 60,00
+Finalidade: Visita técnica
+```
+
+**Continuar padrão:**
+- 2-3 usos por semana por veículo
+- Variar funcionários e obras
+- Combustível entre R$ 50,00 e R$ 150,00
+- Km rodados entre 20 e 100 por uso
+
+---
+
+## 💰 11. OUTROS CUSTOS
+
+### **Julho 2024 - Custos Diversos:**
+
+**Obra: Residencial Jardim das Flores**
+```
+05/07/2024 - Materiais de Construção
+Fornecedor: Depósito Central
+Valor: R$ 15.500,00
+Categoria: Material
+Descrição: Cimento, areia, brita
+
+08/07/2024 - Aluguel de Equipamentos
+Fornecedor: Locadora Máquinas BH
+Valor: R$ 2.800,00
+Categoria: Equipamento
+Descrição: Betoneira e andaimes
+
+12/07/2024 - Serviços Terceirizados
+Fornecedor: Elétrica Silva Ltda
+Valor: R$ 4.200,00
+Categoria: Serviço
+Descrição: Instalações elétricas
+
+15/07/2024 - Materiais de Construção
+Fornecedor: Casa do Construtor
+Valor: R$ 8.900,00
+Categoria: Material
+Descrição: Tijolos e argamassa
+```
+
+**Obra: Galpão Industrial Zona Norte**
+```
+03/07/2024 - Estrutura Metálica
+Fornecedor: Metalúrgica Norte
+Valor: R$ 25.000,00
+Categoria: Material
+Descrição: Vigas e pilares metálicos
+
+10/07/2024 - Aluguel de Equipamentos
+Fornecedor: Guindaste Pesado Ltda
+Valor: R$ 3.500,00
+Categoria: Equipamento
+Descrição: Guindaste para montagem
+
+18/07/2024 - Serviços Terceirizados
+Fornecedor: Soldas Industriais
+Valor: R$ 6.800,00
+Categoria: Serviço
+Descrição: Soldas especializadas
+```
+
+**Obra: Reforma Escritório Central**
+```
+02/07/2024 - Materiais de Acabamento
+Fornecedor: Tintas e Texturas
+Valor: R$ 1.800,00
+Categoria: Material
+Descrição: Tintas e pincéis
+
+09/07/2024 - Móveis e Equipamentos
+Fornecedor: Móveis Corporativos
+Valor: R$ 5.200,00
+Categoria: Equipamento
+Descrição: Mesas e cadeiras
+
+16/07/2024 - Serviços Terceirizados
+Fornecedor: Limpeza Profissional
+Valor: R$ 800,00
+Categoria: Serviço
+Descrição: Limpeza pós-obra
+```
+
+---
+
+## 📋 12. RDOs (RELATÓRIOS DIÁRIOS DE OBRA)
+
+### **RDO 1 - Residencial Jardim das Flores (01/07/2024):**
+```
+Obra: Residencial Jardim das Flores
+Data: 01/07/2024
+Responsável: Ana Paula Rodrigues (F0004)
+
+Serviços Executados:
+- Fundação - Bloco A
+  Quantidade: 15 m³ de concreto
+  % Executado: 25%
+  
+- Alvenaria - Bloco B  
+  Quantidade: 80 m² de parede
+  % Executado: 40%
+
+Funcionários Presentes:
+- Roberto Alves (F0005) - Mestre de Obras
+- José Carlos (F0006) - Pedreiro
+- Antônio Silva (F0007) - Servente
+
+Equipamentos Utilizados:
+- Betoneira
+- Andaimes
+- Ferramentas manuais
+
+Observações:
+Clima favorável. Entrega de materiais conforme programado.
+Produtividade dentro do esperado.
+```
+
+### **RDO 2 - Galpão Industrial (02/07/2024):**
+```
+Obra: Galpão Industrial Zona Norte
+Data: 02/07/2024
+Responsável: Roberto Alves Souza (F0005)
+
+Serviços Executados:
+- Terraplanagem
+  Quantidade: 200 m² nivelados
+  % Executado: 60%
+  
+- Fundação - Sapatas
+  Quantidade: 8 sapatas concretadas
+  % Executado: 30%
+
+Funcionários Presentes:
+- José Carlos (F0006) - Pedreiro
+- Antônio Silva (F0007) - Servente
+
+Equipamentos Utilizados:
+- Retroescavadeira
+- Vibrador de concreto
+
+Observações:
+Início da concretagem das sapatas.
+Aguardando entrega de vigas metálicas.
+```
+
+### **RDO 3 - Reforma Escritório (03/07/2024):**
+```
+Obra: Reforma Escritório Central
+Data: 03/07/2024
+Responsável: José Carlos Ferreira (F0006)
+
+Serviços Executados:
+- Demolição
+  Quantidade: 20 m² de parede removida
+  % Executado: 80%
+  
+- Instalações Elétricas
+  Quantidade: 15 pontos instalados
+  % Executado: 50%
+
+Funcionários Presentes:
+- Antônio Silva (F0007) - Servente
+- Juliana Santos (F0010) - Estagiário
+
+Equipamentos Utilizados:
+- Furadeira
+- Marreta
+- Ferramentas elétricas
+
+Observações:
+Demolição quase concluída.
+Iniciando nova fase de instalações.
+```
+
+**Continuar criando RDOs:**
+- 2-3 RDOs por semana por obra
+- Variar serviços e percentuais
+- Incluir diferentes funcionários
+- Observações realistas
+
+---
+
+## 📊 13. SCRIPT DE POPULAÇÃO AUTOMÁTICA
+
+### **Ordem de Execução:**
+
+```python
+# Script para popular o banco de dados
+def popular_aplicativo_completo():
+    """
+    Popula o aplicativo com todos os dados de teste
+    """
+    
+    print("🏢 1. Criando configurações da empresa...")
+    criar_empresa()
+    
+    print("⏰ 2. Criando horários de trabalho...")
+    criar_horarios_trabalho()
+    
+    print("🏢 3. Criando departamentos e funções...")
+    criar_departamentos_funcoes()
+    
+    print("👥 4. Criando funcionários...")
+    criar_funcionarios()
+    
+    print("🏗️ 5. Criando obras...")
+    criar_obras()
+    
+    print("🚗 6. Criando veículos...")
+    criar_veiculos()
+    
+    print("🍽️ 7. Criando restaurantes...")
+    criar_restaurantes()
+    
+    print("📊 8. Criando registros de ponto...")
+    criar_registros_ponto_julho()
+    
+    print("🍽️ 9. Criando lançamentos de alimentação...")
+    criar_lancamentos_alimentacao_julho()
+    
+    print("🚗 10. Criando registros de uso de veículos...")
+    criar_uso_veiculos_julho()
+    
+    print("💰 11. Criando outros custos...")
+    criar_outros_custos_julho()
+    
+    print("📋 12. Criando RDOs...")
+    criar_rdos_julho()
+    
+    print("✅ População completa finalizada!")
+    print("📊 Gerando relatório de dados criados...")
+    gerar_relatorio_dados()
+
+# Executar população
+popular_aplicativo_completo()
+```
+
+---
+
+## 🎯 14. VALIDAÇÕES APÓS POPULAÇÃO
+
+### **Checklist de Testes:**
+
+**Funcionários e Horários:**
+- [ ] 10 funcionários criados com horários corretos
+- [ ] Estagiários com horário 7h12-12h12 (5h)
+- [ ] Comercial com horário 7h12-17h (8,8h)
+- [ ] Obra com horário 7h-17h (9h)
+
+**Registros de Ponto:**
+- [ ] Horas extras calculadas corretamente
+- [ ] Atrasos registrados adequadamente
+- [ ] Faltas justificadas e não justificadas
+- [ ] KPIs sendo calculados
+
+**Custos e Financeiro:**
+- [ ] Alimentação vinculada às obras
+- [ ] Uso de veículos com custos
+- [ ] Outros custos categorizados
+- [ ] Totais por obra corretos
+
+**Relatórios:**
+- [ ] RDOs com progresso das obras
+- [ ] Dashboard com dados atualizados
+- [ ] Relatórios gerenciais funcionando
+- [ ] Exportações em PDF/Excel
+
+**Funcionalidades Gerais:**
+- [ ] Busca de funcionários
+- [ ] Filtros por período
+- [ ] Navegação entre páginas
+- [ ] Responsividade mobile
+
+---
+
+## 📈 15. DADOS ESPERADOS APÓS POPULAÇÃO
+
+### **Resumo Estatístico:**
+
+**Funcionários:**
+- Total: 10 funcionários
+- Ativos: 10
+- Horário Comercial: 6
+- Horário Estagiário: 2
+- Horário Obra: 2
+
+**Obras:**
+- Total: 3 obras
+- Em andamento: 3
+- Orçamento total: R$ 3.450.000,00
+
+**Registros (Julho 2024):**
+- Registros de ponto: ~220 registros
+- Lançamentos alimentação: ~60 registros
+- Uso de veículos: ~25 registros
+- Outros custos: ~12 registros
+- RDOs: ~18 registros
+
+**Custos Estimados (Julho):**
+- Mão de obra: ~R$ 45.000,00
+- Alimentação: ~R$ 1.200,00
+- Veículos: ~R$ 2.500,00
+- Outros custos: ~R$ 95.000,00
+- **Total: ~R$ 143.700,00**
+
+---
+
+## 🚀 16. EXECUÇÃO
+
+**Para implementar esta população:**
+
+1. **Executar script de criação** dos dados básicos
+2. **Popular registros de ponto** do mês de julho
+3. **Criar lançamentos** de alimentação, veículos e custos
+4. **Gerar RDOs** para as obras
+5. **Validar cálculos** de KPIs e relatórios
+6. **Testar todas as funcionalidades** do sistema
+
+**Resultado:** Sistema completamente populado e pronto para demonstração e testes de todas as funcionalidades!
+
+---
+
+**Este prompt criará um ambiente completo de teste com dados realistas para validar todas as funcionalidades do SIGE!**
+

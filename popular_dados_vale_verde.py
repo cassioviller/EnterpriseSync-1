@@ -10,27 +10,44 @@ from werkzeug.security import generate_password_hash
 from datetime import datetime, date, time, timedelta
 import random
 
+# Dados específicos do arquivo anexo
+
 def limpar_dados_existentes():
     """Limpa dados existentes para recriação"""
-    print("🗑️ Limpando dados existentes...")
+    print("🗑️ Verificando dados existentes...")
     
-    # Ordem de limpeza respeitando FK constraints
-    models_to_clear = [
-        RegistroAlimentacao, OutroCusto, CustoVeiculo, CustoObra, 
-        RegistroPonto, Ocorrencia, RDO, Funcionario, 
-        Usuario, HorarioTrabalho, Funcao, Departamento, 
-        Obra, Veiculo, Restaurante
-    ]
-    
-    for model in models_to_clear:
-        try:
-            db.session.query(model).delete()
-            print(f"   ✅ {model.__name__} limpo")
-        except Exception as e:
-            print(f"   ⚠️ Erro ao limpar {model.__name__}: {e}")
-    
-    db.session.commit()
-    print("   🔄 Dados limpos com sucesso!\n")
+    try:
+        # Primeiro, remove constraints FK temporariamente para Obra
+        from sqlalchemy import text
+        db.session.execute(text("UPDATE obra SET responsavel_id = NULL WHERE responsavel_id IS NOT NULL;"))
+        db.session.commit()
+        
+        # Ordem de limpeza respeitando FK constraints
+        models_to_clear = [
+            RegistroAlimentacao, OutroCusto, CustoVeiculo, CustoObra, 
+            RegistroPonto, Ocorrencia, RDO, Funcionario, 
+            Usuario, HorarioTrabalho, Funcao, Departamento, 
+            Obra, Veiculo, Restaurante
+        ]
+        
+        for model in models_to_clear:
+            try:
+                count = db.session.query(model).count()
+                if count > 0:
+                    db.session.query(model).delete()
+                    print(f"   ✅ {model.__name__} limpo ({count} registros)")
+                else:
+                    print(f"   ℹ️ {model.__name__} já vazio")
+            except Exception as e:
+                print(f"   ⚠️ Erro ao limpar {model.__name__}: {e}")
+                db.session.rollback()
+        
+        db.session.commit()
+        print("   🔄 Dados limpos com sucesso!\n")
+        
+    except Exception as e:
+        print(f"   ❌ Erro geral na limpeza: {e}")
+        db.session.rollback()
 
 def criar_horarios_trabalho():
     """Cria os horários de trabalho"""
@@ -70,9 +87,13 @@ def criar_horarios_trabalho():
     ]
     
     for horario_data in horarios:
-        horario = HorarioTrabalho(**horario_data)
-        db.session.add(horario)
-        print(f"   ✅ Horário {horario.nome} criado")
+        horario_existente = HorarioTrabalho.query.filter_by(nome=horario_data['nome']).first()
+        if not horario_existente:
+            horario = HorarioTrabalho(**horario_data)
+            db.session.add(horario)
+            print(f"   ✅ Horário {horario.nome} criado")
+        else:
+            print(f"   ℹ️ Horário {horario_data['nome']} já existe")
     
     db.session.commit()
     print("   🔄 Horários salvos!\n")
@@ -126,29 +147,36 @@ def criar_usuarios_admin():
     """Cria usuários administrativos"""
     print("👤 Criando usuários administrativos...")
     
-    # Super Admin
-    super_admin = Usuario(
-        username='axiom',
-        email='axiom@valeverde.com.br',
-        password_hash=generate_password_hash('cassio123'),
-        nome='Axiom Super Admin',
-        tipo_usuario=TipoUsuario.SUPER_ADMIN,
-        ativo=True
-    )
-    db.session.add(super_admin)
-    print("   ✅ Super Admin 'axiom' criado")
+    # Verificar se já existem
+    super_admin = Usuario.query.filter_by(username='axiom').first()
+    if not super_admin:
+        super_admin = Usuario(
+            username='axiom',
+            email='axiom@valeverde.com.br',
+            password_hash=generate_password_hash('cassio123'),
+            nome='Axiom Super Admin',
+            tipo_usuario=TipoUsuario.SUPER_ADMIN,
+            ativo=True
+        )
+        db.session.add(super_admin)
+        print("   ✅ Super Admin 'axiom' criado")
+    else:
+        print("   ℹ️ Super Admin 'axiom' já existe")
     
-    # Admin
-    admin = Usuario(
-        username='admin',
-        email='admin@valeverde.com.br',
-        password_hash=generate_password_hash('admin123'),
-        nome='Administrador Vale Verde',
-        tipo_usuario=TipoUsuario.ADMIN,
-        ativo=True
-    )
-    db.session.add(admin)
-    print("   ✅ Admin 'admin' criado")
+    admin = Usuario.query.filter_by(username='admin').first()
+    if not admin:
+        admin = Usuario(
+            username='admin',
+            email='admin@valeverde.com.br',
+            password_hash=generate_password_hash('admin123'),
+            nome='Administrador Vale Verde',
+            tipo_usuario=TipoUsuario.ADMIN,
+            ativo=True
+        )
+        db.session.add(admin)
+        print("   ✅ Admin 'admin' criado")
+    else:
+        print("   ℹ️ Admin 'admin' já existe")
     
     db.session.commit()
     return admin
