@@ -72,7 +72,7 @@
                                 <tr>
                                     <td>{{ func.nome }}</td>
                                     <td><strong>{{ func.username }}</strong></td>
-                                    <td>{{ func.email }}</td>
+                                    <td>{{ func.email or '-' }}</td>
                                     <td>
                                         <span class="badge bg-secondary">Funcionário</span>
                                     </td>
@@ -84,25 +84,24 @@
                                         {% endif %}
                                     </td>
                                     <td>-</td>
-                                    <td>{{ func.created_at.strftime('%d/%m/%Y') }}</td>
+                                    <td>{{ func.created_at.strftime('%d/%m/%Y') if func.created_at else '-' }}</td>
                                     <td>
-                                        <div class="btn-group btn-group-sm">
-                                            <button class="btn btn-primary btn-sm" onclick="editarFuncionario({{ func.id }})" title="Editar">
-                                                <i class="fas fa-edit"></i>
-                                            </button>
+                                        <button class="btn btn-sm btn-outline-primary me-1" onclick="editarFuncionario({{ func.id }}, '{{ func.nome }}', '{{ func.username }}', '{{ func.email or '' }}', {{ func.ativo|tojson }})" title="Editar">
+                                            <i class="fas fa-edit"></i>
+                                        </button>
+                                        <button class="btn btn-sm btn-outline-warning me-1" onclick="alterarSenha({{ func.id }}, '{{ func.nome }}')" title="Alterar Senha">
+                                            <i class="fas fa-key"></i>
+                                        </button>
+                                        <button class="btn btn-sm btn-outline-info me-1" onclick="toggleStatus({{ func.id }}, {{ func.ativo|tojson }}, '{{ func.nome }}')" title="{% if func.ativo %}Desativar{% else %}Ativar{% endif %}">
                                             {% if func.ativo %}
-                                                <button class="btn btn-warning btn-sm" onclick="toggleStatusFuncionario({{ func.id }}, false)" title="Desativar">
-                                                    <i class="fas fa-pause"></i>
-                                                </button>
+                                                <i class="fas fa-pause"></i>
                                             {% else %}
-                                                <button class="btn btn-success btn-sm" onclick="toggleStatusFuncionario({{ func.id }}, true)" title="Ativar">
-                                                    <i class="fas fa-play"></i>
-                                                </button>
+                                                <i class="fas fa-play"></i>
                                             {% endif %}
-                                            <button class="btn btn-danger btn-sm" onclick="removerAcesso({{ func.id }})" title="Remover Acesso">
-                                                <i class="fas fa-trash"></i>
-                                            </button>
-                                        </div>
+                                        </button>
+                                        <button class="btn btn-sm btn-outline-danger" onclick="excluirFuncionario({{ func.id }}, '{{ func.nome }}')" title="Excluir">
+                                            <i class="fas fa-trash"></i>
+                                        </button>
                                     </td>
                                 </tr>
                                 {% endfor %}
@@ -160,6 +159,85 @@
     </div>
 </div>
 
+<!-- Modal Editar Funcionário -->
+<div class="modal fade" id="editarFuncionarioModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="fas fa-user-edit"></i> Editar Funcionário</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form id="formEditarFuncionario">
+                <div class="modal-body">
+                    <input type="hidden" id="editFuncId" name="func_id">
+                    <div class="mb-3">
+                        <label class="form-label">Nome Completo</label>
+                        <input type="text" class="form-control" id="editNome" name="nome" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Username</label>
+                        <input type="text" class="form-control" id="editUsername" name="username" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Email</label>
+                        <input type="email" class="form-control" id="editEmail" name="email" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Nova Senha (opcional)</label>
+                        <input type="password" class="form-control" id="editSenha" name="nova_senha">
+                        <div class="form-text">Deixe em branco para manter a senha atual</div>
+                    </div>
+                    <div class="mb-3">
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="editAtivo" name="ativo">
+                            <label class="form-check-label" for="editAtivo">
+                                Acesso ativo
+                            </label>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-primary">Salvar Alterações</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Alterar Senha -->
+<div class="modal fade" id="alterarSenhaModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="fas fa-key"></i> Alterar Senha</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form id="formAlterarSenha">
+                <div class="modal-body">
+                    <input type="hidden" id="senhaFuncId">
+                    <div class="alert alert-info">
+                        <i class="fas fa-info-circle"></i> Alterando senha para: <strong id="senhaFuncNome"></strong>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Nova Senha</label>
+                        <input type="password" class="form-control" id="novaSenha" required minlength="6">
+                        <div class="form-text">Mínimo de 6 caracteres</div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Confirmar Nova Senha</label>
+                        <input type="password" class="form-control" id="confirmarSenha" required>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-warning">Alterar Senha</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
 <script>
 // Inicializar DataTable
 $(document).ready(function() {
@@ -172,18 +250,33 @@ $(document).ready(function() {
     });
 });
 
-function editarFuncionario(funcId) {
-    alert('Funcionalidade de edição em desenvolvimento');
+function editarFuncionario(id, nome, username, email, ativo) {
+    $('#editFuncId').val(id);
+    $('#editNome').val(nome);
+    $('#editUsername').val(username);
+    $('#editEmail').val(email);
+    $('#editAtivo').prop('checked', ativo);
+    $('#editSenha').val('');
+    $('#editarFuncionarioModal').modal('show');
 }
 
-function toggleStatusFuncionario(funcId, ativo) {
-    if (confirm(ativo ? 'Ativar este funcionário?' : 'Desativar este funcionário?')) {
-        fetch(`/admin/funcionario/toggle-status/${funcId}`, {
+function alterarSenha(id, nome) {
+    $('#senhaFuncId').val(id);
+    $('#senhaFuncNome').text(nome);
+    $('#novaSenha').val('');
+    $('#confirmarSenha').val('');
+    $('#alterarSenhaModal').modal('show');
+}
+
+function toggleStatus(id, ativo, nome) {
+    const acao = ativo ? 'desativar' : 'ativar';
+    if (confirm(`Tem certeza que deseja ${acao} o acesso de ${nome}?`)) {
+        fetch(`/admin/funcionario-acesso/${id}/toggle-status`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
             },
-            body: JSON.stringify({ativo: ativo})
+            body: JSON.stringify({ativo: !ativo})
         })
         .then(response => response.json())
         .then(data => {
@@ -192,24 +285,97 @@ function toggleStatusFuncionario(funcId, ativo) {
             } else {
                 alert('Erro: ' + data.message);
             }
+        })
+        .catch(error => {
+            console.error('Erro:', error);
+            alert('Erro ao alterar status');
         });
     }
 }
 
-function removerAcesso(funcId) {
-    if (confirm('Tem certeza que deseja remover o acesso deste funcionário? Esta ação não pode ser desfeita.')) {
-        fetch(`/admin/funcionario/remover-acesso/${funcId}`, {
+function excluirFuncionario(id, nome) {
+    if (confirm(`Tem certeza que deseja excluir o acesso de ${nome}? Esta ação não pode ser desfeita.`)) {
+        fetch(`/admin/funcionario-acesso/${id}/excluir`, {
             method: 'POST'
         })
         .then(response => response.json())
         .then(data => {
             if (data.success) {
+                alert(data.message);
                 location.reload();
             } else {
                 alert('Erro: ' + data.message);
             }
+        })
+        .catch(error => {
+            console.error('Erro:', error);
+            alert('Erro ao excluir funcionário');
         });
     }
 }
+
+// Form handlers
+$('#formEditarFuncionario').on('submit', function(e) {
+    e.preventDefault();
+    
+    const formData = new FormData(this);
+    const id = $('#editFuncId').val();
+    
+    fetch(`/admin/funcionario-acesso/${id}/editar`, {
+        method: 'POST',
+        body: formData
+    })
+    .then(response => {
+        if (response.ok) {
+            alert('Funcionário atualizado com sucesso!');
+            location.reload();
+        } else {
+            alert('Erro ao atualizar funcionário');
+        }
+    })
+    .catch(error => {
+        console.error('Erro:', error);
+        alert('Erro ao atualizar funcionário');
+    });
+});
+
+$('#formAlterarSenha').on('submit', function(e) {
+    e.preventDefault();
+    
+    const novaSenha = $('#novaSenha').val();
+    const confirmarSenha = $('#confirmarSenha').val();
+    
+    if (novaSenha !== confirmarSenha) {
+        alert('As senhas não coincidem!');
+        return;
+    }
+    
+    if (novaSenha.length < 6) {
+        alert('A senha deve ter pelo menos 6 caracteres!');
+        return;
+    }
+    
+    const id = $('#senhaFuncId').val();
+    const formData = new FormData();
+    formData.append('nova_senha', novaSenha);
+    
+    fetch(`/admin/funcionario-acesso/${id}/alterar-senha`, {
+        method: 'POST',
+        body: formData
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            alert(data.message);
+            $('#alterarSenhaModal').modal('hide');
+        } else {
+            alert('Erro: ' + data.message);
+        }
+    })
+    .catch(error => {
+        console.error('Erro:', error);
+        alert('Erro ao alterar senha');
+    });
+});
 </script>
 {% endblock %}

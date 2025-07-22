@@ -163,6 +163,111 @@ def criar_funcionario_acesso():
     flash(f'Acesso criado para {nome}!', 'success')
     return redirect(url_for('main.admin_acessos'))
 
+@main_bp.route('/admin/funcionario-acesso/<int:funcionario_id>/editar', methods=['GET', 'POST'])
+@admin_required
+def editar_funcionario_acesso(funcionario_id):
+    """Editar dados de funcionário com acesso"""
+    funcionario = Usuario.query.filter_by(
+        id=funcionario_id, 
+        admin_id=current_user.id, 
+        tipo_usuario=TipoUsuario.FUNCIONARIO
+    ).first_or_404()
+    
+    if request.method == 'POST':
+        # Atualizar dados básicos
+        funcionario.nome = request.form['nome']
+        funcionario.email = request.form['email']
+        
+        # Verificar se username mudou e se não existe
+        novo_username = request.form['username']
+        if novo_username != funcionario.username:
+            if Usuario.query.filter_by(username=novo_username).first():
+                flash('Username já existe.', 'danger')
+                return redirect(url_for('main.editar_funcionario_acesso', funcionario_id=funcionario_id))
+            funcionario.username = novo_username
+        
+        # Alterar senha se fornecida
+        nova_senha = request.form.get('nova_senha')
+        if nova_senha:
+            funcionario.password_hash = generate_password_hash(nova_senha)
+            flash('Senha alterada com sucesso!', 'success')
+        
+        # Status ativo/inativo
+        funcionario.ativo = 'ativo' in request.form
+        
+        db.session.commit()
+        flash(f'Dados de {funcionario.nome} atualizados!', 'success')
+        return redirect(url_for('main.admin_acessos'))
+    
+    return render_template('editar_funcionario_acesso.html', funcionario=funcionario)
+
+@main_bp.route('/admin/funcionario-acesso/<int:funcionario_id>/alterar-senha', methods=['POST'])
+@admin_required
+def alterar_senha_funcionario(funcionario_id):
+    """Alterar senha específica de um funcionário"""
+    try:
+        funcionario = Usuario.query.filter_by(
+            id=funcionario_id, 
+            admin_id=current_user.id, 
+            tipo_usuario=TipoUsuario.FUNCIONARIO
+        ).first_or_404()
+        
+        nova_senha = request.form.get('nova_senha')
+        if not nova_senha:
+            return jsonify({'success': False, 'message': 'Nova senha é obrigatória'})
+        
+        funcionario.password_hash = generate_password_hash(nova_senha)
+        db.session.commit()
+        
+        return jsonify({'success': True, 'message': 'Senha alterada com sucesso'})
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'message': 'Erro ao alterar senha'})
+
+@main_bp.route('/admin/funcionario-acesso/<int:funcionario_id>/toggle-status', methods=['POST'])
+@admin_required 
+def toggle_funcionario_status(funcionario_id):
+    """Ativar/desativar acesso do funcionário"""
+    try:
+        funcionario = Usuario.query.filter_by(
+            id=funcionario_id, 
+            admin_id=current_user.id, 
+            tipo_usuario=TipoUsuario.FUNCIONARIO
+        ).first_or_404()
+        
+        data = request.get_json()
+        funcionario.ativo = data.get('ativo', False)
+        db.session.commit()
+        
+        status = 'ativado' if funcionario.ativo else 'desativado'
+        return jsonify({'success': True, 'message': f'Acesso {status} para {funcionario.nome}'})
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'message': 'Erro ao alterar status'})
+
+@main_bp.route('/admin/funcionario-acesso/<int:funcionario_id>/excluir', methods=['POST'])
+@admin_required
+def excluir_funcionario_acesso(funcionario_id):
+    """Excluir funcionário com acesso"""
+    try:
+        funcionario = Usuario.query.filter_by(
+            id=funcionario_id, 
+            admin_id=current_user.id, 
+            tipo_usuario=TipoUsuario.FUNCIONARIO
+        ).first_or_404()
+        
+        nome = funcionario.nome
+        db.session.delete(funcionario)
+        db.session.commit()
+        
+        return jsonify({'success': True, 'message': f'Acesso de {nome} excluído com sucesso'})
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'message': 'Erro ao excluir funcionário'})
+
 # ===== DASHBOARD FUNCIONÁRIO =====
 @main_bp.route('/funcionario-dashboard')
 @funcionario_required
