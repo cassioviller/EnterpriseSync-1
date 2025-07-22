@@ -1567,41 +1567,44 @@ def novo_uso_veiculo_lista():
     
     return redirect(url_for('main.veiculos'))
 
-@main_bp.route('/veiculos/novo-custo', methods=['POST'])
+@main_bp.route('/veiculos/custo', methods=['POST'])
 @login_required
-def novo_custo_veiculo():
-    """Registra novo custo de veículo"""
+def novo_custo_veiculo_lista():
+    """Registra novo custo de veículo a partir da lista principal"""
     try:
         veiculo_id = request.form.get('veiculo_id')
         data_custo = datetime.strptime(request.form.get('data_custo'), '%Y-%m-%d').date()
         valor = float(request.form.get('valor'))
         tipo_custo = request.form.get('tipo_custo')
-        obra_id = request.form.get('obra_id')
         fornecedor = request.form.get('fornecedor')
         descricao = request.form.get('descricao')
-        
-        if not obra_id:
-            flash('Obra é obrigatória para registrar custo do veículo!', 'error')
-            return redirect(url_for('main.detalhes_veiculo', id=veiculo_id))
+        km_atual = int(request.form.get('km_atual')) if request.form.get('km_atual') else None
         
         novo_custo = CustoVeiculo(
             veiculo_id=veiculo_id,
             data_custo=data_custo,
             valor=valor,
             tipo_custo=tipo_custo,
-            obra_id=obra_id,
-            fornecedor=fornecedor,
-            descricao=descricao
+            descricao=descricao,
+            km_atual=km_atual,
+            fornecedor=fornecedor
         )
         
         db.session.add(novo_custo)
+        
+        # Atualizar KM do veículo se fornecido
+        if km_atual:
+            veiculo = Veiculo.query.get(veiculo_id)
+            if veiculo:
+                veiculo.km_atual = km_atual
+        
         db.session.commit()
         
-        flash('Custo do veículo registrado com sucesso!', 'success')
+        flash('Custo de veículo registrado com sucesso!', 'success')
     except Exception as e:
-        flash(f'Erro ao registrar custo: {str(e)}', 'error')
+        flash(f'Erro ao registrar custo do veículo: {str(e)}', 'error')
     
-    return redirect(url_for('main.detalhes_veiculo', id=veiculo_id))
+    return redirect(url_for('main.veiculos'))
 
 @main_bp.route('/veiculos/<int:id>/dados')
 @login_required
