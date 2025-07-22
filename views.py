@@ -1621,78 +1621,97 @@ def dados_veiculo(id):
         'data_proxima_manutencao': veiculo.data_proxima_manutencao.strftime('%Y-%m-%d') if veiculo.data_proxima_manutencao else ''
     })
 
-@main_bp.route('/veiculos/uso', methods=['POST'])
+@main_bp.route('/veiculos/<int:id>/novo-uso', methods=['GET', 'POST'])
 @login_required
-def novo_uso_veiculo():
-    """Registra novo uso de veículo"""
+def novo_uso_veiculo(id):
+    """Página e processamento de novo uso de veículo"""
+    veiculo = Veiculo.query.get_or_404(id)
     form = UsoVeiculoForm()
     
     # Preencher choices dinamicamente
-    form.veiculo_id.choices = [(0, 'Selecione...')] + [(v.id, f"{v.placa} - {v.marca} {v.modelo}") for v in Veiculo.query.filter_by(status='Disponível').all()]
     form.funcionario_id.choices = [(0, 'Selecione...')] + [(f.id, f.nome) for f in Funcionario.query.filter_by(ativo=True).all()]
-    form.obra_id.choices = [(0, 'Selecione...')] + [(o.id, o.nome) for o in Obra.query.all()]
+    form.obra_id.choices = [(0, 'Selecione...')] + [(o.id, o.nome) for o in Obra.query.filter(Obra.status.in_(['Em andamento', 'Pausada'])).all()]
+    
+    # Definir veiculo_id no formulário
+    form.veiculo_id.data = id
+    
+    if request.method == 'GET':
+        return render_template('veiculos/novo_uso.html', form=form, veiculo=veiculo)
     
     if form.validate_on_submit():
-        uso = UsoVeiculo(
-            veiculo_id=form.veiculo_id.data,
-            funcionario_id=form.funcionario_id.data,
-            obra_id=form.obra_id.data if form.obra_id.data else None,
-            data_uso=form.data_uso.data,
-            km_inicial=form.km_inicial.data,
-            km_final=form.km_final.data,
-            finalidade=form.finalidade.data,
-            observacoes=form.observacoes.data
-        )
-        db.session.add(uso)
-        
-        # Atualizar status do veículo para "Em uso"
-        veiculo = Veiculo.query.get(form.veiculo_id.data)
-        if veiculo:
-            veiculo.status = 'Em uso'
-            # Atualizar KM se fornecido
+        try:
+            uso = UsoVeiculo(
+                veiculo_id=id,
+                funcionario_id=form.funcionario_id.data,
+                obra_id=form.obra_id.data if form.obra_id.data and form.obra_id.data != 0 else None,
+                data_uso=form.data_uso.data,
+                km_inicial=form.km_inicial.data,
+                km_final=form.km_final.data,
+                horario_saida=form.horario_saida.data,
+                horario_chegada=form.horario_chegada.data,
+                finalidade=form.finalidade.data,
+                observacoes=form.observacoes.data
+            )
+            db.session.add(uso)
+            
+            # Atualizar KM do veículo se fornecido
             if form.km_final.data:
                 veiculo.km_atual = form.km_final.data
-        
-        db.session.commit()
-        flash('Uso de veículo registrado com sucesso!', 'success')
+            
+            db.session.commit()
+            flash('Uso de veículo registrado com sucesso!', 'success')
+            return redirect(url_for('main.detalhes_veiculo', id=id))
+        except Exception as e:
+            flash(f'Erro ao registrar uso: {str(e)}', 'error')
     else:
-        flash('Erro ao registrar uso do veículo. Verifique os dados.', 'error')
+        for field, errors in form.errors.items():
+            for error in errors:
+                flash(f'{getattr(form, field).label.text}: {error}', 'error')
     
-    return redirect(url_for('main.veiculos'))
+    return render_template('veiculos/novo_uso.html', form=form, veiculo=veiculo)
 
-@main_bp.route('/veiculos/custo', methods=['POST'])
+@main_bp.route('/veiculos/<int:id>/novo-custo', methods=['GET', 'POST'])
 @login_required
-def novo_custo_veiculo_lista():
-    """Registra novo custo de veículo a partir da lista principal"""
+def novo_custo_veiculo_form(id):
+    """Página e processamento de novo custo de veículo"""
+    veiculo = Veiculo.query.get_or_404(id)
     form = CustoVeiculoForm()
     
-    # Preencher choices dinamicamente
-    form.veiculo_id.choices = [(0, 'Selecione...')] + [(v.id, f"{v.placa} - {v.marca} {v.modelo}") for v in Veiculo.query.all()]
+    # Definir veiculo_id no formulário
+    form.veiculo_id.data = id
+    
+    if request.method == 'GET':
+        return render_template('veiculos/novo_custo.html', form=form, veiculo=veiculo)
     
     if form.validate_on_submit():
-        custo = CustoVeiculo(
-            veiculo_id=form.veiculo_id.data,
-            data_custo=form.data_custo.data,
-            valor=form.valor.data,
-            tipo_custo=form.tipo_custo.data,
-            descricao=form.descricao.data,
-            km_atual=form.km_atual.data,
-            fornecedor=form.fornecedor.data
-        )
-        db.session.add(custo)
-        
-        # Atualizar KM do veículo se fornecido
-        if form.km_atual.data:
-            veiculo = Veiculo.query.get(form.veiculo_id.data)
-            if veiculo:
+        try:
+            custo = CustoVeiculo(
+                veiculo_id=id,
+                obra_id=form.obra_id.data if hasattr(form, 'obra_id') and form.obra_id.data and form.obra_id.data != 0 else None,
+                data_custo=form.data_custo.data,
+                valor=form.valor.data,
+                tipo_custo=form.tipo_custo.data,
+                descricao=form.descricao.data,
+                km_atual=form.km_atual.data,
+                fornecedor=form.fornecedor.data
+            )
+            db.session.add(custo)
+            
+            # Atualizar KM do veículo se fornecido
+            if form.km_atual.data:
                 veiculo.km_atual = form.km_atual.data
-        
-        db.session.commit()
-        flash('Custo de veículo registrado com sucesso!', 'success')
+            
+            db.session.commit()
+            flash('Custo de veículo registrado com sucesso!', 'success')
+            return redirect(url_for('main.detalhes_veiculo', id=id))
+        except Exception as e:
+            flash(f'Erro ao registrar custo: {str(e)}', 'error')
     else:
-        flash('Erro ao registrar custo do veículo. Verifique os dados.', 'error')
+        for field, errors in form.errors.items():
+            for error in errors:
+                flash(f'{getattr(form, field).label.text}: {error}', 'error')
     
-    return redirect(url_for('main.veiculos'))
+    return render_template('veiculos/novo_custo.html', form=form, veiculo=veiculo)
 
 # ============================================================================
 # MÓDULO DE SERVIÇOS - SIGE v6.3
