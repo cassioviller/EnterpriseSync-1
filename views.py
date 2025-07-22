@@ -1426,8 +1426,8 @@ def obras():
     data_inicio_filtro = request.args.get('data_inicio')
     data_fim_filtro = request.args.get('data_fim')
     
-    # Query base
-    query = Obra.query
+    # Query base com filtro multi-tenant
+    query = Obra.query.filter(Obra.admin_id == current_user.id)
     
     # Aplicar filtros
     if nome_filtro:
@@ -1522,7 +1522,7 @@ def nova_obra():
     import json
     
     form = ObraForm()
-    form.responsavel_id.choices = [(0, 'Selecione...')] + [(f.id, f.nome) for f in Funcionario.query.filter_by(ativo=True).all()]
+    form.responsavel_id.choices = [(0, 'Selecione...')] + [(f.id, f.nome) for f in Funcionario.query.filter_by(ativo=True, admin_id=current_user.id).all()]
     
     if request.method == 'POST':
         if form.validate_on_submit():
@@ -1534,7 +1534,8 @@ def nova_obra():
                 data_previsao_fim=form.data_previsao_fim.data,
                 orcamento=form.orcamento.data or 0.0,
                 status=form.status.data,
-                responsavel_id=form.responsavel_id.data if form.responsavel_id.data > 0 else None
+                responsavel_id=form.responsavel_id.data if form.responsavel_id.data > 0 else None,
+                admin_id=current_user.id  # Associar obra ao admin logado
             )
             db.session.add(obra)
             db.session.flush()  # Para obter o ID
@@ -1560,9 +1561,9 @@ def nova_obra():
             flash('Obra cadastrada com sucesso!', 'success')
             return redirect(url_for('main.obras'))
     
-    # Buscar dados para o formulário
+    # Buscar dados para o formulário com filtro multi-tenant
     servicos = Servico.query.filter_by(ativo=True).order_by(Servico.categoria, Servico.nome).all()
-    obras = Obra.query.all()
+    obras = Obra.query.filter(Obra.admin_id == current_user.id).all()
     
     return render_template('obras.html', 
                          form=form, 
@@ -1590,9 +1591,10 @@ def api_servicos():
 @main_bp.route('/obras/<int:id>/editar', methods=['GET', 'POST'])
 @login_required
 def editar_obra(id):
-    obra = Obra.query.get_or_404(id)
+    # Verificar se a obra pertence ao admin logado
+    obra = Obra.query.filter_by(id=id, admin_id=current_user.id).first_or_404()
     form = ObraForm(obj=obra)
-    form.responsavel_id.choices = [(0, 'Selecione...')] + [(f.id, f.nome) for f in Funcionario.query.filter_by(ativo=True).all()]
+    form.responsavel_id.choices = [(0, 'Selecione...')] + [(f.id, f.nome) for f in Funcionario.query.filter_by(ativo=True, admin_id=current_user.id).all()]
     
     if form.validate_on_submit():
         obra.nome = form.nome.data
@@ -1607,7 +1609,7 @@ def editar_obra(id):
         flash('Obra atualizada com sucesso!', 'success')
         return redirect(url_for('main.obras'))
     
-    return render_template('obras.html', form=form, obra=obra, obras=Obra.query.all())
+    return render_template('obras.html', form=form, obra=obra, obras=Obra.query.filter(Obra.admin_id == current_user.id).all())
 
 @main_bp.route('/obra/<int:id>')
 @login_required
@@ -1616,7 +1618,8 @@ def detalhes_obra(id):
     from sqlalchemy import func
     from models import ServicoObra, Servico
     
-    obra = Obra.query.get_or_404(id)
+    # Verificar se a obra pertence ao admin logado
+    obra = Obra.query.filter_by(id=id, admin_id=current_user.id).first_or_404()
     
     # Buscar serviços da obra
     servicos_obra = db.session.query(ServicoObra, Servico).join(
@@ -1799,9 +1802,10 @@ def excluir_obra(id):
 @main_bp.route('/veiculos')
 @login_required
 def veiculos():
-    veiculos = Veiculo.query.all()
-    funcionarios = Funcionario.query.filter_by(ativo=True).all()
-    obras = Obra.query.filter_by(status='Em andamento').all()
+    # Filtrar por admin_id para multi-tenant
+    veiculos = Veiculo.query.filter(Veiculo.admin_id == current_user.id).all()
+    funcionarios = Funcionario.query.filter_by(ativo=True, admin_id=current_user.id).all()
+    obras = Obra.query.filter_by(status='Em andamento', admin_id=current_user.id).all()
     return render_template('veiculos.html', 
                          veiculos=veiculos, 
                          funcionarios=funcionarios, 
@@ -1821,7 +1825,8 @@ def novo_veiculo():
             status=form.status.data,
             km_atual=form.km_atual.data or 0,
             data_ultima_manutencao=form.data_ultima_manutencao.data,
-            data_proxima_manutencao=form.data_proxima_manutencao.data
+            data_proxima_manutencao=form.data_proxima_manutencao.data,
+            admin_id=current_user.id  # Associar veículo ao admin logado
         )
         db.session.add(veiculo)
         db.session.commit()
@@ -2709,15 +2714,26 @@ def get_simbolo_unidade(unidade_medida):
 @main_bp.route('/ponto')
 @login_required
 def ponto():
-    registros = RegistroPonto.query.order_by(RegistroPonto.data.desc()).limit(50).all()
+    # Obter funcionários do admin para filtrar registros de ponto
+    funcionarios_admin = Funcionario.query.filter_by(admin_id=current_user.id).all()
+    funcionarios_ids = [f.id for f in funcionarios_admin]
+    
+    if funcionarios_ids:
+        registros = RegistroPonto.query.filter(
+            RegistroPonto.funcionario_id.in_(funcionarios_ids)
+        ).order_by(RegistroPonto.data.desc()).limit(50).all()
+    else:
+        registros = []
+    
     return render_template('ponto.html', registros=registros)
 
 @main_bp.route('/ponto/novo', methods=['GET', 'POST'])
 @login_required
 def novo_ponto_lista():
     form = RegistroPontoForm()
-    form.funcionario_id.choices = [(f.id, f.nome) for f in Funcionario.query.filter_by(ativo=True).all()]
-    form.obra_id.choices = [(0, 'Selecione...')] + [(o.id, o.nome) for o in Obra.query.filter_by(status='Em andamento').all()]
+    # Filtrar por admin_id para multi-tenant
+    form.funcionario_id.choices = [(f.id, f.nome) for f in Funcionario.query.filter_by(ativo=True, admin_id=current_user.id).all()]
+    form.obra_id.choices = [(0, 'Selecione...')] + [(o.id, o.nome) for o in Obra.query.filter_by(status='Em andamento', admin_id=current_user.id).all()]
     
     if form.validate_on_submit():
         registro = RegistroPonto(
@@ -2750,16 +2766,39 @@ def novo_ponto_lista():
         flash('Registro de ponto adicionado com sucesso!', 'success')
         return redirect(url_for('main.ponto'))
     
-    return render_template('ponto.html', form=form, registros=RegistroPonto.query.order_by(RegistroPonto.data.desc()).limit(50).all())
+    # Obter funcionários do admin para filtrar registros de ponto
+    funcionarios_admin = Funcionario.query.filter_by(admin_id=current_user.id).all()
+    funcionarios_ids = [f.id for f in funcionarios_admin]
+    
+    if funcionarios_ids:
+        registros = RegistroPonto.query.filter(
+            RegistroPonto.funcionario_id.in_(funcionarios_ids)
+        ).order_by(RegistroPonto.data.desc()).limit(50).all()
+    else:
+        registros = []
+    
+    return render_template('ponto.html', form=form, registros=registros)
 
 # Alimentação
 @main_bp.route('/alimentacao')
 @login_required
 def alimentacao():
     from datetime import date
-    registros = RegistroAlimentacao.query.order_by(RegistroAlimentacao.data.desc()).limit(50).all()
-    funcionarios = Funcionario.query.filter_by(ativo=True).order_by(Funcionario.nome).all()
-    obras = Obra.query.filter_by(status='Em andamento').order_by(Obra.nome).all()
+    
+    # Obter funcionários do admin atual
+    funcionarios_admin = Funcionario.query.filter_by(ativo=True, admin_id=current_user.id).all()
+    funcionarios_ids = [f.id for f in funcionarios_admin]
+    
+    # Filtrar registros pelos funcionários do admin
+    if funcionarios_ids:
+        registros = RegistroAlimentacao.query.filter(
+            RegistroAlimentacao.funcionario_id.in_(funcionarios_ids)
+        ).order_by(RegistroAlimentacao.data.desc()).limit(50).all()
+    else:
+        registros = []
+    
+    funcionarios = funcionarios_admin
+    obras = Obra.query.filter_by(status='Em andamento', admin_id=current_user.id).order_by(Obra.nome).all()
     restaurantes = Restaurante.query.filter_by(ativo=True).order_by(Restaurante.nome).all()
     
     return render_template('alimentacao.html', 
