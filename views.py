@@ -472,6 +472,129 @@ def api_dashboard_refresh():
     
     return jsonify(dados_refresh)
 
+# Integrar APIs de IA e Analytics
+@main_bp.route('/api/ia/prever-custos', methods=['POST'])
+@login_required
+def api_ia_prever_custos():
+    """API para predição de custos usando IA"""
+    if current_user.tipo_usuario != TipoUsuario.ADMIN:
+        return jsonify({'success': False, 'message': 'Acesso negado'}), 403
+    
+    try:
+        data = request.get_json()
+        orcamento = data.get('orcamento', 100000)
+        funcionarios = data.get('funcionarios', 5)
+        duracao = data.get('duracao', 30)
+        
+        from ai_analytics import prever_custo_obra_api
+        resultado = prever_custo_obra_api(orcamento, funcionarios, duracao)
+        
+        return jsonify({
+            'success': True,
+            'predicao': resultado,
+            'timestamp': datetime.now().isoformat()
+        })
+        
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'message': f'Erro na predição: {str(e)}'
+        }), 500
+
+@main_bp.route('/api/ia/detectar-anomalias', methods=['GET'])
+@login_required
+def api_ia_detectar_anomalias():
+    """API para detecção de anomalias"""
+    if current_user.tipo_usuario != TipoUsuario.ADMIN:
+        return jsonify({'success': False, 'message': 'Acesso negado'}), 403
+    
+    try:
+        dias = int(request.args.get('dias', 7))
+        
+        from ai_analytics import detectar_anomalias_api
+        resultado = detectar_anomalias_api(dias)
+        
+        return jsonify({
+            'success': True,
+            'anomalias': resultado,
+            'timestamp': datetime.now().isoformat()
+        })
+        
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'message': f'Erro na detecção: {str(e)}'
+        }), 500
+
+@main_bp.route('/api/ia/otimizar-recursos', methods=['GET'])
+@login_required
+def api_ia_otimizar_recursos():
+    """API para otimização de recursos"""
+    if current_user.tipo_usuario != TipoUsuario.ADMIN:
+        return jsonify({'success': False, 'message': 'Acesso negado'}), 403
+    
+    try:
+        from ai_analytics import otimizar_recursos_api
+        resultado = otimizar_recursos_api()
+        
+        return jsonify({
+            'success': True,
+            'otimizacoes': resultado,
+            'timestamp': datetime.now().isoformat()
+        })
+        
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'message': f'Erro na otimização: {str(e)}'
+        }), 500
+
+@main_bp.route('/api/ia/analisar-sentimentos', methods=['GET'])
+@login_required
+def api_ia_analisar_sentimentos():
+    """API para análise de sentimentos"""
+    if current_user.tipo_usuario != TipoUsuario.ADMIN:
+        return jsonify({'success': False, 'message': 'Acesso negado'}), 403
+    
+    try:
+        from ai_analytics import analisar_sentimentos_api
+        resultado = analisar_sentimentos_api()
+        
+        return jsonify({
+            'success': True,
+            'sentimentos': resultado,
+            'timestamp': datetime.now().isoformat()
+        })
+        
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'message': f'Erro na análise: {str(e)}'
+        }), 500
+
+@main_bp.route('/api/notificacoes/avancadas', methods=['GET'])
+@login_required
+def api_notificacoes_avancadas():
+    """API para sistema de notificações avançado"""
+    if current_user.tipo_usuario != TipoUsuario.ADMIN:
+        return jsonify({'success': False, 'message': 'Acesso negado'}), 403
+    
+    try:
+        from notification_system import executar_sistema_notificacoes
+        resultado = executar_sistema_notificacoes()
+        
+        return jsonify({
+            'success': True,
+            'notificacoes': resultado,
+            'timestamp': datetime.now().isoformat()
+        })
+        
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'message': f'Erro no sistema de notificações: {str(e)}'
+        }), 500
+
 # Funcionários
 @main_bp.route('/funcionarios')
 @login_required
