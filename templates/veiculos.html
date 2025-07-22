@@ -339,7 +339,7 @@
                                 </h6>
                             </div>
                             <div class="card-body">
-                                <form method="POST" action="{{ url_for('main.novo_uso_veiculo') }}" id="usoForm">
+                                <form method="POST" action="{{ url_for('main.novo_uso_veiculo_lista') }}" id="usoForm">
                                     <input type="hidden" id="uso_veiculo_id" name="veiculo_id">
                                     <div class="mb-3">
                                         <label for="uso_funcionario_id" class="form-label">Funcionário *</label>
@@ -389,7 +389,7 @@
                                 </h6>
                             </div>
                             <div class="card-body">
-                                <form method="POST" action="{{ url_for('main.novo_custo_veiculo') }}" id="custoForm">
+                                <form method="POST" action="{{ url_for('main.novo_custo_veiculo_lista') }}" id="custoForm">
                                     <input type="hidden" id="custo_veiculo_id" name="veiculo_id">
                                     <div class="mb-3">
                                         <label for="custo_data_custo" class="form-label">Data *</label>

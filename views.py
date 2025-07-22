@@ -1518,10 +1518,10 @@ def detalhes_veiculo(id):
                          obras=obras,
                          grafico_uso_obras=grafico_uso_obras)
 
-@main_bp.route('/veiculos/novo-uso-direto', methods=['POST'])
+@main_bp.route('/veiculos/uso', methods=['POST'])
 @login_required
-def novo_uso_veiculo_direto():
-    """Registra novo uso de veículo na página de detalhes"""
+def novo_uso_veiculo_lista():
+    """Registra novo uso de veículo a partir da lista principal"""
     try:
         veiculo_id = request.form.get('veiculo_id')
         funcionario_id = request.form.get('funcionario_id')
@@ -1534,9 +1534,9 @@ def novo_uso_veiculo_direto():
         finalidade = request.form.get('finalidade')
         observacoes = request.form.get('observacoes')
         
-        if not obra_id:
-            flash('Obra é obrigatória para registrar uso do veículo!', 'error')
-            return redirect(url_for('main.detalhes_veiculo', id=veiculo_id))
+        if not funcionario_id:
+            flash('Funcionário é obrigatório para registrar uso do veículo!', 'error')
+            return redirect(url_for('main.veiculos'))
         
         novo_uso = UsoVeiculo(
             veiculo_id=veiculo_id,
@@ -1565,7 +1565,7 @@ def novo_uso_veiculo_direto():
     except Exception as e:
         flash(f'Erro ao registrar uso: {str(e)}', 'error')
     
-    return redirect(url_for('main.detalhes_veiculo', id=veiculo_id))
+    return redirect(url_for('main.veiculos'))
 
 @main_bp.route('/veiculos/novo-custo', methods=['POST'])
 @login_required
