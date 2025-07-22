@@ -2354,45 +2354,82 @@ def novo_ponto_lista():
 def alimentacao():
     from datetime import date
     registros = RegistroAlimentacao.query.order_by(RegistroAlimentacao.data.desc()).limit(50).all()
-    return render_template('alimentacao.html', registros=registros, date=date)
+    funcionarios = Funcionario.query.filter_by(ativo=True).order_by(Funcionario.nome).all()
+    obras = Obra.query.filter_by(status='Em andamento').order_by(Obra.nome).all()
+    restaurantes = Restaurante.query.filter_by(ativo=True).order_by(Restaurante.nome).all()
+    
+    return render_template('alimentacao.html', 
+                         registros=registros, 
+                         funcionarios=funcionarios,
+                         obras=obras,
+                         restaurantes=restaurantes,
+                         date=date)
 
-@main_bp.route('/alimentacao/novo', methods=['GET', 'POST'])
+@main_bp.route('/alimentacao/novo', methods=['POST'])
 @login_required
 def nova_alimentacao():
-    form = AlimentacaoForm()
-    form.funcionario_id.choices = [(f.id, f.nome) for f in Funcionario.query.filter_by(ativo=True).all()]
-    form.obra_id.choices = [(0, 'Selecione...')] + [(o.id, o.nome) for o in Obra.query.filter_by(status='Em andamento').all()]
-    form.restaurante_id.choices = [(0, 'Selecione...')] + [(r.id, r.nome) for r in Restaurante.query.filter_by(ativo=True).all()]
-    
-    if form.validate_on_submit():
-        registro = RegistroAlimentacao(
-            funcionario_id=form.funcionario_id.data,
-            obra_id=form.obra_id.data if form.obra_id.data > 0 else None,
-            restaurante_id=form.restaurante_id.data if form.restaurante_id.data > 0 else None,
-            data=form.data.data,
-            tipo=form.tipo.data,
-            valor=form.valor.data,
-            observacoes=form.observacoes.data
-        )
+    """Criar registros de alimentação para múltiplos funcionários"""
+    try:
+        # Dados básicos do formulário
+        data = datetime.strptime(request.form.get('data'), '%Y-%m-%d').date()
+        tipo = request.form.get('tipo')
+        valor = float(request.form.get('valor'))
+        obra_id = request.form.get('obra_id') if request.form.get('obra_id') else None
+        restaurante_id = request.form.get('restaurante_id') if request.form.get('restaurante_id') else None
+        observacoes = request.form.get('observacoes')
         
-        db.session.add(registro)
+        # Lista de funcionários selecionados
+        funcionarios_ids = request.form.getlist('funcionarios_ids')
         
-        # Adicionar custo à obra se especificada
-        if registro.obra_id:
-            custo = CustoObra(
-                obra_id=registro.obra_id,
-                tipo='alimentacao',
-                descricao=f'Alimentação - {registro.tipo} - {registro.funcionario_ref.nome}',
-                valor=registro.valor,
-                data=registro.data
+        if not funcionarios_ids:
+            return jsonify({'success': False, 'message': 'Nenhum funcionário selecionado'}), 400
+        
+        registros_criados = []
+        
+        # Criar um registro para cada funcionário
+        for funcionario_id in funcionarios_ids:
+            funcionario = Funcionario.query.get(funcionario_id)
+            if not funcionario:
+                continue
+                
+            registro = RegistroAlimentacao(
+                funcionario_id=int(funcionario_id),
+                obra_id=int(obra_id) if obra_id else None,
+                restaurante_id=int(restaurante_id) if restaurante_id else None,
+                data=data,
+                tipo=tipo,
+                valor=valor,
+                observacoes=observacoes
             )
-            db.session.add(custo)
+            
+            db.session.add(registro)
+            registros_criados.append(f"{funcionario.nome} - {tipo}")
+            
+            # Adicionar custo à obra se especificada
+            if obra_id:
+                custo = CustoObra(
+                    obra_id=int(obra_id),
+                    tipo='alimentacao',
+                    descricao=f'Alimentação - {tipo} - {funcionario.nome}',
+                    valor=valor,
+                    data=data
+                )
+                db.session.add(custo)
         
         db.session.commit()
-        flash('Registro de alimentação adicionado com sucesso!', 'success')
-        return redirect(url_for('main.alimentacao'))
-    
-    return render_template('alimentacao.html', form=form, registros=RegistroAlimentacao.query.order_by(RegistroAlimentacao.data.desc()).limit(50).all())
+        
+        total_registros = len(registros_criados)
+        valor_total = total_registros * valor
+        
+        return jsonify({
+            'success': True, 
+            'message': f'{total_registros} registros criados com sucesso! Valor total: R$ {valor_total:.2f}',
+            'registros': registros_criados
+        })
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'message': f'Erro ao criar registros: {str(e)}'}), 500
 
 # Relatórios
 @main_bp.route('/relatorios')
