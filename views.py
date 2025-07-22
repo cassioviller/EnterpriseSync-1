@@ -1475,10 +1475,22 @@ def detalhes_veiculo(id):
     
     # KPIs do veículo
     custo_total = sum(custo.valor for custo in custos)
+    
+    # Calcular média de KM por uso
+    km_total = 0
+    usos_com_km = 0
+    for uso in usos:
+        if uso.km_inicial and uso.km_final and uso.km_final > uso.km_inicial:
+            km_total += (uso.km_final - uso.km_inicial)
+            usos_com_km += 1
+    
+    media_km = km_total / usos_com_km if usos_com_km > 0 else 0
+    
     kpis = {
         'custo_total': custo_total,
         'total_usos': len(usos),
-        'total_custos': len(custos)
+        'total_custos': len(custos),
+        'media_km': media_km
     }
     
     # Dados para gráfico de uso por obra
