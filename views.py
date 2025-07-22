@@ -2655,15 +2655,15 @@ def gerar_relatorio(tipo):
         if departamento_id:
             query = query.join(Funcionario).filter(Funcionario.departamento_id == departamento_id)
         
-        registros = query.join(Funcionario).order_by(RegistroPonto.data.desc()).all()
+        registros = query.options(joinedload(RegistroPonto.funcionario_ref), joinedload(RegistroPonto.obra_ref)).order_by(RegistroPonto.data.desc()).all()
         
         html = '<div class="table-responsive"><table class="table table-striped">'
         html += '<thead><tr><th>Data</th><th>Funcionário</th><th>Obra</th><th>Entrada</th><th>Saída</th><th>Horas Trabalhadas</th><th>Horas Extras</th><th>Atrasos</th></tr></thead><tbody>'
         
         for r in registros:
             html += f'<tr><td>{r.data.strftime("%d/%m/%Y")}</td>'
-            html += f'<td>{r.funcionario.nome}</td>'
-            html += f'<td>{r.obra.nome if r.obra else "-"}</td>'
+            html += f'<td>{r.funcionario_ref.nome if r.funcionario_ref else "-"}</td>'
+            html += f'<td>{r.obra_ref.nome if r.obra_ref else "-"}</td>'
             html += f'<td>{r.hora_entrada.strftime("%H:%M") if r.hora_entrada else "-"}</td>'
             html += f'<td>{r.hora_saida.strftime("%H:%M") if r.hora_saida else "-"}</td>'
             html += f'<td>{r.horas_trabalhadas:.2f}h</td>'
@@ -2688,7 +2688,7 @@ def gerar_relatorio(tipo):
         if departamento_id:
             query = query.join(Funcionario).filter(Funcionario.departamento_id == departamento_id)
         
-        registros = query.join(Funcionario).order_by(RegistroPonto.data.desc()).all()
+        registros = query.options(joinedload(RegistroPonto.funcionario_ref), joinedload(RegistroPonto.obra_ref)).order_by(RegistroPonto.data.desc()).all()
         
         html = '<div class="table-responsive"><table class="table table-striped">'
         html += '<thead><tr><th>Data</th><th>Funcionário</th><th>Obra</th><th>Horas Extras</th><th>Valor Estimado</th></tr></thead><tbody>'

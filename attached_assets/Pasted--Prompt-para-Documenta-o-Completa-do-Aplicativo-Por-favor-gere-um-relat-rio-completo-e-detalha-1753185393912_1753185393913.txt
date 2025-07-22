@@ -1,0 +1,117 @@
+# Prompt para Documentação Completa do Aplicativo
+
+Por favor, gere um relatório completo e detalhado sobre este aplicativo, incluindo todas as informações técnicas e funcionais necessárias para compreender totalmente sua estrutura e funcionamento. O relatório deve ser organizado e abranger os seguintes aspectos:
+
+## 1. VISÃO GERAL DO APLICATIVO
+- Nome e propósito do aplicativo
+- Tecnologias utilizadas (frontend, backend, banco de dados)
+- Arquitetura geral do sistema
+- Versão atual e histórico de versões (se disponível)
+
+## 2. ESTRUTURA DE PÁGINAS E NAVEGAÇÃO
+- Lista completa de todas as páginas/telas do aplicativo
+- Hierarquia e fluxo de navegação entre páginas
+- URLs/rotas de cada página
+- Tipos de acesso (público, autenticado, admin, etc.)
+- Menu principal e submenus
+
+## 3. FUNCIONALIDADES POR PÁGINA
+Para cada página identificada, detalhe:
+- **Objetivo principal da página**
+- **Funcionalidades disponíveis** (botões, ações, operações)
+- **Permissões necessárias** para acessar cada funcionalidade
+- **Fluxos de trabalho** e processos executados
+- **Integrações** com outras páginas ou sistemas externos
+
+## 4. MÓDULOS E COMPONENTES
+- **Módulos principais** do sistema
+- **Componentes reutilizáveis** e sua localização
+- **Bibliotecas e dependências** utilizadas
+- **APIs internas** e endpoints disponíveis
+- **Serviços e utilitários** compartilhados
+
+## 5. CAMPOS E FORMULÁRIOS
+Para cada formulário/tela de entrada de dados:
+- **Nome dos campos** e seus tipos (texto, número, data, etc.)
+- **Validações aplicadas** em cada campo
+- **Campos obrigatórios vs opcionais**
+- **Máscaras e formatações** aplicadas
+- **Valores padrão** e listas de opções (dropdowns, checkboxes)
+- **Relacionamentos** entre campos
+
+## 6. TABELAS E ESTRUTURAS DE DADOS
+Para cada tabela/lista exibida:
+- **Nome da tabela/entidade**
+- **Colunas exibidas** e seus tipos de dados
+- **Filtros e ordenação** disponíveis
+- **Ações disponíveis** (editar, excluir, visualizar, etc.)
+- **Paginação e limites** de registros
+- **Exportação de dados** (se disponível)
+
+## 7. BANCO DE DADOS E SCHEMA
+- **Tipo de banco de dados** utilizado
+- **Schema completo** das tabelas
+- **Relacionamentos** entre tabelas (chaves estrangeiras)
+- **Índices** e otimizações aplicadas
+- **Triggers, procedures** ou funções especiais
+- **Migrations** e versionamento do schema
+
+## 8. CÁLCULOS E KPIs
+Para cada cálculo, métrica ou KPI presente:
+- **Nome do indicador/cálculo**
+- **Fórmula matemática** utilizada
+- **Campos/tabelas** envolvidos no cálculo
+- **Frequência de atualização** (tempo real, diário, etc.)
+- **Regras de negócio** aplicadas
+- **Tratamento de casos especiais** (divisão por zero, valores nulos, etc.)
+
+## 9. ELEMENTOS VISUAIS E INTERFACE
+- **Layout e design** das páginas
+- **Componentes visuais** (gráficos, dashboards, widgets)
+- **Cores, fontes** e padrões visuais utilizados
+- **Responsividade** e adaptação para dispositivos móveis
+- **Acessibilidade** implementada
+- **Imagens, ícones** e recursos visuais
+
+## 10. AUTENTICAÇÃO E AUTORIZAÇÃO
+- **Sistema de login** implementado
+- **Tipos de usuários** e perfis de acesso
+- **Permissões específicas** por funcionalidade
+- **Sessões e tokens** de autenticação
+- **Políticas de segurança** aplicadas
+
+## 11. INTEGRAÇÕES E APIs EXTERNAS
+- **APIs externas** consumidas
+- **Webhooks** e notificações
+- **Sincronizações** com outros sistemas
+- **Formatos de dados** utilizados (JSON, XML, etc.)
+- **Autenticação** para APIs externas
+
+## 12. CONFIGURAÇÕES E PARÂMETROS
+- **Variáveis de ambiente** utilizadas
+- **Configurações do sistema** modificáveis
+- **Parâmetros de negócio** configuráveis
+- **Logs e monitoramento** implementados
+
+## 13. FLUXOS DE DADOS
+- **Entrada de dados** no sistema
+- **Processamento** e transformações aplicadas
+- **Saída de dados** e relatórios gerados
+- **Backup e recuperação** de dados
+
+## 14. PERFORMANCE E OTIMIZAÇÕES
+- **Métricas de performance** monitoradas
+- **Otimizações** implementadas
+- **Cache** utilizado
+- **Limitações** conhecidas do sistema
+
+## INSTRUÇÕES ADICIONAIS:
+- Seja o mais detalhado possível em cada seção
+- Inclua exemplos práticos quando relevante
+- Mencione qualquer peculiaridade ou comportamento especial
+- Se alguma informação não estiver disponível, indique claramente
+- Organize as informações de forma hierárquica e fácil de navegar
+- Use formatação markdown para melhor legibilidade
+
+**IMPORTANTE**: Este relatório será usado para compreensão completa do sistema, então não omita nenhum detalhe técnico ou funcional, por menor que pareça.
+
