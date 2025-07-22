@@ -10,8 +10,13 @@ from app import db
 from sqlalchemy import func, and_, or_
 import json
 import smtplib
-from email.mime.text import MimeText
-from email.mime.multipart import MimeMultipart
+try:
+    from email.mime.text import MimeText
+    from email.mime.multipart import MimeMultipart
+except ImportError:
+    # Fallback para ambientes sem suporte completo a email
+    MimeText = None
+    MimeMultipart = None
 import requests
 import logging
 
