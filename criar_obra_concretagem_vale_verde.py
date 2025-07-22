@@ -35,9 +35,10 @@ def criar_obra_concretagem():
         db.session.commit()
         
         print(f"✅ Obra criada: {obra.nome} (ID: {obra.id})")
-        print(f"   Cliente: {obra.cliente}")
-        print(f"   Valor: R$ {obra.valor_contrato:,.2f}")
-        print(f"   Período: {obra.data_inicio} a {obra.data_prevista_fim}")
+        print(f"   Código: {obra.codigo}")
+        print(f"   Orçamento: R$ {obra.orcamento:,.2f}")
+        print(f"   Período: {obra.data_inicio} a {obra.data_previsao_fim}")
+        print(f"   Área: {obra.area_total_m2} m²")
         
         # 2. Criar serviços específicos de concretagem
         servicos_concretagem = [
@@ -154,22 +155,27 @@ def criar_obra_concretagem():
             print("   ℹ️ Use a página de Acessos para criar um funcionário com login")
         else:
             # Criar RDO de exemplo
+            numero_rdo = f"RDO-{obra.codigo}-{date.today().strftime('%Y%m%d')}-001"
             rdo = RDO(
+                numero_rdo=numero_rdo,
                 obra_id=obra.id,
                 data_relatorio=date.today(),
-                clima='Ensolarado',
-                temperatura=25.0,
-                observacoes_gerais=f'Início da concretagem da fundação. Clima favorável para concretagem. Equipe de 8 funcionários trabalhando.',
+                tempo_manha='Ensolarado',
+                tempo_tarde='Ensolarado', 
+                tempo_noite='Nublado',
+                observacoes_meteorologicas='Clima favorável para concretagem',
+                comentario_geral='Início da concretagem da fundação. Equipe de 8 funcionários trabalhando. Concretagem programada para blocos B1 a B5.',
                 criado_por_id=usuario_funcionario.id,
-                admin_id=10
+                status='Finalizado'
             )
             
             db.session.add(rdo)
             db.session.commit()
             
             print(f"   ✅ RDO criado por: {usuario_funcionario.nome}")
+            print(f"      Número: {rdo.numero_rdo}")
             print(f"      Data: {rdo.data_relatorio}")
-            print(f"      Clima: {rdo.clima}")
+            print(f"      Tempo: {rdo.tempo_manha}/{rdo.tempo_tarde}/{rdo.tempo_noite}")
             
         print(f"\n✅ OBRA DE CONCRETAGEM VALE VERDE CRIADA COM SUCESSO!")
         print(f"\n=== DADOS PARA TESTE ===")
