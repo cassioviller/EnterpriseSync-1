@@ -209,23 +209,118 @@ def dashboard():
     else:
         data_fim = datetime.strptime(data_fim, '%Y-%m-%d').date()
     
-    # KPIs para o dashboard
-    total_funcionarios = Funcionario.query.filter_by(ativo=True).count()
-    total_obras = Obra.query.filter(Obra.status.in_(['Em andamento', 'Pausada'])).count()
-    total_veiculos = Veiculo.query.count()
-    
-    # Custos do período usando função corrigida
-    custos_detalhados = calcular_custos_mes(data_inicio, data_fim)
-    custos_mes = custos_detalhados['total']
-    
-    # Obras em andamento
-    obras_andamento = Obra.query.filter_by(status='Em andamento').limit(5).all()
-    
-    # Funcionários por departamento
-    funcionarios_dept = db.session.query(
-        Departamento.nome,
-        func.count(Funcionario.id).label('total')
-    ).join(Funcionario).filter(Funcionario.ativo == True).group_by(Departamento.nome).all()
+    # Filtro para Vale Verde: usar código dos funcionários VV
+    if current_user.username == 'valeverde':
+        # Admin Vale Verde: mostrar apenas dados VV
+        funcionarios_filter = Funcionario.codigo.like('VV%')
+        obras_filter = Obra.nome.like('%VV')
+        veiculos_filter = Veiculo.placa.like('VV-%')
+        
+        # KPIs para o dashboard apenas da Vale Verde
+        total_funcionarios = Funcionario.query.filter(
+            Funcionario.ativo == True,
+            funcionarios_filter
+        ).count()
+        
+        total_obras = Obra.query.filter(
+            Obra.status.in_(['Em andamento', 'Pausada']),
+            obras_filter
+        ).count()
+        
+        total_veiculos = Veiculo.query.filter(veiculos_filter).count()
+        
+        # Obter IDs dos funcionários VV
+        funcionarios_vv = Funcionario.query.filter(funcionarios_filter).all()
+        funcionarios_ids = [f.id for f in funcionarios_vv]
+        
+        # Custos do período apenas dos funcionários Vale Verde
+        custo_alimentacao = db.session.query(func.sum(RegistroAlimentacao.valor)).filter(
+            RegistroAlimentacao.funcionario_id.in_(funcionarios_ids),
+            RegistroAlimentacao.data.between(data_inicio, data_fim)
+        ).scalar() or 0.0
+        
+        custo_transporte = db.session.query(func.sum(OutroCusto.valor)).filter(
+            OutroCusto.funcionario_id.in_(funcionarios_ids),
+            OutroCusto.tipo.in_(['Vale Transporte', 'Vale Refeição']),
+            OutroCusto.data.between(data_inicio, data_fim)
+        ).scalar() or 0.0
+        
+        outros_custos = db.session.query(func.sum(OutroCusto.valor)).filter(
+            OutroCusto.funcionario_id.in_(funcionarios_ids),
+            ~OutroCusto.tipo.in_(['Vale Transporte', 'Vale Refeição']),
+            OutroCusto.data.between(data_inicio, data_fim)
+        ).scalar() or 0.0
+        
+        # Custo mão de obra baseado em horas trabalhadas VV
+        total_horas = db.session.query(func.sum(RegistroPonto.horas_trabalhadas)).filter(
+            RegistroPonto.funcionario_id.in_(funcionarios_ids),
+            RegistroPonto.data.between(data_inicio, data_fim)
+        ).scalar() or 0.0
+        
+        custo_mao_obra = total_horas * 15.0  # R$ 15/hora padrão
+        
+        custos_detalhados = {
+            'alimentacao': custo_alimentacao,
+            'transporte': custo_transporte,
+            'mao_obra': custo_mao_obra,
+            'faltas_justificadas': 0.0,
+            'outros': outros_custos,
+            'total': custo_alimentacao + custo_transporte + custo_mao_obra + outros_custos
+        }
+        custos_mes = custos_detalhados['total']
+        
+        # Obras em andamento da Vale Verde
+        obras_andamento = Obra.query.filter(
+            Obra.status == 'Em andamento',
+            obras_filter
+        ).limit(5).all()
+        
+        # Funcionários por departamento da Vale Verde
+        funcionarios_dept = db.session.query(
+            Departamento.nome,
+            func.count(Funcionario.id).label('total')
+        ).join(Funcionario).filter(
+            Funcionario.ativo == True,
+            funcionarios_filter
+        ).group_by(Departamento.nome).all()
+        
+    else:
+        # Admin geral: dados de todos exceto VV
+        funcionarios_filter = ~Funcionario.codigo.like('VV%')
+        obras_filter = ~Obra.nome.like('%VV')
+        veiculos_filter = ~Veiculo.placa.like('VV-%')
+        
+        # KPIs para o dashboard excluindo Vale Verde
+        total_funcionarios = Funcionario.query.filter(
+            Funcionario.ativo == True,
+            funcionarios_filter
+        ).count()
+        
+        total_obras = Obra.query.filter(
+            Obra.status.in_(['Em andamento', 'Pausada']),
+            obras_filter
+        ).count()
+        
+        total_veiculos = Veiculo.query.filter(veiculos_filter).count()
+        
+        # Custos do período usando função corrigida
+        custos_detalhados = calcular_custos_mes(data_inicio, data_fim)
+        custos_mes = custos_detalhados['total']
+        
+        # Obras em andamento
+        obras_andamento = Obra.query.filter(
+            Obra.status == 'Em andamento',
+            obras_filter
+        ).limit(5).all()
+        
+        # Funcionários por departamento
+        funcionarios_dept = db.session.query(
+            Departamento.nome,
+            func.count(Funcionario.id).label('total')
+        ).join(Funcionario).filter(
+            Funcionario.ativo == True,
+            funcionarios_filter
+        ).group_by(Departamento.nome).all()
     
     # Custos por obra no período
     custos_recentes = []
