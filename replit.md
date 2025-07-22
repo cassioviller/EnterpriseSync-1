@@ -661,6 +661,16 @@
     - Link da marca SIGE adapta-se dinamicamente ao tipo de usuário
     - Removida dependência do jQuery, usando JavaScript vanilla no Super Admin
     - Sistema multi-tenant com separação rigorosa de responsabilidades
+  - July 22, 2025. Módulo "Controle de Alimentação" Profissional e Funcional - v6.5:
+    - Redesenhado completamente modal de "Controle de Alimentação" com layout profissional
+    - Implementada seleção múltipla de funcionários com busca em tempo real e filtros
+    - Adicionado sistema de cálculo automático de valor total baseado nos funcionários selecionados
+    - Criados cards organizados: Informações Básicas, Funcionários e Detalhes Adicionais
+    - Modal responsivo com avatares dos funcionários, contador de selecionados e checkbox "Selecionar Todos"
+    - Backend completamente atualizado para processar múltiplos funcionários em um único lançamento
+    - Campos "Obra" e "Restaurante" tornados obrigatórios para controle adequado de custos e KPIs
+    - Validação frontend e backend garantindo preenchimento correto dos campos obrigatórios
+    - Sistema permite lançar alimentação para vários funcionários simultaneamente com controle rigoroso
   
   ## User Preferences
   

@@ -2374,9 +2374,16 @@ def nova_alimentacao():
         data = datetime.strptime(request.form.get('data'), '%Y-%m-%d').date()
         tipo = request.form.get('tipo')
         valor = float(request.form.get('valor'))
-        obra_id = request.form.get('obra_id') if request.form.get('obra_id') else None
-        restaurante_id = request.form.get('restaurante_id') if request.form.get('restaurante_id') else None
+        obra_id = request.form.get('obra_id')
+        restaurante_id = request.form.get('restaurante_id')
+        
         observacoes = request.form.get('observacoes')
+        
+        # Validar campos obrigatórios
+        if not obra_id:
+            return jsonify({'success': False, 'message': 'Obra é obrigatória para controle de custos e KPIs'}), 400
+        if not restaurante_id:
+            return jsonify({'success': False, 'message': 'Restaurante é obrigatório para identificação do fornecedor'}), 400
         
         # Lista de funcionários selecionados
         funcionarios_ids = request.form.getlist('funcionarios_ids')
@@ -2394,8 +2401,8 @@ def nova_alimentacao():
                 
             registro = RegistroAlimentacao(
                 funcionario_id=int(funcionario_id),
-                obra_id=int(obra_id) if obra_id else None,
-                restaurante_id=int(restaurante_id) if restaurante_id else None,
+                obra_id=int(obra_id),
+                restaurante_id=int(restaurante_id),
                 data=data,
                 tipo=tipo,
                 valor=valor,
@@ -2405,16 +2412,15 @@ def nova_alimentacao():
             db.session.add(registro)
             registros_criados.append(f"{funcionario.nome} - {tipo}")
             
-            # Adicionar custo à obra se especificada
-            if obra_id:
-                custo = CustoObra(
-                    obra_id=int(obra_id),
-                    tipo='alimentacao',
-                    descricao=f'Alimentação - {tipo} - {funcionario.nome}',
-                    valor=valor,
-                    data=data
-                )
-                db.session.add(custo)
+            # Adicionar custo à obra (sempre, pois é obrigatório)
+            custo = CustoObra(
+                obra_id=int(obra_id),
+                tipo='alimentacao',
+                descricao=f'Alimentação - {tipo} - {funcionario.nome}',
+                valor=valor,
+                data=data
+            )
+            db.session.add(custo)
         
         db.session.commit()
         
