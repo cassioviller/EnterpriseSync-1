@@ -128,7 +128,9 @@
                                 <tr>
                                     <th>Data</th>
                                     <th>Funcionário</th>
-                                    <th>Finalidade</th>
+                                    <th>Obra</th>
+                                    <th>Horário Inicial</th>
+                                    <th>Horário Final</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -136,7 +138,9 @@
                                 <tr>
                                     <td>{{ uso.data_uso.strftime('%d/%m/%Y') }}</td>
                                     <td>{{ uso.funcionario.nome }}</td>
-                                    <td>{{ uso.finalidade or '-' }}</td>
+                                    <td>{{ uso.obra.nome if uso.obra else '-' }}</td>
+                                    <td>{{ uso.horario_saida.strftime('%H:%M') if uso.horario_saida else '-' }}</td>
+                                    <td>{{ uso.horario_chegada.strftime('%H:%M') if uso.horario_chegada else '-' }}</td>
                                 </tr>
                                 {% endfor %}
                             </tbody>

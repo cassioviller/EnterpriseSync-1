@@ -74,6 +74,17 @@
                             </div>
                         </div>
                         
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label for="horario_saida" class="form-label">Horário Inicial</label>
+                                <input type="time" class="form-control" id="horario_saida" name="horario_saida">
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label for="horario_chegada" class="form-label">Horário Final</label>
+                                <input type="time" class="form-control" id="horario_chegada" name="horario_chegada">
+                            </div>
+                        </div>
+                        
                         <div class="mb-3">
                             {{ form.finalidade.label(class="form-label") }}
                             {{ form.finalidade(class="form-control", placeholder="Ex: Transporte de materiais para obra") }}
