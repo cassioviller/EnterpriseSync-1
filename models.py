@@ -72,6 +72,7 @@ class Funcionario(db.Model):
     departamento_id = db.Column(db.Integer, db.ForeignKey('departamento.id'))
     funcao_id = db.Column(db.Integer, db.ForeignKey('funcao.id'))
     horario_trabalho_id = db.Column(db.Integer, db.ForeignKey('horario_trabalho.id'))
+    admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=True)  # Para isolamento multi-tenant
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     
     # Relacionamentos
@@ -90,6 +91,7 @@ class Obra(db.Model):
     status = db.Column(db.String(20), default='Em andamento')
     responsavel_id = db.Column(db.Integer, db.ForeignKey('funcionario.id'))
     ativo = db.Column(db.Boolean, default=True)  # Campo para controle de obras ativas
+    admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=True)  # Para isolamento multi-tenant
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     
     registros_ponto = db.relationship('RegistroPonto', backref='obra_ref', lazy=True, overlaps="obra_ref")
@@ -125,6 +127,7 @@ class Veiculo(db.Model):
     data_ultima_manutencao = db.Column(db.Date)
     data_proxima_manutencao = db.Column(db.Date)
     ativo = db.Column(db.Boolean, default=True)  # Campo para controle de veículos ativos
+    admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=True)  # Para isolamento multi-tenant
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
 

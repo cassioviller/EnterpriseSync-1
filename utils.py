@@ -391,13 +391,23 @@ def calcular_kpis_funcionario_periodo(funcionario_id, data_inicio=None, data_fim
         'pontualidade': pontualidade
     }
 
-def calcular_kpis_funcionarios_geral(data_inicio=None, data_fim=None):
+def calcular_kpis_funcionarios_geral(data_inicio=None, data_fim=None, admin_id=None):
     """
     Calcula KPIs gerais de todos os funcionários para um período
+    Agora com suporte a filtro por admin_id para multi-tenant
     """
     from models import Funcionario
+    from flask_login import current_user
     
-    funcionarios_ativos = Funcionario.query.filter_by(ativo=True).all()
+    # Se admin_id não foi fornecido, usar o admin logado atual
+    if admin_id is None and current_user and current_user.is_authenticated:
+        admin_id = current_user.id
+    
+    # Filtrar funcionários pelo admin
+    if admin_id:
+        funcionarios_ativos = Funcionario.query.filter_by(ativo=True, admin_id=admin_id).all()
+    else:
+        funcionarios_ativos = Funcionario.query.filter_by(ativo=True).all()
     
     total_funcionarios = len(funcionarios_ativos)
     total_custo_geral = 0
