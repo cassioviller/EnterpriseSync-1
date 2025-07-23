@@ -684,6 +684,17 @@
     - Script de testes das melhorias implementadas (testar_melhorias_implementadas.py)
     - Correção de erro no relatório de ponto (referências de funcionário)
     - Base sólida implementada para futuras melhorias: mobile app, IA, automações
+  - July 23, 2025. Correção Crítica do Sistema Multi-Tenant - v8.0.1:
+    - Corrigidos problemas de imports circulares entre models.py, utils.py e views.py
+    - Implementadas funções faltantes no utils.py: calcular_custo_real_obra e calcular_custos_mes
+    - Corrigidos campos de modelos: RegistroAlimentacao.data (era data_hora), CustoVeiculo.data_custo, OutroCusto.data
+    - Corrigidos relacionamentos: funcionario_ref, veiculo_ref nos joins do SQLAlchemy
+    - Template admin_acessos.html corrigido removendo código duplicado que causava erro Jinja2
+    - Sistema multi-tenant Vale Verde operacional: login (valeverde/admin123) funcionando
+    - Dashboard carregando sem erros 500, página de acessos funcional
+    - Estrutura de dados preservada: 14 usuários, 11 obras, 5 RDOs, 6 veículos
+    - Isolamento de tenant mantido com acesso restrito por admin_id
+    - Sistema estável e pronto para produção com correções fundamentais implementadas
   - July 22, 2025. Evolução Completa para SIGE v8.0 - Sistema Inteligente Total:
     - Implementado sistema completo de notificações inteligentes (notification_system.py) com 15 tipos de alertas automáticos
     - Sistema de IA e Analytics avançados (ai_analytics.py) com Random Forest, Isolation Forest e algoritmos de otimização

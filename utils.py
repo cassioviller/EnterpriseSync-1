@@ -150,13 +150,13 @@ def calcular_custo_real_obra(obra_id, data_inicio, data_fim):
     # Custos de alimentação
     custos_alimentacao = db.session.query(func.sum(RegistroAlimentacao.valor)).filter(
         RegistroAlimentacao.obra_id == obra_id,
-        func.date(RegistroAlimentacao.data_hora).between(data_inicio, data_fim)
+        RegistroAlimentacao.data.between(data_inicio, data_fim)
     ).scalar() or 0
     
     # Custos de veículos
     custos_veiculos = db.session.query(func.sum(CustoVeiculo.valor)).filter(
         CustoVeiculo.obra_id == obra_id,
-        CustoVeiculo.data.between(data_inicio, data_fim)
+        CustoVeiculo.data_custo.between(data_inicio, data_fim)
     ).scalar() or 0
     
     # Outros custos
@@ -183,23 +183,25 @@ def calcular_custos_mes(admin_id, data_inicio, data_fim):
     
     # Alimentação
     custo_alimentacao = db.session.query(func.sum(RegistroAlimentacao.valor)).join(
-        RegistroAlimentacao.funcionario
+        RegistroAlimentacao.funcionario_ref
     ).filter(
-        RegistroAlimentacao.funcionario.has(admin_id=admin_id),
-        func.date(RegistroAlimentacao.data_hora).between(data_inicio, data_fim)
+        RegistroAlimentacao.funcionario_ref.has(admin_id=admin_id),
+        RegistroAlimentacao.data.between(data_inicio, data_fim)
     ).scalar() or 0
     
-    # Transporte (veículos)
-    custo_transporte = db.session.query(func.sum(CustoVeiculo.valor)).filter(
-        CustoVeiculo.admin_id == admin_id,
-        CustoVeiculo.data.between(data_inicio, data_fim)
+    # Transporte (veículos) - join com veiculo para acessar admin_id
+    custo_transporte = db.session.query(func.sum(CustoVeiculo.valor)).join(
+        CustoVeiculo.veiculo_ref
+    ).filter(
+        CustoVeiculo.veiculo_ref.has(admin_id=admin_id),
+        CustoVeiculo.data_custo.between(data_inicio, data_fim)
     ).scalar() or 0
     
     # Mão de obra - calcular baseado em registros de ponto
     registros_ponto = db.session.query(RegistroPonto).join(
-        RegistroPonto.funcionario
+        RegistroPonto.funcionario_ref
     ).filter(
-        RegistroPonto.funcionario.has(admin_id=admin_id),
+        RegistroPonto.funcionario_ref.has(admin_id=admin_id),
         RegistroPonto.data.between(data_inicio, data_fim)
     ).all()
     
@@ -214,9 +216,9 @@ def calcular_custos_mes(admin_id, data_inicio, data_fim):
     
     # Outros custos
     outros_custos = db.session.query(func.sum(OutroCusto.valor)).join(
-        OutroCusto.funcionario
+        OutroCusto.funcionario_ref
     ).filter(
-        OutroCusto.funcionario.has(admin_id=admin_id),
+        OutroCusto.funcionario_ref.has(admin_id=admin_id),
         OutroCusto.data.between(data_inicio, data_fim)
     ).scalar() or 0
     
