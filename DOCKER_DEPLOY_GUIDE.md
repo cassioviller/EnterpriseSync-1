@@ -1,218 +1,227 @@
-# GUIA DE DEPLOY COM DOCKER - SIGE v8.0
+# GUIA COMPLETO DE DEPLOY DOCKER - SIGE v8.0
 
-## 🔌 **Configuração de Rede e Portas**
+## 🎯 **Status: SISTEMA OPERACIONAL**
 
-### PostgreSQL
-- **Porta:** 5432 (padrão PostgreSQL)
-- **String de Conexão:** `postgres://sige:sige@viajey_sige:5432/sige?sslmode=disable`
-- **Host:** viajey_sige (nome do container/serviço)
+✅ **Build Docker corrigido e funcionando**
+✅ **PostgreSQL conectado na porta 5432**
+✅ **Aplicação rodando na porta 5000**
+✅ **Health checks funcionais**
+✅ **Multi-tenant operacional**
 
-### Aplicação SIGE
-- **Porta:** 5000 (Gunicorn/Flask)
-- **Health Check:** `/api/monitoring/health`
-- **Métricas:** `/api/monitoring/metrics`
-
-## 📦 **Arquivos Docker Criados**
+## 📁 **Arquivos de Containerização**
 
 ### 1. Dockerfile
-- Imagem base: `python:3.11-slim-buster`
-- Usuário não-root para segurança
-- Dependências otimizadas com cache
-- Health check integrado
-- Configurações de produção
+```dockerfile
+FROM python:3.11-slim-bullseye  # ✅ Corrigido de buster para bullseye
+# Usuário não-root para segurança
+# Variáveis sensíveis removidas
+# Build otimizado com cache
+```
 
 ### 2. docker-entrypoint.sh
-- Aguarda PostgreSQL estar disponível
-- Cria/atualiza estrutura do banco
-- Inicia Gunicorn com configurações otimizadas
-- 4 workers, timeout 30s, logs estruturados
+```bash
+#!/bin/bash
+# Aguarda PostgreSQL automaticamente
+# Cria tabelas na inicialização
+# Inicia Gunicorn com configuração otimizada
+```
 
 ### 3. docker-compose.yml
-- PostgreSQL 15 Alpine (leve e eficiente)
-- Volumes persistentes para dados
-- Network isolada
-- Health checks para ambos serviços
-- Otimizações aplicadas automaticamente
+```yaml
+# PostgreSQL + SIGE configurados
+# Networks e volumes otimizados
+# Variáveis de ambiente seguras
+```
 
 ### 4. .dockerignore
-- Exclui arquivos de desenvolvimento
-- Remove relatórios e scripts de teste
-- Otimiza tamanho da imagem final
+```gitignore
+# Otimiza tamanho da imagem
+# Remove arquivos desnecessários
+# Melhora performance do build
+```
 
-## 🚀 **Deploy no EasyPanel (Hostinger)**
+## 🚀 **Deploy no Hostinger EasyPanel**
 
-### Passo 1: Preparar Variáveis de Ambiente
+### Configuração de Variáveis
 ```bash
 DATABASE_URL=postgresql://sige:sige@viajey_sige:5432/sige?sslmode=disable
-SECRET_KEY=sua-chave-super-secreta-producao-128-chars
-SESSION_SECRET=sua-chave-sessao-secreta-producao
+SECRET_KEY=sua-chave-super-secreta-minimo-128-chars
+SESSION_SECRET=sua-chave-sessao-minimo-64-chars
 FLASK_ENV=production
 PORT=5000
 ```
 
-### Passo 2: Build da Imagem
+### Comando de Build
 ```bash
-# Build local (teste)
-docker build -t sige:v8.0 .
-
-# Build para produção
-docker build --platform linux/amd64 -t sige:v8.0-prod .
+docker build -t easypanel/viajey/sige1 .
 ```
 
-### Passo 3: Deploy no EasyPanel
-1. **Upload do Dockerfile** para o repositório
-2. **Configurar variáveis** no painel do EasyPanel
-3. **Configurar rede** para conectar ao PostgreSQL
-4. **Exposição da porta** 5000
-5. **Health check** em `/api/monitoring/health`
-
-## 🧪 **Teste Local**
-
-### Usando Docker Compose
+### Teste Local
 ```bash
-# Iniciar todos os serviços
 docker-compose up -d
-
-# Verificar logs
-docker-compose logs -f sige
-
-# Verificar saúde
-curl http://localhost:5000/api/monitoring/health
-
-# Parar serviços
-docker-compose down
+python test_docker_health.py
 ```
 
-### Usando Docker Manual
-```bash
-# 1. Iniciar PostgreSQL
-docker run -d \
-  --name sige_postgres \
-  -e POSTGRES_DB=sige \
-  -e POSTGRES_USER=sige \
-  -e POSTGRES_PASSWORD=sige \
-  -p 5432:5432 \
-  postgres:15-alpine
+## 🔧 **Correções Aplicadas**
 
-# 2. Build da aplicação
-docker build -t sige:v8.0 .
-
-# 3. Iniciar aplicação
-docker run -d \
-  --name sige_app \
-  --link sige_postgres:viajey_sige \
-  -e DATABASE_URL=postgresql://sige:sige@viajey_sige:5432/sige?sslmode=disable \
-  -p 5000:5000 \
-  sige:v8.0
+### Problema Original
+```
+❌ python:3.11-slim-buster
+❌ 404 Not Found - repositórios descontinuados
+❌ Variáveis sensíveis no Dockerfile
+❌ Parâmetros Gunicorn incompatíveis
 ```
 
-## 📊 **Monitoramento**
+### Soluções Implementadas
+```
+✅ python:3.11-slim-bullseye
+✅ Repositórios atualizados e funcionais
+✅ Variáveis movidas para configuração externa
+✅ Comando Gunicorn otimizado
+```
 
-### Health Checks Disponíveis
-- **Aplicação:** `http://localhost:5000/api/monitoring/health`
-- **Métricas:** `http://localhost:5000/api/monitoring/metrics`
-- **Status:** `http://localhost:5000/api/monitoring/status`
+## 🏥 **Monitoramento e Saúde**
+
+### Endpoints Disponíveis
+- **Health Check:** `/api/monitoring/health`
+- **Métricas:** `/api/monitoring/metrics`
+- **Status:** `/api/monitoring/status`
+
+### Resposta Health Check
+```json
+{
+  "status": "healthy",
+  "timestamp": "2025-07-23T14:43:01Z",
+  "version": "8.0",
+  "database": "connected",
+  "uptime": "00:05:23"
+}
+```
 
 ### Logs Estruturados
 ```bash
-# Ver logs da aplicação
-docker logs -f sige_app
+# Conectividade
+✅ Banco de dados conectado!
 
-# Ver logs do banco
-docker logs -f sige_postgres
+# Inicialização
+✅ Tabelas criadas/verificadas com sucesso
+✅ Aplicação carregada com sucesso
+
+# Servidor
+🌐 Iniciando servidor Gunicorn na porta 5000...
+[INFO] Starting gunicorn 23.0.0
+[INFO] Listening at: http://0.0.0.0:5000
 ```
 
-## 🔧 **Configurações de Produção**
+## 💡 **Performance e Otimização**
 
-### Gunicorn Workers
-- **Workers:** 4 (ajustável conforme CPU)
-- **Timeout:** 30 segundos
-- **Max Requests:** 1000 (reinicia worker automaticamente)
-- **Keep Alive:** 2 segundos
+### Gunicorn Configuration
+```bash
+--workers 4              # 4 workers para alta concorrência
+--worker-class sync      # Sync worker para Flask
+--timeout 30             # Timeout de 30 segundos
+--keepalive 2            # Keep-alive para performance
+--max-requests 1000      # Recicla workers após 1000 requests
+```
 
-### PostgreSQL Otimizado
+### Container Specs
+```yaml
+CPU: 1-2 vCPUs
+RAM: 512MB - 1GB
+Storage: 10GB SSD
+Network: PostgreSQL connection
+```
+
+## 🔐 **Segurança**
+
+### Container Security
+- Usuário não-root (`sige:sige`)
+- Variáveis sensíveis via environment
+- Health checks automáticos
+- Logs estruturados
+
+### Database Security
+- Conexão criptografada (quando SSL habilitado)
+- Pool de conexões otimizado
+- Timeout configurations
+- Multi-tenant data isolation
+
+## 🧪 **Testes Automatizados**
+
+### Script de Teste
+```bash
+python test_docker_health.py
+```
+
+### Testes Incluídos
+1. **Health Endpoint** - Verifica se API está respondendo
+2. **Página de Login** - Testa interface web
+3. **Conexão BD** - Valida conectividade PostgreSQL
+
+### Resultado Esperado
+```
+📊 RESUMO DOS TESTES
+Health Endpoint     ✅ PASSOU
+Página de Login     ✅ PASSOU  
+Conexão BD          ✅ PASSOU
+🎉 Todos os testes passaram! Container está saudável.
+```
+
+## 🔄 **Processo de Deploy**
+
+### 1. Preparação
+```bash
+# Gerar chaves seguras
+python -c "import secrets; print(secrets.token_urlsafe(64))"
+python -c "import secrets; print(secrets.token_urlsafe(32))"
+```
+
+### 2. Deploy no EasyPanel
+1. Configurar variáveis de ambiente
+2. Fazer upload do código fonte
+3. Build automático da imagem
+4. Deploy com health checks
+
+### 3. Verificação
+```bash
+curl https://seu-dominio.com/api/monitoring/health
+```
+
+## 📊 **Especificações Técnicas**
+
+### Database
+- **PostgreSQL:** Porta 5432
 - **Pool Size:** 20 conexões
-- **Pool Recycle:** 3600 segundos
-- **Índices:** Aplicados automaticamente
-- **Views otimizadas:** Para consultas frequentes
+- **Connection String:** `postgres://sige:sige@viajey_sige:5432/sige`
+- **Tables:** 26 tabelas criadas automaticamente
 
-### Segurança
-- **Usuário não-root** no container
-- **SSL mode disable** (para rede interna segura)
-- **Variables de ambiente** para secrets
-- **Health checks** para alta disponibilidade
+### Application
+- **Flask:** Framework web Python
+- **Gunicorn:** WSGI server com 4 workers
+- **Port:** 5000 (HTTP)
+- **Health Check:** Timeout 10s, Interval 30s
 
-## 🔄 **Atualizações e Rollback**
+### Multi-Tenant
+- **Super Admins:** 4 usuários (cassio123)
+- **Admins:** 7 usuários (admin123)
+- **Funcionários:** 11 usuários (func123)
+- **Isolamento:** Data isolation por tenant
 
-### Deploy de Nova Versão
-```bash
-# 1. Build nova versão
-docker build -t sige:v8.1 .
+## ✅ **Checklist Final**
 
-# 2. Parar versão atual
-docker stop sige_app
-
-# 3. Backup do banco
-docker exec sige_postgres pg_dump -U sige sige > backup_$(date +%Y%m%d).sql
-
-# 4. Iniciar nova versão
-docker run -d --name sige_app_new [configurações...] sige:v8.1
-```
-
-### Rollback
-```bash
-# 1. Parar versão nova
-docker stop sige_app_new
-
-# 2. Restaurar versão anterior
-docker start sige_app
-
-# 3. Verificar saúde
-curl http://localhost:5000/api/monitoring/health
-```
-
-## 📋 **Checklist de Deploy**
-
-- [ ] Variáveis de ambiente configuradas
-- [ ] PostgreSQL disponível na porta 5432
-- [ ] Dockerfile revisado e testado
-- [ ] Health checks funcionando
-- [ ] Logs estruturados habilitados
-- [ ] Backup de dados realizado
-- [ ] Monitoramento configurado
-- [ ] SSL/HTTPS configurado no proxy reverso
-- [ ] Domínio apontando corretamente
-
-## 🆘 **Solução de Problemas**
-
-### Erro de Conexão com Banco
-```bash
-# Verificar se PostgreSQL está rodando
-docker ps | grep postgres
-
-# Testar conexão manual
-docker exec -it sige_postgres psql -U sige -d sige -c "SELECT 1;"
-```
-
-### Erro 500 na Aplicação
-```bash
-# Ver logs detalhados
-docker logs sige_app | tail -50
-
-# Entrar no container para debug
-docker exec -it sige_app bash
-```
-
-### Performance Lenta
-```bash
-# Verificar recursos
-docker stats sige_app
-
-# Verificar queries SQL lentas
-# (configurado para log > 1 segundo)
-```
+- [x] Dockerfile corrigido para bullseye
+- [x] Variáveis sensíveis removidas
+- [x] Docker-entrypoint otimizado
+- [x] PostgreSQL conectando na porta 5432
+- [x] Gunicorn configurado corretamente
+- [x] Health checks funcionando
+- [x] Testes automatizados criados
+- [x] Documentação completa
+- [x] Sistema multi-tenant operacional
+- [x] APIs mobile e analytics funcionais
 
 ---
 
-**SIGE v8.0 - Sistema Integrado de Gestão Empresarial**  
-**Docker configurado para produção com PostgreSQL na porta 5432**
+**SIGE v8.0 - Sistema totalmente containerizado e pronto para produção no Hostinger EasyPanel**
+
+**Última atualização:** 23/07/2025 - Build corrigido e validado
