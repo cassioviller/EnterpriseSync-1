@@ -50,7 +50,7 @@ class KPIsFinanceiros:
         if not obra:
             return {'erro': 'Obra não encontrada'}
         
-        valor_contrato = obra.valor_contrato or obra.orcamento_total or 0
+        valor_contrato = obra.valor_contrato or obra.orcamento or 0
         
         if valor_contrato <= 0:
             return {
@@ -92,10 +92,10 @@ class KPIsFinanceiros:
         custo_atual = calculadora.calcular_custo_total()['total']
         
         obra = Obra.query.get(obra_id)
-        if not obra or not obra.orcamento_total:
+        if not obra or not obra.orcamento:
             return {'erro': 'Orçamento não definido'}
         
-        orcamento_total = obra.orcamento_total
+        orcamento_total = obra.orcamento
         
         # Calcular progresso físico para projeção
         progresso_fisico = KPIsFinanceiros.calcular_progresso_fisico(obra_id)
@@ -145,7 +145,7 @@ class KPIsFinanceiros:
         obra = Obra.query.get(obra_id)
         
         # Estimar investimento inicial (30% do orçamento)
-        orcamento_total = getattr(obra, 'orcamento_total', None) or getattr(obra, 'orcamento', 0)
+        orcamento_total = obra.orcamento or 0
         investimento_inicial = orcamento_total * 0.3
         
         if investimento_inicial <= 0:
@@ -187,7 +187,7 @@ class KPIsFinanceiros:
         custo_atual = calculadora.calcular_custo_total()['total']
         
         obra = Obra.query.get(obra_id)
-        if not obra or not obra.orcamento_total or not obra.data_inicio or not obra.data_fim_prevista:
+        if not obra or not obra.orcamento or not obra.data_inicio or not obra.data_previsao_fim:
             return {'erro': 'Dados da obra incompletos'}
         
         # Calcular tempo decorrido vs tempo total
@@ -199,7 +199,7 @@ class KPIsFinanceiros:
             return {'erro': 'Datas da obra inválidas'}
         
         percentual_tempo = min(100, (tempo_decorrido / tempo_total) * 100)
-        percentual_orcamento = (custo_atual / obra.orcamento_total) * 100
+        percentual_orcamento = (custo_atual / obra.orcamento) * 100
         
         # Calcular velocidade (razão entre % orçamento gasto e % tempo decorrido)
         if percentual_tempo > 0:
@@ -226,10 +226,10 @@ class KPIsFinanceiros:
             'percentual_tempo': percentual_tempo,
             'percentual_orcamento': percentual_orcamento,
             'custo_atual': custo_atual,
-            'orcamento_total': obra.orcamento_total,
+            'orcamento_total': obra.orcamento,
             'status': status,
             'recomendacao': recomendacao,
-            'dias_restantes': max(0, (obra.data_fim_prevista - hoje).days)
+            'dias_restantes': max(0, (obra.data_previsao_fim - hoje).days)
         }
     
     @staticmethod
