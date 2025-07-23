@@ -1,0 +1,118 @@
+Prezado Replit (ou Executor de Testes),
+
+Solicito a execução de um **Teste Completo e Abrangente do Sistema SIGE v8.0**, com o objetivo de validar todas as funcionalidades, identificar gargalos de performance, verificar a segurança e a integridade dos dados, e, crucialmente, gerar um relatório detalhado que servirá como base para os ajustes finos necessários antes da implementação em ambiente de produção.
+
+O teste deve ser conduzido de forma a simular um ambiente de uso real, cobrindo os seguintes aspectos:
+
+### 1. Configuração do Ambiente de Teste
+*   **Dados Iniciais:** O ambiente de teste deve ser populado com um conjunto de dados realistas que inclua:
+    *   Pelo menos 3 `SUPER_ADMIN`s.
+    *   Pelo menos 5 `ADMIN`s (representando diferentes tenants/empresas).
+    *   Pelo menos 50 `FUNCIONARIO`s distribuídos entre os `ADMIN`s.
+    *   Pelo menos 20 `OBRA`s ativas, com orçamentos variados, distribuídas entre os `ADMIN`s.
+    *   Pelo menos 10 `VEICULO`s ativos.
+    *   Um volume significativo de `RegistroPonto`, `CustoObra`, `RegistroAlimentacao`, `RDO` e `UsoVeiculo` para os últimos 6 meses, garantindo dados para os módulos de KPIs, Alertas e IA/Analytics.
+*   **Recursos:** O ambiente de teste deve ter recursos de CPU, memória e disco equivalentes ou superiores ao ambiente de produção planejado.
+
+### 2. Cenários de Teste Funcional (End-to-End)
+
+Para cada cenário, o relatório deve indicar **PASS/FAIL**, descrever o **comportamento observado** e, em caso de falha, detalhar os **passos para reprodução** e a **mensagem de erro/comportamento inesperado**.
+
+#### 2.1. Testes de Multi-Tenancy e Gestão de Acessos
+*   **Login e Logout:**
+    *   Super Admin, Admin e Funcionário devem conseguir logar e deslogar com sucesso.
+    *   Tentativas de login com credenciais inválidas devem falhar e exibir mensagem de erro apropriada.
+*   **Criação de Usuários:**
+    *   Super Admin deve conseguir criar novos Admin (tenants).
+    *   Admin deve conseguir criar novos Funcionários para seu próprio tenant.
+    *   Admin não deve conseguir criar usuários para outros tenants.
+    *   Funcionário não deve conseguir criar nenhum tipo de usuário.
+*   **Acesso a Dados:**
+    *   Super Admin deve ter acesso a todos os dados (todos os tenants).
+    *   Admin deve ter acesso apenas aos dados de seu próprio tenant (funcionários, obras, veículos, RDOs, custos).
+    *   Funcionário deve ter acesso apenas aos seus próprios dados e aos dados de obras/veículos/RDOs associados ao seu `admin_id`.
+    *   Tentativas de acesso a dados de outros tenants devem ser bloqueadas e registrar um evento de segurança.
+
+#### 2.2. Testes de Gestão de Obras
+*   **Criação/Edição de Obras:** Criar, editar e excluir obras, verificando a associação correta ao tenant.
+*   **Cálculo de Custos (`CalculadoraObra`):**
+    *   Executar o cálculo de custo total para diversas obras, com diferentes volumes de dados (pequeno, médio, grande).
+    *   Validar a precisão dos valores de mão de obra, transporte, alimentação e outros custos.
+    *   Verificar o detalhamento de horas normais e extras.
+*   **RDOs:**
+    *   Funcionários devem conseguir criar RDOs para obras do seu tenant.
+    *   Verificar o registro correto das informações do RDO (data, observações, etc.).
+    *   Garantir que RDOs de um tenant não sejam visíveis para outros tenants.
+
+#### 2.3. Testes de Gestão de Funcionários
+*   **Registro de Ponto:** Simular registros de ponto (entrada/saída, horas extras, faltas) para diversos funcionários.
+*   **Cálculo de KPIs (`KPIsEngine`):**
+    *   Executar o cálculo de todos os 15 KPIs para funcionários de diferentes tenants.
+    *   Validar a precisão dos KPIs de produtividade, absenteísmo, horas extras, etc.
+*   **Gestão de Horários:** Criar e associar diferentes horários de trabalho a funcionários.
+
+#### 2.4. Testes de Gestão de Veículos
+*   **Registro de Veículos:** Criar, editar e excluir veículos, verificando a associação ao tenant.
+*   **Registro de Uso/Custos:** Registrar usos e custos de veículos, garantindo o isolamento por tenant.
+
+#### 2.5. Testes de Módulos de IA e Analytics
+*   **Predição de Custos:**
+    *   Executar a predição de custos para novas obras com diferentes parâmetros.
+    *   Avaliar a razoabilidade das previsões em comparação com dados históricos.
+*   **Detecção de Anomalias:**
+    *   Simular cenários com gastos anormais (picos ou quedas inesperadas) e verificar se o sistema os detecta corretamente.
+    *   Verificar a categorização e os detalhes das anomalias.
+*   **Otimização de Recursos:**
+    *   Executar a otimização de alocação de funcionários e cronograma.
+    *   Analisar as recomendações geradas.
+*   **Análise de Sentimentos:**
+    *   Inserir RDOs com observações de sentimentos variados (positivos, negativos, neutros).
+    *   Verificar se o analisador de sentimentos classifica corretamente e fornece o resumo percentual.
+
+#### 2.6. Testes de APIs Mobile
+*   **Autenticação:** Testar o login via API para diferentes tipos de usuários.
+*   **Registro de Ponto:** Enviar registros de ponto via API, incluindo dados de GPS.
+*   **Criação de RDO:** Enviar RDOs via API, verificando a associação correta à obra e ao tenant.
+*   **Acesso a Dados:** Testar o acesso a listas de obras e notificações via API, garantindo o isolamento por tenant.
+
+### 3. Testes de Performance
+*   **Tempos de Resposta:** Medir o tempo de resposta para as seguintes operações sob carga (simulando 10, 50, 100 usuários simultâneos):
+    *   Login.
+    *   Carregamento do Dashboard principal.
+    *   Carregamento de listas (funcionários, obras, RDOs, veículos) com grande volume de dados (1000+ registros).
+    *   Execução de cálculos de KPIs para um período longo (1 ano).
+    *   Execução de predição de custos e detecção de anomalias.
+    *   Submissão de formulários (RDO, registro de ponto).
+*   **Uso de Recursos:** Monitorar o uso de CPU, memória e I/O de disco durante os testes de carga.
+*   **Escalabilidade:** Avaliar como o sistema se comporta com o aumento do volume de dados e usuários.
+
+### 4. Testes de Segurança
+*   **Isolamento de Dados:** Confirmar que não há vazamento de dados entre tenants em nenhuma operação (leitura, escrita, atualização, exclusão).
+*   **Injeção de SQL/XSS:** Realizar testes básicos para identificar vulnerabilidades comuns.
+*   **Autenticação/Autorização:** Tentar acessar rotas restritas sem autenticação ou com permissões insuficientes.
+
+### 5. Testes de Usabilidade e Responsividade
+*   **Navegação:** Verificar se a navegação é intuitiva e consistente.
+*   **Responsividade:** Testar a interface em diferentes tamanhos de tela (desktop, tablet, mobile).
+*   **Feedback ao Usuário:** Avaliar a clareza das mensagens de erro, sucesso e validação.
+
+### 6. Relatório de Resultados do Teste
+
+O resultado do teste deve ser um relatório estruturado, preferencialmente em formato Markdown ou similar, contendo:
+
+*   **Resumo Executivo:** Visão geral do status do sistema (aprovado/reprovado), principais descobertas e recomendações de alto nível.
+*   **Resultados Detalhados por Seção:** Para cada seção de teste (Funcional, Performance, Segurança, Usabilidade):
+    *   **Cenários Testados:** Lista dos cenários executados.
+    *   **Resultados:** Indicação de PASS/FAIL para cada cenário, com descrição do comportamento observado.
+    *   **Evidências:** Logs, screenshots, mensagens de erro, tempos de resposta.
+    *   **Problemas Identificados:** Descrição clara de cada bug, comportamento inesperado ou gargalo de performance, incluindo passos para reprodução.
+*   **Análise de Performance:** Gráficos de tempo de resposta, uso de recursos, e comparação com benchmarks, se aplicável.
+*   **Recomendações de Ajustes Finos:** Uma lista priorizada de ajustes (código, configuração, infraestrutura) necessários para garantir a estabilidade, performance e segurança em produção.
+*   **Sugestões de Melhoria:** Quaisquer outras observações ou sugestões para aprimoramento do sistema.
+
+Este relatório será a base para a fase de ajustes e preparação para a implantação em produção. A precisão e o detalhe das informações são de extrema importância.
+
+Atenciosamente,
+Manus AI
+
+
