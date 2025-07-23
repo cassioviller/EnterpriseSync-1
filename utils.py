@@ -1,7 +1,5 @@
 from datetime import datetime, timedelta, date, time
-from models import CustoObra, RegistroPonto, RegistroAlimentacao, CustoVeiculo, Funcionario, HorarioTrabalho, OutroCusto
 from sqlalchemy import func
-from app import db
 import calendar
 import os
 import re

@@ -9,11 +9,11 @@ def super_admin_required(f):
     def decorated_function(*args, **kwargs):
         if not current_user.is_authenticated:
             flash('Acesso negado. Faça login primeiro.', 'danger')
-            return redirect(url_for('login'))
+            return redirect(url_for('main.login'))
         
         if current_user.tipo_usuario != TipoUsuario.SUPER_ADMIN:
             flash('Acesso negado. Apenas super admin pode acessar esta página.', 'danger')
-            return redirect(url_for('dashboard'))
+            return redirect(url_for('main.dashboard'))
         
         return f(*args, **kwargs)
     return decorated_function
@@ -24,11 +24,11 @@ def admin_required(f):
     def decorated_function(*args, **kwargs):
         if not current_user.is_authenticated:
             flash('Acesso negado. Faça login primeiro.', 'danger')
-            return redirect(url_for('login'))
+            return redirect(url_for('main.login'))
         
         if current_user.tipo_usuario not in [TipoUsuario.SUPER_ADMIN, TipoUsuario.ADMIN]:
             flash('Acesso negado. Acesso restrito a administradores.', 'danger')
-            return redirect(url_for('dashboard'))
+            return redirect(url_for('main.dashboard'))
         
         return f(*args, **kwargs)
     return decorated_function
@@ -39,7 +39,7 @@ def funcionario_required(f):
     def decorated_function(*args, **kwargs):
         if not current_user.is_authenticated:
             flash('Acesso negado. Faça login primeiro.', 'danger')
-            return redirect(url_for('login'))
+            return redirect(url_for('main.login'))
         
         return f(*args, **kwargs)
     return decorated_function
