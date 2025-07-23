@@ -87,6 +87,7 @@ class Obra(db.Model):
     data_inicio = db.Column(db.Date, nullable=False)
     data_previsao_fim = db.Column(db.Date)
     orcamento = db.Column(db.Float, default=0.0)
+    valor_contrato = db.Column(db.Float, default=0.0)  # Valor do contrato para cálculo de margem
     area_total_m2 = db.Column(db.Float, default=0.0)  # Área total da obra
     status = db.Column(db.String(20), default='Em andamento')
     responsavel_id = db.Column(db.Integer, db.ForeignKey('funcionario.id'))

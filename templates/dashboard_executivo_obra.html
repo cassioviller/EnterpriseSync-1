@@ -1,0 +1,295 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard Executivo - {{ obra.nome }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid mt-4">
+    <!-- Header -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <h1 class="h3 mb-0">📊 Dashboard Executivo</h1>
+                    <p class="text-muted mb-0">{{ obra.nome }} - Análise Estratégica</p>
+                </div>
+                <div>
+                    <a href="{{ url_for('main.detalhes_obra', id=obra.id) }}" class="btn btn-outline-secondary">
+                        <i class="fas fa-arrow-left"></i> Voltar
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Filtros de Período -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-body">
+                    <form method="GET" class="row g-3">
+                        <div class="col-md-4">
+                            <label for="data_inicio" class="form-label">Data Início</label>
+                            <input type="date" class="form-control" id="data_inicio" name="data_inicio" 
+                                   value="{{ data_inicio.strftime('%Y-%m-%d') if data_inicio else '' }}">
+                        </div>
+                        <div class="col-md-4">
+                            <label for="data_fim" class="form-label">Data Fim</label>
+                            <input type="date" class="form-control" id="data_fim" name="data_fim" 
+                                   value="{{ data_fim.strftime('%Y-%m-%d') if data_fim else '' }}">
+                        </div>
+                        <div class="col-md-4 d-flex align-items-end">
+                            <button type="submit" class="btn btn-primary">
+                                <i class="fas fa-filter"></i> Filtrar
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- KPIs Financeiros -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <h4 class="mb-3">💰 KPIs Financeiros Estratégicos</h4>
+        </div>
+        
+        <!-- Custo por m² -->
+        <div class="col-md-6 col-lg-4 mb-3">
+            <div class="card h-100">
+                <div class="card-body">
+                    <h6 class="card-title">
+                        <i class="fas fa-ruler-combined text-primary"></i> Custo por m²
+                    </h6>
+                    {% if 'erro' not in kpis_financeiros.custo_por_m2 %}
+                    <h4 class="text-primary">R$ {{ "%.2f"|format(kpis_financeiros.custo_por_m2.valor) }}</h4>
+                    <small class="text-muted">
+                        Área: {{ kpis_financeiros.custo_por_m2.area_m2 }} m²<br>
+                        Benchmark: R$ {{ "%.2f"|format(kpis_financeiros.custo_por_m2.benchmark_mercado) }}
+                    </small>
+                    <div class="mt-2">
+                        <span class="badge bg-{{ 'danger' if kpis_financeiros.custo_por_m2.status == 'acima' else 'success' }}">
+                            {{ kpis_financeiros.custo_por_m2.status|title }}
+                        </span>
+                    </div>
+                    {% else %}
+                    <p class="text-danger">{{ kpis_financeiros.custo_por_m2.erro }}</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Margem de Lucro -->
+        <div class="col-md-6 col-lg-4 mb-3">
+            <div class="card h-100">
+                <div class="card-body">
+                    <h6 class="card-title">
+                        <i class="fas fa-percentage text-success"></i> Margem de Lucro
+                    </h6>
+                    {% if 'erro' not in kpis_financeiros.margem_lucro %}
+                    <h4 class="{{ 'text-success' if kpis_financeiros.margem_lucro.status == 'positiva' else 'text-danger' }}">
+                        {{ "%.1f"|format(kpis_financeiros.margem_lucro.margem_percentual) }}%
+                    </h4>
+                    <small class="text-muted">
+                        R$ {{ "%.2f"|format(kpis_financeiros.margem_lucro.margem_absoluta) }}
+                    </small>
+                    <div class="mt-2">
+                        <span class="badge bg-{{ 'success' if kpis_financeiros.margem_lucro.classificacao in ['excelente', 'boa'] else 'warning' if kpis_financeiros.margem_lucro.classificacao == 'regular' else 'danger' }}">
+                            {{ kpis_financeiros.margem_lucro.classificacao|title }}
+                        </span>
+                    </div>
+                    {% else %}
+                    <p class="text-danger">{{ kpis_financeiros.margem_lucro.erro }}</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Desvio Orçamentário -->
+        <div class="col-md-6 col-lg-4 mb-3">
+            <div class="card h-100">
+                <div class="card-body">
+                    <h6 class="card-title">
+                        <i class="fas fa-chart-line text-warning"></i> Desvio Orçamentário
+                    </h6>
+                    {% if 'erro' not in kpis_financeiros.desvio_orcamentario %}
+                    <h4 class="{{ 'text-success' if kpis_financeiros.desvio_orcamentario.desvio_projetado < 5 else 'text-warning' if kpis_financeiros.desvio_orcamentario.desvio_projetado < 15 else 'text-danger' }}">
+                        {{ "%.1f"|format(kpis_financeiros.desvio_orcamentario.desvio_projetado) }}%
+                    </h4>
+                    <small class="text-muted">
+                        Projetado: R$ {{ "%.2f"|format(kpis_financeiros.desvio_orcamentario.custo_projetado) }}
+                    </small>
+                    <div class="mt-2">
+                        <span class="badge bg-{{ 'success' if kpis_financeiros.desvio_orcamentario.alerta == 'normal' else 'warning' if kpis_financeiros.desvio_orcamentario.alerta in ['medio', 'alto'] else 'danger' }}">
+                            {{ kpis_financeiros.desvio_orcamentario.alerta|title }}
+                        </span>
+                    </div>
+                    {% else %}
+                    <p class="text-danger">{{ kpis_financeiros.desvio_orcamentario.erro }}</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <!-- ROI Projetado -->
+        <div class="col-md-6 col-lg-4 mb-3">
+            <div class="card h-100">
+                <div class="card-body">
+                    <h6 class="card-title">
+                        <i class="fas fa-chart-pie text-info"></i> ROI Projetado
+                    </h6>
+                    {% if 'erro' not in kpis_financeiros.roi_projetado %}
+                    <h4 class="text-info">{{ "%.1f"|format(kpis_financeiros.roi_projetado.roi_percentual) }}%</h4>
+                    <small class="text-muted">
+                        Retorno em {{ "%.1f"|format(kpis_financeiros.roi_projetado.tempo_retorno_meses) }} meses
+                    </small>
+                    <div class="mt-2">
+                        <span class="badge bg-{{ 'success' if kpis_financeiros.roi_projetado.classificacao in ['excelente', 'bom'] else 'warning' if kpis_financeiros.roi_projetado.classificacao == 'regular' else 'danger' }}">
+                            {{ kpis_financeiros.roi_projetado.classificacao|title }}
+                        </span>
+                    </div>
+                    {% else %}
+                    <p class="text-danger">{{ kpis_financeiros.roi_projetado.erro }}</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Velocidade de Queima -->
+        <div class="col-md-6 col-lg-4 mb-3">
+            <div class="card h-100">
+                <div class="card-body">
+                    <h6 class="card-title">
+                        <i class="fas fa-tachometer-alt text-danger"></i> Velocidade de Queima
+                    </h6>
+                    {% if 'erro' not in kpis_financeiros.velocidade_queima %}
+                    <h4 class="{{ 'text-success' if kpis_financeiros.velocidade_queima.status == 'adequada' else 'text-warning' if kpis_financeiros.velocidade_queima.status in ['rapida', 'lenta'] else 'text-danger' }}">
+                        {{ "%.2f"|format(kpis_financeiros.velocidade_queima.velocidade) }}x
+                    </h4>
+                    <small class="text-muted">
+                        {{ "%.1f"|format(kpis_financeiros.velocidade_queima.percentual_orcamento) }}% usado, {{ "%.1f"|format(kpis_financeiros.velocidade_queima.percentual_tempo) }}% tempo
+                    </small>
+                    <div class="mt-2">
+                        <span class="badge bg-{{ 'success' if kpis_financeiros.velocidade_queima.status == 'adequada' else 'warning' if kpis_financeiros.velocidade_queima.status in ['rapida', 'lenta'] else 'danger' }}">
+                            {{ kpis_financeiros.velocidade_queima.status|replace('_', ' ')|title }}
+                        </span>
+                    </div>
+                    {% else %}
+                    <p class="text-danger">{{ kpis_financeiros.velocidade_queima.erro }}</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Produtividade da Obra -->
+        <div class="col-md-6 col-lg-4 mb-3">
+            <div class="card h-100">
+                <div class="card-body">
+                    <h6 class="card-title">
+                        <i class="fas fa-clock text-primary"></i> Produtividade da Obra
+                    </h6>
+                    {% if 'erro' not in kpis_operacionais.produtividade_obra %}
+                    <h4 class="{{ 'text-success' if kpis_operacionais.produtividade_obra.status in ['adiantada', 'muito_adiantada'] else 'text-warning' if kpis_operacionais.produtividade_obra.status == 'no_prazo' else 'text-danger' }}">
+                        {{ "%.2f"|format(kpis_operacionais.produtividade_obra.indice) }}
+                    </h4>
+                    <small class="text-muted">
+                        Físico: {{ "%.1f"|format(kpis_operacionais.produtividade_obra.progresso_fisico) }}% | 
+                        Cronológico: {{ "%.1f"|format(kpis_operacionais.produtividade_obra.progresso_cronologico) }}%
+                    </small>
+                    <div class="mt-2">
+                        <span class="badge bg-{{ 'success' if kpis_operacionais.produtividade_obra.status in ['adiantada', 'muito_adiantada'] else 'warning' if kpis_operacionais.produtividade_obra.status == 'no_prazo' else 'danger' }}">
+                            {{ kpis_operacionais.produtividade_obra.status|replace('_', ' ')|title }}
+                        </span>
+                    </div>
+                    {% else %}
+                    <p class="text-danger">{{ kpis_operacionais.produtividade_obra.erro }}</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Custos Detalhados -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <h4 class="mb-3">💼 Análise de Custos (Calculadora Unificada)</h4>
+        </div>
+        <div class="col-md-3 mb-3">
+            <div class="card text-center">
+                <div class="card-body">
+                    <h6 class="card-title">👷 Mão de Obra</h6>
+                    <h4 class="text-primary">R$ {{ "%.2f"|format(custos.mao_obra) }}</h4>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3 mb-3">
+            <div class="card text-center">
+                <div class="card-body">
+                    <h6 class="card-title">🚚 Transporte</h6>
+                    <h4 class="text-warning">R$ {{ "%.2f"|format(custos.transporte) }}</h4>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3 mb-3">
+            <div class="card text-center">
+                <div class="card-body">
+                    <h6 class="card-title">🍽️ Alimentação</h6>
+                    <h4 class="text-info">R$ {{ "%.2f"|format(custos.alimentacao) }}</h4>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3 mb-3">
+            <div class="card text-center">
+                <div class="card-body">
+                    <h6 class="card-title">📋 Outros</h6>
+                    <h4 class="text-secondary">R$ {{ "%.2f"|format(custos.outros) }}</h4>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Estatísticas do Período -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-body">
+                    <h5 class="card-title">📈 Estatísticas do Período</h5>
+                    <div class="row">
+                        <div class="col-md-3">
+                            <strong>Total de Funcionários:</strong> {{ estatisticas.total_funcionarios }}
+                        </div>
+                        <div class="col-md-3">
+                            <strong>Registros de Ponto:</strong> {{ estatisticas.total_registros }}
+                        </div>
+                        <div class="col-md-3">
+                            <strong>Período:</strong> {{ estatisticas.dias_periodo }} dias
+                        </div>
+                        <div class="col-md-3">
+                            <strong>Custo Total:</strong> R$ {{ "%.2f"|format(custos.total) }}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// Auto-aplicar filtros padrão se necessário
+document.addEventListener('DOMContentLoaded', function() {
+    const dataInicio = document.getElementById('data_inicio');
+    const dataFim = document.getElementById('data_fim');
+    
+    if (!dataInicio.value) {
+        const hoje = new Date();
+        const primeiroDia = new Date(hoje.getFullYear(), hoje.getMonth(), 1);
+        dataInicio.value = primeiroDia.toISOString().split('T')[0];
+    }
+    
+    if (!dataFim.value) {
+        const hoje = new Date();
+        dataFim.value = hoje.toISOString().split('T')[0];
+    }
+});
+</script>
+{% endblock %}

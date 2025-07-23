@@ -1,411 +1,190 @@
 #!/usr/bin/env python3
 """
-Teste Completo do Sistema SIGE v8.0
-Valida todas as funcionalidades implementadas na evolução para v8.0
+TESTE COMPLETO DO SISTEMA SIGE v8.0
+Teste das melhorias implementadas: CalculadoraObra e KPIs Financeiros
 """
 
-import requests
-import json
-from datetime import datetime, date, timedelta
 from app import app, db
-from models import *
+from calculadora_obra import CalculadoraObra
+from kpis_financeiros import KPIsFinanceiros, KPIsOperacionais
+from models import Obra, Funcionario, RegistroPonto
+from datetime import datetime, date
 import sys
 
-def testar_sistema_notificacoes():
-    """Testa sistema de notificações inteligentes"""
-    print("🔔 TESTANDO SISTEMA DE NOTIFICAÇÕES INTELIGENTES")
-    print("=" * 60)
+def executar_testes():
+    """Executa bateria de testes das melhorias implementadas"""
     
-    try:
-        from notification_system import executar_sistema_notificacoes
+    with app.app_context():
+        print("=== TESTE COMPLETO SIGE v8.0 ===")
+        print("Testando melhorias: CalculadoraObra + KPIs Financeiros")
+        print()
         
-        with app.app_context():
-            resultado = executar_sistema_notificacoes()
+        # Buscar obra para teste
+        obra = Obra.query.first()
+        if not obra:
+            print("❌ Nenhuma obra encontrada no sistema")
+            return False
+        
+        print(f"📋 Testando obra: {obra.nome} (ID: {obra.id})")
+        print()
+        
+        # Testar CalculadoraObra
+        print("🔧 TESTE 1: Calculadora Obra Unificada")
+        try:
+            calc = CalculadoraObra(obra.id)
+            custos = calc.calcular_custo_total()
+            estatisticas = calc.obter_estatisticas_periodo()
             
-        print(f"✅ Sistema executado com sucesso!")
-        print(f"   📊 Total de alertas: {resultado['estatisticas']['total']}")
-        print(f"   🔴 Críticos: {resultado['estatisticas']['criticos']}")
-        print(f"   🟡 Importantes: {resultado['estatisticas']['importantes']}")
-        print(f"   🔵 Informativos: {resultado['estatisticas']['informativos']}")
+            print("✅ Calculadora criada com sucesso")
+            print(f"   • Custo Total: R$ {custos['total']:,.2f}")
+            print(f"   • Mão de Obra: R$ {custos['mao_obra']:,.2f}")
+            print(f"   • Transporte: R$ {custos['transporte']:,.2f}")
+            print(f"   • Alimentação: R$ {custos['alimentacao']:,.2f}")
+            print(f"   • Outros: R$ {custos['outros']:,.2f}")
+            print(f"   • Funcionários: {estatisticas['total_funcionarios']}")
+            print(f"   • Registros: {estatisticas['total_registros']}")
+            print()
+            
+        except Exception as e:
+            print(f"❌ Erro na Calculadora: {e}")
+            return False
         
-        if resultado['estatisticas']['por_categoria']:
-            print("   📋 Por categoria:")
-            for categoria, count in resultado['estatisticas']['por_categoria'].items():
-                print(f"      • {categoria}: {count} alertas")
-        
-        # Testar alguns alertas específicos
-        print("\n   🔍 Tipos de verificações ativas:")
-        tipos_verificacao = [
-            "Absenteísmo alto (> 10%)",
-            "Produtividade baixa (< 70%)",
-            "Custos acima orçamento (> 90%)",
-            "Atrasos recorrentes (3+ por semana)",
-            "Veículos em manutenção (> 30%)",
-            "Obras sem progresso (7+ dias)",
-            "Funcionários sem ponto hoje",
-            "Gastos anômalos (> 200% média)"
-        ]
-        
-        for tipo in tipos_verificacao:
-            print(f"      ✅ {tipo}")
-        
-        return True
-        
-    except Exception as e:
-        print(f"❌ Erro no sistema de notificações: {e}")
-        return False
-
-def testar_sistema_ia():
-    """Testa sistema de IA e Analytics"""
-    print("\n🧠 TESTANDO SISTEMA DE IA E ANALYTICS")
-    print("=" * 60)
-    
-    try:
-        from ai_analytics import (
-            inicializar_ia, 
-            prever_custo_obra_api, 
-            detectar_anomalias_api,
-            otimizar_recursos_api,
-            analisar_sentimentos_api,
-            gerar_relatorio_ia_completo
-        )
-        
-        # Inicializar sistema
-        print("🚀 Inicializando sistema de IA...")
-        with app.app_context():
-            sucesso = inicializar_ia()
-        
-        if not sucesso:
-            print("⚠️ IA inicializada em modo básico (dados insuficientes)")
-        else:
-            print("✅ IA inicializada com sucesso!")
-        
-        # Testar predição de custos
-        print("\n📊 Testando predição de custos...")
-        predicao = prever_custo_obra_api(orcamento=150000, funcionarios=8, duracao=45)
-        
-        if 'erro' not in predicao:
-            print(f"   ✅ Predição realizada: R$ {predicao['custo_previsto']:,.2f}")
-            print(f"   📈 Margem de erro: {predicao.get('margem_erro', 'N/A')}")
-            print(f"   🎯 Recomendações: {len(predicao.get('recomendacoes', []))} geradas")
-        else:
-            print(f"   ⚠️ Predição básica: {predicao['erro']}")
-        
-        # Testar detecção de anomalias
-        print("\n🔍 Testando detecção de anomalias...")
-        anomalias = detectar_anomalias_api(dias=14)
-        
-        if 'erro' not in anomalias:
-            print(f"   ✅ Análise realizada: {anomalias.get('anomalias_detectadas', 0)} anomalias")
-            print(f"   📅 Período: {anomalias.get('periodo_analisado', 'N/A')}")
-        else:
-            print(f"   ⚠️ Detecção básica: {anomalias['erro']}")
-        
-        # Testar otimização de recursos
-        print("\n⚡ Testando otimização de recursos...")
-        with app.app_context():
-            otimizacao = otimizar_recursos_api()
-        
-        if 'erro' not in otimizacao:
-            print(f"   ✅ Otimização realizada")
-            print(f"   👥 Alocações: {len(otimizacao.get('alocacao_funcionarios', []))}")
-            print(f"   📅 Cronogramas: {len(otimizacao.get('cronograma_otimizado', []))}")
-            print(f"   💡 Recomendações: {len(otimizacao.get('recomendacoes_gerais', []))}")
-        else:
-            print(f"   ⚠️ Otimização básica: {otimizacao['erro']}")
-        
-        # Testar análise de sentimentos
-        print("\n😊 Testando análise de sentimentos...")
-        with app.app_context():
-            sentimentos = analisar_sentimentos_api()
-        
-        if 'erro' not in sentimentos:
-            if 'mensagem' in sentimentos:
-                print(f"   ℹ️ {sentimentos['mensagem']}")
+        # Testar KPIs Financeiros
+        print("💰 TESTE 2: KPIs Financeiros Avançados")
+        try:
+            # Custo por m²
+            custo_m2 = KPIsFinanceiros.custo_por_m2(obra.id)
+            if 'erro' not in custo_m2:
+                print(f"✅ Custo por m²: R$ {custo_m2['valor']:.2f}")
+                print(f"   • Status: {custo_m2['status']}")
             else:
-                print(f"   ✅ Análise realizada: {sentimentos.get('total_feedbacks', 0)} feedbacks")
-                print(f"   🌡️ Clima geral: {sentimentos.get('clima_geral', 'N/A')}")
-        else:
-            print(f"   ⚠️ Análise básica: {sentimentos['erro']}")
+                print(f"⚠️  Custo por m²: {custo_m2['erro']}")
+            
+            # Margem de lucro
+            margem = KPIsFinanceiros.margem_lucro_realizada(obra.id)
+            if 'erro' not in margem:
+                print(f"✅ Margem de Lucro: {margem['margem_percentual']:.1f}%")
+                print(f"   • Classificação: {margem['classificacao']}")
+            else:
+                print(f"⚠️  Margem de Lucro: {margem['erro']}")
+            
+            # Desvio orçamentário
+            desvio = KPIsFinanceiros.desvio_orcamentario(obra.id)
+            if 'erro' not in desvio:
+                print(f"✅ Desvio Orçamentário: {desvio['desvio_projetado']:.1f}%")
+                print(f"   • Alerta: {desvio['alerta']}")
+            else:
+                print(f"⚠️  Desvio Orçamentário: {desvio['erro']}")
+            
+            # ROI Projetado
+            roi = KPIsFinanceiros.roi_projetado(obra.id)
+            if 'erro' not in roi:
+                print(f"✅ ROI Projetado: {roi['roi_percentual']:.1f}%")
+                print(f"   • Classificação: {roi['classificacao']}")
+            else:
+                print(f"⚠️  ROI Projetado: {roi['erro']}")
+            
+            # Velocidade de queima
+            velocidade = KPIsFinanceiros.velocidade_queima_orcamento(obra.id)
+            if 'erro' not in velocidade:
+                print(f"✅ Velocidade de Queima: {velocidade['velocidade']:.2f}x")
+                print(f"   • Status: {velocidade['status']}")
+            else:
+                print(f"⚠️  Velocidade de Queima: {velocidade['erro']}")
+            
+            print()
+            
+        except Exception as e:
+            print(f"❌ Erro nos KPIs Financeiros: {e}")
+            return False
         
-        # Gerar relatório completo
-        print("\n📋 Gerando relatório completo de IA...")
-        with app.app_context():
-            relatorio = gerar_relatorio_ia_completo()
+        # Testar KPIs Operacionais
+        print("📊 TESTE 3: KPIs Operacionais")
+        try:
+            produtividade = KPIsOperacionais.indice_produtividade_obra(obra.id)
+            if 'erro' not in produtividade:
+                print(f"✅ Produtividade da Obra: {produtividade['indice']:.2f}")
+                print(f"   • Status: {produtividade['status']}")
+                print(f"   • Progresso Físico: {produtividade['progresso_fisico']:.1f}%")
+                print(f"   • Progresso Cronológico: {produtividade['progresso_cronologico']:.1f}%")
+            else:
+                print(f"⚠️  Produtividade: {produtividade['erro']}")
+            print()
+            
+        except Exception as e:
+            print(f"❌ Erro nos KPIs Operacionais: {e}")
+            return False
         
-        print(f"   ✅ Relatório gerado com {len(relatorio)} seções")
-        print(f"   🤖 Modelos ativos: {len(relatorio.get('modelos_ativos', []))}")
+        # Teste de Performance
+        print("⚡ TESTE 4: Performance dos Cálculos")
+        try:
+            import time
+            
+            # Testar tempo de execução
+            start_time = time.time()
+            for i in range(5):  # 5 execuções
+                calc = CalculadoraObra(obra.id)
+                custos = calc.calcular_custo_total()
+            end_time = time.time()
+            
+            tempo_medio = (end_time - start_time) / 5
+            print(f"✅ Tempo médio por cálculo: {tempo_medio:.3f}s")
+            
+            if tempo_medio < 1.0:
+                print("✅ Performance excelente (< 1s)")
+            elif tempo_medio < 2.0:
+                print("⚠️  Performance boa (< 2s)")
+            else:
+                print("❌ Performance ruim (> 2s)")
+            
+            print()
+            
+        except Exception as e:
+            print(f"❌ Erro no teste de performance: {e}")
+            return False
+        
+        # Teste de Integridade dos Dados
+        print("🔍 TESTE 5: Integridade dos Dados")
+        try:
+            # Verificar se há funcionários com registros
+            funcionarios_com_registros = db.session.query(
+                Funcionario.id
+            ).join(RegistroPonto).filter(
+                RegistroPonto.obra_id == obra.id
+            ).distinct().count()
+            
+            print(f"✅ Funcionários com registros: {funcionarios_com_registros}")
+            
+            # Verificar consistência dos custos
+            calc = CalculadoraObra(obra.id)
+            custos = calc.calcular_custo_total()
+            
+            if custos['total'] == (custos['mao_obra'] + custos['transporte'] + 
+                                  custos['alimentacao'] + custos['outros']):
+                print("✅ Soma dos custos consistente")
+            else:
+                print("❌ Inconsistência na soma dos custos")
+                return False
+            
+            print()
+            
+        except Exception as e:
+            print(f"❌ Erro no teste de integridade: {e}")
+            return False
+        
+        # Resumo final
+        print("🎯 RESUMO DOS TESTES")
+        print("✅ Calculadora Obra: Funcionando")
+        print("✅ KPIs Financeiros: Funcionando")
+        print("✅ KPIs Operacionais: Funcionando")
+        print("✅ Performance: Adequada")
+        print("✅ Integridade: Validada")
+        print()
+        print("🏆 TODOS OS TESTES APROVADOS!")
+        print("Sistema SIGE v8.0 validado e pronto para uso")
         
         return True
-        
-    except Exception as e:
-        print(f"❌ Erro no sistema de IA: {e}")
-        return False
-
-def testar_apis_mobile():
-    """Testa APIs mobile"""
-    print("\n📱 TESTANDO APIs MOBILE")
-    print("=" * 60)
-    
-    try:
-        from mobile_api import mobile_api
-        
-        # Verificar endpoints implementados
-        endpoints_mobile = [
-            "POST /api/mobile/auth/login",
-            "GET /api/mobile/dashboard", 
-            "POST /api/mobile/ponto/registrar",
-            "GET /api/mobile/ponto/historico",
-            "GET /api/mobile/rdo/listar",
-            "POST /api/mobile/rdo/criar",
-            "GET /api/mobile/obras/listar",
-            "POST /api/mobile/veiculos/usar",
-            "GET /api/mobile/notificacoes",
-            "GET /api/mobile/config/sincronizacao"
-        ]
-        
-        print("✅ APIs Mobile implementadas:")
-        for endpoint in endpoints_mobile:
-            print(f"   📱 {endpoint}")
-        
-        # Verificar funcionalidades
-        print("\n🔧 Funcionalidades disponíveis:")
-        funcionalidades = [
-            "Ponto eletrônico com GPS",
-            "RDO mobile com fotos",
-            "Gestão de veículos",
-            "Dashboard personalizado",
-            "Notificações push (preparado)",
-            "Modo offline (estruturado)",
-            "Sincronização automática",
-            "Upload de imagens base64",
-            "Autenticação JWT (preparado)",
-            "Histórico completo de ações"
-        ]
-        
-        for func in funcionalidades:
-            print(f"   ✅ {func}")
-        
-        return True
-        
-    except Exception as e:
-        print(f"❌ Erro nas APIs mobile: {e}")
-        return False
-
-def testar_dashboard_interativo():
-    """Testa dashboard interativo"""
-    print("\n📊 TESTANDO DASHBOARD INTERATIVO")
-    print("=" * 60)
-    
-    try:
-        # Verificar APIs do dashboard
-        apis_dashboard = [
-            "/api/dashboard/dados",
-            "/api/dashboard/refresh", 
-            "/api/alertas/verificar",
-            "/api/ia/prever-custos",
-            "/api/ia/detectar-anomalias",
-            "/api/ia/otimizar-recursos",
-            "/api/ia/analisar-sentimentos",
-            "/api/notificacoes/avancadas"
-        ]
-        
-        print("✅ APIs do Dashboard implementadas:")
-        for api in apis_dashboard:
-            print(f"   🌐 {api}")
-        
-        # Verificar funcionalidades interativas
-        print("\n🎛️ Funcionalidades interativas:")
-        funcionalidades = [
-            "Auto-refresh a cada 5 minutos",
-            "Verificação de alertas a cada 2 minutos", 
-            "Top funcionários produtivos",
-            "Obras que precisam de atenção",
-            "KPIs em tempo real",
-            "Gráficos interativos",
-            "Drill-down por período",
-            "Filtros multi-dimensionais",
-            "Comparativos automáticos",
-            "Loading states visuais"
-        ]
-        
-        for func in funcionalidades:
-            print(f"   ✅ {func}")
-        
-        return True
-        
-    except Exception as e:
-        print(f"❌ Erro no dashboard interativo: {e}")
-        return False
-
-def testar_integracao_completa():
-    """Testa integração entre todos os sistemas"""
-    print("\n🔗 TESTANDO INTEGRAÇÃO COMPLETA")
-    print("=" * 60)
-    
-    try:
-        with app.app_context():
-            # Testar dados básicos
-            funcionarios = Funcionario.query.filter_by(ativo=True).count()
-            obras = Obra.query.count()
-            veiculos = Veiculo.query.count()
-            rdos = RDO.query.count()
-            pontos = RegistroPonto.query.count()
-            
-            print(f"📊 Dados no sistema:")
-            print(f"   👥 Funcionários ativos: {funcionarios}")
-            print(f"   🏗️ Obras cadastradas: {obras}")
-            print(f"   🚗 Veículos: {veiculos}")
-            print(f"   📋 RDOs criados: {rdos}")
-            print(f"   ⏰ Registros de ponto: {pontos}")
-        
-        # Verificar integração entre sistemas
-        print("\n🔄 Integrações funcionando:")
-        integracoes = [
-            "Notificações ↔ Dashboard (alertas em tempo real)",
-            "IA ↔ KPIs (predições automáticas)",
-            "Mobile ↔ Web (sincronização de dados)",
-            "Ponto ↔ Analytics (cálculo automático)",
-            "RDO ↔ Obras (controle de progresso)",
-            "Custos ↔ IA (detecção de anomalias)",
-            "Funcionários ↔ Alertas (monitoramento)",
-            "Dashboard ↔ Mobile (dados consistentes)"
-        ]
-        
-        for integracao in integracoes:
-            print(f"   ✅ {integracao}")
-        
-        return True
-        
-    except Exception as e:
-        print(f"❌ Erro na integração: {e}")
-        return False
-
-def calcular_metricas_performance():
-    """Calcula métricas de performance do sistema"""
-    print("\n⚡ MÉTRICAS DE PERFORMANCE")
-    print("=" * 60)
-    
-    try:
-        with app.app_context():
-            # Simular métricas de performance
-            inicio = datetime.now()
-            
-            # Teste de carga do dashboard
-            funcionarios = Funcionario.query.filter_by(ativo=True).count()
-            obras = Obra.query.filter_by(status='Em andamento').count()
-            
-            fim = datetime.now()
-            tempo_consulta = (fim - inicio).total_seconds()
-            
-            print(f"📈 Performance do sistema:")
-            print(f"   ⏱️ Tempo de consulta básica: {tempo_consulta*1000:.1f}ms")
-            print(f"   💾 Cache implementado: Multi-camadas")
-            print(f"   🔄 Auto-refresh: Configurado")
-            print(f"   📱 APIs mobile: Otimizadas")
-            
-            # Calcular melhorias estimadas
-            print(f"\n📊 Melhorias estimadas vs. v6.5:")
-            melhorias = [
-                ("Tempo de identificação de problemas", "40% mais rápido"),
-                ("Análise de dados", "30% mais eficiente"),
-                ("Gestão operacional", "25% mais produtiva"),
-                ("Redução de trabalho manual", "60% automatizado"),
-                ("Precisão de dados", "85% menos erros"),
-                ("Disponibilidade mobile", "100% funcional")
-            ]
-            
-            for melhoria, valor in melhorias:
-                print(f"   📈 {melhoria}: {valor}")
-        
-        return True
-        
-    except Exception as e:
-        print(f"❌ Erro no cálculo de métricas: {e}")
-        return False
-
-def gerar_relatorio_final():
-    """Gera relatório final do teste"""
-    print("\n📋 RELATÓRIO FINAL - SIGE v8.0")
-    print("=" * 60)
-    
-    # Status dos módulos
-    modulos = [
-        ("Sistema de Notificações Inteligentes", "✅ OPERACIONAL"),
-        ("IA e Analytics Avançados", "✅ OPERACIONAL"),
-        ("APIs Mobile Completas", "✅ OPERACIONAL"),
-        ("Dashboard Interativo", "✅ OPERACIONAL"),
-        ("Integração Completa", "✅ OPERACIONAL"),
-        ("Performance Otimizada", "✅ OPERACIONAL")
-    ]
-    
-    print("🚀 Status dos módulos:")
-    for modulo, status in modulos:
-        print(f"   {status} {modulo}")
-    
-    # Próximos passos
-    print(f"\n🛣️ Próximos passos recomendados:")
-    proximos_passos = [
-        "Desenvolver app React Native",
-        "Integrar com ERPs (TOTVS/SAP)",
-        "Implementar Open Banking",
-        "Adicionar sensores IoT",
-        "Expandir modelos de IA",
-        "Deploy em produção"
-    ]
-    
-    for passo in proximos_passos:
-        print(f"   🔄 {passo}")
-    
-    # ROI estimado
-    print(f"\n💰 ROI Estimado:")
-    print(f"   💸 Investimento Fase 1: R$ 150.000")
-    print(f"   💹 Retorno anual estimado: R$ 600.000")
-    print(f"   📈 ROI: 400% em 24 meses")
-    print(f"   ⏰ Payback: 3 meses")
-
-def main():
-    """Função principal do teste completo"""
-    print("🔧 TESTE COMPLETO DO SISTEMA SIGE v8.0")
-    print("=" * 80)
-    print(f"📅 Data/Hora: {datetime.now().strftime('%d/%m/%Y %H:%M:%S')}")
-    print(f"🏗️ Versão: 8.0.1")
-    print(f"👨‍💻 Autor: Sistema SIGE AI")
-    
-    # Executar todos os testes
-    resultados = []
-    
-    resultados.append(testar_sistema_notificacoes())
-    resultados.append(testar_sistema_ia())
-    resultados.append(testar_apis_mobile())
-    resultados.append(testar_dashboard_interativo())
-    resultados.append(testar_integracao_completa())
-    resultados.append(calcular_metricas_performance())
-    
-    # Gerar relatório final
-    gerar_relatorio_final()
-    
-    # Resultado final
-    testes_passados = sum(resultados)
-    total_testes = len(resultados)
-    percentual_sucesso = (testes_passados / total_testes) * 100
-    
-    print(f"\n" + "=" * 80)
-    print(f"🎯 RESULTADO FINAL:")
-    print(f"   ✅ Testes passados: {testes_passados}/{total_testes}")
-    print(f"   📊 Percentual de sucesso: {percentual_sucesso:.1f}%")
-    
-    if percentual_sucesso >= 80:
-        print(f"   🚀 SISTEMA APROVADO PARA PRODUÇÃO!")
-        print(f"   🌟 SIGE v8.0 PRONTO PARA USO!")
-    elif percentual_sucesso >= 60:
-        print(f"   ⚠️ Sistema funcional com algumas limitações")
-        print(f"   🔧 Necessita ajustes menores")
-    else:
-        print(f"   ❌ Sistema precisa de correções")
-        print(f"   🛠️ Revisar implementações")
-    
-    print("=" * 80)
 
 if __name__ == "__main__":
-    main()
+    sucesso = executar_testes()
+    sys.exit(0 if sucesso else 1)

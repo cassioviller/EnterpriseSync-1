@@ -1920,6 +1920,165 @@ def excluir_obra(id):
     flash('Obra excluída com sucesso!', 'success')
     return redirect(url_for('main.obras'))
 
+# ===== NOVOS KPIs FINANCEIROS =====
+@main_bp.route('/api/obras/<int:obra_id>/kpis-financeiros')
+@login_required
+def kpis_financeiros_obra(obra_id):
+    """API para obter KPIs financeiros avançados de uma obra"""
+    try:
+        # Verificar acesso
+        obra = Obra.query.get_or_404(obra_id)
+        if not can_access_data(current_user, obra.admin_id):
+            return jsonify({'erro': 'Acesso negado'}), 403
+        
+        # Obter parâmetros de período
+        data_inicio = request.args.get('data_inicio')
+        data_fim = request.args.get('data_fim')
+        
+        if data_inicio:
+            data_inicio = datetime.strptime(data_inicio, '%Y-%m-%d').date()
+        if data_fim:
+            data_fim = datetime.strptime(data_fim, '%Y-%m-%d').date()
+        
+        # Imports dinâmicos para evitar circular import
+        from kpis_financeiros import KPIsFinanceiros, KPIsOperacionais
+        
+        # Calcular KPIs financeiros
+        custo_por_m2 = KPIsFinanceiros.custo_por_m2(obra_id, data_inicio, data_fim)
+        margem_lucro = KPIsFinanceiros.margem_lucro_realizada(obra_id, data_inicio, data_fim)
+        desvio_orcamentario = KPIsFinanceiros.desvio_orcamentario(obra_id, data_inicio, data_fim)
+        roi_projetado = KPIsFinanceiros.roi_projetado(obra_id, data_inicio, data_fim)
+        velocidade_queima = KPIsFinanceiros.velocidade_queima_orcamento(obra_id, data_inicio, data_fim)
+        
+        # KPIs operacionais complementares
+        produtividade_obra = KPIsOperacionais.indice_produtividade_obra(obra_id, data_inicio, data_fim)
+        
+        return jsonify({
+            'obra_id': obra_id,
+            'obra_nome': obra.nome,
+            'periodo': {
+                'inicio': data_inicio.isoformat() if data_inicio else None,
+                'fim': data_fim.isoformat() if data_fim else None
+            },
+            'kpis_financeiros': {
+                'custo_por_m2': custo_por_m2,
+                'margem_lucro': margem_lucro,
+                'desvio_orcamentario': desvio_orcamentario,
+                'roi_projetado': roi_projetado,
+                'velocidade_queima': velocidade_queima
+            },
+            'kpis_operacionais': {
+                'produtividade_obra': produtividade_obra
+            }
+        })
+        
+    except Exception as e:
+        return jsonify({
+            'erro': f'Erro ao calcular KPIs: {str(e)}'
+        }), 500
+
+@main_bp.route('/obras/<int:obra_id>/dashboard-executivo')
+@login_required
+def dashboard_executivo_obra(obra_id):
+    """Dashboard executivo com KPIs avançados"""
+    try:
+        obra = Obra.query.get_or_404(obra_id)
+        if not can_access_data(current_user, obra.admin_id):
+            flash('Acesso negado', 'danger')
+            return redirect(url_for('main.obras'))
+        
+        # Obter filtros de período
+        data_inicio = request.args.get('data_inicio')
+        data_fim = request.args.get('data_fim')
+        
+        # Definir período padrão (mês atual)
+        if not data_inicio:
+            data_inicio = date.today().replace(day=1)
+        else:
+            data_inicio = datetime.strptime(data_inicio, '%Y-%m-%d').date()
+        
+        if not data_fim:
+            data_fim = date.today()
+        else:
+            data_fim = datetime.strptime(data_fim, '%Y-%m-%d').date()
+        
+        # Imports dinâmicos para evitar circular import
+        from calculadora_obra import CalculadoraObra
+        from kpis_financeiros import KPIsFinanceiros, KPIsOperacionais
+        
+        # Usar calculadora unificada
+        calculadora = CalculadoraObra(obra_id, data_inicio, data_fim)
+        custos_detalhados = calculadora.calcular_custo_total()
+        estatisticas = calculadora.obter_estatisticas_periodo()
+        
+        # Calcular KPIs avançados
+        kpis_financeiros = {
+            'custo_por_m2': KPIsFinanceiros.custo_por_m2(obra_id, data_inicio, data_fim),
+            'margem_lucro': KPIsFinanceiros.margem_lucro_realizada(obra_id, data_inicio, data_fim),
+            'desvio_orcamentario': KPIsFinanceiros.desvio_orcamentario(obra_id, data_inicio, data_fim),
+            'roi_projetado': KPIsFinanceiros.roi_projetado(obra_id, data_inicio, data_fim),
+            'velocidade_queima': KPIsFinanceiros.velocidade_queima_orcamento(obra_id, data_inicio, data_fim)
+        }
+        
+        kpis_operacionais = {
+            'produtividade_obra': KPIsOperacionais.indice_produtividade_obra(obra_id, data_inicio, data_fim)
+        }
+        
+        return render_template('dashboard_executivo_obra.html',
+                             obra=obra,
+                             custos=custos_detalhados,
+                             estatisticas=estatisticas,
+                             kpis_financeiros=kpis_financeiros,
+                             kpis_operacionais=kpis_operacionais,
+                             data_inicio=data_inicio,
+                             data_fim=data_fim)
+        
+    except Exception as e:
+        flash(f'Erro ao gerar dashboard executivo: {str(e)}', 'danger')
+        return redirect(url_for('main.obras'))
+
+@main_bp.route('/api/obras/<int:obra_id>/custo-calculadora')
+@login_required
+def custo_calculadora_api(obra_id):
+    """API para obter custos usando a calculadora unificada"""
+    try:
+        obra = Obra.query.get_or_404(obra_id)
+        if not can_access_data(current_user, obra.admin_id):
+            return jsonify({'erro': 'Acesso negado'}), 403
+        
+        # Obter parâmetros de período
+        data_inicio = request.args.get('data_inicio')
+        data_fim = request.args.get('data_fim')
+        
+        if data_inicio:
+            data_inicio = datetime.strptime(data_inicio, '%Y-%m-%d').date()
+        if data_fim:
+            data_fim = datetime.strptime(data_fim, '%Y-%m-%d').date()
+        
+        # Import dinâmico para evitar circular import
+        from calculadora_obra import CalculadoraObra
+        
+        # Usar calculadora unificada
+        calculadora = CalculadoraObra(obra_id, data_inicio, data_fim)
+        custos = calculadora.calcular_custo_total()
+        estatisticas = calculadora.obter_estatisticas_periodo()
+        
+        return jsonify({
+            'obra_id': obra_id,
+            'custos': custos,
+            'estatisticas': estatisticas,
+            'metodo': 'calculadora_unificada',
+            'periodo': {
+                'inicio': data_inicio.isoformat() if data_inicio else None,
+                'fim': data_fim.isoformat() if data_fim else None
+            }
+        })
+        
+    except Exception as e:
+        return jsonify({
+            'erro': f'Erro ao calcular custos: {str(e)}'
+        }), 500
+
 # Veículos
 @main_bp.route('/veiculos')
 @login_required
