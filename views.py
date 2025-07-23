@@ -3,18 +3,16 @@ from flask_login import login_required, current_user, login_user, logout_user
 from werkzeug.security import check_password_hash, generate_password_hash
 from app import db
 from models import *
-from models import OutroCusto
 from forms import *
 from utils import calcular_horas_trabalhadas, calcular_custo_real_obra, calcular_custos_mes, calcular_kpis_funcionarios_geral, calcular_kpis_funcionario_periodo, calcular_kpis_funcionario_completo, calcular_ocorrencias_funcionario, processar_meio_periodo_exemplo
 from kpis_engine import kpis_engine
 from auth import super_admin_required, admin_required, funcionario_required, get_tenant_filter, can_access_data
-from datetime import datetime, date
-from sqlalchemy import func
+from datetime import datetime, date, timedelta
+from sqlalchemy import func, desc, or_
 
 import os
 import json
 from werkzeug.utils import secure_filename
-from sqlalchemy import or_
 
 main_bp = Blueprint('main', __name__)
 
@@ -223,12 +221,12 @@ def alterar_senha_funcionario(funcionario_id):
         
     except Exception as e:
         db.session.rollback()
-        return jsonify({'success': False, 'message': 'Erro ao alterar senha'})
+        return jsonify({'success': False, 'message': 'Erro interno do servidor'})
 
 @main_bp.route('/admin/funcionario-acesso/<int:funcionario_id>/toggle-status', methods=['POST'])
-@admin_required 
+@admin_required
 def toggle_funcionario_status(funcionario_id):
-    """Ativar/desativar acesso do funcionário"""
+    """Ativar/desativar funcionário"""
     try:
         funcionario = Usuario.query.filter_by(
             id=funcionario_id, 
@@ -237,20 +235,22 @@ def toggle_funcionario_status(funcionario_id):
         ).first_or_404()
         
         data = request.get_json()
-        funcionario.ativo = data.get('ativo', False)
+        ativo = data.get('ativo')
+        
+        funcionario.ativo = ativo
         db.session.commit()
         
-        status = 'ativado' if funcionario.ativo else 'desativado'
-        return jsonify({'success': True, 'message': f'Acesso {status} para {funcionario.nome}'})
+        status = 'ativado' if ativo else 'desativado'
+        return jsonify({'success': True, 'message': f'Funcionário {status} com sucesso'})
         
     except Exception as e:
         db.session.rollback()
-        return jsonify({'success': False, 'message': 'Erro ao alterar status'})
+        return jsonify({'success': False, 'message': 'Erro interno do servidor'})
 
 @main_bp.route('/admin/funcionario-acesso/<int:funcionario_id>/excluir', methods=['POST'])
 @admin_required
 def excluir_funcionario_acesso(funcionario_id):
-    """Excluir funcionário com acesso"""
+    """Excluir funcionário do sistema"""
     try:
         funcionario = Usuario.query.filter_by(
             id=funcionario_id, 
@@ -262,11 +262,11 @@ def excluir_funcionario_acesso(funcionario_id):
         db.session.delete(funcionario)
         db.session.commit()
         
-        return jsonify({'success': True, 'message': f'Acesso de {nome} excluído com sucesso'})
+        return jsonify({'success': True, 'message': f'Funcionário {nome} excluído com sucesso'})
         
     except Exception as e:
         db.session.rollback()
-        return jsonify({'success': False, 'message': 'Erro ao excluir funcionário'})
+        return jsonify({'success': False, 'message': 'Erro interno do servidor'})
 
 # ===== DASHBOARD FUNCIONÁRIO =====
 @main_bp.route('/funcionario-dashboard')

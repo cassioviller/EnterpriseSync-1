@@ -73,6 +73,44 @@
                                     <td>{{ func.nome }}</td>
                                     <td><strong>{{ func.username }}</strong></td>
                                     <td>{{ func.email or '-' }}</td>
+                                    <td><span class="badge bg-primary">Funcionário</span></td>
+                                    <td>
+                                        {% if func.ativo %}
+                                            <span class="badge bg-success">Ativo</span>
+                                        {% else %}
+                                            <span class="badge bg-danger">Inativo</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>{{ func.last_login.strftime('%d/%m/%Y %H:%M') if func.last_login else 'Nunca' }}</td>
+                                    <td>{{ func.created_at.strftime('%d/%m/%Y') if func.created_at else '-' }}</td>
+                                    <td>
+                                        <div class="btn-group" role="group">
+                                            <a href="{{ url_for('main.editar_funcionario_acesso', funcionario_id=func.id) }}" 
+                                               class="btn btn-sm btn-outline-primary" title="Editar">
+                                                <i class="fas fa-edit"></i>
+                                            </a>
+                                            
+                                            <button class="btn btn-sm btn-outline-warning" 
+                                                    onclick="alterarSenha({{ func.id }}, '{{ func.nome }}')" 
+                                                    title="Alterar Senha">
+                                                <i class="fas fa-key"></i>
+                                            </button>
+                                            
+                                            <button class="btn btn-sm btn-outline-info" 
+                                                    onclick="toggleStatus({{ func.id }}, {{ func.ativo|lower }}, '{{ func.nome }}')" 
+                                                    title="{% if func.ativo %}Desativar{% else %}Ativar{% endif %}">
+                                                <i class="fas fa-{% if func.ativo %}pause{% else %}play{% endif %}"></i>
+                                            </button>
+                                            
+                                            <button class="btn btn-sm btn-outline-danger" 
+                                                    onclick="excluirFuncionario({{ func.id }}, '{{ func.nome }}')" 
+                                                    title="Excluir">
+                                                <i class="fas fa-trash"></i>
+                                            </button>
+                                        </div>
+                                    </td>
+                                </tr>
+                                {% endfor %}
                                     <td>
                                         <span class="badge bg-secondary">Funcionário</span>
                                     </td>
