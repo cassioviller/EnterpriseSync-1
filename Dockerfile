@@ -2,7 +2,7 @@
 # Sistema Integrado de Gestão Empresarial
 # Otimizado para Hostinger EasyPanel
 
-FROM python:3.11-slim-buster
+FROM python:3.11-slim-bullseye
 
 # Metadados
 LABEL maintainer="SIGE v8.0" \
@@ -13,14 +13,14 @@ LABEL maintainer="SIGE v8.0" \
 ARG DEBIAN_FRONTEND=noninteractive
 
 # Instalar dependências do sistema
-RUN apt-get update && apt-get install -y \
+RUN apt-get update && apt-get install -y --no-install-recommends \
     postgresql-client \
     curl \
     gcc \
     python3-dev \
     libpq-dev \
-    && rm -rf /var/lib/apt/lists/* \
-    && apt-get clean
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
 
 # Criar usuário não-root para segurança
 RUN groupadd -r sige && useradd -r -g sige sige
@@ -49,11 +49,8 @@ RUN chmod +x /app/docker-entrypoint.sh
 # Mudar para usuário não-root
 USER sige
 
-# Variáveis de ambiente
+# Variáveis de ambiente (não-sensíveis)
 ENV FLASK_ENV=production \
-    DATABASE_URL=postgresql://sige:sige@viajey_sige:5432/sige?sslmode=disable \
-    SECRET_KEY=sige-v8-production-secret-key-change-in-production \
-    SESSION_SECRET=sige-v8-session-secret-change-in-production \
     PORT=5000 \
     PYTHONPATH=/app \
     PYTHONUNBUFFERED=1

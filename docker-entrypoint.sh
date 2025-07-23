@@ -8,9 +8,22 @@ echo "🚀 Iniciando SIGE v8.0 em container Docker..."
 
 # Aguardar banco de dados estar disponível
 echo "⏳ Aguardando banco de dados PostgreSQL..."
-until pg_isready -h viajey_sige -p 5432 -U sige; do
+
+# Extrair host e porta da DATABASE_URL
+DB_HOST=$(echo $DATABASE_URL | sed -n 's/.*@\([^:]*\):.*/\1/p')
+DB_PORT=$(echo $DATABASE_URL | sed -n 's/.*:\([0-9]*\)\/.*/\1/p')
+DB_USER=$(echo $DATABASE_URL | sed -n 's/.*\/\/\([^:]*\):.*/\1/p')
+
+# Usar valores padrão se não conseguir extrair
+DB_HOST=${DB_HOST:-viajey_sige}
+DB_PORT=${DB_PORT:-5432}
+DB_USER=${DB_USER:-sige}
+
+echo "   Conectando em: $DB_HOST:$DB_PORT como $DB_USER"
+
+until pg_isready -h $DB_HOST -p $DB_PORT -U $DB_USER; do
     echo "   Banco ainda não disponível, aguardando..."
-    sleep 2
+    sleep 3
 done
 echo "✅ Banco de dados conectado!"
 

@@ -1,0 +1,118 @@
+Commit: Automate deployment and setup with Docker for easier management
+
+Adds Dockerfile, docker-compose, entrypoint script, ignore file, and deployment guide to containerize the application.
+
+Replit-Commit-Author: Agent
+Replit-Commit-Session-Id: 55b65cd5-5f8d-4f4e-a5aa-8b5cfba7d880
+Replit-Commit-Screenshot-Url: https://storage.googleapis.com/screenshot-production-us-central1/a719a4a9-73c7-43ac-9f05-28b6e4b40780/55b65cd5-5f8d-4f4e-a5aa-8b5cfba7d880/H8xD4If 
+##########################################
+### Download Github Archive Started...
+### Wed, 23 Jul 2025 14:40:13 GMT
+##########################################
+
+#0 building with "default" instance using docker driver
+
+#1 [internal] load build definition from Dockerfile
+#1 transferring dockerfile: 1.84kB 0.0s done
+#1 DONE 0.0s
+
+#2 [internal] load metadata for docker.io/library/python:3.11-slim-buster
+#2 DONE 1.8s
+
+#3 [internal] load .dockerignore
+#3 transferring context: 891B done
+#3 DONE 0.0s
+
+#4 [ 1/10] FROM docker.io/library/python:3.11-slim-buster@sha256:c46b0ae5728c2247b99903098ade3176a58e274d9c7d2efeaaab3e0621a53935
+#4 resolve docker.io/library/python:3.11-slim-buster@sha256:c46b0ae5728c2247b99903098ade3176a58e274d9c7d2efeaaab3e0621a53935 0.0s done
+#4 sha256:c46b0ae5728c2247b99903098ade3176a58e274d9c7d2efeaaab3e0621a53935 988B / 988B done
+#4 sha256:b94af75d4ff65c50bf1b2119bca6d0ba707037bacd0cb75314801a6953c03241 1.37kB / 1.37kB done
+#4 sha256:db841a2e8ab326bf1101c5714186094fa05d3277c5b2dbcec943dade361b269f 6.83kB / 6.83kB done
+#4 sha256:8b91b88d557765cd8c6802668755a3f6dc4337b6ce15a17e4857139e5fc964f3 0B / 27.14MB 0.1s
+#4 sha256:824416e234237961c9c5d4f41dfe5b295a3c35a671ee52889bfb08d8e257ec4c 0B / 2.78MB 0.1s
+#4 sha256:482d64d97d4e63625e51301e23ca7ff526afaf40710da26704d9ce2e1a6168fa 0B / 12.00MB 0.1s
+#4 ...
+
+#5 [internal] load build context
+#5 transferring context: 10.67MB 0.1s done
+#5 DONE 0.1s
+
+#4 [ 1/10] FROM docker.io/library/python:3.11-slim-buster@sha256:c46b0ae5728c2247b99903098ade3176a58e274d9c7d2efeaaab3e0621a53935
+#4 sha256:8b91b88d557765cd8c6802668755a3f6dc4337b6ce15a17e4857139e5fc964f3 12.58MB / 27.14MB 0.5s
+#4 sha256:8b91b88d557765cd8c6802668755a3f6dc4337b6ce15a17e4857139e5fc964f3 16.78MB / 27.14MB 0.6s
+#4 sha256:824416e234237961c9c5d4f41dfe5b295a3c35a671ee52889bfb08d8e257ec4c 2.78MB / 2.78MB 0.6s done
+#4 sha256:c87b3089b2ed5584d9a52ddf02017556958f287dd63945476fbcd191954e6faf 0B / 244B 0.6s
+#4 sha256:8b91b88d557765cd8c6802668755a3f6dc4337b6ce15a17e4857139e5fc964f3 20.97MB / 27.14MB 0.7s
+#4 sha256:482d64d97d4e63625e51301e23ca7ff526afaf40710da26704d9ce2e1a6168fa 3.15MB / 12.00MB 0.7s
+#4 sha256:8b91b88d557765cd8c6802668755a3f6dc4337b6ce15a17e4857139e5fc964f3 25.33MB / 27.14MB 0.8s
+#4 sha256:482d64d97d4e63625e51301e23ca7ff526afaf40710da26704d9ce2e1a6168fa 5.60MB / 12.00MB 0.8s
+#4 extracting sha256:8b91b88d557765cd8c6802668755a3f6dc4337b6ce15a17e4857139e5fc964f3
+#4 sha256:8b91b88d557765cd8c6802668755a3f6dc4337b6ce15a17e4857139e5fc964f3 27.14MB / 27.14MB 0.9s done
+#4 sha256:482d64d97d4e63625e51301e23ca7ff526afaf40710da26704d9ce2e1a6168fa 12.00MB / 12.00MB 1.0s
+#4 sha256:c87b3089b2ed5584d9a52ddf02017556958f287dd63945476fbcd191954e6faf 244B / 244B 0.9s done
+#4 sha256:91bdacd599c69598dd6fbd7f97f7059b565f6f3015a04b6ab9e8db254a41652c 0B / 3.38MB 1.0s
+#4 sha256:482d64d97d4e63625e51301e23ca7ff526afaf40710da26704d9ce2e1a6168fa 12.00MB / 12.00MB 1.0s done
+#4 sha256:91bdacd599c69598dd6fbd7f97f7059b565f6f3015a04b6ab9e8db254a41652c 1.87MB / 3.38MB 1.3s
+#4 sha256:91bdacd599c69598dd6fbd7f97f7059b565f6f3015a04b6ab9e8db254a41652c 3.38MB / 3.38MB 1.4s done
+#4 extracting sha256:8b91b88d557765cd8c6802668755a3f6dc4337b6ce15a17e4857139e5fc964f3 3.4s done
+#4 extracting sha256:824416e234237961c9c5d4f41dfe5b295a3c35a671ee52889bfb08d8e257ec4c
+#4 extracting sha256:824416e234237961c9c5d4f41dfe5b295a3c35a671ee52889bfb08d8e257ec4c 0.3s done
+#4 extracting sha256:482d64d97d4e63625e51301e23ca7ff526afaf40710da26704d9ce2e1a6168fa
+#4 extracting sha256:482d64d97d4e63625e51301e23ca7ff526afaf40710da26704d9ce2e1a6168fa 1.2s done
+#4 extracting sha256:c87b3089b2ed5584d9a52ddf02017556958f287dd63945476fbcd191954e6faf done
+#4 extracting sha256:91bdacd599c69598dd6fbd7f97f7059b565f6f3015a04b6ab9e8db254a41652c 0.1s
+#4 extracting sha256:91bdacd599c69598dd6fbd7f97f7059b565f6f3015a04b6ab9e8db254a41652c 0.7s done
+#4 DONE 6.9s
+
+#6 [ 2/10] RUN apt-get update && apt-get install -y     postgresql-client     curl     gcc     python3-dev     libpq-dev     && rm -rf /var/lib/apt/lists/*     && apt-get clean
+#6 0.425 Ign:1 http://deb.debian.org/debian buster InRelease
+#6 0.429 Ign:2 http://deb.debian.org/debian-security buster/updates InRelease
+#6 0.433 Ign:3 http://deb.debian.org/debian buster-updates InRelease
+#6 0.437 Err:4 http://deb.debian.org/debian buster Release
+#6 0.437   404  Not Found [IP: 2a04:4e42:3b::644 80]
+#6 0.440 Err:5 http://deb.debian.org/debian-security buster/updates Release
+#6 0.440   404  Not Found [IP: 2a04:4e42:3b::644 80]
+#6 0.443 Err:6 http://deb.debian.org/debian buster-updates Release
+#6 0.443   404  Not Found [IP: 2a04:4e42:3b::644 80]
+#6 0.450 Reading package lists...
+#6 0.467 E: The repository 'http://deb.debian.org/debian buster Release' does not have a Release file.
+#6 0.467 E: The repository 'http://deb.debian.org/debian-security buster/updates Release' does not have a Release file.
+#6 0.467 E: The repository 'http://deb.debian.org/debian buster-updates Release' does not have a Release file.
+#6 ERROR: process "/bin/sh -c apt-get update && apt-get install -y     postgresql-client     curl     gcc     python3-dev     libpq-dev     && rm -rf /var/lib/apt/lists/*     && apt-get clean" did not complete successfully: exit code: 100
+------
+ > [ 2/10] RUN apt-get update && apt-get install -y     postgresql-client     curl     gcc     python3-dev     libpq-dev     && rm -rf /var/lib/apt/lists/*     && apt-get clean:
+0.437 Err:4 http://deb.debian.org/debian buster Release
+0.437   404  Not Found [IP: 2a04:4e42:3b::644 80]
+0.440 Err:5 http://deb.debian.org/debian-security buster/updates Release
+0.440   404  Not Found [IP: 2a04:4e42:3b::644 80]
+0.443 Err:6 http://deb.debian.org/debian buster-updates Release
+0.443   404  Not Found [IP: 2a04:4e42:3b::644 80]
+0.450 Reading package lists...
+0.467 E: The repository 'http://deb.debian.org/debian buster Release' does not have a Release file.
+0.467 E: The repository 'http://deb.debian.org/debian-security buster/updates Release' does not have a Release file.
+0.467 E: The repository 'http://deb.debian.org/debian buster-updates Release' does not have a Release file.
+------
+
+ 2 warnings found (use docker --debug to expand):
+ - SecretsUsedInArgOrEnv: Do not use ARG or ENV instructions for sensitive data (ENV "SECRET_KEY") (line 53)
+ - SecretsUsedInArgOrEnv: Do not use ARG or ENV instructions for sensitive data (ENV "SESSION_SECRET") (line 53)
+Dockerfile:16
+--------------------
+  15 |     # Instalar dependências do sistema
+  16 | >>> RUN apt-get update && apt-get install -y \
+  17 | >>>     postgresql-client \
+  18 | >>>     curl \
+  19 | >>>     gcc \
+  20 | >>>     python3-dev \
+  21 | >>>     libpq-dev \
+  22 | >>>     && rm -rf /var/lib/apt/lists/* \
+  23 | >>>     && apt-get clean
+  24 |     
+--------------------
+ERROR: failed to solve: process "/bin/sh -c apt-get update && apt-get install -y     postgresql-client     curl     gcc     python3-dev     libpq-dev     && rm -rf /var/lib/apt/lists/*     && apt-get clean" did not complete successfully: exit code: 100
+##########################################
+### Error
+### Wed, 23 Jul 2025 14:40:25 GMT
+##########################################
+
+Command failed with exit code 1: docker buildx build --network host -f /etc/easypanel/projects/viajey/sige1/code/Dockerfile -t easypanel/viajey/sige1 --label 'keep=true' --build-arg 'GIT_SHA=1126f25a92acc62d664eeb289329429cd73cd982' /etc/easypanel/projects/viajey/sige1/code/
