@@ -1,0 +1,83 @@
+Prezado Replit (ou Executor de Dockerfile),
+
+Solicito a criação de um **Dockerfile** para o sistema **SIGE v8.0**, uma aplicação Python/Flask, com o objetivo de prepará-lo para implantação em ambiente de produção na **Hostinger (EasyPanel)**. O banco de dados utilizado é **PostgreSQL**.
+
+O Dockerfile deve ser otimizado para produção, focado em segurança, performance e facilidade de deploy. Abaixo estão os requisitos e informações essenciais:
+
+### 1. Imagem Base
+*   Utilizar uma imagem base leve e estável do Python, preferencialmente `python:3.11-slim-buster` ou similar, para reduzir o tamanho final da imagem.
+
+### 2. Dependências do Sistema Operacional
+*   Instalar `postgresql-client` para permitir a execução de comandos `psql` (para migrações e otimizações de banco de dados, se necessário) e `curl` ou `wget` para health checks.
+*   Garantir que as dependências do sistema operacional sejam instaladas de forma eficiente, limpando caches após a instalação (`rm -rf /var/lib/apt/lists/*`).
+
+### 3. Diretório de Trabalho
+*   Definir `/app` como o diretório de trabalho (`WORKDIR`).
+
+### 4. Copiar Dependências Python
+*   Copiar o arquivo `pyproject.toml` (ou `requirements.txt`, se preferir gerar um) para o diretório de trabalho antes de instalar as dependências. Isso otimiza o cache do Docker.
+
+### 5. Instalar Dependências Python
+*   Instalar as dependências Python listadas no `pyproject.toml` usando `pip install .` (se for um projeto instalável) ou `pip install -r requirements.txt` (se for gerado um `requirements.txt`).
+*   Considerar a criação de um `requirements.txt` a partir do `pyproject.toml` para simplificar o processo de build do Docker.
+
+### 6. Copiar o Código da Aplicação
+*   Copiar todo o restante do código-fonte da aplicação para o diretório de trabalho.
+
+### 7. Variáveis de Ambiente
+*   Definir variáveis de ambiente essenciais com valores padrão, que serão sobrescritos pelo EasyPanel:
+    *   `DATABASE_URL`: String de conexão com o PostgreSQL (ex: `postgresql://user:password@host:port/database?sslmode=disable`).
+    *   `SECRET_KEY`: Chave secreta para o Flask (gerar uma chave segura).
+    *   `FLASK_ENV`: Definir como `production`.
+    *   `PORT`: A porta em que o Gunicorn irá escutar (ex: `5000`).
+
+### 8. Migrações de Banco de Dados
+*   Incluir um passo para aplicar as migrações do banco de dados (SQLAlchemy/Flask-Migrate) durante o build ou na inicialização do contêiner. A execução na inicialização é mais flexível para ambientes de produção.
+    *   **Sugestão:** Criar um `docker-entrypoint.sh` simples que execute `flask db upgrade` antes de iniciar o Gunicorn.
+
+### 9. Comando de Inicialização da Aplicação
+*   O comando para iniciar a aplicação é `gunicorn --bind 0.0.0.0:5000 main:app`.
+*   Garantir que o Gunicorn escute em `0.0.0.0` para ser acessível externamente.
+
+### 10. Exposição de Porta
+*   Expor a porta em que o Gunicorn está escutando (ex: `EXPOSE 5000`).
+
+### 11. Health Check (Opcional, mas Recomendado)
+*   Adicionar um `HEALTHCHECK` para que o orquestrador (EasyPanel) possa verificar a saúde da aplicação. Pode ser um `curl` para um endpoint de saúde (`/health` ou similar, se implementado no SIGE).
+
+### 12. Exemplo de Estrutura de `pyproject.toml` (para referência)
+```toml
+[project]
+name = "sige"
+dependencies = [
+    "flask",
+    "flask-sqlalchemy", 
+    "flask-login",
+    "flask-wtf",
+    "psycopg2-binary",
+    "gunicorn",
+    "scikit-learn",
+    "pandas",
+    "numpy",
+    "reportlab",
+    "openpyxl"
+]
+```
+
+### 13. Exemplo de `docker-entrypoint.sh` (Sugestão)
+```bash
+#!/bin/bash
+
+# Aplicar migrações de banco de dados
+flask db upgrade
+
+# Iniciar a aplicação
+exec gunicorn --bind 0.0.0.0:${PORT} main:app
+```
+
+O Dockerfile final deve ser conciso, eficiente e seguir as melhores práticas para imagens Docker de produção.
+
+Atenciosamente,
+Manus AI
+
+

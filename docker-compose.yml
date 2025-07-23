@@ -1,0 +1,64 @@
+# DOCKER COMPOSE - SIGE v8.0
+# Para testes locais e desenvolvimento com PostgreSQL
+
+version: '3.8'
+
+services:
+  # Banco de dados PostgreSQL
+  postgres:
+    image: postgres:15-alpine
+    container_name: sige_postgres
+    environment:
+      POSTGRES_DB: sige
+      POSTGRES_USER: sige  
+      POSTGRES_PASSWORD: sige
+      POSTGRES_INITDB_ARGS: "--encoding=UTF-8 --lc-collate=pt_BR.UTF-8 --lc-ctype=pt_BR.UTF-8"
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./otimizacoes_producao.sql:/docker-entrypoint-initdb.d/01-otimizacoes.sql
+    networks:
+      - sige_network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U sige -d sige"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Aplicação SIGE
+  sige:
+    build: .
+    container_name: sige_app
+    environment:
+      DATABASE_URL: postgresql://sige:sige@postgres:5432/sige?sslmode=disable
+      SECRET_KEY: sige-v8-local-secret-key-for-testing
+      SESSION_SECRET: sige-v8-local-session-secret-for-testing
+      FLASK_ENV: production
+      PORT: 5000
+    ports:
+      - "5000:5000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - sige_network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000/api/monitoring/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    volumes:
+      - ./static/fotos:/app/static/fotos
+      - ./logs:/app/logs
+
+networks:
+  sige_network:
+    driver: bridge
+
+volumes:
+  postgres_data:
+    driver: local
