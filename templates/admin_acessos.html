@@ -111,38 +111,6 @@
                                     </td>
                                 </tr>
                                 {% endfor %}
-                                    <td>
-                                        <span class="badge bg-secondary">Funcionário</span>
-                                    </td>
-                                    <td>
-                                        {% if func.ativo %}
-                                            <span class="badge bg-success">Ativo</span>
-                                        {% else %}
-                                            <span class="badge bg-danger">Inativo</span>
-                                        {% endif %}
-                                    </td>
-                                    <td>-</td>
-                                    <td>{{ func.created_at.strftime('%d/%m/%Y') if func.created_at else '-' }}</td>
-                                    <td>
-                                        <button class="btn btn-sm btn-outline-primary me-1" onclick="editarFuncionario({{ func.id }}, '{{ func.nome }}', '{{ func.username }}', '{{ func.email or '' }}', {{ func.ativo|tojson }})" title="Editar">
-                                            <i class="fas fa-edit"></i>
-                                        </button>
-                                        <button class="btn btn-sm btn-outline-warning me-1" onclick="alterarSenha({{ func.id }}, '{{ func.nome }}')" title="Alterar Senha">
-                                            <i class="fas fa-key"></i>
-                                        </button>
-                                        <button class="btn btn-sm btn-outline-info me-1" onclick="toggleStatus({{ func.id }}, {{ func.ativo|tojson }}, '{{ func.nome }}')" title="{% if func.ativo %}Desativar{% else %}Ativar{% endif %}">
-                                            {% if func.ativo %}
-                                                <i class="fas fa-pause"></i>
-                                            {% else %}
-                                                <i class="fas fa-play"></i>
-                                            {% endif %}
-                                        </button>
-                                        <button class="btn btn-sm btn-outline-danger" onclick="excluirFuncionario({{ func.id }}, '{{ func.nome }}')" title="Excluir">
-                                            <i class="fas fa-trash"></i>
-                                        </button>
-                                    </td>
-                                </tr>
-                                {% endfor %}
                             </tbody>
                         </table>
                     </div>

@@ -120,6 +120,114 @@ def validar_cpf(cpf):
     
     return True
 
+def calcular_custo_real_obra(obra_id, data_inicio, data_fim):
+    """Calcula custo real de uma obra no período"""
+    from app import db
+    from models import CustoObra, RegistroPonto, RegistroAlimentacao, CustoVeiculo, OutroCusto, Funcionario
+    
+    # Custos diretos da obra
+    custos_obra = db.session.query(func.sum(CustoObra.valor)).filter(
+        CustoObra.obra_id == obra_id,
+        CustoObra.data.between(data_inicio, data_fim)
+    ).scalar() or 0
+    
+    # Custos de mão de obra (registros de ponto relacionados à obra)
+    registros_ponto = db.session.query(RegistroPonto).filter(
+        RegistroPonto.obra_id == obra_id,
+        RegistroPonto.data.between(data_inicio, data_fim)
+    ).all()
+    
+    custos_mao_obra = 0
+    for registro in registros_ponto:
+        funcionario = db.session.query(Funcionario).get(registro.funcionario_id)
+        if funcionario and funcionario.salario:
+            # Calcular custo baseado em horas trabalhadas e salário
+            salario_hora = funcionario.salario / 220  # 220 horas mensais
+            horas = registro.horas_trabalhadas or 0
+            horas_extras = registro.horas_extras or 0
+            custos_mao_obra += (horas * salario_hora) + (horas_extras * salario_hora * 1.5)
+    
+    # Custos de alimentação
+    custos_alimentacao = db.session.query(func.sum(RegistroAlimentacao.valor)).filter(
+        RegistroAlimentacao.obra_id == obra_id,
+        func.date(RegistroAlimentacao.data_hora).between(data_inicio, data_fim)
+    ).scalar() or 0
+    
+    # Custos de veículos
+    custos_veiculos = db.session.query(func.sum(CustoVeiculo.valor)).filter(
+        CustoVeiculo.obra_id == obra_id,
+        CustoVeiculo.data.between(data_inicio, data_fim)
+    ).scalar() or 0
+    
+    # Outros custos
+    outros_custos = db.session.query(func.sum(OutroCusto.valor)).filter(
+        OutroCusto.obra_id == obra_id,
+        OutroCusto.data.between(data_inicio, data_fim)
+    ).scalar() or 0
+    
+    custo_total = custos_obra + custos_mao_obra + custos_alimentacao + custos_veiculos + outros_custos
+    
+    return {
+        'custo_total': float(custo_total),
+        'custos_obra': float(custos_obra),
+        'custos_mao_obra': float(custos_mao_obra),
+        'custos_alimentacao': float(custos_alimentacao),
+        'custos_veiculos': float(custos_veiculos),
+        'outros_custos': float(outros_custos)
+    }
+
+def calcular_custos_mes(admin_id, data_inicio, data_fim):
+    """Calcula custos mensais por categoria para um admin"""
+    from app import db
+    from models import RegistroAlimentacao, CustoVeiculo, RegistroPonto, OutroCusto, Funcionario
+    
+    # Alimentação
+    custo_alimentacao = db.session.query(func.sum(RegistroAlimentacao.valor)).join(
+        RegistroAlimentacao.funcionario
+    ).filter(
+        RegistroAlimentacao.funcionario.has(admin_id=admin_id),
+        func.date(RegistroAlimentacao.data_hora).between(data_inicio, data_fim)
+    ).scalar() or 0
+    
+    # Transporte (veículos)
+    custo_transporte = db.session.query(func.sum(CustoVeiculo.valor)).filter(
+        CustoVeiculo.admin_id == admin_id,
+        CustoVeiculo.data.between(data_inicio, data_fim)
+    ).scalar() or 0
+    
+    # Mão de obra - calcular baseado em registros de ponto
+    registros_ponto = db.session.query(RegistroPonto).join(
+        RegistroPonto.funcionario
+    ).filter(
+        RegistroPonto.funcionario.has(admin_id=admin_id),
+        RegistroPonto.data.between(data_inicio, data_fim)
+    ).all()
+    
+    custo_mao_obra = 0
+    for registro in registros_ponto:
+        funcionario = db.session.query(Funcionario).get(registro.funcionario_id)
+        if funcionario and funcionario.salario:
+            salario_hora = funcionario.salario / 220
+            horas = registro.horas_trabalhadas or 0
+            horas_extras = registro.horas_extras or 0
+            custo_mao_obra += (horas * salario_hora) + (horas_extras * salario_hora * 1.5)
+    
+    # Outros custos
+    outros_custos = db.session.query(func.sum(OutroCusto.valor)).join(
+        OutroCusto.funcionario
+    ).filter(
+        OutroCusto.funcionario.has(admin_id=admin_id),
+        OutroCusto.data.between(data_inicio, data_fim)
+    ).scalar() or 0
+    
+    return {
+        'alimentacao': float(custo_alimentacao),
+        'transporte': float(custo_transporte),
+        'mao_obra': float(custo_mao_obra),
+        'outros': float(outros_custos),
+        'total': float(custo_alimentacao + custo_transporte + custo_mao_obra + outros_custos)
+    }
+
 def formatar_cpf(cpf):
     """Formata CPF no padrão XXX.XXX.XXX-XX"""
     if not cpf:
@@ -132,60 +240,6 @@ def formatar_cpf(cpf):
         return f"{cpf[:3]}.{cpf[3:6]}.{cpf[6:9]}-{cpf[9:]}"
     
     return cpf
-
-def calcular_custo_real_obra(obra_id, data_inicio=None, data_fim=None):
-    """
-    Calcula o custo real total de uma obra em um período específico
-    """
-    # Query base para custos da obra
-    query_custos = db.session.query(
-        CustoObra.tipo,
-        func.sum(CustoObra.valor).label('total')
-    ).filter(CustoObra.obra_id == obra_id)
-    
-    # Aplicar filtros de data se fornecidos
-    if data_inicio:
-        query_custos = query_custos.filter(CustoObra.data >= data_inicio)
-    if data_fim:
-        query_custos = query_custos.filter(CustoObra.data <= data_fim)
-    
-    custos = query_custos.group_by(CustoObra.tipo).all()
-    custo_total = sum(custo.total for custo in custos)
-    
-    # Adicionar custo de mão de obra baseado nos registros de ponto
-    query_ponto = RegistroPonto.query.filter_by(obra_id=obra_id)
-    if data_inicio:
-        query_ponto = query_ponto.filter(RegistroPonto.data >= data_inicio)
-    if data_fim:
-        query_ponto = query_ponto.filter(RegistroPonto.data <= data_fim)
-    
-    registros_ponto = query_ponto.all()
-    custo_mao_obra = 0
-    
-    for registro in registros_ponto:
-        if registro.funcionario_ref and registro.funcionario_ref.salario:
-            # Assumindo salário por hora baseado em 220 horas mensais
-            salario_hora = registro.funcionario_ref.salario / 220
-            horas_trabalhadas = registro.horas_trabalhadas or 0
-            horas_extras = registro.horas_extras or 0
-            custo_mao_obra += (horas_trabalhadas * salario_hora)
-            custo_mao_obra += (horas_extras * salario_hora * 1.5)  # 50% adicional para horas extras
-    
-    # Adicionar custo de alimentação
-    query_alimentacao = RegistroAlimentacao.query.filter_by(obra_id=obra_id)
-    if data_inicio:
-        query_alimentacao = query_alimentacao.filter(RegistroAlimentacao.data >= data_inicio)
-    if data_fim:
-        query_alimentacao = query_alimentacao.filter(RegistroAlimentacao.data <= data_fim)
-    
-    custo_alimentacao = query_alimentacao.with_entities(func.sum(RegistroAlimentacao.valor)).scalar() or 0
-    
-    return {
-        'custos_detalhados': dict(custos),
-        'custo_mao_obra': custo_mao_obra,
-        'custo_alimentacao': custo_alimentacao,
-        'custo_total': custo_total + custo_mao_obra + custo_alimentacao
-    }
 
 def calcular_custos_mes(data_inicio=None, data_fim=None):
     """
