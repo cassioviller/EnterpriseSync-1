@@ -304,6 +304,7 @@ def calcular_kpis_funcionario_periodo(funcionario_id, data_inicio=None, data_fim
     """
     Calcula KPIs individuais de um funcionário para um período específico
     """
+    from app import db
     from models import Funcionario, RegistroPonto, RegistroAlimentacao, CustoVeiculo, UsoVeiculo
     
     if not data_inicio:

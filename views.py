@@ -793,6 +793,7 @@ def funcionarios():
         data_fim = datetime.strptime(data_fim, '%Y-%m-%d').date()
     
     # Calcular KPIs gerais dos funcionários para o período com filtro por admin
+    from utils import calcular_kpis_funcionarios_geral
     kpis_geral = calcular_kpis_funcionarios_geral(data_inicio, data_fim, current_user.id)
     
     return render_template('funcionarios.html', 
