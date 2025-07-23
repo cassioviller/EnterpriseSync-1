@@ -192,7 +192,7 @@ class KPIsFinanceiros:
         
         # Calcular tempo decorrido vs tempo total
         hoje = datetime.now().date()
-        tempo_total = (obra.data_fim_prevista - obra.data_inicio).days
+        tempo_total = (obra.data_previsao_fim - obra.data_inicio).days
         tempo_decorrido = (hoje - obra.data_inicio).days
         
         if tempo_total <= 0:
@@ -229,7 +229,7 @@ class KPIsFinanceiros:
             'orcamento_total': obra.orcamento,
             'status': status,
             'recomendacao': recomendacao,
-            'dias_restantes': max(0, (obra.data_previsao_fim - hoje).days)
+            'dias_restantes': max(0, (obra.data_previsao_fim - hoje).days) if obra.data_previsao_fim else 0
         }
     
     @staticmethod
@@ -270,12 +270,12 @@ class KPIsOperacionais:
         progresso_fisico = KPIsFinanceiros.calcular_progresso_fisico(obra_id)
         
         obra = Obra.query.get(obra_id)
-        if not obra or not obra.data_inicio or not obra.data_fim_prevista:
+        if not obra or not obra.data_inicio or not obra.data_previsao_fim:
             return {'erro': 'Dados da obra incompletos'}
         
         # Calcular progresso cronológico
         hoje = datetime.now().date()
-        total_dias = (obra.data_fim_prevista - obra.data_inicio).days
+        total_dias = (obra.data_previsao_fim - obra.data_inicio).days
         dias_decorridos = (hoje - obra.data_inicio).days
         
         if total_dias <= 0:
