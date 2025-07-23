@@ -364,13 +364,29 @@ def dashboard():
         # Admin sem funcionários
         custo_alimentacao = custo_transporte = outros_custos = custo_mao_obra = 0.0
     
+    # Calcular custo de faltas justificadas
+    custo_faltas_justificadas = 0.0
+    if funcionarios_ids:
+        # Buscar registros de faltas justificadas
+        registros_faltas = db.session.query(RegistroPonto).filter(
+            RegistroPonto.funcionario_id.in_(funcionarios_ids),
+            RegistroPonto.tipo_registro == 'falta_justificada',
+            RegistroPonto.data.between(data_inicio, data_fim)
+        ).all()
+        
+        for registro in registros_faltas:
+            funcionario = db.session.query(Funcionario).get(registro.funcionario_id)
+            if funcionario and funcionario.salario:
+                salario_hora = funcionario.salario / 220  # 220 horas mensais
+                custo_faltas_justificadas += salario_hora * 8  # 8 horas por dia perdidas
+    
     custos_detalhados = {
         'alimentacao': custo_alimentacao,
         'transporte': custo_transporte,
         'mao_obra': custo_mao_obra,
-        'faltas_justificadas': 0.0,
+        'faltas_justificadas': custo_faltas_justificadas,
         'outros': outros_custos,
-        'total': custo_alimentacao + custo_transporte + custo_mao_obra + outros_custos
+        'total': custo_alimentacao + custo_transporte + custo_mao_obra + custo_faltas_justificadas + outros_custos
     }
     custos_mes = custos_detalhados['total']
     
