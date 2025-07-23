@@ -1,0 +1,69 @@
+Commit: Improve Docker setup and deployment process for the application
+
+Updates Dockerfile, entrypoint, compose file, and adds health check script.
+
+Replit-Commit-Author: Agent
+Replit-Commit-Session-Id: 55b65cd5-5f8d-4f4e-a5aa-8b5cfba7d880
+Replit-Commit-Screenshot-Url: https://storage.googleapis.com/screenshot-production-us-central1/a719a4a9-73c7-43ac-9f05-28b6e4b40780/55b65cd5-5f8d-4f4e-a5aa-8b5cfba7d880/H8xD4If 
+##########################################
+### Download Github Archive Started...
+### Wed, 23 Jul 2025 14:54:03 GMT
+##########################################
+
+#0 building with "default" instance using docker driver
+
+#1 [internal] load build definition from Dockerfile
+#1 transferring dockerfile: 1.67kB done
+#1 DONE 0.0s
+
+#2 [internal] load metadata for docker.io/library/python:3.11-slim-bullseye
+#2 DONE 0.8s
+
+#3 [internal] load .dockerignore
+#3 transferring context: 891B done
+#3 DONE 0.0s
+
+#4 [ 1/10] FROM docker.io/library/python:3.11-slim-bullseye@sha256:ca0bbe3b7742ca8fe37f61a1fd6bffee4a96ee4dacc2d1d34a91bfe8513321ab
+#4 DONE 0.0s
+
+#5 [internal] load build context
+#5 transferring context: 10.68MB 0.1s done
+#5 DONE 0.1s
+
+#6 [ 5/10] COPY pyproject.toml ./
+#6 CACHED
+
+#7 [ 2/10] RUN apt-get update && apt-get install -y --no-install-recommends     postgresql-client     curl     gcc     python3-dev     libpq-dev     && apt-get clean     && rm -rf /var/lib/apt/lists/*
+#7 CACHED
+
+#8 [ 3/10] RUN groupadd -r sige && useradd -r -g sige sige
+#8 CACHED
+
+#9 [ 4/10] WORKDIR /app
+#9 CACHED
+
+#10 [ 6/10] RUN pip install --no-cache-dir --upgrade pip setuptools wheel &&     pip install --no-cache-dir .
+#10 CACHED
+
+#11 [ 7/10] COPY . .
+#11 DONE 0.1s
+
+#12 [ 8/10] RUN mkdir -p /app/static/fotos /app/logs &&     chown -R sige:sige /app
+#12 DONE 0.3s
+
+#13 [ 9/10] COPY docker-entrypoint.sh /app/
+#13 DONE 0.0s
+
+#14 [10/10] RUN chmod +x /app/docker-entrypoint.sh
+#14 DONE 0.1s
+
+#15 exporting to image
+#15 exporting layers 0.1s done
+#15 writing image sha256:a5e25930697f18bec95b37cf1eb4ca10dbed74b5fdfbcfaed8a9644465e6c7de done
+#15 naming to docker.io/easypanel/viajey/sige1 done
+#15 DONE 0.1s
+##########################################
+### Success
+### Wed, 23 Jul 2025 14:54:07 GMT
+##########################################
+ 

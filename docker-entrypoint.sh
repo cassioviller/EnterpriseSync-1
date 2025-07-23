@@ -61,9 +61,6 @@ exec gunicorn \
     --workers 4 \
     --worker-class sync \
     --timeout 30 \
-    --keepalive 2 \
-    --max-requests 1000 \
-    --max-requests-jitter 100 \
     --access-logfile - \
     --error-logfile - \
     --log-level info \
