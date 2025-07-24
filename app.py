@@ -5,6 +5,7 @@ from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy.orm import DeclarativeBase
 from flask_login import LoginManager
 from flask_migrate import Migrate
+from flask_wtf.csrf import CSRFProtect
 from werkzeug.middleware.proxy_fix import ProxyFix
 
 # Configure logging
@@ -16,6 +17,7 @@ class Base(DeclarativeBase):
 db = SQLAlchemy(model_class=Base)
 login_manager = LoginManager()
 migrate = Migrate()
+csrf = CSRFProtect()
 
 # create the app
 app = Flask(__name__)
@@ -34,6 +36,7 @@ app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {
 db.init_app(app)
 migrate.init_app(app, db)
 login_manager.init_app(app)
+csrf.init_app(app)
 login_manager.login_view = 'main.login'
 login_manager.login_message = 'Por favor, faça login para acessar esta página.'
 

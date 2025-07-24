@@ -1,52 +1,54 @@
 #!/usr/bin/env python3
 """
-Debug do sistema de login
-SIGE v8.0 - Sistema Integrado de Gestão Empresarial
+Script para testar login e acesso às rotas de configuração
 """
 
-import requests
-import sys
+from app import app
+from models import Usuario
+from werkzeug.security import check_password_hash
 
-def test_login_redirect():
-    """Testa o login e redirecionamento do super admin"""
-    
-    session = requests.Session()
-    
-    print("1. Acessando página de login...")
-    login_page = session.get('http://localhost:5000/login')
-    print(f"   Status: {login_page.status_code}")
-    
-    print("2. Fazendo login como axiom...")
-    login_data = {
-        'username': 'axiom',
-        'password': 'cassio123'
-    }
-    
-    login_response = session.post('http://localhost:5000/login', data=login_data, allow_redirects=False)
-    print(f"   Status: {login_response.status_code}")
-    print(f"   Headers: {dict(login_response.headers)}")
-    
-    if 'Location' in login_response.headers:
-        redirect_url = login_response.headers['Location']
-        print(f"   Redirecionando para: {redirect_url}")
+def testar_login():
+    with app.test_client() as client:
+        print("🔍 Testando login e acesso às rotas...")
         
-        # Seguir redirecionamento
-        print("3. Seguindo redirecionamento...")
-        final_page = session.get(f'http://localhost:5000{redirect_url}')
-        print(f"   Status final: {final_page.status_code}")
-        print(f"   URL final: {final_page.url}")
+        # 1. Testar login com usuário admin
+        print("\n1. Tentando login com valeverde/admin123:")
+        response = client.post('/login', data={
+            'username': 'valeverde',
+            'password': 'admin123'
+        }, follow_redirects=False)
         
-        # Verificar conteúdo
-        if 'Gerenciar Administradores' in final_page.text:
-            print("✅ Login funcionando! Super Admin Dashboard carregado.")
-        elif 'login' in final_page.text.lower():
-            print("❌ Ainda na página de login - senha incorreta?")
-        else:
-            print("❓ Redirecionado para página desconhecida")
-            print(f"   Conteúdo (primeiros 200 chars): {final_page.text[:200]}")
-    else:
-        print("❌ Sem redirecionamento - login falhou")
-        print(f"   Conteúdo: {login_response.text[:200]}")
+        print(f"Status do login: {response.status_code}")
+        print(f"Location header: {response.headers.get('Location', 'N/A')}")
+        
+        # 2. Testar acesso às páginas depois do login
+        if response.status_code == 302:
+            print("\n2. Fazendo login e testando acessos:")
+            
+            # Login com follow_redirects=True
+            login_response = client.post('/login', data={
+                'username': 'valeverde',
+                'password': 'admin123'
+            }, follow_redirects=True)
+            
+            print(f"Login response status: {login_response.status_code}")
+            
+            # Testar acesso às páginas
+            pages = ['/departamentos', '/funcoes', '/horarios', '/servicos']
+            for page in pages:
+                response = client.get(page)
+                print(f"GET {page}: {response.status_code}")
+        
+        # 3. Verificar usuários no banco
+        print("\n3. Verificando usuários no banco:")
+        with app.app_context():
+            users = Usuario.query.filter_by(ativo=True).all()
+            for user in users[:5]:
+                print(f"- {user.username}: tipo={user.tipo_usuario.name}, ativo={user.ativo}")
+                # Testar senha
+                if user.username == 'valeverde':
+                    is_valid = check_password_hash(user.password_hash, 'admin123')
+                    print(f"  Senha válida: {is_valid}")
 
 if __name__ == "__main__":
-    test_login_redirect()
+    testar_login()
