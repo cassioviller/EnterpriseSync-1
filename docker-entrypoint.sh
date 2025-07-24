@@ -40,6 +40,32 @@ with app.app_context():
 "
 }
 
+# CORREÇÃO SQL URGENTE - categoria_id
+echo "Aplicando correção SQL urgente..."
+python3 -c "
+import os
+if os.path.exists('/app/views.py'):
+    with open('/app/views.py', 'r') as f:
+        content = f.read()
+    
+    # Correção específica para erro categoria_id
+    old_query = 'categorias = db.session.query(Servico.categoria).distinct().all()'
+    new_query = 'categorias_query = db.session.query(Servico.categoria).distinct().filter(Servico.categoria.isnot(None)).all()'
+    
+    if old_query in content:
+        content = content.replace(old_query, new_query)
+        content = content.replace(
+            'categorias = [cat[0] for cat in categorias if cat[0]]',
+            'categorias = [cat[0] for cat in categorias_query if cat[0]]'
+        )
+        
+        with open('/app/views.py', 'w') as f:
+            f.write(content)
+        print('Correção SQL categoria_id aplicada!')
+    else:
+        print('Correção já aplicada ou não necessária')
+"
+
 # Criar usuário admin
 echo "Criando usuários..."
 python3 -c "
