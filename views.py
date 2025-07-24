@@ -8,7 +8,7 @@ from utils import calcular_horas_trabalhadas, calcular_custo_real_obra, calcular
 from kpis_engine import kpis_engine
 from auth import super_admin_required, admin_required, funcionario_required, get_tenant_filter, can_access_data
 from datetime import datetime, date, timedelta
-from sqlalchemy import func, desc, or_
+from sqlalchemy import func, desc, or_, and_
 
 import os
 import json
