@@ -1685,8 +1685,28 @@ def nova_obra():
             flash('Obra cadastrada com sucesso!', 'success')
             return redirect(url_for('main.obras'))
     
-    # Buscar dados para o formulário com filtro multi-tenant
-    servicos = Servico.query.filter_by(ativo=True).order_by(Servico.categoria, Servico.nome).all()
+    # Buscar dados para o formulário com filtro multi-tenant - query específica
+    servicos_data = db.session.query(
+        Servico.id,
+        Servico.nome,
+        Servico.categoria,
+        Servico.unidade_medida,
+        Servico.unidade_simbolo,
+        Servico.custo_unitario
+    ).filter(Servico.ativo == True).order_by(Servico.categoria, Servico.nome).all()
+    
+    # Converter para objetos acessíveis no template
+    servicos = []
+    for row in servicos_data:
+        servico_obj = type('Servico', (), {
+            'id': row.id,
+            'nome': row.nome,
+            'categoria': row.categoria,
+            'unidade_medida': row.unidade_medida,
+            'unidade_simbolo': row.unidade_simbolo,
+            'custo_unitario': row.custo_unitario
+        })()
+        servicos.append(servico_obj)
     categorias = CategoriaServico.query.filter_by(ativo=True).order_by(CategoriaServico.ordem, CategoriaServico.nome).all()
     obras = Obra.query.filter(Obra.admin_id == current_user.id).all()
     
@@ -1700,16 +1720,24 @@ def nova_obra():
 @login_required
 def api_servicos():
     from models import Servico
-    servicos = Servico.query.filter_by(ativo=True).order_by(Servico.categoria, Servico.nome).all()
+    # Query específica para evitar erro categoria_id
+    servicos_data = db.session.query(
+        Servico.id,
+        Servico.nome,
+        Servico.categoria,
+        Servico.unidade_medida,
+        Servico.unidade_simbolo,
+        Servico.custo_unitario
+    ).filter(Servico.ativo == True).order_by(Servico.categoria, Servico.nome).all()
     
     return jsonify([{
-        'id': s.id,
-        'nome': s.nome,
-        'categoria': s.categoria,
-        'unidade_medida': s.unidade_medida,
-        'unidade_simbolo': s.unidade_simbolo or s.unidade_medida,
-        'custo_unitario': float(s.custo_unitario or 0)
-    } for s in servicos])
+        'id': row.id,
+        'nome': row.nome,
+        'categoria': row.categoria,
+        'unidade_medida': row.unidade_medida,
+        'unidade_simbolo': row.unidade_simbolo or row.unidade_medida,
+        'custo_unitario': float(row.custo_unitario or 0)
+    } for row in servicos_data])
 
 # API removida - função duplicada
 
@@ -2424,13 +2452,21 @@ def servicos():
         categoria = request.args.get('categoria')
         ativo = request.args.get('ativo')
         
-        # Query base com filtro de tenant
-        tenant_filter = get_tenant_filter()
-        query = Servico.query
-        
-        # Aplicar filtro de tenant se necessário (para casos futuros)
-        # if tenant_filter:
-        #     query = query.filter(Servico.admin_id == tenant_filter)
+        # Query específica sem categoria_id para evitar erro SQL
+        query = db.session.query(
+            Servico.id,
+            Servico.nome,
+            Servico.descricao,
+            Servico.categoria,
+            Servico.unidade_medida,
+            Servico.unidade_simbolo,
+            Servico.custo_unitario,
+            Servico.complexidade,
+            Servico.requer_especializacao,
+            Servico.ativo,
+            Servico.created_at,
+            Servico.updated_at
+        )
         
         # Aplicar filtros de pesquisa
         if categoria:
@@ -2438,8 +2474,26 @@ def servicos():
         if ativo:
             query = query.filter(Servico.ativo == (ativo == 'true'))
         
-        # Ordenar e buscar
-        servicos = query.order_by(Servico.nome).all()
+        # Ordenar e buscar - converte Row objects em objetos simulados
+        servicos_raw = query.order_by(Servico.nome).all()
+        servicos = []
+        for row in servicos_raw:
+            # Criar objeto com atributos acessíveis no template
+            servico_obj = type('Servico', (), {
+                'id': row.id,
+                'nome': row.nome,
+                'descricao': row.descricao,
+                'categoria': row.categoria,
+                'unidade_medida': row.unidade_medida,
+                'unidade_simbolo': row.unidade_simbolo,
+                'custo_unitario': row.custo_unitario,
+                'complexidade': row.complexidade,
+                'requer_especializacao': row.requer_especializacao,
+                'ativo': row.ativo,
+                'created_at': row.created_at,
+                'updated_at': row.updated_at
+            })()
+            servicos.append(servico_obj)
         
         # Dados para filtros - buscar categorias distintas do campo categoria (string)
         categorias_query = db.session.query(Servico.categoria).distinct().filter(Servico.categoria.isnot(None)).all()
@@ -2859,8 +2913,10 @@ def excluir_categoria(categoria_id):
         if not categoria:
             return jsonify({'success': False, 'message': 'Categoria não encontrada'})
         
-        # Verificar se há serviços usando esta categoria
-        servicos_usando = Servico.query.filter_by(categoria_id=categoria_id).count()
+        # Verificar se há serviços usando esta categoria (usar campo categoria string)
+        servicos_usando = db.session.query(Servico).filter(
+            Servico.categoria == categoria.nome
+        ).count()
         
         if servicos_usando > 0:
             return jsonify({
@@ -2910,7 +2966,14 @@ def obras_autocomplete():
 def servicos_autocomplete():
     """API para autocomplete de serviços"""
     q = request.args.get('q', '')
-    servicos = Servico.query.filter(
+    # Query específica para evitar erro categoria_id
+    servicos_data = db.session.query(
+        Servico.id,
+        Servico.nome,
+        Servico.categoria,
+        Servico.unidade_medida,
+        Servico.complexidade
+    ).filter(
         or_(
             Servico.nome.ilike(f'%{q}%'),
             Servico.categoria.ilike(f'%{q}%')
@@ -2918,13 +2981,13 @@ def servicos_autocomplete():
     ).filter(Servico.ativo == True).limit(10).all()
     
     return jsonify([{
-        'id': servico.id,
-        'nome': servico.nome,
-        'categoria': servico.categoria,
-        'unidade_medida': servico.unidade_medida,
-        'unidade_simbolo': get_simbolo_unidade(servico.unidade_medida),
-        'complexidade': servico.complexidade
-    } for servico in servicos])
+        'id': row.id,
+        'nome': row.nome,
+        'categoria': row.categoria,
+        'unidade_medida': row.unidade_medida,
+        'unidade_simbolo': get_simbolo_unidade(row.unidade_medida),
+        'complexidade': row.complexidade
+    } for row in servicos_data])
 
 @main_bp.route('/api/servicos/<int:servico_id>/subatividades')
 @login_required
@@ -4123,7 +4186,28 @@ def novo_rdo():
     # Dados para template
     obras = Obra.query.filter_by(ativo=True).all()
     funcionarios = Funcionario.query.filter_by(ativo=True).all()
-    servicos = Servico.query.filter_by(ativo=True).all()
+    # Query específica para evitar erro categoria_id
+    servicos_data = db.session.query(
+        Servico.id,
+        Servico.nome,
+        Servico.categoria,
+        Servico.unidade_medida,
+        Servico.unidade_simbolo,
+        Servico.custo_unitario
+    ).filter(Servico.ativo == True).all()
+    
+    # Converter para objetos acessíveis no template
+    servicos = []
+    for row in servicos_data:
+        servico_obj = type('Servico', (), {
+            'id': row.id,
+            'nome': row.nome,
+            'categoria': row.categoria,
+            'unidade_medida': row.unidade_medida,
+            'unidade_simbolo': row.unidade_simbolo,
+            'custo_unitario': row.custo_unitario
+        })()
+        servicos.append(servico_obj)
     
     # Obter obra pré-selecionada se houver
     obra_id = request.args.get('obra_id')
@@ -4999,7 +5083,15 @@ def api_servicos_autocomplete():
     q = request.args.get("q", "")
     ativo = request.args.get("ativo", "true").lower() == "true"
     
-    query = Servico.query.filter(Servico.ativo == ativo)
+    # Query específica para evitar erro categoria_id
+    query = db.session.query(
+        Servico.id,
+        Servico.nome,
+        Servico.categoria,
+        Servico.unidade_medida,
+        Servico.unidade_simbolo,
+        Servico.custo_unitario
+    ).filter(Servico.ativo == ativo)
     
     if q:
         query = query.filter(
@@ -5009,16 +5101,16 @@ def api_servicos_autocomplete():
             )
         )
     
-    servicos = query.limit(10).all()
+    servicos_data = query.limit(10).all()
     
     return jsonify([{
-        "id": servico.id,
-        "nome": servico.nome,
-        "categoria": servico.categoria,
-        "unidade_medida": servico.unidade_medida,
-        "unidade_simbolo": servico.unidade_simbolo,
-        "custo_unitario": float(servico.custo_unitario) if servico.custo_unitario else 0
-    } for servico in servicos])
+        "id": row.id,
+        "nome": row.nome,
+        "categoria": row.categoria,
+        "unidade_medida": row.unidade_medida,
+        "unidade_simbolo": row.unidade_simbolo,
+        "custo_unitario": float(row.custo_unitario) if row.custo_unitario else 0
+    } for row in servicos_data])
 
 @main_bp.route("/api/servicos/<int:servico_id>")
 @login_required
