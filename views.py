@@ -2452,17 +2452,52 @@ def servicos():
         categoria = request.args.get('categoria')
         ativo = request.args.get('ativo')
         
-        # Buscar todos os serviços com dados completos, incluindo subatividades
-        query = Servico.query
+        # Query específica para evitar erro categoria_id
+        servicos_data = db.session.query(
+            Servico.id,
+            Servico.nome,
+            Servico.descricao,
+            Servico.categoria,
+            Servico.unidade_medida,
+            Servico.unidade_simbolo,
+            Servico.custo_unitario,
+            Servico.complexidade,
+            Servico.requer_especializacao,
+            Servico.ativo,
+            Servico.created_at,
+            Servico.updated_at
+        )
         
         # Aplicar filtros de pesquisa
         if categoria:
-            query = query.filter(Servico.categoria == categoria)
+            servicos_data = servicos_data.filter(Servico.categoria == categoria)
         if ativo:
-            query = query.filter(Servico.ativo == (ativo == 'true'))
+            servicos_data = servicos_data.filter(Servico.ativo == (ativo == 'true'))
         
-        # Executar query - agora usando objetos Servico completos
-        servicos = query.order_by(Servico.nome).all()
+        # Executar query e converter para objetos com subatividades
+        servicos_raw = servicos_data.order_by(Servico.nome).all()
+        servicos = []
+        for row in servicos_raw:
+            # Buscar subatividades para este serviço
+            subatividades = SubAtividade.query.filter_by(servico_id=row.id).all()
+            
+            # Criar objeto compatível com template
+            servico_obj = type('Servico', (), {
+                'id': row.id,
+                'nome': row.nome,
+                'descricao': row.descricao,
+                'categoria': row.categoria,
+                'unidade_medida': row.unidade_medida,
+                'unidade_simbolo': row.unidade_simbolo,
+                'custo_unitario': row.custo_unitario,
+                'complexidade': row.complexidade,
+                'requer_especializacao': row.requer_especializacao,
+                'ativo': row.ativo,
+                'created_at': row.created_at,
+                'updated_at': row.updated_at,
+                'subatividades': subatividades
+            })()
+            servicos.append(servico_obj)
         
         # Dados para filtros - buscar categorias distintas do campo categoria (string)
         categorias_query = db.session.query(Servico.categoria).distinct().filter(Servico.categoria.isnot(None)).all()
