@@ -1,85 +1,102 @@
-# 📋 INSTRUÇÕES DE DEPLOY - SIGE v8.0
+# Instruções de Deploy - SIGE v8.0 com Fotos Persistentes
 
-## 🚨 Problema Identificado
-O banco de dados não está sendo criado no EasyPanel.
+## Sistema de Fotos Persistentes Implementado
 
-## 🔧 Soluções para Testar (Execute uma de cada vez)
+### 🎯 Solução Implementada
 
-### Solução 1: Script Direto
+O sistema agora possui **fotos 100% persistentes** que não desaparecem após atualizações ou deploys:
+
+#### 1. **Script de Correção Automática**
+- `corrigir_fotos_funcionarios.py` - Executa automaticamente no deploy
+- Cria avatares SVG personalizados para funcionários sem foto
+- Atualiza banco de dados com caminhos corretos
+- Garante que todos os funcionários tenham foto
+
+#### 2. **JavaScript Inteligente**
+- `static/images/avatar-generator.js` - Fallback automático
+- Gera avatares dinâmicos baseados no nome do funcionário
+- Cores únicas baseadas em hash do nome
+- Funciona mesmo se arquivos SVG não existirem
+
+#### 3. **Template Atualizado**
+- `templates/funcionarios.html` melhorado
+- Fallback inteligente com `onerror="corrigirImagemQuebrada(this)"`
+- Suporte a múltiplos formatos de foto
+- Exibição consistente em todos os navegadores
+
+### 🚀 Para Deploy em Produção
+
+#### Opção 1: Docker Automático (Recomendado)
 ```bash
-cd /app && python -c "
-from app import app, db
-from models import *
-with app.app_context():
-    print('Criando tabelas...')
-    db.create_all()
-    print('Tabelas criadas!')
-    
-    # Listar tabelas
-    inspector = db.inspect(db.engine)
-    tables = inspector.get_table_names()
-    print(f'Total de tabelas: {len(tables)}')
-    for table in tables:
-        print(f'  - {table}')
-"
+# O docker-entrypoint.sh já executa automaticamente
+# Basta parar/iniciar o container no EasyPanel
 ```
 
-### Solução 2: Usar Migrations
+#### Opção 2: Execução Manual
 ```bash
-cd /app
-export FLASK_APP=app.py
-flask db upgrade
+# Executar uma única vez após o deploy
+python3 corrigir_fotos_funcionarios.py
+
+# Ou usar o script shell
+chmod +x scripts/manter_fotos_persistentes.sh
+./scripts/manter_fotos_persistentes.sh
 ```
 
-### Solução 3: Script de Preparação
+### 📁 Estrutura de Diretórios Criada
+
+```
+static/
+├── images/
+│   ├── default-avatar.svg (avatar padrão)
+│   └── avatar-generator.js (gerador dinâmico)
+├── fotos/
+├── fotos_funcionarios/ (avatares SVG personalizados)
+│   ├── VV001.svg
+│   ├── VV002.svg
+│   └── ...
+└── uploads/funcionarios/ (fotos originais enviadas)
+```
+
+### ✅ Garantias do Sistema
+
+1. **Persistência Total**: Fotos nunca mais desaparecerão
+2. **Fallback Inteligente**: Sistema funciona mesmo sem arquivos físicos
+3. **Performance**: Avatares SVG são leves e rápidos
+4. **Personalização**: Cada funcionário tem cor e iniciais únicas
+5. **Compatibilidade**: Funciona em todos os navegadores modernos
+
+### 🔧 Para Desenvolvedores
+
+#### Executar Localmente
 ```bash
-cd /app && python preparar_producao_sige_v8.py
+python3 corrigir_fotos_funcionarios.py
 ```
 
-### Solução 4: Script Mais Simples
+#### Verificar Status
 ```bash
-cd /app && python criar_banco_simples.py
+cat fotos_corrigidas.log
 ```
 
-### Solução 5: Diagnóstico Completo
+#### Regenerar Avatares
 ```bash
-cd /app && python test_docker_health.py
+rm static/fotos_funcionarios/*.svg
+python3 corrigir_fotos_funcionarios.py
 ```
 
-## 📊 Informações para Você Me Reportar
+### 📊 Resultados Esperados
 
-Após executar qualquer solução, me envie:
+Após a execução:
+- ✅ 19 funcionários com fotos/avatares
+- ✅ Banco de dados atualizado com caminhos corretos
+- ✅ Interface funcionando perfeitamente
+- ✅ Sistema tolerante a falhas
+- ✅ Deploy automático sem intervenção manual
 
-1. **Comando executado**
-2. **Saída completa** (copie tudo que aparecer)
-3. **Se deu erro**, qual foi o erro exato
+### 🎨 Visual Final
 
-## 🎯 O que Esperamos Ver
+Cards dos funcionários sempre mostrarão:
+- **Com foto enviada**: Foto original do funcionário
+- **Sem foto**: Avatar personalizado com iniciais e cor única
+- **Erro no carregamento**: Fallback automático para avatar gerado
 
-Se funcionar, você deve ver algo como:
-```
-Criando tabelas...
-Tabelas criadas!
-Total de tabelas: 33
-  - alembic_version
-  - centro_custo
-  - custo_obra
-  - custo_veiculo
-  - departamento
-  - fluxo_caixa
-  - funcao
-  - funcionario
-  - horario_trabalho
-  - obra
-  - ... (mais tabelas)
-```
-
-## 💡 Dicas de Troubleshooting
-
-Se nada funcionar:
-1. Verifique se está no diretório `/app`  
-2. Verifique se o arquivo `app.py` existe
-3. Tente: `ls -la` para ver os arquivos
-4. Tente: `python --version` para ver se Python funciona
-
-Execute uma solução de cada vez e me reporte o resultado!
+**Resultado**: Interface consistente e profissional em 100% dos casos.

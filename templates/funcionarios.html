@@ -169,22 +169,14 @@
             <div class="card-body d-flex flex-column">
                 <!-- Foto e Nome -->
                 <div class="text-center mb-3">
-                    {% if kpi.funcionario.foto %}
-                        <img src="{{ url_for('static', filename=kpi.funcionario.foto) }}" 
-                             class="rounded-circle mb-3" 
-                             width="80" 
-                             height="80" 
-                             style="object-fit: cover; aspect-ratio: 1/1;"
-                             alt="Foto de {{ kpi.funcionario.nome }}"
-                             onerror="this.src='{{ url_for('static', filename='images/default-avatar.svg') }}'">
-                    {% else %}
-                        <img src="{{ url_for('static', filename='images/default-avatar.svg') }}" 
-                             class="rounded-circle mb-3" 
-                             width="80" 
-                             height="80" 
-                             style="object-fit: cover; aspect-ratio: 1/1;"
-                             alt="Avatar padrão">
-                    {% endif %}
+                    <img src="{{ url_for('static', filename=kpi.funcionario.foto) if kpi.funcionario.foto else url_for('static', filename='images/default-avatar.svg') }}" 
+                         class="rounded-circle mb-3" 
+                         width="80" 
+                         height="80" 
+                         style="object-fit: cover; aspect-ratio: 1/1;"
+                         alt="Foto de {{ kpi.funcionario.nome }}"
+                         data-nome="{{ kpi.funcionario.nome }}"
+                         onerror="corrigirImagemQuebrada(this)">
                     <h5 class="card-title mb-1">{{ kpi.funcionario.nome }}</h5>
                     <small class="text-muted">{{ kpi.funcionario.telefone if kpi.funcionario.telefone else '-' }}</small>
                 </div>

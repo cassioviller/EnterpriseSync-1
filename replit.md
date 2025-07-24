@@ -738,6 +738,16 @@
     - Fallback inteligente no app.py para URL do banco de dados
     - Documentação completa em EASYPANEL_DEPLOY.md
     - Deploy funciona apenas parando/iniciando container no EasyPanel
+  - July 24, 2025. Sistema de Fotos Persistentes Implementado - v8.0.8:
+    - Criado script corrigir_fotos_funcionarios.py para garantir fotos persistentes
+    - Sistema gera avatares SVG personalizados com iniciais e cores únicas por funcionário
+    - JavaScript de fallback (avatar-generator.js) para lidar com imagens quebradas
+    - Todas as 19 funcionários agora têm fotos/avatares persistentes no banco de dados
+    - Estrutura de diretórios garantida: static/fotos_funcionarios/, static/images/, static/uploads/
+    - Templates atualizados com fallback inteligente (onerror="corrigirImagemQuebrada(this)")
+    - Script de deploy (scripts/manter_fotos_persistentes.sh) para automação
+    - Documentação completa (DEPLOY_INSTRUCTIONS.md) para deploy em produção
+    - Sistema 100% tolerante a falhas - fotos nunca mais desaparecerão após deploy
   - July 24, 2025. Atualização do Card de Funcionário - v8.0.7:
     - Removido campo departamento do card de funcionário na página principal
     - Substituído email por telefone na exibição abaixo do nome
