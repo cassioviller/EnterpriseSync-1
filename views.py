@@ -2524,7 +2524,7 @@ def api_criar_servico():
             return jsonify({'success': False, 'message': 'Campos obrigatórios não preenchidos'})
         
         # Verificar se já existe serviço com mesmo nome
-        servico_existente = Servico.query.filter_by(nome=dados['nome']).first()
+        servico_existente = db.session.query(Servico.id).filter(Servico.nome == dados['nome']).first()
         if servico_existente:
             return jsonify({'success': False, 'message': 'Já existe um serviço com este nome'})
         
@@ -2624,9 +2624,8 @@ def api_atualizar_servico(id):
             return jsonify({'success': False, 'message': 'Campos obrigatórios não preenchidos'})
         
         # Verificar se já existe outro serviço com mesmo nome
-        servico_existente = Servico.query.filter(
-            Servico.nome == dados['nome'],
-            Servico.id != id
+        servico_existente = db.session.query(Servico.id).filter(
+            and_(Servico.nome == dados['nome'], Servico.id != id)
         ).first()
         if servico_existente:
             return jsonify({'success': False, 'message': 'Já existe um serviço com este nome'})
