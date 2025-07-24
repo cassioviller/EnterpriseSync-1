@@ -1,40 +1,126 @@
 #!/usr/bin/env python3
 """
-Teste de saúde da aplicação Docker
-SIGE v8.0 - Sistema Integrado de Gestão Empresarial
+Script para testar saúde do container Docker e banco de dados
 """
 
-from werkzeug.security import generate_password_hash, check_password_hash
+import os
 import sys
+from datetime import datetime
 
-def test_password():
-    """Testa se a senha está correta"""
-    # Hash atual do banco
-    hash_banco = "scrypt:32768:8:1$nm7UZN6yEl8eY3tJ$4efb2fec46530daa51f5b0f734d7b7993fdbfa1a2758e5addd6a432158d97d27afa88a05f2ef40be21a917d1137cf2c3c465b8b6b83b93dcb7a963df5663ba8a"
+def test_environment():
+    """Testa ambiente e configurações"""
+    print("🔍 TESTE DE AMBIENTE - SIGE v8.0")
+    print("=" * 50)
     
-    # Senhas para testar
-    senhas = ['cassio123', 'admin123', 'password', '123456']
+    # Variáveis de ambiente
+    print("📋 Variáveis de Ambiente:")
+    env_vars = ['DATABASE_URL', 'FLASK_APP', 'PORT', 'PGHOST', 'PGPORT', 'PGUSER', 'PGDATABASE']
+    for var in env_vars:
+        value = os.environ.get(var, 'NÃO DEFINIDA')
+        if 'PASSWORD' in var or 'SECRET' in var:
+            value = '*' * len(value) if value else 'NÃO DEFINIDA'
+        print(f"   {var}: {value}")
     
-    print("🔍 Testando senhas contra hash do banco...")
-    print(f"Hash: {hash_banco[:50]}...")
+    # Diretório atual
+    print(f"\n📁 Diretório atual: {os.getcwd()}")
     
-    for senha in senhas:
-        resultado = check_password_hash(hash_banco, senha)
-        status = "✅" if resultado else "❌"
-        print(f"{status} Senha '{senha}': {resultado}")
+    # Arquivos importantes
+    print("\n📄 Arquivos importantes:")
+    important_files = ['app.py', 'models.py', 'views.py', 'main.py', 'requirements.txt', 'Dockerfile']
+    for file in important_files:
+        exists = "✅" if os.path.exists(file) else "❌"
+        print(f"   {exists} {file}")
     
-    # Gerar novo hash para cassio123
-    print("\n🔧 Gerando novo hash para senha 'cassio123':")
-    novo_hash = generate_password_hash('cassio123')
-    print(f"Novo hash: {novo_hash}")
+    # Testar importação
+    print("\n🐍 Teste de Importação:")
+    try:
+        from app import app, db
+        print("   ✅ app e db importados com sucesso")
+        
+        with app.app_context():
+            # Testar conexão com banco
+            try:
+                result = db.engine.execute(db.text("SELECT 1")).fetchone()
+                print("   ✅ Conexão com banco funcionando")
+            except Exception as e:
+                print(f"   ❌ Erro na conexão: {e}")
+            
+            # Testar criação de tabelas
+            try:
+                import models
+                print("   ✅ Modelos importados")
+                
+                db.create_all()
+                print("   ✅ db.create_all() executado")
+                
+                # Listar tabelas
+                inspector = db.inspect(db.engine)
+                tables = inspector.get_table_names()
+                print(f"   📊 Total de tabelas criadas: {len(tables)}")
+                
+                if len(tables) > 0:
+                    print("   📋 Tabelas encontradas:")
+                    for table in sorted(tables):
+                        print(f"      • {table}")
+                else:
+                    print("   ⚠️ Nenhuma tabela encontrada")
+                
+            except Exception as e:
+                print(f"   ❌ Erro ao criar tabelas: {e}")
+                import traceback
+                traceback.print_exc()
     
-    # Testar o novo hash
-    teste_novo = check_password_hash(novo_hash, 'cassio123')
-    print(f"✅ Teste do novo hash: {teste_novo}")
+    except Exception as e:
+        print(f"   ❌ Erro na importação: {e}")
+        import traceback
+        traceback.print_exc()
+
+def test_database_direct():
+    """Teste direto no banco PostgreSQL"""
+    print("\n🗄️ TESTE DIRETO NO BANCO:")
+    print("=" * 50)
     
-    return novo_hash
+    try:
+        import psycopg2
+        
+        # Pegar URL do banco
+        db_url = os.environ.get('DATABASE_URL')
+        if not db_url:
+            print("   ❌ DATABASE_URL não definida")
+            return
+        
+        # Conectar diretamente
+        conn = psycopg2.connect(db_url)
+        cursor = conn.cursor()
+        
+        # Testar conexão
+        cursor.execute("SELECT version();")
+        version = cursor.fetchone()
+        print(f"   ✅ PostgreSQL conectado: {version[0][:50]}...")
+        
+        # Listar tabelas
+        cursor.execute("""
+            SELECT table_name 
+            FROM information_schema.tables 
+            WHERE table_schema = 'public'
+            ORDER BY table_name;
+        """)
+        
+        tables = cursor.fetchall()
+        print(f"   📊 Tabelas no banco: {len(tables)}")
+        
+        if tables:
+            for table in tables:
+                print(f"      • {table[0]}")
+        
+        cursor.close()
+        conn.close()
+        
+    except Exception as e:
+        print(f"   ❌ Erro no teste direto: {e}")
 
 if __name__ == "__main__":
-    novo_hash = test_password()
-    print(f"\n🎯 Use este comando SQL para corrigir:")
-    print(f"UPDATE usuario SET password_hash = '{novo_hash}' WHERE username = 'axiom';")
+    print(f"⏰ Executado em: {datetime.now()}")
+    test_environment()
+    test_database_direct()
+    print("\n🏁 Teste concluído!")

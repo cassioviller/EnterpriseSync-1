@@ -1,101 +1,85 @@
 # 📋 INSTRUÇÕES DE DEPLOY - SIGE v8.0
 
-## 🎯 Situação Atual
+## 🚨 Problema Identificado
+O banco de dados não está sendo criado no EasyPanel.
 
-O sistema foi implantado com sucesso no EasyPanel, mas o banco de dados está vazio. Para resolver isso, execute os seguintes comandos:
+## 🔧 Soluções para Testar (Execute uma de cada vez)
 
-## 🚀 Passos para Ativar o Sistema
-
-### 1. Conectar ao Container
-
-Acesse o terminal do container no EasyPanel e execute:
-
+### Solução 1: Script Direto
 ```bash
-# Navegar para o diretório da aplicação
-cd /app
-
-# Executar script de configuração do banco
-python setup_production_database.py
-```
-
-### 2. Verificar Funcionamento
-
-Após executar o script, o sistema terá:
-
-- ✅ Todas as tabelas criadas
-- ✅ Super Admin: `admin@sige.com` / `admin123`
-- ✅ Admin Demo: `valeverde` / `admin123`
-- ✅ Dados básicos (departamentos, funções, horários)
-- ✅ Funcionários de demonstração
-- ✅ Obra e veículos de exemplo
-
-### 3. Acessar o Sistema
-
-1. **Super Admin**: Para gerenciar administradores
-   - Login: `admin@sige.com`
-   - Senha: `admin123`
-
-2. **Admin Demo**: Para testar todas as funcionalidades
-   - Login: `valeverde`
-   - Senha: `admin123`
-
-## 🔧 Comandos Alternativos
-
-Se preferir executar passo a passo:
-
-```bash
-# Apenas criar tabelas
-python -c "from app import app, db; app.app_context().push(); db.create_all()"
-
-# Apenas criar super admin
-python criar_superadmin.py
-
-# Executar migrações (se necessário)
-export FLASK_APP=main.py
-flask db upgrade
-```
-
-## 📊 Validação do Sistema
-
-Para verificar se tudo está funcionando:
-
-```bash
-# Testar conexão e dados
-python -c "
+cd /app && python -c "
 from app import app, db
-from models import Usuario, Funcionario
+from models import *
 with app.app_context():
-    print(f'Usuários: {Usuario.query.count()}')
-    print(f'Funcionários: {Funcionario.query.count()}')
-    print('Sistema operacional!')
+    print('Criando tabelas...')
+    db.create_all()
+    print('Tabelas criadas!')
+    
+    # Listar tabelas
+    inspector = db.inspect(db.engine)
+    tables = inspector.get_table_names()
+    print(f'Total de tabelas: {len(tables)}')
+    for table in tables:
+        print(f'  - {table}')
 "
 ```
 
-## 🐳 Informações do Deploy
+### Solução 2: Usar Migrations
+```bash
+cd /app
+export FLASK_APP=app.py
+flask db upgrade
+```
 
-- **Imagem Docker**: `easypanel/viajey/sige1`
-- **Banco de dados**: PostgreSQL (configurado via `DATABASE_URL`)
-- **Porta**: 5000
-- **Ambiente**: Produção
+### Solução 3: Script de Preparação
+```bash
+cd /app && python preparar_producao_sige_v8.py
+```
 
-## 🔐 Segurança
+### Solução 4: Script Mais Simples
+```bash
+cd /app && python criar_banco_simples.py
+```
 
-Após validar o funcionamento, recomenda-se:
+### Solução 5: Diagnóstico Completo
+```bash
+cd /app && python test_docker_health.py
+```
 
-1. Alterar as senhas padrão
-2. Configurar backup automático do banco
-3. Ativar logs de auditoria
-4. Configurar SSL/TLS
+## 📊 Informações para Você Me Reportar
 
-## 🆘 Resolução de Problemas
+Após executar qualquer solução, me envie:
 
-Se houver erros:
+1. **Comando executado**
+2. **Saída completa** (copie tudo que aparecer)
+3. **Se deu erro**, qual foi o erro exato
 
-1. Verificar se `DATABASE_URL` está configurada
-2. Verificar conectividade com PostgreSQL
-3. Executar: `python -c "from app import db; print(db.engine.url)"`
-4. Consultar logs: `tail -f /app/logs/sige.log`
+## 🎯 O que Esperamos Ver
 
----
+Se funcionar, você deve ver algo como:
+```
+Criando tabelas...
+Tabelas criadas!
+Total de tabelas: 33
+  - alembic_version
+  - centro_custo
+  - custo_obra
+  - custo_veiculo
+  - departamento
+  - fluxo_caixa
+  - funcao
+  - funcionario
+  - horario_trabalho
+  - obra
+  - ... (mais tabelas)
+```
 
-**Sistema pronto para uso após executar `setup_production_database.py`**
+## 💡 Dicas de Troubleshooting
+
+Se nada funcionar:
+1. Verifique se está no diretório `/app`  
+2. Verifique se o arquivo `app.py` existe
+3. Tente: `ls -la` para ver os arquivos
+4. Tente: `python --version` para ver se Python funciona
+
+Execute uma solução de cada vez e me reporte o resultado!
