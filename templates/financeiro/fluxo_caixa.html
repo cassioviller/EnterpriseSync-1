@@ -219,7 +219,7 @@ function sincronizarFluxo() {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                'X-CSRFToken': '{{ csrf_token() }}'
+                'X-CSRFToken': ''
             }
         })
         .then(response => response.json())

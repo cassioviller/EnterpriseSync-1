@@ -35,6 +35,8 @@ app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {
 db.init_app(app)
 migrate.init_app(app, db)
 login_manager.init_app(app)
+# Desabilitar CSRF temporariamente para produção
+app.config['WTF_CSRF_ENABLED'] = False
 csrf.init_app(app)
 login_manager.login_view = 'main.login'
 login_manager.login_message = 'Por favor, faça login para acessar esta página.'

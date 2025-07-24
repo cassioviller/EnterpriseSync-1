@@ -20,8 +20,8 @@ main_bp = Blueprint('main', __name__)
 @main_bp.route('/login', methods=['GET', 'POST'])
 def login():
     if request.method == 'POST':
-        username = request.form['username']
-        password = request.form['password']
+        username = request.form.get('username')
+        password = request.form.get('password')
         
         user = Usuario.query.filter_by(username=username, ativo=True).first()
         
@@ -285,6 +285,7 @@ def funcionario_dashboard():
 # Rotas adicionais de veículos serão adicionadas diretamente aqui
 
 @main_bp.route('/')
+@main_bp.route('/dashboard')
 @login_required
 def dashboard():
     # Super Admin deve ser redirecionado para sua própria página
@@ -1493,6 +1494,7 @@ def funcoes():
     funcoes = Funcao.query.all()
     return render_template('funcoes.html', funcoes=funcoes)
 
+@main_bp.route('/funcoes/nova', methods=['GET', 'POST'])
 @main_bp.route('/funcoes/novo', methods=['GET', 'POST'])
 @login_required
 def nova_funcao():
