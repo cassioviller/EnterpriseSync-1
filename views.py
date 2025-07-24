@@ -1,4 +1,4 @@
-from flask import Blueprint, render_template, request, redirect, url_for, flash, jsonify
+from flask import Blueprint, render_template, request, redirect, url_for, flash, jsonify, session
 from flask_login import login_required, current_user, login_user, logout_user
 from werkzeug.security import check_password_hash, generate_password_hash
 from app import db
@@ -2416,32 +2416,43 @@ def novo_custo_veiculo_form(id):
 
 @main_bp.route('/servicos')
 @login_required
+@admin_required
 def servicos():
     """Página de listagem de serviços com filtros"""
-    # Filtros
-    categoria = request.args.get('categoria')
-    ativo = request.args.get('ativo')
-    
-    # Query base
-    query = Servico.query
-    
-    # Aplicar filtros
-    if categoria:
-        query = query.filter(Servico.categoria == categoria)
-    if ativo:
-        query = query.filter(Servico.ativo == (ativo == 'true'))
-    
-    # Ordenar e buscar
-    servicos = query.order_by(Servico.nome).all()
-    
-    # Dados para filtros
-    categorias = db.session.query(Servico.categoria).distinct().all()
-    categorias = [cat[0] for cat in categorias if cat[0]]
-    
-    return render_template('servicos.html', 
-                         servicos=servicos, 
-                         categorias=categorias,
-                         filtros={'categoria': categoria, 'ativo': ativo})
+    try:
+        # Filtros
+        categoria = request.args.get('categoria')
+        ativo = request.args.get('ativo')
+        
+        # Query base com filtro de tenant
+        tenant_filter = get_tenant_filter()
+        query = Servico.query
+        
+        # Aplicar filtro de tenant se necessário (para casos futuros)
+        # if tenant_filter:
+        #     query = query.filter(Servico.admin_id == tenant_filter)
+        
+        # Aplicar filtros de pesquisa
+        if categoria:
+            query = query.filter(Servico.categoria == categoria)
+        if ativo:
+            query = query.filter(Servico.ativo == (ativo == 'true'))
+        
+        # Ordenar e buscar
+        servicos = query.order_by(Servico.nome).all()
+        
+        # Dados para filtros - buscar categorias distintas
+        categorias = db.session.query(Servico.categoria).distinct().all()
+        categorias = [cat[0] for cat in categorias if cat[0]]
+        
+        return render_template('servicos.html', 
+                             servicos=servicos, 
+                             categorias=categorias,
+                             filtros={'categoria': categoria, 'ativo': ativo})
+                             
+    except Exception as e:
+        flash(f'Erro ao carregar serviços: {str(e)}', 'error')
+        return redirect(url_for('main.dashboard'))
 
 @main_bp.route('/api/servicos', methods=['POST'])
 @login_required
