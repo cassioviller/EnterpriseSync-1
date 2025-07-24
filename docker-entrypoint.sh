@@ -35,22 +35,33 @@ echo "🗄️ Aplicando migrações de banco de dados..."
 cd /app
 
 # Configurar variável de ambiente para Flask-Migrate
-export FLASK_APP=main.py
+export FLASK_APP=app.py
 
-# Aplicar migrações - preserva dados existentes
-flask db upgrade 2>/dev/null || {
-    echo "⚠️ Erro ao aplicar migrações ou primeira execução, criando tabelas..."
-    python -c "
+# Tentar executar migrações primeiro
+echo "   Tentando aplicar migrações existentes..."
+flask db upgrade 2>/dev/null && echo "✅ Migrações aplicadas" || {
+    echo "   Nenhuma migração encontrada, criando migração inicial..."
+    
+    # Se não há migrações, criar uma
+    if [ ! -f "migrations/versions/"*.py ] 2>/dev/null; then
+        echo "   Gerando migração inicial..."
+        flask db migrate -m "Initial migration from models" 2>/dev/null || echo "   Aviso: Erro ao gerar migração"
+    fi
+    
+    # Aplicar migrações ou criar tabelas manualmente
+    flask db upgrade 2>/dev/null || {
+        echo "   Migrações falharam, criando tabelas diretamente..."
+        python -c "
 from app import app, db
 with app.app_context():
     try:
-        import models
         db.create_all()
-        print('✅ Tabelas criadas/verificadas com sucesso')
+        print('✅ Tabelas criadas diretamente')
     except Exception as e:
         print(f'❌ Erro ao criar tabelas: {e}')
         exit(1)
-    "
+        "
+    }
 }
 echo "✅ Migrações aplicadas/verificadas com sucesso"
 
