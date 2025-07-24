@@ -2441,9 +2441,9 @@ def servicos():
         # Ordenar e buscar
         servicos = query.order_by(Servico.nome).all()
         
-        # Dados para filtros - buscar categorias distintas
-        categorias = db.session.query(Servico.categoria).distinct().all()
-        categorias = [cat[0] for cat in categorias if cat[0]]
+        # Dados para filtros - buscar categorias distintas do campo categoria (string)
+        categorias_query = db.session.query(Servico.categoria).distinct().filter(Servico.categoria.isnot(None)).all()
+        categorias = [cat[0] for cat in categorias_query if cat[0]]
         
         return render_template('servicos.html', 
                              servicos=servicos, 
