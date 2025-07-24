@@ -22,8 +22,8 @@ app = Flask(__name__)
 app.secret_key = os.environ.get("SESSION_SECRET", "dev-secret-key-change-in-production")
 app.wsgi_app = ProxyFix(app.wsgi_app, x_proto=1, x_host=1)
 
-# configure the database - URL padrão para EasyPanel
-default_db_url = "postgres://sige:sige@viajey_sige:5432/sige?sslmode=disable"
+# configure the database - URL corrigida para PostgreSQL
+default_db_url = "postgresql://sige:sige@viajey_sige:5432/sige"
 app.config["SQLALCHEMY_DATABASE_URI"] = os.environ.get("DATABASE_URL", default_db_url)
 app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {
     "pool_recycle": 300,
@@ -52,19 +52,4 @@ app.register_blueprint(relatorios_bp, url_prefix='/relatorios')
 def load_user(user_id):
     return Usuario.query.get(int(user_id))
 
-with app.app_context():
-    db.create_all()
-    
-    # Create default admin user if none exists
-    if not Usuario.query.first():
-        from werkzeug.security import generate_password_hash
-        admin = Usuario(
-            username='admin',
-            email='admin@estruturasdovale.com',
-            password_hash=generate_password_hash('admin123'),
-            nome='Administrador',
-            ativo=True
-        )
-        db.session.add(admin)
-        db.session.commit()
-        logging.info("Default admin user created: admin/admin123")
+# Criação de tabelas será feita pelo docker-entrypoint.sh
