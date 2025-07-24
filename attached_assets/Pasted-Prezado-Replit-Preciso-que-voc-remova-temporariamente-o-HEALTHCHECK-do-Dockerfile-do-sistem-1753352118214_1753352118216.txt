@@ -1,0 +1,143 @@
+Prezado Replit,
+
+Preciso que você remova temporariamente o **HEALTHCHECK** do Dockerfile do sistema SIGE v8.0 para resolver o problema de "Service is not reachable" no EasyPanel da Hostinger. Esta é uma solução imediata para permitir que o deploy funcione corretamente.
+
+## **Por que remover o Health Check?**
+
+O health check no Dockerfile está causando falha no deploy porque:
+
+1. **Endpoint inexistente**: O health check tenta acessar `/api/monitoring/health`, mas este endpoint não existe na aplicação SIGE atual
+2. **Erro 404 contínuo**: O EasyPanel recebe erro 404 ao tentar verificar a saúde da aplicação
+3. **Serviço marcado como não disponível**: Por causa do health check falhando, o EasyPanel considera o serviço como "not reachable"
+
+## **O Health Check é obrigatório?**
+
+**NÃO.** O health check é uma funcionalidade **opcional** que:
+- Ajuda o orquestrador a verificar se a aplicação está saudável
+- Permite reinicializações automáticas em caso de falha
+- Melhora o monitoramento, mas não é essencial para o funcionamento
+
+## **Solução Imediata**
+
+Por favor, **remova ou comente** as seguintes linhas do seu Dockerfile:
+
+```dockerfile
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
+    CMD curl -f http://localhost:5000/api/monitoring/health || exit 1
+```
+
+## **Dockerfile Atualizado (sem Health Check)**
+
+Aqui está o Dockerfile completo **sem o health check**:
+
+```dockerfile
+# DOCKERFILE PRODUÇÃO - SIGE v8.0
+# Sistema Integrado de Gestão Empresarial
+# Otimizado para Hostinger EasyPanel
+
+FROM python:3.11-slim-bullseye
+
+# Metadados
+LABEL maintainer="SIGE v8.0" \
+      version="8.0" \
+      description="Sistema Integrado de Gestão Empresarial"
+
+# Variáveis de build
+ARG DEBIAN_FRONTEND=noninteractive
+
+# Instalar dependências do sistema
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    postgresql-client \
+    curl \
+    gcc \
+    python3-dev \
+    libpq-dev \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
+
+# Criar usuário não-root para segurança
+RUN groupadd -r sige && useradd -r -g sige sige
+
+# Definir diretório de trabalho
+WORKDIR /app
+
+# Copiar arquivos de dependências primeiro (otimização de cache)
+COPY pyproject.toml ./
+
+# Gerar requirements.txt e instalar dependências
+RUN pip install --no-cache-dir --upgrade pip setuptools wheel && \
+    pip install --no-cache-dir .
+
+# Copiar código da aplicação
+COPY . .
+
+# Criar diretórios necessários
+RUN mkdir -p /app/static/fotos /app/logs && \
+    chown -R sige:sige /app
+
+# Copiar script de entrada
+COPY docker-entrypoint.sh /app/
+RUN chmod +x /app/docker-entrypoint.sh
+
+# Mudar para usuário não-root
+USER sige
+
+# Variáveis de ambiente (não-sensíveis)
+ENV FLASK_ENV=production \
+    PORT=5000 \
+    PYTHONPATH=/app \
+    PYTHONUNBUFFERED=1
+
+# Expor porta
+EXPOSE 5000
+
+# Comando de entrada
+ENTRYPOINT ["/app/docker-entrypoint.sh"]
+```
+
+## **O que mudou?**
+
+**REMOVIDO:**
+```dockerfile
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
+    CMD curl -f http://localhost:5000/api/monitoring/health || exit 1
+```
+
+**MANTIDO:** Todo o resto do Dockerfile permanece igual.
+
+## **Próximos Passos**
+
+1. **Atualize o Dockerfile** com o conteúdo fornecido acima (sem o HEALTHCHECK)
+2. **Faça o commit** das alterações
+3. **Tente o deploy novamente** no EasyPanel
+4. **Verifique se o serviço fica acessível** após o deploy
+
+## **Implementação Futura do Health Check (Opcional)**
+
+Quando quiser reativar o health check no futuro, você precisará:
+
+1. **Adicionar o endpoint** `/api/monitoring/health` na sua aplicação Flask:
+```python
+@app.route('/api/monitoring/health', methods=['GET'])
+def health_check():
+    return jsonify({
+        'status': 'healthy',
+        'service': 'SIGE v8.0',
+        'message': 'Service is running'
+    }), 200
+```
+
+2. **Reativar o HEALTHCHECK** no Dockerfile
+
+## **Resultado Esperado**
+
+Com essa alteração, o EasyPanel deve conseguir:
+- ✅ Fazer o build do Docker com sucesso
+- ✅ Iniciar o contêiner sem problemas
+- ✅ Marcar o serviço como disponível
+- ✅ Permitir acesso externo à aplicação
+
+Por favor, implemente essa alteração e me informe o resultado do deploy.
+

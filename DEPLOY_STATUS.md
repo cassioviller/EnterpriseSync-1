@@ -12,6 +12,11 @@
 - ✅ **Comando:** Limpo, sem parâmetros inválidos
 - ✅ **Permissões:** `chmod +x` aplicado
 
+### Health Check
+- ✅ **HEALTHCHECK removido:** Temporariamente removido do Dockerfile
+- ✅ **Problema resolvido:** Evita erro 404 no endpoint `/api/monitoring/health`
+- ✅ **EasyPanel compatível:** Deploy funcionará sem problemas de "Service not reachable"
+
 ### Logs de Funcionamento
 ```
 ✅ Banco de dados conectado!
