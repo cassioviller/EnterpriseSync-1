@@ -133,12 +133,29 @@ class Veiculo(db.Model):
 
 
 
+class CategoriaServico(db.Model):
+    """Categorias para classificação de serviços"""
+    id = db.Column(db.Integer, primary_key=True)
+    nome = db.Column(db.String(100), nullable=False)
+    descricao = db.Column(db.Text)
+    cor = db.Column(db.String(7), default='#6c757d')  # Cor hex para identificação visual
+    icone = db.Column(db.String(50), default='fas fa-wrench')  # Ícone FontAwesome
+    ordem = db.Column(db.Integer, default=0)  # Para ordenação
+    ativo = db.Column(db.Boolean, default=True)
+    admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=True)  # Multi-tenant
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    # Relacionamentos
+    servicos = db.relationship('Servico', backref='categoria_ref', lazy=True)
+
 class Servico(db.Model):
     """Serviços para coleta de dados reais via RDO - SIGE v6.3"""
     id = db.Column(db.Integer, primary_key=True)
     nome = db.Column(db.String(100), nullable=False)
     descricao = db.Column(db.Text)
-    categoria = db.Column(db.String(50), nullable=False)  # estrutura, alvenaria, acabamento, etc.
+    categoria = db.Column(db.String(50), nullable=False)  # Manter para compatibilidade
+    categoria_id = db.Column(db.Integer, db.ForeignKey('categoria_servico.id'), nullable=True)  # Nova referência
     unidade_medida = db.Column(db.String(10), nullable=False)  # m2, m3, kg, ton, un, m, h
     unidade_simbolo = db.Column(db.String(10))  # Símbolo da unidade para exibição
     custo_unitario = db.Column(db.Float, default=0.0)  # Custo unitário do serviço

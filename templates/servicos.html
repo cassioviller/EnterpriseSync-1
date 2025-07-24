@@ -204,19 +204,24 @@
                                 </div>
                                 <div class="col-md-4">
                                     <label class="form-label">Categoria *</label>
-                                    <select class="form-select" id="categoria_servico" required>
-                                        <option value="">Selecione...</option>
-                                        <option value="estrutura">Estrutura</option>
-                                        <option value="alvenaria">Alvenaria</option>
-                                        <option value="acabamento">Acabamento</option>
-                                        <option value="instalacoes">Instalações</option>
-                                        <option value="cobertura">Cobertura</option>
-                                        <option value="fundacao">Fundação</option>
-                                        <option value="impermeabilizacao">Impermeabilização</option>
-                                        <option value="pintura">Pintura</option>
-                                        <option value="esquadrias">Esquadrias</option>
-                                        <option value="pisos">Pisos e Revestimentos</option>
-                                    </select>
+                                    <div class="input-group">
+                                        <select class="form-select" id="categoria_servico" required>
+                                            <option value="">Selecione...</option>
+                                            <option value="estrutura">Estrutura</option>
+                                            <option value="alvenaria">Alvenaria</option>
+                                            <option value="acabamento">Acabamento</option>
+                                            <option value="instalacoes">Instalações</option>
+                                            <option value="cobertura">Cobertura</option>
+                                            <option value="fundacao">Fundação</option>
+                                            <option value="impermeabilizacao">Impermeabilização</option>
+                                            <option value="pintura">Pintura</option>
+                                            <option value="esquadrias">Esquadrias</option>
+                                            <option value="pisos">Pisos e Revestimentos</option>
+                                        </select>
+                                        <button class="btn btn-outline-secondary" type="button" id="btnGerenciarCategorias" title="Gerenciar Categorias">
+                                            <i class="fas fa-plus"></i>
+                                        </button>
+                                    </div>
                                 </div>
                             </div>
                             
@@ -788,5 +793,289 @@ function limparFormulario() {
     // Voltar para primeira aba
     document.querySelector('#tabs_servico .nav-link').click();
 }
+
+// ==================== MODAL CATEGORIAS ====================
+
+$('#btnGerenciarCategorias').click(function() {
+    carregarCategorias();
+    $('#modalCategorias').modal('show');
+});
+
+$('#btnNovaCategoriaModal').click(function() {
+    limparFormularioCategoria();
+    $('#modalFormCategoria').modal('show');
+});
+
+$('#btnSalvarCategoria').click(function() {
+    salvarCategoria();
+});
+
+function carregarCategorias() {
+    $.ajax({
+        url: '/api/categorias',
+        method: 'GET',
+        success: function(data) {
+            $('#tabelaCategorias tbody').empty();
+            
+            if (data.length === 0) {
+                $('#tabelaCategorias tbody').append(
+                    '<tr><td colspan="5" class="text-center text-muted">Nenhuma categoria cadastrada</td></tr>'
+                );
+            } else {
+                data.forEach(function(categoria) {
+                    $('#tabelaCategorias tbody').append(`
+                        <tr>
+                            <td>
+                                <i class="${categoria.icone} me-2" style="color: ${categoria.cor}"></i>
+                                ${categoria.nome}
+                            </td>
+                            <td>${categoria.descricao || '-'}</td>
+                            <td>
+                                <span class="badge" style="background-color: ${categoria.cor}">${categoria.cor}</span>
+                            </td>
+                            <td>${categoria.ordem}</td>
+                            <td>
+                                <div class="btn-group btn-group-sm">
+                                    <button class="btn btn-outline-primary" onclick="editarCategoria(${categoria.id})" title="Editar">
+                                        <i class="fas fa-edit"></i>
+                                    </button>
+                                    <button class="btn btn-outline-danger" onclick="excluirCategoria(${categoria.id})" title="Excluir">
+                                        <i class="fas fa-trash"></i>
+                                    </button>
+                                </div>
+                            </td>
+                        </tr>
+                    `);
+                });
+            }
+        },
+        error: function(xhr) {
+            alert('Erro ao carregar categorias');
+        }
+    });
+}
+
+function limparFormularioCategoria() {
+    $('#formCategoria')[0].reset();
+    $('#categoriaId').val('');
+    $('#tituloModalCategoria').text('Nova Categoria');
+}
+
+function salvarCategoria() {
+    const categoriaId = $('#categoriaId').val();
+    const dados = {
+        nome: $('#nomeCategoria').val(),
+        descricao: $('#descricaoCategoria').val(),
+        cor: $('#corCategoria').val(),
+        icone: $('#iconeCategoria').val(),
+        ordem: parseInt($('#ordemCategoria').val()) || 0
+    };
+    
+    if (!dados.nome.trim()) {
+        alert('Nome da categoria é obrigatório');
+        return;
+    }
+    
+    const url = categoriaId ? `/api/categorias/${categoriaId}` : '/api/categorias';
+    const method = categoriaId ? 'PUT' : 'POST';
+    
+    $.ajax({
+        url: url,
+        method: method,
+        contentType: 'application/json',
+        data: JSON.stringify(dados),
+        success: function(response) {
+            if (response.success) {
+                alert(response.message);
+                $('#modalFormCategoria').modal('hide');
+                carregarCategorias();
+                atualizarSelectCategoria();
+            } else {
+                alert(response.message);
+            }
+        },
+        error: function(xhr) {
+            alert('Erro ao salvar categoria');
+        }
+    });
+}
+
+function editarCategoria(id) {
+    $.ajax({
+        url: `/api/categorias`,
+        method: 'GET',
+        success: function(data) {
+            const categoria = data.find(c => c.id === id);
+            if (categoria) {
+                $('#categoriaId').val(categoria.id);
+                $('#nomeCategoria').val(categoria.nome);
+                $('#descricaoCategoria').val(categoria.descricao);
+                $('#corCategoria').val(categoria.cor);
+                $('#iconeCategoria').val(categoria.icone);
+                $('#ordemCategoria').val(categoria.ordem);
+                $('#tituloModalCategoria').text('Editar Categoria');
+                $('#modalFormCategoria').modal('show');
+            }
+        }
+    });
+}
+
+function excluirCategoria(id) {
+    if (!confirm('Tem certeza que deseja excluir esta categoria?')) return;
+    
+    $.ajax({
+        url: `/api/categorias/${id}`,
+        method: 'DELETE',
+        success: function(response) {
+            if (response.success) {
+                alert(response.message);
+                carregarCategorias();
+                atualizarSelectCategoria();
+            } else {
+                alert(response.message);
+            }
+        },
+        error: function(xhr) {
+            alert('Erro ao excluir categoria');
+        }
+    });
+}
+
+function atualizarSelectCategoria() {
+    $.ajax({
+        url: '/api/categorias',
+        method: 'GET',
+        success: function(data) {
+            const select = $('#categoria_servico');
+            const valorAtual = select.val();
+            select.empty().append('<option value="">Selecione...</option>');
+            
+            data.forEach(function(categoria) {
+                select.append(`<option value="${categoria.nome.toLowerCase()}">${categoria.nome}</option>`);
+            });
+            
+            // Restaurar valor se ainda existir
+            if (valorAtual) {
+                select.val(valorAtual);
+            }
+        }
+    });
+}
+
+});
 </script>
+
+<!-- Modal Gerenciar Categorias -->
+<div class="modal fade" id="modalCategorias" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="fas fa-tags"></i> Gerenciar Categorias de Serviços
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <p class="text-muted mb-0">Gerencie as categorias disponíveis para classificar os serviços</p>
+                    <button class="btn btn-success btn-sm" id="btnNovaCategoriaModal">
+                        <i class="fas fa-plus"></i> Nova Categoria
+                    </button>
+                </div>
+                
+                <div class="table-responsive">
+                    <table class="table table-hover" id="tabelaCategorias">
+                        <thead>
+                            <tr>
+                                <th>Nome</th>
+                                <th>Descrição</th>
+                                <th>Cor</th>
+                                <th>Ordem</th>
+                                <th>Ações</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td colspan="5" class="text-center">
+                                    <div class="spinner-border spinner-border-sm" role="status"></div>
+                                    Carregando...
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fechar</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Formulário de Categoria -->
+<div class="modal fade" id="modalFormCategoria" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="fas fa-tag"></i> <span id="tituloModalCategoria">Nova Categoria</span>
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            
+            <form id="formCategoria">
+                <div class="modal-body">
+                    <input type="hidden" id="categoriaId">
+                    
+                    <div class="row">
+                        <div class="col-md-8">
+                            <label class="form-label">Nome *</label>
+                            <input type="text" class="form-control" id="nomeCategoria" required>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Ordem</label>
+                            <input type="number" class="form-control" id="ordemCategoria" value="0" min="0">
+                        </div>
+                    </div>
+                    
+                    <div class="row mt-3">
+                        <div class="col-12">
+                            <label class="form-label">Descrição</label>
+                            <textarea class="form-control" id="descricaoCategoria" rows="2"></textarea>
+                        </div>
+                    </div>
+                    
+                    <div class="row mt-3">
+                        <div class="col-md-6">
+                            <label class="form-label">Cor</label>
+                            <input type="color" class="form-control form-control-color" id="corCategoria" value="#6c757d">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Ícone (FontAwesome)</label>
+                            <input type="text" class="form-control" id="iconeCategoria" value="fas fa-wrench" 
+                                   placeholder="Ex: fas fa-hammer">
+                        </div>
+                    </div>
+                    
+                    <div class="row mt-3">
+                        <div class="col-12">
+                            <div class="alert alert-info">
+                                <i class="fas fa-info-circle"></i>
+                                <strong>Dica:</strong> Use ícones do FontAwesome como <code>fas fa-home</code>, <code>fas fa-tools</code>, etc.
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="button" class="btn btn-primary" id="btnSalvarCategoria">
+                        <i class="fas fa-save"></i> Salvar
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
 {% endblock %}

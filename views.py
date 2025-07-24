@@ -1687,6 +1687,7 @@ def nova_obra():
     
     # Buscar dados para o formulário com filtro multi-tenant
     servicos = Servico.query.filter_by(ativo=True).order_by(Servico.categoria, Servico.nome).all()
+    categorias = CategoriaServico.query.filter_by(ativo=True).order_by(CategoriaServico.ordem, CategoriaServico.nome).all()
     obras = Obra.query.filter(Obra.admin_id == current_user.id).all()
     
     return render_template('obras.html', 
@@ -2705,6 +2706,168 @@ def api_produtividade_servico(id):
         
     except Exception as e:
         return jsonify({'success': False, 'message': f'Erro ao obter produtividade: {str(e)}'})
+
+# ============================================================================
+# ROTAS PARA GERENCIAR CATEGORIAS DE SERVIÇOS
+# ============================================================================
+
+@main_bp.route('/api/categorias', methods=['GET'])
+@login_required
+@admin_required
+def listar_categorias():
+    """API para listar categorias ativas"""
+    try:
+        categorias = CategoriaServico.query.filter_by(
+            ativo=True,
+            admin_id=current_user.id
+        ).order_by(CategoriaServico.ordem, CategoriaServico.nome).all()
+        
+        return jsonify([{
+            'id': cat.id,
+            'nome': cat.nome,
+            'descricao': cat.descricao,
+            'cor': cat.cor,
+            'icone': cat.icone,
+            'ordem': cat.ordem
+        } for cat in categorias])
+        
+    except Exception as e:
+        return jsonify({'success': False, 'message': f'Erro ao listar categorias: {str(e)}'})
+
+@main_bp.route('/api/categorias', methods=['POST'])
+@login_required
+@admin_required
+def criar_categoria():
+    """API para criar nova categoria"""
+    try:
+        data = request.get_json()
+        
+        # Verificar se já existe categoria com mesmo nome
+        categoria_existente = CategoriaServico.query.filter_by(
+            nome=data.get('nome'),
+            admin_id=current_user.id
+        ).first()
+        
+        if categoria_existente:
+            return jsonify({'success': False, 'message': 'Já existe uma categoria com este nome'})
+        
+        # Criar nova categoria
+        categoria = CategoriaServico(
+            nome=data.get('nome'),
+            descricao=data.get('descricao', ''),
+            cor=data.get('cor', '#6c757d'),
+            icone=data.get('icone', 'fas fa-wrench'),
+            ordem=data.get('ordem', 0),
+            admin_id=current_user.id
+        )
+        
+        db.session.add(categoria)
+        db.session.commit()
+        
+        return jsonify({
+            'success': True, 
+            'message': 'Categoria criada com sucesso!',
+            'categoria': {
+                'id': categoria.id,
+                'nome': categoria.nome,
+                'descricao': categoria.descricao,
+                'cor': categoria.cor,
+                'icone': categoria.icone,
+                'ordem': categoria.ordem
+            }
+        })
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'message': f'Erro ao criar categoria: {str(e)}'})
+
+@main_bp.route('/api/categorias/<int:categoria_id>', methods=['PUT'])
+@login_required
+@admin_required
+def editar_categoria(categoria_id):
+    """API para editar categoria existente"""
+    try:
+        categoria = CategoriaServico.query.filter_by(
+            id=categoria_id,
+            admin_id=current_user.id
+        ).first()
+        
+        if not categoria:
+            return jsonify({'success': False, 'message': 'Categoria não encontrada'})
+        
+        data = request.get_json()
+        
+        # Verificar se nome já existe em outra categoria
+        categoria_nome_existente = CategoriaServico.query.filter(
+            CategoriaServico.nome == data.get('nome'),
+            CategoriaServico.id != categoria_id,
+            CategoriaServico.admin_id == current_user.id
+        ).first()
+        
+        if categoria_nome_existente:
+            return jsonify({'success': False, 'message': 'Já existe uma categoria com este nome'})
+        
+        # Atualizar categoria
+        categoria.nome = data.get('nome', categoria.nome)
+        categoria.descricao = data.get('descricao', categoria.descricao)
+        categoria.cor = data.get('cor', categoria.cor)
+        categoria.icone = data.get('icone', categoria.icone)
+        categoria.ordem = data.get('ordem', categoria.ordem)
+        categoria.updated_at = datetime.utcnow()
+        
+        db.session.commit()
+        
+        return jsonify({
+            'success': True,
+            'message': 'Categoria atualizada com sucesso!',
+            'categoria': {
+                'id': categoria.id,
+                'nome': categoria.nome,
+                'descricao': categoria.descricao,
+                'cor': categoria.cor,
+                'icone': categoria.icone,
+                'ordem': categoria.ordem
+            }
+        })
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'message': f'Erro ao editar categoria: {str(e)}'})
+
+@main_bp.route('/api/categorias/<int:categoria_id>', methods=['DELETE'])
+@login_required
+@admin_required
+def excluir_categoria(categoria_id):
+    """API para excluir categoria"""
+    try:
+        categoria = CategoriaServico.query.filter_by(
+            id=categoria_id,
+            admin_id=current_user.id
+        ).first()
+        
+        if not categoria:
+            return jsonify({'success': False, 'message': 'Categoria não encontrada'})
+        
+        # Verificar se há serviços usando esta categoria
+        servicos_usando = Servico.query.filter_by(categoria_id=categoria_id).count()
+        
+        if servicos_usando > 0:
+            return jsonify({
+                'success': False, 
+                'message': f'Não é possível excluir. Existem {servicos_usando} serviços usando esta categoria.'
+            })
+        
+        # Marcar como inativo ao invés de excluir
+        categoria.ativo = False
+        categoria.updated_at = datetime.utcnow()
+        
+        db.session.commit()
+        
+        return jsonify({'success': True, 'message': 'Categoria removida com sucesso!'})
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'message': f'Erro ao excluir categoria: {str(e)}'})
 
 # ============================================================================
 # API ENDPOINTS PARA DROPDOWNS INTELIGENTES - RDO OPERACIONAL
