@@ -24,9 +24,8 @@ app = Flask(__name__)
 app.secret_key = os.environ.get("SESSION_SECRET", "dev-secret-key-change-in-production")
 app.wsgi_app = ProxyFix(app.wsgi_app, x_proto=1, x_host=1)
 
-# configure the database - URL corrigida para PostgreSQL
-default_db_url = "postgresql://sige:sige@viajey_sige:5432/sige"
-app.config["SQLALCHEMY_DATABASE_URI"] = os.environ.get("DATABASE_URL", default_db_url)
+# configure the database - usar DATABASE_URL do ambiente ou SQLite local
+app.config["SQLALCHEMY_DATABASE_URI"] = os.environ.get("DATABASE_URL", "sqlite:///sige.db")
 app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {
     "pool_recycle": 300,
     "pool_pre_ping": True,
@@ -55,4 +54,7 @@ app.register_blueprint(relatorios_bp, url_prefix='/relatorios')
 def load_user(user_id):
     return Usuario.query.get(int(user_id))
 
-# Criação de tabelas será feita pelo docker-entrypoint.sh
+# Create tables if they don't exist
+with app.app_context():
+    db.create_all()
+    logging.info("Database tables created/verified")

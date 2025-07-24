@@ -98,7 +98,7 @@
     <div class="modal-dialog">
         <div class="modal-content">
             <form method="POST" id="horarioForm" action="{{ url_for('main.novo_horario') }}">
-                {{ csrf_token() }}
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
                 <div class="modal-header">
                     <h5 class="modal-title" id="horarioModalLabel">Novo Horário de Trabalho</h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
