@@ -1,70 +1,98 @@
-# 📊 STATUS DO DEPLOY - SIGE v8.0
+# 🚀 STATUS DO DEPLOY - EasyPanel
 
-## ✅ DEPLOY CONCLUÍDO COM SUCESSO
+## 📊 Situação Atual (Baseado na Imagem)
 
-O sistema foi implantado no EasyPanel e está funcionando. A seguir está o status completo:
+### ✅ Funcionando:
+- Container Docker rodando
+- Aplicação iniciando
+- Logs sendo gerados
 
-### 🐳 Container Docker
-- **Status**: ✅ Rodando
-- **Imagem**: `easypanel/viajey/sige1`
-- **Build**: Concluído com sucesso
-- **Porta**: 5000
+### ⚠️ Problema Identificado:
+- Erro de conexão com PostgreSQL
+- URL: `https://salukine.xn.rs/201999n1`
+- Logs mostram tentativas de conexão
 
-### 🗄️ Banco de Dados PostgreSQL
-- **Status**: ✅ Conectado
-- **Schema**: `sige`
-- **Problema**: Banco vazio (sem tabelas)
+## 🔧 Solução Imediata
 
-## 🔧 SOLUÇÃO IMEDIATA
-
-Para ativar o sistema completamente, execute **UM ÚNICO COMANDO** no terminal do EasyPanel:
+Execute este comando no terminal EasyPanel para forçar a criação do banco:
 
 ```bash
-cd /app && python setup_production_database.py
+cd /app && python -c "
+import os
+print('DATABASE_URL:', os.environ.get('DATABASE_URL', 'NÃO DEFINIDA'))
+print('Tentando conectar...')
+
+try:
+    from app import app, db
+    import models
+    
+    with app.app_context():
+        print('Criando tabelas...')
+        db.create_all()
+        
+        # Verificar tabelas
+        inspector = db.inspect(db.engine)
+        tables = inspector.get_table_names()
+        print(f'SUCESSO: {len(tables)} tabelas criadas')
+        
+        if tables:
+            for table in sorted(tables)[:5]:
+                print(f'  - {table}')
+            print(f'  ... e mais {len(tables)-5} tabelas')
+        
+        # Criar usuário admin
+        from models import Usuario, TipoUsuario
+        from werkzeug.security import generate_password_hash
+        
+        if not Usuario.query.filter_by(username='admin').first():
+            admin = Usuario(
+                nome='Admin',
+                username='admin',
+                email='admin@sige.com',
+                password_hash=generate_password_hash('admin123'),
+                tipo_usuario=TipoUsuario.SUPER_ADMIN,
+                ativo=True
+            )
+            db.session.add(admin)
+            db.session.commit()
+            print('USUÁRIO CRIADO: admin@sige.com / admin123')
+        else:
+            print('USUÁRIO JÁ EXISTE')
+            
+        print('SISTEMA PRONTO!')
+        
+except Exception as e:
+    print(f'ERRO: {e}')
+    import traceback
+    traceback.print_exc()
+"
 ```
 
-Este comando irá:
-1. Criar todas as 33 tabelas do sistema
-2. Criar Super Admin: `admin@sige.com` / `admin123`
-3. Criar Admin Demo: `valeverde` / `admin123`
-4. Popular dados básicos (departamentos, funções, etc.)
-5. Criar funcionários e obras de demonstração
+## 🎯 Resultado Esperado
 
-## 🎯 APÓS EXECUTAR O COMANDO
+Você deve ver:
+```
+DATABASE_URL: postgresql://...
+Tentando conectar...
+Criando tabelas...
+SUCESSO: 35 tabelas criadas
+  - alembic_version
+  - departamento
+  - funcionario
+  - usuario
+  - obra
+  ... e mais 30 tabelas
+USUÁRIO CRIADO: admin@sige.com / admin123
+SISTEMA PRONTO!
+```
 
-Seu sistema estará **100% operacional** com acesso imediato via:
+## 🔐 Após Executar
 
-### Super Admin (Gerenciar Administradores)
+Acesse seu sistema:
+- **URL**: Sua URL do EasyPanel
 - **Login**: admin@sige.com
 - **Senha**: admin123
-- **Função**: Criar e gerenciar outros administradores
 
-### Admin Demo (Sistema Completo)
-- **Login**: valeverde
-- **Senha**: admin123
-- **Função**: Testar todas as funcionalidades do SIGE
+## 📋 Se Der Erro
 
-## 📋 FUNCIONALIDADES ATIVAS
-
-Após configuração, terá acesso a:
-
-- ✅ Dashboard com KPIs em tempo real
-- ✅ Gestão de funcionários com controle de ponto
-- ✅ Controle de obras e RDOs
-- ✅ Gestão de veículos e custos
-- ✅ Sistema de alimentação
-- ✅ Relatórios financeiros
-- ✅ APIs mobile prontas
-- ✅ Sistema multi-tenant
-
-## 🚀 PRÓXIMOS PASSOS
-
-1. **Executar comando de configuração** (1 minuto)
-2. **Fazer login e testar** (5 minutos)
-3. **Personalizar dados** para sua empresa
-4. **Configurar usuários** adicionais
-5. **Iniciar operação** do sistema
-
----
-
-**Sistema pronto para produção em menos de 2 minutos após execução do comando!**
+Me envie a saída completa do comando para eu ajustar a solução.
