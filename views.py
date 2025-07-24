@@ -2930,33 +2930,7 @@ def obras_autocomplete():
         'area_total_m2': float(obra.area_total_m2) if obra.area_total_m2 else 0
     } for obra in obras])
 
-@main_bp.route('/api/servicos/autocomplete')
-@login_required
-def servicos_autocomplete():
-    """API para autocomplete de serviços"""
-    q = request.args.get('q', '')
-    # Query específica para evitar erro categoria_id
-    servicos_data = db.session.query(
-        Servico.id,
-        Servico.nome,
-        Servico.categoria,
-        Servico.unidade_medida,
-        Servico.complexidade
-    ).filter(
-        or_(
-            Servico.nome.ilike(f'%{q}%'),
-            Servico.categoria.ilike(f'%{q}%')
-        )
-    ).filter(Servico.ativo == True).limit(10).all()
-    
-    return jsonify([{
-        'id': row.id,
-        'nome': row.nome,
-        'categoria': row.categoria,
-        'unidade_medida': row.unidade_medida,
-        'unidade_simbolo': get_simbolo_unidade(row.unidade_medida),
-        'complexidade': row.complexidade
-    } for row in servicos_data])
+# REMOVIDO: Função duplicada, usando api_servicos_autocomplete abaixo
 
 @main_bp.route('/api/servicos/<int:servico_id>/subatividades')
 @login_required
@@ -5045,8 +5019,8 @@ def api_funcionarios_todos():
         print(f"Erro ao carregar funcionários: {str(e)}")
         return jsonify([]), 500
 
-@main_bp.route("/api/servicos/autocomplete")
-@login_required
+@main_bp.route('/api/servicos/autocomplete')
+@login_required  
 def api_servicos_autocomplete():
     """API para autocomplete de serviços"""
     q = request.args.get("q", "")

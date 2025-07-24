@@ -12,15 +12,17 @@
 
 ## 🔧 CORREÇÕES APLICADAS COM SUCESSO
 
-### Queries Corrigidas (7 localizações + DataTables fix)
+### Queries Corrigidas (8 localizações + fixes importantes)
 1. **✅ Rota `/servicos`** - Query principal + correção DataTables
-2. **✅ API `/api/servicos`** - Carregamento para JavaScript funcionando
-3. **✅ API `/api/servicos/autocomplete`** - Autocomplete em RDO operacional
+2. **✅ API `/api/servicos`** - Carregamento para JavaScript funcionando  
+3. **✅ API `/api/servicos/autocomplete`** - Autocomplete unificado (removida duplicata)
 4. **✅ Rota `/obras`** - Formulário com lista de serviços corrigido
 5. **✅ Rota `/rdo/novo`** - Novo RDO com serviços funcionando
 6. **✅ Exclusão de categorias** - Verificação de uso corrigida
 7. **✅ Template servicos.html** - Compatibilidade com objetos Servico
 8. **✅ DataTables** - 'Incorrect column count' resolvido
+9. **✅ Função duplicada** - servicos_autocomplete() removida
+10. **✅ Sistema unificado** - Objetos Servico completos restaurados
 
 ### Estratégia Técnica Implementada
 ```python
