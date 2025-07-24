@@ -796,20 +796,7 @@ function limparFormulario() {
 
 // ==================== MODAL CATEGORIAS ====================
 
-$('#btnGerenciarCategorias').click(function() {
-    carregarCategorias();
-    $('#modalCategorias').modal('show');
-});
-
-$('#btnNovaCategoriaModal').click(function() {
-    limparFormularioCategoria();
-    $('#modalFormCategoria').modal('show');
-});
-
-$('#btnSalvarCategoria').click(function() {
-    salvarCategoria();
-});
-
+// Funções globais para gerenciamento de categorias
 function carregarCategorias() {
     $.ajax({
         url: '/api/categorias',
@@ -850,6 +837,7 @@ function carregarCategorias() {
             }
         },
         error: function(xhr) {
+            console.error('Erro ao carregar categorias:', xhr);
             alert('Erro ao carregar categorias');
         }
     });
@@ -895,6 +883,7 @@ function salvarCategoria() {
             }
         },
         error: function(xhr) {
+            console.error('Erro ao salvar categoria:', xhr);
             alert('Erro ao salvar categoria');
         }
     });
@@ -916,6 +905,10 @@ function editarCategoria(id) {
                 $('#tituloModalCategoria').text('Editar Categoria');
                 $('#modalFormCategoria').modal('show');
             }
+        },
+        error: function(xhr) {
+            console.error('Erro ao buscar categoria:', xhr);
+            alert('Erro ao buscar categoria');
         }
     });
 }
@@ -936,6 +929,7 @@ function excluirCategoria(id) {
             }
         },
         error: function(xhr) {
+            console.error('Erro ao excluir categoria:', xhr);
             alert('Erro ao excluir categoria');
         }
     });
@@ -958,9 +952,40 @@ function atualizarSelectCategoria() {
             if (valorAtual) {
                 select.val(valorAtual);
             }
+        },
+        error: function(xhr) {
+            console.error('Erro ao atualizar select:', xhr);
         }
     });
 }
+
+// Eventos do DOM
+$(document).ready(function() {
+    console.log('Inicializando eventos de categorias...');
+    
+    // Botão principal +
+    $(document).on('click', '#btnGerenciarCategorias', function(e) {
+        e.preventDefault();
+        console.log('Botão + clicado - carregando categorias...');
+        carregarCategorias();
+        $('#modalCategorias').modal('show');
+    });
+    
+    // Botão Nova Categoria dentro do modal
+    $(document).on('click', '#btnNovaCategoriaModal', function(e) {
+        e.preventDefault();
+        console.log('Nova categoria clicada');
+        limparFormularioCategoria();
+        $('#modalFormCategoria').modal('show');
+    });
+    
+    // Botão Salvar Categoria
+    $(document).on('click', '#btnSalvarCategoria', function(e) {
+        e.preventDefault();
+        console.log('Salvar categoria clicada');
+        salvarCategoria();
+    });
+});
 
 });
 </script>
