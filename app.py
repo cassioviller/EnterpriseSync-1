@@ -4,6 +4,7 @@ from flask import Flask
 from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy.orm import DeclarativeBase
 from flask_login import LoginManager
+from flask_migrate import Migrate
 from werkzeug.middleware.proxy_fix import ProxyFix
 
 # Configure logging
@@ -14,6 +15,7 @@ class Base(DeclarativeBase):
 
 db = SQLAlchemy(model_class=Base)
 login_manager = LoginManager()
+migrate = Migrate()
 
 # create the app
 app = Flask(__name__)
@@ -29,6 +31,7 @@ app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {
 
 # initialize extensions
 db.init_app(app)
+migrate.init_app(app, db)
 login_manager.init_app(app)
 login_manager.login_view = 'main.login'
 login_manager.login_message = 'Por favor, faça login para acessar esta página.'

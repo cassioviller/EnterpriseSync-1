@@ -1,98 +1,91 @@
 #!/usr/bin/env python3
 """
-Teste para verificar se endpoint de health check existe
+Teste do endpoint de health check para validar deploy
 SIGE v8.0 - Sistema Integrado de Gestão Empresarial
 """
 
 import requests
-import sys
-from urllib.parse import urljoin
+import json
+from datetime import datetime
 
-def test_health_endpoint():
-    """Testa se o endpoint de health check está disponível"""
-    base_url = "http://localhost:5000"
-    health_endpoint = "/api/monitoring/health"
-    full_url = urljoin(base_url, health_endpoint)
-    
-    print(f"🔍 Testando endpoint: {full_url}")
-    
+def test_healthcheck():
+    """Testa endpoint de health check"""
     try:
-        response = requests.get(full_url, timeout=5)
+        print("🔍 Testando endpoint de health check...")
+        
+        # URL do endpoint local
+        url = "http://localhost:5000/api/monitoring/health"
+        
+        # Fazer requisição GET
+        response = requests.get(url, timeout=10)
+        
+        print(f"   Status Code: {response.status_code}")
+        print(f"   Content-Type: {response.headers.get('Content-Type', 'N/A')}")
         
         if response.status_code == 200:
-            print("✅ Health check endpoint está funcionando!")
-            print(f"   Resposta: {response.json()}")
-            return True
-        elif response.status_code == 404:
-            print("❌ Health check endpoint não encontrado (404)")
-            print("   Este é o motivo do problema no EasyPanel HEALTHCHECK")
-            return False
+            try:
+                data = response.json()
+                print("✅ Health check funcionando!")
+                print(f"   Status: {data.get('status')}")
+                print(f"   Version: {data.get('version')}")
+                print(f"   Database: {data.get('database')}")
+                print(f"   Timestamp: {data.get('timestamp')}")
+                return True
+            except json.JSONDecodeError:
+                print("⚠️ Resposta não é JSON válido")
+                print(f"   Conteúdo: {response.text[:200]}")
+                return False
         else:
-            print(f"⚠️ Health check endpoint retornou status: {response.status_code}")
+            print(f"❌ Erro no health check: {response.status_code}")
+            print(f"   Resposta: {response.text[:200]}")
             return False
             
     except requests.exceptions.ConnectionError:
-        print("❌ Não foi possível conectar ao servidor")
-        print("   Certifique-se que a aplicação está rodando na porta 5000")
+        print("❌ Erro de conexão - aplicação pode não estar rodando")
         return False
     except requests.exceptions.Timeout:
-        print("❌ Timeout ao acessar o endpoint")
+        print("❌ Timeout na requisição")
         return False
     except Exception as e:
         print(f"❌ Erro inesperado: {e}")
         return False
 
-def create_health_endpoint_suggestion():
-    """Sugere código para implementar o health check"""
-    print("\n💡 SUGESTÃO: Para reativar o HEALTHCHECK no futuro, adicione este código em views.py:")
-    print("""
-from flask import jsonify
-import datetime
-
-@app.route('/api/monitoring/health', methods=['GET'])
-def health_check():
-    '''Endpoint de health check para monitoramento'''
-    return jsonify({
-        'status': 'healthy',
-        'service': 'SIGE v8.0',
-        'timestamp': datetime.datetime.now().isoformat(),
-        'version': '8.0',
-        'message': 'Sistema operacional'
-    }), 200
-
-@app.route('/api/monitoring/status', methods=['GET'])
-def status_check():
-    '''Endpoint de status detalhado'''
+def test_app_running():
+    """Testa se a aplicação está respondendo"""
     try:
-        # Testar conexão com banco
-        db.session.execute('SELECT 1')
-        db_status = 'connected'
-    except:
-        db_status = 'disconnected'
-    
-    return jsonify({
-        'status': 'operational',
-        'database': db_status,
-        'timestamp': datetime.datetime.now().isoformat(),
-        'uptime': 'active'
-    }), 200
-""")
+        print("🌐 Testando se aplicação está rodando...")
+        
+        # URL raiz da aplicação
+        url = "http://localhost:5000/"
+        
+        # Fazer requisição GET
+        response = requests.get(url, timeout=10)
+        
+        print(f"   Status Code: {response.status_code}")
+        
+        if response.status_code in [200, 302, 401]:  # 200=OK, 302=Redirect, 401=Auth needed
+            print("✅ Aplicação está respondendo!")
+            return True
+        else:
+            print(f"⚠️ Status inesperado: {response.status_code}")
+            return False
+            
+    except Exception as e:
+        print(f"❌ Erro ao testar aplicação: {e}")
+        return False
 
 if __name__ == "__main__":
-    print("🏥 TESTE DE HEALTH CHECK ENDPOINT - SIGE v8.0")
+    print("🧪 TESTE DE SAÚDE DA APLICAÇÃO - SIGE v8.0")
     print("=" * 50)
     
-    # Testar endpoint
-    endpoint_exists = test_health_endpoint()
+    app_ok = test_app_running()
+    health_ok = test_healthcheck()
     
-    if not endpoint_exists:
-        create_health_endpoint_suggestion()
+    print("\n📊 RESULTADOS:")
+    print(f"   Aplicação rodando: {'✅' if app_ok else '❌'}")
+    print(f"   Health check: {'✅' if health_ok else '❌'}")
     
-    print("\n📋 RESUMO:")
-    if endpoint_exists:
-        print("✅ Health check está funcionando - HEALTHCHECK pode ser reativado no Dockerfile")
+    if app_ok and health_ok:
+        print("\n🎯 Sistema pronto para deploy!")
     else:
-        print("❌ Health check não existe - HEALTHCHECK foi corretamente removido do Dockerfile")
-        print("   O deploy no EasyPanel agora funcionará sem problemas")
-    
-    print(f"\n🎯 Status final: {'SUCESSO' if not endpoint_exists else 'ENDPOINT EXISTE'}")
+        print("\n⚠️ Sistema precisa de ajustes antes do deploy")
