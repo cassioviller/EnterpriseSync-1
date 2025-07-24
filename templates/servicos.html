@@ -609,32 +609,54 @@ function editarServico(id) {
                 // Limpar subatividades existentes
                 document.getElementById('container_subatividades').innerHTML = '';
                 
-                // Adicionar subatividades
+                // Adicionar subatividades - VERSÃO CORRIGIDA
+                console.log(`📋 Total de subatividades a carregar: ${dados.subatividades.length}`);
+                
+                // Carregar todas as subatividades uma por vez
                 dados.subatividades.forEach((sub, index) => {
+                    console.log(`⏳ Processando subatividade ${index + 1}: "${sub.nome}"`);
+                    
+                    // Adicionar card
                     adicionarSubatividade();
-                    const cards = document.querySelectorAll('.subatividade-card');
-                    const ultimoCard = cards[cards.length - 1];
                     
-                    // Log para debug
-                    console.log(`Carregando subatividade ${index + 1}: ${sub.nome}`);
-                    
-                    // Aguardar um pequeno delay para garantir que o DOM foi atualizado
+                    // Aguardar DOM atualizar antes de preencher
                     setTimeout(() => {
-                        const nomeInput = ultimoCard.querySelector('input[placeholder="Nome da subatividade"]');
-                        const descricaoTextarea = ultimoCard.querySelector('textarea');
-                        const ferramentasInput = ultimoCard.querySelector('input[placeholder*="Furadeira"]');
-                        const materiaisInput = ultimoCard.querySelector('input[placeholder*="Blocos"]');
-                        const checkboxes = ultimoCard.querySelectorAll('input[type="checkbox"]');
-                        const selectQualificacao = ultimoCard.querySelector('select');
+                        const cards = document.querySelectorAll('.subatividade-card');
+                        const targetCard = cards[index]; // Usar o índice correto
                         
-                        if (nomeInput) nomeInput.value = sub.nome;
-                        if (descricaoTextarea) descricaoTextarea.value = sub.descricao || '';
-                        if (ferramentasInput) ferramentasInput.value = sub.ferramentas_necessarias || '';
-                        if (materiaisInput) materiaisInput.value = sub.materiais_principais || '';
-                        if (checkboxes[0]) checkboxes[0].checked = sub.requer_aprovacao;
-                        if (checkboxes[1]) checkboxes[1].checked = sub.pode_executar_paralelo;
-                        if (selectQualificacao) selectQualificacao.value = sub.qualificacao_minima || '';
-                    }, 50 * index); // Delay crescente para cada subatividade
+                        if (targetCard) {
+                            console.log(`✅ Preenchendo card ${index + 1} com dados de "${sub.nome}"`);
+                            
+                            const nomeInput = targetCard.querySelector('input[placeholder="Nome da subatividade"]');
+                            const descricaoTextarea = targetCard.querySelector('textarea');
+                            const ferramentasInput = targetCard.querySelector('input[placeholder*="Furadeira"]');
+                            const materiaisInput = targetCard.querySelector('input[placeholder*="Blocos"]');
+                            const checkboxes = targetCard.querySelectorAll('input[type="checkbox"]');
+                            const selectQualificacao = targetCard.querySelector('select');
+                            
+                            if (nomeInput) {
+                                nomeInput.value = sub.nome;
+                                console.log(`  - Nome definido: "${sub.nome}"`);
+                            }
+                            if (descricaoTextarea) {
+                                descricaoTextarea.value = sub.descricao || '';
+                                console.log(`  - Descrição definida: "${sub.descricao || ''}"`);
+                            }
+                            if (ferramentasInput) {
+                                ferramentasInput.value = sub.ferramentas_necessarias || '';
+                                console.log(`  - Ferramentas definidas: "${sub.ferramentas_necessarias || ''}"`);
+                            }
+                            if (materiaisInput) {
+                                materiaisInput.value = sub.materiais_principais || '';
+                                console.log(`  - Materiais definidos: "${sub.materiais_principais || ''}"`);
+                            }
+                            if (checkboxes[0]) checkboxes[0].checked = sub.requer_aprovacao;
+                            if (checkboxes[1]) checkboxes[1].checked = sub.pode_executar_paralelo;
+                            if (selectQualificacao) selectQualificacao.value = sub.qualificacao_minima || '';
+                        } else {
+                            console.error(`❌ Card ${index + 1} não encontrado!`);
+                        }
+                    }, 100 + (index * 50)); // Delay maior e progressivo
                 });
                 
                 // Aguardar todas as subatividades serem carregadas antes de atualizar contador
