@@ -728,6 +728,16 @@
     - Scripts preparados para execução no terminal EasyPanel com diagnóstico completo
     - Usuários administrativos configurados e testados localmente
     - Sistema completamente funcional, necessita apenas execução dos comandos no EasyPanel
+  - July 24, 2025. Deploy Totalmente Automático EasyPanel - v8.0.4:
+    - Docker-entrypoint.sh completamente reescrito para zero intervenção manual
+    - Sistema 100% automático: cria banco, tabelas e usuários na inicialização
+    - URL padrão configurada: postgres://sige:sige@viajey_sige:5432/sige?sslmode=disable
+    - Processo em 3 etapas: 1) Criar tabelas 2) Criar usuários 3) Verificar sistema
+    - Credenciais automáticas: admin@sige.com/admin123 (Super Admin) e valeverde/admin123 (Admin Demo)
+    - Logs detalhados para monitoramento completo da inicialização
+    - Fallback inteligente no app.py para URL do banco de dados
+    - Documentação completa em EASYPANEL_DEPLOY.md
+    - Deploy funciona apenas parando/iniciando container no EasyPanel
   - July 23, 2025. Implementação de Melhorias Críticas - Calculadora Unificada e KPIs Financeiros - v8.0.1:
     - Criada classe CalculadoraObra centralizada (calculadora_obra.py) para cálculos unificados e eliminação de discrepâncias
     - Implementado sistema de cálculo de valor/hora baseado em horário real: Mon-Fri 7h12-17h = 8h48/dia = 23 dias úteis/mês
