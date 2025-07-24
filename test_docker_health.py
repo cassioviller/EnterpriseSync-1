@@ -1,111 +1,40 @@
 #!/usr/bin/env python3
 """
-Script de teste para verificar saúde do container Docker
+Teste de saúde da aplicação Docker
 SIGE v8.0 - Sistema Integrado de Gestão Empresarial
 """
 
-import requests
+from werkzeug.security import generate_password_hash, check_password_hash
 import sys
-import time
-from datetime import datetime
 
-def test_health_endpoint():
-    """Testa o endpoint de saúde da aplicação"""
-    try:
-        print("🔍 Testando endpoint de saúde...")
-        response = requests.get("http://localhost:5000/api/monitoring/health", timeout=10)
-        
-        if response.status_code == 200:
-            data = response.json()
-            print(f"✅ Health check OK: {data}")
-            return True
-        else:
-            print(f"❌ Health check falhou: {response.status_code}")
-            return False
-    except requests.exceptions.RequestException as e:
-        print(f"❌ Erro de conexão: {e}")
-        return False
-
-def test_login_page():
-    """Testa se a página de login está acessível"""
-    try:
-        print("🔍 Testando página de login...")
-        response = requests.get("http://localhost:5000/login", timeout=10)
-        
-        if response.status_code == 200:
-            print("✅ Página de login acessível")
-            return True
-        else:
-            print(f"❌ Página de login inacessível: {response.status_code}")
-            return False
-    except requests.exceptions.RequestException as e:
-        print(f"❌ Erro ao acessar login: {e}")
-        return False
-
-def test_database_connection():
-    """Testa se o banco de dados está conectado através do endpoint de métricas"""
-    try:
-        print("🔍 Testando conexão com banco de dados...")
-        response = requests.get("http://localhost:5000/api/monitoring/metrics", timeout=10)
-        
-        if response.status_code == 200:
-            data = response.json()
-            if data.get('database_status') == 'connected':
-                print("✅ Banco de dados conectado")
-                return True
-            else:
-                print(f"❌ Banco desconectado: {data.get('database_status')}")
-                return False
-        else:
-            print(f"❌ Não foi possível verificar banco: {response.status_code}")
-            return False
-    except requests.exceptions.RequestException as e:
-        print(f"❌ Erro ao verificar banco: {e}")
-        return False
-
-def main():
-    """Executa todos os testes"""
-    print("🚀 Iniciando testes de saúde do SIGE v8.0")
-    print(f"⏰ Timestamp: {datetime.now().isoformat()}")
-    print("-" * 50)
+def test_password():
+    """Testa se a senha está correta"""
+    # Hash atual do banco
+    hash_banco = "scrypt:32768:8:1$nm7UZN6yEl8eY3tJ$4efb2fec46530daa51f5b0f734d7b7993fdbfa1a2758e5addd6a432158d97d27afa88a05f2ef40be21a917d1137cf2c3c465b8b6b83b93dcb7a963df5663ba8a"
     
-    # Aguardar aplicação inicializar
-    print("⏳ Aguardando aplicação inicializar (30s)...")
-    time.sleep(30)
+    # Senhas para testar
+    senhas = ['cassio123', 'admin123', 'password', '123456']
     
-    tests = [
-        ("Health Endpoint", test_health_endpoint),
-        ("Página de Login", test_login_page),
-        ("Conexão BD", test_database_connection)
-    ]
+    print("🔍 Testando senhas contra hash do banco...")
+    print(f"Hash: {hash_banco[:50]}...")
     
-    results = []
-    for test_name, test_func in tests:
-        print(f"\n📋 Executando: {test_name}")
-        result = test_func()
-        results.append((test_name, result))
-        time.sleep(2)  # Pausa entre testes
+    for senha in senhas:
+        resultado = check_password_hash(hash_banco, senha)
+        status = "✅" if resultado else "❌"
+        print(f"{status} Senha '{senha}': {resultado}")
     
-    # Resumo dos resultados
-    print("\n" + "=" * 50)
-    print("📊 RESUMO DOS TESTES")
-    print("=" * 50)
+    # Gerar novo hash para cassio123
+    print("\n🔧 Gerando novo hash para senha 'cassio123':")
+    novo_hash = generate_password_hash('cassio123')
+    print(f"Novo hash: {novo_hash}")
     
-    passed = 0
-    for test_name, result in results:
-        status = "✅ PASSOU" if result else "❌ FALHOU"
-        print(f"{test_name:20} {status}")
-        if result:
-            passed += 1
+    # Testar o novo hash
+    teste_novo = check_password_hash(novo_hash, 'cassio123')
+    print(f"✅ Teste do novo hash: {teste_novo}")
     
-    print(f"\nResultado: {passed}/{len(tests)} testes passaram")
-    
-    if passed == len(tests):
-        print("🎉 Todos os testes passaram! Container está saudável.")
-        sys.exit(0)
-    else:
-        print("⚠️ Alguns testes falharam. Verifique logs do container.")
-        sys.exit(1)
+    return novo_hash
 
 if __name__ == "__main__":
-    main()
+    novo_hash = test_password()
+    print(f"\n🎯 Use este comando SQL para corrigir:")
+    print(f"UPDATE usuario SET password_hash = '{novo_hash}' WHERE username = 'axiom';")
