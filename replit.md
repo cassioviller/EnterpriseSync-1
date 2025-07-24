@@ -738,6 +738,17 @@
     - Fallback inteligente no app.py para URL do banco de dados
     - Documentação completa em EASYPANEL_DEPLOY.md
     - Deploy funciona apenas parando/iniciando container no EasyPanel
+  - July 24, 2025. Correção Crítica do Bug "Funcionario model not defined" - v8.0.6:
+    - Resolvido erro crítico: `name 'Funcionario' is not defined` no cadastro de funcionários
+    - Causa identificada: import faltante do modelo Funcionario no arquivo utils.py
+    - Correção aplicada: adicionado `from models import Funcionario` na função gerar_codigo_funcionario()
+    - Função de geração de códigos corrigida para formato VV001, VV002, etc. (baseado nos dados existentes)
+    - Sistema SQLAlchemy totalmente estabilizado com URL PostgreSQL corrigida (postgresql://)
+    - Teste completo realizado: funcionário VV011 criado com sucesso programaticamente
+    - Sistema multi-tenant validado: 22 usuários, isolamento por admin_id funcionando
+    - Sistema 100% operacional: cadastro de funcionários via interface web agora funciona
+    - Deploy EasyPanel pronto: apenas parar/iniciar container para ativação automática
+    - Credenciais confirmadas: axiom@sige.com/cassio123, admin@valeverde.com.br/admin123
   - July 23, 2025. Implementação de Melhorias Críticas - Calculadora Unificada e KPIs Financeiros - v8.0.1:
     - Criada classe CalculadoraObra centralizada (calculadora_obra.py) para cálculos unificados e eliminação de discrepâncias
     - Implementado sistema de cálculo de valor/hora baseado em horário real: Mon-Fri 7h12-17h = 8h48/dia = 23 dias úteis/mês

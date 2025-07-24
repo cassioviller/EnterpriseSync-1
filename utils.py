@@ -47,14 +47,17 @@ def calcular_horas_trabalhadas(hora_entrada, hora_saida, hora_almoco_saida=None,
     }
 
 def gerar_codigo_funcionario():
-    """Gera código único para funcionário no formato F0001, F0002, etc."""
+    """Gera código único para funcionário no formato VV001, VV002, etc."""
+    from models import Funcionario  # Import local para evitar circular imports
+    
+    # Buscar o maior número entre códigos VV
     ultimo_funcionario = Funcionario.query.filter(
-        Funcionario.codigo.isnot(None)
+        Funcionario.codigo.like('VV%')
     ).order_by(Funcionario.codigo.desc()).first()
     
     if ultimo_funcionario and ultimo_funcionario.codigo:
-        # Extrair número do último código
-        numero_str = ultimo_funcionario.codigo[1:]  # Remove 'F'
+        # Extrair número do último código (VV010 -> 010)
+        numero_str = ultimo_funcionario.codigo[2:]  # Remove 'VV'
         try:
             ultimo_numero = int(numero_str)
             novo_numero = ultimo_numero + 1
@@ -63,7 +66,7 @@ def gerar_codigo_funcionario():
     else:
         novo_numero = 1
     
-    return f"F{novo_numero:04d}"
+    return f"VV{novo_numero:03d}"
 
 def salvar_foto_funcionario(foto, codigo):
     """Salva foto do funcionário e retorna o nome do arquivo"""
