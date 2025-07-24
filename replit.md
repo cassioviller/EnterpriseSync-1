@@ -693,9 +693,12 @@
     - Rotas corrigidas e testadas: /servicos, /api/servicos, /api/servicos/autocomplete, /obras, /rdo/novo
     - Template servicos.html atualizado para compatibilidade com objetos customizados
     - Erro DataTables "Incorrect column count" resolvido com campo subatividades tratado
-    - Sistema com zero referências a categoria_id em qualquer query ou operação
+    - Modelo Servico corrigido: removido campo categoria_id que não existe na estrutura real do banco
+    - Relacionamento CategoriaServico.servicos removido para eliminar dependência de categoria_id
+    - Alinhamento perfeito: modelo Python agora corresponde exatamente à estrutura do banco PostgreSQL
+    - Sistema com zero referências a categoria_id em qualquer query, modelo ou operação
     - Todas as funcionalidades de gestão de serviços, obras e RDO restauradas 100%
-    - Validação completa: 5/5 rotas principais funcionando sem erros SQL
+    - Validação completa: 5/5 rotas principais funcionando sem erros SQL ou relacionamentos
     - Multi-tenant isolamento preservado, zero perda de dados ou funcionalidade
     - Sistema local completamente validado e pronto para ativação em produção EasyPanel
   - July 23, 2025. Correção Crítica do Sistema Multi-Tenant - v8.0.1:
