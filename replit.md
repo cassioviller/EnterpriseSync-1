@@ -738,6 +738,12 @@
     - Fallback inteligente no app.py para URL do banco de dados
     - Documentação completa em EASYPANEL_DEPLOY.md
     - Deploy funciona apenas parando/iniciando container no EasyPanel
+  - July 24, 2025. Atualização do Card de Funcionário - v8.0.7:
+    - Removido campo departamento do card de funcionário na página principal
+    - Substituído email por telefone na exibição abaixo do nome
+    - Interface mais limpa focando em função e horário de trabalho
+    - Atualizado filtro de dados para usar telefone ao invés de departamento
+    - Card agora exibe: Nome, Telefone, Função, Horário, KPIs e Botões de ação
   - July 24, 2025. Correção Crítica do Bug "Funcionario model not defined" - v8.0.6:
     - Resolvido erro crítico: `name 'Funcionario' is not defined` no cadastro de funcionários
     - Causa identificada: import faltante do modelo Funcionario no arquivo utils.py

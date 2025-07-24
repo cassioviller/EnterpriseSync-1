@@ -162,7 +162,7 @@
         {% for kpi in funcionarios_kpis %}
     <div class="col-lg-4 col-md-6 mb-4 funcionario-card" 
          data-nome="{{ kpi.funcionario.nome.lower() }}" 
-         data-departamento="{{ kpi.funcionario.departamento_ref.nome.lower() if kpi.funcionario.departamento_ref else '' }}"
+         data-telefone="{{ kpi.funcionario.telefone.lower() if kpi.funcionario.telefone else '' }}"
          data-funcao="{{ kpi.funcionario.funcao_ref.nome.lower() if kpi.funcionario.funcao_ref else '' }}"
          data-status="{{ 'ativo' if kpi.funcionario.ativo else 'inativo' }}">
         <div class="card h-100 funcionario-card-item">
@@ -186,15 +186,11 @@
                              alt="Avatar padrão">
                     {% endif %}
                     <h5 class="card-title mb-1">{{ kpi.funcionario.nome }}</h5>
-                    <small class="text-muted">{{ kpi.funcionario.email if kpi.funcionario.email else '-' }}</small>
+                    <small class="text-muted">{{ kpi.funcionario.telefone if kpi.funcionario.telefone else '-' }}</small>
                 </div>
                 
                 <!-- Informações -->
                 <div class="mb-3">
-                    <div class="mb-2">
-                        <i class="fas fa-sitemap text-primary me-2"></i>
-                        <span>{{ kpi.funcionario.departamento_ref.nome if kpi.funcionario.departamento_ref else '-' }}</span>
-                    </div>
                     <div class="mb-2">
                         <i class="fas fa-user-tie text-success me-2"></i>
                         <span>{{ kpi.funcionario.funcao_ref.nome if kpi.funcionario.funcao_ref else '-' }}</span>
