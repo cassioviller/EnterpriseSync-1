@@ -1,0 +1,68 @@
+
+Commit: Improve user login security and fix incorrect role assignment after login
+
+Removes test credentials from login page, corrects session cookie handling, and adds login redirect tests.
+
+Replit-Commit-Author: Agent
+Replit-Commit-Session-Id: 55b65cd5-5f8d-4f4e-a5aa-8b5cfba7d880
+Replit-Commit-Screenshot-Url: https://storage.googleapis.com/screenshot-production-us-central1/a719a4a9-73c7-43ac-9f05-28b6e4b40780/55b65cd5-5f8d-4f4e-a5aa-8b5cfba7d880/kxhhjLW 
+##########################################
+### Download Github Archive Started...
+### Thu, 24 Jul 2025 10:40:25 GMT
+##########################################
+
+#0 building with "default" instance using docker driver
+
+#1 [internal] load build definition from Dockerfile
+#1 transferring dockerfile: 1.51kB done
+#1 DONE 0.0s
+
+#2 [internal] load metadata for docker.io/library/python:3.11-slim-bullseye
+#2 DONE 0.8s
+
+#3 [internal] load .dockerignore
+#3 transferring context: 891B done
+#3 DONE 0.0s
+
+#4 [ 1/10] FROM docker.io/library/python:3.11-slim-bullseye@sha256:9e25f400253a5fa3191813d6a67eb801ca1e6f012b3bd2588fa6920b59e3eba6
+#4 DONE 0.0s
+
+#5 [internal] load build context
+#5 transferring context: 10.71MB 0.1s done
+#5 DONE 0.1s
+
+#6 [ 2/10] RUN apt-get update && apt-get install -y --no-install-recommends     postgresql-client     curl     gcc     python3-dev     libpq-dev     && apt-get clean     && rm -rf /var/lib/apt/lists/*
+#6 CACHED
+
+#7 [ 3/10] RUN groupadd -r sige && useradd -r -g sige sige
+#7 CACHED
+
+#8 [ 4/10] WORKDIR /app
+#8 CACHED
+
+#9 [ 5/10] COPY pyproject.toml ./
+#9 CACHED
+
+#10 [ 6/10] RUN pip install --no-cache-dir --upgrade pip setuptools wheel &&     pip install --no-cache-dir .
+#10 CACHED
+
+#11 [ 7/10] COPY . .
+#11 DONE 0.1s
+
+#12 [ 8/10] RUN mkdir -p /app/static/fotos /app/logs &&     chown -R sige:sige /app
+#12 DONE 0.3s
+
+#13 [ 9/10] COPY docker-entrypoint.sh /app/
+#13 DONE 0.0s
+
+#14 [10/10] RUN chmod +x /app/docker-entrypoint.sh
+#14 DONE 0.1s
+
+#15 exporting to image
+#15 exporting layers 0.1s done
+#15 writing image sha256:a6b481e7c7d76858f513eef08bd672ebb3f498f090904e6aad26f7f0c70a2bd7 done
+#15 naming to docker.io/easypanel/viajey/sige1 done
+#15 DONE 0.1s
+##########################################
+### Success
+### Thu, 24 Jul 2025 10:40:29 GMT
