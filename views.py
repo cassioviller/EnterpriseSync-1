@@ -2452,21 +2452,8 @@ def servicos():
         categoria = request.args.get('categoria')
         ativo = request.args.get('ativo')
         
-        # Query específica sem categoria_id para evitar erro SQL
-        query = db.session.query(
-            Servico.id,
-            Servico.nome,
-            Servico.descricao,
-            Servico.categoria,
-            Servico.unidade_medida,
-            Servico.unidade_simbolo,
-            Servico.custo_unitario,
-            Servico.complexidade,
-            Servico.requer_especializacao,
-            Servico.ativo,
-            Servico.created_at,
-            Servico.updated_at
-        )
+        # Buscar todos os serviços com dados completos, incluindo subatividades
+        query = Servico.query
         
         # Aplicar filtros de pesquisa
         if categoria:
@@ -2474,26 +2461,8 @@ def servicos():
         if ativo:
             query = query.filter(Servico.ativo == (ativo == 'true'))
         
-        # Ordenar e buscar - converte Row objects em objetos simulados
-        servicos_raw = query.order_by(Servico.nome).all()
-        servicos = []
-        for row in servicos_raw:
-            # Criar objeto com atributos acessíveis no template
-            servico_obj = type('Servico', (), {
-                'id': row.id,
-                'nome': row.nome,
-                'descricao': row.descricao,
-                'categoria': row.categoria,
-                'unidade_medida': row.unidade_medida,
-                'unidade_simbolo': row.unidade_simbolo,
-                'custo_unitario': row.custo_unitario,
-                'complexidade': row.complexidade,
-                'requer_especializacao': row.requer_especializacao,
-                'ativo': row.ativo,
-                'created_at': row.created_at,
-                'updated_at': row.updated_at
-            })()
-            servicos.append(servico_obj)
+        # Executar query - agora usando objetos Servico completos
+        servicos = query.order_by(Servico.nome).all()
         
         # Dados para filtros - buscar categorias distintas do campo categoria (string)
         categorias_query = db.session.query(Servico.categoria).distinct().filter(Servico.categoria.isnot(None)).all()

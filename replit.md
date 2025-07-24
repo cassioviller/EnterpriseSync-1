@@ -684,6 +684,18 @@
     - Script de testes das melhorias implementadas (testar_melhorias_implementadas.py)
     - Correção de erro no relatório de ponto (referências de funcionário)
     - Base sólida implementada para futuras melhorias: mobile app, IA, automações
+  - July 24, 2025. Correção Final do Erro categoria_id - SIGE v8.0.9:
+    - Resolvido completamente o erro SQL crítico: "column servico.categoria_id does not exist"
+    - Identificadas e corrigidas 7 queries problemáticas que tentavam acessar categoria_id inexistente
+    - Substituição estratégica: Servico.query.all() → db.session.query() com campos específicos
+    - Rotas corrigidas: /servicos, /api/servicos, /api/servicos/autocomplete, /obras, /rdo/novo
+    - Template servicos.html corrigido para compatibilidade com objetos Servico completos
+    - Erro DataTables "Incorrect column count" resolvido com correção no campo subatividades
+    - Sistema retornou à funcionalidade de usar objetos Servico completos para melhor performance
+    - Todas as funcionalidades de gestão de serviços, obras e RDO restauradas 100%
+    - Validação completa: todas as rotas testadas e funcionando sem erros SQL
+    - Multi-tenant isolamento preservado, zero perda de dados ou funcionalidade
+    - Sistema local 100% operacional e pronto para deploy em produção EasyPanel
   - July 23, 2025. Correção Crítica do Sistema Multi-Tenant - v8.0.1:
     - Corrigidos problemas de imports circulares entre models.py, utils.py e views.py
     - Implementadas funções faltantes no utils.py: calcular_custo_real_obra e calcular_custos_mes

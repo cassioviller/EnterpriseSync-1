@@ -121,7 +121,7 @@
                                 </div>
                             </td>
                             <td>
-                                <span class="badge bg-secondary">{{ servico.subatividades|length }}</span>
+                                <span class="badge bg-secondary">{{ servico.subatividades|length if servico.subatividades else 0 }}</span>
                             </td>
                             <td>
                                 {% if servico.ativo %}

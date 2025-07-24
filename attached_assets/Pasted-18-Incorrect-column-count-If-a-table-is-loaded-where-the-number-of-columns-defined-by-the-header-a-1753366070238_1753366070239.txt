@@ -1,0 +1,107 @@
+18. Incorrect column count
+If a table is loaded where the number of columns defined by the header and used in the body do not match, the error:
+
+Incorrect column count
+
+will occur when the table is loaded.
+
+Meaning
+DataTables requires that the number of columns defined in the table header match the number of columns that are used in the table body. If they mismatch, not only will DataTables throw an error, but the HTML document would also be invalid.
+
+Consider the following:
+
+HTML
+1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+14
+15
+16
+<table>
+    <thead>
+        <tr>
+            <th>...</th>
+            <th>...</th>
+            <th>...</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td>...</td>
+            <td>...</td>
+        </tr>
+        ...
+    </tbody>
+</table>
+In this case, the header defines three columns but the first row in the table body only defines two columns. This error would be triggered when initialising DataTables on such a table.
+
+The converse is also true:
+
+HTML
+1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+14
+15
+16
+<table>
+    <thead>
+        <tr>
+            <th>...</th>
+            <th>...</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td>...</td>
+            <td>...</td>
+            <td>...</td>
+        </tr>
+        ...
+    </tbody>
+</table>
+In this case, the body row has more columns than the header, also triggering this error.
+
+These two cases are the most simple type, but the error can also occur when complex headers (i.e. those with colspan and rowspan attributes on the cells) are used. In such a case the same rules apply - the number of columns defined in the header must match those used in the table body rows.
+
+Additionally, DataTables does not support colspan or rowspan attributes on cells in the table body.
+
+This error can also happen if you are using columnDefs.targets to target a column that does not exist and there are other columns already defined.
+
+Resolution
+To resolve this issue, make sure that the number of columns in the table header match those in the table body:
+
+Validate your HTML
+Ensure colspan and rowspan are not used in the table body rows
+Use columnDefs.targets with only columns that are already defined.
+Comments (0)
+No comments posted for this page yet. Be the first to contribute!
+Post new comment
+Contributions in the form of tips, code snippets and suggestions for the above material are very welcome. To post a comment, please use the form below. Text is formatted by Markdown.
+
+To post comments, please sign in to your DataTables account, or register:
+
+Sign in
+Register
+Any questions posted here will be deleted without being published.
+Please post questions in the Forums. Comments are moderated.
