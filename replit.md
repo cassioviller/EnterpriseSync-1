@@ -755,6 +755,24 @@
     - Fallback inteligente no app.py para URL do banco de dados
     - Documentação completa em EASYPANEL_DEPLOY.md
     - Deploy funciona apenas parando/iniciando container no EasyPanel
+  - July 25, 2025. Correção Crítica do Cálculo de KPIs - Custo de Mão de Obra - v8.0.9:
+    - Corrigido bug crítico no cálculo de "Custo Mão de Obra" para funcionários CLT
+    - Problema identificado: sistema calculava baseado em valor/hora (R$ 15,00) ao invés do salário mensal
+    - Implementada lógica correta: para períodos mensais completos, usar salário integral CLT
+    - Ana Paula Rodrigues (R$ 7.200,00 salário): custo corrigido de R$ 2.904,00 → R$ 7.200,00
+    - Sistema agora diferencia funcionários CLT (salário mensal) vs horistas (valor/hora)
+    - Mantido cálculo proporcional para períodos parciais e adição correta de horas extras
+    - Engine KPIs v3.1 atualizado com lógica de custo CLT mais precisa
+    - Validação completa: 22 registros de maio/2025, 193.6h trabalhadas = 100% do salário mensal
+  - July 25, 2025. Sistema Inteligente de Horários de Trabalho - Lançamento Múltiplo - v8.0.10:
+    - Implementada lógica inteligente para respeitar dias de trabalho individuais por funcionário
+    - API de lançamento múltiplo agora verifica horários configurados (seg-sex, seg-sáb, dias específicos)
+    - Sistema automaticamente pula fins de semana/dias não trabalhados baseado no HorarioTrabalho
+    - Exemplos: horário seg-sex (1-5) só lança seg-sex, horário seg-quinta (1,4) só lança estes dias
+    - Tipos especiais (sábado/domingo extras, feriados) sempre são processados independente do horário
+    - Uso automático dos horários de entrada/saída configurados para cada funcionário
+    - Prevenção de registros duplicados mantida com validação por funcionário+data
+    - Observações automáticas incluem nome do horário respeitado ("Respeitando horário: Comercial Vale Verde")
   - July 24, 2025. Sistema de Fotos Persistentes Implementado - v8.0.8:
     - Criado script corrigir_fotos_funcionarios.py para garantir fotos persistentes
     - Sistema gera avatares SVG personalizados com iniciais e cores únicas por funcionário

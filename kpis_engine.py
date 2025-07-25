@@ -173,40 +173,48 @@ class KPIsEngine:
         return total or 0.0
     
     def _calcular_custo_mensal(self, funcionario_id, data_inicio, data_fim):
-        """5. Custo Mensal: Valor total incluindo trabalho + faltas justificadas"""
+        """5. Custo Mensal: Valor total baseado no salário CLT proporcional aos dias trabalhados"""
         funcionario = Funcionario.query.get(funcionario_id)
         if not funcionario or not funcionario.salario:
             return 0.0
         
-        # Calcular valor hora baseado no horário específico ou padrão
-        if funcionario.horario_trabalho and funcionario.horario_trabalho.valor_hora:
-            valor_hora = funcionario.horario_trabalho.valor_hora
-        elif funcionario.horario_trabalho and funcionario.horario_trabalho.horas_diarias:
-            # Calcular valor/hora baseado nas horas diárias específicas
-            horas_mensais = funcionario.horario_trabalho.horas_diarias * 22  # 22 dias úteis/mês
-            valor_hora = funcionario.salario / horas_mensais
+        # Para funcionários CLT, usar salário mensal proporcional
+        salario_mensal = funcionario.salario
+        
+        # Calcular dias úteis no período (baseado no horário de trabalho)
+        if funcionario.horario_trabalho and funcionario.horario_trabalho.dias_semana:
+            dias_trabalho_semana = len([d for d in funcionario.horario_trabalho.dias_semana.split(',') if d.strip()])
         else:
-            # Padrão: 220 horas/mês
-            valor_hora = funcionario.salario / 220
+            dias_trabalho_semana = 5  # Segunda a sexta (padrão)
         
-        # Horas trabalhadas
-        horas_trabalhadas = self._calcular_horas_trabalhadas(funcionario_id, data_inicio, data_fim)
+        # Estimar dias úteis por mês baseado nos dias de trabalho
+        dias_uteis_mes = int((dias_trabalho_semana * 52) / 12)  # Aproximação anual dividida por 12
         
-        # Horas extras com percentuais específicos por tipo
+        # Contar dias efetivamente trabalhados no período
+        registros_trabalho = db.session.query(func.count(RegistroPonto.id)).filter(
+            RegistroPonto.funcionario_id == funcionario_id,
+            RegistroPonto.data >= data_inicio,
+            RegistroPonto.data <= data_fim,
+            RegistroPonto.tipo_registro.in_(['trabalho_normal', 'sabado_horas_extras', 'domingo_horas_extras', 'feriado_trabalhado', 'meio_periodo'])
+        ).scalar() or 0
+        
+        # Calcular custo base proporcional
+        if registros_trabalho > 0:
+            # Custo proporcional baseado nos dias trabalhados vs dias úteis do mês
+            custo_base = salario_mensal * (registros_trabalho / dias_uteis_mes)
+        else:
+            custo_base = 0.0
+        
+        # Adicionar custo de horas extras (cálculo separado)
+        valor_hora = salario_mensal / (dias_uteis_mes * (funcionario.horario_trabalho.horas_diarias if funcionario.horario_trabalho else 8))
         custo_extras = self._calcular_custo_horas_extras_especifico(funcionario_id, data_inicio, data_fim, valor_hora)
         
-        # Faltas justificadas (ocorrências aprovadas que afetam custo)
-        horas_faltas_justificadas = self._calcular_horas_faltas_justificadas(
-            funcionario_id, data_inicio, data_fim
-        )
-        
-        custo_total = (
-            (horas_trabalhadas * valor_hora) + 
-            custo_extras + 
-            (horas_faltas_justificadas * valor_hora)
-        )
-        
-        return custo_total
+        # Para períodos de 1 mês completo, usar salário integral + extras
+        periodo_dias = (data_fim - data_inicio).days + 1
+        if periodo_dias >= 28:  # Mês completo ou quase completo
+            return salario_mensal + custo_extras
+        else:
+            return custo_base + custo_extras
     
     def _calcular_faltas_justificadas(self, funcionario_id, data_inicio, data_fim):
         """Calcular faltas justificadas (com ocorrências aprovadas)"""
