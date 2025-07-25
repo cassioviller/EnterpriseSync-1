@@ -3599,8 +3599,11 @@ def novo_ponto_lista():
 @main_bp.route('/restaurantes')
 @admin_required
 def lista_restaurantes():
-    tenant_filter = get_tenant_filter()
-    restaurantes = Restaurante.query.filter(tenant_filter).order_by(Restaurante.nome).all()
+    # Filtro multi-tenant
+    if current_user.tipo_usuario == TipoUsuario.ADMIN:
+        restaurantes = Restaurante.query.filter_by(admin_id=current_user.id).order_by(Restaurante.nome).all()
+    else:
+        restaurantes = Restaurante.query.filter_by(admin_id=current_user.admin_id).order_by(Restaurante.nome).all()
     
     return render_template('restaurantes.html', 
                          restaurantes=restaurantes,
@@ -3625,10 +3628,8 @@ def novo_restaurante():
                 return redirect(url_for('main.novo_restaurante'))
             
             # Verificar duplicatas
-            tenant_filter = get_tenant_filter()
-            existing = Restaurante.query.filter(
-                and_(Restaurante.nome == nome, tenant_filter)
-            ).first()
+            admin_id = current_user.id if current_user.tipo_usuario == TipoUsuario.ADMIN else current_user.admin_id
+            existing = Restaurante.query.filter_by(nome=nome, admin_id=admin_id).first()
             
             if existing:
                 flash(f'Já existe um restaurante com o nome "{nome}".', 'danger')
@@ -3664,10 +3665,9 @@ def novo_restaurante():
 @main_bp.route('/restaurantes/<int:id>')
 @admin_required
 def detalhes_restaurante(id):
-    tenant_filter = get_tenant_filter()
-    restaurante = Restaurante.query.filter(
-        and_(Restaurante.id == id, tenant_filter)
-    ).first_or_404()
+    # Filtro multi-tenant
+    admin_id = current_user.id if current_user.tipo_usuario == TipoUsuario.ADMIN else current_user.admin_id
+    restaurante = Restaurante.query.filter_by(id=id, admin_id=admin_id).first_or_404()
     
     # Buscar estatísticas do restaurante
     from datetime import datetime, timedelta
@@ -3717,10 +3717,9 @@ def detalhes_restaurante(id):
 @main_bp.route('/restaurantes/<int:id>/editar', methods=['GET', 'POST'])
 @admin_required  
 def editar_restaurante(id):
-    tenant_filter = get_tenant_filter()
-    restaurante = Restaurante.query.filter(
-        and_(Restaurante.id == id, tenant_filter)
-    ).first_or_404()
+    # Filtro multi-tenant
+    admin_id = current_user.id if current_user.tipo_usuario == TipoUsuario.ADMIN else current_user.admin_id
+    restaurante = Restaurante.query.filter_by(id=id, admin_id=admin_id).first_or_404()
     
     if request.method == 'POST':
         try:
@@ -3739,12 +3738,11 @@ def editar_restaurante(id):
                 return redirect(url_for('main.editar_restaurante', id=id))
             
             # Verificar duplicatas (exceto o próprio)
+            admin_id = current_user.id if current_user.tipo_usuario == TipoUsuario.ADMIN else current_user.admin_id
             existing = Restaurante.query.filter(
-                and_(
-                    Restaurante.nome == nome,
-                    Restaurante.id != id,
-                    tenant_filter
-                )
+                Restaurante.nome == nome,
+                Restaurante.id != id,
+                Restaurante.admin_id == admin_id
             ).first()
             
             if existing:
@@ -3780,10 +3778,9 @@ def editar_restaurante(id):
 @main_bp.route('/restaurantes/<int:id>/excluir', methods=['POST'])
 @admin_required
 def excluir_restaurante(id):
-    tenant_filter = get_tenant_filter()
-    restaurante = Restaurante.query.filter(
-        and_(Restaurante.id == id, tenant_filter)
-    ).first_or_404()
+    # Filtro multi-tenant
+    admin_id = current_user.id if current_user.tipo_usuario == TipoUsuario.ADMIN else current_user.admin_id
+    restaurante = Restaurante.query.filter_by(id=id, admin_id=admin_id).first_or_404()
     
     try:
         # Verificar se tem registros de alimentação associados
