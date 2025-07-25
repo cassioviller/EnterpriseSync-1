@@ -66,6 +66,10 @@ if os.path.exists('/app/views.py'):
         print('Correção já aplicada ou não necessária')
 "
 
+# Correção automática do schema restaurante
+echo "🔧 Verificando e corrigindo schema de restaurantes..."
+python3 auto_fix_schema.py
+
 # Criar usuário admin
 echo "Criando usuários..."
 python3 -c "

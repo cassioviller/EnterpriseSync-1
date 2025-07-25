@@ -778,6 +778,16 @@
     - Sistema identifica problemas específicos: contato_responsavel duplicado, colunas faltantes, etc.
     - Documentação completa criada: SOLUCAO_PRODUCAO_RESTAURANTES.md
     - Produção agora mostrará erro específico ao invés de genérico "Internal Server Error"
+  - July 25, 2025. Deploy Automático com Correção Integrada - v8.0.18:
+    - Implementada correção automática do schema restaurante integrada ao docker-entrypoint.sh
+    - Criado script auto_fix_schema.py que executa automaticamente durante inicialização do container
+    - Correção não requer intervenção manual - executa automaticamente no deploy EasyPanel
+    - Script verifica schema, adiciona colunas faltantes (responsavel, preco_almoco, preco_jantar, preco_lanche, admin_id)
+    - Remove coluna duplicada contato_responsavel se existir e configura admin_id para restaurantes existentes
+    - Sistema não falha deploy se schema já estiver correto (idempotente)
+    - Logs detalhados mostram progresso da correção durante inicialização
+    - Deploy totalmente automatizado: parar/iniciar container no EasyPanel resolve o problema
+    - Zero intervenção manual necessária - problema será corrigido automaticamente no próximo deploy
   - July 25, 2025. Módulo de Restaurantes Completo Implementado - v8.0.15:
     - Implementado sistema completo de gerenciamento de restaurantes com CRUD funcional
     - Corrigidas colunas faltantes no banco de dados (responsavel, preco_almoco, preco_jantar, preco_lanche, observacoes, admin_id)
