@@ -162,12 +162,15 @@ class KPIsEngine:
         return faltas or 0
     
     def _calcular_atrasos_horas(self, funcionario_id, data_inicio, data_fim):
-        """4. Atrasos: Total de horas de atraso (entrada + saída antecipada)"""
+        """4. Atrasos: Total de horas de atraso (entrada + saída antecipada)
+        EXCLUINDO sábados, domingos e feriados trabalhados (onde toda hora é extra)"""
         total = db.session.query(func.sum(RegistroPonto.total_atraso_horas)).filter(
             RegistroPonto.funcionario_id == funcionario_id,
             RegistroPonto.data >= data_inicio,
             RegistroPonto.data <= data_fim,
-            RegistroPonto.total_atraso_horas.isnot(None)
+            RegistroPonto.total_atraso_horas.isnot(None),
+            # EXCLUIR tipos onde toda hora é extra (não há conceito de atraso)
+            ~RegistroPonto.tipo_registro.in_(['sabado_horas_extras', 'domingo_horas_extras', 'feriado_trabalhado'])
         ).scalar()
         
         return total or 0.0
@@ -489,21 +492,24 @@ class KPIsEngine:
             horario_entrada = horario.entrada
             horario_saida = horario.saida
         
-        # Calcular atrasos
+        # Calcular atrasos APENAS para tipos normais (não para sábado/domingo/feriado)
         minutos_atraso_entrada = 0
         minutos_atraso_saida = 0
         
-        if registro.hora_entrada and registro.hora_entrada > horario_entrada:
-            # Atraso na entrada
-            entrada_minutos = registro.hora_entrada.hour * 60 + registro.hora_entrada.minute
-            previsto_minutos = horario_entrada.hour * 60 + horario_entrada.minute
-            minutos_atraso_entrada = entrada_minutos - previsto_minutos
-        
-        if registro.hora_saida and registro.hora_saida < horario_saida:
-            # Saída antecipada
-            saida_minutos = registro.hora_saida.hour * 60 + registro.hora_saida.minute
-            previsto_minutos = horario_saida.hour * 60 + horario_saida.minute
-            minutos_atraso_saida = previsto_minutos - saida_minutos
+        # Em sábado, domingo e feriado trabalhado não há conceito de atraso
+        # pois toda hora trabalhada é considerada extra
+        if registro.tipo_registro not in ['sabado_horas_extras', 'domingo_horas_extras', 'feriado_trabalhado']:
+            if registro.hora_entrada and registro.hora_entrada > horario_entrada:
+                # Atraso na entrada
+                entrada_minutos = registro.hora_entrada.hour * 60 + registro.hora_entrada.minute
+                previsto_minutos = horario_entrada.hour * 60 + horario_entrada.minute
+                minutos_atraso_entrada = entrada_minutos - previsto_minutos
+            
+            if registro.hora_saida and registro.hora_saida < horario_saida:
+                # Saída antecipada
+                saida_minutos = registro.hora_saida.hour * 60 + registro.hora_saida.minute
+                previsto_minutos = horario_saida.hour * 60 + horario_saida.minute
+                minutos_atraso_saida = previsto_minutos - saida_minutos
         
         # Atualizar campos de atraso
         registro.minutos_atraso_entrada = minutos_atraso_entrada

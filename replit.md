@@ -755,6 +755,14 @@
     - Fallback inteligente no app.py para URL do banco de dados
     - Documentação completa em EASYPANEL_DEPLOY.md
     - Deploy funciona apenas parando/iniciando container no EasyPanel
+  - July 25, 2025. Correção da Lógica de Atrasos para Sábado/Domingo/Feriado - v8.0.11:
+    - Implementada regra de negócio: em sábado, domingo e feriado trabalhado não há conceito de atraso
+    - Corrigido engine de KPIs para excluir tipos especiais do cálculo de atrasos
+    - Função _calcular_atrasos_horas() agora filtra tipos onde toda hora é extra
+    - Função calcular_e_atualizar_ponto() não calcula atrasos para sabado_horas_extras, domingo_horas_extras, feriado_trabalhado
+    - Script corrigir_atrasos_sabado_domingo.py criado para zerar atrasos existentes incorretos
+    - Lógica correta: se toda hora é extra (50% ou 100% adicional), não pode haver atraso
+    - KPI "Atrasos" agora reflete apenas trabalho normal onde existe horário estabelecido
   - July 25, 2025. Correção Crítica do Cálculo de KPIs - Custo de Mão de Obra - v8.0.9:
     - Corrigido bug crítico no cálculo de "Custo Mão de Obra" para funcionários CLT
     - Problema identificado: sistema calculava baseado em valor/hora (R$ 15,00) ao invés do salário mensal
