@@ -767,6 +767,17 @@
     - Documentação completa criada: HOTFIX_ALIMENTACAO_PRODUCAO.md e deploy_fix_alimentacao.md
     - KPI de Faltas Justificadas corrigido simultaneamente: R$ 1.261,82 (era R$ 0,00)
     - Multi-tenant preservado com isolamento por admin_id
+  - July 25, 2025. Sistema de Diagnóstico Inteligente de Erros - v8.0.17:
+    - Implementado tratamento de erro detalhado nas rotas de alimentação (/restaurantes e /alimentacao)
+    - Sistema substitui "Internal Server Error" por diagnósticos específicos do problema
+    - Criado template error_debug.html para exibir erros com soluções automáticas
+    - Verificação automática de: tabelas existentes, schema de colunas, colunas duplicadas
+    - Página de erro mostra exatamente qual comando executar para corrigir (SQL, Python ou Flask-Migrate)
+    - Auto-refresh a cada 30 segundos para verificar se problema foi resolvido
+    - Scripts de correção incluídos na própria página de erro para facilitar aplicação
+    - Sistema identifica problemas específicos: contato_responsavel duplicado, colunas faltantes, etc.
+    - Documentação completa criada: SOLUCAO_PRODUCAO_RESTAURANTES.md
+    - Produção agora mostrará erro específico ao invés de genérico "Internal Server Error"
   - July 25, 2025. Módulo de Restaurantes Completo Implementado - v8.0.15:
     - Implementado sistema completo de gerenciamento de restaurantes com CRUD funcional
     - Corrigidas colunas faltantes no banco de dados (responsavel, preco_almoco, preco_jantar, preco_lanche, observacoes, admin_id)

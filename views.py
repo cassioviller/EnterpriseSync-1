@@ -3532,15 +3532,69 @@ def novo_ponto_lista():
 @main_bp.route('/restaurantes')
 @admin_required
 def lista_restaurantes():
-    # Filtro multi-tenant
-    if current_user.tipo_usuario == TipoUsuario.ADMIN:
-        restaurantes = Restaurante.query.filter_by(admin_id=current_user.id).order_by(Restaurante.nome).all()
-    else:
-        restaurantes = Restaurante.query.filter_by(admin_id=current_user.admin_id).order_by(Restaurante.nome).all()
-    
-    return render_template('restaurantes.html', 
-                         restaurantes=restaurantes,
-                         titulo="Gerenciamento de Restaurantes")
+    """Lista restaurantes com tratamento de erro detalhado para produção"""
+    try:
+        # Verificar se tabela restaurante existe e tem schema correto
+        from sqlalchemy import inspect, text
+        
+        inspector = inspect(db.engine)
+        if 'restaurante' not in inspector.get_table_names():
+            error_msg = "❌ ERRO CRÍTICO: Tabela 'restaurante' não existe no banco de dados"
+            return render_template('error_debug.html', 
+                                 error_title="Erro de Schema - Tabela Restaurante",
+                                 error_message=error_msg,
+                                 solution="Execute: CREATE TABLE restaurante (...)")
+        
+        # Verificar colunas necessárias
+        columns = inspector.get_columns('restaurante')
+        column_names = [col['name'] for col in columns]
+        
+        required_columns = ['id', 'nome', 'responsavel', 'preco_almoco', 'preco_jantar', 'preco_lanche', 'admin_id']
+        missing_columns = [col for col in required_columns if col not in column_names]
+        
+        if missing_columns:
+            error_msg = f"❌ ERRO DE SCHEMA: Colunas faltantes na tabela restaurante: {', '.join(missing_columns)}"
+            solution = f"Execute: ALTER TABLE restaurante ADD COLUMN {missing_columns[0]} VARCHAR(100);"
+            return render_template('error_debug.html',
+                                 error_title="Erro de Schema - Colunas Faltantes", 
+                                 error_message=error_msg,
+                                 solution=solution,
+                                 all_columns=column_names,
+                                 required_columns=required_columns)
+        
+        # Verificar coluna duplicada problemática
+        if 'contato_responsavel' in column_names and 'responsavel' in column_names:
+            error_msg = "❌ ERRO DE SCHEMA: Coluna 'contato_responsavel' duplicada com 'responsavel'"
+            solution = "Execute: ALTER TABLE restaurante DROP COLUMN contato_responsavel;"
+            return render_template('error_debug.html',
+                                 error_title="Erro de Schema - Coluna Duplicada",
+                                 error_message=error_msg,
+                                 solution=solution,
+                                 all_columns=column_names)
+        
+        # Filtro multi-tenant
+        if current_user.tipo_usuario == TipoUsuario.ADMIN:
+            admin_id = current_user.id
+        else:
+            admin_id = current_user.admin_id
+            
+        # Tentar fazer query dos restaurantes
+        restaurantes = Restaurante.query.filter_by(admin_id=admin_id).order_by(Restaurante.nome).all()
+        
+        return render_template('restaurantes.html', 
+                             restaurantes=restaurantes,
+                             titulo="Gerenciamento de Restaurantes")
+                             
+    except Exception as e:
+        # Capturar erro específico e mostrar detalhes
+        import traceback
+        error_details = traceback.format_exc()
+        
+        return render_template('error_debug.html',
+                             error_title="Erro no Módulo de Restaurantes",
+                             error_message=f"❌ ERRO: {str(e)}",
+                             error_details=error_details,
+                             solution="Verifique o schema da tabela restaurante e aplique as correções necessárias")
 
 @main_bp.route('/restaurantes/novo', methods=['GET', 'POST'])
 @admin_required
@@ -3742,25 +3796,87 @@ def excluir_restaurante(id):
 @main_bp.route('/alimentacao')
 @login_required
 def alimentacao():
-    from datetime import date
+    """Registros de alimentação com tratamento de erro detalhado"""
+    try:
+        from datetime import date
+        from sqlalchemy import inspect
+        
+        # Verificar se tabelas necessárias existem
+        inspector = inspect(db.engine)
+        tables = inspector.get_table_names()
+        
+        missing_tables = []
+        required_tables = ['registro_alimentacao', 'restaurante', 'funcionario', 'obra']
+        
+        for table in required_tables:
+            if table not in tables:
+                missing_tables.append(table)
+        
+        if missing_tables:
+            error_msg = f"❌ ERRO CRÍTICO: Tabelas faltantes: {', '.join(missing_tables)}"
+            solution = f"Execute migração completa: flask db upgrade"
+            return render_template('error_debug.html',
+                                 error_title="Erro de Schema - Tabelas Faltantes",
+                                 error_message=error_msg,
+                                 solution=solution,
+                                 all_columns=tables,
+                                 required_columns=required_tables)
+        
+        # Verificar schema da tabela restaurante especificamente
+        if 'restaurante' in tables:
+            rest_columns = inspector.get_columns('restaurante')
+            rest_column_names = [col['name'] for col in rest_columns]
+            
+            # Verificar coluna duplicada problemática
+            if 'contato_responsavel' in rest_column_names and 'responsavel' in rest_column_names:
+                error_msg = "❌ ERRO DE SCHEMA: Tabela restaurante tem coluna 'contato_responsavel' duplicada"
+                solution = "Execute: ALTER TABLE restaurante DROP COLUMN contato_responsavel;"
+                return render_template('error_debug.html',
+                                     error_title="Erro no Módulo Alimentação - Schema Restaurante",
+                                     error_message=error_msg,
+                                     solution=solution,
+                                     all_columns=rest_column_names)
+        
+        # Obter funcionários do admin atual
+        funcionarios_admin = Funcionario.query.filter_by(ativo=True, admin_id=current_user.id).all()
+        funcionarios_ids = [f.id for f in funcionarios_admin]
+        
+        # Filtrar registros pelos funcionários do admin
+        if funcionarios_ids:
+            registros = RegistroAlimentacao.query.filter(
+                RegistroAlimentacao.funcionario_id.in_(funcionarios_ids)
+            ).order_by(RegistroAlimentacao.data.desc()).limit(50).all()
+        else:
+            registros = []
+        
+        funcionarios = funcionarios_admin
+        obras = Obra.query.filter_by(status='Em andamento', admin_id=current_user.id).order_by(Obra.nome).all()
+        
+        # Tentar buscar restaurantes com filtro por admin
+        try:
+            restaurantes = Restaurante.query.filter_by(ativo=True, admin_id=current_user.id).order_by(Restaurante.nome).all()
+        except Exception as rest_error:
+            # Se falhar na query de restaurantes, mostrar erro específico
+            error_msg = f"❌ ERRO NA QUERY DE RESTAURANTES: {str(rest_error)}"
+            solution = "Verifique o schema da tabela restaurante e execute fix_restaurante_schema_production.py"
+            return render_template('error_debug.html',
+                                 error_title="Erro na Query de Restaurantes",
+                                 error_message=error_msg,
+                                 solution=solution,
+                                 error_details=str(rest_error))
     
-    # Obter funcionários do admin atual
-    funcionarios_admin = Funcionario.query.filter_by(ativo=True, admin_id=current_user.id).all()
-    funcionarios_ids = [f.id for f in funcionarios_admin]
+    except Exception as e:
+        # Capturar qualquer outro erro e mostrar detalhes
+        import traceback
+        error_details = traceback.format_exc()
+        
+        return render_template('error_debug.html',
+                             error_title="Erro no Módulo de Alimentação",
+                             error_message=f"❌ ERRO: {str(e)}",
+                             error_details=error_details,
+                             solution="Verifique o schema das tabelas e aplique as correções necessárias")
     
-    # Filtrar registros pelos funcionários do admin
-    if funcionarios_ids:
-        registros = RegistroAlimentacao.query.filter(
-            RegistroAlimentacao.funcionario_id.in_(funcionarios_ids)
-        ).order_by(RegistroAlimentacao.data.desc()).limit(50).all()
-    else:
-        registros = []
-    
-    funcionarios = funcionarios_admin
-    obras = Obra.query.filter_by(status='Em andamento', admin_id=current_user.id).order_by(Obra.nome).all()
-    restaurantes = Restaurante.query.filter_by(ativo=True).order_by(Restaurante.nome).all()
-    
-    return render_template('alimentacao.html', 
+    return render_template('alimentacao.html',
                          registros=registros, 
                          funcionarios=funcionarios,
                          obras=obras,
