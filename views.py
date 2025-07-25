@@ -1865,78 +1865,121 @@ def obras():
 @main_bp.route('/obras/novo', methods=['GET', 'POST'])
 @login_required
 def nova_obra():
-    from models import Servico, ServicoObra
+    from models import Servico, ServicoObra, CategoriaServico
     import json
+    import logging
+    
+    # Log para debug em produção
+    logging.info(f"[NOVA_OBRA] Usuário {current_user.id} acessando criação de obra")
     
     form = ObraForm()
-    form.responsavel_id.choices = [(0, 'Selecione...')] + [(f.id, f.nome) for f in Funcionario.query.filter_by(ativo=True, admin_id=current_user.id).all()]
+    
+    try:
+        # Buscar funcionários com tratamento de erro
+        funcionarios = Funcionario.query.filter_by(ativo=True, admin_id=current_user.id).all()
+        form.responsavel_id.choices = [(0, 'Selecione...')] + [(f.id, f.nome) for f in funcionarios]
+        logging.info(f"[NOVA_OBRA] {len(funcionarios)} funcionários carregados")
+    except Exception as e:
+        logging.error(f"[NOVA_OBRA] Erro ao carregar funcionários: {e}")
+        form.responsavel_id.choices = [(0, 'Selecione...')]
     
     if request.method == 'POST':
+        logging.info(f"[NOVA_OBRA] Recebido POST para criação de obra")
+        
         if form.validate_on_submit():
-            # Criar obra
-            obra = Obra(
-                nome=form.nome.data,
-                endereco=form.endereco.data,
-                data_inicio=form.data_inicio.data,
-                data_previsao_fim=form.data_previsao_fim.data,
-                orcamento=form.orcamento.data or 0.0,
-                status=form.status.data,
-                responsavel_id=form.responsavel_id.data if form.responsavel_id.data > 0 else None,
-                admin_id=current_user.id  # Associar obra ao admin logado
-            )
-            db.session.add(obra)
-            db.session.flush()  # Para obter o ID
+            try:
+                # Criar obra com tratamento de erro robusto
+                obra = Obra(
+                    nome=form.nome.data,
+                    endereco=form.endereco.data,
+                    data_inicio=form.data_inicio.data,
+                    data_previsao_fim=form.data_previsao_fim.data,
+                    orcamento=float(form.orcamento.data) if form.orcamento.data else 0.0,
+                    status=form.status.data,
+                    responsavel_id=form.responsavel_id.data if form.responsavel_id.data and form.responsavel_id.data > 0 else None,
+                    admin_id=current_user.id
+                )
+                
+                logging.info(f"[NOVA_OBRA] Criando obra: {obra.nome}")
+                db.session.add(obra)
+                db.session.flush()  # Para obter o ID
+                logging.info(f"[NOVA_OBRA] Obra criada com ID: {obra.id}")
+                
+                # Processar serviços da obra
+                servicos_data = request.form.get('servicos_data')
+                if servicos_data:
+                    try:
+                        servicos_list = json.loads(servicos_data)
+                        logging.info(f"[NOVA_OBRA] Processando {len(servicos_list)} serviços")
+                        
+                        for i, servico_item in enumerate(servicos_list):
+                            if servico_item.get('servico_id') and servico_item.get('quantidade'):
+                                servico_obra = ServicoObra(
+                                    obra_id=obra.id,
+                                    servico_id=int(servico_item['servico_id']),
+                                    quantidade_planejada=float(servico_item['quantidade']),
+                                    observacoes=servico_item.get('observacoes', '')
+                                )
+                                db.session.add(servico_obra)
+                                logging.info(f"[NOVA_OBRA] Serviço {i+1} adicionado: ID {servico_item['servico_id']}")
+                    except (json.JSONDecodeError, ValueError) as e:
+                        logging.error(f"[NOVA_OBRA] Erro ao processar serviços: {e}")
+                        flash(f'Erro ao processar serviços: {str(e)}', 'warning')
+                        db.session.rollback()
+                        return render_template('obra_form.html', form=form, servicos=[], categorias=[])
+                
+                db.session.commit()
+                logging.info(f"[NOVA_OBRA] Obra {obra.nome} criada com sucesso - ID: {obra.id}")
+                flash('Obra cadastrada com sucesso!', 'success')
+                return redirect(url_for('main.obras'))
+                
+            except Exception as e:
+                db.session.rollback()
+                logging.error(f"[NOVA_OBRA] Erro ao criar obra: {e}")
+                import traceback
+                logging.error(f"[NOVA_OBRA] Traceback: {traceback.format_exc()}")
+                flash(f'Erro ao criar obra: {str(e)}', 'error')
+        else:
+            logging.warning(f"[NOVA_OBRA] Formulário inválido: {form.errors}")
+            flash('Por favor, corrija os erros no formulário.', 'warning')
+    
+    # Buscar dados para o formulário com tratamento de erro
+    try:
+        servicos_data = db.session.query(
+            Servico.id,
+            Servico.nome,
+            Servico.categoria,
+            Servico.unidade_medida,
+            Servico.unidade_simbolo,
+            Servico.custo_unitario
+        ).filter(Servico.ativo == True).order_by(Servico.categoria, Servico.nome).all()
+        
+        # Converter para objetos acessíveis no template
+        servicos = []
+        for row in servicos_data:
+            servico_obj = type('Servico', (), {
+                'id': row.id,
+                'nome': row.nome,
+                'categoria': row.categoria,
+                'unidade_medida': row.unidade_medida,
+                'unidade_simbolo': row.unidade_simbolo,
+                'custo_unitario': row.custo_unitario
+            })()
+            servicos.append(servico_obj)
             
-            # Processar serviços da obra
-            servicos_data = request.form.get('servicos_data')
-            if servicos_data:
-                try:
-                    servicos_list = json.loads(servicos_data)
-                    for servico_item in servicos_list:
-                        if servico_item.get('servico_id') and servico_item.get('quantidade'):
-                            servico_obra = ServicoObra(
-                                obra_id=obra.id,
-                                servico_id=int(servico_item['servico_id']),
-                                quantidade_planejada=float(servico_item['quantidade']),
-                                observacoes=servico_item.get('observacoes', '')
-                            )
-                            db.session.add(servico_obra)
-                except (json.JSONDecodeError, ValueError) as e:
-                    flash(f'Erro ao processar serviços: {str(e)}', 'warning')
-            
-            db.session.commit()
-            flash('Obra cadastrada com sucesso!', 'success')
-            return redirect(url_for('main.obras'))
+        categorias = CategoriaServico.query.filter_by(ativo=True).order_by(CategoriaServico.ordem, CategoriaServico.nome).all()
+        logging.info(f"[NOVA_OBRA] {len(servicos)} serviços e {len(categorias)} categorias carregados")
+        
+    except Exception as e:
+        logging.error(f"[NOVA_OBRA] Erro ao carregar dados: {e}")
+        servicos = []
+        categorias = []
     
-    # Buscar dados para o formulário com filtro multi-tenant - query específica
-    servicos_data = db.session.query(
-        Servico.id,
-        Servico.nome,
-        Servico.categoria,
-        Servico.unidade_medida,
-        Servico.unidade_simbolo,
-        Servico.custo_unitario
-    ).filter(Servico.ativo == True).order_by(Servico.categoria, Servico.nome).all()
-    
-    # Converter para objetos acessíveis no template
-    servicos = []
-    for row in servicos_data:
-        servico_obj = type('Servico', (), {
-            'id': row.id,
-            'nome': row.nome,
-            'categoria': row.categoria,
-            'unidade_medida': row.unidade_medida,
-            'unidade_simbolo': row.unidade_simbolo,
-            'custo_unitario': row.custo_unitario
-        })()
-        servicos.append(servico_obj)
-    categorias = CategoriaServico.query.filter_by(ativo=True).order_by(CategoriaServico.ordem, CategoriaServico.nome).all()
-    obras = Obra.query.filter(Obra.admin_id == current_user.id).all()
-    
-    return render_template('obras.html', 
+    return render_template('obra_form.html', 
                          form=form, 
-                         obras=obras,
-                         servicos=servicos)
+                         servicos=servicos,
+                         categorias=categorias)
+
 
 # API para buscar serviços (para JavaScript)
 @main_bp.route('/api/servicos')
