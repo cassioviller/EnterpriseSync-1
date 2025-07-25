@@ -3572,11 +3572,15 @@ def lista_restaurantes():
                                  solution=solution,
                                  all_columns=column_names)
         
-        # Filtro multi-tenant
+        # Schema correto - carregar dados normalmente
         if current_user.tipo_usuario == TipoUsuario.ADMIN:
             admin_id = current_user.id
         else:
             admin_id = current_user.admin_id
+            
+        restaurantes = Restaurante.query.filter_by(admin_id=admin_id).all()
+        
+        return render_template('restaurantes.html', restaurantes=restaurantes)
             
         # Tentar fazer query dos restaurantes
         restaurantes = Restaurante.query.filter_by(admin_id=admin_id).order_by(Restaurante.nome).all()
