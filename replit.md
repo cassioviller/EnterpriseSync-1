@@ -755,6 +755,18 @@
     - Fallback inteligente no app.py para URL do banco de dados
     - Documentação completa em EASYPANEL_DEPLOY.md
     - Deploy funciona apenas parando/iniciando container no EasyPanel
+  - July 25, 2025. HOTFIX: Correção Crítica do Schema Restaurante - v8.0.16:
+    - Identificado e corrigido problema crítico no schema da tabela restaurante em produção
+    - Problema: Coluna 'contato_responsavel' duplicada com 'responsavel' causando erro 500
+    - Solução local aplicada: removida coluna duplicada, mantido apenas 'responsavel'
+    - Criados scripts de correção para produção: fix_restaurante_schema_production.py
+    - Criada migração Alembic específica: migrations/versions/fix_restaurante_schema.py  
+    - Schema correto: 13 colunas (id, nome, endereco, telefone, email, responsavel, preco_almoco, preco_jantar, preco_lanche, observacoes, ativo, admin_id, created_at)
+    - Scripts SQL manuais criados para aplicação em produção EasyPanel
+    - Sistema local funcionando: 9 restaurantes cadastrados, 5 rotas operacionais
+    - Documentação completa criada: HOTFIX_ALIMENTACAO_PRODUCAO.md e deploy_fix_alimentacao.md
+    - KPI de Faltas Justificadas corrigido simultaneamente: R$ 1.261,82 (era R$ 0,00)
+    - Multi-tenant preservado com isolamento por admin_id
   - July 25, 2025. Módulo de Restaurantes Completo Implementado - v8.0.15:
     - Implementado sistema completo de gerenciamento de restaurantes com CRUD funcional
     - Corrigidas colunas faltantes no banco de dados (responsavel, preco_almoco, preco_jantar, preco_lanche, observacoes, admin_id)
