@@ -1141,6 +1141,51 @@ def lancamento_multiplo_ponto():
                 if registro_existente:
                     continue  # Pular se já existe registro
                 
+                # Verificar se o funcionário deve trabalhar neste dia da semana
+                deve_trabalhar_hoje = False
+                if funcionario.horario_trabalho_id:
+                    horario = HorarioTrabalho.query.get(funcionario.horario_trabalho_id)
+                    if horario and horario.dias_semana:
+                        # Converter dia da semana (Monday=0, Sunday=6) para formato brasileiro (Monday=1, Sunday=7)
+                        dia_semana_br = current_date.weekday() + 1
+                        if dia_semana_br == 7:  # Domingo
+                            dia_semana_br = 7
+                        
+                        # Verificar se este dia está nos dias de trabalho
+                        dias_trabalho = [int(d.strip()) for d in horario.dias_semana.split(',') if d.strip()]
+                        deve_trabalhar_hoje = dia_semana_br in dias_trabalho
+                else:
+                    # Se não tem horário configurado, assumir segunda a sexta (padrão)
+                    dia_semana_br = current_date.weekday() + 1
+                    deve_trabalhar_hoje = dia_semana_br <= 5  # Segunda a sexta
+                
+                # Para tipos especiais (sábado/domingo extras), forçar criação independente do horário
+                if tipo_lancamento in ['sabado_horas_extras', 'domingo_horas_extras', 'feriado_trabalhado']:
+                    deve_trabalhar_hoje = True
+                
+                # Pular este dia se o funcionário não deve trabalhar
+                if not deve_trabalhar_hoje:
+                    continue
+                
+                # Usar horários do funcionário se disponível
+                horario_funcionario = None
+                if funcionario.horario_trabalho_id:
+                    horario_funcionario = HorarioTrabalho.query.get(funcionario.horario_trabalho_id)
+                
+                # Configurar horários baseados no horário do funcionário ou padrões
+                if tipo_lancamento == 'trabalho_normal' and horario_funcionario:
+                    hora_entrada = horario_funcionario.entrada
+                    hora_saida = horario_funcionario.saida
+                    hora_almoco_inicio = horario_funcionario.saida_almoco if not data.get('sem_intervalo', False) else None
+                    hora_almoco_fim = horario_funcionario.retorno_almoco if not data.get('sem_intervalo', False) else None
+                elif tipo_lancamento == 'trabalho_normal':
+                    # Usar horários do formulário se não há horário configurado
+                    hora_entrada = datetime.strptime(data.get('hora_entrada', '07:12'), '%H:%M').time()
+                    hora_saida = datetime.strptime(data.get('hora_saida', '17:00'), '%H:%M').time()
+                    if not data.get('sem_intervalo', False):
+                        hora_almoco_inicio = datetime.strptime(data.get('hora_almoco_inicio', '12:00'), '%H:%M').time()
+                        hora_almoco_fim = datetime.strptime(data.get('hora_almoco_fim', '13:00'), '%H:%M').time()
+                
                 # Criar novo registro
                 registro = RegistroPonto(
                     funcionario_id=funcionario.id,
@@ -1174,12 +1219,31 @@ def lancamento_multiplo_ponto():
                                 horas_trabalhadas -= intervalo_almoco
                             
                             registro.horas_extras = horas_trabalhadas
+                    
+                    # Para trabalho normal, calcular horas trabalhadas também
+                    if tipo_lancamento == 'trabalho_normal' and hora_entrada and hora_saida:
+                        entrada_dt = datetime.combine(current_date, hora_entrada)
+                        saida_dt = datetime.combine(current_date, hora_saida)
+                        
+                        horas_totais = (saida_dt - entrada_dt).total_seconds() / 3600
+                        if hora_almoco_inicio and hora_almoco_fim:
+                            almoco_inicio_dt = datetime.combine(current_date, hora_almoco_inicio)
+                            almoco_fim_dt = datetime.combine(current_date, hora_almoco_fim)
+                            intervalo_almoco = (almoco_fim_dt - almoco_inicio_dt).total_seconds() / 3600
+                            horas_totais -= intervalo_almoco
+                        
+                        registro.horas_trabalhadas = horas_totais
+                        
+                        # Verificar se há horas extras (acima das horas diárias do funcionário)
+                        if horario_funcionario and horas_totais > horario_funcionario.horas_diarias:
+                            registro.horas_extras = horas_totais - horario_funcionario.horas_diarias
                 
                 # Adicionar observações específicas do tipo
                 if observacoes:
                     registro.observacoes = f"{tipo_lancamento.upper()}: {observacoes}"
                 else:
-                    registro.observacoes = f"Lançamento múltiplo - {tipo_lancamento.replace('_', ' ').title()}"
+                    nome_tipo = tipo_lancamento.replace('_', ' ').title()
+                    registro.observacoes = f"Lançamento múltiplo - {nome_tipo} (Respeitando horário: {horario_funcionario.nome if horario_funcionario else 'Padrão'})"
                 
                 db.session.add(registro)
                 total_lancamentos += 1
