@@ -797,9 +797,23 @@ def funcionarios():
     from utils import calcular_kpis_funcionarios_geral
     kpis_geral = calcular_kpis_funcionarios_geral(data_inicio, data_fim, current_user.id)
     
+    # Buscar obras ativas do admin para o modal de lançamento múltiplo
+    obras_ativas = Obra.query.filter_by(
+        admin_id=current_user.id,
+        status='Em andamento'  
+    ).order_by(Obra.nome).all()
+    
+    # Buscar funcionários ativos do admin para o modal
+    funcionarios = Funcionario.query.filter_by(
+        admin_id=current_user.id,
+        ativo=True
+    ).order_by(Funcionario.nome).all()
+    
     return render_template('funcionarios.html', 
                          funcionarios_kpis=kpis_geral['funcionarios_kpis'],
+                         funcionarios=funcionarios,
                          kpis_geral=kpis_geral,
+                         obras_ativas=obras_ativas,
                          departamentos=Departamento.query.all(),
                          funcoes=Funcao.query.all(),
                          horarios=HorarioTrabalho.query.all(),
@@ -1044,6 +1058,152 @@ def horario_padrao_funcionario(funcionario_id):
         return jsonify({
             'success': False,
             'message': 'Funcionário não possui horário de trabalho configurado'
+        })
+
+@main_bp.route('/api/ponto/lancamento-multiplo', methods=['POST'])
+@login_required
+@admin_required
+def lancamento_multiplo_ponto():
+    """API para processar lançamento múltiplo de ponto"""
+    try:
+        data = request.get_json()
+        
+        # Validações básicas
+        periodo_inicio = datetime.strptime(data.get('periodo_inicio'), '%Y-%m-%d').date()
+        periodo_fim = datetime.strptime(data.get('periodo_fim'), '%Y-%m-%d').date()
+        tipo_lancamento = data.get('tipo_lancamento')
+        obra_id = data.get('obra_id')
+        funcionarios_ids = data.get('funcionarios', [])
+        observacoes = data.get('observacoes', '')
+        
+        if not all([periodo_inicio, periodo_fim, tipo_lancamento, obra_id, funcionarios_ids]):
+            return jsonify({'success': False, 'message': 'Dados obrigatórios não informados'})
+        
+        # Verificar se obra existe e pertence ao tenant
+        obra = Obra.query.filter_by(id=obra_id, admin_id=current_user.id).first()
+        if not obra:
+            return jsonify({'success': False, 'message': 'Obra não encontrada'})
+        
+        # Configurar horários baseados no tipo de lançamento
+        hora_entrada = None
+        hora_saida = None
+        hora_almoco_inicio = None
+        hora_almoco_fim = None
+        percentual_extras = 0
+        
+        if tipo_lancamento == 'trabalho_normal':
+            hora_entrada = datetime.strptime(data.get('hora_entrada', '07:12'), '%H:%M').time()
+            hora_saida = datetime.strptime(data.get('hora_saida', '17:00'), '%H:%M').time()
+            if not data.get('sem_intervalo', False):
+                hora_almoco_inicio = datetime.strptime(data.get('hora_almoco_inicio', '12:00'), '%H:%M').time()
+                hora_almoco_fim = datetime.strptime(data.get('hora_almoco_fim', '13:00'), '%H:%M').time()
+        
+        elif tipo_lancamento in ['sabado_horas_extras', 'domingo_horas_extras']:
+            hora_entrada = datetime.strptime(data.get('hora_entrada', '07:00'), '%H:%M').time()
+            hora_saida = datetime.strptime(data.get('hora_saida', '11:00'), '%H:%M').time()
+            percentual_extras = int(data.get('percentual_extras', 50 if tipo_lancamento == 'sabado_horas_extras' else 100))
+        
+        elif tipo_lancamento == 'feriado_trabalhado':
+            hora_entrada = datetime.strptime(data.get('hora_entrada', '07:12'), '%H:%M').time()
+            hora_saida = datetime.strptime(data.get('hora_saida', '17:00'), '%H:%M').time()
+            if not data.get('sem_intervalo', False):
+                hora_almoco_inicio = datetime.strptime(data.get('hora_almoco_inicio', '12:00'), '%H:%M').time()
+                hora_almoco_fim = datetime.strptime(data.get('hora_almoco_fim', '13:00'), '%H:%M').time()
+            percentual_extras = 100
+        
+        elif tipo_lancamento == 'meio_periodo':
+            hora_entrada = datetime.strptime(data.get('hora_entrada', '07:12'), '%H:%M').time()
+            hora_saida = datetime.strptime(data.get('hora_saida', '11:12'), '%H:%M').time()
+        
+        # Processar lançamentos para cada funcionário em cada dia do período
+        total_lancamentos = 0
+        current_date = periodo_inicio
+        
+        # Buscar funcionários com isolamento de tenant
+        funcionarios = Funcionario.query.filter(
+            Funcionario.id.in_(funcionarios_ids),
+            Funcionario.admin_id == current_user.id
+        ).all()
+        
+        if len(funcionarios) != len(funcionarios_ids):
+            return jsonify({'success': False, 'message': 'Alguns funcionários não foram encontrados'})
+        
+        while current_date <= periodo_fim:
+            for funcionario in funcionarios:
+                # Verificar se já existe registro para este funcionário nesta data
+                registro_existente = RegistroPonto.query.filter(
+                    and_(
+                        RegistroPonto.funcionario_id == funcionario.id,
+                        RegistroPonto.data == current_date
+                    )
+                ).first()
+                
+                if registro_existente:
+                    continue  # Pular se já existe registro
+                
+                # Criar novo registro
+                registro = RegistroPonto(
+                    funcionario_id=funcionario.id,
+                    obra_id=obra_id,
+                    data=current_date,
+                    tipo_registro=tipo_lancamento,
+                    admin_id=current_user.id
+                )
+                
+                # Configurar campos baseados no tipo
+                if tipo_lancamento not in ['falta', 'falta_justificada']:
+                    registro.hora_entrada = hora_entrada
+                    registro.hora_saida = hora_saida
+                    registro.hora_almoco_saida = hora_almoco_inicio
+                    registro.hora_almoco_retorno = hora_almoco_fim
+                    
+                    if percentual_extras > 0:
+                        registro.percentual_extras = percentual_extras
+                        
+                        # Calcular horas extras baseado no tipo
+                        if hora_entrada and hora_saida:
+                            # Calcular horas trabalhadas
+                            entrada_dt = datetime.combine(current_date, hora_entrada)
+                            saida_dt = datetime.combine(current_date, hora_saida)
+                            
+                            # Subtrair almoço se houver
+                            horas_trabalhadas = (saida_dt - entrada_dt).total_seconds() / 3600
+                            if hora_almoco_inicio and hora_almoco_fim:
+                                almoco_inicio_dt = datetime.combine(current_date, hora_almoco_inicio)
+                                almoco_fim_dt = datetime.combine(current_date, hora_almoco_fim)
+                                intervalo_almoco = (almoco_fim_dt - almoco_inicio_dt).total_seconds() / 3600
+                                horas_trabalhadas -= intervalo_almoco
+                            
+                            registro.horas_extras = horas_trabalhadas
+                
+                # Adicionar observações específicas do tipo
+                if observacoes:
+                    registro.observacoes = f"{tipo_lancamento.upper()}: {observacoes}"
+                else:
+                    registro.observacoes = f"Lançamento múltiplo - {tipo_lancamento.replace('_', ' ').title()}"
+                
+                db.session.add(registro)
+                total_lancamentos += 1
+            
+            # Próximo dia
+            current_date += timedelta(days=1)
+        
+        # Commit de todos os registros
+        db.session.commit()
+        
+        return jsonify({
+            'success': True,
+            'message': f'Lançamentos processados com sucesso!',
+            'total_lancamentos': total_lancamentos,
+            'funcionarios_processados': len(funcionarios),
+            'dias_processados': (periodo_fim - periodo_inicio).days + 1
+        })
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({
+            'success': False, 
+            'message': f'Erro ao processar lançamentos: {str(e)}'
         })
 
 @main_bp.route('/funcionarios/modal', methods=['POST'])

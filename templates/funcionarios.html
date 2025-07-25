@@ -18,6 +18,9 @@
                     <button type="button" class="btn btn-outline-primary" data-bs-toggle="modal" data-bs-target="#funcionarioModal" onclick="abrirModalNovoFuncionario()">
                         <i class="fas fa-plus-circle"></i> Modal Rápido
                     </button>
+                    <button type="button" class="btn btn-success" data-bs-toggle="modal" data-bs-target="#modalLancamentoMultiplo">
+                        <i class="fas fa-users-cog"></i> Lançamento Múltiplo
+                    </button>
                 </div>
             </div>
         </div>
@@ -716,5 +719,406 @@ function setDateRange(period) {
         console.error('Campos de data não encontrados!');
     }
 }
+</script>
+
+<!-- Modal de Lançamento Múltiplo -->
+<div class="modal fade" id="modalLancamentoMultiplo" tabindex="-1" aria-labelledby="modalLancamentoMultiploLabel" aria-hidden="true">
+    <div class="modal-dialog modal-xl">
+        <div class="modal-content">
+            <div class="modal-header bg-success text-white">
+                <h5 class="modal-title" id="modalLancamentoMultiploLabel">
+                    <i class="fas fa-users-cog"></i> Lançamento Múltiplo de Ponto
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Fechar"></button>
+            </div>
+            <div class="modal-body">
+                <form id="formLancamentoMultiplo">
+                    <!-- Período e Configurações Gerais -->
+                    <div class="row mb-4">
+                        <div class="col-12">
+                            <div class="card">
+                                <div class="card-header">
+                                    <h6 class="mb-0"><i class="fas fa-calendar-alt"></i> Configurações do Lançamento</h6>
+                                </div>
+                                <div class="card-body">
+                                    <div class="row">
+                                        <div class="col-md-3">
+                                            <label for="periodo_inicio" class="form-label">Data Início*</label>
+                                            <input type="date" class="form-control" id="periodo_inicio" name="periodo_inicio" required>
+                                        </div>
+                                        <div class="col-md-3">
+                                            <label for="periodo_fim" class="form-label">Data Fim*</label>
+                                            <input type="date" class="form-control" id="periodo_fim" name="periodo_fim" required>
+                                        </div>
+                                        <div class="col-md-3">
+                                            <label for="tipo_lancamento" class="form-label">Tipo de Lançamento*</label>
+                                            <select class="form-select" id="tipo_lancamento" name="tipo_lancamento" required onchange="toggleCamposTipoLancamento()">
+                                                <option value="">Selecione...</option>
+                                                <option value="trabalho_normal">Trabalho Normal</option>
+                                                <option value="sabado_horas_extras">Sábado - Horas Extras</option>
+                                                <option value="domingo_horas_extras">Domingo - Horas Extras</option>
+                                                <option value="feriado_trabalhado">Feriado Trabalhado</option>
+                                                <option value="meio_periodo">Meio Período</option>
+                                                <option value="falta">Falta</option>
+                                                <option value="falta_justificada">Falta Justificada</option>
+                                            </select>
+                                        </div>
+                                        <div class="col-md-3">
+                                            <label for="obra_lancamento" class="form-label">Obra*</label>
+                                            <select class="form-select" id="obra_lancamento" name="obra_id" required>
+                                                <option value="">Selecione uma obra...</option>
+                                                {% for obra in obras_ativas %}
+                                                <option value="{{ obra.id }}">{{ obra.nome }}</option>
+                                                {% endfor %}
+                                            </select>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Campos de Horários (visível apenas para tipos que precisam) -->
+                    <div class="row mb-4" id="campos_horarios" style="display: none;">
+                        <div class="col-12">
+                            <div class="card">
+                                <div class="card-header">
+                                    <h6 class="mb-0"><i class="fas fa-clock"></i> Horários de Trabalho</h6>
+                                </div>
+                                <div class="card-body">
+                                    <div class="row">
+                                        <div class="col-md-2">
+                                            <label for="hora_entrada" class="form-label">Entrada</label>
+                                            <input type="time" class="form-control" id="hora_entrada" name="hora_entrada">
+                                        </div>
+                                        <div class="col-md-2">
+                                            <label for="hora_almoco_inicio" class="form-label">Início Almoço</label>
+                                            <input type="time" class="form-control" id="hora_almoco_inicio" name="hora_almoco_inicio">
+                                        </div>
+                                        <div class="col-md-2">
+                                            <label for="hora_almoco_fim" class="form-label">Fim Almoço</label>
+                                            <input type="time" class="form-control" id="hora_almoco_fim" name="hora_almoco_fim">
+                                        </div>
+                                        <div class="col-md-2">
+                                            <label for="hora_saida" class="form-label">Saída</label>
+                                            <input type="time" class="form-control" id="hora_saida" name="hora_saida">
+                                        </div>
+                                        <div class="col-md-2">
+                                            <label for="percentual_extras" class="form-label">% Extras</label>
+                                            <input type="number" class="form-control" id="percentual_extras" name="percentual_extras" 
+                                                   min="0" max="200" placeholder="50">
+                                        </div>
+                                        <div class="col-md-2">
+                                            <div class="form-check mt-4">
+                                                <input class="form-check-input" type="checkbox" id="sem_intervalo" name="sem_intervalo">
+                                                <label class="form-check-label" for="sem_intervalo">
+                                                    Sem Intervalo
+                                                </label>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Seleção de Funcionários -->
+                    <div class="row mb-4">
+                        <div class="col-12">
+                            <div class="card">
+                                <div class="card-header d-flex justify-content-between align-items-center">
+                                    <h6 class="mb-0"><i class="fas fa-users"></i> Selecionar Funcionários</h6>
+                                    <div>
+                                        <button type="button" class="btn btn-sm btn-outline-primary" onclick="selecionarTodosFuncionarios()">
+                                            <i class="fas fa-check-double"></i> Selecionar Todos
+                                        </button>
+                                        <button type="button" class="btn btn-sm btn-outline-secondary" onclick="limparSelecaoFuncionarios()">
+                                            <i class="fas fa-times"></i> Limpar Seleção
+                                        </button>
+                                    </div>
+                                </div>
+                                <div class="card-body">
+                                    <div class="row mb-3">
+                                        <div class="col-md-6">
+                                            <input type="text" class="form-control" id="busca_funcionarios" 
+                                                   placeholder="Buscar funcionários..." onkeyup="filtrarFuncionariosModal()">
+                                        </div>
+                                        <div class="col-md-6">
+                                            <div id="contador_selecionados" class="text-muted">
+                                                <i class="fas fa-users"></i> 0 funcionários selecionados
+                                            </div>
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="row" id="lista_funcionarios" style="max-height: 300px; overflow-y: auto;">
+                                        {% for funcionario in funcionarios %}
+                                        <div class="col-md-4 mb-2 funcionario-item" data-nome="{{ funcionario.nome.lower() }}" data-funcao="{{ funcionario.funcao.nome.lower() if funcionario.funcao else '' }}">
+                                            <div class="card">
+                                                <div class="card-body p-2">
+                                                    <div class="form-check">
+                                                        <input class="form-check-input funcionario-checkbox" type="checkbox" 
+                                                               value="{{ funcionario.id }}" id="func_{{ funcionario.id }}" 
+                                                               onchange="atualizarContadorSelecionados()">
+                                                        <label class="form-check-label w-100" for="func_{{ funcionario.id }}">
+                                                            <div class="d-flex align-items-center">
+                                                                <div class="me-2">
+                                                                    {% if funcionario.foto %}
+                                                                    <img src="{{ funcionario.foto }}" class="rounded-circle" width="30" height="30">
+                                                                    {% else %}
+                                                                    <div class="rounded-circle bg-primary text-white d-flex align-items-center justify-content-center" 
+                                                                         style="width: 30px; height: 30px; font-size: 12px;">
+                                                                        {{ funcionario.nome.split()[0][0] }}{{ funcionario.nome.split()[-1][0] if funcionario.nome.split()|length > 1 else '' }}
+                                                                    </div>
+                                                                    {% endif %}
+                                                                </div>
+                                                                <div class="flex-grow-1">
+                                                                    <div class="fw-bold" style="font-size: 0.9em;">{{ funcionario.nome[:20] }}{% if funcionario.nome|length > 20 %}...{% endif %}</div>
+                                                                    <small class="text-muted">{{ funcionario.funcao.nome if funcionario.funcao else 'Sem função' }}</small>
+                                                                </div>
+                                                            </div>
+                                                        </label>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        {% endfor %}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Observações -->
+                    <div class="row mb-3">
+                        <div class="col-12">
+                            <div class="card">
+                                <div class="card-header">
+                                    <h6 class="mb-0"><i class="fas fa-comment"></i> Observações (Opcional)</h6>
+                                </div>
+                                <div class="card-body">
+                                    <textarea class="form-control" id="observacoes_lancamento" name="observacoes" 
+                                              rows="3" placeholder="Observações sobre este lançamento..."></textarea>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                    <i class="fas fa-times"></i> Cancelar
+                </button>
+                <button type="button" class="btn btn-success" onclick="processarLancamentoMultiplo()">
+                    <i class="fas fa-save"></i> Processar Lançamentos
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// Funções para o Modal de Lançamento Múltiplo
+function toggleCamposTipoLancamento() {
+    const tipo = document.getElementById('tipo_lancamento').value;
+    const camposHorarios = document.getElementById('campos_horarios');
+    
+    // Tipos que precisam de horários
+    const tiposComHorarios = ['trabalho_normal', 'sabado_horas_extras', 'domingo_horas_extras', 'feriado_trabalhado', 'meio_periodo'];
+    
+    if (tiposComHorarios.includes(tipo)) {
+        camposHorarios.style.display = 'block';
+        
+        // Definir valores padrão baseados no tipo
+        const horaEntrada = document.getElementById('hora_entrada');
+        const horaAlmocoInicio = document.getElementById('hora_almoco_inicio');
+        const horaAlmocoFim = document.getElementById('hora_almoco_fim');
+        const horaSaida = document.getElementById('hora_saida');
+        const percentualExtras = document.getElementById('percentual_extras');
+        
+        switch(tipo) {
+            case 'trabalho_normal':
+                horaEntrada.value = '07:12';
+                horaAlmocoInicio.value = '12:00';
+                horaAlmocoFim.value = '13:00';
+                horaSaida.value = '17:00';
+                percentualExtras.value = '';
+                break;
+            case 'sabado_horas_extras':
+                horaEntrada.value = '07:00';
+                horaAlmocoInicio.value = '';
+                horaAlmocoFim.value = '';
+                horaSaida.value = '11:00';
+                percentualExtras.value = '50';
+                break;
+            case 'domingo_horas_extras':
+                horaEntrada.value = '07:00';
+                horaAlmocoInicio.value = '';
+                horaAlmocoFim.value = '';
+                horaSaida.value = '11:00';
+                percentualExtras.value = '100';
+                break;
+            case 'feriado_trabalhado':
+                horaEntrada.value = '07:12';
+                horaAlmocoInicio.value = '12:00';
+                horaAlmocoFim.value = '13:00';
+                horaSaida.value = '17:00';
+                percentualExtras.value = '100';
+                break;
+            case 'meio_periodo':
+                horaEntrada.value = '07:12';
+                horaAlmocoInicio.value = '';
+                horaAlmocoFim.value = '';
+                horaSaida.value = '11:12';
+                percentualExtras.value = '';
+                break;
+        }
+    } else {
+        camposHorarios.style.display = 'none';
+    }
+}
+
+function selecionarTodosFuncionarios() {
+    const checkboxes = document.querySelectorAll('.funcionario-checkbox');
+    const funcionariosVisiveis = document.querySelectorAll('.funcionario-item:not([style*="display: none"])');
+    
+    funcionariosVisiveis.forEach(item => {
+        const checkbox = item.querySelector('.funcionario-checkbox');
+        if (checkbox) {
+            checkbox.checked = true;
+        }
+    });
+    
+    atualizarContadorSelecionados();
+}
+
+function limparSelecaoFuncionarios() {
+    const checkboxes = document.querySelectorAll('.funcionario-checkbox');
+    checkboxes.forEach(checkbox => {
+        checkbox.checked = false;
+    });
+    atualizarContadorSelecionados();
+}
+
+function atualizarContadorSelecionados() {
+    const checkboxes = document.querySelectorAll('.funcionario-checkbox:checked');
+    const contador = document.getElementById('contador_selecionados');
+    contador.innerHTML = `<i class="fas fa-users"></i> ${checkboxes.length} funcionários selecionados`;
+}
+
+function filtrarFuncionariosModal() {
+    const busca = document.getElementById('busca_funcionarios').value.toLowerCase();
+    const funcionarios = document.querySelectorAll('.funcionario-item');
+    
+    funcionarios.forEach(funcionario => {
+        const nome = funcionario.dataset.nome || '';
+        const funcao = funcionario.dataset.funcao || '';
+        
+        if (nome.includes(busca) || funcao.includes(busca)) {
+            funcionario.style.display = '';
+        } else {
+            funcionario.style.display = 'none';
+        }
+    });
+}
+
+function processarLancamentoMultiplo() {
+    const form = document.getElementById('formLancamentoMultiplo');
+    const formData = new FormData(form);
+    
+    // Validações
+    if (!formData.get('periodo_inicio') || !formData.get('periodo_fim')) {
+        alert('Por favor, selecione o período de lançamento.');
+        return;
+    }
+    
+    if (!formData.get('tipo_lancamento')) {
+        alert('Por favor, selecione o tipo de lançamento.');
+        return;
+    }
+    
+    if (!formData.get('obra_id')) {
+        alert('Por favor, selecione uma obra.');
+        return;
+    }
+    
+    // Coletar funcionários selecionados
+    const funcionariosSelecionados = [];
+    const checkboxes = document.querySelectorAll('.funcionario-checkbox:checked');
+    
+    if (checkboxes.length === 0) {
+        alert('Por favor, selecione pelo menos um funcionário.');
+        return;
+    }
+    
+    checkboxes.forEach(checkbox => {
+        funcionariosSelecionados.push(checkbox.value);
+    });
+    
+    // Preparar dados para envio
+    const dadosLancamento = {
+        periodo_inicio: formData.get('periodo_inicio'),
+        periodo_fim: formData.get('periodo_fim'),
+        tipo_lancamento: formData.get('tipo_lancamento'),
+        obra_id: formData.get('obra_id'),
+        funcionarios: funcionariosSelecionados,
+        hora_entrada: formData.get('hora_entrada'),
+        hora_almoco_inicio: formData.get('hora_almoco_inicio'),
+        hora_almoco_fim: formData.get('hora_almoco_fim'),
+        hora_saida: formData.get('hora_saida'),
+        percentual_extras: formData.get('percentual_extras'),
+        sem_intervalo: formData.get('sem_intervalo') ? true : false,
+        observacoes: formData.get('observacoes')
+    };
+    
+    // Confirmar com o usuário
+    const diasPeriodo = Math.ceil((new Date(dadosLancamento.periodo_fim) - new Date(dadosLancamento.periodo_inicio)) / (1000 * 60 * 60 * 24)) + 1;
+    const totalLancamentos = funcionariosSelecionados.length * diasPeriodo;
+    
+    if (!confirm(`Confirma o lançamento múltiplo?\n\n${funcionariosSelecionados.length} funcionários\n${diasPeriodo} dias\nTotal: ${totalLancamentos} lançamentos`)) {
+        return;
+    }
+    
+    // Mostrar loading
+    const btnProcessar = event.target;
+    const textoOriginal = btnProcessar.innerHTML;
+    btnProcessar.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Processando...';
+    btnProcessar.disabled = true;
+    
+    // Enviar requisição
+    fetch('/api/ponto/lancamento-multiplo', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(dadosLancamento)
+    })
+    .then(response => response.json())
+    .then(result => {
+        if (result.success) {
+            alert(`Sucesso! ${result.total_lancamentos} lançamentos processados.`);
+            $('#modalLancamentoMultiplo').modal('hide');
+            location.reload();
+        } else {
+            alert('Erro: ' + result.message);
+        }
+    })
+    .catch(error => {
+        console.error('Erro:', error);
+        alert('Erro ao processar lançamentos.');
+    })
+    .finally(() => {
+        btnProcessar.innerHTML = textoOriginal;
+        btnProcessar.disabled = false;
+    });
+}
+
+// Configurar datas padrão ao abrir o modal
+$('#modalLancamentoMultiplo').on('show.bs.modal', function() {
+    const hoje = new Date();
+    const primeiroDiaDoMes = new Date(hoje.getFullYear(), hoje.getMonth(), 1);
+    
+    document.getElementById('periodo_inicio').value = primeiroDiaDoMes.toISOString().split('T')[0];
+    document.getElementById('periodo_fim').value = hoje.toISOString().split('T')[0];
+});
 </script>
 {% endblock %}
