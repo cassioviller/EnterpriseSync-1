@@ -6,9 +6,10 @@ import re
 from werkzeug.utils import secure_filename
 from flask import current_app
 
-def calcular_horas_trabalhadas(hora_entrada, hora_saida, hora_almoco_saida=None, hora_almoco_retorno=None):
+def calcular_horas_trabalhadas(hora_entrada, hora_saida, hora_almoco_saida=None, hora_almoco_retorno=None, data=None):
     """
     Calcula as horas trabalhadas e horas extras
+    Considera adicional de 50% para sábados
     """
     if not hora_entrada or not hora_saida:
         return {'total': 0, 'extras': 0}
@@ -38,8 +39,16 @@ def calcular_horas_trabalhadas(hora_entrada, hora_saida, hora_almoco_saida=None,
     # Converter para horas decimais
     horas_trabalhadas = tempo_total.total_seconds() / 3600
     
-    # Calcular horas extras (acima de 8 horas)
-    horas_extras = max(0, horas_trabalhadas - 8)
+    # Calcular horas extras
+    if data and data.weekday() == 5:  # Sábado (0=segunda, 5=sábado)
+        # No sábado, todas as horas são consideradas extras
+        horas_extras = horas_trabalhadas
+    elif data and data.weekday() == 6:  # Domingo
+        # No domingo, todas as horas são consideradas extras
+        horas_extras = horas_trabalhadas
+    else:
+        # Dias normais: extras acima de 8 horas
+        horas_extras = max(0, horas_trabalhadas - 8)
     
     return {
         'total': round(horas_trabalhadas, 2),

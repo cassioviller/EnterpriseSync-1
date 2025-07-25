@@ -3517,7 +3517,8 @@ def novo_ponto_lista():
         if registro.hora_entrada and registro.hora_saida:
             horas_trabalhadas = calcular_horas_trabalhadas(
                 registro.hora_entrada, registro.hora_saida,
-                registro.hora_almoco_saida, registro.hora_almoco_retorno
+                registro.hora_almoco_saida, registro.hora_almoco_retorno,
+                registro.data
             )
             registro.horas_trabalhadas = horas_trabalhadas['total']
             registro.horas_extras = horas_trabalhadas['extras']
@@ -3578,7 +3579,8 @@ def editar_registro_ponto(id):
             if registro.hora_entrada and registro.hora_saida:
                 horas_trabalhadas = calcular_horas_trabalhadas(
                     registro.hora_entrada, registro.hora_saida,
-                    registro.hora_almoco_saida, registro.hora_almoco_retorno
+                    registro.hora_almoco_saida, registro.hora_almoco_retorno,
+                    registro.data
                 )
                 registro.horas_trabalhadas = horas_trabalhadas['total']
                 registro.horas_extras = horas_trabalhadas['extras']
