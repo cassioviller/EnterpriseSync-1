@@ -523,19 +523,34 @@ class KPIsEngine:
             entrada_minutos = registro.hora_entrada.hour * 60 + registro.hora_entrada.minute
             saida_minutos = registro.hora_saida.hour * 60 + registro.hora_saida.minute
             
-            # Subtrair tempo de almoço
-            tempo_almoco = 60  # 1 hora padrão
+            # CORREÇÃO: Almoço opcional para tipos especiais
+            tempo_almoco = 0
             if registro.hora_almoco_saida and registro.hora_almoco_retorno:
                 almoco_saida = registro.hora_almoco_saida.hour * 60 + registro.hora_almoco_saida.minute
                 almoco_retorno = registro.hora_almoco_retorno.hour * 60 + registro.hora_almoco_retorno.minute
                 tempo_almoco = almoco_retorno - almoco_saida
+            elif registro.tipo_registro == 'trabalho_normal':
+                # Para trabalho normal sem horário especificado, assumir 1h
+                tempo_almoco = 60
             
             total_minutos = saida_minutos - entrada_minutos - tempo_almoco
             registro.horas_trabalhadas = max(0, total_minutos / 60.0)
             
-            # Calcular horas extras (acima de 8h)
-            jornada_normal = 8.0
-            registro.horas_extras = max(0, registro.horas_trabalhadas - jornada_normal)
+            # CORREÇÃO CRÍTICA: Calcular horas extras baseado no tipo
+            if registro.tipo_registro in ['sabado_horas_extras', 'domingo_horas_extras', 'feriado_trabalhado']:
+                # Para tipos especiais, TODAS as horas são extras
+                registro.horas_extras = registro.horas_trabalhadas
+                # Definir percentual correto automaticamente
+                if registro.tipo_registro == 'sabado_horas_extras':
+                    registro.percentual_extras = 50.0
+                else:  # domingo_horas_extras, feriado_trabalhado
+                    registro.percentual_extras = 100.0
+            else:
+                # Para trabalho normal, apenas horas acima da jornada padrão
+                horas_jornada = funcionario.horario_trabalho.horas_diarias if funcionario.horario_trabalho else 8.0
+                registro.horas_extras = max(0, registro.horas_trabalhadas - horas_jornada)
+                if registro.horas_extras > 0:
+                    registro.percentual_extras = 50.0  # Padrão para horas extras normais
         
         # Salvar alterações
         db.session.commit()

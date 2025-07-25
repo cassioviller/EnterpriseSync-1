@@ -1,0 +1,126 @@
+Prezado Replit,
+
+Com base em um relatório técnico detalhado, identifiquei diversos bugs e inconsistências no sistema de registro de ponto do SIGE v8.0. É crucial que essas correções sejam implementadas para garantir a precisão dos cálculos de horas, horas extras, atrasos e a correta funcionalidade do CRUD.
+
+Por favor, revise os arquivos `models.py`, `views.py`, `kpis_engine.py`, `templates/funcionario_perfil.html` e os arquivos JavaScript em `static/js/` para aplicar as correções detalhadas abaixo. O objetivo é alinhar o sistema com as regras de negócio e garantir a integridade dos dados.
+
+---
+
+### **Visão Geral dos Problemas e Soluções**
+
+O sistema de registro de ponto, embora funcional em sua base, apresenta falhas críticas que afetam a precisão dos cálculos e a usabilidade. Os problemas foram categorizados e as soluções propostas visam corrigir a lógica de negócio e a interação entre frontend e backend.
+
+---
+
+### **1. Problemas Identificados e Correções Necessárias**
+
+#### **🔴 PROBLEMA 1: Sábado sem Horário de Almoço**
+*   **Sintoma**: Registros de sábado não salvam `hora_almoco_saida`/`retorno`.
+*   **Causa**: JavaScript ou backend não processa o horário de almoço para tipos de registro especiais (`SABADO_HORAS_EXTRAS`, `DOMINGO_HORAS_EXTRAS`, `FERIADO_TRABALHADO`).
+*   **Impacto**: Cálculo incorreto de horas trabalhadas.
+*   **Correção**: Modificar a lógica no frontend (JavaScript do modal de edição) e no backend (`views.py`) para permitir que os campos de horário de almoço sejam opcionais para esses tipos de registro, mas que, se preenchidos, sejam salvos e considerados no cálculo.
+
+#### **🔴 PROBLEMA 2: Cálculo de Horas Inconsistente**
+*   **Sintoma**: Horas extras não seguem a regra "TODAS as horas em sábado/domingo/feriado são extras".
+*   **Causa**: A lógica de cálculo em `kpis_engine.py` não diferencia corretamente os tipos de registro especiais dos normais para o cálculo de horas extras.
+*   **Impacto**: Pagamento incorreto de horas extras.
+*   **Correção**: Ajustar a função `_calcular_horas_extras` e `calcular_e_atualizar_ponto` em `kpis_engine.py` para aplicar a regra correta:
+    ```python
+    # LÓGICA CORRETA para horas extras
+    if registro.tipo_registro in ["sabado_horas_extras", "domingo_horas_extras", "feriado_trabalhado"]:
+        registro.horas_extras = registro.horas_trabalhadas  # TODAS as horas são extras
+    else:
+        registro.horas_extras = max(0, registro.horas_trabalhadas - 8.0)  # Apenas acima de 8h para trabalho normal
+    ```
+
+#### **🔴 PROBLEMA 3: CRUD com Erros de Campo**
+*   **Sintoma**: `AttributeError: 'entrada' object has no attribute` ao tentar editar registros.
+*   **Causa**: Inconsistência entre os nomes dos campos no modelo (`models.py`) e o código que tenta acessá-los (`views.py`). O modelo usa `hora_entrada`, `hora_saida`, etc., mas o código tenta acessar `entrada`, `saida`.
+*   **Impacto**: Funcionalidade de edição de registro quebrada.
+*   **Correção**: Em `views.py`, substituir as referências incorretas pelos nomes de campo corretos do modelo `RegistroPonto`:
+    ```python
+    # ❌ ERRO ATUAL
+    # 'entrada': registro.entrada.strftime('%H:%M')
+
+    # ✅ CORREÇÃO
+    'hora_entrada': registro.hora_entrada.strftime('%H:%M') if registro.hora_entrada else None,
+    'hora_saida': registro.hora_saida.strftime('%H:%M') if registro.hora_saida else None,
+    'hora_almoco_saida': registro.hora_almoco_saida.strftime('%H:%M') if registro.hora_almoco_saida else None,
+    'hora_almoco_retorno': registro.hora_almoco_retorno.strftime('%H:%M') if registro.hora_almoco_retorno else None,
+    ```
+    Aplicar essa correção em todas as partes do CRUD onde os campos de horário são acessados.
+
+#### **🔴 PROBLEMA 4: Validação de Tipos Especiais (Atrasos)**
+*   **Sintoma**: O sistema permite o cálculo de atrasos para registros de sábado/domingo/feriado.
+*   **Causa**: A lógica de cálculo de atrasos em `kpis_engine.py` não exclui corretamente os tipos de registro especiais.
+*   **Impacto**: KPIs de atraso incorretos.
+*   **Correção**: Ajustar a função `_calcular_atrasos_horas` e `calcular_e_atualizar_ponto` em `kpis_engine.py` para zerar os atrasos para esses tipos de registro:
+    ```python
+    # LÓGICA CORRETA para atrasos
+    if registro.tipo_registro not in ["sabado_horas_extras", "domingo_horas_extras", "feriado_trabalhado"]:
+        # Só calcula atraso para trabalho com horário fixo
+        # ... (lógica existente de cálculo de atrasos)
+    else:
+        # Tipos especiais: zero atraso sempre
+        registro.minutos_atraso_entrada = 0
+        registro.minutos_atraso_saida = 0
+        registro.total_atraso_minutos = 0
+        registro.total_atraso_horas = 0
+    ```
+
+---
+
+### **2. Regras Críticas de Implementação (Reafirmação)**
+
+Para garantir a consistência, reafirmo as regras críticas que devem ser seguidas na implementação:
+
+*   **Horários de Almoço**: OBRIGATÓRIO para `TRABALHO_NORMAL` (desconta 1h padrão); OPCIONAL para `SABADO_HORAS_EXTRAS`, `DOMINGO_HORAS_EXTRAS`, `FERIADO_TRABALHADO` (pode trabalhar sem parar); NÃO SE APLICA para `FALTA`/`FALTA_JUSTIFICADA`.
+*   **Cálculo de Horas Extras**: Conforme a correção do PROBLEMA 2.
+*   **Atrasos**: Conforme a correção do PROBLEMA 4.
+*   **Percentuais**: `TRABALHO_NORMAL`: 50% apenas para horas acima de 8h; `SÁBADO`: 50% sobre TODAS as horas; `DOMINGO`/`FERIADO`: 100% sobre TODAS as horas.
+
+---
+
+### **3. Arquivos Principais Envolvidos**
+
+As alterações devem ser focadas nos seguintes arquivos:
+
+*   `models.py`: Verificação da estrutura do modelo `RegistroPonto`.
+*   `views.py`: APIs REST para CRUD do ponto (principalmente na edição e criação).
+*   `kpis_engine.py`: Motor de cálculos e KPIs (onde a lógica de horas extras e atrasos reside).
+*   `templates/funcionario_perfil.html`: Interface de controle (pode precisar de ajustes para campos de almoço opcionais).
+*   `static/js/`: Arquivos JavaScript relacionados ao modal de edição/criação de ponto (para lidar com a opcionalidade do almoço).
+
+---
+
+### **4. Comandos de Teste e Validação**
+
+Após a implementação das correções, por favor, execute os seguintes testes para validar a funcionalidade:
+
+*   **Testar cálculos de um registro específico:**
+    ```bash
+    python -c "from kpis_engine import KPIsEngine; engine = KPIsEngine(); engine.calcular_e_atualizar_ponto(ID_DO_REGISTRO)"
+    ```
+    (Substitua `ID_DO_REGISTRO` por um ID real de teste).
+
+*   **Verificar inconsistências (se houver um script de debug):**
+    ```bash
+    python debug_calculos_ponto.py
+    ```
+
+*   **Testar o CRUD completo (criação, leitura, atualização, exclusão) de registros de ponto para todos os tipos (`TRABALHO_NORMAL`, `SABADO_HORAS_EXTRAS`, `DOMINGO_HORAS_EXTRAS`, `FERIADO_TRABALHADO`, `FALTA`, `FALTA_JUSTIFICADA`).**
+
+---
+
+**Resultado Esperado:**
+
+Com a aplicação dessas correções, o sistema de registro de ponto do SIGE v8.0 deve:
+
+*   ✅ Calcular horas trabalhadas e horas extras de forma precisa para todos os tipos de registro.
+*   ✅ Processar corretamente os horários de almoço, respeitando a opcionalidade para tipos especiais.
+*   ✅ Permitir a edição de registros sem erros de `AttributeError`.
+*   ✅ Calcular atrasos apenas para os tipos de registro aplicáveis, zerando-os para os tipos especiais.
+*   ✅ Fornecer KPIs de produtividade e absenteísmo mais confiáveis.
+
+Por favor, implemente essas correções e me informe o resultado. Se precisar de mais informações ou encontrar qualquer dificuldade, estou à disposição.
+

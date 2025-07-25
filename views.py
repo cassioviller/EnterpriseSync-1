@@ -4872,18 +4872,22 @@ def criar_registro_ponto():
             saida = request.form.get('saida')
             
             if entrada:
-                registro.entrada = datetime.strptime(entrada, '%H:%M').time()
+                registro.hora_entrada = datetime.strptime(entrada, '%H:%M').time()
             if saida_almoco:
-                registro.saida_almoco = datetime.strptime(saida_almoco, '%H:%M').time()
+                registro.hora_almoco_saida = datetime.strptime(saida_almoco, '%H:%M').time()
             if retorno_almoco:
-                registro.retorno_almoco = datetime.strptime(retorno_almoco, '%H:%M').time()
+                registro.hora_almoco_retorno = datetime.strptime(retorno_almoco, '%H:%M').time()
             if saida:
-                registro.saida = datetime.strptime(saida, '%H:%M').time()
+                registro.hora_saida = datetime.strptime(saida, '%H:%M').time()
         
-        # Percentual de extras
-        percentual_extras = request.form.get('percentual_extras')
-        if percentual_extras:
-            registro.percentual_extras = float(percentual_extras)
+        # Percentual de extras baseado no tipo
+        if tipo_registro == 'sabado_horas_extras':
+            registro.percentual_extras = 50.0
+        elif tipo_registro in ['domingo_horas_extras', 'feriado_trabalhado']:
+            registro.percentual_extras = 100.0
+        else:
+            percentual_extras = request.form.get('percentual_extras')
+            registro.percentual_extras = float(percentual_extras) if percentual_extras else 0.0
         
         # Observações
         registro.observacoes = request.form.get('observacoes')
@@ -4960,12 +4964,14 @@ def atualizar_registro_ponto(registro_id):
             if saida:
                 registro.hora_saida = datetime.strptime(saida, '%H:%M').time()
                 
-        # Percentual de extras
-        percentual_extras = request.json.get('percentual_extras')
-        if percentual_extras:
-            registro.percentual_extras = float(percentual_extras)
+        # Percentual de extras baseado no tipo
+        if tipo_registro == 'sabado_horas_extras':
+            registro.percentual_extras = 50.0
+        elif tipo_registro in ['domingo_horas_extras', 'feriado_trabalhado']:
+            registro.percentual_extras = 100.0
         else:
-            registro.percentual_extras = 0
+            percentual_extras = request.json.get('percentual_extras')
+            registro.percentual_extras = float(percentual_extras) if percentual_extras else 0.0
         
         # Observações
         registro.observacoes = request.json.get('observacoes_ponto', '')
