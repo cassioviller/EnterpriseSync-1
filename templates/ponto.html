@@ -335,16 +335,48 @@ function registrarPonto(tipo) {
 }
 
 function editarRegistro(id) {
-    alert('Funcionalidade de edição será implementada em breve');
+    // Redirecionar para página de edição
+    window.location.href = `/ponto/editar/${id}`;
 }
 
 function excluirRegistro(id) {
-    if (confirm('Tem certeza que deseja excluir este registro?')) {
-        const form = document.createElement('form');
-        form.method = 'POST';
-        form.action = '/ponto/' + id + '/excluir';
-        document.body.appendChild(form);
-        form.submit();
+    if (confirm('Tem certeza que deseja excluir este registro de ponto?')) {
+        // Fazer requisição AJAX para exclusão
+        fetch(`/ponto/excluir/${id}`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-Requested-With': 'XMLHttpRequest'
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                // Mostrar mensagem de sucesso
+                const alertDiv = document.createElement('div');
+                alertDiv.className = 'alert alert-success alert-dismissible fade show';
+                alertDiv.innerHTML = `
+                    <i class="fas fa-check-circle me-2"></i>
+                    ${data.message}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                `;
+                
+                // Inserir alerta no topo da página
+                const container = document.querySelector('.row');
+                container.insertBefore(alertDiv, container.firstChild);
+                
+                // Recarregar a página após 1.5 segundos
+                setTimeout(() => {
+                    window.location.reload();
+                }, 1500);
+            } else {
+                alert('Erro ao excluir registro: ' + data.message);
+            }
+        })
+        .catch(error => {
+            console.error('Erro:', error);
+            alert('Erro ao excluir registro. Tente novamente.');
+        });
     }
 }
 </script>

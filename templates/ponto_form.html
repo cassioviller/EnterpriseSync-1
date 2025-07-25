@@ -1,0 +1,167 @@
+{% extends "base.html" %}
+
+{% block title %}{{ acao }} Registro de Ponto - SIGE{% endblock %}
+
+{% block content %}
+<div class="container-fluid mt-4">
+    <div class="row">
+        <div class="col-md-8 mx-auto">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">
+                        <i class="fas fa-clock me-2"></i>{{ acao }} Registro de Ponto
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <form method="POST" id="formRegistroPonto">
+                        {{ form.hidden_tag() }}
+                        
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    {{ form.funcionario_id.label(class="form-label") }}
+                                    {{ form.funcionario_id(class="form-select") }}
+                                    {% if form.funcionario_id.errors %}
+                                        <div class="text-danger small">
+                                            {% for error in form.funcionario_id.errors %}
+                                                {{ error }}
+                                            {% endfor %}
+                                        </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    {{ form.obra_id.label(class="form-label") }}
+                                    {{ form.obra_id(class="form-select") }}
+                                    {% if form.obra_id.errors %}
+                                        <div class="text-danger small">
+                                            {% for error in form.obra_id.errors %}
+                                                {{ error }}
+                                            {% endfor %}
+                                        </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-4">
+                                <div class="mb-3">
+                                    {{ form.data.label(class="form-label") }}
+                                    {{ form.data(class="form-control", type="date") }}
+                                    {% if form.data.errors %}
+                                        <div class="text-danger small">
+                                            {% for error in form.data.errors %}
+                                                {{ error }}
+                                            {% endfor %}
+                                        </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="mb-3">
+                                    {{ form.hora_entrada.label(class="form-label") }}
+                                    {{ form.hora_entrada(class="form-control", type="time") }}
+                                    {% if form.hora_entrada.errors %}
+                                        <div class="text-danger small">
+                                            {% for error in form.hora_entrada.errors %}
+                                                {{ error }}
+                                            {% endfor %}
+                                        </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="mb-3">
+                                    {{ form.hora_saida.label(class="form-label") }}
+                                    {{ form.hora_saida(class="form-control", type="time") }}
+                                    {% if form.hora_saida.errors %}
+                                        <div class="text-danger small">
+                                            {% for error in form.hora_saida.errors %}
+                                                {{ error }}
+                                            {% endfor %}
+                                        </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    {{ form.hora_almoco_saida.label(class="form-label") }}
+                                    {{ form.hora_almoco_saida(class="form-control", type="time") }}
+                                    {% if form.hora_almoco_saida.errors %}
+                                        <div class="text-danger small">
+                                            {% for error in form.hora_almoco_saida.errors %}
+                                                {{ error }}
+                                            {% endfor %}
+                                        </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    {{ form.hora_almoco_retorno.label(class="form-label") }}
+                                    {{ form.hora_almoco_retorno(class="form-control", type="time") }}
+                                    {% if form.hora_almoco_retorno.errors %}
+                                        <div class="text-danger small">
+                                            {% for error in form.hora_almoco_retorno.errors %}
+                                                {{ error }}
+                                            {% endfor %}
+                                        </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            {{ form.observacoes.label(class="form-label") }}
+                            {{ form.observacoes(class="form-control", rows="3") }}
+                            {% if form.observacoes.errors %}
+                                <div class="text-danger small">
+                                    {% for error in form.observacoes.errors %}
+                                        {{ error }}
+                                    {% endfor %}
+                                </div>
+                            {% endif %}
+                        </div>
+
+                        <div class="d-flex justify-content-between">
+                            <a href="{{ url_for('main.ponto') }}" class="btn btn-secondary">
+                                <i class="fas fa-arrow-left me-2"></i>Voltar
+                            </a>
+                            <button type="submit" class="btn btn-primary">
+                                <i class="fas fa-save me-2"></i>{{ acao }} Registro
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Aplicar tema aos campos de formulário
+    if (typeof applyThemeToFields === 'function') {
+        applyThemeToFields();
+    }
+    
+    // Validação de horários
+    const form = document.getElementById('formRegistroPonto');
+    form.addEventListener('submit', function(e) {
+        const entrada = document.getElementById('hora_entrada').value;
+        const saida = document.getElementById('hora_saida').value;
+        
+        if (entrada && saida && entrada >= saida) {
+            e.preventDefault();
+            alert('Horário de saída deve ser posterior ao horário de entrada.');
+            return false;
+        }
+    });
+});
+</script>
+{% endblock %}

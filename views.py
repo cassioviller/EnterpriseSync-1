@@ -3545,6 +3545,123 @@ def novo_ponto_lista():
     
     return render_template('ponto.html', form=form, registros=registros)
 
+@main_bp.route('/ponto/editar/<int:id>', methods=['GET', 'POST'])
+@login_required
+def editar_registro_ponto(id):
+    """Editar registro de ponto existente"""
+    import logging
+    logging.info(f"[EDITAR_PONTO] Usuário {current_user.id} editando registro {id}")
+    
+    # Verificar se o registro pertence a funcionário do admin logado
+    registro = db.session.query(RegistroPonto).join(Funcionario).filter(
+        RegistroPonto.id == id,
+        Funcionario.admin_id == current_user.id
+    ).first_or_404()
+    
+    form = RegistroPontoForm(obj=registro)
+    form.funcionario_id.choices = [(f.id, f.nome) for f in Funcionario.query.filter_by(ativo=True, admin_id=current_user.id).all()]
+    form.obra_id.choices = [(0, 'Selecione...')] + [(o.id, o.nome) for o in Obra.query.filter_by(status='Em andamento', admin_id=current_user.id).all()]
+    
+    if request.method == 'POST' and form.validate_on_submit():
+        try:
+            # Atualizar dados do registro
+            registro.funcionario_id = form.funcionario_id.data
+            registro.obra_id = form.obra_id.data if form.obra_id.data > 0 else None
+            registro.data = form.data.data
+            registro.hora_entrada = form.hora_entrada.data
+            registro.hora_saida = form.hora_saida.data
+            registro.hora_almoco_saida = form.hora_almoco_saida.data
+            registro.hora_almoco_retorno = form.hora_almoco_retorno.data
+            registro.observacoes = form.observacoes.data
+            
+            # Recalcular horas trabalhadas
+            if registro.hora_entrada and registro.hora_saida:
+                horas_trabalhadas = calcular_horas_trabalhadas(
+                    registro.hora_entrada, registro.hora_saida,
+                    registro.hora_almoco_saida, registro.hora_almoco_retorno
+                )
+                registro.horas_trabalhadas = horas_trabalhadas['total']
+                registro.horas_extras = horas_trabalhadas['extras']
+            
+            db.session.commit()
+            
+            # Atualizar cálculos automáticos do registro
+            from kpis_engine import atualizar_calculos_ponto
+            atualizar_calculos_ponto(registro.id)
+            
+            logging.info(f"[EDITAR_PONTO] Registro {id} atualizado com sucesso")
+            flash('Registro de ponto atualizado com sucesso!', 'success')
+            return redirect(url_for('main.ponto'))
+            
+        except Exception as e:
+            db.session.rollback()
+            logging.error(f"[EDITAR_PONTO] Erro ao atualizar registro {id}: {e}")
+            flash(f'Erro ao atualizar registro: {str(e)}', 'error')
+    
+    return render_template('ponto_form.html', form=form, registro=registro, acao='Editar')
+
+@main_bp.route('/ponto/excluir/<int:id>', methods=['POST'])
+@login_required  
+def excluir_registro_ponto(id):
+    """Excluir registro de ponto"""
+    import logging
+    logging.info(f"[EXCLUIR_PONTO] Usuário {current_user.id} excluindo registro {id}")
+    
+    try:
+        # Verificar se o registro pertence a funcionário do admin logado
+        registro = db.session.query(RegistroPonto).join(Funcionario).filter(
+            RegistroPonto.id == id,
+            Funcionario.admin_id == current_user.id
+        ).first_or_404()
+        
+        funcionario_nome = registro.funcionario_ref.nome
+        data_registro = registro.data.strftime('%d/%m/%Y')
+        
+        db.session.delete(registro)
+        db.session.commit()
+        
+        logging.info(f"[EXCLUIR_PONTO] Registro {id} excluído com sucesso")
+        flash(f'Registro de ponto de {funcionario_nome} ({data_registro}) excluído com sucesso!', 'success')
+        
+        return jsonify({'success': True, 'message': 'Registro excluído com sucesso!'})
+        
+    except Exception as e:
+        db.session.rollback()
+        logging.error(f"[EXCLUIR_PONTO] Erro ao excluir registro {id}: {e}")
+        return jsonify({'success': False, 'message': f'Erro ao excluir registro: {str(e)}'})
+
+@main_bp.route('/api/ponto/<int:id>')
+@login_required
+def api_obter_registro_ponto(id):
+    """API para obter dados de um registro de ponto"""
+    try:
+        # Verificar se o registro pertence a funcionário do admin logado
+        registro = db.session.query(RegistroPonto).join(Funcionario).filter(
+            RegistroPonto.id == id,
+            Funcionario.admin_id == current_user.id
+        ).first_or_404()
+        
+        return jsonify({
+            'success': True,
+            'dados': {
+                'id': registro.id,
+                'funcionario_id': registro.funcionario_id,
+                'obra_id': registro.obra_id,
+                'data': registro.data.isoformat(),
+                'hora_entrada': registro.hora_entrada.strftime('%H:%M') if registro.hora_entrada else '',
+                'hora_saida': registro.hora_saida.strftime('%H:%M') if registro.hora_saida else '',
+                'hora_almoco_saida': registro.hora_almoco_saida.strftime('%H:%M') if registro.hora_almoco_saida else '',
+                'hora_almoco_retorno': registro.hora_almoco_retorno.strftime('%H:%M') if registro.hora_almoco_retorno else '',
+                'tipo_registro': registro.tipo_registro or 'trabalhado',
+                'horas_trabalhadas': float(registro.horas_trabalhadas or 0),
+                'horas_extras': float(registro.horas_extras or 0),
+                'observacoes': registro.observacoes or ''
+            }
+        })
+        
+    except Exception as e:
+        return jsonify({'success': False, 'message': f'Erro ao obter registro: {str(e)}'})
+
 # Alimentação
 @main_bp.route('/alimentacao')
 @login_required
@@ -4913,20 +5030,7 @@ def atualizar_registro_ponto(registro_id):
         db.session.rollback()
         return jsonify({'error': str(e)}), 500
 
-@main_bp.route('/ponto/registro/<int:registro_id>', methods=['DELETE'])
-@login_required
-def excluir_registro_ponto(registro_id):
-    """Excluir registro de ponto"""
-    try:
-        registro = RegistroPonto.query.get_or_404(registro_id)
-        db.session.delete(registro)
-        db.session.commit()
-        
-        return jsonify({'success': True})
-        
-    except Exception as e:
-        db.session.rollback()
-        return jsonify({'error': str(e)}), 500
+# Função removida - duplicada (existe versão anterior mais completa)
 
 @main_bp.route('/outros-custos')
 @login_required
