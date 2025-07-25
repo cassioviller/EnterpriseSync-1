@@ -24,6 +24,11 @@ app = Flask(__name__)
 app.secret_key = os.environ.get("SESSION_SECRET", "dev-secret-key-change-in-production")
 app.wsgi_app = ProxyFix(app.wsgi_app, x_proto=1, x_host=1)
 
+# Configurações para URLs funcionarem corretamente
+app.config['SERVER_NAME'] = None  # Allow localhost and other hosts
+app.config['APPLICATION_ROOT'] = '/'
+app.config['PREFERRED_URL_SCHEME'] = 'http'
+
 # configure the database - usar DATABASE_URL do ambiente ou SQLite local
 app.config["SQLALCHEMY_DATABASE_URI"] = os.environ.get("DATABASE_URL", "sqlite:///sige.db")
 app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {

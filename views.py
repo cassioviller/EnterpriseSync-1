@@ -20,10 +20,15 @@ main_bp = Blueprint('main', __name__)
 @main_bp.route('/login', methods=['GET', 'POST'])
 def login():
     if request.method == 'POST':
-        username = request.form.get('username')
+        # Suportar tanto email quanto username
+        login_field = request.form.get('email') or request.form.get('username')
         password = request.form.get('password')
         
-        user = Usuario.query.filter_by(username=username, ativo=True).first()
+        # Buscar por email ou username
+        user = Usuario.query.filter(
+            or_(Usuario.email == login_field, Usuario.username == login_field),
+            Usuario.ativo == True
+        ).first()
         
         if user and check_password_hash(user.password_hash, password):
             login_user(user)
@@ -36,7 +41,7 @@ def login():
             else:  # FUNCIONARIO
                 return redirect(url_for('main.funcionario_dashboard'))
         else:
-            flash('Username ou senha inválidos.', 'danger')
+            flash('Email/Username ou senha inválidos.', 'danger')
     
     return render_template('login.html')
 
