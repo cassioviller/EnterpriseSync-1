@@ -291,7 +291,7 @@
                 <h5 class="card-title mb-0">
                     <i class="fas fa-clock"></i> Controle de Ponto
                 </h5>
-                <button class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#pontoModal">
+                <button class="btn btn-primary btn-sm" id="btnNovoRegistro" onclick="abrirModalNovoPonto()">
                     <i class="fas fa-plus"></i> Novo Registro
                 </button>
             </div>
@@ -1458,6 +1458,65 @@ function submeterFormularioPonto(event) {
     return false;
 }
 
+// Função específica para abrir modal de novo registro
+function abrirModalNovoPonto() {
+    console.log('🎯 Abrindo modal de novo registro...');
+    
+    try {
+        // Limpar formulário
+        const form = document.getElementById('pontoForm');
+        if (form) {
+            form.reset();
+            form.removeAttribute('data-modo');
+            
+            // Remover campo hidden de edição se existir
+            const hiddenId = document.getElementById('registro_id_ponto');
+            if (hiddenId) {
+                hiddenId.remove();
+            }
+        }
+        
+        // Definir data atual
+        const hoje = new Date().toISOString().split('T')[0];
+        const dataEl = document.getElementById('data_ponto');
+        if (dataEl) {
+            dataEl.value = hoje;
+            console.log('✅ Data definida:', hoje);
+        }
+        
+        // Resetar título do modal
+        const titulo = document.querySelector('#pontoModal .modal-title');
+        if (titulo) {
+            titulo.innerHTML = '<i class="fas fa-clock"></i> Novo Registro de Ponto';
+        }
+        
+        // Esconder campos opcionais inicialmente
+        const elementos = ['campos_horario', 'campo_percentual_extras', 'alertaTipoLancamento'];
+        elementos.forEach(id => {
+            const elemento = document.getElementById(id);
+            if (elemento) {
+                elemento.style.display = 'none';
+            }
+        });
+        
+        // Abrir modal
+        const modalElement = document.getElementById('pontoModal');
+        if (modalElement) {
+            console.log('✅ Modal encontrado, abrindo...');
+            const modal = new bootstrap.Modal(modalElement);
+            modal.show();
+            console.log('✅ Modal exibido');
+        } else {
+            console.error('❌ Modal pontoModal não encontrado');
+            alert('Erro: Modal não encontrado');
+        }
+        
+    } catch (error) {
+        console.error('❌ Erro ao abrir modal:', error);
+        alert('Erro ao abrir modal: ' + error.message);
+    }
+}
+
 // Funções de edição e exclusão
 function editarPonto(id) {
     console.log('Carregando dados do registro:', id);
@@ -1515,12 +1574,25 @@ function editarPonto(id) {
             // Ajustar visibilidade dos campos baseado no tipo
             alterarTipoLancamento();
             
-            // Abrir modal
-            new bootstrap.Modal(document.getElementById('pontoModal')).show();
+            // Abrir modal com verificação
+            const modalElement = document.getElementById('pontoModal');
+            if (modalElement) {
+                const modal = new bootstrap.Modal(modalElement);
+                modal.show();
+            } else {
+                console.error('Modal pontoModal não encontrado');
+                alert('Erro: Modal não encontrado');
+            }
         })
         .catch(error => {
             console.error('Erro ao carregar registro:', error);
-            alert('Erro ao carregar dados do registro: ' + error.message);
+            
+            // Mostrar detalhes do erro
+            if (error.message.includes('Cannot read properties of null')) {
+                alert('Erro: Dados do registro não puderam ser carregados. Verifique se o registro existe.');
+            } else {
+                alert('Erro ao carregar dados do registro: ' + error.message);
+            }
         });
 }
 
@@ -1765,7 +1837,8 @@ document.addEventListener('DOMContentLoaded', function() {
             if (form) {
                 form.reset();
                 const hoje = new Date().toISOString().split('T')[0];
-                document.getElementById('data_ponto').value = hoje;
+                const dataEl = document.getElementById('data_ponto');
+                if (dataEl) dataEl.value = hoje;
                 
                 // Resetar visibilidade dos elementos com verificação de existência
                 const elementos = [
