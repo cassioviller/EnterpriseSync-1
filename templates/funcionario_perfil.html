@@ -1471,16 +1471,28 @@ function editarPonto(id) {
         .then(data => {
             console.log('Dados carregados:', data);
             
-            // Preencher o modal com os dados
-            document.getElementById('data_ponto').value = data.data;
-            document.getElementById('tipo_lancamento').value = data.tipo_registro;
-            document.getElementById('obra_id_ponto').value = data.obra_id || '';
-            document.getElementById('hora_entrada_ponto').value = data.entrada || '';
-            document.getElementById('hora_saida_ponto').value = data.saida || '';
-            document.getElementById('hora_almoco_saida_ponto').value = data.saida_almoco || '';
-            document.getElementById('hora_almoco_retorno_ponto').value = data.retorno_almoco || '';
-            document.getElementById('percentual_extras').value = data.percentual_extras || '';
-            document.getElementById('observacoes_ponto').value = data.observacoes || '';
+            // Preencher o modal com os dados - verificar elementos principais
+            const dataEl = document.getElementById('data_ponto');
+            const tipoEl = document.getElementById('tipo_lancamento');
+            const obraEl = document.getElementById('obra_id_ponto');
+            
+            if (dataEl) dataEl.value = data.data;
+            if (tipoEl) tipoEl.value = data.tipo_registro;
+            if (obraEl) obraEl.value = data.obra_id || '';
+            // Verificar se os elementos existem antes de definir valores
+            const entradaEl = document.getElementById('hora_entrada_ponto');
+            const saidaEl = document.getElementById('hora_saida_ponto');
+            const almocoSaidaEl = document.getElementById('hora_almoco_saida_ponto');
+            const almocoRetornoEl = document.getElementById('hora_almoco_retorno_ponto');
+            const percentualEl = document.getElementById('percentual_extras');
+            const observacoesEl = document.getElementById('observacoes_ponto');
+            
+            if (entradaEl) entradaEl.value = data.entrada || '';
+            if (saidaEl) saidaEl.value = data.saida || '';
+            if (almocoSaidaEl) almocoSaidaEl.value = data.saida_almoco || '';
+            if (almocoRetornoEl) almocoRetornoEl.value = data.retorno_almoco || '';
+            if (percentualEl) percentualEl.value = data.percentual_extras || 0;
+            if (observacoesEl) observacoesEl.value = data.observacoes || '';
             
             // Alterar o título do modal
             document.querySelector('#pontoModal .modal-title').innerHTML = '<i class="fas fa-edit"></i> Editar Registro de Ponto';
@@ -1755,11 +1767,20 @@ document.addEventListener('DOMContentLoaded', function() {
                 const hoje = new Date().toISOString().split('T')[0];
                 document.getElementById('data_ponto').value = hoje;
                 
-                // Resetar visibilidade dos elementos
-                document.getElementById('campos_horario').style.display = 'none';
-                document.getElementById('btnHorarioPadrao').style.display = 'none';
-                document.getElementById('campo_percentual_extras').style.display = 'none';
-                document.getElementById('alertaTipoLancamento').style.display = 'none';
+                // Resetar visibilidade dos elementos com verificação de existência
+                const elementos = [
+                    'campos_horario',
+                    'btnHorarioPadrao', 
+                    'campo_percentual_extras',
+                    'alertaTipoLancamento'
+                ];
+                
+                elementos.forEach(id => {
+                    const elemento = document.getElementById(id);
+                    if (elemento) {
+                        elemento.style.display = 'none';
+                    }
+                });
             }
         });
     }

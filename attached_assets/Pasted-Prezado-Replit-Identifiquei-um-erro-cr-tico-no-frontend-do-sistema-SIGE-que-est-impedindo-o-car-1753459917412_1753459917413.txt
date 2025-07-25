@@ -1,0 +1,106 @@
+Prezado Replit,
+
+Identifiquei um erro crítico no frontend do sistema SIGE que está impedindo o carregamento correto de dados e a interação com a interface. O erro é `TypeError: Cannot read properties of null (reading 'style')`.
+
+---
+
+### **1. Diagnóstico do Erro: `TypeError: Cannot read properties of null (reading 'style')`**
+
+**Sintoma:**
+
+O erro `TypeError: Cannot read properties of null (reading 'style')` aparece no console do navegador e em pop-ups de erro na interface do usuário. Isso ocorre quando o código JavaScript tenta acessar a propriedade `style` de um elemento HTML que não existe (é `null`) no momento em que o script é executado.
+
+**Causa Provável:**
+
+Este erro geralmente acontece por uma das seguintes razões:
+
+1.  **Execução Antecipada do JavaScript:** O script JavaScript está sendo executado antes que o elemento HTML ao qual ele tenta acessar tenha sido completamente carregado e renderizado no DOM (Document Object Model).
+2.  **ID ou Seletor Incorreto:** O JavaScript está usando um ID ou seletor CSS incorreto para tentar encontrar o elemento, resultando em `document.getElementById('someId')` ou `document.querySelector('.someClass')` retornando `null`.
+3.  **Elemento Removido Dinamicamente:** O elemento HTML pode ter sido removido do DOM por outro script ou por uma atualização dinâmica da página antes que o script em questão tentasse acessá-lo.
+
+Com base nas imagens fornecidas, o erro parece estar relacionado ao carregamento de dados de registro, o que sugere que um elemento da interface (provavelmente um modal, um campo de formulário ou um contêiner de dados) não está disponível quando o JavaScript tenta manipulá-lo.
+
+---
+
+### **2. Soluções Propostas e Implementação**
+
+Para corrigir este erro, sugiro as seguintes abordagens, que devem ser aplicadas nos arquivos JavaScript relevantes (provavelmente em `static/js/` ou nos scripts embutidos nos templates HTML como `templates/funcionario_perfil.html`):
+
+#### **Solução 1: Garantir que o JavaScript Execute Após o Carregamento do DOM (Mais Comum)**
+
+Certifique-se de que o código JavaScript que manipula elementos do DOM seja executado somente após o DOM estar completamente carregado. Existem duas formas principais de fazer isso:
+
+*   **Opção A: Colocar o `<script>` no final do `<body>`:**
+    Esta é a forma mais simples. Mova todas as tags `<script>` que manipulam o DOM para logo antes da tag de fechamento `</body>` no seu HTML. Isso garante que todos os elementos HTML acima do script já foram parseados e estão disponíveis.
+
+    ```html
+    <!-- Seu HTML aqui -->
+    <body>
+        <!-- Conteúdo da página -->
+
+        <script src="/static/js/seu_script.js"></script>
+        <script>
+            // Seu código JavaScript embutido aqui
+        </script>
+    </body>
+    </html>
+    ```
+
+*   **Opção B: Usar o evento `DOMContentLoaded`:**
+    Se você não puder mover os scripts para o final do `<body>` (por exemplo, se eles estiverem no `<head>`), envolva o código que manipula o DOM dentro de um listener para o evento `DOMContentLoaded`. Este evento é disparado quando o documento HTML foi completamente carregado e parseado, sem esperar por folhas de estilo, imagens e subframes para terminar de carregar.
+
+    ```javascript
+    document.addEventListener('DOMContentLoaded', function() {
+        // Coloque todo o seu código JavaScript que manipula o DOM aqui dentro
+        // Exemplo: var elemento = document.getElementById('algumId');
+        // if (elemento) { elemento.style.display = 'block'; }
+    });
+    ```
+
+#### **Solução 2: Verificar a Existência do Elemento Antes de Manipulá-lo**
+
+Sempre que você tentar acessar um elemento do DOM e manipular suas propriedades (como `style`), adicione uma verificação para garantir que o elemento realmente foi encontrado. Isso previne o erro `Cannot read properties of null`.
+
+**Exemplo de Correção:**
+
+```javascript
+// ❌ Código com erro potencial
+// var meuElemento = document.getElementById('idQuePodeNaoExistir');
+// meuElemento.style.display = 'none'; // Erro se meuElemento for null
+
+// ✅ Código corrigido com verificação
+var meuElemento = document.getElementById('idQuePodeNaoExistir');
+if (meuElemento) { // Verifica se o elemento existe antes de tentar manipulá-lo
+    meuElemento.style.display = 'none';
+} else {
+    console.warn('Elemento com ID "idQuePodeNaoExistir" não encontrado no DOM.');
+}
+```
+
+#### **Solução 3: Revisar IDs e Seletores CSS**
+
+Verifique cuidadosamente os IDs e seletores CSS usados no seu JavaScript. Um erro de digitação ou uma diferença entre o HTML e o JavaScript pode fazer com que `document.getElementById` ou `document.querySelector` retornem `null`.
+
+*   Confirme se o ID ou a classe que o JavaScript está procurando realmente existe no HTML.
+*   Verifique se não há IDs duplicados na mesma página HTML, pois `getElementById` retornará apenas o primeiro.
+
+---
+
+### **3. Arquivos Principais Envolvidos**
+
+Com base no contexto do sistema de ponto e no erro, os arquivos mais prováveis de estarem envolvidos são:
+
+*   `templates/funcionario_perfil.html` (ou qualquer outro template que contenha o modal/formulário de edição de registro de ponto).
+*   Arquivos JavaScript em `static/js/` que são responsáveis pela lógica de carregamento e manipulação dos dados do registro de ponto (e.g., scripts que abrem modais, preenchem formulários, etc.).
+
+---
+
+### **4. Resultado Esperado**
+
+Após a aplicação dessas correções, o sistema deve:
+
+*   ✅ Carregar os dados de registro e exibir a interface sem erros de JavaScript.
+*   ✅ Permitir a interação com os elementos da página que antes causavam o erro.
+*   ✅ Proporcionar uma experiência de usuário mais estável e sem interrupções visuais.
+
+Por favor, implemente essas correções e me informe o resultado. Se precisar de mais informações sobre qual parte do código específico está causando o erro ou como aplicar as soluções, estou à disposição para ajudar.
