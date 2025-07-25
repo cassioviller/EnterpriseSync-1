@@ -4927,9 +4927,9 @@ def atualizar_registro_ponto(registro_id):
         registro = RegistroPonto.query.get_or_404(registro_id)
         
         # Dados básicos
-        data = datetime.strptime(request.json.get('data'), '%Y-%m-%d').date()
-        tipo_registro = request.json.get('tipo_registro', 'trabalho_normal')
-        obra_id = request.json.get('obra_id') or None
+        data = datetime.strptime(request.json.get('data_ponto'), '%Y-%m-%d').date()
+        tipo_registro = request.json.get('tipo_lancamento', 'trabalhado')
+        obra_id = request.json.get('obra_id_ponto') or None
         
         # Atualizar dados básicos
         registro.data = data
@@ -4944,12 +4944,12 @@ def atualizar_registro_ponto(registro_id):
         registro.horas_trabalhadas = 0
         registro.horas_extras = 0
         
-        # Adicionar horários se não for falta
-        if tipo_registro not in ['falta', 'falta_justificada']:
-            entrada = request.json.get('entrada')
-            saida_almoco = request.json.get('saida_almoco')
-            retorno_almoco = request.json.get('retorno_almoco')
-            saida = request.json.get('saida')
+        # Adicionar horários se não for falta ou feriado
+        if tipo_registro not in ['falta', 'falta_justificada', 'feriado']:
+            entrada = request.json.get('hora_entrada_ponto')
+            saida_almoco = request.json.get('hora_almoco_saida_ponto')
+            retorno_almoco = request.json.get('hora_almoco_retorno_ponto')
+            saida = request.json.get('hora_saida_ponto')
             
             if entrada:
                 registro.entrada = datetime.strptime(entrada, '%H:%M').time()
@@ -4968,7 +4968,7 @@ def atualizar_registro_ponto(registro_id):
             registro.percentual_extras = 0
         
         # Observações
-        registro.observacoes = request.json.get('observacoes', '')
+        registro.observacoes = request.json.get('observacoes_ponto', '')
         
         db.session.commit()
         

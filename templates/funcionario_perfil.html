@@ -718,7 +718,7 @@
                 <h5 class="modal-title" id="pontoModalLabel">Novo Registro de Ponto</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
-            <form method="POST" id="pontoForm" action="{{ url_for('main.novo_ponto') }}">
+            <form method="POST" id="pontoForm" action="{{ url_for('main.novo_ponto') }}" onsubmit="return submeterFormularioPonto(event)">
                 <div class="modal-body">
                     <input type="hidden" id="funcionario_id" name="funcionario_id" value="{{ funcionario.id }}">
                     
@@ -1404,6 +1404,60 @@ document.addEventListener('DOMContentLoaded', function() {
     console.log('Página de perfil carregada com filtros preservados');
 });
 
+// Função para submeter formulário de ponto (criação ou edição)
+function submeterFormularioPonto(event) {
+    event.preventDefault();
+    
+    const form = document.getElementById('pontoForm');
+    const formData = new FormData(form);
+    
+    // Verificar se é edição ou criação
+    const registroId = document.getElementById('registro_id_ponto');
+    const isEdicao = registroId && registroId.value;
+    
+    let url, method;
+    if (isEdicao) {
+        // Edição
+        url = `/ponto/registro/${registroId.value}`;
+        method = 'PUT';
+        
+        // Converter FormData para JSON para PUT
+        const data = {};
+        for (let [key, value] of formData.entries()) {
+            if (key !== 'registro_id') { // Não incluir o ID no corpo
+                data[key] = value;
+            }
+        }
+        
+        fetch(url, {
+            method: method,
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(data)
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                alert('Registro atualizado com sucesso!');
+                bootstrap.Modal.getInstance(document.getElementById('pontoModal')).hide();
+                location.reload();
+            } else {
+                throw new Error(data.error || 'Erro desconhecido');
+            }
+        })
+        .catch(error => {
+            console.error('Erro:', error);
+            alert('Erro ao atualizar registro: ' + error.message);
+        });
+    } else {
+        // Criação - usar o formulário padrão
+        form.submit();
+    }
+    
+    return false;
+}
+
 // Funções de edição e exclusão
 function editarPonto(id) {
     console.log('Carregando dados do registro:', id);
@@ -1419,7 +1473,7 @@ function editarPonto(id) {
             
             // Preencher o modal com os dados
             document.getElementById('data_ponto').value = data.data;
-            document.getElementById('tipo_registro_ponto').value = data.tipo_registro;
+            document.getElementById('tipo_lancamento').value = data.tipo_registro;
             document.getElementById('obra_id_ponto').value = data.obra_id || '';
             document.getElementById('hora_entrada_ponto').value = data.entrada || '';
             document.getElementById('hora_saida_ponto').value = data.saida || '';
@@ -1429,10 +1483,10 @@ function editarPonto(id) {
             document.getElementById('observacoes_ponto').value = data.observacoes || '';
             
             // Alterar o título do modal
-            document.querySelector('#modalPonto .modal-title').innerHTML = '<i class="fas fa-edit"></i> Editar Registro de Ponto';
+            document.querySelector('#pontoModal .modal-title').innerHTML = '<i class="fas fa-edit"></i> Editar Registro de Ponto';
             
             // Adicionar campo hidden com ID do registro
-            let formPonto = document.getElementById('formPonto');
+            let formPonto = document.getElementById('pontoForm');
             let hiddenId = document.getElementById('registro_id_ponto');
             if (!hiddenId) {
                 hiddenId = document.createElement('input');
@@ -1443,11 +1497,14 @@ function editarPonto(id) {
             }
             hiddenId.value = id;
             
+            // Configurar modo de edição
+            formPonto.setAttribute('data-modo', 'edicao');
+            
             // Ajustar visibilidade dos campos baseado no tipo
-            ajustarCamposPorTipo();
+            alterarTipoLancamento();
             
             // Abrir modal
-            new bootstrap.Modal(document.getElementById('modalPonto')).show();
+            new bootstrap.Modal(document.getElementById('pontoModal')).show();
         })
         .catch(error => {
             console.error('Erro ao carregar registro:', error);
@@ -1547,11 +1604,12 @@ $(document).ready(function() {
     document.getElementById('data_alimentacao').value = today;
     
     // Reset do modal de ponto para novos registros
-    $('#modalPonto').on('show.bs.modal', function (event) {
+    $('#pontoModal').on('show.bs.modal', function (event) {
         // Se não foi clique no botão editar, limpar o formulário para novo registro
         if (!event.relatedTarget || !event.relatedTarget.classList.contains('btn-outline-warning')) {
-            document.querySelector('#modalPonto .modal-title').innerHTML = '<i class="fas fa-clock"></i> Novo Registro de Ponto';
-            document.getElementById('formPonto').reset();
+            document.querySelector('#pontoModal .modal-title').innerHTML = '<i class="fas fa-clock"></i> Novo Registro de Ponto';
+            document.getElementById('pontoForm').reset();
+            document.getElementById('pontoForm').removeAttribute('data-modo');
             
             // Remover campo hidden se existir
             const hiddenId = document.getElementById('registro_id_ponto');
@@ -1561,6 +1619,10 @@ $(document).ready(function() {
             
             // Definir data padrão
             document.getElementById('data_ponto').value = today;
+            
+            // Esconder campos de horário inicialmente
+            document.getElementById('camposHorario').style.display = 'none';
+            document.getElementById('btnHorarioPadrao').style.display = 'none';
         }
     });
     
