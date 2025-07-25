@@ -315,81 +315,41 @@ def dashboard():
     else:
         data_fim = datetime.strptime(data_fim, '%Y-%m-%d').date()
     
-    # Filtro multi-tenant baseado no admin logado
+    # Usar sistema unificado de KPIs para garantir consistência
+    from kpi_unificado import obter_kpi_dashboard
+    
     admin_id = current_user.id
+    kpis_dashboard = obter_kpi_dashboard(admin_id, data_inicio, data_fim)
     
-    # KPIs para o dashboard com isolamento por admin_id
-    total_funcionarios = Funcionario.query.filter(
-        Funcionario.ativo == True,
-        Funcionario.admin_id == admin_id
-    ).count()
+    # Extrair valores do sistema unificado
+    total_funcionarios = kpis_dashboard.get('funcionarios_ativos', 0)
+    total_obras = kpis_dashboard.get('obras_ativas', 0)
+    total_veiculos = kpis_dashboard.get('veiculos_ativos', 0)
     
-    total_obras = Obra.query.filter(
-        Obra.status.in_(['Em andamento', 'Pausada']),
-        Obra.admin_id == admin_id
-    ).count()
+    # Custos detalhados do sistema unificado
+    custos_detalhados = kpis_dashboard.get('custos_detalhados', {})
+    custo_alimentacao = custos_detalhados.get('alimentacao', 0)
+    custo_transporte = custos_detalhados.get('transporte', 0)
+    custo_mao_obra = custos_detalhados.get('mao_obra', 0)
+    custo_outros = custos_detalhados.get('outros', 0)
     
-    total_veiculos = Veiculo.query.filter(Veiculo.admin_id == admin_id).count()
-    
-    # Obter IDs dos funcionários deste admin
+    # Para compatibilidade com código antigo
     funcionarios_admin = Funcionario.query.filter_by(admin_id=admin_id).all()
     funcionarios_ids = [f.id for f in funcionarios_admin]
     
     if funcionarios_ids:
-        # Custos do período apenas dos funcionários deste admin
-        custo_alimentacao = db.session.query(func.sum(RegistroAlimentacao.valor)).filter(
-            RegistroAlimentacao.funcionario_id.in_(funcionarios_ids),
-            RegistroAlimentacao.data.between(data_inicio, data_fim)
-        ).scalar() or 0.0
-        
-        custo_transporte = db.session.query(func.sum(OutroCusto.valor)).filter(
-            OutroCusto.funcionario_id.in_(funcionarios_ids),
-            OutroCusto.tipo.in_(['Vale Transporte', 'Vale Refeição']),
-            OutroCusto.data.between(data_inicio, data_fim)
-        ).scalar() or 0.0
-        
-        outros_custos = db.session.query(func.sum(OutroCusto.valor)).filter(
-            OutroCusto.funcionario_id.in_(funcionarios_ids),
-            ~OutroCusto.tipo.in_(['Vale Transporte', 'Vale Refeição']),
-            OutroCusto.data.between(data_inicio, data_fim)
-        ).scalar() or 0.0
-        
-        # Custo mão de obra baseado em horas trabalhadas
-        total_horas = db.session.query(func.sum(RegistroPonto.horas_trabalhadas)).filter(
-            RegistroPonto.funcionario_id.in_(funcionarios_ids),
-            RegistroPonto.data.between(data_inicio, data_fim)
-        ).scalar() or 0.0
-        
-        custo_mao_obra = total_horas * 15.0  # R$ 15/hora padrão
-    else:
-        # Admin sem funcionários
-        custo_alimentacao = custo_transporte = outros_custos = custo_mao_obra = 0.0
-    
-    # Calcular custo de faltas justificadas
-    custo_faltas_justificadas = 0.0
-    if funcionarios_ids:
-        # Buscar registros de faltas justificadas
-        registros_faltas = db.session.query(RegistroPonto).filter(
+        # Manter cálculo de faltas justificadas para compatibilidade
+        custo_faltas_justificadas = db.session.query(func.sum(func.coalesce(RegistroPonto.horas_trabalhadas, 0))).filter(
             RegistroPonto.funcionario_id.in_(funcionarios_ids),
             RegistroPonto.tipo_registro == 'falta_justificada',
             RegistroPonto.data.between(data_inicio, data_fim)
-        ).all()
-        
-        for registro in registros_faltas:
-            funcionario = db.session.query(Funcionario).get(registro.funcionario_id)
-            if funcionario and funcionario.salario:
-                salario_hora = funcionario.salario / 220  # 220 horas mensais
-                custo_faltas_justificadas += salario_hora * 8  # 8 horas por dia perdidas
+        ).scalar() or 0.0
+    else:
+        custo_faltas_justificadas = 0.0
     
-    custos_detalhados = {
-        'alimentacao': custo_alimentacao,
-        'transporte': custo_transporte,
-        'mao_obra': custo_mao_obra,
-        'faltas_justificadas': custo_faltas_justificadas,
-        'outros': outros_custos,
-        'total': custo_alimentacao + custo_transporte + custo_mao_obra + custo_faltas_justificadas + outros_custos
-    }
-    custos_mes = custos_detalhados['total']
+    # Total dos custos do sistema unificado
+    total_custos = kpis_dashboard.get('custos_periodo', 0)
+    custos_mes = total_custos
     
     # Obras em andamento deste admin
     obras_andamento = Obra.query.filter(
@@ -416,12 +376,22 @@ def dashboard():
                 'total_custo': custo_obra['custo_total']
             })
     
+    # Garantir que custos_detalhados tenha as chaves esperadas pelo template
+    custos_dashboard = {
+        'alimentacao': custo_alimentacao,
+        'transporte': custo_transporte,
+        'mao_obra': custo_mao_obra,
+        'outros': custo_outros,
+        'faltas_justificadas': custo_faltas_justificadas,
+        'total': custos_mes
+    }
+    
     return render_template('dashboard.html',
                          total_funcionarios=total_funcionarios,
                          total_obras=total_obras,
                          total_veiculos=total_veiculos,
                          custos_mes=custos_mes,
-                         custos_detalhados=custos_detalhados,
+                         custos_detalhados=custos_dashboard,
                          data_inicio=data_inicio,
                          data_fim=data_fim,
                          obras_andamento=obras_andamento,
@@ -1796,57 +1766,28 @@ def obras():
         # Último mês por padrão (30 dias atrás)
         data_inicio = data_fim - timedelta(days=30)
     
+    # Usar sistema unificado para calcular KPIs das obras
+    from kpi_unificado import obter_kpi_obra
+    
     for obra in obras:
+        # Usar sistema unificado de KPIs
+        kpis_obra = obter_kpi_obra(obra.id, data_inicio, data_fim)
+        
         # Calcular RDOs
         total_rdos = RDO.query.filter_by(obra_id=obra.id).count()
         
-        # Calcular dias trabalhados (registros de ponto únicos)
-        dias_trabalhados = db.session.query(RegistroPonto.data).filter(
-            RegistroPonto.obra_id == obra.id,
-            RegistroPonto.data.between(data_inicio, data_fim),
-            RegistroPonto.hora_entrada.isnot(None)
-        ).distinct().count()
-        
-        # Calcular custo total básico (últimos 30 dias)
-        custo_alimentacao = db.session.query(func.sum(RegistroAlimentacao.valor)).filter(
-            RegistroAlimentacao.obra_id == obra.id,
-            RegistroAlimentacao.data.between(data_inicio, data_fim)
-        ).scalar() or 0.0
-        
-        # Criar objeto KPI simples
-        # Calcular custos reais da obra
-        custo_obra_total = 0
-        
-        # Custos diretos de obra
-        try:
-            from models import CustoObra
-            custos_obra = db.session.query(CustoObra).filter(
-                CustoObra.obra_id == obra.id,
-                CustoObra.data >= data_inicio,
-                CustoObra.data <= data_fim
-            ).all()
-            custo_obra_total += sum(custo.valor for custo in custos_obra)
-        except:
-            pass
-        
-        # Adicionar custos de alimentação
-        custo_obra_total += custo_alimentacao
-        
-        # Custos de veículos da obra
-        try:
-            custos_veiculos = db.session.query(CustoVeiculo).filter(
-                CustoVeiculo.obra_id == obra.id,
-                CustoVeiculo.data_custo >= data_inicio,
-                CustoVeiculo.data_custo <= data_fim
-            ).all()
-            custo_obra_total += sum(custo.valor for custo in custos_veiculos)
-        except:
-            pass
+        # Extrair dados do sistema unificado
+        custo_obra_total = kpis_obra.get('custo_total', 0)
+        dias_trabalhados = kpis_obra.get('dias_trabalhados', 0)
+        total_horas = kpis_obra.get('total_horas', 0)
+        funcionarios_periodo = kpis_obra.get('funcionarios_periodo', 0)
         
         obra.kpis = type('KPIs', (), {
             'total_rdos': total_rdos,
             'dias_trabalhados': dias_trabalhados,
-            'custo_total': custo_obra_total
+            'custo_total': custo_obra_total,
+            'total_horas': total_horas,
+            'funcionarios_periodo': funcionarios_periodo
         })()
     
     # Status disponíveis para filtro
