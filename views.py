@@ -3560,7 +3560,6 @@ def novo_restaurante():
             preco_almoco = float(request.form.get('preco_almoco', 0))
             preco_jantar = float(request.form.get('preco_jantar', 0))
             preco_lanche = float(request.form.get('preco_lanche', 0))
-            observacoes = request.form.get('observacoes', '').strip()
             
             if not nome:
                 flash('Nome é obrigatório.', 'danger')
@@ -3582,7 +3581,6 @@ def novo_restaurante():
                 preco_almoco=preco_almoco,
                 preco_jantar=preco_jantar,
                 preco_lanche=preco_lanche,
-                observacoes=observacoes,
                 admin_id=current_user.id if current_user.tipo_usuario == TipoUsuario.ADMIN else current_user.admin_id
             )
             
@@ -3669,7 +3667,6 @@ def editar_restaurante(id):
             preco_almoco = float(request.form.get('preco_almoco', 0))
             preco_jantar = float(request.form.get('preco_jantar', 0))
             preco_lanche = float(request.form.get('preco_lanche', 0))
-            observacoes = request.form.get('observacoes', '').strip()
             ativo = request.form.get('ativo') == 'on'
             
             if not nome:
@@ -3696,7 +3693,6 @@ def editar_restaurante(id):
             restaurante.preco_almoco = preco_almoco
             restaurante.preco_jantar = preco_jantar
             restaurante.preco_lanche = preco_lanche
-            restaurante.observacoes = observacoes
             restaurante.ativo = ativo
             
             db.session.commit()
