@@ -863,8 +863,8 @@
                     </div>
                     
                     <div class="mb-3">
-                        <label for="observacoes_ponto" class="form-label">Observações</label>
-                        <textarea class="form-control" id="observacoes_ponto" name="observacoes" rows="3"></textarea>
+                        <label for="observacoes" class="form-label">Observações</label>
+                        <textarea class="form-control" id="observacoes" name="observacoes" rows="3"></textarea>
                     </div>
                 </div>
                 <div class="modal-footer">
@@ -1463,6 +1463,28 @@ function abrirModalNovoPonto() {
     console.log('🎯 Abrindo modal de novo registro...');
     
     try {
+        // Verificar se todos os elementos existem primeiro
+        const elementos_necessarios = [
+            'pontoModal',
+            'pontoForm', 
+            'data_ponto',
+            'tipo_lancamento',
+            'observacoes'
+        ];
+        
+        let elementos_faltando = [];
+        elementos_necessarios.forEach(id => {
+            if (!document.getElementById(id)) {
+                elementos_faltando.push(id);
+            }
+        });
+        
+        if (elementos_faltando.length > 0) {
+            console.error('❌ Elementos faltando:', elementos_faltando);
+            alert('Erro: Elementos do modal não encontrados: ' + elementos_faltando.join(', '));
+            return;
+        }
+        
         // Limpar formulário
         const form = document.getElementById('pontoForm');
         if (form) {
@@ -1491,8 +1513,8 @@ function abrirModalNovoPonto() {
         }
         
         // Esconder campos opcionais inicialmente
-        const elementos = ['campos_horario', 'campo_percentual_extras', 'alertaTipoLancamento'];
-        elementos.forEach(id => {
+        const campos_opcionais = ['campos_horario', 'campo_percentual_extras', 'alertaTipoLancamento'];
+        campos_opcionais.forEach(id => {
             const elemento = document.getElementById(id);
             if (elemento) {
                 elemento.style.display = 'none';
@@ -1501,15 +1523,10 @@ function abrirModalNovoPonto() {
         
         // Abrir modal
         const modalElement = document.getElementById('pontoModal');
-        if (modalElement) {
-            console.log('✅ Modal encontrado, abrindo...');
-            const modal = new bootstrap.Modal(modalElement);
-            modal.show();
-            console.log('✅ Modal exibido');
-        } else {
-            console.error('❌ Modal pontoModal não encontrado');
-            alert('Erro: Modal não encontrado');
-        }
+        console.log('✅ Modal encontrado, abrindo...');
+        const modal = new bootstrap.Modal(modalElement);
+        modal.show();
+        console.log('✅ Modal exibido');
         
     } catch (error) {
         console.error('❌ Erro ao abrir modal:', error);
@@ -1517,9 +1534,9 @@ function abrirModalNovoPonto() {
     }
 }
 
-// Funções de edição e exclusão
+// Funções de edição e exclusão  
 function editarPonto(id) {
-    console.log('Carregando dados do registro:', id);
+    console.log('🔧 Editando registro:', id);
     
     // Buscar dados do registro
     fetch(`/ponto/registro/${id}`)
@@ -1544,7 +1561,7 @@ function editarPonto(id) {
             const almocoSaidaEl = document.getElementById('hora_almoco_saida_ponto');
             const almocoRetornoEl = document.getElementById('hora_almoco_retorno_ponto');
             const percentualEl = document.getElementById('percentual_extras');
-            const observacoesEl = document.getElementById('observacoes_ponto');
+            const observacoesEl = document.getElementById('observacoes');
             
             if (entradaEl) entradaEl.value = data.entrada || '';
             if (saidaEl) saidaEl.value = data.saida || '';
