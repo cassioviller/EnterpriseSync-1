@@ -755,6 +755,18 @@
     - Fallback inteligente no app.py para URL do banco de dados
     - Documentação completa em EASYPANEL_DEPLOY.md
     - Deploy funciona apenas parando/iniciando container no EasyPanel
+  - July 25, 2025. Relatório Técnico Completo do Sistema de Ponto - v8.0.12:
+    - Criado relatório técnico abrangente (RELATORIO_SISTEMA_PONTO_COMPLETO.md) para análise por LLM
+    - Documentado esquema completo do banco de dados (21 campos do RegistroPonto)
+    - Especificadas regras de negócio para todos os tipos de registro (trabalho_normal, sabado_horas_extras, etc.)
+    - Identificados 4 problemas críticos: CRUD quebrado, sábados sem almoço, cálculos incorretos, campos inconsistentes
+    - Script de debug completo (debug_ponto_template.py) com análise detalhada dos problemas
+    - Documentação de 548 registros existentes distribuídos em 11 tipos diferentes
+    - Análise do motor de cálculo (kpis_engine.py) com fórmulas corretas e incorretas
+    - Gerado script de correção automática (corrigir_problemas_ponto.py)
+    - HOTFIX documentado (HOTFIX_PONTO_CRUD.md) com plano de correção em 3 fases
+    - Identificado: 15 sábados sem horário de almoço, campos CRUD incorretos (entrada vs hora_entrada)
+    - Objetivo: fornecer base completa para qualquer LLM corrigir os problemas persistentes
   - July 25, 2025. Correção da Lógica de Atrasos para Sábado/Domingo/Feriado - v8.0.11:
     - Implementada regra de negócio: em sábado, domingo e feriado trabalhado não há conceito de atraso
     - Corrigido engine de KPIs para excluir tipos especiais do cálculo de atrasos
