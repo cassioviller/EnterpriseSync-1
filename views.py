@@ -3532,73 +3532,21 @@ def novo_ponto_lista():
 @main_bp.route('/restaurantes')
 @admin_required
 def lista_restaurantes():
-    """Lista restaurantes com tratamento de erro detalhado para produção"""
+    """Lista restaurantes - VERSÃO SIMPLES E FUNCIONAL"""
     try:
-        # Verificar se tabela restaurante existe e tem schema correto
-        from sqlalchemy import inspect, text
+        # Determinar admin_id
+        admin_id = current_user.id if current_user.tipo_usuario == TipoUsuario.ADMIN else current_user.admin_id
         
-        inspector = inspect(db.engine)
-        if 'restaurante' not in inspector.get_table_names():
-            error_msg = "❌ ERRO CRÍTICO: Tabela 'restaurante' não existe no banco de dados"
-            return render_template('error_debug.html', 
-                                 error_title="Erro de Schema - Tabela Restaurante",
-                                 error_message=error_msg,
-                                 solution="Execute: CREATE TABLE restaurante (...)")
-        
-        # Verificar colunas necessárias
-        columns = inspector.get_columns('restaurante')
-        column_names = [col['name'] for col in columns]
-        
-        required_columns = ['id', 'nome', 'responsavel', 'preco_almoco', 'preco_jantar', 'preco_lanche', 'admin_id']
-        missing_columns = [col for col in required_columns if col not in column_names]
-        
-        if missing_columns:
-            error_msg = f"❌ ERRO DE SCHEMA: Colunas faltantes na tabela restaurante: {', '.join(missing_columns)}"
-            solution = f"Execute: ALTER TABLE restaurante ADD COLUMN {missing_columns[0]} VARCHAR(100);"
-            return render_template('error_debug.html',
-                                 error_title="Erro de Schema - Colunas Faltantes", 
-                                 error_message=error_msg,
-                                 solution=solution,
-                                 all_columns=column_names,
-                                 required_columns=required_columns)
-        
-        # Verificar coluna duplicada problemática
-        if 'contato_responsavel' in column_names and 'responsavel' in column_names:
-            error_msg = "❌ ERRO DE SCHEMA: Coluna 'contato_responsavel' duplicada com 'responsavel'"
-            solution = "Execute: ALTER TABLE restaurante DROP COLUMN contato_responsavel;"
-            return render_template('error_debug.html',
-                                 error_title="Erro de Schema - Coluna Duplicada",
-                                 error_message=error_msg,
-                                 solution=solution,
-                                 all_columns=column_names)
-        
-        # Schema correto - carregar dados normalmente
-        if current_user.tipo_usuario == TipoUsuario.ADMIN:
-            admin_id = current_user.id
-        else:
-            admin_id = current_user.admin_id
-            
+        # Query direta
         restaurantes = Restaurante.query.filter_by(admin_id=admin_id).all()
         
         return render_template('restaurantes.html', restaurantes=restaurantes)
-            
-        # Tentar fazer query dos restaurantes
-        restaurantes = Restaurante.query.filter_by(admin_id=admin_id).order_by(Restaurante.nome).all()
         
-        return render_template('restaurantes.html', 
-                             restaurantes=restaurantes,
-                             titulo="Gerenciamento de Restaurantes")
-                             
     except Exception as e:
-        # Capturar erro específico e mostrar detalhes
-        import traceback
-        error_details = traceback.format_exc()
-        
         return render_template('error_debug.html',
                              error_title="Erro no Módulo de Restaurantes",
-                             error_message=f"❌ ERRO: {str(e)}",
-                             error_details=error_details,
-                             solution="Verifique o schema da tabela restaurante e aplique as correções necessárias")
+                             error_message=f"ERRO: {str(e)}",
+                             solution="Verificar schema da tabela restaurante")
 
 @main_bp.route('/restaurantes/novo', methods=['GET', 'POST'])
 @admin_required
