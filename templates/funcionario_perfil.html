@@ -304,7 +304,7 @@
                             <span class="badge bg-success ms-2"><i class="fas fa-calendar-week"></i> SÁBADO</span>
                             <span class="badge bg-warning ms-2"><i class="fas fa-sun"></i> DOMINGO</span>
                             <span class="badge bg-info ms-2"><i class="fas fa-star"></i> FERIADO TRAB.</span>
-                            <span class="badge bg-secondary ms-2"><i class="fas fa-home"></i> FERIADO</span>
+                            <span class="badge bg-secondary ms-2"><i class="fas fa-home"></i> FERIADO NORMAL</span>
                             <span class="badge bg-primary ms-2"><i class="fas fa-check"></i> JUSTIFICADA</span>
                             <span class="badge bg-danger ms-2"><i class="fas fa-times"></i> FALTA</span>
                         </div>
@@ -734,13 +734,14 @@
                                         <div class="col-md-8">
                                             <select class="form-select form-select-lg" id="tipo_lancamento" name="tipo_lancamento" required onchange="alterarTipoLancamento()">
                                                 <option value="">Selecione o tipo de lançamento...</option>
-                                                <option value="trabalhado">Trabalhado</option>
+                                                <option value="trabalhado">Trabalho Normal</option>
                                                 <option value="falta">Falta</option>
                                                 <option value="falta_justificada">Falta Justificada</option>
-                                                <option value="feriado">Feriado</option>
+                                                <option value="feriado">Feriado Normal</option>
                                                 <option value="feriado_trabalhado">Feriado Trabalhado</option>
-                                                <option value="sabado_horas_extras">Sábado Horas Extras</option>
-                                                <option value="domingo_horas_extras">Domingo Horas Extras</option>
+                                                <option value="sabado_horas_extras">Sábado - Horas Extras</option>
+                                                <option value="domingo_horas_extras">Domingo - Horas Extras</option>
+                                                <option value="meio_periodo">Meio Período</option>
                                             </select>
                                         </div>
                                         <div class="col-md-4">
@@ -756,7 +757,7 @@
                                             <i class="fas fa-info-circle"></i> <strong>Trabalhado:</strong> Registre os horários normais de trabalho. Configure o percentual para horas extras (se houver).
                                         </div>
                                         <div id="alertaFeriado" class="alert alert-secondary" style="display: none;">
-                                            <i class="fas fa-calendar"></i> <strong>Feriado:</strong> Marcação de feriado nacional/local. Não é necessário informar horários.
+                                            <i class="fas fa-calendar"></i> <strong>Feriado Normal:</strong> Marcação de feriado nacional/local não trabalhado. Não é necessário informar horários.
                                         </div>
                                         <div id="alertaFeriadoTrabalhado" class="alert alert-warning" style="display: none;">
                                             <i class="fas fa-exclamation-triangle"></i> <strong>Feriado Trabalhado:</strong> Trabalho em feriado recebe <strong>100% de adicional</strong> sobre as horas normais.
