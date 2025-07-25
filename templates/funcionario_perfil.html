@@ -1405,13 +1405,81 @@ document.addEventListener('DOMContentLoaded', function() {
 
 // Funções de edição e exclusão
 function editarPonto(id) {
-    alert('Funcionalidade de edição de ponto será implementada');
+    console.log('Carregando dados do registro:', id);
+    
+    // Buscar dados do registro
+    fetch(`/ponto/registro/${id}`)
+        .then(response => {
+            if (!response.ok) throw new Error('Erro ao carregar dados');
+            return response.json();
+        })
+        .then(data => {
+            console.log('Dados carregados:', data);
+            
+            // Preencher o modal com os dados
+            document.getElementById('data_ponto').value = data.data;
+            document.getElementById('tipo_registro_ponto').value = data.tipo_registro;
+            document.getElementById('obra_id_ponto').value = data.obra_id || '';
+            document.getElementById('hora_entrada_ponto').value = data.entrada || '';
+            document.getElementById('hora_saida_ponto').value = data.saida || '';
+            document.getElementById('hora_almoco_saida_ponto').value = data.saida_almoco || '';
+            document.getElementById('hora_almoco_retorno_ponto').value = data.retorno_almoco || '';
+            document.getElementById('percentual_extras').value = data.percentual_extras || '';
+            document.getElementById('observacoes_ponto').value = data.observacoes || '';
+            
+            // Alterar o título do modal
+            document.querySelector('#modalPonto .modal-title').innerHTML = '<i class="fas fa-edit"></i> Editar Registro de Ponto';
+            
+            // Adicionar campo hidden com ID do registro
+            let formPonto = document.getElementById('formPonto');
+            let hiddenId = document.getElementById('registro_id_ponto');
+            if (!hiddenId) {
+                hiddenId = document.createElement('input');
+                hiddenId.type = 'hidden';
+                hiddenId.id = 'registro_id_ponto';
+                hiddenId.name = 'registro_id';
+                formPonto.appendChild(hiddenId);
+            }
+            hiddenId.value = id;
+            
+            // Ajustar visibilidade dos campos baseado no tipo
+            ajustarCamposPorTipo();
+            
+            // Abrir modal
+            new bootstrap.Modal(document.getElementById('modalPonto')).show();
+        })
+        .catch(error => {
+            console.error('Erro ao carregar registro:', error);
+            alert('Erro ao carregar dados do registro: ' + error.message);
+        });
 }
 
 function excluirPonto(id) {
-    if (confirm('Tem certeza que deseja excluir este registro de ponto?')) {
-        // Implementar exclusão via AJAX
-        console.log('Excluir ponto:', id);
+    if (confirm('Tem certeza que deseja excluir este registro de ponto?\\n\\nEsta ação não pode ser desfeita.')) {
+        console.log('Excluindo registro:', id);
+        
+        fetch(`/ponto/registro/${id}`, {
+            method: 'DELETE',
+            headers: {
+                'Content-Type': 'application/json'
+            }
+        })
+        .then(response => {
+            if (!response.ok) throw new Error('Erro na requisição');
+            return response.json();
+        })
+        .then(data => {
+            if (data.success) {
+                alert('Registro excluído com sucesso!');
+                location.reload(); // Recarregar a página para atualizar a tabela
+            } else {
+                throw new Error(data.error || 'Erro desconhecido');
+            }
+        })
+        .catch(error => {
+            console.error('Erro ao excluir:', error);
+            alert('Erro ao excluir registro: ' + error.message);
+        });
     }
 }
 
@@ -1476,6 +1544,24 @@ $(document).ready(function() {
     document.getElementById('data_ponto').value = today;
     document.getElementById('data_inicio_ocorrencia').value = today;
     document.getElementById('data_alimentacao').value = today;
+    
+    // Reset do modal de ponto para novos registros
+    $('#modalPonto').on('show.bs.modal', function (event) {
+        // Se não foi clique no botão editar, limpar o formulário para novo registro
+        if (!event.relatedTarget || !event.relatedTarget.classList.contains('btn-outline-warning')) {
+            document.querySelector('#modalPonto .modal-title').innerHTML = '<i class="fas fa-clock"></i> Novo Registro de Ponto';
+            document.getElementById('formPonto').reset();
+            
+            // Remover campo hidden se existir
+            const hiddenId = document.getElementById('registro_id_ponto');
+            if (hiddenId) {
+                hiddenId.remove();
+            }
+            
+            // Definir data padrão
+            document.getElementById('data_ponto').value = today;
+        }
+    });
     
     // Inicializar tooltips
     var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
