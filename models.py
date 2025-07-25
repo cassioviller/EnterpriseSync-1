@@ -502,8 +502,13 @@ class Restaurante(db.Model):
     endereco = db.Column(db.Text)
     telefone = db.Column(db.String(20))
     email = db.Column(db.String(120))
-    contato_responsavel = db.Column(db.String(100))
+    responsavel = db.Column(db.String(100))  # Campo corrigido
+    preco_almoco = db.Column(db.Float, default=0.0)
+    preco_jantar = db.Column(db.Float, default=0.0)  
+    preco_lanche = db.Column(db.Float, default=0.0)
+    observacoes = db.Column(db.Text)
     ativo = db.Column(db.Boolean, default=True)
+    admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=True)  # Multi-tenant
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     
     # Relacionamentos

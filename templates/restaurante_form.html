@@ -1,0 +1,132 @@
+{% extends "base.html" %}
+
+{% block title %}{{ titulo }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+            <div class="card">
+                <div class="card-header">
+                    <h4><i class="fas fa-utensils"></i> {{ titulo }}</h4>
+                </div>
+                <div class="card-body">
+                    {% with messages = get_flashed_messages(with_categories=true) %}
+                        {% if messages %}
+                            {% for category, message in messages %}
+                                <div class="alert alert-{{ 'danger' if category == 'error' else category }} alert-dismissible fade show">
+                                    {{ message }}
+                                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                                </div>
+                            {% endfor %}
+                        {% endif %}
+                    {% endwith %}
+                    
+                    <form method="POST">
+                        <div class="row">
+                            <div class="col-md-12">
+                                <div class="mb-3">
+                                    <label for="nome" class="form-label">Nome do Restaurante *</label>
+                                    <input type="text" class="form-control" id="nome" name="nome" 
+                                           value="{{ restaurante.nome if restaurante else '' }}" required>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="row">
+                            <div class="col-md-8">
+                                <div class="mb-3">
+                                    <label for="endereco" class="form-label">Endereço</label>
+                                    <textarea class="form-control" id="endereco" name="endereco" rows="2">{{ restaurante.endereco if restaurante else '' }}</textarea>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="mb-3">
+                                    <label for="telefone" class="form-label">Telefone</label>
+                                    <input type="text" class="form-control" id="telefone" name="telefone" 
+                                           value="{{ restaurante.telefone if restaurante else '' }}">
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="responsavel" class="form-label">Responsável</label>
+                                    <input type="text" class="form-control" id="responsavel" name="responsavel" 
+                                           value="{{ restaurante.responsavel if restaurante else '' }}">
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <h5 class="mb-3">Preços</h5>
+                        <div class="row">
+                            <div class="col-md-4">
+                                <div class="mb-3">
+                                    <label for="preco_almoco" class="form-label">Preço Almoço (R$)</label>
+                                    <input type="number" step="0.01" class="form-control" id="preco_almoco" name="preco_almoco" 
+                                           value="{{ '%.2f'|format(restaurante.preco_almoco) if restaurante else '0.00' }}">
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="mb-3">
+                                    <label for="preco_jantar" class="form-label">Preço Jantar (R$)</label>
+                                    <input type="number" step="0.01" class="form-control" id="preco_jantar" name="preco_jantar" 
+                                           value="{{ '%.2f'|format(restaurante.preco_jantar) if restaurante else '0.00' }}">
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="mb-3">
+                                    <label for="preco_lanche" class="form-label">Preço Lanche (R$)</label>
+                                    <input type="number" step="0.01" class="form-control" id="preco_lanche" name="preco_lanche" 
+                                           value="{{ '%.2f'|format(restaurante.preco_lanche) if restaurante else '0.00' }}">
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label for="observacoes" class="form-label">Observações</label>
+                            <textarea class="form-control" id="observacoes" name="observacoes" rows="3">{{ restaurante.observacoes if restaurante else '' }}</textarea>
+                        </div>
+                        
+                        {% if restaurante %}
+                        <div class="mb-3">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="ativo" name="ativo" 
+                                       {{ 'checked' if restaurante.ativo else '' }}>
+                                <label class="form-check-label" for="ativo">
+                                    Restaurante Ativo
+                                </label>
+                            </div>
+                        </div>
+                        {% endif %}
+                        
+                        <div class="d-flex justify-content-between">
+                            <a href="{{ url_for('main.lista_restaurantes') }}" class="btn btn-secondary">
+                                <i class="fas fa-arrow-left"></i> Voltar
+                            </a>
+                            <button type="submit" class="btn btn-primary">
+                                <i class="fas fa-save"></i> {{ acao }}
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// Máscara para telefone
+document.getElementById('telefone').addEventListener('input', function(e) {
+    let value = e.target.value.replace(/\D/g, '');
+    if (value.length <= 11) {
+        value = value.replace(/(\d{2})(\d{5})(\d{4})/, '($1) $2-$3');
+        if (value.length <= 14) {
+            value = value.replace(/(\d{2})(\d{4})(\d{4})/, '($1) $2-$3');
+        }
+    }
+    e.target.value = value;
+});
+</script>
+{% endblock %}

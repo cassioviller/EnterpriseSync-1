@@ -3595,7 +3595,220 @@ def novo_ponto_lista():
 
 # Função duplicada removida - implementação única mantida nas linhas posteriores
 
-# Alimentação
+# ===== ROTAS DE RESTAURANTES =====
+@main_bp.route('/restaurantes')
+@admin_required
+def lista_restaurantes():
+    tenant_filter = get_tenant_filter()
+    restaurantes = Restaurante.query.filter(tenant_filter).order_by(Restaurante.nome).all()
+    
+    return render_template('restaurantes.html', 
+                         restaurantes=restaurantes,
+                         titulo="Gerenciamento de Restaurantes")
+
+@main_bp.route('/restaurantes/novo', methods=['GET', 'POST'])
+@admin_required
+def novo_restaurante():
+    if request.method == 'POST':
+        try:
+            nome = request.form.get('nome', '').strip()
+            endereco = request.form.get('endereco', '').strip()
+            telefone = request.form.get('telefone', '').strip()
+            responsavel = request.form.get('responsavel', '').strip()
+            preco_almoco = float(request.form.get('preco_almoco', 0))
+            preco_jantar = float(request.form.get('preco_jantar', 0))
+            preco_lanche = float(request.form.get('preco_lanche', 0))
+            observacoes = request.form.get('observacoes', '').strip()
+            
+            if not nome:
+                flash('Nome é obrigatório.', 'danger')
+                return redirect(url_for('main.novo_restaurante'))
+            
+            # Verificar duplicatas
+            tenant_filter = get_tenant_filter()
+            existing = Restaurante.query.filter(
+                and_(Restaurante.nome == nome, tenant_filter)
+            ).first()
+            
+            if existing:
+                flash(f'Já existe um restaurante com o nome "{nome}".', 'danger')
+                return redirect(url_for('main.novo_restaurante'))
+            
+            restaurante = Restaurante(
+                nome=nome,
+                endereco=endereco,
+                telefone=telefone,
+                responsavel=responsavel,
+                preco_almoco=preco_almoco,
+                preco_jantar=preco_jantar,
+                preco_lanche=preco_lanche,
+                observacoes=observacoes,
+                admin_id=current_user.id if current_user.tipo_usuario == TipoUsuario.ADMIN else current_user.admin_id
+            )
+            
+            db.session.add(restaurante)
+            db.session.commit()
+            
+            flash(f'Restaurante "{nome}" criado com sucesso!', 'success')
+            return redirect(url_for('main.lista_restaurantes'))
+            
+        except Exception as e:
+            db.session.rollback()
+            flash(f'Erro ao criar restaurante: {str(e)}', 'danger')
+            return redirect(url_for('main.novo_restaurante'))
+    
+    return render_template('restaurante_form.html', 
+                         titulo="Novo Restaurante",
+                         acao="Criar")
+
+@main_bp.route('/restaurantes/<int:id>')
+@admin_required
+def detalhes_restaurante(id):
+    tenant_filter = get_tenant_filter()
+    restaurante = Restaurante.query.filter(
+        and_(Restaurante.id == id, tenant_filter)
+    ).first_or_404()
+    
+    # Buscar estatísticas do restaurante
+    from datetime import datetime, timedelta
+    hoje = datetime.now().date()
+    inicio_mes = hoje.replace(day=1)
+    
+    # Total de registros de alimentação no mês
+    registros_mes = RegistroAlimentacao.query.filter(
+        and_(
+            RegistroAlimentacao.restaurante_id == id,
+            RegistroAlimentacao.data >= inicio_mes,
+            RegistroAlimentacao.data <= hoje
+        )
+    ).count()
+    
+    # Valor total no mês
+    valor_total_mes = db.session.query(func.sum(RegistroAlimentacao.valor)).filter(
+        and_(
+            RegistroAlimentacao.restaurante_id == id,
+            RegistroAlimentacao.data >= inicio_mes,
+            RegistroAlimentacao.data <= hoje
+        )
+    ).scalar() or 0
+    
+    # Últimos registros
+    ultimos_registros = db.session.query(
+        RegistroAlimentacao.data,
+        RegistroAlimentacao.tipo,
+        RegistroAlimentacao.valor,
+        Funcionario.nome.label('funcionario_nome')
+    ).join(
+        Funcionario, RegistroAlimentacao.funcionario_id == Funcionario.id
+    ).filter(
+        RegistroAlimentacao.restaurante_id == id
+    ).order_by(
+        RegistroAlimentacao.data.desc(),
+        RegistroAlimentacao.id.desc()
+    ).limit(10).all()
+    
+    return render_template('restaurante_detalhes.html',
+                         restaurante=restaurante,
+                         registros_mes=registros_mes,
+                         valor_total_mes=valor_total_mes,
+                         ultimos_registros=ultimos_registros,
+                         titulo=f"Restaurante: {restaurante.nome}")
+
+@main_bp.route('/restaurantes/<int:id>/editar', methods=['GET', 'POST'])
+@admin_required  
+def editar_restaurante(id):
+    tenant_filter = get_tenant_filter()
+    restaurante = Restaurante.query.filter(
+        and_(Restaurante.id == id, tenant_filter)
+    ).first_or_404()
+    
+    if request.method == 'POST':
+        try:
+            nome = request.form.get('nome', '').strip()
+            endereco = request.form.get('endereco', '').strip()
+            telefone = request.form.get('telefone', '').strip()
+            responsavel = request.form.get('responsavel', '').strip()
+            preco_almoco = float(request.form.get('preco_almoco', 0))
+            preco_jantar = float(request.form.get('preco_jantar', 0))
+            preco_lanche = float(request.form.get('preco_lanche', 0))
+            observacoes = request.form.get('observacoes', '').strip()
+            ativo = request.form.get('ativo') == 'on'
+            
+            if not nome:
+                flash('Nome é obrigatório.', 'danger')
+                return redirect(url_for('main.editar_restaurante', id=id))
+            
+            # Verificar duplicatas (exceto o próprio)
+            existing = Restaurante.query.filter(
+                and_(
+                    Restaurante.nome == nome,
+                    Restaurante.id != id,
+                    tenant_filter
+                )
+            ).first()
+            
+            if existing:
+                flash(f'Já existe outro restaurante com o nome "{nome}".', 'danger')
+                return redirect(url_for('main.editar_restaurante', id=id))
+            
+            # Atualizar dados
+            restaurante.nome = nome
+            restaurante.endereco = endereco
+            restaurante.telefone = telefone
+            restaurante.responsavel = responsavel  
+            restaurante.preco_almoco = preco_almoco
+            restaurante.preco_jantar = preco_jantar
+            restaurante.preco_lanche = preco_lanche
+            restaurante.observacoes = observacoes
+            restaurante.ativo = ativo
+            
+            db.session.commit()
+            
+            flash(f'Restaurante "{nome}" atualizado com sucesso!', 'success')
+            return redirect(url_for('main.detalhes_restaurante', id=id))
+            
+        except Exception as e:
+            db.session.rollback()
+            flash(f'Erro ao atualizar restaurante: {str(e)}', 'danger')
+            return redirect(url_for('main.editar_restaurante', id=id))
+    
+    return render_template('restaurante_form.html',
+                         restaurante=restaurante,
+                         titulo="Editar Restaurante",
+                         acao="Atualizar")
+
+@main_bp.route('/restaurantes/<int:id>/excluir', methods=['POST'])
+@admin_required
+def excluir_restaurante(id):
+    tenant_filter = get_tenant_filter()
+    restaurante = Restaurante.query.filter(
+        and_(Restaurante.id == id, tenant_filter)
+    ).first_or_404()
+    
+    try:
+        # Verificar se tem registros de alimentação associados
+        registros_count = RegistroAlimentacao.query.filter_by(restaurante_id=id).count()
+        
+        if registros_count > 0:
+            # Só desativar se tem registros
+            restaurante.ativo = False
+            db.session.commit()
+            flash(f'Restaurante "{restaurante.nome}" foi desativado (possui {registros_count} registros de alimentação).', 'warning')
+        else:
+            # Excluir completamente se não tem registros
+            nome = restaurante.nome
+            db.session.delete(restaurante)
+            db.session.commit()
+            flash(f'Restaurante "{nome}" excluído com sucesso!', 'success')
+        
+        return redirect(url_for('main.lista_restaurantes'))
+        
+    except Exception as e:
+        db.session.rollback()
+        flash(f'Erro ao excluir restaurante: {str(e)}', 'danger')
+        return redirect(url_for('main.detalhes_restaurante', id=id))
+
+# ===== ROTAS DE ALIMENTAÇÃO =====
 @main_bp.route('/alimentacao')
 @login_required
 def alimentacao():

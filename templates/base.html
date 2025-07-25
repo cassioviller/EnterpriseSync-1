@@ -702,10 +702,18 @@
                             </a>
                         </li>
                         
-                        <li class="nav-item">
-                            <a class="nav-link" href="{{ url_for('main.alimentacao') }}">
+                        <li class="nav-item dropdown">
+                            <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown">
                                 <i class="fas fa-utensils me-1"></i> Alimentação
                             </a>
+                            <ul class="dropdown-menu">
+                                <li><a class="dropdown-item" href="{{ url_for('main.lista_restaurantes') }}">
+                                    <i class="fas fa-store"></i> Restaurantes
+                                </a></li>
+                                <li><a class="dropdown-item" href="{{ url_for('main.alimentacao') }}">
+                                    <i class="fas fa-clipboard-list"></i> Registros
+                                </a></li>
+                            </ul>
                         </li>
                         
                         <li class="nav-item">

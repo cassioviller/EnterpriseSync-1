@@ -1,0 +1,173 @@
+{% extends "base.html" %}
+
+{% block title %}{{ titulo }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h2><i class="fas fa-utensils"></i> {{ titulo }}</h2>
+                <div class="btn-group">
+                    <a href="{{ url_for('main.editar_restaurante', id=restaurante.id) }}" class="btn btn-warning">
+                        <i class="fas fa-edit"></i> Editar
+                    </a>
+                    <a href="{{ url_for('main.lista_restaurantes') }}" class="btn btn-secondary">
+                        <i class="fas fa-arrow-left"></i> Voltar
+                    </a>
+                </div>
+            </div>
+            
+            {% with messages = get_flashed_messages(with_categories=true) %}
+                {% if messages %}
+                    {% for category, message in messages %}
+                        <div class="alert alert-{{ 'danger' if category == 'error' else category }} alert-dismissible fade show">
+                            {{ message }}
+                            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                        </div>
+                    {% endfor %}
+                {% endif %}
+            {% endwith %}
+            
+            <div class="row">
+                <!-- Informações do Restaurante -->
+                <div class="col-md-6">
+                    <div class="card">
+                        <div class="card-header">
+                            <h5><i class="fas fa-info-circle"></i> Informações</h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="row">
+                                <div class="col-sm-4"><strong>Nome:</strong></div>
+                                <div class="col-sm-8">{{ restaurante.nome }}</div>
+                            </div>
+                            <hr>
+                            <div class="row">
+                                <div class="col-sm-4"><strong>Responsável:</strong></div>
+                                <div class="col-sm-8">{{ restaurante.responsavel or '-' }}</div>
+                            </div>
+                            <hr>
+                            <div class="row">
+                                <div class="col-sm-4"><strong>Telefone:</strong></div>
+                                <div class="col-sm-8">{{ restaurante.telefone or '-' }}</div>
+                            </div>
+                            <hr>
+                            <div class="row">
+                                <div class="col-sm-4"><strong>Endereço:</strong></div>
+                                <div class="col-sm-8">{{ restaurante.endereco or '-' }}</div>
+                            </div>
+                            <hr>
+                            <div class="row">
+                                <div class="col-sm-4"><strong>Status:</strong></div>
+                                <div class="col-sm-8">
+                                    {% if restaurante.ativo %}
+                                        <span class="badge bg-success">Ativo</span>
+                                    {% else %}
+                                        <span class="badge bg-secondary">Inativo</span>
+                                    {% endif %}
+                                </div>
+                            </div>
+                            {% if restaurante.observacoes %}
+                            <hr>
+                            <div class="row">
+                                <div class="col-sm-4"><strong>Observações:</strong></div>
+                                <div class="col-sm-8">{{ restaurante.observacoes }}</div>
+                            </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Preços -->
+                <div class="col-md-6">
+                    <div class="card">
+                        <div class="card-header">
+                            <h5><i class="fas fa-dollar-sign"></i> Preços</h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="row mb-3">
+                                <div class="col-4">
+                                    <div class="text-center">
+                                        <div class="h4 text-primary">R$ {{ "%.2f"|format(restaurante.preco_almoco) }}</div>
+                                        <small class="text-muted">Almoço</small>
+                                    </div>
+                                </div>
+                                <div class="col-4">
+                                    <div class="text-center">
+                                        <div class="h4 text-success">R$ {{ "%.2f"|format(restaurante.preco_jantar) }}</div>
+                                        <small class="text-muted">Jantar</small>
+                                    </div>
+                                </div>
+                                <div class="col-4">
+                                    <div class="text-center">
+                                        <div class="h4 text-warning">R$ {{ "%.2f"|format(restaurante.preco_lanche) }}</div>
+                                        <small class="text-muted">Lanche</small>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Estatísticas do Mês -->
+                    <div class="card mt-3">
+                        <div class="card-header">
+                            <h5><i class="fas fa-chart-bar"></i> Estatísticas do Mês</h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="row text-center">
+                                <div class="col-6">
+                                    <div class="h4 text-info">{{ registros_mes }}</div>
+                                    <small class="text-muted">Registros</small>
+                                </div>
+                                <div class="col-6">
+                                    <div class="h4 text-success">R$ {{ "%.2f"|format(valor_total_mes) }}</div>
+                                    <small class="text-muted">Valor Total</small>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Últimos Registros -->
+            {% if ultimos_registros %}
+            <div class="row mt-4">
+                <div class="col-12">
+                    <div class="card">
+                        <div class="card-header">
+                            <h5><i class="fas fa-history"></i> Últimos Registros de Alimentação</h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="table-responsive">
+                                <table class="table table-sm table-hover">
+                                    <thead>
+                                        <tr>
+                                            <th>Data</th>
+                                            <th>Funcionário</th>
+                                            <th>Tipo</th>
+                                            <th>Valor</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for registro in ultimos_registros %}
+                                        <tr>
+                                            <td>{{ registro.data.strftime('%d/%m/%Y') }}</td>
+                                            <td>{{ registro.funcionario_nome }}</td>
+                                            <td>
+                                                <span class="badge bg-secondary">{{ registro.tipo.title() }}</span>
+                                            </td>
+                                            <td>R$ {{ "%.2f"|format(registro.valor) }}</td>
+                                        </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}
