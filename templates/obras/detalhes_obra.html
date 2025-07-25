@@ -790,8 +790,11 @@ $(document).ready(function() {
                     if (data.subatividades && data.subatividades.length > 0) {
                         html = '<div class="row">';
                         data.subatividades.forEach(function(sub, index) {
-                            const statusClass = index < 3 ? 'success' : index < 5 ? 'warning' : 'secondary';
-                            const statusText = index < 3 ? 'Concluída' : index < 5 ? 'Em andamento' : 'Pendente';
+                            // Usar status real da API ao invés de hardcoded
+                            const statusClass = sub.status_class || 'secondary';
+                            const statusText = sub.status || 'Pendente';
+                            const percentual = sub.percentual_concluido || 0;
+                            const rdosCount = sub.rdos_count || 0;
                             
                             html += `
                                 <div class="col-md-6 mb-2">
@@ -801,6 +804,7 @@ $(document).ready(function() {
                                             <small><strong>${sub.nome}</strong></small><br>
                                             <small class="text-muted">${sub.descricao}</small><br>
                                             <small class="text-info">Qualificação: ${sub.qualificacao_minima}</small>
+                                            ${rdosCount > 0 ? `<br><small class="text-success">${rdosCount} RDO(s) lançado(s) - ${percentual}%</small>` : '<br><small class="text-warning">Nenhum RDO lançado</small>'}
                                         </div>
                                         <span class="badge bg-${statusClass}">${statusText}</span>
                                     </div>

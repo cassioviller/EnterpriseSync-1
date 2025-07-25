@@ -3238,12 +3238,49 @@ def obras_autocomplete():
 @main_bp.route('/api/servicos/<int:servico_id>/subatividades')
 @login_required
 def api_subatividades_servico(servico_id):
-    """API para buscar subatividades de um serviço"""
+    """API para buscar subatividades de um serviço com status real baseado em RDOs"""
     subatividades = SubAtividade.query.filter_by(servico_id=servico_id, ativo=True).order_by(SubAtividade.ordem_execucao).all()
     
-    return jsonify({
-        'success': True,
-        'subatividades': [{
+    result = []
+    for sub in subatividades:
+        # Calcular status real baseado em RDOs
+        # Buscar RDO_Subatividades relacionadas
+        try:
+            rdo_subatividades = db.session.query(RDO_Subatividade).filter_by(
+                subatividade_id=sub.id
+            ).all()
+            
+            # Calcular percentual médio de conclusão
+            total_percentual = 0
+            count_rdos = len(rdo_subatividades)
+            
+            if count_rdos > 0:
+                for rdo_sub in rdo_subatividades:
+                    total_percentual += rdo_sub.percentual_concluido or 0
+                percentual_medio = total_percentual / count_rdos
+            else:
+                percentual_medio = 0
+                
+        except Exception:
+            # Se não existe a tabela RDO_Subatividade, usar 0
+            percentual_medio = 0
+            count_rdos = 0
+        
+        # Determinar status baseado no percentual real
+        if percentual_medio >= 100:
+            status = 'Concluída'
+            status_class = 'success'
+        elif percentual_medio >= 50:
+            status = 'Em andamento'
+            status_class = 'warning' 
+        elif percentual_medio > 0:
+            status = 'Iniciada'
+            status_class = 'info'
+        else:
+            status = 'Pendente'
+            status_class = 'secondary'
+        
+        result.append({
             'id': sub.id,
             'nome': sub.nome,
             'descricao': sub.descricao,
@@ -3252,8 +3289,16 @@ def api_subatividades_servico(servico_id):
             'materiais_principais': sub.materiais_principais,
             'requer_aprovacao': sub.requer_aprovacao,
             'pode_executar_paralelo': sub.pode_executar_paralelo,
-            'qualificacao_minima': sub.qualificacao_minima
-        } for sub in subatividades]
+            'qualificacao_minima': sub.qualificacao_minima,
+            'status': status,
+            'status_class': status_class,
+            'percentual_concluido': round(percentual_medio, 1),
+            'rdos_count': count_rdos
+        })
+    
+    return jsonify({
+        'success': True,
+        'subatividades': result
     })
 
 @main_bp.route('/api/funcionarios/autocomplete')
