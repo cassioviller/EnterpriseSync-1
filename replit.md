@@ -755,6 +755,17 @@
     - Fallback inteligente no app.py para URL do banco de dados
     - Documentação completa em EASYPANEL_DEPLOY.md
     - Deploy funciona apenas parando/iniciando container no EasyPanel
+  - July 25, 2025. Módulo de Restaurantes Completo Implementado - v8.0.15:
+    - Implementado sistema completo de gerenciamento de restaurantes com CRUD funcional
+    - Corrigidas colunas faltantes no banco de dados (responsavel, preco_almoco, preco_jantar, preco_lanche, observacoes, admin_id)
+    - Criados templates responsivos: restaurantes.html, restaurante_form.html, restaurante_detalhes.html
+    - Rotas implementadas: lista, criar, editar, excluir, detalhes com isolamento multi-tenant
+    - Menu atualizado com dropdown: Alimentação > Restaurantes/Registros
+    - 8 restaurantes existentes associados automaticamente ao admin do sistema
+    - Script de correção criado (fix_restaurantes_producao.py) para deployment em produção
+    - Integração completa com sistema de registros de alimentação existente
+    - Validações de duplicatas, máscaras de telefone, estatísticas em tempo real
+    - Sistema de exclusão inteligente: desativa se tem registros, exclui se vazio
   - July 25, 2025. Correções Críticas Implementadas - Sistema de Ponto Finalizado - v8.0.13:
     - TODAS as correções do relatório técnico implementadas com sucesso
     - Corrigidos campos do CRUD (views.py): entrada → hora_entrada, saida → hora_saida, etc.
