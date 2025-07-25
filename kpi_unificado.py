@@ -122,10 +122,42 @@ class KPIUnificado:
             )
             custos['outros'] = query_outros.scalar() or 0
         
+        # 5. FALTAS JUSTIFICADAS (custo de horas não trabalhadas mas pagas)
+        custos['faltas_justificadas'] = self._calcular_custo_faltas_justificadas(funcionarios_filter)
+        
         # TOTAL
         custos['total'] = sum(custos.values()) - custos['total']  # Evitar double counting
         
         return custos
+    
+    def _calcular_custo_faltas_justificadas(self, funcionarios_filter):
+        """Calcula o custo de faltas justificadas (horas pagas mas não trabalhadas)"""
+        if not funcionarios_filter:
+            return 0
+        
+        # Buscar faltas justificadas no período
+        faltas_justificadas = db.session.query(RegistroPonto).filter(
+            RegistroPonto.tipo_registro == 'falta_justificada',
+            RegistroPonto.funcionario_id.in_(funcionarios_filter),
+            RegistroPonto.data >= self.data_inicio,
+            RegistroPonto.data <= self.data_fim
+        ).all()
+        
+        custo_total = 0
+        for falta in faltas_justificadas:
+            funcionario = Funcionario.query.get(falta.funcionario_id)
+            if funcionario and funcionario.salario:
+                # Assumir 8 horas por dia de falta justificada
+                horas_falta = 8
+                
+                # Valor hora baseado no salário (220h/mês)
+                valor_hora = funcionario.salario / 220
+                
+                # Custo da falta justificada (empresa paga mas funcionário não trabalha)
+                custo_falta = horas_falta * valor_hora
+                custo_total += custo_falta
+        
+        return custo_total
     
     def calcular_kpis_dashboard(self):
         """KPIs para o dashboard principal"""

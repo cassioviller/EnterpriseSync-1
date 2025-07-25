@@ -337,20 +337,7 @@ def dashboard():
     custo_transporte = custos_detalhados.get('transporte', 0)
     custo_mao_obra = custos_detalhados.get('mao_obra', 0)
     custo_outros = custos_detalhados.get('outros', 0)
-    
-    # Para compatibilidade com código antigo
-    funcionarios_admin = Funcionario.query.filter_by(admin_id=admin_id).all()
-    funcionarios_ids = [f.id for f in funcionarios_admin]
-    
-    if funcionarios_ids:
-        # Manter cálculo de faltas justificadas para compatibilidade
-        custo_faltas_justificadas = db.session.query(func.sum(func.coalesce(RegistroPonto.horas_trabalhadas, 0))).filter(
-            RegistroPonto.funcionario_id.in_(funcionarios_ids),
-            RegistroPonto.tipo_registro == 'falta_justificada',
-            RegistroPonto.data.between(data_inicio, data_fim)
-        ).scalar() or 0.0
-    else:
-        custo_faltas_justificadas = 0.0
+    custo_faltas_justificadas = custos_detalhados.get('faltas_justificadas', 0)
     
     # Total dos custos do sistema unificado
     total_custos = kpis_dashboard.get('custos_periodo', 0)
