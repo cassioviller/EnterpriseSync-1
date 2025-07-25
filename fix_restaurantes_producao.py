@@ -6,8 +6,8 @@ Adiciona colunas faltantes e configura dados necessários
 
 import os
 import sys
-from sqlalchemy import create_engine, text
-from sqlalchemy.orm import sessionmaker
+import psycopg2
+from urllib.parse import urlparse
 
 def main():
     print("🔧 CORREÇÃO DA TABELA RESTAURANTE - PRODUÇÃO")
@@ -19,26 +19,34 @@ def main():
         print("❌ DATABASE_URL não encontrada!")
         return False
     
-    print(f"📡 Conectando ao banco: {database_url[:30]}...")
+    print(f"📡 Conectando ao banco: {database_url[:50]}...")
+    
+    # Parse da URL para psycopg2
+    parsed = urlparse(database_url)
     
     try:
-        # Criar engine e sessão
-        engine = create_engine(database_url)
-        Session = sessionmaker(bind=engine)
-        session = Session()
+        # Conectar diretamente com psycopg2
+        conn = psycopg2.connect(
+            host=parsed.hostname,
+            database=parsed.path[1:],
+            user=parsed.username,
+            password=parsed.password,
+            port=parsed.port or 5432
+        )
         
+        cursor = conn.cursor()
         print("✅ Conectado ao banco de dados!")
         
         # 1. Verificar colunas existentes
         print("\n🔍 Verificando estrutura atual da tabela restaurante...")
-        result = session.execute(text("""
+        cursor.execute("""
             SELECT column_name 
             FROM information_schema.columns 
             WHERE table_name = 'restaurante'
             ORDER BY column_name;
-        """))
+        """)
         
-        colunas_existentes = [row[0] for row in result.fetchall()]
+        colunas_existentes = [row[0] for row in cursor.fetchall()]
         print(f"📋 Colunas existentes: {colunas_existentes}")
         
         # 2. Colunas necessárias
@@ -59,7 +67,7 @@ def main():
             if coluna not in colunas_existentes:
                 try:
                     sql = f"ALTER TABLE restaurante ADD COLUMN {coluna} {tipo};"
-                    session.execute(text(sql))
+                    cursor.execute(sql)
                     print(f"✅ Adicionada: {coluna} ({tipo})")
                     colunas_adicionadas += 1
                 except Exception as e:
@@ -69,61 +77,62 @@ def main():
         
         # 4. Verificar se temos usuários admin
         print("\n👤 Verificando usuários admin...")
-        result = session.execute(text("""
+        cursor.execute("""
             SELECT id, nome, email 
             FROM usuario 
             WHERE tipo_usuario = 'ADMIN' 
             LIMIT 1;
-        """))
+        """)
         
-        admin = result.fetchone()
+        admin = cursor.fetchone()
         if admin:
             admin_id, admin_nome, admin_email = admin
             print(f"✅ Admin encontrado: {admin_nome} ({admin_email})")
             
             # 5. Atualizar restaurantes sem admin_id
-            if 'admin_id' in [col for col, _ in colunas_necessarias.items() if col not in colunas_existentes]:
+            if 'admin_id' not in colunas_existentes or colunas_adicionadas > 0:
                 print("\n🔗 Configurando admin_id para restaurantes existentes...")
-                result = session.execute(text("""
+                cursor.execute("""
                     UPDATE restaurante 
-                    SET admin_id = :admin_id 
+                    SET admin_id = %s 
                     WHERE admin_id IS NULL OR admin_id = 0;
-                """), {'admin_id': admin_id})
+                """, (admin_id,))
                 
-                print(f"✅ {result.rowcount} restaurantes associados ao admin")
+                print(f"✅ {cursor.rowcount} restaurantes associados ao admin")
         else:
             print("⚠️ Nenhum usuário admin encontrado!")
         
         # 6. Commit das alterações
-        session.commit()
+        conn.commit()
         print(f"\n🎉 CORREÇÃO FINALIZADA!")
         print(f"📊 Colunas adicionadas: {colunas_adicionadas}")
         
         # 7. Verificação final
         print("\n🔍 Verificação final...")
-        result = session.execute(text("SELECT COUNT(*) FROM restaurante;"))
-        total_restaurantes = result.scalar()
+        cursor.execute("SELECT COUNT(*) FROM restaurante;")
+        total_restaurantes = cursor.fetchone()[0]
         print(f"📈 Total de restaurantes: {total_restaurantes}")
         
-        result = session.execute(text("""
+        cursor.execute("""
             SELECT column_name 
             FROM information_schema.columns 
             WHERE table_name = 'restaurante'
             ORDER BY column_name;
-        """))
+        """)
         
-        colunas_finais = [row[0] for row in result.fetchall()]
+        colunas_finais = [row[0] for row in cursor.fetchall()]
         print(f"📋 Estrutura final: {sorted(colunas_finais)}")
         
-        session.close()
+        cursor.close()
+        conn.close()
         print("\n✅ SCRIPT EXECUTADO COM SUCESSO!")
         return True
         
     except Exception as e:
         print(f"\n❌ ERRO CRÍTICO: {e}")
-        if 'session' in locals():
-            session.rollback()
-            session.close()
+        if 'conn' in locals():
+            conn.rollback()
+            conn.close()
         return False
 
 if __name__ == "__main__":
