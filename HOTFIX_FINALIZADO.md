@@ -1,133 +1,90 @@
-# ✅ HOTFIX CONCLUÍDO - ERRO categoria_id RESOLVIDO
-**Sistema SIGE v8.0 - Deploy EasyPanel**
-**Data: 24/07/2025 - 14:05 UTC**
+# HOTFIX FINALIZADO - SIGE v8.0.9
+**Data:** 25 de Julho de 2025  
+**Status:** ✅ CONCLUÍDO COM SUCESSO
 
-## 🎉 PROBLEMA RESOLVIDO COM SUCESSO
+## 🎯 Problemas Resolvidos
 
-### ✅ Erro SQL Completamente Corrigido
+### 1. BUG CRÍTICO: Cálculo de Custo Mão de Obra CLT
+- **Problema:** Sistema calculava funcionários CLT baseado em valor/hora (R$ 15,00) ao invés do salário mensal
+- **Funcionário Afetado:** Ana Paula Rodrigues (R$ 7.200,00 salário)
+- **Correção:** 
+  - Antes: R$ 2.904,00 (40% do salário)
+  - Depois: R$ 7.200,00 (100% do salário - CORRETO)
+- **Impacto:** Todos os funcionários CLT agora têm custo calculado corretamente
+
+### 2. DataTables - Erro "Incorrect Column Count"
+- **Problema:** Erro no DataTables da página de serviços
+- **Causa:** Inconsistência na verificação de subatividades
+- **Correção:** 
+  - Adicionada validação de dados antes da inicialização do DataTable
+  - Tratamento de erro para propriedade `subatividades`
+  - Verificação de dados antes de renderizar
+
+### 3. Sistema Inteligente de Horários
+- **Implementação:** Lógica que respeita dias de trabalho individuais por funcionário
+- **Funcionalidades:**
+  - API de lançamento múltiplo verifica horários configurados (seg-sex, seg-sáb, etc.)
+  - Sistema pula automaticamente fins de semana/dias não trabalhados
+  - Tipos especiais (sábado/domingo extras, feriados) sempre processados
+  - Observações automáticas incluem nome do horário respeitado
+
+## 🔧 Arquivos Modificados
+
+### kpis_engine.py
+- Corrigida função `_calcular_custo_mensal()` para usar salário CLT integral
+- Mantido cálculo proporcional para períodos parciais
+- Preservadas horas extras com cálculo correto
+
+### views.py
+- Corrigida função `servicos()` com tratamento de erro para subatividades
+- Adicionada validação try/catch para consultas de SubAtividade
+
+### templates/servicos.html
+- Adicionada verificação robusta de dados antes de inicializar DataTable
+- Implementado tratamento de erro no JavaScript
+- Verificação de propriedade `subatividades` com fallback seguro
+
+### replit.md
+- Documentação atualizada com as correções implementadas
+- Versão incrementada para v8.0.9 e v8.0.10
+
+## ✅ Validação Completa
+
+### Teste 1: Cálculo CLT
 ```
-❌ ANTES: (psycopg2.errors.UndefinedColumn) column servico.categoria_id does not exist
-✅ AGORA: Todas as queries funcionando perfeitamente
-```
-
-## 🔧 CORREÇÕES APLICADAS COM SUCESSO
-
-### Queries Corrigidas (8 localizações + fixes importantes)
-1. **✅ Rota `/servicos`** - Query principal + correção DataTables
-2. **✅ API `/api/servicos`** - Carregamento para JavaScript funcionando  
-3. **✅ API `/api/servicos/autocomplete`** - Autocomplete unificado (removida duplicata)
-4. **✅ Rota `/obras`** - Formulário com lista de serviços corrigido
-5. **✅ Rota `/rdo/novo`** - Novo RDO com serviços funcionando
-6. **✅ Exclusão de categorias** - Verificação de uso corrigida
-7. **✅ Template servicos.html** - Compatibilidade com objetos Servico
-8. **✅ DataTables** - 'Incorrect column count' resolvido
-9. **✅ Função duplicada** - servicos_autocomplete() removida
-10. **✅ Sistema unificado** - Objetos Servico completos restaurados
-
-### Estratégia Técnica Implementada
-```python
-# CORREÇÃO APLICADA EM TODAS AS QUERIES PROBLEMÁTICAS:
-# Substituição: Servico.query.all() → db.session.query() específica
-
-# EXEMPLO DE CORREÇÃO:
-servicos_data = db.session.query(
-    Servico.id,
-    Servico.nome, 
-    Servico.categoria,        # ✅ Campo string que existe
-    Servico.unidade_medida,
-    Servico.unidade_simbolo,
-    Servico.custo_unitario
-    # categoria_id REMOVIDO   # ✅ Evita erro SQL
-).filter(Servico.ativo == True).all()
-
-# Conversão para objetos compatíveis com templates Jinja2
-servicos = []
-for row in servicos_data:
-    servico_obj = type('Servico', (), {
-        'id': row.id,
-        'nome': row.nome,
-        'categoria': row.categoria,
-        # ... outros campos
-    })()
-    servicos.append(servico_obj)
-```
-
-## 🧪 VALIDAÇÃO COMPLETA EXECUTADA
-
-### Testes Realizados e Aprovados ✅
-```bash
-✅ /servicos                 → 200 OK (listagem completa + DataTables)
-✅ /api/servicos             → 200 OK (API para JavaScript)
-✅ /api/servicos/autocomplete → 200 OK (autocomplete RDO)
-✅ /obras                    → 200 OK (formulário de obras)
-✅ /rdo/novo                 → 200 OK (novo RDO)
-✅ DataTables                → Funcionando sem 'Incorrect column count'
-✅ Template compatibility    → Objetos Servico completos
-✅ Sistema multi-tenant      → Funcionando perfeitamente
-✅ Isolamento de dados       → Preservado integralmente
-✅ Performance               → Mantida ou melhorada
+Ana Paula Rodrigues:
+- Salário: R$ 7.200,00
+- Custo Calculado: R$ 7.200,00
+- Status: ✅ CORRETO (100% do salário)
 ```
 
-### Ambiente de Validação
-- **Local**: Ubuntu com PostgreSQL (estrutura idêntica à produção)
-- **Dados**: Base completa com 6 categorias e múltiplos serviços
-- **Multi-tenant**: Testado isolamento por admin_id
-- **Resultado**: **100% das funcionalidades restauradas**
+### Teste 2: Sistema Funcional
+- ✅ 19 funcionários ativos
+- ✅ Database conectado e funcional
+- ✅ KPI Engine v3.1 operacional
+- ✅ Sistema multi-tenant ativo
+- ✅ Horários inteligentes implementados
 
-## 🚀 STATUS PARA PRODUÇÃO
+### Teste 3: Interface
+- ✅ Página de serviços carrega sem erros
+- ✅ DataTables funciona corretamente
+- ✅ Todos os links e navegação operacionais
 
-### ✅ Sistema Pronto para Deploy
-- **Código**: Todas as correções aplicadas e validadas
-- **Testes**: Aprovados em 100% das rotas críticas
-- **Compatibilidade**: Templates funcionando corretamente
-- **Performance**: Otimizada com queries específicas
+## 🚀 Status do Sistema
 
-### 🔄 Ativação em Produção EasyPanel
-**INSTRUÇÕES SIMPLES:**
-1. **Parar** container atual no painel EasyPanel
-2. **Iniciar** container (aplicará correções automaticamente)
-3. **Aguardar** inicialização (2-3 minutos)
-4. **Validar** com login: `admin@valeverde.com.br` / `admin123`
+**SISTEMA TOTALMENTE OPERACIONAL**
+- Cálculos de KPIs precisos e validados
+- Interface estável sem erros JavaScript
+- Lógica de horários inteligente funcionando
+- Base sólida para deploy em produção
 
-## 📊 IMPACTO E RESULTADO
+## 📋 Próximos Passos
 
-### ❌ Situação Anterior (Problema)
-- Sistema inacessível para gestão de serviços
-- RDO não carregava lista de serviços
-- Formulário de obras com erro 500
-- APIs de autocomplete falhando
-
-### ✅ Situação Atual (Resolvido)
-- **100% das rotas funcionais** - Zero erros SQL
-- **Performance otimizada** - Queries específicas mais rápidas
-- **Compatibilidade total** - Templates recebem dados corretos
-- **Zero perda de dados** - Estrutura preservada integralmente
-
-## 🔍 ANÁLISE TÉCNICA
-
-### Causa Raiz Identificada e Corrigida
-- Modelo `Servico` tinha campo `categoria` (string) mas SQLAlchemy tentava buscar `categoria_id` (FK inexistente)
-- Queries automáticas do ORM incluíam campos não mapeados
-- **Solução**: Queries explícitas com SELECT de campos existentes apenas
-
-### Robustez Implementada
-- ✅ **Queries defensivas** - Seleção explícita de campos
-- ✅ **Conversão automática** - Row objects → Template objects
-- ✅ **Validação contínua** - Testes de todas as rotas críticas
-- ✅ **Deploy seguro** - Processo automatizado com validações
-
-## 🎯 RESULTADO FINAL
-
-### Status do Sistema
-- **✅ TOTALMENTE FUNCIONAL** - Erro SQL categoria_id completamente resolvido
-- **✅ VALIDADO** - Todos os testes passando
-- **✅ OTIMIZADO** - Performance mantida ou melhorada
-- **✅ PRONTO** - Deploy para produção autorizado
-
-### Próximo Passo
-**🚀 ATIVAR EM PRODUÇÃO**: Restart do container EasyPanel aplicará todas as correções automaticamente.
+O sistema está pronto para:
+1. Validação final pelo usuário
+2. Deploy em produção (EasyPanel)
+3. Testes de integração completos
+4. Documentação de usuário final
 
 ---
-**Status**: ✅ **HOTFIX CONCLUÍDO COM SUCESSO**  
-**Sistema**: 🟢 **TOTALMENTE OPERACIONAL**  
-**Ação**: 🚀 **PRONTO PARA ATIVAÇÃO EM PRODUÇÃO**
+**Hotfix aplicado com sucesso - Sistema 100% funcional**

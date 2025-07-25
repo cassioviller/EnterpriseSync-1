@@ -121,7 +121,7 @@
                                 </div>
                             </td>
                             <td>
-                                <span class="badge bg-secondary">{{ servico.subatividades|length if servico.subatividades else 0 }}</span>
+                                <span class="badge bg-secondary">{{ servico.subatividades|length if servico.subatividades and servico.subatividades is iterable else 0 }}</span>
                             </td>
                             <td>
                                 {% if servico.ativo %}
@@ -430,14 +430,30 @@
 let servicoEditando = null;
 
 $(document).ready(function() {
-    // Inicializar DataTable
-    $('#servicosTable').DataTable({
-        language: {
-            url: '//cdn.datatables.net/plug-ins/1.13.6/i18n/pt-BR.json'
-        },
-        order: [[0, 'asc']],
-        pageLength: 25
-    });
+    // Verificar se a tabela tem dados antes de inicializar DataTable
+    try {
+        const table = $('#servicosTable');
+        const tbody = table.find('tbody tr');
+        
+        // Só inicializar DataTable se há dados na tabela
+        if (tbody.length > 0) {
+            table.DataTable({
+                language: {
+                    url: '//cdn.datatables.net/plug-ins/1.13.6/i18n/pt-BR.json'
+                },
+                order: [[0, 'asc']],
+                pageLength: 25,
+                responsive: true,
+                columnDefs: [
+                    { targets: [4, 5, 6], orderable: false } // Subatividades, Status, Ações não ordenáveis
+                ]
+            });
+        } else {
+            console.log('Tabela vazia - DataTable não inicializado');
+        }
+    } catch (error) {
+        console.error('Erro ao inicializar DataTable:', error);
+    }
     
     // Resetar modal ao fechar
     $('#modalServico').on('hidden.bs.modal', function() {

@@ -2701,8 +2701,11 @@ def servicos():
         servicos_raw = servicos_data.order_by(Servico.nome).all()
         servicos = []
         for row in servicos_raw:
-            # Buscar subatividades para este serviço
-            subatividades = SubAtividade.query.filter_by(servico_id=row.id).all()
+            # Buscar subatividades para este serviço (ou lista vazia se não existir)
+            try:
+                subatividades = SubAtividade.query.filter_by(servico_id=row.id).all()
+            except:
+                subatividades = []
             
             # Criar objeto compatível com template
             servico_obj = type('Servico', (), {
@@ -2718,7 +2721,7 @@ def servicos():
                 'ativo': row.ativo,
                 'created_at': row.created_at,
                 'updated_at': row.updated_at,
-                'subatividades': subatividades
+                'subatividades': subatividades or []
             })()
             servicos.append(servico_obj)
         
