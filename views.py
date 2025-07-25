@@ -1146,8 +1146,7 @@ def lancamento_multiplo_ponto():
                     funcionario_id=funcionario.id,
                     obra_id=obra_id,
                     data=current_date,
-                    tipo_registro=tipo_lancamento,
-                    admin_id=current_user.id
+                    tipo_registro=tipo_lancamento
                 )
                 
                 # Configurar campos baseados no tipo
