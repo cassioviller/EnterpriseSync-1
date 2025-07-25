@@ -4908,10 +4908,10 @@ def obter_registro_ponto(registro_id):
         'funcionario_id': registro.funcionario_id,
         'data': registro.data.strftime('%Y-%m-%d') if registro.data else '',
         'tipo_registro': registro.tipo_registro,
-        'entrada': registro.entrada.strftime('%H:%M') if registro.entrada else '',
-        'saida_almoco': registro.saida_almoco.strftime('%H:%M') if registro.saida_almoco else '',
-        'retorno_almoco': registro.retorno_almoco.strftime('%H:%M') if registro.retorno_almoco else '',
-        'saida': registro.saida.strftime('%H:%M') if registro.saida else '',
+        'entrada': registro.hora_entrada.strftime('%H:%M') if registro.hora_entrada else '',
+        'saida_almoco': registro.hora_almoco_saida.strftime('%H:%M') if registro.hora_almoco_saida else '',
+        'retorno_almoco': registro.hora_almoco_retorno.strftime('%H:%M') if registro.hora_almoco_retorno else '',
+        'saida': registro.hora_saida.strftime('%H:%M') if registro.hora_saida else '',
         'horas_trabalhadas': float(registro.horas_trabalhadas) if registro.horas_trabalhadas else 0,
         'horas_extras': float(registro.horas_extras) if registro.horas_extras else 0,
         'percentual_extras': float(registro.percentual_extras) if registro.percentual_extras else 0,
@@ -4937,10 +4937,10 @@ def atualizar_registro_ponto(registro_id):
         registro.obra_id = obra_id
         
         # Limpar horários primeiro
-        registro.entrada = None
-        registro.saida_almoco = None
-        registro.retorno_almoco = None
-        registro.saida = None
+        registro.hora_entrada = None
+        registro.hora_almoco_saida = None
+        registro.hora_almoco_retorno = None
+        registro.hora_saida = None
         registro.horas_trabalhadas = 0
         registro.horas_extras = 0
         
@@ -4952,13 +4952,13 @@ def atualizar_registro_ponto(registro_id):
             saida = request.json.get('hora_saida_ponto')
             
             if entrada:
-                registro.entrada = datetime.strptime(entrada, '%H:%M').time()
+                registro.hora_entrada = datetime.strptime(entrada, '%H:%M').time()
             if saida_almoco:
-                registro.saida_almoco = datetime.strptime(saida_almoco, '%H:%M').time()
+                registro.hora_almoco_saida = datetime.strptime(saida_almoco, '%H:%M').time()
             if retorno_almoco:
-                registro.retorno_almoco = datetime.strptime(retorno_almoco, '%H:%M').time()
+                registro.hora_almoco_retorno = datetime.strptime(retorno_almoco, '%H:%M').time()
             if saida:
-                registro.saida = datetime.strptime(saida, '%H:%M').time()
+                registro.hora_saida = datetime.strptime(saida, '%H:%M').time()
                 
         # Percentual de extras
         percentual_extras = request.json.get('percentual_extras')
