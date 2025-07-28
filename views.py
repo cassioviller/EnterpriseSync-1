@@ -2624,7 +2624,7 @@ def novo_custo_veiculo_form(id):
         try:
             custo = CustoVeiculo(
                 veiculo_id=id,
-                obra_id=form.obra_id.data if form.obra_id.data else None,
+                obra_id=int(form.obra_id.data) if form.obra_id.data and form.obra_id.data.isdigit() else None,
                 data_custo=form.data_custo.data,
                 valor=form.valor.data,
                 tipo_custo=form.tipo_custo.data,
