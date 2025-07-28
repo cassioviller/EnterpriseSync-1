@@ -423,6 +423,105 @@ function setupMultiSelectionFunctionality() {
 document.getElementById('alimentacaoForm').addEventListener('submit', function(e) {
     e.preventDefault();
     
+    const formData = new FormData(this);
+    const btnSalvar = document.getElementById('btnSalvar');
+    
+    // Desabilitar botão durante envio
+    btnSalvar.disabled = true;
+    btnSalvar.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Salvando...';
+    
+    fetch("{{ url_for('main.nova_alimentacao') }}", {
+        method: 'POST',
+        body: formData
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            // Fechar modal e recarregar página
+            $('#alimentacaoModal').modal('hide');
+            location.reload();
+        } else {
+            alert('Erro: ' + data.message);
+        }
+    })
+    .catch(error => {
+        console.error('Erro:', error);
+        alert('Erro ao salvar registros');
+    })
+    .finally(() => {
+        // Reabilitar botão
+        btnSalvar.disabled = false;
+        btnSalvar.innerHTML = '<i class="fas fa-save me-2"></i>Salvar Lançamentos';
+    });
+});
+
+// Função para editar registro
+function editarRegistro(id) {
+    fetch(`/alimentacao/${id}/editar`)
+        .then(response => response.json())
+        .then(data => {
+            // Preencher modal com dados do registro
+            document.getElementById('modalTitle').textContent = 'Editar Registro de Alimentação';
+            document.getElementById('data').value = data.data;
+            document.getElementById('tipo').value = data.tipo;
+            document.getElementById('valor').value = data.valor;
+            document.getElementById('obra_id').value = data.obra_id;
+            document.getElementById('restaurante_id').value = data.restaurante_id;
+            document.getElementById('observacoes').value = data.observacoes;
+            
+            // Selecionar apenas o funcionário específico
+            document.querySelectorAll('.funcionario-checkbox').forEach(checkbox => {
+                checkbox.checked = checkbox.value == data.funcionario_id;
+                checkbox.disabled = checkbox.value != data.funcionario_id;
+            });
+            
+            // Atualizar URL do formulário para edição
+            document.getElementById('alimentacaoForm').action = `/alimentacao/${id}/editar`;
+            
+            // Mostrar modal
+            $('#alimentacaoModal').modal('show');
+        })
+        .catch(error => {
+            console.error('Erro:', error);
+            alert('Erro ao carregar dados para edição');
+        });
+}
+
+// Função para excluir registro  
+function excluirRegistro(id) {
+    if (confirm('Tem certeza que deseja excluir este registro?')) {
+        fetch(`/alimentacao/${id}/excluir`, {
+            method: 'DELETE'
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                location.reload();
+            } else {
+                alert('Erro: ' + data.message);
+            }
+        })
+        .catch(error => {
+            console.error('Erro:', error);
+            alert('Erro ao excluir registro');
+        });
+    }
+}
+
+// Reset form quando abrir modal para novo registro
+$('#alimentacaoModal').on('show.bs.modal', function() {
+    // Se não está editando, resetar para novo registro
+    if (document.getElementById('modalTitle').textContent.includes('Novo')) {
+        document.getElementById('alimentacaoForm').action = "{{ url_for('main.nova_alimentacao') }}";
+        
+        // Habilitar todos os checkboxes
+        document.querySelectorAll('.funcionario-checkbox').forEach(checkbox => {
+            checkbox.disabled = false;
+        });
+    }
+});
+</script>
+{% endblock %}
     const selecionados = document.querySelectorAll('.funcionario-checkbox:checked');
     const formData = new FormData(this);
     
