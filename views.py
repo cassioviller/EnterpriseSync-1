@@ -2620,34 +2620,41 @@ def novo_custo_veiculo_form(id):
     if request.method == 'GET':
         return render_template('veiculos/novo_custo.html', form=form, veiculo=veiculo)
     
-    if form.validate_on_submit():
-        try:
-            custo = CustoVeiculo(
-                veiculo_id=id,
-                obra_id=form.obra_id.data,
-                data_custo=form.data_custo.data,
-                valor=form.valor.data,
-                tipo_custo=form.tipo_custo.data,
-                descricao=form.descricao.data,
-                km_atual=form.km_atual.data,
-                fornecedor=form.fornecedor.data,
-                admin_id=current_user.id
-            )
-            db.session.add(custo)
-            
-            # Atualizar KM do veículo se fornecido
-            if form.km_atual.data:
-                veiculo.km_atual = form.km_atual.data
-            
-            db.session.commit()
-            flash('Custo de veículo registrado com sucesso!', 'success')
-            return redirect(url_for('main.detalhes_veiculo', id=id))
-        except Exception as e:
-            flash(f'Erro ao registrar custo: {str(e)}', 'error')
-    else:
-        for field, errors in form.errors.items():
-            for error in errors:
-                flash(f'{getattr(form, field).label.text}: {error}', 'error')
+    # Validação manual para obra_id obrigatório
+    if request.method == 'POST':
+        obra_id_value = request.form.get('obra_id')
+        if not obra_id_value:
+            flash('Obra é obrigatória para registrar o custo', 'error')
+            return render_template('veiculos/novo_custo.html', form=form, veiculo=veiculo)
+        
+        # Validar outros campos do formulário
+        form.obra_id.data = int(obra_id_value)
+        if form.data_custo.validate(form) and form.valor.validate(form) and form.tipo_custo.validate(form):
+            try:
+                custo = CustoVeiculo(
+                    veiculo_id=id,
+                    obra_id=int(obra_id_value),
+                    data_custo=form.data_custo.data,
+                    valor=form.valor.data,
+                    tipo_custo=form.tipo_custo.data,
+                    descricao=form.descricao.data,
+                    km_atual=form.km_atual.data,
+                    fornecedor=form.fornecedor.data,
+                    admin_id=current_user.id
+                )
+                db.session.add(custo)
+                
+                # Atualizar KM do veículo se fornecido
+                if form.km_atual.data:
+                    veiculo.km_atual = form.km_atual.data
+                
+                db.session.commit()
+                flash('Custo de veículo registrado com sucesso!', 'success')
+                return redirect(url_for('main.detalhes_veiculo', id=id))
+            except Exception as e:
+                flash(f'Erro ao registrar custo: {str(e)}', 'error')
+        else:
+            flash('Por favor, preencha todos os campos obrigatórios', 'error')
     
     return render_template('veiculos/novo_custo.html', form=form, veiculo=veiculo)
 
