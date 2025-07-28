@@ -2600,6 +2600,18 @@ def novo_custo_veiculo_form(id):
     veiculo = Veiculo.query.get_or_404(id)
     form = CustoVeiculoForm()
     
+    # Carregar obras ativas para o usuário admin
+    obras_choices = [(0, 'Selecione uma obra...')]
+    obras = Obra.query.filter(
+        Obra.admin_id == current_user.id,
+        Obra.status.in_(['Em Andamento', 'Planejada'])
+    ).order_by(Obra.nome).all()
+    
+    for obra in obras:
+        obras_choices.append((obra.id, obra.nome))
+    
+    form.obra_id.choices = obras_choices
+    
     # Definir veiculo_id no formulário
     form.veiculo_id.data = id
     
@@ -2610,13 +2622,14 @@ def novo_custo_veiculo_form(id):
         try:
             custo = CustoVeiculo(
                 veiculo_id=id,
-                obra_id=form.obra_id.data if hasattr(form, 'obra_id') and form.obra_id.data and form.obra_id.data != 0 else None,
+                obra_id=form.obra_id.data if form.obra_id.data and form.obra_id.data != 0 else None,
                 data_custo=form.data_custo.data,
                 valor=form.valor.data,
                 tipo_custo=form.tipo_custo.data,
                 descricao=form.descricao.data,
                 km_atual=form.km_atual.data,
-                fornecedor=form.fornecedor.data
+                fornecedor=form.fornecedor.data,
+                admin_id=current_user.id
             )
             db.session.add(custo)
             

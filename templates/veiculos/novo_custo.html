@@ -49,6 +49,20 @@
                         </div>
                         
                         <div class="row">
+                            <div class="col-md-12 mb-3">
+                                {{ form.obra_id.label(class="form-label") }}
+                                {{ form.obra_id(class="form-select") }}
+                                {% for error in form.obra_id.errors %}
+                                    <div class="text-danger small">{{ error }}</div>
+                                {% endfor %}
+                                <small class="form-text text-muted">
+                                    <i class="fas fa-exclamation-triangle text-warning me-1"></i>
+                                    Obrigatório para controle de custos de transporte por obra
+                                </small>
+                            </div>
+                        </div>
+                        
+                        <div class="row">
                             <div class="col-md-6 mb-3">
                                 {{ form.valor.label(class="form-label") }}
                                 <div class="input-group">
