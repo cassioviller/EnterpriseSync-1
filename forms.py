@@ -245,7 +245,7 @@ class UsoVeiculoForm(FlaskForm):
 class CustoVeiculoForm(FlaskForm):
     """Formulário para registro de custo de veículo"""
     veiculo_id = SelectField('Veículo', coerce=int, validators=[DataRequired()])
-    obra_id = SelectField('Obra', coerce=int, validators=[DataRequired()], choices=[])
+    obra_id = SelectField('Obra (Opcional)', coerce=int, validators=[Optional()], choices=[])
     data_custo = DateField('Data do Custo', validators=[DataRequired()], default=date.today)
     valor = FloatField('Valor', validators=[DataRequired(), NumberRange(min=0)])
     tipo_custo = SelectField('Tipo de Custo', choices=[
