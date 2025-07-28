@@ -2600,16 +2600,14 @@ def novo_custo_veiculo_form(id):
     veiculo = Veiculo.query.get_or_404(id)
     form = CustoVeiculoForm()
     
-    # Carregar todas as obras do admin (removido filtro de status)
-    obras_choices = [(0, 'Nenhuma obra selecionada')]
+    # Carregar obras ativas para o usuário admin (corrigir status)
+    obras_choices = [(0, 'Selecione uma obra...')]
     obras = Obra.query.filter(
-        Obra.admin_id == current_user.id
+        Obra.admin_id == current_user.id,
+        Obra.status.in_(['Em andamento', 'Planejada'])
     ).order_by(Obra.nome).all()
     
-    # Debug: Verificar obras encontradas
-    print(f"DEBUG: Admin ID {current_user.id} tem {len(obras)} obras")
     for obra in obras:
-        print(f"  - {obra.id}: {obra.nome} (Status: {obra.status})")
         obras_choices.append((obra.id, obra.nome))
     
     form.obra_id.choices = obras_choices
