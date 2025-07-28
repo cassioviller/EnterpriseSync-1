@@ -2600,11 +2600,11 @@ def novo_custo_veiculo_form(id):
     veiculo = Veiculo.query.get_or_404(id)
     form = CustoVeiculoForm()
     
-    # Carregar obras ativas para o usuário admin
+    # Carregar obras ativas para o usuário admin (corrigir status)
     obras_choices = [(0, 'Selecione uma obra...')]
     obras = Obra.query.filter(
         Obra.admin_id == current_user.id,
-        Obra.status.in_(['Em Andamento', 'Planejada'])
+        Obra.status.in_(['Em andamento', 'Planejada'])
     ).order_by(Obra.nome).all()
     
     for obra in obras:
