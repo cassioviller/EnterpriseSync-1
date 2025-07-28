@@ -2598,20 +2598,20 @@ def novo_uso_veiculo(id):
 def novo_custo_veiculo_form(id):
     """Página e processamento de novo custo de veículo"""
     veiculo = Veiculo.query.get_or_404(id)
+    form = CustoVeiculoForm()
     
-    # Carregar obras ativas para o usuário admin ANTES de criar o formulário
+    # Carregar todas as obras do admin (removido filtro de status)
+    obras_choices = [(0, 'Nenhuma obra selecionada')]
     obras = Obra.query.filter(
-        Obra.admin_id == current_user.id,
-        Obra.status.in_(['Em andamento', 'Planejada'])
+        Obra.admin_id == current_user.id
     ).order_by(Obra.nome).all()
     
-    # Criar choices para o dropdown (incluindo opção vazia)
-    obras_choices = [('', 'Nenhuma obra selecionada')]
+    # Debug: Verificar obras encontradas
+    print(f"DEBUG: Admin ID {current_user.id} tem {len(obras)} obras")
     for obra in obras:
+        print(f"  - {obra.id}: {obra.nome} (Status: {obra.status})")
         obras_choices.append((obra.id, obra.nome))
     
-    # Agora criar o formulário COM as choices já configuradas
-    form = CustoVeiculoForm()
     form.obra_id.choices = obras_choices
     
     # Definir veiculo_id no formulário
@@ -2624,7 +2624,7 @@ def novo_custo_veiculo_form(id):
         try:
             custo = CustoVeiculo(
                 veiculo_id=id,
-                obra_id=int(form.obra_id.data) if form.obra_id.data and form.obra_id.data.isdigit() else None,
+                obra_id=form.obra_id.data if form.obra_id.data and form.obra_id.data != 0 else None,
                 data_custo=form.data_custo.data,
                 valor=form.valor.data,
                 tipo_custo=form.tipo_custo.data,
