@@ -2605,8 +2605,8 @@ def novo_custo_veiculo_form(id):
         Obra.status.in_(['Em andamento', 'Planejada'])
     ).order_by(Obra.nome).all()
     
-    # Criar choices para o dropdown
-    obras_choices = []
+    # Criar choices para o dropdown (incluindo opção vazia)
+    obras_choices = [('', 'Nenhuma obra selecionada')]
     for obra in obras:
         obras_choices.append((obra.id, obra.nome))
     
@@ -2624,7 +2624,7 @@ def novo_custo_veiculo_form(id):
         try:
             custo = CustoVeiculo(
                 veiculo_id=id,
-                obra_id=form.obra_id.data,
+                obra_id=form.obra_id.data if form.obra_id.data else None,
                 data_custo=form.data_custo.data,
                 valor=form.valor.data,
                 tipo_custo=form.tipo_custo.data,
