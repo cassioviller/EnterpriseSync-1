@@ -2601,7 +2601,7 @@ def novo_custo_veiculo_form(id):
     form = CustoVeiculoForm()
     
     # Carregar todas as obras do admin (removido filtro de status)
-    obras_choices = [(0, 'Nenhuma obra selecionada')]
+    obras_choices = [('', 'Selecione uma obra...')]
     obras = Obra.query.filter(
         Obra.admin_id == current_user.id
     ).order_by(Obra.nome).all()
@@ -2624,7 +2624,7 @@ def novo_custo_veiculo_form(id):
         try:
             custo = CustoVeiculo(
                 veiculo_id=id,
-                obra_id=form.obra_id.data if form.obra_id.data and form.obra_id.data != 0 else None,
+                obra_id=form.obra_id.data,
                 data_custo=form.data_custo.data,
                 valor=form.valor.data,
                 tipo_custo=form.tipo_custo.data,
