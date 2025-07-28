@@ -2658,7 +2658,8 @@ def novo_custo_veiculo_form(id):
             db.session.rollback()
             flash(f'Erro ao registrar custo: {str(e)}', 'error')
     
-    return render_template('veiculos/novo_custo.html', veiculo=veiculo, obras=obras, form_data={})
+    return render_template('veiculos/novo_custo.html', veiculo=veiculo, obras=obras, 
+                         form_data={}, today=date.today().strftime('%Y-%m-%d'))
 
 # ============================================================================
 # MÓDULO DE SERVIÇOS - SIGE v6.3

@@ -30,13 +30,13 @@
                             <div class="col-md-6 mb-3">
                                 <label class="form-label">Data do Custo</label>
                                 <input type="date" name="data_custo" class="form-control" 
-                                       value="{{ form_data.get('data_custo', '') }}" required>
+                                       value="{{ form_data.get('data_custo', '') or today }}" required>
                             </div>
                             <div class="col-md-6 mb-3">
                                 <label class="form-label">Tipo de Custo</label>
                                 <select name="tipo_custo" class="form-select" required>
                                     <option value="">Selecione...</option>
-                                    <option value="combustivel" {% if form_data.get('tipo_custo') == 'combustivel' %}selected{% endif %}>Combustível</option>
+                                    <option value="combustivel" {% if form_data.get('tipo_custo') == 'combustivel' %}selected{% elif not form_data.get('tipo_custo') %}selected{% endif %}>Combustível</option>
                                     <option value="manutencao" {% if form_data.get('tipo_custo') == 'manutencao' %}selected{% endif %}>Manutenção</option>
                                     <option value="seguro" {% if form_data.get('tipo_custo') == 'seguro' %}selected{% endif %}>Seguro</option>
                                     <option value="multa" {% if form_data.get('tipo_custo') == 'multa' %}selected{% endif %}>Multa</option>
@@ -77,8 +77,8 @@
                             <div class="col-md-6 mb-3">
                                 <label class="form-label">KM Atual</label>
                                 <input type="number" name="km_atual" class="form-control" 
-                                       placeholder="Ex: 25000" min="0"
-                                       value="{{ form_data.get('km_atual', '') }}">
+                                       placeholder="{{ veiculo.km_atual or 0 }}" min="0"
+                                       value="{{ form_data.get('km_atual', veiculo.km_atual or '') }}">
                                 <small class="form-text text-muted">Opcional - atualiza o KM do veículo</small>
                             </div>
                         </div>
