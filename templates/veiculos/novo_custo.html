@@ -51,7 +51,14 @@
                         <div class="row">
                             <div class="col-md-12 mb-3">
                                 {{ form.obra_id.label(class="form-label") }}
-                                {{ form.obra_id(class="form-select") }}
+                                <select name="obra_id" class="form-select" required>
+                                    <option value="">Selecione uma obra...</option>
+                                    {% for choice in form.obra_id.choices %}
+                                        {% if choice[0] %}
+                                        <option value="{{ choice[0] }}" {% if form.obra_id.data == choice[0] %}selected{% endif %}>{{ choice[1] }}</option>
+                                        {% endif %}
+                                    {% endfor %}
+                                </select>
                                 {% for error in form.obra_id.errors %}
                                     <div class="text-danger small">{{ error }}</div>
                                 {% endfor %}
