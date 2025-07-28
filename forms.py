@@ -1,6 +1,6 @@
 from flask_wtf import FlaskForm
 from flask_wtf.file import FileField, FileAllowed
-from wtforms import StringField, TextAreaField, FloatField, DateField, SelectField, BooleanField, TimeField, IntegerField
+from wtforms import StringField, TextAreaField, FloatField, DateField, SelectField, BooleanField, TimeField, IntegerField, HiddenField
 from wtforms.validators import DataRequired, Email, Length, NumberRange, Optional
 from datetime import date
 
@@ -244,8 +244,7 @@ class UsoVeiculoForm(FlaskForm):
 
 class CustoVeiculoForm(FlaskForm):
     """Formulário para registro de custo de veículo"""
-    veiculo_id = SelectField('Veículo', coerce=int, validators=[DataRequired()])
-    obra_id = SelectField('Obra', coerce=int, validators=[DataRequired()], choices=[])
+    veiculo_id = HiddenField('Veículo')
     data_custo = DateField('Data do Custo', validators=[DataRequired()], default=date.today)
     valor = FloatField('Valor', validators=[DataRequired(), NumberRange(min=0)])
     tipo_custo = SelectField('Tipo de Custo', choices=[

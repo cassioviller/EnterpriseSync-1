@@ -2598,65 +2598,67 @@ def novo_uso_veiculo(id):
 def novo_custo_veiculo_form(id):
     """Página e processamento de novo custo de veículo"""
     veiculo = Veiculo.query.get_or_404(id)
-    form = CustoVeiculoForm()
     
-    # Carregar todas as obras do admin (removido filtro de status)
-    obras_choices = []
+    # Carregar obras do admin
     obras = Obra.query.filter(
         Obra.admin_id == current_user.id
     ).order_by(Obra.nome).all()
     
-    # Debug: Verificar obras encontradas
-    print(f"DEBUG: Admin ID {current_user.id} tem {len(obras)} obras")
-    for obra in obras:
-        print(f"  - {obra.id}: {obra.nome} (Status: {obra.status})")
-        obras_choices.append((obra.id, obra.nome))
-    
-    form.obra_id.choices = obras_choices
-    
-    # Definir veiculo_id no formulário
-    form.veiculo_id.data = id
-    
-    if request.method == 'GET':
-        return render_template('veiculos/novo_custo.html', form=form, veiculo=veiculo)
-    
-    # Validação manual para obra_id obrigatório
     if request.method == 'POST':
-        obra_id_value = request.form.get('obra_id')
-        if not obra_id_value:
-            flash('Obra é obrigatória para registrar o custo', 'error')
-            return render_template('veiculos/novo_custo.html', form=form, veiculo=veiculo)
+        # Obter dados do formulário
+        obra_id = request.form.get('obra_id')
+        data_custo = request.form.get('data_custo')
+        valor = request.form.get('valor')
+        tipo_custo = request.form.get('tipo_custo')
+        descricao = request.form.get('descricao', '')
+        km_atual = request.form.get('km_atual')
+        fornecedor = request.form.get('fornecedor', '')
         
-        # Validar outros campos do formulário
-        form.obra_id.data = int(obra_id_value)
-        if form.data_custo.validate(form) and form.valor.validate(form) and form.tipo_custo.validate(form):
-            try:
-                custo = CustoVeiculo(
-                    veiculo_id=id,
-                    obra_id=int(obra_id_value),
-                    data_custo=form.data_custo.data,
-                    valor=form.valor.data,
-                    tipo_custo=form.tipo_custo.data,
-                    descricao=form.descricao.data,
-                    km_atual=form.km_atual.data,
-                    fornecedor=form.fornecedor.data,
-                    admin_id=current_user.id
-                )
-                db.session.add(custo)
-                
-                # Atualizar KM do veículo se fornecido
-                if form.km_atual.data:
-                    veiculo.km_atual = form.km_atual.data
-                
-                db.session.commit()
-                flash('Custo de veículo registrado com sucesso!', 'success')
-                return redirect(url_for('main.detalhes_veiculo', id=id))
-            except Exception as e:
-                flash(f'Erro ao registrar custo: {str(e)}', 'error')
-        else:
-            flash('Por favor, preencha todos os campos obrigatórios', 'error')
+        # Validações
+        erros = []
+        if not obra_id:
+            erros.append('Obra é obrigatória')
+        if not data_custo:
+            erros.append('Data é obrigatória')
+        if not valor:
+            erros.append('Valor é obrigatório')
+        if not tipo_custo:
+            erros.append('Tipo de custo é obrigatório')
+        
+        if erros:
+            for erro in erros:
+                flash(erro, 'error')
+            return render_template('veiculos/novo_custo.html', veiculo=veiculo, obras=obras,
+                                 form_data=request.form)
+        
+        try:
+            # Criar o custo
+            custo = CustoVeiculo(
+                veiculo_id=id,
+                obra_id=int(obra_id),
+                data_custo=datetime.strptime(data_custo, '%Y-%m-%d').date(),
+                valor=float(valor),
+                tipo_custo=tipo_custo,
+                descricao=descricao,
+                km_atual=int(km_atual) if km_atual else None,
+                fornecedor=fornecedor,
+                admin_id=current_user.id
+            )
+            db.session.add(custo)
+            
+            # Atualizar KM do veículo se fornecido
+            if km_atual:
+                veiculo.km_atual = int(km_atual)
+            
+            db.session.commit()
+            flash('Custo de veículo registrado com sucesso!', 'success')
+            return redirect(url_for('main.detalhes_veiculo', id=id))
+            
+        except Exception as e:
+            db.session.rollback()
+            flash(f'Erro ao registrar custo: {str(e)}', 'error')
     
-    return render_template('veiculos/novo_custo.html', form=form, veiculo=veiculo)
+    return render_template('veiculos/novo_custo.html', veiculo=veiculo, obras=obras, form_data={})
 
 # ============================================================================
 # MÓDULO DE SERVIÇOS - SIGE v6.3

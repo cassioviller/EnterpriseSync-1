@@ -26,42 +26,37 @@
                 </div>
                 <div class="card-body">
                     <form method="POST">
-                        {{ form.hidden_tag() }}
-                        
-                        <!-- Campo oculto -->
-                        {{ form.veiculo_id(type="hidden") }}
-                        
                         <div class="row">
                             <div class="col-md-6 mb-3">
-                                {{ form.data_custo.label(class="form-label") }}
-                                {{ form.data_custo(class="form-control") }}
-                                {% for error in form.data_custo.errors %}
-                                    <div class="text-danger small">{{ error }}</div>
-                                {% endfor %}
+                                <label class="form-label">Data do Custo</label>
+                                <input type="date" name="data_custo" class="form-control" 
+                                       value="{{ form_data.get('data_custo', '') }}" required>
                             </div>
                             <div class="col-md-6 mb-3">
-                                {{ form.tipo_custo.label(class="form-label") }}
-                                {{ form.tipo_custo(class="form-select") }}
-                                {% for error in form.tipo_custo.errors %}
-                                    <div class="text-danger small">{{ error }}</div>
-                                {% endfor %}
+                                <label class="form-label">Tipo de Custo</label>
+                                <select name="tipo_custo" class="form-select" required>
+                                    <option value="">Selecione...</option>
+                                    <option value="combustivel" {% if form_data.get('tipo_custo') == 'combustivel' %}selected{% endif %}>Combustível</option>
+                                    <option value="manutencao" {% if form_data.get('tipo_custo') == 'manutencao' %}selected{% endif %}>Manutenção</option>
+                                    <option value="seguro" {% if form_data.get('tipo_custo') == 'seguro' %}selected{% endif %}>Seguro</option>
+                                    <option value="multa" {% if form_data.get('tipo_custo') == 'multa' %}selected{% endif %}>Multa</option>
+                                    <option value="lavagem" {% if form_data.get('tipo_custo') == 'lavagem' %}selected{% endif %}>Lavagem</option>
+                                    <option value="outros" {% if form_data.get('tipo_custo') == 'outros' %}selected{% endif %}>Outros</option>
+                                </select>
                             </div>
                         </div>
                         
                         <div class="row">
                             <div class="col-md-12 mb-3">
-                                {{ form.obra_id.label(class="form-label") }}
+                                <label class="form-label">Obra</label>
                                 <select name="obra_id" class="form-select" required>
                                     <option value="">Selecione uma obra...</option>
-                                    {% for choice in form.obra_id.choices %}
-                                        {% if choice[0] %}
-                                        <option value="{{ choice[0] }}" {% if form.obra_id.data == choice[0] %}selected{% endif %}>{{ choice[1] }}</option>
-                                        {% endif %}
+                                    {% for obra in obras %}
+                                        <option value="{{ obra.id }}" {% if form_data.get('obra_id') == obra.id|string %}selected{% endif %}>
+                                            {{ obra.nome }}
+                                        </option>
                                     {% endfor %}
                                 </select>
-                                {% for error in form.obra_id.errors %}
-                                    <div class="text-danger small">{{ error }}</div>
-                                {% endfor %}
                                 <small class="form-text text-muted">
                                     <i class="fas fa-asterisk text-danger me-1"></i>
                                     Campo obrigatório para controle de custos
@@ -71,39 +66,34 @@
                         
                         <div class="row">
                             <div class="col-md-6 mb-3">
-                                {{ form.valor.label(class="form-label") }}
+                                <label class="form-label">Valor</label>
                                 <div class="input-group">
                                     <span class="input-group-text">R$</span>
-                                    {{ form.valor(class="form-control", placeholder="0,00", step="0.01") }}
+                                    <input type="number" name="valor" class="form-control" 
+                                           placeholder="0,00" step="0.01" min="0"
+                                           value="{{ form_data.get('valor', '') }}" required>
                                 </div>
-                                {% for error in form.valor.errors %}
-                                    <div class="text-danger small">{{ error }}</div>
-                                {% endfor %}
                             </div>
                             <div class="col-md-6 mb-3">
-                                {{ form.km_atual.label(class="form-label") }}
-                                {{ form.km_atual(class="form-control", placeholder="Ex: 25000") }}
-                                {% for error in form.km_atual.errors %}
-                                    <div class="text-danger small">{{ error }}</div>
-                                {% endfor %}
+                                <label class="form-label">KM Atual</label>
+                                <input type="number" name="km_atual" class="form-control" 
+                                       placeholder="Ex: 25000" min="0"
+                                       value="{{ form_data.get('km_atual', '') }}">
                                 <small class="form-text text-muted">Opcional - atualiza o KM do veículo</small>
                             </div>
                         </div>
                         
                         <div class="mb-3">
-                            {{ form.fornecedor.label(class="form-label") }}
-                            {{ form.fornecedor(class="form-control", placeholder="Ex: Posto XYZ, Oficina ABC") }}
-                            {% for error in form.fornecedor.errors %}
-                                <div class="text-danger small">{{ error }}</div>
-                            {% endfor %}
+                            <label class="form-label">Fornecedor</label>
+                            <input type="text" name="fornecedor" class="form-control" 
+                                   placeholder="Ex: Posto XYZ, Oficina ABC"
+                                   value="{{ form_data.get('fornecedor', '') }}">
                         </div>
                         
                         <div class="mb-3">
-                            {{ form.descricao.label(class="form-label") }}
-                            {{ form.descricao(class="form-control", rows="3", placeholder="Detalhes sobre o custo...") }}
-                            {% for error in form.descricao.errors %}
-                                <div class="text-danger small">{{ error }}</div>
-                            {% endfor %}
+                            <label class="form-label">Descrição</label>
+                            <textarea name="descricao" class="form-control" rows="3" 
+                                      placeholder="Detalhes sobre o custo...">{{ form_data.get('descricao', '') }}</textarea>
                         </div>
                         
                         <div class="d-grid gap-2 d-md-flex justify-content-md-end">
