@@ -2641,8 +2641,7 @@ def novo_custo_veiculo_form(id):
                 tipo_custo=tipo_custo,
                 descricao=descricao,
                 km_atual=int(km_atual) if km_atual else None,
-                fornecedor=fornecedor,
-                admin_id=current_user.id
+                fornecedor=fornecedor
             )
             db.session.add(custo)
             
