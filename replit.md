@@ -684,6 +684,15 @@
     - Script de testes das melhorias implementadas (testar_melhorias_implementadas.py)
     - Correção de erro no relatório de ponto (referências de funcionário)
     - Base sólida implementada para futuras melhorias: mobile app, IA, automações
+  - July 29, 2025. Correção de Custos de Veículos por Obra Específica - v8.0.10:
+    - Corrigido erro crítico no cálculo de custos de transporte na página de detalhes da obra
+    - Problema identificado: sistema somava custos de TODOS os veículos do período, não apenas da obra específica
+    - Implementada correção: adicionado filtro `CustoVeiculo.obra_id == id` nos queries de custo de transporte
+    - Corrigidos dois locais: cálculo de custo_transporte e custos_transporte_detalhados
+    - Sistema agora mostra apenas custos de veículos que foram realmente utilizados na obra
+    - Eliminação de valores inflacionados que incluíam custos de outras obras no mesmo período
+    - Módulo de criação de custos de veículos mantém campo "Obra" obrigatório para correto controle
+    - Correção aplicada tanto no KPI principal quanto na listagem detalhada de custos de transporte
   - July 24, 2025. Correção Final e Definitiva do Erro categoria_id - SIGE v8.0.9:
     - Resolvido completamente o erro SQL crítico: "column servico.categoria_id does not exist"
     - Localizada e corrigida a query principal /servicos que usava Servico.query.all() (gera categoria_id automático)
