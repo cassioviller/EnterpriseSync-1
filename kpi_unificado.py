@@ -80,10 +80,12 @@ class KPIUnificado:
             )
             
             if obra_id:
-                # Filtrar por registros da obra
-                registros_ponto = registros_ponto.filter(
-                    RegistroPonto.funcionario_id.in_(funcionarios_filter) if funcionarios_filter else True
-                )
+                # Filtrar por registros da obra específica
+                registros_ponto = registros_ponto.filter(RegistroPonto.obra_id == obra_id)
+                if funcionarios_filter:
+                    registros_ponto = registros_ponto.filter(
+                        RegistroPonto.funcionario_id.in_(funcionarios_filter)
+                    )
             elif funcionarios_filter:
                 registros_ponto = registros_ponto.filter(
                     RegistroPonto.funcionario_id.in_(funcionarios_filter)
@@ -210,23 +212,26 @@ class KPIUnificado:
         custos['custos_diretos'] = custos_diretos
         custos['total'] += custos_diretos
         
-        # Dias trabalhados (registros únicos de ponto)
+        # Dias trabalhados (registros únicos de ponto) - filtrar por obra específica
         dias_trabalhados = db.session.query(RegistroPonto.data).filter(
+            RegistroPonto.obra_id == obra_id,
             RegistroPonto.data >= self.data_inicio,
             RegistroPonto.data <= self.data_fim,
             RegistroPonto.hora_entrada.isnot(None)
         ).distinct().count()
         
-        # Total de horas trabalhadas
+        # Total de horas trabalhadas - filtrar por obra específica
         total_horas = db.session.query(
             func.sum(RegistroPonto.horas_trabalhadas + RegistroPonto.horas_extras)
         ).filter(
+            RegistroPonto.obra_id == obra_id,
             RegistroPonto.data >= self.data_inicio,
             RegistroPonto.data <= self.data_fim
         ).scalar() or 0
         
-        # Funcionários que trabalharam na obra
+        # Funcionários que trabalharam na obra - filtrar por obra específica
         funcionarios_obra = db.session.query(RegistroPonto.funcionario_id).filter(
+            RegistroPonto.obra_id == obra_id,
             RegistroPonto.data >= self.data_inicio,
             RegistroPonto.data <= self.data_fim
         ).distinct().count()
