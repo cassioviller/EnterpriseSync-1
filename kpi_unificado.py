@@ -127,8 +127,8 @@ class KPIUnificado:
         # 5. FALTAS JUSTIFICADAS (custo de horas não trabalhadas mas pagas)
         custos['faltas_justificadas'] = self._calcular_custo_faltas_justificadas(funcionarios_filter)
         
-        # TOTAL
-        custos['total'] = sum(custos.values()) - custos['total']  # Evitar double counting
+        # TOTAL (apenas alimentação + transporte + mão de obra)
+        custos['total'] = custos.get('alimentacao', 0) + custos.get('transporte', 0) + custos.get('mao_obra', 0)
         
         return custos
     
