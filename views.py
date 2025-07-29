@@ -1746,7 +1746,7 @@ def obras():
     
     obras = query.all()
     
-    # Período para KPIs (padrão: último mês)
+    # Período para KPIs (EXATAMENTE IGUAL À PÁGINA DE DETALHES)
     if data_fim_filtro:
         data_fim = datetime.strptime(data_fim_filtro, '%Y-%m-%d').date()
     else:
@@ -1755,8 +1755,8 @@ def obras():
     if data_inicio_filtro:
         data_inicio = datetime.strptime(data_inicio_filtro, '%Y-%m-%d').date()
     else:
-        # Último mês por padrão (30 dias atrás)
-        data_inicio = data_fim - timedelta(days=30)
+        # Período padrão (mês atual) - IGUAL À PÁGINA DE DETALHES
+        data_inicio = date.today().replace(day=1)
     
     # Calcular KPIs das obras usando a MESMA LÓGICA da página de detalhes
     for obra in obras:
