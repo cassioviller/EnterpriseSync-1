@@ -1758,21 +1758,60 @@ def obras():
         # Último mês por padrão (30 dias atrás)
         data_inicio = data_fim - timedelta(days=30)
     
-    # Usar sistema unificado para calcular KPIs das obras
-    from kpi_unificado import obter_kpi_obra
-    
+    # Calcular KPIs das obras usando a MESMA LÓGICA da página de detalhes
     for obra in obras:
-        # Usar sistema unificado de KPIs
-        kpis_obra = obter_kpi_obra(obra.id, data_inicio, data_fim)
+        # ===== MESMO CÁLCULO DA PÁGINA DE DETALHES =====
         
-        # Calcular RDOs
+        # 1. Custos de Transporte (Veículos) - apenas desta obra específica
+        custo_transporte = db.session.query(func.sum(CustoVeiculo.valor)).filter(
+            CustoVeiculo.obra_id == obra.id,
+            CustoVeiculo.data_custo.between(data_inicio, data_fim)
+        ).scalar() or 0.0
+        
+        # 2. Custos de Alimentação
+        custo_alimentacao = db.session.query(func.sum(RegistroAlimentacao.valor)).filter(
+            RegistroAlimentacao.obra_id == obra.id,
+            RegistroAlimentacao.data.between(data_inicio, data_fim)
+        ).scalar() or 0.0
+        
+        # 3. Custos de Mão de Obra
+        # Buscar registros de ponto da obra no período
+        registros_ponto = db.session.query(RegistroPonto).join(Funcionario).filter(
+            RegistroPonto.obra_id == obra.id,
+            RegistroPonto.data.between(data_inicio, data_fim),
+            RegistroPonto.hora_entrada.isnot(None)  # Só dias trabalhados
+        ).all()
+        
+        custo_mao_obra = 0.0
+        total_horas = 0.0
+        dias_trabalhados = len(set(rp.data for rp in registros_ponto))
+        
+        for registro in registros_ponto:
+            if registro.hora_entrada and registro.hora_saida:
+                # Calcular horas trabalhadas
+                entrada = datetime.combine(registro.data, registro.hora_entrada)
+                saida = datetime.combine(registro.data, registro.hora_saida)
+                
+                # Subtrair tempo de almoço (1 hora padrão)
+                horas_dia = (saida - entrada).total_seconds() / 3600 - 1
+                horas_dia = max(0, horas_dia)  # Não pode ser negativo
+                total_horas += horas_dia
+                
+                # Calcular custo baseado no salário do funcionário
+                if registro.funcionario_ref.salario:
+                    valor_hora = registro.funcionario_ref.salario / 220  # 220 horas/mês aprox
+                    custo_mao_obra += horas_dia * valor_hora
+        
+        # 4. Custo Total da Obra (EXATAMENTE IGUAL À PÁGINA DE DETALHES)
+        custo_obra_total = custo_transporte + custo_alimentacao + custo_mao_obra
+        
+        # Calcular RDOs e funcionários únicos
         total_rdos = RDO.query.filter_by(obra_id=obra.id).count()
-        
-        # Extrair dados do sistema unificado
-        custo_obra_total = kpis_obra.get('custo_total', 0)
-        dias_trabalhados = kpis_obra.get('dias_trabalhados', 0)
-        total_horas = kpis_obra.get('total_horas', 0)
-        funcionarios_periodo = kpis_obra.get('funcionarios_periodo', 0)
+        funcionarios_periodo = db.session.query(Funcionario).join(RegistroPonto).filter(
+            RegistroPonto.obra_id == obra.id,
+            RegistroPonto.data.between(data_inicio, data_fim),
+            RegistroPonto.hora_entrada.isnot(None)
+        ).distinct().count()
         
         obra.kpis = type('KPIs', (), {
             'total_rdos': total_rdos,
