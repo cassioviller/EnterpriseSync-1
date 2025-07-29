@@ -202,15 +202,8 @@ class KPIUnificado:
         # Custos específicos da obra
         custos = self.calcular_custos_periodo(obra_id=obra_id)
         
-        # Adicionar custos diretos da obra (tabela custo_obra)
-        custos_diretos = db.session.query(func.sum(CustoObra.valor)).filter(
-            CustoObra.obra_id == obra_id,
-            CustoObra.data >= self.data_inicio,
-            CustoObra.data <= self.data_fim
-        ).scalar() or 0
-        
-        custos['custos_diretos'] = custos_diretos
-        custos['total'] += custos_diretos
+        # Não incluir custos diretos para evitar duplicação com alimentação
+        # custos_diretos removido para evitar duplicação
         
         # Dias trabalhados (registros únicos de ponto) - filtrar por obra específica
         dias_trabalhados = db.session.query(RegistroPonto.data).filter(

@@ -2038,14 +2038,8 @@ def detalhes_obra(id):
                 valor_hora = registro.funcionario_ref.salario / 220  # 220 horas/mês aprox
                 custo_mao_obra += horas_dia * valor_hora
     
-    # 4. Custos Diretos da Obra (materiais, equipamentos, etc.)
-    custos_diretos = db.session.query(func.sum(CustoObra.valor)).filter(
-        CustoObra.obra_id == id,
-        CustoObra.data.between(data_inicio, data_fim)
-    ).scalar() or 0.0
-    
-    # 5. Custo Total da Obra
-    custo_total = custo_transporte + custo_alimentacao + custo_mao_obra + custos_diretos
+    # 4. Custo Total da Obra (removendo custos_diretos duplicados)
+    custo_total = custo_transporte + custo_alimentacao + custo_mao_obra
     
     # ===== RDOs =====
     rdos_periodo = RDO.query.filter(
@@ -2122,7 +2116,6 @@ def detalhes_obra(id):
         'custo_transporte': custo_transporte,
         'custo_alimentacao': custo_alimentacao,
         'custo_mao_obra': custo_mao_obra,
-        'custos_diretos': custos_diretos,
         'custo_total': custo_total,
         'dias_trabalhados': dias_trabalhados,
         'total_horas': round(total_horas, 1),
