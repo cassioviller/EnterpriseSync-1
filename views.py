@@ -1998,9 +1998,9 @@ def detalhes_obra(id):
     
     # ===== CÁLCULO DOS KPIS =====
     
-    # 1. Custos de Transporte (Veículos) - apenas desta obra específica
+    # 1. Custos de Transporte (Veículos)
+    # Por enquanto, vamos usar apenas custos de veículos sem vinculação específica à obra
     custo_transporte = db.session.query(func.sum(CustoVeiculo.valor)).filter(
-        CustoVeiculo.obra_id == id,
         CustoVeiculo.data_custo.between(data_inicio, data_fim)
     ).scalar() or 0.0
     
@@ -2038,14 +2038,8 @@ def detalhes_obra(id):
                 valor_hora = registro.funcionario_ref.salario / 220  # 220 horas/mês aprox
                 custo_mao_obra += horas_dia * valor_hora
     
-    # 4. Custos Diretos da Obra (materiais, equipamentos, etc.)
-    custos_diretos = db.session.query(func.sum(CustoObra.valor)).filter(
-        CustoObra.obra_id == id,
-        CustoObra.data.between(data_inicio, data_fim)
-    ).scalar() or 0.0
-    
-    # 5. Custo Total da Obra
-    custo_total = custo_transporte + custo_alimentacao + custo_mao_obra + custos_diretos
+    # 4. Custo Total da Obra
+    custo_total = custo_transporte + custo_alimentacao + custo_mao_obra
     
     # ===== RDOs =====
     rdos_periodo = RDO.query.filter(
@@ -2086,14 +2080,13 @@ def detalhes_obra(id):
     
     # ===== CUSTOS DE TRANSPORTE DETALHADOS =====
     custos_transporte = db.session.query(CustoVeiculo).filter(
-        CustoVeiculo.obra_id == id,
         CustoVeiculo.data_custo.between(data_inicio, data_fim)
     ).order_by(CustoVeiculo.data_custo.desc()).all()
     
     custos_transporte_total = sum(c.valor for c in custos_transporte)
     
     # ===== CUSTOS DE MÃO DE OBRA DETALHADOS =====
-    custos_mao_obra_detalhados = []
+    custos_mao_obra = []
     for registro in registros_ponto:
         if registro.hora_entrada and registro.hora_saida:
             # Calcular horas trabalhadas
@@ -2109,7 +2102,7 @@ def detalhes_obra(id):
                 valor_hora = registro.funcionario_ref.salario / 220  # 220 horas/mês aprox
                 total_dia = horas_dia * valor_hora
                 
-                custos_mao_obra_detalhados.append({
+                custos_mao_obra.append({
                     'data': registro.data,
                     'funcionario_nome': registro.funcionario_ref.nome,
                     'horas_trabalhadas': horas_dia,
@@ -2122,7 +2115,6 @@ def detalhes_obra(id):
         'custo_transporte': custo_transporte,
         'custo_alimentacao': custo_alimentacao,
         'custo_mao_obra': custo_mao_obra,
-        'custos_diretos': custos_diretos,
         'custo_total': custo_total,
         'dias_trabalhados': dias_trabalhados,
         'total_horas': round(total_horas, 1),
@@ -2137,7 +2129,7 @@ def detalhes_obra(id):
                          custos_obra=custos_obra,
                          custos_transporte=custos_transporte,
                          custos_transporte_total=custos_transporte_total,
-                         custos_mao_obra=custos_mao_obra_detalhados,
+                         custos_mao_obra=custos_mao_obra,
                          rdos_periodo=rdos_periodo,
                          rdos_recentes=rdos_recentes,
                          total_rdos=total_rdos,

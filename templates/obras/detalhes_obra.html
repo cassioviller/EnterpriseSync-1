@@ -130,7 +130,7 @@
 
 <!-- Detalhamento dos Custos -->
 <div class="row mb-4">
-    <div class="col-lg-3 col-md-6 mb-3">
+    <div class="col-lg-4 col-md-6 mb-3">
         <div class="card">
             <div class="card-body text-center">
                 <i class="fas fa-car fa-2x text-danger mb-2"></i>
@@ -140,7 +140,7 @@
         </div>
     </div>
     
-    <div class="col-lg-3 col-md-6 mb-3">
+    <div class="col-lg-4 col-md-6 mb-3">
         <div class="card">
             <div class="card-body text-center">
                 <i class="fas fa-utensils fa-2x text-warning mb-2"></i>
@@ -150,22 +150,12 @@
         </div>
     </div>
     
-    <div class="col-lg-3 col-md-6 mb-3">
+    <div class="col-lg-4 col-md-6 mb-3">
         <div class="card">
             <div class="card-body text-center">
                 <i class="fas fa-hammer fa-2x text-info mb-2"></i>
                 <h5 class="text-info">R$ {{ '{:,.2f}'.format(kpis.custo_mao_obra).replace(',', ' ').replace('.', ',').replace(' ', '.') }}</h5>
                 <small class="text-muted">Mão de Obra</small>
-            </div>
-        </div>
-    </div>
-    
-    <div class="col-lg-3 col-md-6 mb-3">
-        <div class="card">
-            <div class="card-body text-center">
-                <i class="fas fa-tools fa-2x text-secondary mb-2"></i>
-                <h5 class="text-secondary">R$ {{ '{:,.2f}'.format(kpis.custos_diretos).replace(',', ' ').replace('.', ',').replace(' ', '.') }}</h5>
-                <small class="text-muted">Custos Diretos</small>
             </div>
         </div>
     </div>
