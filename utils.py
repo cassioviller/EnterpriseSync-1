@@ -470,11 +470,11 @@ def calcular_kpis_funcionarios_geral(data_inicio=None, data_fim=None, admin_id=N
     if admin_id is None and current_user and current_user.is_authenticated:
         admin_id = current_user.id
     
-    # Filtrar funcionários pelo admin
+    # Filtrar funcionários pelo admin (ordenados alfabeticamente)
     if admin_id:
-        funcionarios_ativos = Funcionario.query.filter_by(ativo=True, admin_id=admin_id).all()
+        funcionarios_ativos = Funcionario.query.filter_by(ativo=True, admin_id=admin_id).order_by(Funcionario.nome).all()
     else:
-        funcionarios_ativos = Funcionario.query.filter_by(ativo=True).all()
+        funcionarios_ativos = Funcionario.query.filter_by(ativo=True).order_by(Funcionario.nome).all()
     
     total_funcionarios = len(funcionarios_ativos)
     total_custo_geral = 0
