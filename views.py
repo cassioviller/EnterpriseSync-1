@@ -1848,7 +1848,7 @@ def nova_obra():
     
     try:
         # Buscar funcionários com tratamento de erro
-        funcionarios = Funcionario.query.filter_by(ativo=True, admin_id=current_user.id).all()
+        funcionarios = Funcionario.query.filter_by(ativo=True, admin_id=current_user.id).order_by(Funcionario.nome).all()
         form.responsavel_id.choices = [(0, 'Selecione...')] + [(f.id, f.nome) for f in funcionarios]
         logging.info(f"[NOVA_OBRA] {len(funcionarios)} funcionários carregados")
     except Exception as e:
@@ -1982,7 +1982,7 @@ def editar_obra(id):
     # Verificar se a obra pertence ao admin logado
     obra = Obra.query.filter_by(id=id, admin_id=current_user.id).first_or_404()
     form = ObraForm(obj=obra)
-    form.responsavel_id.choices = [(0, 'Selecione...')] + [(f.id, f.nome) for f in Funcionario.query.filter_by(ativo=True, admin_id=current_user.id).all()]
+    form.responsavel_id.choices = [(0, 'Selecione...')] + [(f.id, f.nome) for f in Funcionario.query.filter_by(ativo=True, admin_id=current_user.id).order_by(Funcionario.nome).all()]
     
     if form.validate_on_submit():
         obra.nome = form.nome.data
@@ -2461,7 +2461,7 @@ def custo_calculadora_api(obra_id):
 def veiculos():
     # Filtrar por admin_id para multi-tenant
     veiculos = Veiculo.query.filter(Veiculo.admin_id == current_user.id).all()
-    funcionarios = Funcionario.query.filter_by(ativo=True, admin_id=current_user.id).all()
+    funcionarios = Funcionario.query.filter_by(ativo=True, admin_id=current_user.id).order_by(Funcionario.nome).all()
     obras = Obra.query.filter_by(status='Em andamento', admin_id=current_user.id).all()
     return render_template('veiculos.html', 
                          veiculos=veiculos, 
@@ -2698,7 +2698,7 @@ def novo_uso_veiculo(id):
     form = UsoVeiculoForm()
     
     # Preencher choices dinamicamente
-    form.funcionario_id.choices = [(0, 'Selecione...')] + [(f.id, f.nome) for f in Funcionario.query.filter_by(ativo=True).all()]
+    form.funcionario_id.choices = [(0, 'Selecione...')] + [(f.id, f.nome) for f in Funcionario.query.filter_by(ativo=True).order_by(Funcionario.nome).all()]
     form.obra_id.choices = [(0, 'Selecione...')] + [(o.id, o.nome) for o in Obra.query.filter(Obra.status.in_(['Em andamento', 'Pausada'])).all()]
     
     # Definir veiculo_id no formulário
@@ -3629,7 +3629,7 @@ def get_simbolo_unidade(unidade_medida):
 @login_required
 def ponto():
     # Obter funcionários do admin para filtrar registros de ponto
-    funcionarios_admin = Funcionario.query.filter_by(admin_id=current_user.id).all()
+    funcionarios_admin = Funcionario.query.filter_by(admin_id=current_user.id).order_by(Funcionario.nome).all()
     funcionarios_ids = [f.id for f in funcionarios_admin]
     
     if funcionarios_ids:
@@ -3646,7 +3646,7 @@ def ponto():
 def novo_ponto_lista():
     form = RegistroPontoForm()
     # Filtrar por admin_id para multi-tenant
-    form.funcionario_id.choices = [(f.id, f.nome) for f in Funcionario.query.filter_by(ativo=True, admin_id=current_user.id).all()]
+    form.funcionario_id.choices = [(f.id, f.nome) for f in Funcionario.query.filter_by(ativo=True, admin_id=current_user.id).order_by(Funcionario.nome).all()]
     form.obra_id.choices = [(0, 'Selecione...')] + [(o.id, o.nome) for o in Obra.query.filter_by(status='Em andamento', admin_id=current_user.id).all()]
     
     if form.validate_on_submit():
@@ -3682,7 +3682,7 @@ def novo_ponto_lista():
         return redirect(url_for('main.ponto'))
     
     # Obter funcionários do admin para filtrar registros de ponto
-    funcionarios_admin = Funcionario.query.filter_by(admin_id=current_user.id).all()
+    funcionarios_admin = Funcionario.query.filter_by(admin_id=current_user.id).order_by(Funcionario.nome).all()
     funcionarios_ids = [f.id for f in funcionarios_admin]
     
     if funcionarios_ids:
@@ -3956,7 +3956,7 @@ def alimentacao():
                                      all_columns=rest_column_names)
         
         # Obter funcionários do admin atual
-        funcionarios_admin = Funcionario.query.filter_by(ativo=True, admin_id=current_user.id).all()
+        funcionarios_admin = Funcionario.query.filter_by(ativo=True, admin_id=current_user.id).order_by(Funcionario.nome).all()
         funcionarios_ids = [f.id for f in funcionarios_admin]
         
         # Filtrar registros pelos funcionários do admin
@@ -4951,7 +4951,7 @@ def novo_rdo():
     
     # Dados para template
     obras = Obra.query.filter_by(ativo=True).all()
-    funcionarios = Funcionario.query.filter_by(ativo=True).all()
+    funcionarios = Funcionario.query.filter_by(ativo=True).order_by(Funcionario.nome).all()
     # Query específica para evitar erro categoria_id
     servicos_data = db.session.query(
         Servico.id,
@@ -5040,7 +5040,7 @@ def editar_rdo(id):
     """Formulário para editar RDO"""
     rdo = RDO.query.get_or_404(id)
     obras = Obra.query.all()
-    funcionarios = Funcionario.query.filter_by(ativo=True).all()
+    funcionarios = Funcionario.query.filter_by(ativo=True).order_by(Funcionario.nome).all()
     
     return render_template('rdo/formulario_rdo.html', 
                          rdo=rdo,
