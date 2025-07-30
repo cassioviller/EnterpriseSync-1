@@ -684,6 +684,27 @@
     - Script de testes das melhorias implementadas (testar_melhorias_implementadas.py)
     - Correção de erro no relatório de ponto (referências de funcionário)
     - Base sólida implementada para futuras melhorias: mobile app, IA, automações
+  - July 30, 2025. Documentação Completa do Sistema - Relatório Técnico Abrangente - v8.0.11:
+    - Criado RELATORIO_COMPLETO_SISTEMA_SIGE.md: documentação técnica completa para LLMs
+    - Documentação de 33 tabelas do banco de dados com estrutura SQL detalhada
+    - Especificação completa dos 15 KPIs do funcionário (layout 4-4-4-3) com fórmulas exatas
+    - Fluxos de informação, navegação e arquitetura multi-tenant documentados
+    - Engine de cálculos detalhado: tipos de registro, regras de negócio, algoritmos
+    - Sistema de custos por obra com KPIs financeiros estratégicos explicados
+    - 180+ endpoints documentados com métodos HTTP e parâmetros
+    - Validações, performance, deploy e configurações técnicas
+    - Credenciais de acesso e estrutura de permissões
+    - Roadmap futuro e melhorias implementadas v8.0
+    - 24.434 linhas de código Python documentadas
+    - Base completa para qualquer LLM entender e trabalhar com o sistema
+  - July 30, 2025. Organização Alfabética Completa dos Funcionários - v8.0.12:
+    - Corrigidas TODAS as consultas de funcionários para ordenação alfabética em 37+ locais
+    - Função `calcular_kpis_funcionarios_geral` corrigida para ordenar por `Funcionario.nome`
+    - Cards de funcionários na página principal agora exibem em ordem alfabética
+    - Dropdowns e seleções em formulários ordenados alfabeticamente
+    - Consultas em RDO, obras, veículos e modais com ordenação consistente
+    - Sistema multi-tenant preservado com isolamento por admin_id
+    - Experiência do usuário melhorada com organização visual consistente
   - July 29, 2025. Correção de Custos de Veículos por Obra Específica - v8.0.10:
     - Corrigido erro crítico no cálculo de custos de transporte na página de detalhes da obra
     - Problema identificado: sistema somava custos de TODOS os veículos do período, não apenas da obra específica
