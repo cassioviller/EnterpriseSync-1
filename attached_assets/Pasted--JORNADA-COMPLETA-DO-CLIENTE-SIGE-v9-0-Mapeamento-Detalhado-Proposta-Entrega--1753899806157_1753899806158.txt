@@ -1,0 +1,526 @@
+# 🗺️ JORNADA COMPLETA DO CLIENTE - SIGE v9.0
+## Mapeamento Detalhado: Proposta → Entrega
+
+---
+
+## 🗣️ CONTINUAÇÃO DA REUNIÃO DE KICKOFF
+
+**🎯 RICARDO (Gestor):** *"Pessoal, vamos mapear cada etapa da jornada do cliente. Preciso que vocês pensem em como cada módulo se conecta com o próximo e com o sistema atual."*
+
+**💻 FERNANDO (Arquiteto):** *"Ricardo, vou garantir que cada transição seja automática. Quando uma proposta for aprovada, ela deve virar obra automaticamente no sistema existente."*
+
+**🗄️ PATRICIA (Backend):** *"Fernando, vou criar relacionamentos entre as novas tabelas e as existentes. Um lead vira proposta, proposta vira obra, obra usa funcionários e custos atuais."*
+
+**📊 CARLOS (Orçamentos):** *"Patricia, minha engine de orçamentos vai usar dados reais de custos históricos. Assim teremos orçamentos precisos baseados em obras anteriores."*
+
+**🎨 CAMILA (Designer):** *"Carlos, cada etapa terá uma interface específica. O cliente vai acompanhar visualmente o progresso da sua obra em tempo real."*
+
+**📈 MARCOS (Frontend):** *"Camila, vou criar dashboards interativos para cada etapa. O cliente terá acesso a um portal para acompanhar tudo."*
+
+**🔗 ANDRÉ (Integrações):** *"Marcos, vou automatizar notificações. Cliente recebe e-mail a cada mudança de status, com links para acompanhar."*
+
+**📋 JULIANA (Processos):** *"André, vou definir checkpoints de qualidade em cada etapa. Nada avança sem aprovação dos responsáveis."*
+
+**🧪 BEATRIZ (QA):** *"Juliana, vou testar toda a jornada end-to-end. Desde o primeiro lead até a entrega final."*
+
+---
+
+## 🗺️ JORNADA COMPLETA MAPEADA
+
+### 📊 VISÃO GERAL DA JORNADA (8 ETAPAS)
+
+```
+1. CAPTAÇÃO DE LEADS → 2. QUALIFICAÇÃO → 3. PROPOSTA → 4. ORÇAMENTO → 
+5. CONTRATO → 6. PLANEJAMENTO → 7. EXECUÇÃO → 8. ENTREGA
+```
+
+---
+
+### 🎯 ETAPA 1: CAPTAÇÃO DE LEADS
+**Responsável:** Ricardo (CRM) + André (Integrações)
+
+**📋 FUNCIONALIDADES:**
+- **Formulário de contato** no site da empresa
+- **Landing pages** específicas por tipo de estrutura
+- **Integração WhatsApp** para atendimento inicial
+- **Captura automática** de dados do lead
+- **Classificação inicial** por potencial
+
+**🗄️ TABELA NOVA: `lead`**
+```sql
+CREATE TABLE lead (
+    id SERIAL PRIMARY KEY,
+    nome VARCHAR(100) NOT NULL,
+    email VARCHAR(120),
+    telefone VARCHAR(20),
+    empresa VARCHAR(100),
+    tipo_estrutura VARCHAR(50), -- Galpão, Mezanino, Cobertura, etc.
+    area_estimada DECIMAL(10,2),
+    orcamento_estimado DECIMAL(12,2),
+    origem VARCHAR(50), -- Site, WhatsApp, Indicação, etc.
+    status VARCHAR(30) DEFAULT 'novo', -- novo, qualificado, perdido
+    observacoes TEXT,
+    data_contato DATE DEFAULT CURRENT_DATE,
+    responsavel_id INTEGER REFERENCES funcionario(id),
+    admin_id INTEGER REFERENCES usuario(id),
+    created_at TIMESTAMP DEFAULT NOW()
+);
+```
+
+**🎨 INTERFACE:**
+- **Dashboard de Leads** com cards visuais
+- **Filtros** por origem, status, responsável
+- **Timeline** de interações
+- **Botões de ação** (qualificar, descartar, agendar)
+
+---
+
+### 🎯 ETAPA 2: QUALIFICAÇÃO DO LEAD
+**Responsável:** Ricardo (CRM) + Camila (Interface)
+
+**📋 FUNCIONALIDADES:**
+- **Questionário de qualificação** estruturado
+- **Pontuação automática** do lead (scoring)
+- **Agendamento de visita** técnica
+- **Histórico de interações** completo
+- **Classificação por prioridade**
+
+**🗄️ TABELA NOVA: `lead_interacao`**
+```sql
+CREATE TABLE lead_interacao (
+    id SERIAL PRIMARY KEY,
+    lead_id INTEGER REFERENCES lead(id) NOT NULL,
+    tipo VARCHAR(30) NOT NULL, -- ligacao, email, whatsapp, visita
+    descricao TEXT NOT NULL,
+    data_interacao TIMESTAMP DEFAULT NOW(),
+    responsavel_id INTEGER REFERENCES funcionario(id),
+    admin_id INTEGER REFERENCES usuario(id)
+);
+```
+
+**🎨 INTERFACE:**
+- **Perfil completo do lead** com histórico
+- **Formulário de qualificação** passo a passo
+- **Agenda integrada** para visitas
+- **Score visual** do lead (barras coloridas)
+
+---
+
+### 🎯 ETAPA 3: CRIAÇÃO DA PROPOSTA
+**Responsável:** Carlos (Orçamentos) + Camila (Design)
+
+**📋 FUNCIONALIDADES:**
+- **Geração automática** de proposta em PDF
+- **Template personalizado** com logo da empresa
+- **Cálculos automáticos** baseados em dados históricos
+- **Múltiplas versões** da proposta
+- **Assinatura digital** integrada
+
+**🗄️ TABELA NOVA: `proposta`**
+```sql
+CREATE TABLE proposta (
+    id SERIAL PRIMARY KEY,
+    lead_id INTEGER REFERENCES lead(id) NOT NULL,
+    numero_proposta VARCHAR(20) UNIQUE NOT NULL, -- PROP-2025-001
+    titulo VARCHAR(200) NOT NULL,
+    descricao_projeto TEXT,
+    area_total_m2 DECIMAL(10,2) NOT NULL,
+    valor_total DECIMAL(12,2) NOT NULL,
+    prazo_execucao INTEGER, -- dias
+    validade_proposta INTEGER DEFAULT 30, -- dias
+    status VARCHAR(30) DEFAULT 'enviada', -- enviada, aprovada, rejeitada, expirada
+    arquivo_pdf VARCHAR(255), -- caminho do PDF gerado
+    data_envio DATE DEFAULT CURRENT_DATE,
+    data_resposta DATE,
+    observacoes TEXT,
+    responsavel_id INTEGER REFERENCES funcionario(id),
+    admin_id INTEGER REFERENCES usuario(id),
+    created_at TIMESTAMP DEFAULT NOW()
+);
+```
+
+**🗄️ TABELA NOVA: `proposta_item`**
+```sql
+CREATE TABLE proposta_item (
+    id SERIAL PRIMARY KEY,
+    proposta_id INTEGER REFERENCES proposta(id) NOT NULL,
+    descricao VARCHAR(200) NOT NULL,
+    unidade VARCHAR(20) NOT NULL, -- m², kg, un
+    quantidade DECIMAL(10,4) NOT NULL,
+    valor_unitario DECIMAL(10,2) NOT NULL,
+    valor_total DECIMAL(12,2) NOT NULL,
+    observacoes TEXT,
+    admin_id INTEGER REFERENCES usuario(id)
+);
+```
+
+**🎨 INTERFACE:**
+- **Editor de proposta** com arrastar e soltar
+- **Biblioteca de itens** pré-cadastrados
+- **Preview em tempo real** do PDF
+- **Histórico de versões** da proposta
+- **Dashboard de conversão** (propostas → contratos)
+
+---
+
+### 🎯 ETAPA 4: ORÇAMENTO DETALHADO
+**Responsável:** Carlos (Orçamentos) + Patricia (Backend)
+
+**📋 FUNCIONALIDADES:**
+- **Orçamento técnico** detalhado por item
+- **Cálculo de materiais** baseado em projetos similares
+- **Estimativa de mão de obra** usando dados históricos
+- **Margem de lucro** configurável
+- **Comparativo** com orçamentos anteriores
+
+**🗄️ TABELA NOVA: `orcamento`**
+```sql
+CREATE TABLE orcamento (
+    id SERIAL PRIMARY KEY,
+    proposta_id INTEGER REFERENCES proposta(id) NOT NULL,
+    numero_orcamento VARCHAR(20) UNIQUE NOT NULL, -- ORC-2025-001
+    versao INTEGER DEFAULT 1,
+    
+    -- Totais calculados
+    total_materiais DECIMAL(12,2) DEFAULT 0.0,
+    total_mao_obra DECIMAL(12,2) DEFAULT 0.0,
+    total_equipamentos DECIMAL(12,2) DEFAULT 0.0,
+    total_outros DECIMAL(12,2) DEFAULT 0.0,
+    subtotal DECIMAL(12,2) DEFAULT 0.0,
+    margem_lucro_percentual DECIMAL(5,2) DEFAULT 20.0,
+    valor_margem DECIMAL(12,2) DEFAULT 0.0,
+    valor_final DECIMAL(12,2) DEFAULT 0.0,
+    
+    status VARCHAR(30) DEFAULT 'em_elaboracao', -- em_elaboracao, finalizado, aprovado
+    data_finalizacao DATE,
+    observacoes TEXT,
+    responsavel_id INTEGER REFERENCES funcionario(id),
+    admin_id INTEGER REFERENCES usuario(id),
+    created_at TIMESTAMP DEFAULT NOW()
+);
+```
+
+**🗄️ TABELA NOVA: `orcamento_item`**
+```sql
+CREATE TABLE orcamento_item (
+    id SERIAL PRIMARY KEY,
+    orcamento_id INTEGER REFERENCES orcamento(id) NOT NULL,
+    categoria VARCHAR(50) NOT NULL, -- Material, Mão de Obra, Equipamento, Outros
+    descricao VARCHAR(200) NOT NULL,
+    unidade VARCHAR(20) NOT NULL,
+    quantidade DECIMAL(10,4) NOT NULL,
+    valor_unitario DECIMAL(10,2) NOT NULL,
+    valor_total DECIMAL(12,2) NOT NULL,
+    fornecedor VARCHAR(100),
+    observacoes TEXT,
+    admin_id INTEGER REFERENCES usuario(id)
+);
+```
+
+**🎨 INTERFACE:**
+- **Planilha interativa** de orçamento
+- **Calculadora automática** de totais
+- **Gráficos de distribuição** de custos
+- **Comparativo visual** com projetos similares
+- **Aprovação eletrônica** do orçamento
+
+---
+
+### 🎯 ETAPA 5: FORMALIZAÇÃO DO CONTRATO
+**Responsável:** Ricardo (Processos) + André (Automação)
+
+**📋 FUNCIONALIDADES:**
+- **Geração automática** de contrato em PDF
+- **Cláusulas personalizáveis** por tipo de obra
+- **Cronograma de pagamento** integrado
+- **Assinatura digital** das partes
+- **Controle de aditivos** contratuais
+
+**🗄️ TABELA NOVA: `contrato`**
+```sql
+CREATE TABLE contrato (
+    id SERIAL PRIMARY KEY,
+    proposta_id INTEGER REFERENCES proposta(id) NOT NULL,
+    orcamento_id INTEGER REFERENCES orcamento(id) NOT NULL,
+    numero_contrato VARCHAR(20) UNIQUE NOT NULL, -- CONT-2025-001
+    
+    -- Dados do cliente
+    cliente_nome VARCHAR(100) NOT NULL,
+    cliente_documento VARCHAR(20) NOT NULL, -- CPF ou CNPJ
+    cliente_endereco TEXT,
+    cliente_telefone VARCHAR(20),
+    cliente_email VARCHAR(120),
+    
+    -- Dados do contrato
+    valor_total DECIMAL(12,2) NOT NULL,
+    prazo_execucao INTEGER NOT NULL, -- dias
+    data_inicio DATE NOT NULL,
+    data_previsao_fim DATE NOT NULL,
+    forma_pagamento TEXT, -- Descrição das parcelas
+    
+    status VARCHAR(30) DEFAULT 'em_elaboracao', -- em_elaboracao, enviado, assinado, em_execucao, finalizado
+    arquivo_pdf VARCHAR(255), -- caminho do PDF do contrato
+    data_assinatura DATE,
+    observacoes TEXT,
+    responsavel_id INTEGER REFERENCES funcionario(id),
+    admin_id INTEGER REFERENCES usuario(id),
+    created_at TIMESTAMP DEFAULT NOW()
+);
+```
+
+**🗄️ TABELA NOVA: `contrato_parcela`**
+```sql
+CREATE TABLE contrato_parcela (
+    id SERIAL PRIMARY KEY,
+    contrato_id INTEGER REFERENCES contrato(id) NOT NULL,
+    numero_parcela INTEGER NOT NULL,
+    descricao VARCHAR(200) NOT NULL, -- Ex: "30% na assinatura"
+    valor DECIMAL(12,2) NOT NULL,
+    data_vencimento DATE NOT NULL,
+    status VARCHAR(30) DEFAULT 'pendente', -- pendente, pago, atrasado
+    data_pagamento DATE,
+    observacoes TEXT,
+    admin_id INTEGER REFERENCES usuario(id)
+);
+```
+
+**🎨 INTERFACE:**
+- **Editor de contrato** com templates
+- **Assinatura eletrônica** integrada
+- **Timeline de pagamentos** visual
+- **Dashboard de contratos** por status
+- **Alertas de vencimento** automáticos
+
+---
+
+### 🎯 ETAPA 6: PLANEJAMENTO DA OBRA
+**Responsável:** Juliana (Processos) + Marcos (Frontend)
+
+**📋 FUNCIONALIDADES:**
+- **Conversão automática** contrato → obra (integração com SIGE v8.0)
+- **Cronograma detalhado** por atividades
+- **Alocação de funcionários** baseada em disponibilidade
+- **Planejamento de materiais** com datas de entrega
+- **Cronograma de pagamentos** sincronizado
+
+**🔗 INTEGRAÇÃO COM SIGE v8.0:**
+```sql
+-- A tabela 'obra' já existe no SIGE v8.0
+-- Vamos adicionar campos para integração com contratos
+
+ALTER TABLE obra ADD COLUMN contrato_id INTEGER REFERENCES contrato(id);
+ALTER TABLE obra ADD COLUMN cronograma_ativo BOOLEAN DEFAULT TRUE;
+ALTER TABLE obra ADD COLUMN percentual_conclusao DECIMAL(5,2) DEFAULT 0.0;
+```
+
+**🗄️ TABELA NOVA: `cronograma_atividade`**
+```sql
+CREATE TABLE cronograma_atividade (
+    id SERIAL PRIMARY KEY,
+    obra_id INTEGER REFERENCES obra(id) NOT NULL,
+    nome VARCHAR(200) NOT NULL,
+    descricao TEXT,
+    data_inicio_prevista DATE NOT NULL,
+    data_fim_prevista DATE NOT NULL,
+    data_inicio_real DATE,
+    data_fim_real DATE,
+    percentual_conclusao DECIMAL(5,2) DEFAULT 0.0,
+    responsavel_id INTEGER REFERENCES funcionario(id),
+    predecessora_id INTEGER REFERENCES cronograma_atividade(id), -- Atividade anterior
+    status VARCHAR(30) DEFAULT 'planejada', -- planejada, em_andamento, concluida, atrasada
+    observacoes TEXT,
+    admin_id INTEGER REFERENCES usuario(id),
+    created_at TIMESTAMP DEFAULT NOW()
+);
+```
+
+**🎨 INTERFACE:**
+- **Gráfico de Gantt** interativo
+- **Kanban de atividades** por status
+- **Calendário de obra** com marcos
+- **Alocação visual** de funcionários
+- **Dashboard de progresso** em tempo real
+
+---
+
+### 🎯 ETAPA 7: EXECUÇÃO DA OBRA
+**Responsável:** Integração com SIGE v8.0 existente
+
+**📋 FUNCIONALIDADES (JÁ EXISTENTES):**
+- **Controle de ponto** dos funcionários
+- **RDO (Relatório Diário de Obra)** detalhado
+- **Gestão de custos** por categoria
+- **Controle de alimentação** e transporte
+- **15 KPIs por funcionário** em tempo real
+
+**🔗 NOVAS INTEGRAÇÕES:**
+- **Atualização automática** do cronograma baseada no RDO
+- **Alertas de desvio** de prazo ou orçamento
+- **Relatórios de progresso** para o cliente
+- **Fotos de progresso** integradas ao RDO
+
+**🗄️ TABELA NOVA: `obra_foto`**
+```sql
+CREATE TABLE obra_foto (
+    id SERIAL PRIMARY KEY,
+    obra_id INTEGER REFERENCES obra(id) NOT NULL,
+    atividade_id INTEGER REFERENCES cronograma_atividade(id),
+    arquivo VARCHAR(255) NOT NULL, -- caminho da foto
+    descricao TEXT,
+    data_foto DATE DEFAULT CURRENT_DATE,
+    responsavel_id INTEGER REFERENCES funcionario(id),
+    visivel_cliente BOOLEAN DEFAULT TRUE, -- Cliente pode ver esta foto
+    admin_id INTEGER REFERENCES usuario(id),
+    created_at TIMESTAMP DEFAULT NOW()
+);
+```
+
+**🎨 INTERFACE:**
+- **Portal do cliente** com progresso visual
+- **Galeria de fotos** da obra
+- **Timeline de atividades** concluídas
+- **Gráficos de progresso** vs planejado
+- **Alertas automáticos** de marcos importantes
+
+---
+
+### 🎯 ETAPA 8: ENTREGA E PÓS-VENDA
+**Responsável:** Juliana (Qualidade) + André (Automação)
+
+**📋 FUNCIONALIDADES:**
+- **Checklist de entrega** por tipo de estrutura
+- **Inspeção de qualidade** com fotos
+- **Termo de entrega** digital
+- **Garantia automática** com prazos
+- **Pesquisa de satisfação** automatizada
+
+**🗄️ TABELA NOVA: `entrega`**
+```sql
+CREATE TABLE entrega (
+    id SERIAL PRIMARY KEY,
+    obra_id INTEGER REFERENCES obra(id) NOT NULL,
+    data_entrega DATE NOT NULL,
+    responsavel_entrega_id INTEGER REFERENCES funcionario(id),
+    responsavel_recebimento VARCHAR(100) NOT NULL, -- Nome do cliente
+    documento_recebimento VARCHAR(20), -- CPF/CNPJ de quem recebeu
+    
+    -- Checklist de entrega
+    estrutura_completa BOOLEAN DEFAULT FALSE,
+    pintura_finalizada BOOLEAN DEFAULT FALSE,
+    limpeza_concluida BOOLEAN DEFAULT FALSE,
+    documentacao_entregue BOOLEAN DEFAULT FALSE,
+    manual_entregue BOOLEAN DEFAULT FALSE,
+    garantia_explicada BOOLEAN DEFAULT FALSE,
+    
+    observacoes TEXT,
+    arquivo_termo_entrega VARCHAR(255), -- PDF do termo assinado
+    nota_satisfacao INTEGER, -- 1 a 5
+    comentario_cliente TEXT,
+    status VARCHAR(30) DEFAULT 'entregue', -- entregue, garantia, finalizado
+    admin_id INTEGER REFERENCES usuario(id),
+    created_at TIMESTAMP DEFAULT NOW()
+);
+```
+
+**🗄️ TABELA NOVA: `pos_venda`**
+```sql
+CREATE TABLE pos_venda (
+    id SERIAL PRIMARY KEY,
+    obra_id INTEGER REFERENCES obra(id) NOT NULL,
+    tipo VARCHAR(50) NOT NULL, -- garantia, manutencao, reclamacao, elogio
+    descricao TEXT NOT NULL,
+    data_solicitacao DATE DEFAULT CURRENT_DATE,
+    data_atendimento DATE,
+    responsavel_id INTEGER REFERENCES funcionario(id),
+    status VARCHAR(30) DEFAULT 'aberto', -- aberto, em_andamento, resolvido, fechado
+    prioridade VARCHAR(20) DEFAULT 'normal', -- baixa, normal, alta, urgente
+    observacoes TEXT,
+    admin_id INTEGER REFERENCES usuario(id),
+    created_at TIMESTAMP DEFAULT NOW()
+);
+```
+
+**🎨 INTERFACE:**
+- **Checklist interativo** de entrega
+- **Assinatura digital** do termo
+- **Portal de garantia** para o cliente
+- **Dashboard de pós-venda** com chamados
+- **Pesquisa de satisfação** automatizada
+
+---
+
+## 🔗 INTEGRAÇÃO COMPLETA COM SIGE v8.0
+
+### 📊 FLUXO DE DADOS INTEGRADO:
+
+```
+LEAD → PROPOSTA → ORÇAMENTO → CONTRATO → OBRA (v8.0) → ENTREGA
+  ↓        ↓         ↓          ↓          ↓           ↓
+CRM → Comercial → Técnico → Jurídico → Execução → Qualidade
+```
+
+### 🔄 AUTOMAÇÕES IMPLEMENTADAS:
+
+1. **Lead qualificado** → Cria proposta automaticamente
+2. **Proposta aprovada** → Gera orçamento detalhado
+3. **Orçamento aprovado** → Cria contrato
+4. **Contrato assinado** → Cria obra no SIGE v8.0
+5. **Obra iniciada** → Ativa cronograma e notificações
+6. **Atividade concluída** → Atualiza progresso e notifica cliente
+7. **Obra finalizada** → Inicia processo de entrega
+8. **Entrega concluída** → Ativa garantia e pós-venda
+
+### 📈 DASHBOARDS DA JORNADA:
+
+**DASHBOARD COMERCIAL:**
+- Funil de conversão (Lead → Contrato)
+- Taxa de conversão por vendedor
+- Tempo médio por etapa
+- Valor médio de contrato
+- Pipeline de vendas
+
+**DASHBOARD OPERACIONAL:**
+- Obras em andamento vs cronograma
+- Desvios de prazo e orçamento
+- Produtividade por obra
+- Custos reais vs orçados
+- Alertas de qualidade
+
+**DASHBOARD EXECUTIVO:**
+- Faturamento por etapa da jornada
+- Margem de lucro por projeto
+- Satisfação do cliente
+- Indicadores de pós-venda
+- ROI por tipo de estrutura
+
+---
+
+## ✅ APROVAÇÃO DA JORNADA PELA EQUIPE
+
+**🎯 RICARDO:** *"Perfeito! Essa jornada cobre todas as necessidades comerciais e se integra naturalmente com o sistema atual."*
+
+**💻 FERNANDO:** *"A arquitetura está sólida. Cada nova tabela se relaciona com as existentes mantendo a integridade."*
+
+**🗄️ PATRICIA:** *"As APIs vão ser robustas. Vou usar os mesmos padrões do SIGE v8.0 para manter consistência."*
+
+**📊 CARLOS:** *"A engine de orçamentos vai ser precisa usando dados históricos reais. Isso vai melhorar muito a margem."*
+
+**🎨 CAMILA:** *"As interfaces vão seguir o mesmo padrão visual. O usuário não vai sentir que é um sistema diferente."*
+
+**📈 MARCOS:** *"Os dashboards vão ser interativos e responsivos. Cada stakeholder terá sua visão específica."*
+
+**🔗 ANDRÉ:** *"As automações vão fazer a jornada fluir naturalmente. Menos trabalho manual, mais eficiência."*
+
+**📋 JULIANA:** *"Os processos de qualidade garantem que nada passe despercebido. Cada etapa tem suas validações."*
+
+**🧪 BEATRIZ:** *"Vou testar toda a integração. Nada vai quebrar no sistema atual, garantido."*
+
+---
+
+## 🚀 STATUS: JORNADA DEFINIDA E APROVADA
+
+**✅ Fase 2 Concluída**  
+**➡️ Próximo:** Fase 3 - Implementação do Módulo CRM e Propostas
+
+A jornada completa está mapeada e aprovada por todos os especialistas. Agora vamos partir para a implementação dos módulos!
+
