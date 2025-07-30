@@ -420,59 +420,46 @@ function adicionarMaoObra() {
     contadorMaoObra++;
     const container = document.getElementById('mao-obra-container');
     const html = `
-        <div class="border rounded p-3 mb-3" style="background-color: #f8f9fa; border-left: 3px solid #4CAF50;" id="mao-obra-${contadorMaoObra}">
-            <div class="d-flex justify-content-between align-items-center mb-3">
-                <h6 class="mb-0">Funcionário #${contadorMaoObra}</h6>
-                <button type="button" class="btn btn-sm btn-outline-danger" onclick="removerItem('mao-obra-${contadorMaoObra}')">
-                    <i class="fas fa-trash"></i>
-                </button>
-            </div>
-            <div class="row">
-                <div class="col-md-4">
-                    <label class="form-label">Funcionário</label>
-                    <select class="form-select" name="funcionario_${contadorMaoObra}" onchange="preencherDadosFuncionario(this, ${contadorMaoObra})" required>
-                        <option value="">Selecione o funcionário...</option>
+        <div class="border rounded p-2 mb-2" style="background-color: #f8f9fa; border-left: 3px solid #4CAF50;" id="mao-obra-${contadorMaoObra}">
+            <div class="row align-items-center">
+                <div class="col-md-3">
+                    <label class="form-label small mb-1">Funcionário</label>
+                    <select class="form-select form-select-sm" name="funcionario_${contadorMaoObra}" onchange="preencherDadosFuncionario(this, ${contadorMaoObra})" required>
+                        <option value="">Selecione...</option>
                     </select>
                 </div>
-                <div class="col-md-4">
-                    <label class="form-label">Entrada</label>
-                    <input type="time" class="form-control" name="entrada_${contadorMaoObra}" value="07:00" onchange="calcularTotalHoras(${contadorMaoObra})">
+                <div class="col-md-2">
+                    <label class="form-label small mb-1">Entrada</label>
+                    <input type="time" class="form-control form-control-sm" name="entrada_${contadorMaoObra}" value="07:00" onchange="calcularTotalHoras(${contadorMaoObra})">
                 </div>
-                <div class="col-md-4">
-                    <label class="form-label">Saída</label>
-                    <input type="time" class="form-control" name="saida_${contadorMaoObra}" value="17:00" onchange="calcularTotalHoras(${contadorMaoObra})">
+                <div class="col-md-2">
+                    <label class="form-label small mb-1">Saída</label>
+                    <input type="time" class="form-control form-control-sm" name="saida_${contadorMaoObra}" value="17:00" onchange="calcularTotalHoras(${contadorMaoObra})">
                 </div>
-            </div>
-            <div class="row mt-2">
-                <div class="col-md-4">
-                    <label class="form-label">Total Horas</label>
-                    <input type="text" class="form-control" name="total_horas_${contadorMaoObra}" value="Calculado automaticamente" readonly>
+                <div class="col-md-1">
+                    <label class="form-label small mb-1">Total</label>
+                    <input type="text" class="form-control form-control-sm" name="total_horas_${contadorMaoObra}" value="8h" readonly style="background-color: #e9ecef;">
                 </div>
-                <div class="col-md-4">
-                    <label class="form-label">Presente</label>
-                    <div class="form-check">
+                <div class="col-md-2">
+                    <label class="form-label small mb-1">Função</label>
+                    <input type="text" class="form-control form-control-sm" name="funcao_${contadorMaoObra}" placeholder="Ex: Pedreiro">
+                </div>
+                <div class="col-md-1">
+                    <label class="form-label small mb-1">Presente</label>
+                    <div class="form-check form-check-sm">
                         <input class="form-check-input" type="checkbox" name="presente_${contadorMaoObra}" checked>
-                        <label class="form-check-label text-dark">
-                            Funcionário presente
-                        </label>
                     </div>
                 </div>
-                <div class="col-md-4">
-                    <button type="button" class="btn btn-sm btn-outline-danger" onclick="removerItem('mao-obra-${contadorMaoObra}')">
-                        <i class="fas fa-trash"></i> Excluir
+                <div class="col-md-1 text-end">
+                    <label class="form-label small mb-1">&nbsp;</label>
+                    <button type="button" class="btn btn-sm btn-outline-danger d-block" onclick="removerItem('mao-obra-${contadorMaoObra}')" title="Excluir">
+                        <i class="fas fa-trash"></i>
                     </button>
                 </div>
             </div>
             <div class="row mt-2">
                 <div class="col-12">
-                    <label class="form-label">Função Exercida</label>
-                    <input type="text" class="form-control" name="funcao_${contadorMaoObra}" placeholder="Ex: Pedreiro, Ajudante, Eletricista">
-                </div>
-            </div>
-            <div class="row mt-2">
-                <div class="col-12">
-                    <label class="form-label">Observações sobre o funcionário no dia</label>
-                    <textarea class="form-control" name="observacoes_${contadorMaoObra}" rows="2" placeholder="Observações específicas..."></textarea>
+                    <textarea class="form-control form-control-sm" name="observacoes_${contadorMaoObra}" rows="1" placeholder="Observações específicas sobre o funcionário no dia..."></textarea>
                 </div>
             </div>
         </div>
