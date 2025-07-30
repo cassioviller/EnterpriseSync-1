@@ -312,6 +312,7 @@
         </div>
     </div>
 </div>
+
 {% endblock %}
 
 {% block scripts %}
@@ -519,39 +520,6 @@ $('#alimentacaoModal').on('show.bs.modal', function() {
             checkbox.disabled = false;
         });
     }
-});
-</script>
-{% endblock %}
-    const selecionados = document.querySelectorAll('.funcionario-checkbox:checked');
-    const formData = new FormData(this);
-    
-    // Remover funcionario_id do FormData se existir
-    formData.delete('funcionario_id');
-    
-    // Adicionar cada funcionário selecionado
-    selecionados.forEach(checkbox => {
-        formData.append('funcionarios_ids', checkbox.value);
-    });
-    
-    // Enviar via fetch
-    fetch(this.action, {
-        method: 'POST',
-        body: formData
-    })
-    .then(response => response.json())
-    .then(data => {
-        if (data.success) {
-            alert(data.message);
-            $('#alimentacaoModal').modal('hide');
-            location.reload();
-        } else {
-            alert(data.message || 'Erro ao salvar registros de alimentação');
-        }
-    })
-    .catch(error => {
-        console.error('Erro:', error);
-        alert('Erro ao salvar registros de alimentação');
-    });
 });
 
 function editarRegistro(id) {

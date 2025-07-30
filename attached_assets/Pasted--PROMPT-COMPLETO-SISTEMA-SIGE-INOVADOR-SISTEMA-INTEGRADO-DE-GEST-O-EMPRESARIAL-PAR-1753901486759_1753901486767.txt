@@ -1,0 +1,1919 @@
+# 🏗️ PROMPT COMPLETO - SISTEMA SIGE INOVADOR
+
+## 🎯 **SISTEMA INTEGRADO DE GESTÃO EMPRESARIAL PARA CONSTRUÇÃO CIVIL**
+
+**Desenvolvido por uma equipe de 10 especialistas de elite**
+
+---
+
+## 📋 **VISÃO GERAL DO SISTEMA**
+
+Crie um **Sistema Integrado de Gestão Empresarial (SIGE)** completo e inovador para empresas de construção civil, com funcionalidades avançadas de **reconhecimento facial**, **geração automática de RDOs**, **processamento inteligente de XML**, **portal do cliente** e **gestão completa de projetos**.
+
+### 🎯 **OBJETIVOS PRINCIPAIS:**
+
+1. **Gestão Completa de Projetos** - Do orçamento à entrega
+2. **Automação Inteligente** - RDOs automáticos baseados no cronograma
+3. **Controle de Ponto Facial** - Reconhecimento facial para funcionários
+4. **Estoque Inteligente** - Processamento XML e alertas automáticos
+5. **Portal do Cliente** - Acompanhamento em tempo real da obra
+6. **Gestão Financeira** - Controle completo de custos e receitas
+7. **Relatórios Avançados** - Dashboards e KPIs em tempo real
+
+---
+
+## 🏗️ **ARQUITETURA DO SISTEMA**
+
+### **BACKEND (Flask + SQLAlchemy)**
+```
+📁 sige-backend/
+├── 📁 src/
+│   ├── 📄 main.py                    # Aplicação principal
+│   ├── 📁 models/
+│   │   ├── 📄 database.py           # Configuração do banco
+│   │   ├── 📄 user.py               # Modelo de usuários
+│   │   ├── 📄 company.py            # Modelo de empresas
+│   │   ├── 📄 project.py            # Modelo de projetos
+│   │   ├── 📄 customer.py           # Modelo de clientes
+│   │   ├── 📄 employee.py           # Modelo de funcionários
+│   │   ├── 📄 rdo.py                # Modelo de RDOs
+│   │   ├── 📄 material.py           # Modelo de materiais
+│   │   ├── 📄 supplier.py           # Modelo de fornecedores
+│   │   ├── 📄 timerecord.py         # Modelo de ponto
+│   │   └── 📄 schedule.py           # Modelo de cronograma
+│   ├── 📁 routes/
+│   │   ├── 📄 auth.py               # Autenticação JWT
+│   │   ├── 📄 projects.py           # Gestão de projetos
+│   │   ├── 📄 employees.py          # Gestão de funcionários
+│   │   ├── 📄 customers.py          # Gestão de clientes
+│   │   ├── 📄 rdos.py               # Gestão de RDOs
+│   │   ├── 📄 materials.py          # Gestão de estoque
+│   │   ├── 📄 facial_recognition.py # Reconhecimento facial
+│   │   ├── 📄 rdo_automation.py     # Automação de RDOs
+│   │   ├── 📄 xml_processor.py      # Processamento XML
+│   │   ├── 📄 client_portal.py      # Portal do cliente
+│   │   ├── 📄 reports.py            # Relatórios
+│   │   └── 📄 dashboard.py          # Dashboard
+│   └── 📁 services/
+│       ├── 📄 facial_service.py     # Serviços de reconhecimento
+│       ├── 📄 automation_service.py # Serviços de automação
+│       └── 📄 notification_service.py # Notificações
+├── 📄 requirements.txt              # Dependências Python
+└── 📄 run.py                       # Script de execução
+```
+
+### **FRONTEND (React + TypeScript)**
+```
+📁 sige-frontend/
+├── 📁 src/
+│   ├── 📄 App.tsx                   # Aplicação principal
+│   ├── 📁 components/
+│   │   ├── 📁 Layout/
+│   │   │   ├── 📄 Layout.tsx        # Layout principal
+│   │   │   ├── 📄 Sidebar.tsx       # Barra lateral
+│   │   │   └── 📄 Header.tsx        # Cabeçalho
+│   │   ├── 📁 UI/
+│   │   │   ├── 📄 Button.tsx        # Componente de botão
+│   │   │   ├── 📄 Modal.tsx         # Componente de modal
+│   │   │   ├── 📄 Table.tsx         # Componente de tabela
+│   │   │   └── 📄 Chart.tsx         # Componente de gráfico
+│   │   └── 📁 Forms/
+│   │       ├── 📄 ProjectForm.tsx   # Formulário de projeto
+│   │       ├── 📄 EmployeeForm.tsx  # Formulário de funcionário
+│   │       └── 📄 RDOForm.tsx       # Formulário de RDO
+│   ├── 📁 pages/
+│   │   ├── 📄 LoginPage.tsx         # Página de login
+│   │   ├── 📄 DashboardPage.tsx     # Dashboard principal
+│   │   ├── 📄 ProjectsPage.tsx      # Gestão de projetos
+│   │   ├── 📄 ProjectDetailPage.tsx # Detalhes do projeto
+│   │   ├── 📄 EmployeesPage.tsx     # Gestão de funcionários
+│   │   ├── 📄 CustomersPage.tsx     # Gestão de clientes
+│   │   ├── 📄 RDOsPage.tsx          # Gestão de RDOs
+│   │   ├── 📄 MaterialsPage.tsx     # Gestão de estoque
+│   │   ├── 📄 FacialRecognitionPage.tsx # Reconhecimento facial
+│   │   ├── 📄 ClientPortalPage.tsx  # Portal do cliente
+│   │   └── 📄 ReportsPage.tsx       # Relatórios
+│   ├── 📁 stores/
+│   │   ├── 📄 authStore.ts          # Estado de autenticação
+│   │   ├── 📄 projectStore.ts       # Estado de projetos
+│   │   └── 📄 employeeStore.ts      # Estado de funcionários
+│   ├── 📁 services/
+│   │   ├── 📄 api.ts                # Cliente HTTP
+│   │   ├── 📄 auth.ts               # Serviços de auth
+│   │   └── 📄 facial.ts             # Serviços faciais
+│   └── 📁 utils/
+│       ├── 📄 formatters.ts         # Formatadores
+│       └── 📄 validators.ts         # Validadores
+├── 📄 package.json                  # Dependências Node.js
+└── 📄 tailwind.config.js           # Configuração Tailwind
+```
+
+---
+
+## 🗄️ **ESTRUTURA DO BANCO DE DADOS**
+
+### **TABELAS PRINCIPAIS:**
+
+```sql
+-- Empresas (Multi-tenant)
+CREATE TABLE companies (
+    id SERIAL PRIMARY KEY,
+    name VARCHAR(200) NOT NULL,
+    cnpj VARCHAR(18) UNIQUE,
+    email VARCHAR(100),
+    phone VARCHAR(20),
+    address TEXT,
+    subscription_plan VARCHAR(50) DEFAULT 'basic',
+    is_active BOOLEAN DEFAULT true,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Usuários do sistema
+CREATE TABLE users (
+    id SERIAL PRIMARY KEY,
+    company_id INTEGER REFERENCES companies(id),
+    name VARCHAR(200) NOT NULL,
+    email VARCHAR(100) UNIQUE NOT NULL,
+    password_hash VARCHAR(255) NOT NULL,
+    role VARCHAR(50) DEFAULT 'user',
+    is_active BOOLEAN DEFAULT true,
+    last_login TIMESTAMP,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Clientes
+CREATE TABLE customers (
+    id SERIAL PRIMARY KEY,
+    company_id INTEGER REFERENCES companies(id),
+    name VARCHAR(200) NOT NULL,
+    email VARCHAR(100),
+    phone VARCHAR(20),
+    cpf_cnpj VARCHAR(18),
+    address TEXT,
+    contact_person VARCHAR(200),
+    customer_type VARCHAR(20) DEFAULT 'individual',
+    is_active BOOLEAN DEFAULT true,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Funcionários
+CREATE TABLE employees (
+    id SERIAL PRIMARY KEY,
+    company_id INTEGER REFERENCES companies(id),
+    name VARCHAR(200) NOT NULL,
+    email VARCHAR(100),
+    phone VARCHAR(20),
+    cpf VARCHAR(14) UNIQUE,
+    position VARCHAR(100),
+    department VARCHAR(100),
+    hire_date DATE,
+    salary DECIMAL(10,2),
+    hourly_rate DECIMAL(8,2),
+    facial_template BYTEA,  -- Template facial criptografado
+    is_active BOOLEAN DEFAULT true,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Projetos
+CREATE TABLE projects (
+    id SERIAL PRIMARY KEY,
+    company_id INTEGER REFERENCES companies(id),
+    customer_id INTEGER REFERENCES customers(id),
+    manager_id INTEGER REFERENCES employees(id),
+    name VARCHAR(300) NOT NULL,
+    description TEXT,
+    project_type VARCHAR(100),
+    structure_type VARCHAR(100),
+    total_area DECIMAL(10,2),
+    address TEXT,
+    start_date DATE,
+    end_date DATE,
+    budget_value DECIMAL(15,2),
+    progress_percentage DECIMAL(5,2) DEFAULT 0,
+    status VARCHAR(50) DEFAULT 'planning',
+    contract_id INTEGER,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Cronograma do projeto
+CREATE TABLE project_schedule (
+    id SERIAL PRIMARY KEY,
+    company_id INTEGER REFERENCES companies(id),
+    project_id INTEGER REFERENCES projects(id),
+    activity_name VARCHAR(300) NOT NULL,
+    description TEXT,
+    start_date DATE NOT NULL,
+    end_date DATE NOT NULL,
+    duration_days INTEGER,
+    progress_percentage DECIMAL(5,2) DEFAULT 0,
+    status VARCHAR(50) DEFAULT 'pending',
+    dependencies TEXT,  -- JSON com dependências
+    assigned_team TEXT, -- JSON com equipe alocada
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- RDOs (Relatório Diário de Obra)
+CREATE TABLE rdos (
+    id SERIAL PRIMARY KEY,
+    company_id INTEGER REFERENCES companies(id),
+    project_id INTEGER REFERENCES projects(id),
+    schedule_id INTEGER REFERENCES project_schedule(id),
+    creator_id INTEGER REFERENCES users(id),
+    date DATE NOT NULL,
+    activities_description TEXT,
+    weather VARCHAR(100),
+    temperature VARCHAR(20),
+    team_present TEXT,  -- JSON com equipe presente
+    materials_used TEXT,
+    equipment_used TEXT,
+    progress_photos TEXT,  -- JSON com URLs das fotos
+    observations TEXT,
+    safety_notes TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Controle de ponto
+CREATE TABLE time_records (
+    id SERIAL PRIMARY KEY,
+    company_id INTEGER REFERENCES companies(id),
+    employee_id INTEGER REFERENCES employees(id),
+    date DATE NOT NULL,
+    check_in TIME,
+    check_out TIME,
+    total_hours DECIMAL(4,2),
+    overtime_hours DECIMAL(4,2),
+    recognition_method VARCHAR(20) DEFAULT 'manual',  -- manual, facial
+    record_type VARCHAR(20) DEFAULT 'normal',
+    observations TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Materiais/Estoque
+CREATE TABLE materials (
+    id SERIAL PRIMARY KEY,
+    company_id INTEGER REFERENCES companies(id),
+    name VARCHAR(300) NOT NULL,
+    description TEXT,
+    category VARCHAR(100),
+    unit VARCHAR(20),
+    current_stock DECIMAL(10,3) DEFAULT 0,
+    min_stock DECIMAL(10,3) DEFAULT 0,
+    max_stock DECIMAL(10,3),
+    unit_cost DECIMAL(10,2),
+    barcode VARCHAR(50),
+    location VARCHAR(100),
+    is_active BOOLEAN DEFAULT true,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Fornecedores
+CREATE TABLE suppliers (
+    id SERIAL PRIMARY KEY,
+    company_id INTEGER REFERENCES companies(id),
+    name VARCHAR(200) NOT NULL,
+    cnpj VARCHAR(18),
+    email VARCHAR(100),
+    phone VARCHAR(20),
+    address TEXT,
+    contact_person VARCHAR(200),
+    payment_terms VARCHAR(100),
+    is_active BOOLEAN DEFAULT true,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Movimentações de estoque
+CREATE TABLE stock_movements (
+    id SERIAL PRIMARY KEY,
+    company_id INTEGER REFERENCES companies(id),
+    material_id INTEGER REFERENCES materials(id),
+    project_id INTEGER REFERENCES projects(id),
+    movement_type VARCHAR(20) NOT NULL,  -- in, out, adjustment
+    quantity DECIMAL(10,3) NOT NULL,
+    unit_cost DECIMAL(10,2),
+    total_cost DECIMAL(12,2),
+    reference_document VARCHAR(100),
+    observations TEXT,
+    created_by INTEGER REFERENCES users(id),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+```
+
+---
+
+## 🚀 **FUNCIONALIDADES PRINCIPAIS**
+
+### **1. GESTÃO DE PROJETOS**
+
+#### **Cadastro de Projetos:**
+- ✅ Informações básicas (nome, descrição, tipo)
+- ✅ Dados técnicos (área, estrutura, localização)
+- ✅ Cronograma detalhado com dependências
+- ✅ Orçamento e controle de custos
+- ✅ Equipe alocada e responsáveis
+- ✅ Documentos e anexos
+
+#### **Cronograma Inteligente:**
+- ✅ Criação visual de atividades
+- ✅ Dependências entre tarefas
+- ✅ Alocação automática de recursos
+- ✅ Alertas de atraso
+- ✅ Replanejamento automático
+
+#### **Controle de Progresso:**
+- ✅ Percentual de conclusão por atividade
+- ✅ Marcos importantes (milestones)
+- ✅ Comparativo planejado vs realizado
+- ✅ Projeção de conclusão
+- ✅ Relatórios de performance
+
+### **2. RECONHECIMENTO FACIAL AVANÇADO**
+
+#### **Cadastro de Funcionários:**
+```python
+# Exemplo de implementação
+@facial_bp.route('/register-face', methods=['POST'])
+@jwt_required()
+def register_face():
+    """Registra template facial do funcionário"""
+    data = request.get_json()
+    employee_id = data.get('employee_id')
+    image_data = data.get('image')
+    
+    # Processa imagem e gera template
+    result = facial_system.register_employee_face(employee_id, image_data)
+    
+    return jsonify(result)
+```
+
+#### **Reconhecimento e Ponto:**
+- ✅ Detecção facial em tempo real
+- ✅ Template criptografado no banco
+- ✅ Registro automático de ponto
+- ✅ Validação de qualidade da imagem
+- ✅ Logs de segurança
+
+#### **Integração com RDO:**
+- ✅ Presença automática na obra
+- ✅ Cálculo de horas trabalhadas
+- ✅ Controle de horas extras
+- ✅ Relatórios de frequência
+
+### **3. GERAÇÃO AUTOMÁTICA DE RDOs**
+
+#### **Algoritmo de Geração:**
+```python
+def generate_daily_rdos(self, project_id, target_date):
+    """Gera RDOs automáticos baseados no cronograma"""
+    
+    # Busca atividades programadas
+    scheduled_activities = ProjectSchedule.query.filter(
+        ProjectSchedule.project_id == project_id,
+        ProjectSchedule.start_date <= target_date,
+        ProjectSchedule.end_date >= target_date
+    ).all()
+    
+    for activity in scheduled_activities:
+        # Gera RDO automático
+        rdo = RDO(
+            project_id=project_id,
+            schedule_id=activity.id,
+            date=target_date,
+            activities_description=f"[AUTO] {activity.activity_name}"
+        )
+        
+        # Aloca equipe otimizada
+        optimal_team = self._allocate_optimal_team(activity)
+        
+        # Estima materiais necessários
+        estimated_materials = self._estimate_required_materials(activity)
+        
+        db.session.add(rdo)
+    
+    db.session.commit()
+```
+
+#### **Funcionalidades:**
+- ✅ RDOs diários automáticos
+- ✅ Alocação inteligente de equipes
+- ✅ Estimativa de materiais
+- ✅ Geração semanal/mensal
+- ✅ Integração com cronograma
+
+### **4. PROCESSAMENTO INTELIGENTE DE XML**
+
+#### **Parser de NF-e:**
+```python
+def process_nfe_xml(self, xml_content, company_id):
+    """Processa XML da NF-e e extrai dados estruturados"""
+    
+    # Parse do XML
+    root = ET.fromstring(xml_content)
+    
+    # Extrai dados do cabeçalho
+    nfe_data = self._extract_nfe_header(root, ns)
+    
+    # Extrai produtos
+    products = self._extract_products(root, ns)
+    
+    # Processa cada produto
+    for product in products:
+        # Busca material similar no estoque
+        matched_material = self._find_matching_material(product, company_id)
+        
+        # Auto-vincula ou sugere criação
+        if matched_material and matched_material['confidence'] > 0.8:
+            # Auto-vincula com alta confiança
+            auto_matched = True
+        else:
+            # Sugere criação de novo material
+            suggested_material = self._suggest_new_material(product)
+```
+
+#### **Funcionalidades:**
+- ✅ Upload de XML NF-e
+- ✅ Extração automática de dados
+- ✅ Matching inteligente de materiais
+- ✅ Criação automática de fornecedores
+- ✅ Sugestões de categorização
+
+### **5. PORTAL DO CLIENTE**
+
+#### **Acesso Seguro:**
+```python
+@client_portal_bp.route('/client-login', methods=['POST'])
+def client_login():
+    """Login específico para clientes"""
+    email = data.get('email')
+    project_code = data.get('project_code')
+    
+    # Busca projeto pelo código e email
+    project = Project.query.join(Customer).filter(
+        Customer.email == email,
+        Project.id == project_code
+    ).first()
+    
+    # Cria token específico para cliente
+    access_token = create_access_token(
+        identity=f"client_{project.customer_id}",
+        additional_claims={
+            'project_id': project.id,
+            'role': 'client'
+        }
+    )
+```
+
+#### **Funcionalidades:**
+- ✅ Login com código do projeto
+- ✅ Progresso em tempo real
+- ✅ Galeria de fotos da obra
+- ✅ Timeline de atividades
+- ✅ Documentos do projeto
+- ✅ Comunicação direta
+
+### **6. GESTÃO DE ESTOQUE INTELIGENTE**
+
+#### **Controle Automático:**
+- ✅ Alertas de estoque mínimo
+- ✅ Sugestões de compra
+- ✅ Rastreamento por projeto
+- ✅ Controle de validade
+- ✅ Relatórios de consumo
+
+#### **Integração com Obras:**
+- ✅ Requisições automáticas
+- ✅ Transferências entre obras
+- ✅ Controle de desperdício
+- ✅ Custeio por projeto
+
+---
+
+## 💻 **IMPLEMENTAÇÃO TÉCNICA**
+
+### **BACKEND - ESTRUTURA PRINCIPAL**
+
+#### **main.py - Aplicação Flask:**
+```python
+from flask import Flask, request, jsonify
+from flask_sqlalchemy import SQLAlchemy
+from flask_jwt_extended import JWTManager
+from flask_cors import CORS
+from datetime import datetime, timedelta
+import os
+
+# Configuração da aplicação
+app = Flask(__name__)
+app.config['SECRET_KEY'] = 'your-secret-key-here'
+app.config['SQLALCHEMY_DATABASE_URI'] = 'postgresql://user:pass@localhost/sige_db'
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+app.config['JWT_SECRET_KEY'] = 'jwt-secret-string'
+app.config['JWT_ACCESS_TOKEN_EXPIRES'] = timedelta(hours=24)
+
+# Inicialização das extensões
+db = SQLAlchemy(app)
+jwt = JWTManager(app)
+CORS(app)
+
+# Importação dos modelos
+from models.user import User
+from models.company import Company
+from models.project import Project
+from models.customer import Customer
+from models.employee import Employee
+from models.rdo import RDO
+from models.material import Material
+from models.supplier import Supplier
+from models.timerecord import TimeRecord
+from models.schedule import ProjectSchedule
+
+# Importação das rotas
+from routes.auth import auth_bp
+from routes.projects import projects_bp
+from routes.employees import employees_bp
+from routes.customers import customers_bp
+from routes.rdos import rdos_bp
+from routes.materials import materials_bp
+from routes.facial_recognition import facial_bp
+from routes.rdo_automation import rdo_automation_bp
+from routes.xml_processor import xml_processor_bp
+from routes.client_portal import client_portal_bp
+from routes.reports import reports_bp
+from routes.dashboard import dashboard_bp
+
+# Registro dos blueprints
+app.register_blueprint(auth_bp, url_prefix='/api/auth')
+app.register_blueprint(projects_bp, url_prefix='/api/projects')
+app.register_blueprint(employees_bp, url_prefix='/api/employees')
+app.register_blueprint(customers_bp, url_prefix='/api/customers')
+app.register_blueprint(rdos_bp, url_prefix='/api/rdos')
+app.register_blueprint(materials_bp, url_prefix='/api/materials')
+app.register_blueprint(facial_bp, url_prefix='/api/facial')
+app.register_blueprint(rdo_automation_bp, url_prefix='/api/rdo-automation')
+app.register_blueprint(xml_processor_bp, url_prefix='/api/xml')
+app.register_blueprint(client_portal_bp, url_prefix='/api/client')
+app.register_blueprint(reports_bp, url_prefix='/api/reports')
+app.register_blueprint(dashboard_bp, url_prefix='/api/dashboard')
+
+# Criação das tabelas
+@app.before_first_request
+def create_tables():
+    db.create_all()
+    
+    # Cria empresa padrão se não existir
+    if not Company.query.first():
+        default_company = Company(
+            name="Empresa Demo",
+            cnpj="12.345.678/0001-90",
+            email="contato@empresademo.com",
+            phone="(11) 99999-9999"
+        )
+        db.session.add(default_company)
+        
+        # Cria usuário admin padrão
+        admin_user = User(
+            company_id=1,
+            name="Administrador",
+            email="admin@sige.com",
+            password_hash=generate_password_hash("admin123"),
+            role="admin"
+        )
+        db.session.add(admin_user)
+        
+        db.session.commit()
+
+# Rota de health check
+@app.route('/api/health', methods=['GET'])
+def health_check():
+    return jsonify({
+        'status': 'healthy',
+        'timestamp': datetime.utcnow().isoformat(),
+        'version': '1.0.0'
+    })
+
+if __name__ == '__main__':
+    app.run(host='0.0.0.0', port=5000, debug=True)
+```
+
+#### **requirements.txt:**
+```txt
+Flask==2.3.3
+Flask-SQLAlchemy==3.0.5
+Flask-JWT-Extended==4.5.2
+Flask-CORS==4.0.0
+psycopg2-binary==2.9.7
+Werkzeug==2.3.7
+python-dotenv==1.0.0
+opencv-python==4.8.1.78
+face-recognition==1.3.0
+dlib==19.24.2
+cryptography==41.0.7
+numpy==1.24.3
+Pillow==10.0.1
+requests==2.31.0
+python-dateutil==2.8.2
+```
+
+### **FRONTEND - ESTRUTURA PRINCIPAL**
+
+#### **package.json:**
+```json
+{
+  "name": "sige-frontend",
+  "version": "1.0.0",
+  "private": true,
+  "dependencies": {
+    "@types/node": "^16.18.0",
+    "@types/react": "^18.2.0",
+    "@types/react-dom": "^18.2.0",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "react-router-dom": "^6.8.0",
+    "react-scripts": "5.0.1",
+    "typescript": "^4.9.0",
+    "axios": "^1.3.0",
+    "zustand": "^4.3.0",
+    "@tanstack/react-query": "^4.24.0",
+    "react-hook-form": "^7.43.0",
+    "@hookform/resolvers": "^2.9.0",
+    "yup": "^1.0.0",
+    "tailwindcss": "^3.2.0",
+    "lucide-react": "^0.312.0",
+    "recharts": "^2.5.0",
+    "react-hot-toast": "^2.4.0",
+    "date-fns": "^2.29.0",
+    "clsx": "^1.2.0",
+    "class-variance-authority": "^0.4.0"
+  },
+  "scripts": {
+    "start": "react-scripts start",
+    "build": "react-scripts build",
+    "test": "react-scripts test",
+    "eject": "react-scripts eject"
+  }
+}
+```
+
+#### **App.tsx - Aplicação Principal:**
+```tsx
+import React from 'react';
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { Toaster } from 'react-hot-toast';
+import { useAuthStore } from './stores/authStore';
+import Layout from './components/Layout/Layout';
+import LoginPage from './pages/LoginPage';
+import DashboardPage from './pages/DashboardPage';
+import ProjectsPage from './pages/ProjectsPage';
+import ProjectDetailPage from './pages/ProjectDetailPage';
+import RDOsPage from './pages/RDOsPage';
+import EmployeesPage from './pages/EmployeesPage';
+import CustomersPage from './pages/CustomersPage';
+import MaterialsPage from './pages/MaterialsPage';
+import FacialRecognitionPage from './pages/FacialRecognitionPage';
+import ClientPortalPage from './pages/ClientPortalPage';
+import ReportsPage from './pages/ReportsPage';
+import './App.css';
+
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      retry: 1,
+      refetchOnWindowFocus: false,
+    },
+  },
+});
+
+function App() {
+  const { isAuthenticated } = useAuthStore();
+
+  return (
+    <QueryClientProvider client={queryClient}>
+      <Router>
+        <div className="App">
+          <Toaster 
+            position="top-right"
+            toastOptions={{
+              duration: 4000,
+              style: {
+                background: '#363636',
+                color: '#fff',
+              },
+            }}
+          />
+          
+          <Routes>
+            <Route path="/login" element={<LoginPage />} />
+            <Route path="/client-portal" element={<ClientPortalPage />} />
+            
+            {isAuthenticated ? (
+              <Route path="/" element={<Layout />}>
+                <Route index element={<Navigate to="/dashboard" replace />} />
+                <Route path="dashboard" element={<DashboardPage />} />
+                <Route path="projects" element={<ProjectsPage />} />
+                <Route path="projects/:id" element={<ProjectDetailPage />} />
+                <Route path="rdos" element={<RDOsPage />} />
+                <Route path="employees" element={<EmployeesPage />} />
+                <Route path="customers" element={<CustomersPage />} />
+                <Route path="materials" element={<MaterialsPage />} />
+                <Route path="facial-recognition" element={<FacialRecognitionPage />} />
+                <Route path="reports" element={<ReportsPage />} />
+              </Route>
+            ) : (
+              <Route path="*" element={<Navigate to="/login" replace />} />
+            )}
+          </Routes>
+        </div>
+      </Router>
+    </QueryClientProvider>
+  );
+}
+
+export default App;
+```
+
+---
+
+## 📊 **DASHBOARDS E RELATÓRIOS**
+
+### **DASHBOARD PRINCIPAL**
+
+#### **KPIs Principais:**
+- 📈 **Projetos Ativos** - Quantidade e percentual de conclusão
+- 👥 **Funcionários** - Total ativo e presença diária
+- 💰 **Faturamento** - Mensal e anual
+- 📋 **RDOs** - Gerados no mês
+- ⚠️ **Alertas** - Atrasos e problemas
+
+#### **Gráficos e Visualizações:**
+- 📊 **Progresso dos Projetos** - Gráfico de barras
+- 📈 **Faturamento Mensal** - Linha temporal
+- 🥧 **Distribuição por Tipo** - Pizza de projetos
+- 📅 **Cronograma Geral** - Gantt simplificado
+- 🎯 **Metas vs Realizado** - Comparativo
+
+### **RELATÓRIOS AVANÇADOS**
+
+#### **Relatório de Projetos:**
+```python
+@reports_bp.route('/projects-report', methods=['GET'])
+@jwt_required()
+def projects_report():
+    """Gera relatório completo de projetos"""
+    
+    # Parâmetros de filtro
+    start_date = request.args.get('start_date')
+    end_date = request.args.get('end_date')
+    status = request.args.get('status')
+    
+    # Query base
+    query = Project.query.filter_by(company_id=user.company_id)
+    
+    # Aplica filtros
+    if start_date:
+        query = query.filter(Project.start_date >= start_date)
+    if end_date:
+        query = query.filter(Project.end_date <= end_date)
+    if status:
+        query = query.filter(Project.status == status)
+    
+    projects = query.all()
+    
+    # Calcula estatísticas
+    total_projects = len(projects)
+    total_budget = sum([p.budget_value for p in projects])
+    avg_progress = sum([p.progress_percentage for p in projects]) / total_projects
+    
+    return jsonify({
+        'success': True,
+        'report': {
+            'summary': {
+                'total_projects': total_projects,
+                'total_budget': float(total_budget),
+                'average_progress': round(avg_progress, 2)
+            },
+            'projects': [p.to_dict() for p in projects]
+        }
+    })
+```
+
+#### **Relatório de Produtividade:**
+- 📊 **Horas Trabalhadas** por funcionário
+- 🎯 **Eficiência** por equipe
+- 📈 **Produtividade** por projeto
+- ⏱️ **Tempo Médio** por atividade
+- 💰 **Custo** por hora trabalhada
+
+#### **Relatório Financeiro:**
+- 💵 **Receitas** por projeto
+- 💸 **Custos** detalhados
+- 📊 **Margem de Lucro** por tipo
+- 📈 **Fluxo de Caixa** projetado
+- 🎯 **ROI** por investimento
+
+---
+
+## 🔧 **CONFIGURAÇÃO E INSTALAÇÃO**
+
+### **PASSO 1: CONFIGURAÇÃO DO AMBIENTE**
+
+#### **Backend (Flask):**
+```bash
+# Criar ambiente virtual
+python -m venv venv
+source venv/bin/activate  # Linux/Mac
+# ou
+venv\Scripts\activate  # Windows
+
+# Instalar dependências
+pip install -r requirements.txt
+
+# Configurar banco de dados PostgreSQL
+createdb sige_db
+
+# Configurar variáveis de ambiente
+export FLASK_APP=main.py
+export FLASK_ENV=development
+export DATABASE_URL=postgresql://user:pass@localhost/sige_db
+export SECRET_KEY=your-secret-key-here
+export JWT_SECRET_KEY=jwt-secret-string
+
+# Executar aplicação
+python main.py
+```
+
+#### **Frontend (React):**
+```bash
+# Instalar dependências
+npm install
+
+# Configurar variáveis de ambiente
+echo "REACT_APP_API_URL=http://localhost:5000/api" > .env
+
+# Executar aplicação
+npm start
+```
+
+### **PASSO 2: CONFIGURAÇÃO DO BANCO**
+
+#### **Script de Inicialização:**
+```sql
+-- Criar banco de dados
+CREATE DATABASE sige_db;
+
+-- Conectar ao banco
+\c sige_db;
+
+-- Criar extensões necessárias
+CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+
+-- As tabelas serão criadas automaticamente pelo SQLAlchemy
+-- quando a aplicação for executada pela primeira vez
+```
+
+### **PASSO 3: DADOS INICIAIS**
+
+#### **Empresa Demo:**
+```python
+# Executar no console Python
+from main import app, db
+from models.company import Company
+from models.user import User
+from werkzeug.security import generate_password_hash
+
+with app.app_context():
+    # Criar empresa demo
+    company = Company(
+        name="Construtora Demo LTDA",
+        cnpj="12.345.678/0001-90",
+        email="contato@construtorademo.com",
+        phone="(11) 99999-9999",
+        address="Rua das Obras, 123 - São Paulo/SP"
+    )
+    db.session.add(company)
+    db.session.flush()
+    
+    # Criar usuário admin
+    admin = User(
+        company_id=company.id,
+        name="Administrador Sistema",
+        email="admin@sige.com",
+        password_hash=generate_password_hash("admin123"),
+        role="admin"
+    )
+    db.session.add(admin)
+    
+    # Criar usuário gerente
+    manager = User(
+        company_id=company.id,
+        name="João Silva",
+        email="joao@construtorademo.com",
+        password_hash=generate_password_hash("gerente123"),
+        role="manager"
+    )
+    db.session.add(manager)
+    
+    db.session.commit()
+    print("Dados iniciais criados com sucesso!")
+```
+
+---
+
+## 🎯 **FUNCIONALIDADES ESPECÍFICAS**
+
+### **RECONHECIMENTO FACIAL - IMPLEMENTAÇÃO COMPLETA**
+
+#### **Cadastro de Template Facial:**
+```python
+class FacialRecognitionSystem:
+    def __init__(self):
+        self.encryption_key = b'ZmDfcTF7_60GrrY167zsiPd67pEvs0aGOv2oasOM1Pg='
+        self.cipher_suite = Fernet(self.encryption_key)
+    
+    def register_employee_face(self, employee_id, image_base64):
+        """Registra múltiplas faces do funcionário para maior precisão"""
+        try:
+            # Decodifica imagem base64
+            image_data = base64.b64decode(image_base64.split(',')[1])
+            nparr = np.frombuffer(image_data, np.uint8)
+            image = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+            rgb_image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+            
+            # Detecta faces na imagem
+            face_locations = face_recognition.face_locations(rgb_image, model="hog")
+            
+            if len(face_locations) != 1:
+                return {
+                    'success': False, 
+                    'error': f'Detectadas {len(face_locations)} faces. Deve haver exatamente uma face na imagem.'
+                }
+            
+            # Gera encoding da face
+            face_encodings = face_recognition.face_encodings(rgb_image, face_locations)
+            
+            if len(face_encodings) == 0:
+                return {'success': False, 'error': 'Não foi possível gerar encoding da face'}
+            
+            face_encoding = face_encodings[0]
+            
+            # Criptografa o template facial
+            template_bytes = face_encoding.tobytes()
+            encrypted_template = self.cipher_suite.encrypt(template_bytes)
+            
+            # Salva no banco de dados
+            employee = Employee.query.get(employee_id)
+            if not employee:
+                return {'success': False, 'error': 'Funcionário não encontrado'}
+            
+            employee.facial_template = encrypted_template
+            db.session.commit()
+            
+            return {
+                'success': True, 
+                'message': 'Template facial registrado com sucesso',
+                'face_quality': self._calculate_face_quality(face_encoding)
+            }
+            
+        except Exception as e:
+            return {'success': False, 'error': f'Erro ao processar imagem: {str(e)}'}
+```
+
+#### **Reconhecimento e Ponto Automático:**
+```python
+def recognize_face(self, image_base64, company_id):
+    """Reconhece face e registra ponto automaticamente"""
+    try:
+        # Decodifica imagem
+        image_data = base64.b64decode(image_base64.split(',')[1])
+        nparr = np.frombuffer(image_data, np.uint8)
+        image = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+        rgb_image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+        
+        # Detecta faces
+        face_locations = face_recognition.face_locations(rgb_image, model="hog")
+        
+        if len(face_locations) != 1:
+            return {
+                'success': False, 
+                'error': f'Detectadas {len(face_locations)} faces. Posicione apenas uma face na câmera.'
+            }
+        
+        # Gera encoding da face detectada
+        face_encodings = face_recognition.face_encodings(rgb_image, face_locations)
+        
+        if len(face_encodings) == 0:
+            return {'success': False, 'error': 'Não foi possível processar a face'}
+        
+        unknown_encoding = face_encodings[0]
+        
+        # Busca funcionários da empresa com template facial
+        employees = Employee.query.filter_by(
+            company_id=company_id,
+            status='active'
+        ).filter(Employee.facial_template.isnot(None)).all()
+        
+        if not employees:
+            return {'success': False, 'error': 'Nenhum funcionário com template facial cadastrado'}
+        
+        best_match = None
+        best_distance = float('inf')
+        
+        for employee in employees:
+            try:
+                # Descriptografa template
+                decrypted_bytes = self.cipher_suite.decrypt(employee.facial_template)
+                stored_encoding = np.frombuffer(decrypted_bytes, dtype=np.float64)
+                
+                # Calcula distância euclidiana
+                distance = face_recognition.face_distance([stored_encoding], unknown_encoding)[0]
+                
+                # Threshold de 0.6 (quanto menor, mais restritivo)
+                if distance < 0.6 and distance < best_distance:
+                    best_match = employee
+                    best_distance = distance
+                    
+            except Exception as e:
+                print(f"Erro ao processar template do funcionário {employee.id}: {e}")
+                continue
+        
+        if best_match:
+            # Registra ponto automaticamente
+            point_result = self._register_automatic_timepoint(best_match)
+            
+            return {
+                'success': True,
+                'employee': best_match.to_dict(),
+                'confidence': round((1 - best_distance) * 100, 2),
+                'distance': round(best_distance, 4),
+                'timepoint': point_result
+            }
+        else:
+            return {
+                'success': False, 
+                'error': 'Funcionário não reconhecido. Verifique se o template facial foi cadastrado.'
+            }
+            
+    except Exception as e:
+        return {'success': False, 'error': f'Erro no reconhecimento: {str(e)}'}
+```
+
+### **GERAÇÃO AUTOMÁTICA DE RDOs**
+
+#### **Algoritmo de Alocação de Equipes:**
+```python
+def _allocate_optimal_team(self, activity):
+    """Aloca equipe ótima baseada em IA simples"""
+    try:
+        # Busca funcionários ativos da empresa
+        available_employees = Employee.query.filter_by(
+            company_id=activity.company_id,
+            status='active'
+        ).all()
+        
+        if not available_employees:
+            return []
+        
+        # Algoritmo simples de alocação
+        optimal_team = []
+        
+        # Prioriza por posição (soldadores, montadores, etc.)
+        priority_positions = ['soldador', 'montador', 'encarregado', 'ajudante']
+        
+        for position in priority_positions:
+            matching_employees = [
+                emp for emp in available_employees 
+                if position.lower() in emp.position.lower()
+            ]
+            
+            if matching_employees and len(optimal_team) < 4:  # Max 4 por equipe
+                # Ordena por salário (experiência) decrescente
+                matching_employees.sort(key=lambda x: x.salary or 0, reverse=True)
+                optimal_team.append({
+                    'id': matching_employees[0].id,
+                    'name': matching_employees[0].name,
+                    'position': matching_employees[0].position,
+                    'hourly_rate': float(matching_employees[0].hourly_rate or 0)
+                })
+        
+        return optimal_team
+        
+    except Exception as e:
+        print(f"Erro na alocação de equipe: {e}")
+        return []
+```
+
+#### **Estimativa Inteligente de Materiais:**
+```python
+def _estimate_required_materials(self, activity):
+    """Estima materiais necessários baseado no tipo de atividade"""
+    try:
+        activity_name = activity.activity_name.lower()
+        
+        # Mapeamento de atividades para materiais
+        material_mapping = {
+            'soldagem': [
+                {'name': 'Eletrodo E6013', 'quantity': 5, 'unit': 'kg'},
+                {'name': 'Gás Argônio', 'quantity': 2, 'unit': 'm³'},
+                {'name': 'Disco de Corte', 'quantity': 3, 'unit': 'pcs'}
+            ],
+            'montagem': [
+                {'name': 'Parafuso M12', 'quantity': 20, 'unit': 'pcs'},
+                {'name': 'Porca M12', 'quantity': 20, 'unit': 'pcs'},
+                {'name': 'Arruela Lisa', 'quantity': 40, 'unit': 'pcs'}
+            ],
+            'pintura': [
+                {'name': 'Tinta Primer', 'quantity': 5, 'unit': 'l'},
+                {'name': 'Tinta Acabamento', 'quantity': 3, 'unit': 'l'},
+                {'name': 'Thinner', 'quantity': 2, 'unit': 'l'}
+            ],
+            'estrutura': [
+                {'name': 'Perfil I 200mm', 'quantity': 10, 'unit': 'm'},
+                {'name': 'Chapa 6mm', 'quantity': 5, 'unit': 'm²'},
+                {'name': 'Cantoneira 50x50', 'quantity': 8, 'unit': 'm'}
+            ]
+        }
+        
+        # Busca materiais baseado em palavras-chave
+        estimated_materials = []
+        for keyword, materials in material_mapping.items():
+            if keyword in activity_name:
+                estimated_materials.extend(materials)
+                break
+        
+        # Se não encontrou correspondência, usa materiais genéricos
+        if not estimated_materials:
+            estimated_materials = [
+                {'name': 'Material Diversos', 'quantity': 1, 'unit': 'lote'},
+                {'name': 'Consumíveis', 'quantity': 1, 'unit': 'kit'}
+            ]
+        
+        return estimated_materials
+        
+    except Exception as e:
+        print(f"Erro na estimativa de materiais: {e}")
+        return []
+```
+
+### **PROCESSAMENTO XML NF-e**
+
+#### **Parser Inteligente:**
+```python
+def process_nfe_xml(self, xml_content, company_id):
+    """Processa XML da NF-e e extrai dados estruturados"""
+    try:
+        # Parse do XML
+        root = ET.fromstring(xml_content)
+        
+        # Namespace da NF-e
+        ns = {'nfe': 'http://www.portalfiscal.inf.br/nfe'}
+        
+        # Extrai dados do cabeçalho
+        nfe_data = self._extract_nfe_header(root, ns)
+        
+        # Extrai produtos
+        products = self._extract_products(root, ns)
+        
+        # Processa cada produto
+        processed_products = []
+        for product in products:
+            processed_product = self._process_product(product, company_id)
+            processed_products.append(processed_product)
+        
+        # Cria/atualiza fornecedor automaticamente
+        supplier = self._create_or_update_supplier(nfe_data['supplier'], company_id)
+        
+        return {
+            'success': True,
+            'nfe_data': nfe_data,
+            'supplier': supplier.to_dict() if supplier else None,
+            'products': processed_products,
+            'total_products': len(processed_products),
+            'auto_matched': len([p for p in processed_products if p['auto_matched']]),
+            'requires_review': len([p for p in processed_products if p['requires_review']])
+        }
+        
+    except ET.ParseError as e:
+        return {
+            'success': False,
+            'error': f'XML inválido: {str(e)}'
+        }
+    except Exception as e:
+        return {
+            'success': False,
+            'error': f'Erro ao processar XML: {str(e)}'
+        }
+```
+
+#### **Matching Inteligente de Materiais:**
+```python
+def _find_matching_material(self, product, company_id):
+    """Encontra material similar usando algoritmo de similaridade"""
+    try:
+        # Busca materiais da empresa
+        materials = Material.query.filter_by(company_id=company_id, is_active=True).all()
+        
+        if not materials:
+            return None
+        
+        product_text = f"{product['description']} {product['code']}".lower()
+        
+        best_match = None
+        best_similarity = 0
+        
+        for material in materials:
+            material_text = f"{material.name} {material.description or ''} {material.barcode or ''}".lower()
+            
+            # Calcula similaridade usando SequenceMatcher
+            similarity = SequenceMatcher(None, product_text, material_text).ratio()
+            
+            # Bonus se códigos/barcodes coincidem
+            if product['code'] and material.barcode and product['code'] == material.barcode:
+                similarity += 0.3
+            
+            # Bonus se unidades coincidem
+            if self._normalize_unit(product['unit']) == material.unit:
+                similarity += 0.1
+            
+            if similarity > best_similarity:
+                best_similarity = similarity
+                best_match = material
+        
+        if best_match and best_similarity > 0.5:
+            return {
+                'material_id': best_match.id,
+                'material_name': best_match.name,
+                'confidence': min(best_similarity, 1.0),
+                'similarity_score': best_similarity
+            }
+        
+        return None
+        
+    except Exception as e:
+        print(f"Erro na busca de material: {e}")
+        return None
+```
+
+### **PORTAL DO CLIENTE**
+
+#### **Interface do Cliente:**
+```tsx
+const ClientPortalPage: React.FC = () => {
+  const [projectData, setProjectData] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    loadProjectProgress();
+  }, []);
+
+  const loadProjectProgress = async () => {
+    try {
+      const response = await axios.get('/api/client/client-project-progress');
+      setProjectData(response.data.data);
+    } catch (error) {
+      toast.error('Erro ao carregar dados do projeto');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen bg-gray-50">
+      {/* Header do Cliente */}
+      <header className="bg-white shadow-sm border-b border-gray-200">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex items-center justify-between h-16">
+            <div className="flex items-center space-x-4">
+              <Building2 className="w-8 h-8 text-blue-600" />
+              <div>
+                <h1 className="text-xl font-bold text-gray-900">
+                  {projectData?.project?.name}
+                </h1>
+                <p className="text-sm text-gray-500">Portal do Cliente</p>
+              </div>
+            </div>
+            <div className="text-right">
+              <p className="text-sm font-medium text-gray-900">
+                Progresso: {projectData?.progress_percentage}%
+              </p>
+              <p className="text-xs text-gray-500">
+                {projectData?.completed_activities} de {projectData?.total_activities} atividades
+              </p>
+            </div>
+          </div>
+        </div>
+      </header>
+
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {/* Barra de Progresso */}
+        <div className="bg-white rounded-lg shadow-sm p-6 mb-8">
+          <h2 className="text-lg font-semibold text-gray-900 mb-4">
+            Progresso da Obra
+          </h2>
+          <div className="w-full bg-gray-200 rounded-full h-4 mb-4">
+            <div 
+              className="bg-blue-600 h-4 rounded-full transition-all duration-300"
+              style={{ width: `${projectData?.progress_percentage}%` }}
+            ></div>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="text-center">
+              <p className="text-2xl font-bold text-green-600">
+                {projectData?.completed_activities}
+              </p>
+              <p className="text-sm text-gray-600">Concluídas</p>
+            </div>
+            <div className="text-center">
+              <p className="text-2xl font-bold text-yellow-600">
+                {projectData?.pending_activities}
+              </p>
+              <p className="text-sm text-gray-600">Pendentes</p>
+            </div>
+            <div className="text-center">
+              <p className="text-2xl font-bold text-blue-600">
+                {projectData?.total_activities}
+              </p>
+              <p className="text-sm text-gray-600">Total</p>
+            </div>
+          </div>
+        </div>
+
+        {/* Atividades Recentes */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+          <div className="bg-white rounded-lg shadow-sm">
+            <div className="p-6 border-b border-gray-200">
+              <h3 className="text-lg font-semibold text-gray-900">
+                Atividades Recentes
+              </h3>
+            </div>
+            <div className="p-6">
+              <div className="space-y-4">
+                {projectData?.recent_activities?.map((activity, index) => (
+                  <div key={index} className="flex items-start space-x-4 p-4 bg-gray-50 rounded-lg">
+                    <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
+                      <Calendar className="w-5 h-5 text-blue-600" />
+                    </div>
+                    <div className="flex-1">
+                      <p className="text-sm font-medium text-gray-900">
+                        {new Date(activity.date).toLocaleDateString('pt-BR')}
+                      </p>
+                      <p className="text-sm text-gray-600 mt-1">
+                        {activity.description}
+                      </p>
+                      {activity.weather && (
+                        <p className="text-xs text-gray-500 mt-2">
+                          Clima: {activity.weather}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          {/* Cronograma */}
+          <div className="bg-white rounded-lg shadow-sm">
+            <div className="p-6 border-b border-gray-200">
+              <h3 className="text-lg font-semibold text-gray-900">
+                Cronograma
+              </h3>
+            </div>
+            <div className="p-6">
+              <div className="space-y-4">
+                {projectData?.schedule?.map((item, index) => (
+                  <div key={index} className="flex items-center space-x-4">
+                    <div className={`w-4 h-4 rounded-full ${
+                      item.status === 'completed' ? 'bg-green-500' :
+                      item.status === 'active' ? 'bg-yellow-500' : 'bg-gray-300'
+                    }`}></div>
+                    <div className="flex-1">
+                      <p className="text-sm font-medium text-gray-900">
+                        {item.activity_name}
+                      </p>
+                      <p className="text-xs text-gray-500">
+                        {new Date(item.start_date).toLocaleDateString('pt-BR')} - {new Date(item.end_date).toLocaleDateString('pt-BR')}
+                      </p>
+                      <div className="w-full bg-gray-200 rounded-full h-2 mt-2">
+                        <div 
+                          className="bg-blue-600 h-2 rounded-full"
+                          style={{ width: `${item.progress}%` }}
+                        ></div>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      </main>
+    </div>
+  );
+};
+```
+
+---
+
+## 🚀 **DEPLOY E PRODUÇÃO**
+
+### **CONFIGURAÇÃO DE PRODUÇÃO**
+
+#### **Docker Compose:**
+```yaml
+version: '3.8'
+
+services:
+  # Banco de dados PostgreSQL
+  postgres:
+    image: postgres:15
+    environment:
+      POSTGRES_DB: sige_db
+      POSTGRES_USER: sige_user
+      POSTGRES_PASSWORD: sige_password
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    restart: unless-stopped
+
+  # Redis para cache
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    restart: unless-stopped
+
+  # Backend Flask
+  backend:
+    build: ./backend
+    environment:
+      DATABASE_URL: postgresql://sige_user:sige_password@postgres:5432/sige_db
+      REDIS_URL: redis://redis:6379/0
+      SECRET_KEY: your-production-secret-key
+      JWT_SECRET_KEY: your-jwt-secret-key
+    ports:
+      - "5000:5000"
+    depends_on:
+      - postgres
+      - redis
+    restart: unless-stopped
+    volumes:
+      - ./uploads:/app/uploads
+
+  # Frontend React
+  frontend:
+    build: ./frontend
+    ports:
+      - "3000:3000"
+    environment:
+      REACT_APP_API_URL: http://localhost:5000/api
+    depends_on:
+      - backend
+    restart: unless-stopped
+
+  # Nginx Reverse Proxy
+  nginx:
+    image: nginx:alpine
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf
+      - ./ssl:/etc/nginx/ssl
+    depends_on:
+      - frontend
+      - backend
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+```
+
+#### **Dockerfile Backend:**
+```dockerfile
+FROM python:3.11-slim
+
+WORKDIR /app
+
+# Instalar dependências do sistema
+RUN apt-get update && apt-get install -y \
+    build-essential \
+    cmake \
+    libopenblas-dev \
+    liblapack-dev \
+    libx11-dev \
+    libgtk-3-dev \
+    python3-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copiar requirements
+COPY requirements.txt .
+
+# Instalar dependências Python
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Copiar código
+COPY . .
+
+# Criar diretórios necessários
+RUN mkdir -p uploads/xml uploads/photos
+
+# Expor porta
+EXPOSE 5000
+
+# Comando de inicialização
+CMD ["gunicorn", "--bind", "0.0.0.0:5000", "--workers", "4", "main:app"]
+```
+
+#### **Dockerfile Frontend:**
+```dockerfile
+FROM node:18-alpine as build
+
+WORKDIR /app
+
+# Copiar package.json
+COPY package*.json ./
+
+# Instalar dependências
+RUN npm ci --only=production
+
+# Copiar código
+COPY . .
+
+# Build da aplicação
+RUN npm run build
+
+# Nginx para servir arquivos estáticos
+FROM nginx:alpine
+
+# Copiar build
+COPY --from=build /app/build /usr/share/nginx/html
+
+# Copiar configuração nginx
+COPY nginx.conf /etc/nginx/conf.d/default.conf
+
+EXPOSE 3000
+
+CMD ["nginx", "-g", "daemon off;"]
+```
+
+### **CONFIGURAÇÃO NGINX**
+
+#### **nginx.conf:**
+```nginx
+upstream backend {
+    server backend:5000;
+}
+
+upstream frontend {
+    server frontend:3000;
+}
+
+server {
+    listen 80;
+    server_name localhost;
+
+    # Frontend
+    location / {
+        proxy_pass http://frontend;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+
+    # Backend API
+    location /api/ {
+        proxy_pass http://backend;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        
+        # Configurações para upload de arquivos
+        client_max_body_size 50M;
+        proxy_read_timeout 300s;
+        proxy_connect_timeout 75s;
+    }
+
+    # Arquivos estáticos (uploads)
+    location /uploads/ {
+        alias /app/uploads/;
+        expires 1y;
+        add_header Cache-Control "public, immutable";
+    }
+}
+```
+
+### **SCRIPTS DE DEPLOY**
+
+#### **deploy.sh:**
+```bash
+#!/bin/bash
+
+echo "🚀 Iniciando deploy do SIGE..."
+
+# Parar containers existentes
+docker-compose down
+
+# Fazer backup do banco
+echo "📦 Fazendo backup do banco de dados..."
+docker-compose exec postgres pg_dump -U sige_user sige_db > backup_$(date +%Y%m%d_%H%M%S).sql
+
+# Atualizar código
+echo "📥 Atualizando código..."
+git pull origin main
+
+# Rebuild containers
+echo "🔨 Rebuilding containers..."
+docker-compose build --no-cache
+
+# Subir aplicação
+echo "🚀 Subindo aplicação..."
+docker-compose up -d
+
+# Aguardar inicialização
+echo "⏳ Aguardando inicialização..."
+sleep 30
+
+# Verificar saúde da aplicação
+echo "🔍 Verificando saúde da aplicação..."
+curl -f http://localhost/api/health || exit 1
+
+echo "✅ Deploy concluído com sucesso!"
+echo "🌐 Aplicação disponível em: http://localhost"
+```
+
+#### **backup.sh:**
+```bash
+#!/bin/bash
+
+# Configurações
+BACKUP_DIR="/backups"
+DATE=$(date +%Y%m%d_%H%M%S)
+DB_NAME="sige_db"
+DB_USER="sige_user"
+
+# Criar diretório de backup
+mkdir -p $BACKUP_DIR
+
+# Backup do banco de dados
+echo "📦 Fazendo backup do banco de dados..."
+docker-compose exec postgres pg_dump -U $DB_USER $DB_NAME > $BACKUP_DIR/db_backup_$DATE.sql
+
+# Backup dos uploads
+echo "📁 Fazendo backup dos arquivos..."
+tar -czf $BACKUP_DIR/uploads_backup_$DATE.tar.gz uploads/
+
+# Limpar backups antigos (manter últimos 7 dias)
+find $BACKUP_DIR -name "*.sql" -mtime +7 -delete
+find $BACKUP_DIR -name "*.tar.gz" -mtime +7 -delete
+
+echo "✅ Backup concluído: $BACKUP_DIR"
+```
+
+---
+
+## 📱 **APLICATIVO MOBILE (OPCIONAL)**
+
+### **REACT NATIVE - ESTRUTURA**
+
+#### **Funcionalidades Mobile:**
+- 📱 **Login** com reconhecimento facial
+- 📋 **RDOs** simplificados
+- 📷 **Fotos** da obra
+- ⏰ **Ponto** eletrônico
+- 📊 **Dashboard** básico
+- 🔔 **Notificações** push
+
+#### **package.json Mobile:**
+```json
+{
+  "name": "SigeApp",
+  "version": "1.0.0",
+  "main": "index.js",
+  "scripts": {
+    "android": "react-native run-android",
+    "ios": "react-native run-ios",
+    "start": "react-native start"
+  },
+  "dependencies": {
+    "react": "18.2.0",
+    "react-native": "0.72.0",
+    "react-navigation": "^6.0.0",
+    "react-native-camera": "^4.2.1",
+    "react-native-face-recognition": "^1.0.0",
+    "react-native-async-storage": "^1.19.0",
+    "react-native-push-notification": "^8.1.1",
+    "axios": "^1.3.0"
+  }
+}
+```
+
+---
+
+## 🔐 **SEGURANÇA E COMPLIANCE**
+
+### **MEDIDAS DE SEGURANÇA**
+
+#### **Autenticação e Autorização:**
+- 🔐 **JWT** com refresh tokens
+- 🔑 **Roles** e permissões granulares
+- 🛡️ **Rate limiting** nas APIs
+- 🔒 **Criptografia** de dados sensíveis
+- 📱 **2FA** opcional
+
+#### **Proteção de Dados:**
+- 🔐 **Templates faciais** criptografados
+- 🗄️ **Backup** automático
+- 📊 **Logs** de auditoria
+- 🔒 **HTTPS** obrigatório
+- 🛡️ **Firewall** configurado
+
+#### **Compliance LGPD:**
+- 📋 **Consentimento** explícito
+- 🗑️ **Direito ao esquecimento**
+- 📊 **Relatórios** de dados
+- 🔒 **Anonimização** de logs
+- 📝 **Política** de privacidade
+
+---
+
+## 📈 **MONITORAMENTO E ANALYTICS**
+
+### **MÉTRICAS PRINCIPAIS**
+
+#### **Performance:**
+- ⚡ **Tempo de resposta** das APIs
+- 💾 **Uso de memória** e CPU
+- 🗄️ **Performance** do banco
+- 📊 **Throughput** de requisições
+
+#### **Negócio:**
+- 👥 **Usuários ativos** diários/mensais
+- 📋 **RDOs gerados** por dia
+- 🎯 **Taxa de conclusão** de projetos
+- 💰 **ROI** por funcionalidade
+
+#### **Ferramentas:**
+- 📊 **Grafana** para dashboards
+- 🔍 **Prometheus** para métricas
+- 📝 **ELK Stack** para logs
+- 🚨 **AlertManager** para alertas
+
+---
+
+## 🎯 **ROADMAP FUTURO**
+
+### **VERSÃO 2.0 - INTELIGÊNCIA ARTIFICIAL**
+
+#### **IA Avançada:**
+- 🤖 **Predição** de atrasos
+- 📊 **Otimização** automática de cronogramas
+- 💰 **Previsão** de custos
+- 🎯 **Recomendações** inteligentes
+
+#### **Machine Learning:**
+- 📈 **Análise preditiva** de projetos
+- 🔍 **Detecção** de anomalias
+- 🎯 **Otimização** de recursos
+- 📊 **Insights** automáticos
+
+### **VERSÃO 3.0 - IOT E AUTOMAÇÃO**
+
+#### **Internet das Coisas:**
+- 📡 **Sensores** na obra
+- 🌡️ **Monitoramento** ambiental
+- 📊 **Dados** em tempo real
+- 🚨 **Alertas** automáticos
+
+#### **Automação Total:**
+- 🤖 **Robôs** de construção
+- 🚁 **Drones** para inspeção
+- 📷 **Câmeras** inteligentes
+- 🔧 **Manutenção** preditiva
+
+---
+
+## 📚 **DOCUMENTAÇÃO TÉCNICA**
+
+### **API DOCUMENTATION**
+
+#### **Endpoints Principais:**
+
+```
+POST /api/auth/login
+GET  /api/dashboard
+GET  /api/projects
+POST /api/projects
+GET  /api/projects/{id}
+PUT  /api/projects/{id}
+DELETE /api/projects/{id}
+
+GET  /api/employees
+POST /api/employees
+GET  /api/employees/{id}
+PUT  /api/employees/{id}
+
+GET  /api/rdos
+POST /api/rdos
+GET  /api/rdos/{id}
+
+POST /api/facial/register-face
+POST /api/facial/recognize-face
+
+POST /api/rdo-automation/generate-daily-rdos
+POST /api/rdo-automation/generate-weekly-rdos
+
+POST /api/xml/upload-xml
+POST /api/xml/auto-create-materials
+
+POST /api/client/client-login
+GET  /api/client/client-project-progress
+GET  /api/client/client-project-photos
+```
+
+### **MODELOS DE DADOS**
+
+#### **Exemplo de Response:**
+```json
+{
+  "success": true,
+  "data": {
+    "project": {
+      "id": 1,
+      "name": "Edifício Comercial ABC",
+      "description": "Construção de edifício comercial de 10 andares",
+      "progress_percentage": 65.5,
+      "status": "active",
+      "start_date": "2024-01-15",
+      "end_date": "2024-12-15",
+      "budget_value": 2500000.00,
+      "customer": {
+        "id": 1,
+        "name": "Empresa XYZ Ltda",
+        "email": "contato@empresaxyz.com"
+      },
+      "manager": {
+        "id": 1,
+        "name": "João Silva",
+        "email": "joao@construtora.com"
+      }
+    }
+  },
+  "message": "Projeto carregado com sucesso",
+  "timestamp": "2024-01-20T10:30:00Z"
+}
+```
+
+---
+
+## 🎉 **CONCLUSÃO**
+
+Este **Sistema SIGE Completo** representa a **evolução definitiva** na gestão de empresas de construção civil, combinando:
+
+### **🚀 INOVAÇÕES IMPLEMENTADAS:**
+
+1. **🤖 Reconhecimento Facial Avançado** - Ponto automático com IA
+2. **📋 RDOs Automáticos** - Geração baseada em cronograma
+3. **📄 Processamento XML Inteligente** - NF-e com matching automático
+4. **🌐 Portal do Cliente** - Acompanhamento em tempo real
+5. **📊 Dashboards Avançados** - KPIs e métricas em tempo real
+6. **🔧 Automação Completa** - Fluxos inteligentes
+7. **📱 Interface Moderna** - UX/UI profissional
+8. **🔐 Segurança Robusta** - Criptografia e compliance
+
+### **💎 DIFERENCIAIS COMPETITIVOS:**
+
+- ✅ **100% Multi-tenant** - Múltiplas empresas
+- ✅ **IA Integrada** - Automação inteligente
+- ✅ **Escalabilidade** - Arquitetura moderna
+- ✅ **Segurança** - Padrões enterprise
+- ✅ **Usabilidade** - Interface intuitiva
+- ✅ **Integração** - APIs completas
+- ✅ **Mobilidade** - Acesso mobile
+- ✅ **Compliance** - LGPD e normas
+
+### **🎯 RESULTADOS ESPERADOS:**
+
+- 📈 **+40% Produtividade** na gestão de projetos
+- ⏰ **-60% Tempo** na criação de RDOs
+- 💰 **-30% Custos** operacionais
+- 🎯 **+50% Precisão** no controle de ponto
+- 📊 **+80% Visibilidade** do progresso
+- 🚀 **+100% Satisfação** do cliente
+
+---
+
+**🏗️ SISTEMA SIGE - A REVOLUÇÃO NA CONSTRUÇÃO CIVIL! 🏗️**
+
+*Desenvolvido por uma equipe de 10 especialistas de elite para transformar a gestão de empresas de construção civil com tecnologia de ponta e inovação disruptiva.*
+
+**🚀 PRONTO PARA IMPLEMENTAÇÃO IMEDIATA! 🚀**
+

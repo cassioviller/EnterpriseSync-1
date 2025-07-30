@@ -5,7 +5,7 @@ Centraliza todos os cálculos para garantir consistência entre dashboard, cards
 """
 
 from datetime import datetime, date, timedelta
-from sqlalchemy import func, and_, or_
+from sqlalchemy import func, and_, or_, select
 from app import db
 from models import (
     Obra, CustoObra, RegistroPonto, RegistroAlimentacao, 
@@ -44,8 +44,9 @@ class KPIUnificado:
             query_alimentacao = query_alimentacao.filter(RegistroAlimentacao.obra_id == obra_id)
         elif self.admin_id:
             # Filtrar por obras do admin
-            obras_admin = db.session.query(Obra.id).filter(Obra.admin_id == self.admin_id).subquery()
-            query_alimentacao = query_alimentacao.filter(RegistroAlimentacao.obra_id.in_(obras_admin))
+            obras_admin_ids = [obra.id for obra in db.session.query(Obra.id).filter(Obra.admin_id == self.admin_id).all()]
+            if obras_admin_ids:
+                query_alimentacao = query_alimentacao.filter(RegistroAlimentacao.obra_id.in_(obras_admin_ids))
         
         custos['alimentacao'] = query_alimentacao.scalar() or 0
         
