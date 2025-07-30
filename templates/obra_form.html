@@ -1,0 +1,267 @@
+{% extends "base.html" %}
+
+{% block title %}
+    {% if obra %}Editar Obra{% else %}Nova Obra{% endif %} - SIGE
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid mt-4">
+    <div class="row">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h1 class="h3 mb-0">
+                    <i class="fas fa-building me-2"></i>
+                    {% if obra %}Editar Obra{% else %}Nova Obra{% endif %}
+                </h1>
+                <a href="{{ url_for('main.obras') }}" class="btn btn-outline-secondary">
+                    <i class="fas fa-arrow-left me-2"></i>Voltar
+                </a>
+            </div>
+
+            <div class="card">
+                <div class="card-body">
+                    <form method="POST" class="row g-3">
+                        {{ form.hidden_tag() }}
+                        
+                        <div class="col-md-6">
+                            <label for="{{ form.nome.id }}" class="form-label">Nome da Obra *</label>
+                            {{ form.nome(class="form-control") }}
+                            {% if form.nome.errors %}
+                                <div class="text-danger small">
+                                    {% for error in form.nome.errors %}
+                                        <span>{{ error }}</span>
+                                    {% endfor %}
+                                </div>
+                            {% endif %}
+                        </div>
+
+                        <div class="col-md-6">
+                            <label for="{{ form.status.id }}" class="form-label">Status</label>
+                            {{ form.status(class="form-select") }}
+                        </div>
+
+                        <div class="col-12">
+                            <label for="{{ form.endereco.id }}" class="form-label">Endereço</label>
+                            {{ form.endereco(class="form-control") }}
+                        </div>
+
+                        <div class="col-md-4">
+                            <label for="{{ form.data_inicio.id }}" class="form-label">Data de Início</label>
+                            {{ form.data_inicio(class="form-control") }}
+                        </div>
+
+                        <div class="col-md-4">
+                            <label for="{{ form.data_previsao_fim.id }}" class="form-label">Previsão de Término</label>
+                            {{ form.data_previsao_fim(class="form-control") }}
+                        </div>
+
+                        <div class="col-md-4">
+                            <label for="{{ form.orcamento.id }}" class="form-label">Orçamento (R$)</label>
+                            {{ form.orcamento(class="form-control", step="0.01") }}
+                        </div>
+
+                        <div class="col-md-6">
+                            <label for="{{ form.responsavel_id.id }}" class="form-label">Responsável</label>
+                            {{ form.responsavel_id(class="form-select") }}
+                        </div>
+
+                        <div class="col-12">
+                            <div class="d-flex gap-2">
+                                <button type="submit" class="btn btn-success">
+                                    <i class="fas fa-save me-2"></i>
+                                    {% if obra %}Atualizar{% else %}Criar{% endif %} Obra
+                                </button>
+                                <a href="{{ url_for('main.obras') }}" class="btn btn-outline-secondary">
+                                    <i class="fas fa-times me-2"></i>Cancelar
+                                </a>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <!-- Seção de Serviços (apenas para edição) -->
+            {% if obra %}
+            <div class="card mt-4">
+                <div class="card-header">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0">
+                            <i class="fas fa-cogs me-2"></i>Serviços da Obra
+                        </h5>
+                        <button type="button" class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#modalNovoServico">
+                            <i class="fas fa-plus me-2"></i>Adicionar Serviço
+                        </button>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead>
+                                <tr>
+                                    <th>Serviço</th>
+                                    <th>Categoria</th>
+                                    <th>Quantidade Planejada</th>
+                                    <th>Unidade</th>
+                                    <th>Ações</th>
+                                </tr>
+                            </thead>
+                            <tbody id="servicosTableBody">
+                                <!-- Serviços serão carregados via JavaScript -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Modal para Novo Serviço -->
+            <div class="modal fade" id="modalNovoServico" tabindex="-1">
+                <div class="modal-dialog">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <h5 class="modal-title">Adicionar Serviço à Obra</h5>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                        </div>
+                        <div class="modal-body">
+                            <form id="formNovoServico">
+                                <div class="mb-3">
+                                    <label class="form-label">Serviço *</label>
+                                    <select class="form-select" id="servicoSelect" required>
+                                        <option value="">Selecione um serviço...</option>
+                                    </select>
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label">Quantidade Planejada *</label>
+                                    <input type="number" class="form-control" id="quantidadePlanejada" step="0.01" min="0" required>
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label">Observações</label>
+                                    <textarea class="form-control" id="observacoes" rows="3"></textarea>
+                                </div>
+                            </form>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                            <button type="button" class="btn btn-primary" onclick="adicionarServico()">Adicionar</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<script>
+{% if obra %}
+// Carregar serviços da obra
+document.addEventListener('DOMContentLoaded', function() {
+    carregarServicosObra();
+    carregarServicosDisponiveis();
+});
+
+function carregarServicosObra() {
+    fetch(`/api/obras/{{ obra.id }}/servicos`)
+        .then(response => response.json())
+        .then(data => {
+            const tbody = document.getElementById('servicosTableBody');
+            tbody.innerHTML = '';
+            
+            data.forEach(servico => {
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td>${servico.nome}</td>
+                    <td>${servico.categoria || 'N/A'}</td>
+                    <td>${servico.quantidade_planejada || 0}</td>
+                    <td>${servico.unidade_simbolo || servico.unidade_medida}</td>
+                    <td>
+                        <button class="btn btn-sm btn-outline-danger" onclick="removerServico(${servico.id})">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                    </td>
+                `;
+                tbody.appendChild(row);
+            });
+        })
+        .catch(error => {
+            console.error('Erro ao carregar serviços:', error);
+        });
+}
+
+function carregarServicosDisponiveis() {
+    fetch('/api/servicos')
+        .then(response => response.json())
+        .then(data => {
+            const select = document.getElementById('servicoSelect');
+            select.innerHTML = '<option value="">Selecione um serviço...</option>';
+            
+            data.forEach(servico => {
+                const option = document.createElement('option');
+                option.value = servico.id;
+                option.textContent = `${servico.nome} (${servico.unidade_simbolo || servico.unidade_medida})`;
+                select.appendChild(option);
+            });
+        })
+        .catch(error => {
+            console.error('Erro ao carregar serviços disponíveis:', error);
+        });
+}
+
+function adicionarServico() {
+    const servicoId = document.getElementById('servicoSelect').value;
+    const quantidade = document.getElementById('quantidadePlanejada').value;
+    const observacoes = document.getElementById('observacoes').value;
+    
+    if (!servicoId || !quantidade) {
+        alert('Por favor, preencha todos os campos obrigatórios.');
+        return;
+    }
+    
+    fetch(`/obras/{{ obra.id }}/servicos`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+            servico_id: servicoId,
+            quantidade_planejada: parseFloat(quantidade),
+            observacoes: observacoes
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            bootstrap.Modal.getInstance(document.getElementById('modalNovoServico')).hide();
+            document.getElementById('formNovoServico').reset();
+            carregarServicosObra();
+        } else {
+            alert('Erro ao adicionar serviço: ' + data.message);
+        }
+    })
+    .catch(error => {
+        console.error('Erro:', error);
+        alert('Erro ao adicionar serviço.');
+    });
+}
+
+function removerServico(servicoId) {
+    if (confirm('Tem certeza que deseja remover este serviço da obra?')) {
+        fetch(`/obras/{{ obra.id }}/servicos/${servicoId}`, {
+            method: 'DELETE'
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                carregarServicosObra();
+            } else {
+                alert('Erro ao remover serviço: ' + data.message);
+            }
+        })
+        .catch(error => {
+            console.error('Erro:', error);
+            alert('Erro ao remover serviço.');
+        });
+    }
+}
+{% endif %}
+</script>
+{% endblock %}

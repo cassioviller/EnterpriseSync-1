@@ -1947,10 +1947,7 @@ def nova_obra():
         servicos = []
         categorias = []
     
-    return render_template('obra_form.html', 
-                         form=form, 
-                         servicos=servicos,
-                         categorias=categorias)
+    return render_template('obra_form.html', form=form)
 
 
 # API para buscar serviços (para JavaScript)
@@ -2000,7 +1997,7 @@ def editar_obra(id):
         flash('Obra atualizada com sucesso!', 'success')
         return redirect(url_for('main.obras'))
     
-    return render_template('obras.html', form=form, obra=obra, obras=Obra.query.filter(Obra.admin_id == current_user.id).all())
+    return render_template('obra_form.html', form=form, obra=obra)
 
 @main_bp.route('/obra/<int:id>')
 @login_required
@@ -2184,11 +2181,120 @@ def detalhes_obra(id):
 @main_bp.route('/obras/<int:id>/excluir', methods=['POST'])
 @login_required
 def excluir_obra(id):
-    obra = Obra.query.get_or_404(id)
+    obra = Obra.query.filter_by(id=id, admin_id=current_user.id).first_or_404()
     db.session.delete(obra)
     db.session.commit()
     flash('Obra excluída com sucesso!', 'success')
     return redirect(url_for('main.obras'))
+
+# ===== ROTAS PARA GERENCIAR SERVIÇOS DA OBRA =====
+@main_bp.route('/obras/<int:obra_id>/servicos', methods=['POST'])
+@login_required
+@admin_required
+def adicionar_servico_obra(obra_id):
+    """Adicionar serviço à obra"""
+    try:
+        # Verificar acesso à obra
+        obra = Obra.query.filter_by(id=obra_id, admin_id=current_user.id).first_or_404()
+        
+        data = request.get_json()
+        servico_id = data.get('servico_id')
+        quantidade_planejada = data.get('quantidade_planejada')
+        observacoes = data.get('observacoes', '')
+        
+        # Verificar se o serviço já existe na obra
+        servico_existente = ServicoObra.query.filter_by(
+            obra_id=obra_id, 
+            servico_id=servico_id,
+            ativo=True
+        ).first()
+        
+        if servico_existente:
+            return jsonify({'success': False, 'message': 'Serviço já está associado a esta obra'})
+        
+        # Criar nova associação
+        servico_obra = ServicoObra(
+            obra_id=obra_id,
+            servico_id=servico_id,
+            quantidade_planejada=quantidade_planejada,
+            quantidade_executada=0.0,
+            observacoes=observacoes,
+            ativo=True
+        )
+        
+        db.session.add(servico_obra)
+        db.session.commit()
+        
+        return jsonify({'success': True, 'message': 'Serviço adicionado com sucesso'})
+        
+    except Exception as e:
+        return jsonify({'success': False, 'message': f'Erro ao adicionar serviço: {str(e)}'})
+
+@main_bp.route('/obras/<int:obra_id>/servicos/<int:servico_id>', methods=['DELETE'])
+@login_required
+@admin_required
+def remover_servico_obra(obra_id, servico_id):
+    """Remover serviço da obra"""
+    try:
+        # Verificar acesso à obra
+        obra = Obra.query.filter_by(id=obra_id, admin_id=current_user.id).first_or_404()
+        
+        # Buscar associação
+        servico_obra = ServicoObra.query.filter_by(
+            obra_id=obra_id,
+            servico_id=servico_id,
+            ativo=True
+        ).first()
+        
+        if not servico_obra:
+            return jsonify({'success': False, 'message': 'Serviço não encontrado na obra'})
+        
+        # Marcar como inativo ao invés de excluir
+        servico_obra.ativo = False
+        db.session.commit()
+        
+        return jsonify({'success': True, 'message': 'Serviço removido com sucesso'})
+        
+    except Exception as e:
+        return jsonify({'success': False, 'message': f'Erro ao remover serviço: {str(e)}'})
+
+@main_bp.route('/api/obras/<int:obra_id>/servicos')
+@login_required
+def api_servicos_obra_especifica(obra_id):
+    """API para carregar serviços de uma obra específica"""
+    try:
+        # Verificar acesso à obra
+        obra = Obra.query.filter_by(id=obra_id, admin_id=current_user.id).first_or_404()
+        
+        servicos_obra = db.session.query(
+            ServicoObra.id,
+            Servico.nome,
+            Servico.categoria,
+            Servico.unidade_medida,
+            Servico.unidade_simbolo,
+            ServicoObra.quantidade_planejada,
+            ServicoObra.quantidade_executada,
+            ServicoObra.observacoes
+        ).join(
+            Servico, ServicoObra.servico_id == Servico.id
+        ).filter(
+            ServicoObra.obra_id == obra_id,
+            ServicoObra.ativo == True
+        ).order_by(Servico.nome).all()
+        
+        return jsonify([{
+            'id': row.id,
+            'nome': row.nome,
+            'categoria': row.categoria,
+            'unidade_medida': row.unidade_medida,
+            'unidade_simbolo': row.unidade_simbolo or row.unidade_medida,
+            'quantidade_planejada': float(row.quantidade_planejada or 0),
+            'quantidade_executada': float(row.quantidade_executada or 0),
+            'observacoes': row.observacoes or ''
+        } for row in servicos_obra])
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
 # ===== NOVOS KPIs FINANCEIROS =====
 @main_bp.route('/api/obras/<int:obra_id>/kpis-financeiros')
@@ -6079,9 +6185,9 @@ def api_ultimo_rdo_obra(obra_id):
     """API para buscar o último RDO de uma obra para pré-popular valores"""
     try:
         # Buscar o RDO mais recente desta obra
-        ultimo_rdo = RegistroRDO.query.filter_by(
+        ultimo_rdo = RDO.query.filter_by(
             obra_id=obra_id
-        ).order_by(RegistroRDO.data_relatorio.desc()).first()
+        ).order_by(RDO.data.desc()).first()
         
         if not ultimo_rdo:
             return jsonify({
