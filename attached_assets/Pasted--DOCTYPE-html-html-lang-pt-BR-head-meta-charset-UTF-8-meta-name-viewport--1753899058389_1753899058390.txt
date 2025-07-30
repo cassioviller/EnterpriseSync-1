@@ -1,0 +1,1521 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SIGE - Dashboards Executivos</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        :root {
+            --primary-color: #2563eb;
+            --secondary-color: #64748b;
+            --success-color: #059669;
+            --warning-color: #d97706;
+            --danger-color: #dc2626;
+            --info-color: #0891b2;
+            --dark-color: #1e293b;
+            --light-color: #f8fafc;
+        }
+        
+        body {
+            background-color: var(--light-color);
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        
+        .sidebar {
+            background: linear-gradient(135deg, var(--dark-color) 0%, #334155 100%);
+            min-height: 100vh;
+            box-shadow: 2px 0 10px rgba(0,0,0,0.1);
+        }
+        
+        .sidebar .nav-link {
+            color: #cbd5e1;
+            padding: 12px 20px;
+            margin: 4px 0;
+            border-radius: 8px;
+            transition: all 0.3s ease;
+        }
+        
+        .sidebar .nav-link:hover,
+        .sidebar .nav-link.active {
+            background-color: var(--primary-color);
+            color: white;
+            transform: translateX(5px);
+        }
+        
+        .dashboard-card {
+            border: none;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+            transition: all 0.3s ease;
+            background: white;
+        }
+        
+        .dashboard-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 15px rgba(0,0,0,0.1);
+        }
+        
+        .metric-card {
+            background: linear-gradient(135deg, var(--primary-color) 0%, #3b82f6 100%);
+            color: white;
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+        
+        .metric-card.success {
+            background: linear-gradient(135deg, var(--success-color) 0%, #10b981 100%);
+        }
+        
+        .metric-card.warning {
+            background: linear-gradient(135deg, var(--warning-color) 0%, #f59e0b 100%);
+        }
+        
+        .metric-card.danger {
+            background: linear-gradient(135deg, var(--danger-color) 0%, #ef4444 100%);
+        }
+        
+        .metric-card.info {
+            background: linear-gradient(135deg, var(--info-color) 0%, #06b6d4 100%);
+        }
+        
+        .metric-value {
+            font-size: 2.5rem;
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+        
+        .metric-label {
+            font-size: 0.9rem;
+            opacity: 0.9;
+        }
+        
+        .chart-container {
+            position: relative;
+            height: 300px;
+            margin: 20px 0;
+        }
+        
+        .table-responsive {
+            border-radius: 8px;
+            overflow: hidden;
+        }
+        
+        .table th {
+            background-color: var(--dark-color);
+            color: white;
+            border: none;
+            font-weight: 600;
+        }
+        
+        .badge-status {
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            font-weight: 500;
+        }
+        
+        .progress-bar-custom {
+            height: 8px;
+            border-radius: 4px;
+            background-color: #e2e8f0;
+        }
+        
+        .progress-fill {
+            height: 100%;
+            border-radius: 4px;
+            background: linear-gradient(90deg, var(--success-color) 0%, #10b981 100%);
+            transition: width 0.3s ease;
+        }
+        
+        .alert-item {
+            border-left: 4px solid var(--warning-color);
+            background-color: #fef3c7;
+            border-radius: 0 8px 8px 0;
+            padding: 12px 16px;
+            margin-bottom: 10px;
+        }
+        
+        .alert-item.danger {
+            border-left-color: var(--danger-color);
+            background-color: #fee2e2;
+        }
+        
+        .dashboard-header {
+            background: white;
+            padding: 20px;
+            border-radius: 12px;
+            margin-bottom: 30px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+        }
+        
+        .filter-section {
+            background: white;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+        }
+        
+        .btn-dashboard {
+            border-radius: 8px;
+            padding: 8px 16px;
+            font-weight: 500;
+            transition: all 0.3s ease;
+        }
+        
+        .btn-dashboard:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+        }
+        
+        .dashboard-tab {
+            display: none;
+        }
+        
+        .dashboard-tab.active {
+            display: block;
+        }
+        
+        .kpi-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+        
+        @media (max-width: 768px) {
+            .sidebar {
+                position: fixed;
+                top: 0;
+                left: -250px;
+                width: 250px;
+                z-index: 1000;
+                transition: left 0.3s ease;
+            }
+            
+            .sidebar.show {
+                left: 0;
+            }
+            
+            .main-content {
+                margin-left: 0;
+            }
+            
+            .kpi-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container-fluid">
+        <div class="row">
+            <!-- Sidebar -->
+            <div class="col-md-3 col-lg-2 sidebar">
+                <div class="p-3">
+                    <h4 class="text-white mb-4">
+                        <i class="bi bi-building"></i> SIGE
+                    </h4>
+                    <nav class="nav flex-column">
+                        <a class="nav-link active" href="#" onclick="showDashboard('comercial')">
+                            <i class="bi bi-graph-up me-2"></i> Comercial
+                        </a>
+                        <a class="nav-link" href="#" onclick="showDashboard('obras')">
+                            <i class="bi bi-hammer me-2"></i> Obras
+                        </a>
+                        <a class="nav-link" href="#" onclick="showDashboard('financeiro')">
+                            <i class="bi bi-currency-dollar me-2"></i> Financeiro
+                        </a>
+                        <a class="nav-link" href="#" onclick="showDashboard('alimentacao')">
+                            <i class="bi bi-cup-hot me-2"></i> Alimentação
+                        </a>
+                        <a class="nav-link" href="#" onclick="showDashboard('transporte')">
+                            <i class="bi bi-truck me-2"></i> Transporte
+                        </a>
+                        <a class="nav-link" href="#" onclick="showDashboard('rh')">
+                            <i class="bi bi-people me-2"></i> RH & Ponto
+                        </a>
+                        <a class="nav-link" href="#" onclick="showDashboard('diretoria')">
+                            <i class="bi bi-pie-chart me-2"></i> Diretoria
+                        </a>
+                    </nav>
+                </div>
+            </div>
+            
+            <!-- Main Content -->
+            <div class="col-md-9 col-lg-10 main-content p-4">
+                
+                <!-- Dashboard Comercial -->
+                <div id="comercial" class="dashboard-tab active">
+                    <div class="dashboard-header">
+                        <h2><i class="bi bi-graph-up text-primary me-2"></i> Painel Comercial</h2>
+                        <p class="text-muted mb-0">Funil de vendas, conversão e performance comercial</p>
+                    </div>
+                    
+                    <div class="filter-section">
+                        <div class="row">
+                            <div class="col-md-3">
+                                <label class="form-label">Período</label>
+                                <select class="form-select">
+                                    <option>Mês atual</option>
+                                    <option>Últimos 3 meses</option>
+                                    <option>Últimos 6 meses</option>
+                                </select>
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label">Vendedor</label>
+                                <select class="form-select">
+                                    <option>Todos</option>
+                                    <option>João Silva</option>
+                                    <option>Maria Santos</option>
+                                </select>
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label">Status</label>
+                                <select class="form-select">
+                                    <option>Todos</option>
+                                    <option>Em aberto</option>
+                                    <option>Fechadas</option>
+                                </select>
+                            </div>
+                            <div class="col-md-3 d-flex align-items-end">
+                                <button class="btn btn-primary btn-dashboard">
+                                    <i class="bi bi-funnel me-1"></i> Filtrar
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="kpi-grid">
+                        <div class="metric-card">
+                            <div class="metric-value">47</div>
+                            <div class="metric-label">
+                                <i class="bi bi-file-earmark-text me-1"></i>
+                                Total de Propostas
+                            </div>
+                        </div>
+                        <div class="metric-card success">
+                            <div class="metric-value">23</div>
+                            <div class="metric-label">
+                                <i class="bi bi-check-circle me-1"></i>
+                                Propostas Fechadas
+                            </div>
+                        </div>
+                        <div class="metric-card info">
+                            <div class="metric-value">48.9%</div>
+                            <div class="metric-label">
+                                <i class="bi bi-percent me-1"></i>
+                                Taxa de Conversão
+                            </div>
+                        </div>
+                        <div class="metric-card warning">
+                            <div class="metric-value">R$ 85.2K</div>
+                            <div class="metric-label">
+                                <i class="bi bi-currency-dollar me-1"></i>
+                                Ticket Médio
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="dashboard-card p-4">
+                                <h5><i class="bi bi-funnel me-2"></i> Funil de Vendas</h5>
+                                <div class="chart-container">
+                                    <canvas id="funnelChart"></canvas>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="dashboard-card p-4">
+                                <h5><i class="bi bi-graph-up me-2"></i> Evolução Mensal</h5>
+                                <div class="chart-container">
+                                    <canvas id="evolutionChart"></canvas>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="row mt-4">
+                        <div class="col-md-8">
+                            <div class="dashboard-card p-4">
+                                <h5><i class="bi bi-people me-2"></i> Performance por Vendedor</h5>
+                                <div class="table-responsive">
+                                    <table class="table table-hover">
+                                        <thead>
+                                            <tr>
+                                                <th>Vendedor</th>
+                                                <th>Propostas</th>
+                                                <th>Fechadas</th>
+                                                <th>Conversão</th>
+                                                <th>Valor Total</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            <tr>
+                                                <td><strong>João Silva</strong></td>
+                                                <td>23</td>
+                                                <td>12</td>
+                                                <td><span class="badge bg-success">52.2%</span></td>
+                                                <td>R$ 1.2M</td>
+                                            </tr>
+                                            <tr>
+                                                <td><strong>Maria Santos</strong></td>
+                                                <td>18</td>
+                                                <td>8</td>
+                                                <td><span class="badge bg-warning">44.4%</span></td>
+                                                <td>R$ 850K</td>
+                                            </tr>
+                                            <tr>
+                                                <td><strong>Pedro Costa</strong></td>
+                                                <td>6</td>
+                                                <td>3</td>
+                                                <td><span class="badge bg-info">50.0%</span></td>
+                                                <td>R$ 420K</td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="dashboard-card p-4">
+                                <h5><i class="bi bi-geo-alt me-2"></i> Distribuição Geográfica</h5>
+                                <div class="mb-3">
+                                    <div class="d-flex justify-content-between">
+                                        <span>São Paulo - SP</span>
+                                        <span>15 propostas</span>
+                                    </div>
+                                    <div class="progress-bar-custom">
+                                        <div class="progress-fill" style="width: 75%"></div>
+                                    </div>
+                                </div>
+                                <div class="mb-3">
+                                    <div class="d-flex justify-content-between">
+                                        <span>Rio de Janeiro - RJ</span>
+                                        <span>12 propostas</span>
+                                    </div>
+                                    <div class="progress-bar-custom">
+                                        <div class="progress-fill" style="width: 60%"></div>
+                                    </div>
+                                </div>
+                                <div class="mb-3">
+                                    <div class="d-flex justify-content-between">
+                                        <span>Belo Horizonte - MG</span>
+                                        <span>8 propostas</span>
+                                    </div>
+                                    <div class="progress-bar-custom">
+                                        <div class="progress-fill" style="width: 40%"></div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Dashboard Obras -->
+                <div id="obras" class="dashboard-tab">
+                    <div class="dashboard-header">
+                        <h2><i class="bi bi-hammer text-warning me-2"></i> Painel de Obras</h2>
+                        <p class="text-muted mb-0">Progresso, funcionários e atividades das obras</p>
+                    </div>
+                    
+                    <div class="kpi-grid">
+                        <div class="metric-card warning">
+                            <div class="metric-value">12</div>
+                            <div class="metric-label">
+                                <i class="bi bi-building me-1"></i>
+                                Obras Ativas
+                            </div>
+                        </div>
+                        <div class="metric-card success">
+                            <div class="metric-value">8</div>
+                            <div class="metric-label">
+                                <i class="bi bi-check-circle me-1"></i>
+                                Obras Concluídas
+                            </div>
+                        </div>
+                        <div class="metric-card info">
+                            <div class="metric-value">156</div>
+                            <div class="metric-label">
+                                <i class="bi bi-people me-1"></i>
+                                Funcionários Alocados
+                            </div>
+                        </div>
+                        <div class="metric-card">
+                            <div class="metric-value">2.8K</div>
+                            <div class="metric-label">
+                                <i class="bi bi-clock me-1"></i>
+                                Horas Trabalhadas (mês)
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-8">
+                            <div class="dashboard-card p-4">
+                                <h5><i class="bi bi-list-task me-2"></i> Obras em Andamento</h5>
+                                <div class="table-responsive">
+                                    <table class="table table-hover">
+                                        <thead>
+                                            <tr>
+                                                <th>Obra</th>
+                                                <th>Progresso</th>
+                                                <th>Funcionários</th>
+                                                <th>Status</th>
+                                                <th>Previsão</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            <tr>
+                                                <td><strong>Galpão Industrial ABC</strong></td>
+                                                <td>
+                                                    <div class="progress-bar-custom">
+                                                        <div class="progress-fill" style="width: 75%"></div>
+                                                    </div>
+                                                    <small>75%</small>
+                                                </td>
+                                                <td>18</td>
+                                                <td><span class="badge bg-success">No prazo</span></td>
+                                                <td>15/12/2024</td>
+                                            </tr>
+                                            <tr>
+                                                <td><strong>Estrutura Comercial XYZ</strong></td>
+                                                <td>
+                                                    <div class="progress-bar-custom">
+                                                        <div class="progress-fill" style="width: 45%"></div>
+                                                    </div>
+                                                    <small>45%</small>
+                                                </td>
+                                                <td>12</td>
+                                                <td><span class="badge bg-warning">Atenção</span></td>
+                                                <td>20/01/2025</td>
+                                            </tr>
+                                            <tr>
+                                                <td><strong>Cobertura Metálica DEF</strong></td>
+                                                <td>
+                                                    <div class="progress-bar-custom">
+                                                        <div class="progress-fill" style="width: 90%"></div>
+                                                    </div>
+                                                    <small>90%</small>
+                                                </td>
+                                                <td>8</td>
+                                                <td><span class="badge bg-success">Finalizando</span></td>
+                                                <td>30/11/2024</td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="dashboard-card p-4">
+                                <h5><i class="bi bi-camera me-2"></i> Atividades Recentes</h5>
+                                <div class="mb-3 p-3 bg-light rounded">
+                                    <div class="d-flex justify-content-between">
+                                        <strong>Galpão Industrial ABC</strong>
+                                        <small class="text-muted">Hoje</small>
+                                    </div>
+                                    <p class="mb-1 small">Montagem das tesouras principais concluída. Iniciando cobertura.</p>
+                                    <small class="text-muted">18 funcionários</small>
+                                </div>
+                                <div class="mb-3 p-3 bg-light rounded">
+                                    <div class="d-flex justify-content-between">
+                                        <strong>Estrutura Comercial XYZ</strong>
+                                        <small class="text-muted">Ontem</small>
+                                    </div>
+                                    <p class="mb-1 small">Soldagem dos pilares em andamento. Clima favorável.</p>
+                                    <small class="text-muted">12 funcionários</small>
+                                </div>
+                                <div class="mb-3 p-3 bg-light rounded">
+                                    <div class="d-flex justify-content-between">
+                                        <strong>Cobertura Metálica DEF</strong>
+                                        <small class="text-muted">2 dias atrás</small>
+                                    </div>
+                                    <p class="mb-1 small">Instalação das telhas quase finalizada. Previsão de entrega antecipada.</p>
+                                    <small class="text-muted">8 funcionários</small>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="row mt-4">
+                        <div class="col-md-12">
+                            <div class="dashboard-card p-4">
+                                <h5><i class="bi bi-graph-up me-2"></i> Horas Trabalhadas por Obra (Últimos 30 dias)</h5>
+                                <div class="chart-container">
+                                    <canvas id="hoursChart"></canvas>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Dashboard Financeiro -->
+                <div id="financeiro" class="dashboard-tab">
+                    <div class="dashboard-header">
+                        <h2><i class="bi bi-currency-dollar text-success me-2"></i> Painel Financeiro</h2>
+                        <p class="text-muted mb-0">Custos, orçamentos e análise financeira</p>
+                    </div>
+                    
+                    <div class="kpi-grid">
+                        <div class="metric-card success">
+                            <div class="metric-value">R$ 2.8M</div>
+                            <div class="metric-label">
+                                <i class="bi bi-graph-up me-1"></i>
+                                Faturamento Total
+                            </div>
+                        </div>
+                        <div class="metric-card danger">
+                            <div class="metric-value">R$ 2.1M</div>
+                            <div class="metric-label">
+                                <i class="bi bi-graph-down me-1"></i>
+                                Custos Totais
+                            </div>
+                        </div>
+                        <div class="metric-card info">
+                            <div class="metric-value">25.0%</div>
+                            <div class="metric-label">
+                                <i class="bi bi-percent me-1"></i>
+                                Margem Bruta
+                            </div>
+                        </div>
+                        <div class="metric-card warning">
+                            <div class="metric-value">+5.2%</div>
+                            <div class="metric-label">
+                                <i class="bi bi-exclamation-triangle me-1"></i>
+                                Desvio Orçamento
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="dashboard-card p-4">
+                                <h5><i class="bi bi-pie-chart me-2"></i> Distribuição de Custos</h5>
+                                <div class="chart-container">
+                                    <canvas id="costsChart"></canvas>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="dashboard-card p-4">
+                                <h5><i class="bi bi-bar-chart me-2"></i> Orçado vs Real</h5>
+                                <div class="chart-container">
+                                    <canvas id="budgetChart"></canvas>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="row mt-4">
+                        <div class="col-md-8">
+                            <div class="dashboard-card p-4">
+                                <h5><i class="bi bi-table me-2"></i> Custos por Obra</h5>
+                                <div class="table-responsive">
+                                    <table class="table table-hover">
+                                        <thead>
+                                            <tr>
+                                                <th>Obra</th>
+                                                <th>Orçamento</th>
+                                                <th>Custo Real</th>
+                                                <th>Desvio</th>
+                                                <th>Status</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            <tr>
+                                                <td><strong>Galpão Industrial ABC</strong></td>
+                                                <td>R$ 850.000</td>
+                                                <td>R$ 892.500</td>
+                                                <td class="text-danger">+5.0%</td>
+                                                <td><span class="badge bg-warning">Atenção</span></td>
+                                            </tr>
+                                            <tr>
+                                                <td><strong>Estrutura Comercial XYZ</strong></td>
+                                                <td>R$ 650.000</td>
+                                                <td>R$ 620.800</td>
+                                                <td class="text-success">-4.5%</td>
+                                                <td><span class="badge bg-success">OK</span></td>
+                                            </tr>
+                                            <tr>
+                                                <td><strong>Cobertura Metálica DEF</strong></td>
+                                                <td>R$ 420.000</td>
+                                                <td>R$ 445.200</td>
+                                                <td class="text-danger">+6.0%</td>
+                                                <td><span class="badge bg-danger">Crítico</span></td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="dashboard-card p-4">
+                                <h5><i class="bi bi-exclamation-triangle me-2"></i> Alertas Financeiros</h5>
+                                <div class="alert-item danger">
+                                    <strong>Cobertura Metálica DEF</strong><br>
+                                    <small>Desvio de orçamento: +6.0%</small>
+                                </div>
+                                <div class="alert-item">
+                                    <strong>Galpão Industrial ABC</strong><br>
+                                    <small>Desvio de orçamento: +5.0%</small>
+                                </div>
+                                <div class="alert-item">
+                                    <strong>Custo de Transporte</strong><br>
+                                    <small>Aumento de 15% no mês</small>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Dashboard Alimentação -->
+                <div id="alimentacao" class="dashboard-tab">
+                    <div class="dashboard-header">
+                        <h2><i class="bi bi-cup-hot text-info me-2"></i> Painel de Alimentação</h2>
+                        <p class="text-muted mb-0">Controle de refeições, faturas e validações</p>
+                    </div>
+                    
+                    <div class="kpi-grid">
+                        <div class="metric-card info">
+                            <div class="metric-value">1,247</div>
+                            <div class="metric-label">
+                                <i class="bi bi-cup-hot me-1"></i>
+                                Refeições (mês)
+                            </div>
+                        </div>
+                        <div class="metric-card success">
+                            <div class="metric-value">R$ 18.7K</div>
+                            <div class="metric-label">
+                                <i class="bi bi-currency-dollar me-1"></i>
+                                Valor Total
+                            </div>
+                        </div>
+                        <div class="metric-card warning">
+                            <div class="metric-value">R$ 15.00</div>
+                            <div class="metric-label">
+                                <i class="bi bi-calculator me-1"></i>
+                                Custo Médio/Refeição
+                            </div>
+                        </div>
+                        <div class="metric-card danger">
+                            <div class="metric-value">12</div>
+                            <div class="metric-label">
+                                <i class="bi bi-exclamation-triangle me-1"></i>
+                                Inconsistências
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="dashboard-card p-4">
+                                <h5><i class="bi bi-building me-2"></i> Refeições por Obra</h5>
+                                <div class="chart-container">
+                                    <canvas id="mealsChart"></canvas>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="dashboard-card p-4">
+                                <h5><i class="bi bi-calendar me-2"></i> Evolução Diária</h5>
+                                <div class="chart-container">
+                                    <canvas id="dailyMealsChart"></canvas>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="row mt-4">
+                        <div class="col-md-8">
+                            <div class="dashboard-card p-4">
+                                <h5><i class="bi bi-people me-2"></i> Ranking de Consumo</h5>
+                                <div class="table-responsive">
+                                    <table class="table table-hover">
+                                        <thead>
+                                            <tr>
+                                                <th>Funcionário</th>
+                                                <th>Refeições</th>
+                                                <th>Valor Total</th>
+                                                <th>Média/Dia</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            <tr>
+                                                <td><strong>João Silva</strong></td>
+                                                <td>45</td>
+                                                <td>R$ 675,00</td>
+                                                <td>2.1</td>
+                                            </tr>
+                                            <tr>
+                                                <td><strong>Pedro Santos</strong></td>
+                                                <td>42</td>
+                                                <td>R$ 630,00</td>
+                                                <td>2.0</td>
+                                            </tr>
+                                            <tr>
+                                                <td><strong>Maria Costa</strong></td>
+                                                <td>38</td>
+                                                <td>R$ 570,00</td>
+                                                <td>1.8</td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="dashboard-card p-4">
+                                <h5><i class="bi bi-shop me-2"></i> Fatura por Restaurante</h5>
+                                <div class="mb-3">
+                                    <div class="d-flex justify-content-between">
+                                        <span><strong>Restaurante Central</strong></span>
+                                        <span>R$ 12.500</span>
+                                    </div>
+                                    <small class="text-muted">850 refeições</small>
+                                </div>
+                                <div class="mb-3">
+                                    <div class="d-flex justify-content-between">
+                                        <span><strong>Cantina do Trabalhador</strong></span>
+                                        <span>R$ 6.200</span>
+                                    </div>
+                                    <small class="text-muted">397 refeições</small>
+                                </div>
+                                <hr>
+                                <div class="d-flex justify-content-between">
+                                    <strong>Total Mensal</strong>
+                                    <strong>R$ 18.700</strong>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Dashboard Transporte -->
+                <div id="transporte" class="dashboard-tab">
+                    <div class="dashboard-header">
+                        <h2><i class="bi bi-truck text-primary me-2"></i> Painel de Transporte</h2>
+                        <p class="text-muted mb-0">Frota, combustível e logística</p>
+                    </div>
+                    
+                    <div class="kpi-grid">
+                        <div class="metric-card">
+                            <div class="metric-value">8</div>
+                            <div class="metric-label">
+                                <i class="bi bi-truck me-1"></i>
+                                Veículos Ativos
+                            </div>
+                        </div>
+                        <div class="metric-card warning">
+                            <div class="metric-value">12.5K</div>
+                            <div class="metric-label">
+                                <i class="bi bi-speedometer me-1"></i>
+                                Km Rodados (mês)
+                            </div>
+                        </div>
+                        <div class="metric-card danger">
+                            <div class="metric-value">R$ 8.9K</div>
+                            <div class="metric-label">
+                                <i class="bi bi-fuel-pump me-1"></i>
+                                Combustível (mês)
+                            </div>
+                        </div>
+                        <div class="metric-card info">
+                            <div class="metric-value">R$ 0.71</div>
+                            <div class="metric-label">
+                                <i class="bi bi-calculator me-1"></i>
+                                Custo por Km
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="dashboard-card p-4">
+                                <h5><i class="bi bi-bar-chart me-2"></i> Consumo por Veículo</h5>
+                                <div class="chart-container">
+                                    <canvas id="vehicleChart"></canvas>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="dashboard-card p-4">
+                                <h5><i class="bi bi-graph-up me-2"></i> Evolução de Custos</h5>
+                                <div class="chart-container">
+                                    <canvas id="transportCostsChart"></canvas>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="row mt-4">
+                        <div class="col-md-8">
+                            <div class="dashboard-card p-4">
+                                <h5><i class="bi bi-list me-2"></i> Performance da Frota</h5>
+                                <div class="table-responsive">
+                                    <table class="table table-hover">
+                                        <thead>
+                                            <tr>
+                                                <th>Veículo</th>
+                                                <th>Km Total</th>
+                                                <th>Consumo</th>
+                                                <th>Km/L</th>
+                                                <th>Custo</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            <tr>
+                                                <td><strong>ABC-1234</strong> <small>Iveco Daily</small></td>
+                                                <td>2,450 km</td>
+                                                <td>350 L</td>
+                                                <td>7.0</td>
+                                                <td>R$ 1.890</td>
+                                            </tr>
+                                            <tr>
+                                                <td><strong>DEF-5678</strong> <small>Ford Cargo</small></td>
+                                                <td>1,890 km</td>
+                                                <td>420 L</td>
+                                                <td>4.5</td>
+                                                <td>R$ 2.268</td>
+                                            </tr>
+                                            <tr>
+                                                <td><strong>GHI-9012</strong> <small>VW Delivery</small></td>
+                                                <td>1,650 km</td>
+                                                <td>275 L</td>
+                                                <td>6.0</td>
+                                                <td>R$ 1.485</td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="dashboard-card p-4">
+                                <h5><i class="bi bi-wrench me-2"></i> Manutenção Preventiva</h5>
+                                <div class="alert-item danger">
+                                    <strong>ABC-1234</strong><br>
+                                    <small>Revisão em 250 km</small>
+                                </div>
+                                <div class="alert-item">
+                                    <strong>DEF-5678</strong><br>
+                                    <small>Revisão em 800 km</small>
+                                </div>
+                                <div class="alert-item">
+                                    <strong>GHI-9012</strong><br>
+                                    <small>Revisão em 1.200 km</small>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Dashboard RH -->
+                <div id="rh" class="dashboard-tab">
+                    <div class="dashboard-header">
+                        <h2><i class="bi bi-people text-success me-2"></i> Painel RH & Ponto</h2>
+                        <p class="text-muted mb-0">Recursos humanos, ponto e produtividade</p>
+                    </div>
+                    
+                    <div class="kpi-grid">
+                        <div class="metric-card success">
+                            <div class="metric-value">156</div>
+                            <div class="metric-label">
+                                <i class="bi bi-people me-1"></i>
+                                Funcionários Ativos
+                            </div>
+                        </div>
+                        <div class="metric-card info">
+                            <div class="metric-value">2,847</div>
+                            <div class="metric-label">
+                                <i class="bi bi-clock me-1"></i>
+                                Horas Trabalhadas
+                            </div>
+                        </div>
+                        <div class="metric-card warning">
+                            <div class="metric-value">3.2%</div>
+                            <div class="metric-label">
+                                <i class="bi bi-exclamation-triangle me-1"></i>
+                                Taxa Absenteísmo
+                            </div>
+                        </div>
+                        <div class="metric-card">
+                            <div class="metric-value">247</div>
+                            <div class="metric-label">
+                                <i class="bi bi-plus-circle me-1"></i>
+                                Horas Extras
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="dashboard-card p-4">
+                                <h5><i class="bi bi-graph-up me-2"></i> Evolução de Horas</h5>
+                                <div class="chart-container">
+                                    <canvas id="hoursEvolutionChart"></canvas>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="dashboard-card p-4">
+                                <h5><i class="bi bi-bar-chart me-2"></i> Absenteísmo por Semana</h5>
+                                <div class="chart-container">
+                                    <canvas id="absenteeismChart"></canvas>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="row mt-4">
+                        <div class="col-md-8">
+                            <div class="dashboard-card p-4">
+                                <h5><i class="bi bi-trophy me-2"></i> Ranking de Produtividade</h5>
+                                <div class="table-responsive">
+                                    <table class="table table-hover">
+                                        <thead>
+                                            <tr>
+                                                <th>Funcionário</th>
+                                                <th>Horas</th>
+                                                <th>Extras</th>
+                                                <th>Faltas</th>
+                                                <th>Produtividade</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            <tr>
+                                                <td><strong>João Silva</strong></td>
+                                                <td>168h</td>
+                                                <td>12h</td>
+                                                <td>0</td>
+                                                <td><span class="badge bg-success">100%</span></td>
+                                            </tr>
+                                            <tr>
+                                                <td><strong>Pedro Santos</strong></td>
+                                                <td>162h</td>
+                                                <td>8h</td>
+                                                <td>1</td>
+                                                <td><span class="badge bg-success">96.4%</span></td>
+                                            </tr>
+                                            <tr>
+                                                <td><strong>Maria Costa</strong></td>
+                                                <td>156h</td>
+                                                <td>4h</td>
+                                                <td>2</td>
+                                                <td><span class="badge bg-warning">92.9%</span></td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="dashboard-card p-4">
+                                <h5><i class="bi bi-exclamation-circle me-2"></i> Funcionários com Faltas</h5>
+                                <div class="mb-3">
+                                    <div class="d-flex justify-content-between">
+                                        <span><strong>Carlos Oliveira</strong></span>
+                                        <span class="badge bg-danger">5 faltas</span>
+                                    </div>
+                                    <small class="text-muted">Última falta: 15/11/2024</small>
+                                </div>
+                                <div class="mb-3">
+                                    <div class="d-flex justify-content-between">
+                                        <span><strong>Ana Ferreira</strong></span>
+                                        <span class="badge bg-warning">3 faltas</span>
+                                    </div>
+                                    <small class="text-muted">Última falta: 12/11/2024</small>
+                                </div>
+                                <div class="mb-3">
+                                    <div class="d-flex justify-content-between">
+                                        <span><strong>Roberto Lima</strong></span>
+                                        <span class="badge bg-warning">2 faltas</span>
+                                    </div>
+                                    <small class="text-muted">Última falta: 08/11/2024</small>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Dashboard Diretoria -->
+                <div id="diretoria" class="dashboard-tab">
+                    <div class="dashboard-header">
+                        <h2><i class="bi bi-pie-chart text-dark me-2"></i> Painel Diretoria</h2>
+                        <p class="text-muted mb-0">Visão executiva e indicadores estratégicos</p>
+                    </div>
+                    
+                    <div class="kpi-grid">
+                        <div class="metric-card success">
+                            <div class="metric-value">R$ 2.8M</div>
+                            <div class="metric-label">
+                                <i class="bi bi-graph-up me-1"></i>
+                                Faturamento Total
+                            </div>
+                        </div>
+                        <div class="metric-card info">
+                            <div class="metric-value">25.0%</div>
+                            <div class="metric-label">
+                                <i class="bi bi-percent me-1"></i>
+                                Margem Bruta
+                            </div>
+                        </div>
+                        <div class="metric-card warning">
+                            <div class="metric-value">20</div>
+                            <div class="metric-label">
+                                <i class="bi bi-building me-1"></i>
+                                Obras Ativas
+                            </div>
+                        </div>
+                        <div class="metric-card">
+                            <div class="metric-value">156</div>
+                            <div class="metric-label">
+                                <i class="bi bi-people me-1"></i>
+                                Equipe Total
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="dashboard-card p-4">
+                                <h5><i class="bi bi-pie-chart me-2"></i> Distribuição de Receita</h5>
+                                <div class="chart-container">
+                                    <canvas id="revenueChart"></canvas>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="dashboard-card p-4">
+                                <h5><i class="bi bi-graph-up me-2"></i> Evolução do Faturamento</h5>
+                                <div class="chart-container">
+                                    <canvas id="revenueEvolutionChart"></canvas>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="row mt-4">
+                        <div class="col-md-8">
+                            <div class="dashboard-card p-4">
+                                <h5><i class="bi bi-geo-alt me-2"></i> Distribuição Geográfica</h5>
+                                <div class="table-responsive">
+                                    <table class="table table-hover">
+                                        <thead>
+                                            <tr>
+                                                <th>Estado</th>
+                                                <th>Obras</th>
+                                                <th>Faturamento</th>
+                                                <th>Participação</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            <tr>
+                                                <td><strong>São Paulo</strong></td>
+                                                <td>8</td>
+                                                <td>R$ 1.2M</td>
+                                                <td><span class="badge bg-primary">42.9%</span></td>
+                                            </tr>
+                                            <tr>
+                                                <td><strong>Rio de Janeiro</strong></td>
+                                                <td>5</td>
+                                                <td>R$ 850K</td>
+                                                <td><span class="badge bg-info">30.4%</span></td>
+                                            </tr>
+                                            <tr>
+                                                <td><strong>Minas Gerais</strong></td>
+                                                <td>4</td>
+                                                <td>R$ 520K</td>
+                                                <td><span class="badge bg-success">18.6%</span></td>
+                                            </tr>
+                                            <tr>
+                                                <td><strong>Outros</strong></td>
+                                                <td>3</td>
+                                                <td>R$ 230K</td>
+                                                <td><span class="badge bg-secondary">8.2%</span></td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="dashboard-card p-4">
+                                <h5><i class="bi bi-exclamation-triangle me-2"></i> Alertas Executivos</h5>
+                                <div class="alert-item danger">
+                                    <strong>Margem Crítica</strong><br>
+                                    <small>Obra DEF com margem de 8%</small>
+                                </div>
+                                <div class="alert-item">
+                                    <strong>Prazo em Risco</strong><br>
+                                    <small>2 obras com atraso potencial</small>
+                                </div>
+                                <div class="alert-item">
+                                    <strong>Oportunidade</strong><br>
+                                    <small>15 propostas em negociação</small>
+                                </div>
+                                <div class="alert-item">
+                                    <strong>Equipe</strong><br>
+                                    <small>Taxa de absenteísmo: 3.2%</small>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+            </div>
+        </div>
+    </div>
+    
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        // Função para alternar entre dashboards
+        function showDashboard(dashboardId) {
+            // Esconder todos os dashboards
+            document.querySelectorAll('.dashboard-tab').forEach(tab => {
+                tab.classList.remove('active');
+            });
+            
+            // Remover classe active de todos os links
+            document.querySelectorAll('.nav-link').forEach(link => {
+                link.classList.remove('active');
+            });
+            
+            // Mostrar dashboard selecionado
+            document.getElementById(dashboardId).classList.add('active');
+            
+            // Adicionar classe active ao link clicado
+            event.target.classList.add('active');
+            
+            // Inicializar gráficos do dashboard ativo
+            initializeCharts(dashboardId);
+        }
+        
+        // Função para inicializar gráficos
+        function initializeCharts(dashboardId) {
+            switch(dashboardId) {
+                case 'comercial':
+                    initComercialCharts();
+                    break;
+                case 'obras':
+                    initObrasCharts();
+                    break;
+                case 'financeiro':
+                    initFinanceiroCharts();
+                    break;
+                case 'alimentacao':
+                    initAlimentacaoCharts();
+                    break;
+                case 'transporte':
+                    initTransporteCharts();
+                    break;
+                case 'rh':
+                    initRHCharts();
+                    break;
+                case 'diretoria':
+                    initDiretoriaCharts();
+                    break;
+            }
+        }
+        
+        // Gráficos do Dashboard Comercial
+        function initComercialCharts() {
+            // Funil de Vendas
+            const funnelCtx = document.getElementById('funnelChart');
+            if (funnelCtx) {
+                new Chart(funnelCtx, {
+                    type: 'doughnut',
+                    data: {
+                        labels: ['Fechadas', 'Em Negociação', 'Em Aberto', 'Perdidas'],
+                        datasets: [{
+                            data: [23, 12, 8, 4],
+                            backgroundColor: ['#059669', '#d97706', '#2563eb', '#dc2626']
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false
+                    }
+                });
+            }
+            
+            // Evolução Mensal
+            const evolutionCtx = document.getElementById('evolutionChart');
+            if (evolutionCtx) {
+                new Chart(evolutionCtx, {
+                    type: 'line',
+                    data: {
+                        labels: ['Jul', 'Aug', 'Sep', 'Oct', 'Nov'],
+                        datasets: [{
+                            label: 'Propostas',
+                            data: [35, 42, 38, 45, 47],
+                            borderColor: '#2563eb',
+                            tension: 0.4
+                        }, {
+                            label: 'Fechadas',
+                            data: [18, 22, 19, 24, 23],
+                            borderColor: '#059669',
+                            tension: 0.4
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false
+                    }
+                });
+            }
+        }
+        
+        // Gráficos do Dashboard Obras
+        function initObrasCharts() {
+            const hoursCtx = document.getElementById('hoursChart');
+            if (hoursCtx) {
+                new Chart(hoursCtx, {
+                    type: 'bar',
+                    data: {
+                        labels: ['Galpão ABC', 'Estrutura XYZ', 'Cobertura DEF', 'Obra GHI'],
+                        datasets: [{
+                            label: 'Horas Trabalhadas',
+                            data: [450, 320, 180, 240],
+                            backgroundColor: '#d97706'
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false
+                    }
+                });
+            }
+        }
+        
+        // Gráficos do Dashboard Financeiro
+        function initFinanceiroCharts() {
+            // Distribuição de Custos
+            const costsCtx = document.getElementById('costsChart');
+            if (costsCtx) {
+                new Chart(costsCtx, {
+                    type: 'pie',
+                    data: {
+                        labels: ['Mão de Obra', 'Materiais', 'Transporte', 'Alimentação', 'Outros'],
+                        datasets: [{
+                            data: [45, 30, 12, 8, 5],
+                            backgroundColor: ['#2563eb', '#059669', '#d97706', '#0891b2', '#dc2626']
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false
+                    }
+                });
+            }
+            
+            // Orçado vs Real
+            const budgetCtx = document.getElementById('budgetChart');
+            if (budgetCtx) {
+                new Chart(budgetCtx, {
+                    type: 'bar',
+                    data: {
+                        labels: ['Galpão ABC', 'Estrutura XYZ', 'Cobertura DEF'],
+                        datasets: [{
+                            label: 'Orçado',
+                            data: [850000, 650000, 420000],
+                            backgroundColor: '#64748b'
+                        }, {
+                            label: 'Real',
+                            data: [892500, 620800, 445200],
+                            backgroundColor: '#dc2626'
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false
+                    }
+                });
+            }
+        }
+        
+        // Gráficos do Dashboard Alimentação
+        function initAlimentacaoCharts() {
+            const mealsCtx = document.getElementById('mealsChart');
+            if (mealsCtx) {
+                new Chart(mealsCtx, {
+                    type: 'bar',
+                    data: {
+                        labels: ['Galpão ABC', 'Estrutura XYZ', 'Cobertura DEF', 'Obra GHI'],
+                        datasets: [{
+                            label: 'Refeições',
+                            data: [450, 320, 180, 297],
+                            backgroundColor: '#0891b2'
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false
+                    }
+                });
+            }
+            
+            const dailyMealsCtx = document.getElementById('dailyMealsChart');
+            if (dailyMealsCtx) {
+                new Chart(dailyMealsCtx, {
+                    type: 'line',
+                    data: {
+                        labels: ['1', '2', '3', '4', '5', '6', '7'],
+                        datasets: [{
+                            label: 'Refeições Diárias',
+                            data: [65, 72, 68, 75, 70, 0, 0],
+                            borderColor: '#0891b2',
+                            tension: 0.4
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false
+                    }
+                });
+            }
+        }
+        
+        // Gráficos do Dashboard Transporte
+        function initTransporteCharts() {
+            const vehicleCtx = document.getElementById('vehicleChart');
+            if (vehicleCtx) {
+                new Chart(vehicleCtx, {
+                    type: 'bar',
+                    data: {
+                        labels: ['ABC-1234', 'DEF-5678', 'GHI-9012', 'JKL-3456'],
+                        datasets: [{
+                            label: 'Consumo (L)',
+                            data: [350, 420, 275, 180],
+                            backgroundColor: '#2563eb'
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false
+                    }
+                });
+            }
+            
+            const transportCostsCtx = document.getElementById('transportCostsChart');
+            if (transportCostsCtx) {
+                new Chart(transportCostsCtx, {
+                    type: 'line',
+                    data: {
+                        labels: ['Sem 1', 'Sem 2', 'Sem 3', 'Sem 4'],
+                        datasets: [{
+                            label: 'Custo Semanal',
+                            data: [2200, 2800, 2100, 2400],
+                            borderColor: '#2563eb',
+                            tension: 0.4
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false
+                    }
+                });
+            }
+        }
+        
+        // Gráficos do Dashboard RH
+        function initRHCharts() {
+            const hoursEvolutionCtx = document.getElementById('hoursEvolutionChart');
+            if (hoursEvolutionCtx) {
+                new Chart(hoursEvolutionCtx, {
+                    type: 'line',
+                    data: {
+                        labels: ['Sem 1', 'Sem 2', 'Sem 3', 'Sem 4', 'Sem 5', 'Sem 6'],
+                        datasets: [{
+                            label: 'Horas Normais',
+                            data: [2400, 2600, 2500, 2700, 2550, 2650],
+                            borderColor: '#059669',
+                            tension: 0.4
+                        }, {
+                            label: 'Horas Extras',
+                            data: [180, 220, 200, 250, 190, 240],
+                            borderColor: '#d97706',
+                            tension: 0.4
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false
+                    }
+                });
+            }
+            
+            const absenteeismCtx = document.getElementById('absenteeismChart');
+            if (absenteeismCtx) {
+                new Chart(absenteeismCtx, {
+                    type: 'bar',
+                    data: {
+                        labels: ['Sem 1', 'Sem 2', 'Sem 3', 'Sem 4'],
+                        datasets: [{
+                            label: 'Taxa de Absenteísmo (%)',
+                            data: [2.8, 3.5, 2.9, 3.2],
+                            backgroundColor: '#dc2626'
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false
+                    }
+                });
+            }
+        }
+        
+        // Gráficos do Dashboard Diretoria
+        function initDiretoriaCharts() {
+            const revenueCtx = document.getElementById('revenueChart');
+            if (revenueCtx) {
+                new Chart(revenueCtx, {
+                    type: 'doughnut',
+                    data: {
+                        labels: ['Galpões', 'Estruturas', 'Coberturas', 'Outros'],
+                        datasets: [{
+                            data: [45, 30, 20, 5],
+                            backgroundColor: ['#2563eb', '#059669', '#d97706', '#64748b']
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false
+                    }
+                });
+            }
+            
+            const revenueEvolutionCtx = document.getElementById('revenueEvolutionChart');
+            if (revenueEvolutionCtx) {
+                new Chart(revenueEvolutionCtx, {
+                    type: 'line',
+                    data: {
+                        labels: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'],
+                        datasets: [{
+                            label: 'Faturamento',
+                            data: [2200000, 2800000, 2100000, 2400000, 2600000, 2800000],
+                            borderColor: '#059669',
+                            tension: 0.4
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false
+                    }
+                });
+            }
+        }
+        
+        // Inicializar dashboard comercial por padrão
+        document.addEventListener('DOMContentLoaded', function() {
+            initComercialCharts();
+        });
+    </script>
+</body>
+</html>
+
