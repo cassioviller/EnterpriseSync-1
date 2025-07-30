@@ -697,6 +697,17 @@
     - Roadmap futuro e melhorias implementadas v8.0
     - 24.434 linhas de código Python documentadas
     - Base completa para qualquer LLM entender e trabalhar com o sistema
+  - July 30, 2025. Roadmap SIGE v9.0 - Estruturas Metálicas Especializada - v8.0.13:
+    - Criado roadmap completo ROADMAP_SIGE_v9_ESTRUTURAS_METALICAS.md para expansão do sistema
+    - Analisados 3 documentos técnicos: Jornada do Cliente, Dashboards BI, Sistema v9.0 Completo
+    - Planejados 5 módulos novos: Comercial Completo, Almoxarifado, Documentos, Transporte Expandido, Dashboards BI
+    - Especificadas 20 novas tabelas integradas ao schema existente (33 + 20 = 53 tabelas total)
+    - Módulo Comercial: lead, proposta_comercial, orcamento_detalhado, contrato (8 etapas completas)
+    - Módulo Almoxarifado: ferramenta, material_metalico, movimento_ferramenta, estoque_obra
+    - Sistema BI: 7 painéis especializados (Comercial, Obras, Financeiro, Alimentação, Transporte, RH, Diretoria)
+    - Cronograma definido: 24 dias úteis, 8 fases de desenvolvimento
+    - ROI projetado: 350% em 18 meses, economia operacional de R$ 1.4M/ano
+    - Transformação de sistema genérico em solução especializada para estruturas metálicas
   - July 30, 2025. Organização Alfabética Completa dos Funcionários - v8.0.12:
     - Corrigidas TODAS as consultas de funcionários para ordenação alfabética em 37+ locais
     - Função `calcular_kpis_funcionarios_geral` corrigida para ordenar por `Funcionario.nome`
