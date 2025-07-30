@@ -582,3 +582,126 @@ class OutroCusto(db.Model):
     
     def __repr__(self):
         return f'<OutroCusto {self.funcionario.nome} - {self.tipo} R$ {self.valor}>'
+
+# ================================
+# MÓDULO DE PROPOSTAS COMERCIAIS
+# ================================
+
+class StatusProposta(Enum):
+    RASCUNHO = "rascunho"
+    ENVIADA = "enviada"
+    EM_ANALISE = "em_analise"
+    APROVADA = "aprovada"
+    REJEITADA = "rejeitada"
+    EXPIRADA = "expirada"
+
+class Proposta(db.Model):
+    """Modelo para propostas comerciais que podem se tornar obras"""
+    __tablename__ = 'proposta'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    numero_proposta = db.Column(db.String(20), unique=True, nullable=False)  # PROP-2025-001
+    
+    # Dados do Cliente
+    cliente_nome = db.Column(db.String(100), nullable=False)
+    cliente_documento = db.Column(db.String(18))  # CPF ou CNPJ
+    cliente_endereco = db.Column(db.Text)
+    cliente_telefone = db.Column(db.String(20))
+    cliente_email = db.Column(db.String(120))
+    
+    # Dados do Projeto
+    titulo_projeto = db.Column(db.String(150), nullable=False)
+    descricao_projeto = db.Column(db.Text)
+    local_execucao = db.Column(db.Text, nullable=False)
+    area_total_m2 = db.Column(db.Float, default=0.0)
+    peso_total_kg = db.Column(db.Float, default=0.0)
+    
+    # Financeiro
+    valor_total = db.Column(db.Float, default=0.0)
+    desconto_percentual = db.Column(db.Float, default=0.0)
+    valor_com_desconto = db.Column(db.Float, default=0.0)
+    margem_lucro_percentual = db.Column(db.Float, default=30.0)
+    
+    # Prazos
+    prazo_execucao_dias = db.Column(db.Integer, default=30)
+    data_validade = db.Column(db.Date, nullable=False)
+    
+    # Status e Controle
+    status = db.Column(db.Enum(StatusProposta), default=StatusProposta.RASCUNHO, nullable=False)
+    observacoes = db.Column(db.Text)
+    condicoes_pagamento = db.Column(db.Text)
+    garantias = db.Column(db.Text)
+    
+    # Controle Interno
+    responsavel_comercial_id = db.Column(db.Integer, db.ForeignKey('funcionario.id'))
+    admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=True)
+    obra_gerada_id = db.Column(db.Integer, db.ForeignKey('obra.id'), nullable=True)  # Obra criada quando aprovada
+    
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    data_aprovacao = db.Column(db.DateTime)
+    
+    # Relacionamentos
+    responsavel_comercial = db.relationship('Funcionario', backref='propostas_comerciais', lazy=True)
+    obra_gerada = db.relationship('Obra', backref='proposta_origem', lazy=True)
+    itens = db.relationship('ItemProposta', backref='proposta', cascade='all, delete-orphan', lazy=True)
+    
+    def __repr__(self):
+        return f'<Proposta {self.numero_proposta} - {self.cliente_nome}>'
+    
+    @property
+    def valor_final(self):
+        """Calcula o valor final com desconto aplicado"""
+        if self.desconto_percentual > 0:
+            return self.valor_total * (1 - self.desconto_percentual / 100)
+        return self.valor_total
+
+class ItemProposta(db.Model):
+    """Itens de serviço dentro de uma proposta"""
+    __tablename__ = 'item_proposta'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    proposta_id = db.Column(db.Integer, db.ForeignKey('proposta.id'), nullable=False)
+    servico_id = db.Column(db.Integer, db.ForeignKey('servico.id'), nullable=False)
+    
+    # Quantidades e Medidas
+    quantidade = db.Column(db.Numeric(10, 4), nullable=False)
+    unidade = db.Column(db.String(10), nullable=False)  # m², kg, m³, pç, etc.
+    
+    # Preços
+    preco_unitario = db.Column(db.Numeric(10, 2), nullable=False)
+    valor_total = db.Column(db.Numeric(10, 2), nullable=False)
+    
+    # Detalhamento
+    especificacoes = db.Column(db.Text)  # Especificações técnicas específicas
+    observacoes = db.Column(db.Text)
+    
+    # Ordem de apresentação
+    ordem = db.Column(db.Integer, default=1)
+    
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    
+    # Relacionamentos
+    servico = db.relationship('Servico', backref='itens_proposta', lazy=True)
+    
+    # Unique constraint para evitar duplicatas de serviço na mesma proposta
+    __table_args__ = (db.UniqueConstraint('proposta_id', 'servico_id', name='_proposta_servico_uc'),)
+    
+    def __repr__(self):
+        return f'<ItemProposta ID:{self.id} - Serviço:{self.servico_id}>'
+
+class HistoricoStatusProposta(db.Model):
+    """Histórico de mudanças de status das propostas"""
+    __tablename__ = 'historico_status_proposta'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    proposta_id = db.Column(db.Integer, db.ForeignKey('proposta.id'), nullable=False)
+    status_anterior = db.Column(db.Enum(StatusProposta))
+    status_novo = db.Column(db.Enum(StatusProposta), nullable=False)
+    usuario_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False)
+    motivo = db.Column(db.Text)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    
+    # Relacionamentos
+    proposta = db.relationship('Proposta', backref='historico_status', lazy=True)
+    usuario = db.relationship('Usuario', backref='mudancas_status_proposta', lazy=True)

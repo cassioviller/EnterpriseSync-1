@@ -1,0 +1,606 @@
+{% extends "base.html" %}
+
+{% block title %}Proposta {{ proposta.numero_proposta }} - SIGE{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- Cabeçalho -->
+    <div class="row mb-4">
+        <div class="col-md-8">
+            <h2><i class="fas fa-file-contract"></i> Proposta {{ proposta.numero_proposta }}</h2>
+            <p class="text-muted">{{ proposta.titulo_projeto }} - {{ proposta.cliente_nome }}</p>
+        </div>
+        <div class="col-md-4 text-end">
+            <div class="btn-group" role="group">
+                <a href="{{ url_for('main.lista_propostas') }}" class="btn btn-secondary">
+                    <i class="fas fa-arrow-left"></i> Voltar
+                </a>
+                {% if proposta.status == StatusProposta.RASCUNHO %}
+                <a href="{{ url_for('main.editar_proposta', id=proposta.id) }}" class="btn btn-primary">
+                    <i class="fas fa-edit"></i> Editar
+                </a>
+                {% endif %}
+                <a href="{{ url_for('main.gerar_pdf_proposta', id=proposta.id) }}" class="btn btn-success">
+                    <i class="fas fa-file-pdf"></i> PDF
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Status e Ações -->
+    <div class="row mb-4">
+        <div class="col-md-8">
+            {% set status_colors = {
+                'rascunho': 'secondary',
+                'enviada': 'primary', 
+                'em_analise': 'warning',
+                'aprovada': 'success',
+                'rejeitada': 'danger',
+                'expirada': 'dark'
+            } %}
+            <span class="badge bg-{{ status_colors.get(proposta.status.value, 'secondary') }} fs-6">
+                {{ proposta.status.value|title|replace('_', ' ') }}
+            </span>
+            
+            {% if proposta.data_validade < date.today() %}
+            <span class="badge bg-danger fs-6 ms-2">
+                <i class="fas fa-exclamation-triangle"></i> Expirada
+            </span>
+            {% endif %}
+            
+            {% if proposta.obra_gerada_id %}
+            <span class="badge bg-info fs-6 ms-2">
+                <i class="fas fa-hammer"></i> Convertida em Obra
+            </span>
+            {% endif %}
+        </div>
+        <div class="col-md-4 text-end">
+            {% if proposta.status == StatusProposta.RASCUNHO %}
+            <button class="btn btn-primary btn-sm" onclick="alterarStatus('enviada')">
+                <i class="fas fa-paper-plane"></i> Enviar
+            </button>
+            <button class="btn btn-danger btn-sm" onclick="excluirProposta()">
+                <i class="fas fa-trash"></i> Excluir
+            </button>
+            {% elif proposta.status == StatusProposta.ENVIADA %}
+            <button class="btn btn-warning btn-sm" onclick="alterarStatus('em_analise')">
+                <i class="fas fa-clock"></i> Em Análise
+            </button>
+            {% elif proposta.status == StatusProposta.EM_ANALISE %}
+            <button class="btn btn-success btn-sm" onclick="alterarStatus('aprovada')">
+                <i class="fas fa-check"></i> Aprovar
+            </button>
+            <button class="btn btn-danger btn-sm" onclick="alterarStatus('rejeitada')">
+                <i class="fas fa-times"></i> Rejeitar
+            </button>
+            {% elif proposta.status == StatusProposta.APROVADA and not proposta.obra_gerada_id %}
+            <button class="btn btn-success btn-sm" onclick="converterParaObra()">
+                <i class="fas fa-hammer"></i> Converter em Obra
+            </button>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="row">
+        <!-- Dados Principais -->
+        <div class="col-md-8">
+            <!-- Dados do Cliente -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5><i class="fas fa-user"></i> Dados do Cliente</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <strong>Nome/Razão Social:</strong><br>
+                            {{ proposta.cliente_nome }}
+                        </div>
+                        <div class="col-md-6">
+                            {% if proposta.cliente_documento %}
+                            <strong>CPF/CNPJ:</strong><br>
+                            {{ proposta.cliente_documento }}
+                            {% endif %}
+                        </div>
+                    </div>
+                    {% if proposta.cliente_endereco %}
+                    <div class="row mt-3">
+                        <div class="col-md-12">
+                            <strong>Endereço:</strong><br>
+                            {{ proposta.cliente_endereco }}
+                        </div>
+                    </div>
+                    {% endif %}
+                    <div class="row mt-3">
+                        <div class="col-md-6">
+                            {% if proposta.cliente_telefone %}
+                            <strong>Telefone:</strong><br>
+                            {{ proposta.cliente_telefone }}
+                            {% endif %}
+                        </div>
+                        <div class="col-md-6">
+                            {% if proposta.cliente_email %}
+                            <strong>E-mail:</strong><br>
+                            {{ proposta.cliente_email }}
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Dados do Projeto -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5><i class="fas fa-hammer"></i> Dados do Projeto</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-12">
+                            <strong>Título:</strong><br>
+                            {{ proposta.titulo_projeto }}
+                        </div>
+                    </div>
+                    <div class="row mt-3">
+                        <div class="col-md-12">
+                            <strong>Local de Execução:</strong><br>
+                            {{ proposta.local_execucao }}
+                        </div>
+                    </div>
+                    {% if proposta.descricao_projeto %}
+                    <div class="row mt-3">
+                        <div class="col-md-12">
+                            <strong>Descrição:</strong><br>
+                            {{ proposta.descricao_projeto|nl2br|safe }}
+                        </div>
+                    </div>
+                    {% endif %}
+                    <div class="row mt-3">
+                        <div class="col-md-3">
+                            {% if proposta.area_total_m2 > 0 %}
+                            <strong>Área Total:</strong><br>
+                            {{ proposta.area_total_m2 }} m²
+                            {% endif %}
+                        </div>
+                        <div class="col-md-3">
+                            {% if proposta.peso_total_kg > 0 %}
+                            <strong>Peso Total:</strong><br>
+                            {{ proposta.peso_total_kg }} kg
+                            {% endif %}
+                        </div>
+                        <div class="col-md-3">
+                            <strong>Prazo:</strong><br>
+                            {{ proposta.prazo_execucao_dias }} dias
+                        </div>
+                        <div class="col-md-3">
+                            <strong>Validade:</strong><br>
+                            {{ proposta.data_validade.strftime('%d/%m/%Y') }}
+                            {% if proposta.data_validade < date.today() %}
+                            <br><small class="text-danger">Expirada</small>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Escopo de Serviços -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5><i class="fas fa-list"></i> Escopo de Serviços</h5>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-striped">
+                            <thead>
+                                <tr>
+                                    <th>Item</th>
+                                    <th>Descrição</th>
+                                    <th>Qtd</th>
+                                    <th>Unid.</th>
+                                    <th>Valor Unit.</th>
+                                    <th>Valor Total</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for item in proposta.itens %}
+                                <tr>
+                                    <td>{{ loop.index }}</td>
+                                    <td>
+                                        <strong>{{ item.servico.nome }}</strong>
+                                        {% if item.especificacoes %}
+                                        <br><small class="text-muted">{{ item.especificacoes }}</small>
+                                        {% endif %}
+                                    </td>
+                                    <td>{{ "%.4f"|format(item.quantidade) }}</td>
+                                    <td>{{ item.unidade }}</td>
+                                    <td>R$ {{ "%.2f"|format(item.preco_unitario) }}</td>
+                                    <td>R$ {{ "%.2f"|format(item.valor_total) }}</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                            <tfoot>
+                                <tr class="table-info">
+                                    <td colspan="5" class="text-end"><strong>Total:</strong></td>
+                                    <td><strong>R$ {{ "%.2f"|format(proposta.valor_total) }}</strong></td>
+                                </tr>
+                                {% if proposta.desconto_percentual > 0 %}
+                                <tr class="table-success">
+                                    <td colspan="5" class="text-end"><strong>Desconto ({{ proposta.desconto_percentual }}%):</strong></td>
+                                    <td><strong>- R$ {{ "%.2f"|format(proposta.valor_total * proposta.desconto_percentual / 100) }}</strong></td>
+                                </tr>
+                                <tr class="table-primary">
+                                    <td colspan="5" class="text-end"><strong>Valor Final:</strong></td>
+                                    <td><strong>R$ {{ "%.2f"|format(proposta.valor_final) }}</strong></td>
+                                </tr>
+                                {% endif %}
+                            </tfoot>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Condições -->
+            {% if proposta.condicoes_pagamento or proposta.garantias or proposta.observacoes %}
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5><i class="fas fa-file-alt"></i> Condições e Observações</h5>
+                </div>
+                <div class="card-body">
+                    {% if proposta.condicoes_pagamento %}
+                    <div class="mb-3">
+                        <strong>Condições de Pagamento:</strong><br>
+                        {{ proposta.condicoes_pagamento|nl2br|safe }}
+                    </div>
+                    {% endif %}
+                    
+                    {% if proposta.garantias %}
+                    <div class="mb-3">
+                        <strong>Garantias:</strong><br>
+                        {{ proposta.garantias|nl2br|safe }}
+                    </div>
+                    {% endif %}
+                    
+                    {% if proposta.observacoes %}
+                    <div class="mb-3">
+                        <strong>Observações:</strong><br>
+                        {{ proposta.observacoes|nl2br|safe }}
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+            {% endif %}
+        </div>
+
+        <!-- Informações Laterais -->
+        <div class="col-md-4">
+            <!-- Resumo Financeiro -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5><i class="fas fa-dollar-sign"></i> Resumo Financeiro</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-12">
+                            <div class="d-flex justify-content-between">
+                                <span>Valor dos Serviços:</span>
+                                <strong>R$ {{ "%.2f"|format(proposta.valor_total) }}</strong>
+                            </div>
+                            {% if proposta.desconto_percentual > 0 %}
+                            <div class="d-flex justify-content-between text-success">
+                                <span>Desconto ({{ proposta.desconto_percentual }}%):</span>
+                                <strong>- R$ {{ "%.2f"|format(proposta.valor_total * proposta.desconto_percentual / 100) }}</strong>
+                            </div>
+                            <hr>
+                            <div class="d-flex justify-content-between">
+                                <span><strong>Valor Final:</strong></span>
+                                <strong>R$ {{ "%.2f"|format(proposta.valor_final) }}</strong>
+                            </div>
+                            {% endif %}
+                            <hr>
+                            <div class="d-flex justify-content-between text-muted">
+                                <span>Margem de Lucro:</span>
+                                <span>{{ proposta.margem_lucro_percentual }}%</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Dados de Controle -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5><i class="fas fa-info-circle"></i> Informações de Controle</h5>
+                </div>
+                <div class="card-body">
+                    <div class="mb-2">
+                        <strong>Criada em:</strong><br>
+                        {{ proposta.created_at.strftime('%d/%m/%Y às %H:%M') }}
+                    </div>
+                    {% if proposta.updated_at != proposta.created_at %}
+                    <div class="mb-2">
+                        <strong>Última atualização:</strong><br>
+                        {{ proposta.updated_at.strftime('%d/%m/%Y às %H:%M') }}
+                    </div>
+                    {% endif %}
+                    {% if proposta.responsavel_comercial %}
+                    <div class="mb-2">
+                        <strong>Responsável Comercial:</strong><br>
+                        {{ proposta.responsavel_comercial.nome }}
+                    </div>
+                    {% endif %}
+                    {% if proposta.data_aprovacao %}
+                    <div class="mb-2">
+                        <strong>Aprovada em:</strong><br>
+                        {{ proposta.data_aprovacao.strftime('%d/%m/%Y às %H:%M') }}
+                    </div>
+                    {% endif %}
+                    {% if proposta.obra_gerada_id %}
+                    <div class="mb-2">
+                        <strong>Obra Gerada:</strong><br>
+                        <a href="{{ url_for('main.visualizar_obra', id=proposta.obra_gerada_id) }}" class="btn btn-sm btn-outline-info">
+                            <i class="fas fa-hammer"></i> Ver Obra
+                        </a>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Histórico de Status -->
+            {% if proposta.historico_status %}
+            <div class="card">
+                <div class="card-header">
+                    <h5><i class="fas fa-history"></i> Histórico de Status</h5>
+                </div>
+                <div class="card-body">
+                    {% for historico in proposta.historico_status|reverse %}
+                    <div class="mb-3">
+                        <div class="d-flex justify-content-between">
+                            <span class="badge bg-primary">{{ historico.status_novo.value|title|replace('_', ' ') }}</span>
+                            <small class="text-muted">{{ historico.created_at.strftime('%d/%m/%Y %H:%M') }}</small>
+                        </div>
+                        {% if historico.motivo %}
+                        <small class="text-muted">{{ historico.motivo }}</small>
+                        {% endif %}
+                        {% if historico.usuario %}
+                        <small class="text-muted d-block">Por: {{ historico.usuario.nome or historico.usuario.username }}</small>
+                        {% endif %}
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<!-- Modal de Alteração de Status -->
+<div class="modal fade" id="alterarStatusModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Alterar Status da Proposta</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <label for="novoStatus" class="form-label">Novo Status:</label>
+                    <input type="text" class="form-control" id="novoStatus" readonly>
+                </div>
+                <div class="mb-3">
+                    <label for="motivoStatus" class="form-label">Motivo (opcional):</label>
+                    <textarea class="form-control" id="motivoStatus" rows="3"></textarea>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-primary" id="confirmarStatus">Confirmar</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal de Conversão para Obra -->
+<div class="modal fade" id="converterObraModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Converter Proposta em Obra</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p>Deseja converter esta proposta aprovada em uma nova obra no sistema?</p>
+                <div class="alert alert-info">
+                    <i class="fas fa-info-circle"></i> A obra será criada automaticamente com:
+                    <ul class="mb-0 mt-2">
+                        <li>Todos os serviços da proposta</li>
+                        <li>Orçamento baseado no valor final</li>
+                        <li>Prazo de execução definido</li>
+                        <li>Cliente e local já configurados</li>
+                    </ul>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-success" id="confirmarConversao">
+                    <i class="fas fa-hammer"></i> Converter em Obra
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal de Exclusão -->
+<div class="modal fade" id="excluirPropostaModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Excluir Proposta</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p>Tem certeza que deseja excluir esta proposta?</p>
+                <div class="alert alert-warning">
+                    <i class="fas fa-exclamation-triangle"></i> Esta ação não pode ser desfeita. Todos os dados da proposta serão perdidos permanentemente.
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-danger" id="confirmarExclusao">
+                    <i class="fas fa-trash"></i> Excluir Proposta
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+let statusParaAlterar = null;
+
+function alterarStatus(novoStatus) {
+    statusParaAlterar = novoStatus;
+    document.getElementById('novoStatus').value = novoStatus.replace('_', ' ').toUpperCase();
+    document.getElementById('motivoStatus').value = '';
+    $('#alterarStatusModal').modal('show');
+}
+
+function converterParaObra() {
+    $('#converterObraModal').modal('show');
+}
+
+function excluirProposta() {
+    $('#excluirPropostaModal').modal('show');
+}
+
+// Confirmar alteração de status
+document.getElementById('confirmarStatus').addEventListener('click', function() {
+    if (!statusParaAlterar) return;
+    
+    const motivo = document.getElementById('motivoStatus').value;
+    
+    fetch(`/propostas/{{ proposta.id }}/status`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+            status: statusParaAlterar,
+            motivo: motivo
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            Swal.fire({
+                icon: 'success',
+                title: 'Sucesso!',
+                text: data.message
+            }).then(() => {
+                location.reload();
+            });
+        } else {
+            Swal.fire({
+                icon: 'error',
+                title: 'Erro',
+                text: data.message
+            });
+        }
+    })
+    .catch(error => {
+        console.error('Erro:', error);
+        Swal.fire({
+            icon: 'error',
+            title: 'Erro',
+            text: 'Erro ao alterar status da proposta'
+        });
+    })
+    .finally(() => {
+        $('#alterarStatusModal').modal('hide');
+        statusParaAlterar = null;
+    });
+});
+
+// Confirmar conversão para obra
+document.getElementById('confirmarConversao').addEventListener('click', function() {
+    fetch(`/propostas/{{ proposta.id }}/converter-obra`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            Swal.fire({
+                icon: 'success',
+                title: 'Sucesso!',
+                text: data.message,
+                confirmButtonText: 'Ver Obra Criada'
+            }).then((result) => {
+                if (result.isConfirmed) {
+                    window.location.href = `/obras/${data.obra_id}`;
+                } else {
+                    location.reload();
+                }
+            });
+        } else {
+            Swal.fire({
+                icon: 'error',
+                title: 'Erro',
+                text: data.message
+            });
+        }
+    })
+    .catch(error => {
+        console.error('Erro:', error);
+        Swal.fire({
+            icon: 'error',
+            title: 'Erro',
+            text: 'Erro ao converter proposta em obra'
+        });
+    })
+    .finally(() => {
+        $('#converterObraModal').modal('hide');
+    });
+});
+
+// Confirmar exclusão
+document.getElementById('confirmarExclusao').addEventListener('click', function() {
+    fetch(`/propostas/{{ proposta.id }}/excluir`, {
+        method: 'DELETE',
+        headers: {
+            'Content-Type': 'application/json'
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            Swal.fire({
+                icon: 'success',
+                title: 'Sucesso!',
+                text: data.message
+            }).then(() => {
+                window.location.href = '/propostas';
+            });
+        } else {
+            Swal.fire({
+                icon: 'error',
+                title: 'Erro',
+                text: data.message
+            });
+        }
+    })
+    .catch(error => {
+        console.error('Erro:', error);
+        Swal.fire({
+            icon: 'error',
+            title: 'Erro',
+            text: 'Erro ao excluir proposta'
+        });
+    })
+    .finally(() => {
+        $('#excluirPropostaModal').modal('hide');
+    });
+});
+</script>
+{% endblock %}

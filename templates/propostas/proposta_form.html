@@ -1,0 +1,431 @@
+{% extends "base.html" %}
+
+{% block title %}
+{% if acao == 'editar' %}Editar Proposta{% else %}Nova Proposta{% endif %} - SIGE
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- Cabeçalho -->
+    <div class="row mb-4">
+        <div class="col-md-8">
+            <h2>
+                <i class="fas fa-file-contract"></i> 
+                {% if acao == 'editar' %}Editar Proposta {{ proposta.numero_proposta }}{% else %}Nova Proposta Comercial{% endif %}
+            </h2>
+            <p class="text-muted">Preencha os dados da proposta comercial</p>
+        </div>
+        <div class="col-md-4 text-end">
+            <a href="{{ url_for('main.lista_propostas') }}" class="btn btn-secondary">
+                <i class="fas fa-arrow-left"></i> Voltar
+            </a>
+        </div>
+    </div>
+
+    <!-- Formulário -->
+    <form method="POST" 
+          action="{% if acao == 'editar' %}{{ url_for('main.atualizar_proposta', id=proposta.id) }}{% else %}{{ url_for('main.criar_proposta') }}{% endif %}">
+        
+        <!-- Dados do Cliente -->
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5><i class="fas fa-user"></i> Dados do Cliente</h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-8">
+                        <label for="cliente_nome" class="form-label">Nome/Razão Social *</label>
+                        <input type="text" class="form-control" id="cliente_nome" name="cliente_nome" 
+                               value="{% if proposta %}{{ proposta.cliente_nome }}{% endif %}" required>
+                    </div>
+                    <div class="col-md-4">
+                        <label for="cliente_documento" class="form-label">CPF/CNPJ</label>
+                        <input type="text" class="form-control" id="cliente_documento" name="cliente_documento"
+                               value="{% if proposta %}{{ proposta.cliente_documento }}{% endif %}">
+                    </div>
+                </div>
+                <div class="row mt-3">
+                    <div class="col-md-8">
+                        <label for="cliente_endereco" class="form-label">Endereço</label>
+                        <input type="text" class="form-control" id="cliente_endereco" name="cliente_endereco"
+                               value="{% if proposta %}{{ proposta.cliente_endereco }}{% endif %}">
+                    </div>
+                    <div class="col-md-4">
+                        <label for="cliente_telefone" class="form-label">Telefone</label>
+                        <input type="text" class="form-control" id="cliente_telefone" name="cliente_telefone"
+                               value="{% if proposta %}{{ proposta.cliente_telefone }}{% endif %}">
+                    </div>
+                </div>
+                <div class="row mt-3">
+                    <div class="col-md-6">
+                        <label for="cliente_email" class="form-label">E-mail</label>
+                        <input type="email" class="form-control" id="cliente_email" name="cliente_email"
+                               value="{% if proposta %}{{ proposta.cliente_email }}{% endif %}">
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Dados do Projeto -->
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5><i class="fas fa-hammer"></i> Dados do Projeto</h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-12">
+                        <label for="titulo_projeto" class="form-label">Título do Projeto *</label>
+                        <input type="text" class="form-control" id="titulo_projeto" name="titulo_projeto"
+                               value="{% if proposta %}{{ proposta.titulo_projeto }}{% endif %}" required>
+                    </div>
+                </div>
+                <div class="row mt-3">
+                    <div class="col-md-12">
+                        <label for="local_execucao" class="form-label">Local de Execução *</label>
+                        <textarea class="form-control" id="local_execucao" name="local_execucao" rows="2" required>{% if proposta %}{{ proposta.local_execucao }}{% endif %}</textarea>
+                    </div>
+                </div>
+                <div class="row mt-3">
+                    <div class="col-md-12">
+                        <label for="descricao_projeto" class="form-label">Descrição do Projeto</label>
+                        <textarea class="form-control" id="descricao_projeto" name="descricao_projeto" rows="3">{% if proposta %}{{ proposta.descricao_projeto }}{% endif %}</textarea>
+                    </div>
+                </div>
+                <div class="row mt-3">
+                    <div class="col-md-3">
+                        <label for="area_total_m2" class="form-label">Área Total (m²)</label>
+                        <input type="number" step="0.01" class="form-control" id="area_total_m2" name="area_total_m2"
+                               value="{% if proposta %}{{ proposta.area_total_m2 }}{% endif %}">
+                    </div>
+                    <div class="col-md-3">
+                        <label for="peso_total_kg" class="form-label">Peso Total (kg)</label>
+                        <input type="number" step="0.01" class="form-control" id="peso_total_kg" name="peso_total_kg"
+                               value="{% if proposta %}{{ proposta.peso_total_kg }}{% endif %}">
+                    </div>
+                    <div class="col-md-3">
+                        <label for="prazo_execucao_dias" class="form-label">Prazo (dias)</label>
+                        <input type="number" class="form-control" id="prazo_execucao_dias" name="prazo_execucao_dias"
+                               value="{% if proposta %}{{ proposta.prazo_execucao_dias }}{% else %}30{% endif %}">
+                    </div>
+                    <div class="col-md-3">
+                        <label for="data_validade" class="form-label">Validade da Proposta</label>
+                        <input type="date" class="form-control" id="data_validade" name="data_validade"
+                               value="{% if proposta %}{{ proposta.data_validade.strftime('%Y-%m-%d') }}{% endif %}">
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Escopo de Serviços -->
+        <div class="card mb-4">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5><i class="fas fa-list"></i> Escopo de Serviços</h5>
+                <button type="button" class="btn btn-sm btn-primary" onclick="adicionarServico()">
+                    <i class="fas fa-plus"></i> Adicionar Serviço
+                </button>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-bordered" id="servicos-table">
+                        <thead>
+                            <tr>
+                                <th width="35%">Serviço</th>
+                                <th width="15%">Quantidade</th>
+                                <th width="10%">Unidade</th>
+                                <th width="15%">Preço Unit.</th>
+                                <th width="15%">Valor Total</th>
+                                <th width="10%">Ações</th>
+                            </tr>
+                        </thead>
+                        <tbody id="servicos-tbody">
+                            {% if proposta and proposta.itens %}
+                            {% for item in proposta.itens %}
+                            <tr>
+                                <td>
+                                    <select class="form-select servico-select" name="servico_id[]" data-row-index="{{ loop.index0 }}" required>
+                                        <option value="">Selecione um serviço...</option>
+                                        {% for servico in servicos %}
+                                        <option value="{{ servico.id }}" 
+                                                data-preco="{{ servico.preco_unitario }}" 
+                                                data-unidade="{{ servico.unidade_medida }}"
+                                                {% if item.servico_id == servico.id %}selected{% endif %}>
+                                            {{ servico.nome }}
+                                        </option>
+                                        {% endfor %}
+                                    </select>
+                                </td>
+                                <td>
+                                    <input type="number" step="0.0001" class="form-control quantidade-input" 
+                                           name="quantidade[]" value="{{ item.quantidade }}" data-row-index="{{ loop.index0 }}" required>
+                                </td>
+                                <td>
+                                    <input type="text" class="form-control unidade-input" name="unidade[]" 
+                                           value="{{ item.unidade }}" readonly>
+                                </td>
+                                <td>
+                                    <input type="number" step="0.01" class="form-control preco-input" 
+                                           name="preco_unitario[]" value="{{ item.preco_unitario }}" data-row-index="{{ loop.index0 }}" required>
+                                </td>
+                                <td>
+                                    <input type="text" class="form-control valor-total-input" 
+                                           value="R$ {{ '%.2f'|format(item.valor_total) }}" readonly>
+                                </td>
+                                <td>
+                                    <button type="button" class="btn btn-sm btn-danger" onclick="removerServico(this)">
+                                        <i class="fas fa-trash"></i>
+                                    </button>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                            {% endif %}
+                        </tbody>
+                        <tfoot>
+                            <tr class="table-info">
+                                <td colspan="4" class="text-end"><strong>Total Geral:</strong></td>
+                                <td><strong id="total-geral">R$ 0,00</strong></td>
+                                <td></td>
+                            </tr>
+                        </tfoot>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- Condições Comerciais -->
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5><i class="fas fa-dollar-sign"></i> Condições Comerciais</h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-3">
+                        <label for="desconto_percentual" class="form-label">Desconto (%)</label>
+                        <input type="number" step="0.01" class="form-control" id="desconto_percentual" name="desconto_percentual"
+                               value="{% if proposta %}{{ proposta.desconto_percentual }}{% else %}0{% endif %}">
+                    </div>
+                    <div class="col-md-3">
+                        <label for="margem_lucro_percentual" class="form-label">Margem de Lucro (%)</label>
+                        <input type="number" step="0.01" class="form-control" id="margem_lucro_percentual" name="margem_lucro_percentual"
+                               value="{% if proposta %}{{ proposta.margem_lucro_percentual }}{% else %}30{% endif %}">
+                    </div>
+                    <div class="col-md-6">
+                        <label for="responsavel_comercial_id" class="form-label">Responsável Comercial</label>
+                        <select class="form-select" id="responsavel_comercial_id" name="responsavel_comercial_id">
+                            <option value="">Selecione o responsável...</option>
+                            {% for funcionario in funcionarios %}
+                            <option value="{{ funcionario.id }}"
+                                    {% if proposta and proposta.responsavel_comercial_id == funcionario.id %}selected{% endif %}>
+                                {{ funcionario.nome }}
+                            </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </div>
+                <div class="row mt-3">
+                    <div class="col-md-12">
+                        <label for="condicoes_pagamento" class="form-label">Condições de Pagamento</label>
+                        <textarea class="form-control" id="condicoes_pagamento" name="condicoes_pagamento" rows="3">{% if proposta %}{{ proposta.condicoes_pagamento }}{% endif %}</textarea>
+                    </div>
+                </div>
+                <div class="row mt-3">
+                    <div class="col-md-12">
+                        <label for="garantias" class="form-label">Garantias</label>
+                        <textarea class="form-control" id="garantias" name="garantias" rows="3">{% if proposta %}{{ proposta.garantias }}{% endif %}</textarea>
+                    </div>
+                </div>
+                <div class="row mt-3">
+                    <div class="col-md-12">
+                        <label for="observacoes" class="form-label">Observações</label>
+                        <textarea class="form-control" id="observacoes" name="observacoes" rows="3">{% if proposta %}{{ proposta.observacoes }}{% endif %}</textarea>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Botões de Ação -->
+        <div class="card">
+            <div class="card-body text-center">
+                <button type="submit" class="btn btn-success btn-lg me-3">
+                    <i class="fas fa-save"></i> 
+                    {% if acao == 'editar' %}Atualizar Proposta{% else %}Criar Proposta{% endif %}
+                </button>
+                <a href="{{ url_for('main.lista_propostas') }}" class="btn btn-secondary btn-lg">
+                    <i class="fas fa-times"></i> Cancelar
+                </a>
+            </div>
+        </div>
+
+        <!-- Campo oculto para dados dos serviços (JSON) -->
+        <input type="hidden" id="itens_servicos" name="itens_servicos">
+    </form>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+let servicosData = @json([{
+    'id': servico.id,
+    'nome': servico.nome,
+    'preco_unitario': servico.preco_unitario|float,
+    'unidade_medida': servico.unidade_medida
+} for servico in servicos]);
+
+function adicionarServico() {
+    const tbody = document.getElementById('servicos-tbody');
+    const rowIndex = tbody.children.length;
+    
+    const row = document.createElement('tr');
+    row.innerHTML = `
+        <td>
+            <select class="form-select servico-select" name="servico_id[]" data-row-index="${rowIndex}" required>
+                <option value="">Selecione um serviço...</option>
+                ${servicosData.map(s => `<option value="${s.id}" data-preco="${s.preco_unitario}" data-unidade="${s.unidade_medida}">${s.nome}</option>`).join('')}
+            </select>
+        </td>
+        <td>
+            <input type="number" step="0.0001" class="form-control quantidade-input" name="quantidade[]" data-row-index="${rowIndex}" required>
+        </td>
+        <td>
+            <input type="text" class="form-control unidade-input" name="unidade[]" readonly>
+        </td>
+        <td>
+            <input type="number" step="0.01" class="form-control preco-input" name="preco_unitario[]" data-row-index="${rowIndex}" required>
+        </td>
+        <td>
+            <input type="text" class="form-control valor-total-input" readonly>
+        </td>
+        <td>
+            <button type="button" class="btn btn-sm btn-danger" onclick="removerServico(this)">
+                <i class="fas fa-trash"></i>
+            </button>
+        </td>
+    `;
+    
+    tbody.appendChild(row);
+    attachEventListeners(row);
+}
+
+function removerServico(button) {
+    button.closest('tr').remove();
+    recalcularTotal();
+}
+
+function attachEventListeners(row) {
+    const servicoSelect = row.querySelector('.servico-select');
+    const quantidadeInput = row.querySelector('.quantidade-input');
+    const precoInput = row.querySelector('.preco-input');
+    const unidadeInput = row.querySelector('.unidade-input');
+    
+    servicoSelect.addEventListener('change', function() {
+        const selectedOption = this.options[this.selectedIndex];
+        if (selectedOption.value) {
+            precoInput.value = selectedOption.dataset.preco;
+            unidadeInput.value = selectedOption.dataset.unidade;
+            recalcularLinha(row);
+        }
+    });
+    
+    quantidadeInput.addEventListener('input', () => recalcularLinha(row));
+    precoInput.addEventListener('input', () => recalcularLinha(row));
+}
+
+function recalcularLinha(row) {
+    const quantidade = parseFloat(row.querySelector('.quantidade-input').value) || 0;
+    const preco = parseFloat(row.querySelector('.preco-input').value) || 0;
+    const total = quantidade * preco;
+    
+    row.querySelector('.valor-total-input').value = `R$ ${total.toFixed(2)}`;
+    recalcularTotal();
+}
+
+function recalcularTotal() {
+    let totalGeral = 0;
+    document.querySelectorAll('.valor-total-input').forEach(input => {
+        const valor = parseFloat(input.value.replace('R$ ', '').replace(',', '.')) || 0;
+        totalGeral += valor;
+    });
+    
+    document.getElementById('total-geral').textContent = `R$ ${totalGeral.toFixed(2)}`;
+}
+
+function serializarItensServicos() {
+    const itens = [];
+    const rows = document.querySelectorAll('#servicos-tbody tr');
+    
+    rows.forEach(row => {
+        const servicoId = row.querySelector('.servico-select').value;
+        const quantidade = row.querySelector('.quantidade-input').value;
+        const precoUnitario = row.querySelector('.preco-input').value;
+        
+        if (servicoId && quantidade && precoUnitario) {
+            itens.push({
+                servico_id: parseInt(servicoId),
+                quantidade: parseFloat(quantidade),
+                preco_unitario: parseFloat(precoUnitario)
+            });
+        }
+    });
+    
+    document.getElementById('itens_servicos').value = JSON.stringify(itens);
+}
+
+// Inicialização
+document.addEventListener('DOMContentLoaded', function() {
+    // Anexar event listeners às linhas existentes
+    document.querySelectorAll('#servicos-tbody tr').forEach(attachEventListeners);
+    
+    // Calcular total inicial
+    recalcularTotal();
+    
+    // Serializar dados antes do submit
+    document.querySelector('form').addEventListener('submit', function(e) {
+        serializarItensServicos();
+    });
+    
+    // Auto-preencher data de validade se não definida
+    const dataValidadeInput = document.getElementById('data_validade');
+    if (!dataValidadeInput.value) {
+        const hoje = new Date();
+        hoje.setDate(hoje.getDate() + 30); // 30 dias a partir de hoje
+        dataValidadeInput.value = hoje.toISOString().split('T')[0];
+    }
+});
+
+// Máscara para CPF/CNPJ
+document.getElementById('cliente_documento').addEventListener('input', function(e) {
+    let value = e.target.value.replace(/\D/g, '');
+    
+    if (value.length <= 11) {
+        // CPF: 000.000.000-00
+        value = value.replace(/(\d{3})(\d)/, '$1.$2');
+        value = value.replace(/(\d{3})(\d)/, '$1.$2');
+        value = value.replace(/(\d{3})(\d{1,2})$/, '$1-$2');
+    } else {
+        // CNPJ: 00.000.000/0000-00
+        value = value.replace(/^(\d{2})(\d)/, '$1.$2');
+        value = value.replace(/^(\d{2})\.(\d{3})(\d)/, '$1.$2.$3');
+        value = value.replace(/\.(\d{3})(\d)/, '.$1/$2');
+        value = value.replace(/(\d{4})(\d)/, '$1-$2');
+    }
+    
+    e.target.value = value;
+});
+
+// Máscara para telefone
+document.getElementById('cliente_telefone').addEventListener('input', function(e) {
+    let value = e.target.value.replace(/\D/g, '');
+    
+    if (value.length <= 10) {
+        // Telefone fixo: (00) 0000-0000
+        value = value.replace(/(\d{2})(\d)/, '($1) $2');
+        value = value.replace(/(\d{4})(\d)/, '$1-$2');
+    } else {
+        // Celular: (00) 00000-0000
+        value = value.replace(/(\d{2})(\d)/, '($1) $2');
+        value = value.replace(/(\d{5})(\d)/, '$1-$2');
+    }
+    
+    e.target.value = value;
+});
+</script>
+{% endblock %}
