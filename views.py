@@ -838,7 +838,11 @@ def novo_funcionario():
                 foto_path = salvar_foto_funcionario(form.foto.data, funcionario.codigo)
                 if foto_path:
                     funcionario.foto = foto_path
-                    funcionario.foto_editada_usuario = True  # Marcar como editada pelo usuário
+                    # Marcar como editada pelo usuário (se coluna existir)
+                    try:
+                        funcionario.foto_editada_usuario = True
+                    except:
+                        pass  # Coluna não existe em produção ainda
             
             db.session.commit()
             flash('Funcionário cadastrado com sucesso!', 'success')
@@ -903,7 +907,11 @@ def editar_funcionario(id):
                     foto_path = salvar_foto_funcionario(foto, funcionario.codigo)
                     if foto_path:
                         funcionario.foto = foto_path
-                        funcionario.foto_editada_usuario = True  # Marcar como editada pelo usuário
+                        # Marcar como editada pelo usuário (se coluna existir)
+                        try:
+                            funcionario.foto_editada_usuario = True
+                        except:
+                            pass  # Coluna não existe em produção ainda
             
             db.session.commit()
             flash('Funcionário atualizado com sucesso!', 'success')
