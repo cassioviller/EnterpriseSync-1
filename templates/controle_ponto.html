@@ -44,15 +44,25 @@
                             <label for="tipo_registro" class="form-label">Tipo</label>
                             <select class="form-select" id="tipo_registro" name="tipo_registro">
                                 <option value="">Todos os tipos</option>
-                                <option value="trabalho_normal" {% if request.args.get('tipo_registro') == 'trabalho_normal' %}selected{% endif %}>Trabalho Normal</option>
-                                <option value="falta" {% if request.args.get('tipo_registro') == 'falta' %}selected{% endif %}>Falta</option>
-                                <option value="falta_justificada" {% if request.args.get('tipo_registro') == 'falta_justificada' %}selected{% endif %}>Falta Justificada</option>
-                                <option value="sabado_horas_extras" {% if request.args.get('tipo_registro') == 'sabado_horas_extras' %}selected{% endif %}>Sábado Horas Extras</option>
-                                <option value="domingo_horas_extras" {% if request.args.get('tipo_registro') == 'domingo_horas_extras' %}selected{% endif %}>Domingo Horas Extras</option>
-                                <option value="sabado_nao_trabalhado" {% if request.args.get('tipo_registro') == 'sabado_nao_trabalhado' %}selected{% endif %}>Sábado Não Trabalhado</option>
-                                <option value="domingo_nao_trabalhado" {% if request.args.get('tipo_registro') == 'domingo_nao_trabalhado' %}selected{% endif %}>Domingo Não Trabalhado</option>
-                                <option value="feriado_trabalhado" {% if request.args.get('tipo_registro') == 'feriado_trabalhado' %}selected{% endif %}>Feriado Trabalhado</option>
-                                <option value="meio_periodo" {% if request.args.get('tipo_registro') == 'meio_periodo' %}selected{% endif %}>Meio Período</option>
+                                
+                                <optgroup label="📋 TRABALHO">
+                                    <option value="trabalho_normal" {% if request.args.get('tipo_registro') == 'trabalho_normal' %}selected{% endif %}>👷 Trabalho Normal</option>
+                                    <option value="sabado_trabalhado" {% if request.args.get('tipo_registro') == 'sabado_trabalhado' %}selected{% endif %}>📅 Sábado Trabalhado</option>
+                                    <option value="domingo_trabalhado" {% if request.args.get('tipo_registro') == 'domingo_trabalhado' %}selected{% endif %}>📅 Domingo Trabalhado</option>
+                                    <option value="feriado_trabalhado" {% if request.args.get('tipo_registro') == 'feriado_trabalhado' %}selected{% endif %}>🎉 Feriado Trabalhado</option>
+                                </optgroup>
+                                
+                                <optgroup label="⚠️ AUSÊNCIAS">
+                                    <option value="falta" {% if request.args.get('tipo_registro') == 'falta' %}selected{% endif %}>❌ Falta</option>
+                                    <option value="falta_justificada" {% if request.args.get('tipo_registro') == 'falta_justificada' %}selected{% endif %}>⚕️ Falta Justificada</option>
+                                    <option value="ferias" {% if request.args.get('tipo_registro') == 'ferias' %}selected{% endif %}>🏖️ Férias</option>
+                                </optgroup>
+                                
+                                <optgroup label="🏠 FOLGAS">
+                                    <option value="sabado_folga" {% if request.args.get('tipo_registro') == 'sabado_folga' %}selected{% endif %}>📅 Sábado - Folga</option>
+                                    <option value="domingo_folga" {% if request.args.get('tipo_registro') == 'domingo_folga' %}selected{% endif %}>📅 Domingo - Folga</option>
+                                    <option value="feriado_folga" {% if request.args.get('tipo_registro') == 'feriado_folga' %}selected{% endif %}>🎉 Feriado - Folga</option>
+                                </optgroup>
                             </select>
                         </div>
                         <div class="col-12">

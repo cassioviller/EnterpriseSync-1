@@ -754,13 +754,25 @@ function setDateRange(period) {
                                             <label for="tipo_lancamento" class="form-label">Tipo de Lançamento*</label>
                                             <select class="form-select" id="tipo_lancamento" name="tipo_lancamento" required onchange="toggleCamposTipoLancamento()">
                                                 <option value="">Selecione...</option>
-                                                <option value="trabalho_normal">Trabalho Normal</option>
-                                                <option value="sabado_horas_extras">Sábado - Horas Extras</option>
-                                                <option value="domingo_horas_extras">Domingo - Horas Extras</option>
-                                                <option value="feriado_trabalhado">Feriado Trabalhado</option>
-                                                <option value="meio_periodo">Meio Período</option>
-                                                <option value="falta">Falta</option>
-                                                <option value="falta_justificada">Falta Justificada</option>
+                                                
+                                                <optgroup label="📋 TRABALHO (com custo)">
+                                                    <option value="trabalho_normal">👷 Trabalho Normal</option>
+                                                    <option value="sabado_trabalhado">📅 Sábado Trabalhado (+50%)</option>
+                                                    <option value="domingo_trabalhado">📅 Domingo Trabalhado (+100%)</option>
+                                                    <option value="feriado_trabalhado">🎉 Feriado Trabalhado (+100%)</option>
+                                                </optgroup>
+                                                
+                                                <optgroup label="⚠️ AUSÊNCIAS">
+                                                    <option value="falta">❌ Falta (desconta salário)</option>
+                                                    <option value="falta_justificada">⚕️ Falta Justificada</option>
+                                                    <option value="ferias">🏖️ Férias</option>
+                                                </optgroup>
+                                                
+                                                <optgroup label="🏠 FOLGAS (sem custo)">
+                                                    <option value="sabado_folga">📅 Sábado - Folga</option>
+                                                    <option value="domingo_folga">📅 Domingo - Folga</option>
+                                                    <option value="feriado_folga">🎉 Feriado - Folga</option>
+                                                </optgroup>
                                             </select>
                                         </div>
                                         <div class="col-md-3">

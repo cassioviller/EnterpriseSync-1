@@ -1,0 +1,66 @@
+
+<!-- DROPDOWN COMPLETO - TIPOS v8.1 -->
+<div class="col-md-3">
+    <label for="tipo_registro" class="form-label">Tipo de Lançamento*</label>
+    <select class="form-select" id="tipo_registro" name="tipo_registro" required>
+        <option value="">Selecione o tipo...</option>
+        
+        <optgroup label="📋 TRABALHO (com custo)">
+            <option value="trabalho_normal">👷 Trabalho Normal</option>
+            <option value="sabado_trabalhado">📅 Sábado Trabalhado (+50%)</option>
+            <option value="domingo_trabalhado">📅 Domingo Trabalhado (+100%)</option>
+            <option value="feriado_trabalhado">🎉 Feriado Trabalhado (+100%)</option>
+        </optgroup>
+        
+        <optgroup label="⚠️ AUSÊNCIAS">
+            <option value="falta">❌ Falta (desconta salário)</option>
+            <option value="falta_justificada">⚕️ Falta Justificada</option>
+            <option value="ferias">🏖️ Férias</option>
+        </optgroup>
+        
+        <optgroup label="🏠 FOLGAS (sem custo)">
+            <option value="sabado_folga">📅 Sábado - Folga</option>
+            <option value="domingo_folga">📅 Domingo - Folga</option>
+            <option value="feriado_folga">🎉 Feriado - Folga</option>
+        </optgroup>
+    </select>
+    
+    <div class="form-text">
+        <small class="text-muted">
+            <i class="fas fa-info-circle"></i>
+            Tipos com custo afetam o orçamento da obra
+        </small>
+    </div>
+</div>
+
+<script>
+// JavaScript para ajustar campos baseado no tipo
+document.getElementById('tipo_registro').addEventListener('change', function() {
+    const horasField = document.querySelector('input[name="horas_trabalhadas"]');
+    const tiposSemHoras = ['sabado_folga', 'domingo_folga', 'feriado_folga', 'falta'];
+    
+    if (tiposSemHoras.includes(this.value)) {
+        // Tipos sem horas trabalhadas
+        if (horasField) {
+            horasField.value = '0';
+            horasField.readOnly = true;
+            horasField.style.backgroundColor = '#f8f9fa';
+        }
+    } else {
+        // Tipos com horas trabalhadas
+        if (horasField) {
+            horasField.readOnly = false;
+            horasField.style.backgroundColor = '';
+            
+            // Valor padrão baseado no tipo
+            if (this.value === 'trabalho_normal') {
+                horasField.value = '8.0';
+            } else if (this.value.includes('trabalhado')) {
+                horasField.value = '8.0';
+            } else if (this.value === 'ferias') {
+                horasField.value = '8.0';
+            }
+        }
+    }
+});
+</script>
