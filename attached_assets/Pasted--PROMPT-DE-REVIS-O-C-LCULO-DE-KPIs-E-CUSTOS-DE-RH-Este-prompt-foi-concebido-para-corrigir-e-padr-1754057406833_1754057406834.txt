@@ -1,0 +1,371 @@
+📋 PROMPT DE REVISÃO – CÁLCULO DE KPIs E CUSTOS DE RH
+Este prompt foi concebido para corrigir e padronizar a forma de calcular os principais indicadores de desempenho e custos de mão de obra com base na folha de ponto, atendendo à legislação trabalhista brasileira.
+
+1️⃣ Classificação de Lançamentos
+Configure cada registro de ponto em uma das categorias abaixo, pois a forma de cálculo varia conforme o tipo de lançamento:
+
+Trabalho Normal: Horas de jornada regular (segunda a sexta, ou conforme acordo). Entram no divisor de cálculo do valor/hora.
+
+Sábado Trabalhado (+50%): Horas trabalhadas além da jornada normal ou em sábado que não faz parte da escala; remunera‑se com adicional de 50 % (valor hora × 1,5). Não entram no divisor.
+
+Domingo Trabalhado (+100%): Horas trabalhadas em domingo (dia de descanso); recebem adicional de 100 % (valor hora × 2). Não entram no divisor.
+
+Feriado Trabalhado (+100%): Horas trabalhadas em feriados; recebem adicional de 100 % (valor hora × 2). Não entram no divisor.
+
+Falta (desconta salário): Dia não trabalhado sem justificativa. Não é remunerado; as horas não entram no divisor e contam como horas perdidas.
+
+Falta Justificada: Dia não trabalhado com justificativa válida (médica ou prevista no art. 473 da CLT). É remunerado como dia normal; suas horas entram no divisor.
+
+Férias: Dias de férias remuneradas; recebem 1/3 de adicional (art. 7º, XVII, Constituição). Não entram no divisor; o valor é calculado separadamente: horas de férias × valor hora × 1,33.
+
+Folga – Sábado/Domingo/Feriado: Dias de descanso previstos. Não geram pagamento adicional além do salário já acordado; não entram no divisor, mas também não são consideradas faltas.
+
+Observação: se a escala semanal da empresa incluir parte do sábado como jornada normal (por exemplo, 4 h), ajuste a classificação de “Sábado Trabalhado” para separar o período normal (que entra no divisor) do período extra (que recebe 50 %).
+
+2️⃣ Cálculo do Valor da Hora
+Somar as horas normais: some todas as horas de Trabalho Normal e de Falta Justificada do período.
+
+Valor da hora base:
+
+valor_hora
+=
+sal
+a
+ˊ
+rio mensal
+∑
+Horas Trabalho Normal
++
+∑
+Horas Falta Justificada
+valor_hora= 
+∑Horas Trabalho Normal+∑Horas Falta Justificada
+sal 
+a
+ˊ
+ rio mensal
+​
+ 
+Horas extras (sábados, domingos e feriados trabalhados), férias, folgas e faltas sem justificativa não entram no divisor.
+
+3️⃣ Cálculo dos KPIs
+Para cada período consultado (por exemplo, de 01/07 a 31/07), calcule:
+
+Horas Trabalhadas:
+
+∑
+(
+horas de Trabalho Normal
+)
+∑(horas de Trabalho Normal)
+Horas Extras:
+
+∑
+(
+horas S
+a
+ˊ
+bado Trabalhado
+)
++
+∑
+(
+horas Domingo Trabalhado
+)
++
+∑
+(
+horas Feriado Trabalhado
+)
+∑(horas S 
+a
+ˊ
+ bado Trabalhado)+∑(horas Domingo Trabalhado)+∑(horas Feriado Trabalhado)
+Registre separadamente os diferentes adicionais (50 % ou 100 %) se precisar de análises detalhadas.
+
+Faltas: número de dias marcados como Falta (desconta salário).
+
+Atrasos:
+
+∑
+max
+⁡
+(
+0
+,
+  
+hora prevista de entrada
+−
+hora real de entrada
+)
++
+max
+⁡
+(
+0
+,
+  
+hora real de sa
+ı
+ˊ
+da
+−
+hora prevista de sa
+ı
+ˊ
+da
+)
+∑max(0,hora prevista de entrada−hora real de entrada)+max(0,hora real de sa 
+ı
+ˊ
+ da−hora prevista de sa 
+ı
+ˊ
+ da)
+Ajuste a regra conforme a política (se conta apenas entrada ou inclui saídas antecipadas).
+
+Produtividade (%): proporção entre horas úteis aproveitadas e horas totais disponíveis:
+
+Horas Trabalhadas + Horas Extras
+Horas Trabalhadas + Horas Extras + Horas Perdidas
+×
+100
+Horas Trabalhadas + Horas Extras + Horas Perdidas
+Horas Trabalhadas + Horas Extras
+​
+ ×100
+ou, se preferir comparar com a jornada planejada: Horas Trabalhadas ÷ (Dias úteis × carga diária) × 100.
+
+Absenteísmo (%):
+
+Horas Perdidas
+Horas Trabalhadas + Horas Extras + Horas Perdidas
+×
+100
+Horas Trabalhadas + Horas Extras + Horas Perdidas
+Horas Perdidas
+​
+ ×100
+ou use Dias com falta ÷ Dias programados × 100.
+
+Média Diária:
+
+Horas Trabalhadas
+N
+u
+ˊ
+mero de dias com lan
+c
+¸
+amentos
+N 
+u
+ˊ
+ mero de dias com lan 
+c
+¸
+​
+ amentos
+Horas Trabalhadas
+​
+ 
+Faltas Justificadas: número de lançamentos de Falta Justificada.
+
+Custo Mão de Obra:
+
+∑
+(
+Horas Trabalho Normal
++
+Faltas Justificadas
+)
+×
+valor_hora
+⏟
+Remunera
+c
+¸
+a
+˜
+o normal
+  
++
+  
+∑
+Horas S
+a
+ˊ
+bado Trabalhado
+×
+valor_hora
+×
+1,5
+⏟
+50
+%
+ de adicional
+  
++
+  
+(
+∑
+Horas Domingo/Feriado Trabalhado
+)
+×
+valor_hora
+×
+2
+⏟
+100
+%
+ de adicional
+  
++
+  
+∑
+Horas de F
+e
+ˊ
+rias
+×
+valor_hora
+×
+1,33
+⏟
+Adicional de f
+e
+ˊ
+rias
+Remunera 
+c
+¸
+​
+  
+a
+˜
+ o normal
+∑(Horas Trabalho Normal+Faltas Justificadas)×valor_hora
+​
+ 
+​
+ + 
+50% de adicional
+∑Horas S 
+a
+ˊ
+ bado Trabalhado×valor_hora×1,5
+​
+ 
+​
+ + 
+100% de adicional
+(∑Horas Domingo/Feriado Trabalhado)×valor_hora×2
+​
+ 
+​
+ + 
+Adicional de f 
+e
+ˊ
+ rias
+∑Horas de F 
+e
+ˊ
+ rias×valor_hora×1,33
+​
+ 
+​
+ 
+Custo Alimentação: quantidade de refeições fornecidas × valor unitário (por dia, por refeição ou conforme a política de vale‑refeição).
+
+Custo Transporte: quantidade de dias em que o vale‑transporte foi utilizado × valor diário (ou cálculo de quilometragem × custo por km, se aplicável).
+
+Outros Custos: soma de despesas extras vinculadas ao colaborador/obra (equipamentos de proteção, uniformes, treinamentos, adicional noturno, etc.).
+
+Horas Perdidas:
+
+(
+Dias 
+u
+ˊ
+teis do per
+ı
+ˊ
+odo
+×
+carga di
+a
+ˊ
+ria
+)
+−
+Horas Trabalhadas
+−
+Horas Extras (sem adicional)
+(Dias  
+u
+ˊ
+ teis do per 
+ı
+ˊ
+ odo×carga di 
+a
+ˊ
+ ria)−Horas Trabalhadas−Horas Extras (sem adicional)
+Ou simplesmente a soma de horas das Faltas (desconta salário).
+
+Eficiência (%): proporção de horas aproveitadas em relação às horas remuneradas. Uma fórmula simples:
+
+Horas Trabalhadas
+Horas Trabalhadas + Horas Perdidas
+×
+100
+Horas Trabalhadas + Horas Perdidas
+Horas Trabalhadas
+​
+ ×100
+Ou, incluindo extras e férias, ((Horas Trabalhadas + Horas Extras) ÷ Horas pagas) × 100.
+
+Valor Falta Justificada:
+
+∑
+(
+Horas Falta Justificada
+×
+valor_hora
+)
+∑(Horas Falta Justificada×valor_hora)
+Representa quanto a empresa paga pelas ausências justificadas.
+
+Custo Total:
+
+Custo M
+a
+˜
+o de Obra
++
+Custo Alimenta
+c
+¸
+a
+˜
+o
++
+Custo Transporte
++
+Outros Custos
+Custo M 
+a
+˜
+ o de Obra+Custo Alimenta 
+c
+¸
+​
+  
+a
+˜
+ o+Custo Transporte+Outros Custos
+Se o custo de férias e o valor das faltas justificadas já estiverem incluídos no custo de mão de obra, não some novamente.
+
+✅ Aplicação prática
+Utilize essas regras para processar os registros de ponto e gerar os KPIs em relatórios e dashboards. Adapte o cálculo das horas extras (50 % ou 100 %) e o valor da hora de férias conforme a convenção ou acordo coletivo da sua categoria. Se a empresa tiver escala de trabalho que inclua parte do sábado ou domingos alternados como jornada normal, ajuste as classificações e o divisor de horas para refletir essa política.

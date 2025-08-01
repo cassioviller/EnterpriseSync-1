@@ -34,8 +34,10 @@ class KPIsEngine:
     
     def calcular_kpis_funcionario(self, funcionario_id, data_inicio=None, data_fim=None):
         """
-        Calcula todos os KPIs de um funcionário no período especificado
-        Layout 4-4-2 conforme especificação
+        Calcula todos os 16 KPIs seguindo as especificações do documento oficial
+        "PROMPT DE REVISÃO – CÁLCULO DE KPIs E CUSTOS DE RH"
+        
+        Layout 4-4-4-4 com tipos padronizados v8.2
         """
         if not data_inicio:
             data_inicio = self.hoje.replace(day=1)  # Primeiro dia do mês
@@ -160,65 +162,82 @@ class KPIsEngine:
     
     def _calcular_custo_mensal(self, funcionario_id, data_inicio, data_fim):
         """
-        5. Custo Mão de Obra: Lógica baseada em horas realmente trabalhadas
+        9. Custo Mão de Obra: Implementação conforme documento oficial
         
-        PRINCÍPIO CORRETO:
-        - Se funcionário trabalha todas as horas esperadas → Custo = Salário
-        - Se trabalha menos → Custo proporcional menor
-        - Se trabalha mais (extras) → Custo proporcional maior com multiplicadores
+        FÓRMULA PADRONIZADA v8.2:
+        ∑(Horas Trabalho Normal + Faltas Justificadas) × valor_hora +
+        ∑Horas Sábado × valor_hora × 1,5 +  
+        ∑Horas Domingo/Feriado × valor_hora × 2 +
+        ∑Horas Férias × valor_hora × 1,33
+        
+        CÁLCULO DO VALOR/HORA:
+        valor_hora = salário_mensal / (∑Horas Trabalho Normal + ∑Horas Falta Justificada)
         """
         funcionario = Funcionario.query.get(funcionario_id)
         if not funcionario or not funcionario.salario:
             return 0.0
         
-        # Calcular horas trabalhadas no período
-        horas_trabalhadas = self._calcular_horas_trabalhadas(funcionario_id, data_inicio, data_fim)
+        # Buscar registros do período
+        registros = RegistroPonto.query.filter(
+            RegistroPonto.funcionario_id == funcionario_id,
+            RegistroPonto.data >= data_inicio,
+            RegistroPonto.data <= data_fim
+        ).all()
         
-        if horas_trabalhadas == 0:
-            return 0.0
+        # Classificar horas por tipo padronizado
+        horas_por_tipo = {}
+        for registro in registros:
+            tipo = registro.tipo_registro or 'trabalho_normal'
+            horas = float(registro.horas_trabalhadas or 0)
+            
+            if tipo not in horas_por_tipo:
+                horas_por_tipo[tipo] = 0.0
+            horas_por_tipo[tipo] += horas
         
-        # Para mês completo: usar proporção do salário
-        if (data_inicio.day == 1 and 
-            data_fim.month == data_inicio.month and 
-            data_fim.day >= 28):  # Mês completo
-            
-            # Determinar horas esperadas baseado no horário do funcionário
-            if funcionario.horario_trabalho and funcionario.horario_trabalho.horas_diarias:
-                horas_diarias = float(funcionario.horario_trabalho.horas_diarias)
-            else:
-                # Analisar padrão real do funcionário
-                dias_trabalhados = self._calcular_dias_com_lancamento(funcionario_id, data_inicio, data_fim)
-                if dias_trabalhados > 0:
-                    horas_diarias = horas_trabalhadas / dias_trabalhados
-                else:
-                    horas_diarias = 8.0  # Fallback
-            
+        # Calcular valor/hora base (conforme documento)
+        tipos_divisor = ['trabalho_normal', 'falta_justificada']
+        horas_divisor = sum(horas_por_tipo.get(tipo, 0.0) for tipo in tipos_divisor)
+        
+        if horas_divisor > 0:
+            valor_hora = float(funcionario.salario) / horas_divisor
+        else:
+            # Fallback: usar jornada padrão mensal
             from calcular_dias_uteis_mes import calcular_dias_uteis_mes
             dias_uteis = calcular_dias_uteis_mes(data_inicio.year, data_inicio.month)
-            horas_esperadas_mes = dias_uteis * horas_diarias
             
-            # Proporção: se trabalhou tudo, custo = salário
-            if horas_esperadas_mes > 0:
-                proporcao = horas_trabalhadas / horas_esperadas_mes
-                custo_base = float(funcionario.salario) * proporcao
+            if funcionario.horario_trabalho:
+                horas_diarias = float(funcionario.horario_trabalho.horas_diarias or 8.0)
             else:
-                custo_base = 0.0
-        else:
-            # Para períodos parciais: usar valor/hora proporcional
-            from utils import calcular_valor_hora_corrigido
-            valor_hora = calcular_valor_hora_corrigido(funcionario)
-            custo_base = horas_trabalhadas * valor_hora
+                horas_diarias = 8.0
+            
+            horas_mensais = dias_uteis * horas_diarias
+            valor_hora = float(funcionario.salario) / horas_mensais if horas_mensais > 0 else 0.0
         
-        # Adicionar custos de horas extras (se houver)
-        horas_extras = self._calcular_horas_extras(funcionario_id, data_inicio, data_fim)
-        if horas_extras > 0:
-            from utils import calcular_valor_hora_corrigido
-            valor_hora = calcular_valor_hora_corrigido(funcionario)
-            # Assumir média de 50% extra (pode ser refinado)
-            custo_extras = horas_extras * valor_hora * 0.5
-            custo_base += custo_extras
+        # Aplicar fórmula oficial do documento
+        custo_total = 0.0
         
-        return custo_base
+        # 1. Remuneração normal (trabalho normal + faltas justificadas)
+        horas_normais = (horas_por_tipo.get('trabalho_normal', 0.0) + 
+                        horas_por_tipo.get('falta_justificada', 0.0))
+        custo_total += horas_normais * valor_hora
+        
+        # 2. Sábado trabalhado (+50%)
+        horas_sabado = horas_por_tipo.get('sabado_trabalhado', 0.0)
+        custo_total += horas_sabado * valor_hora * 1.5
+        
+        # 3. Domingo trabalhado (+100%)
+        horas_domingo = horas_por_tipo.get('domingo_trabalhado', 0.0)
+        custo_total += horas_domingo * valor_hora * 2.0
+        
+        # 4. Feriado trabalhado (+100%)
+        horas_feriado = horas_por_tipo.get('feriado_trabalhado', 0.0)
+        custo_total += horas_feriado * valor_hora * 2.0
+        
+        # 5. Férias (+33%)
+        horas_ferias = horas_por_tipo.get('ferias', 0.0)
+        custo_total += horas_ferias * valor_hora * 1.33
+        
+        return custo_total
     
     def _calcular_dias_uteis_mes(self, ano, mes):
         """Calcula dias úteis reais do mês (seg-sex, excluindo feriados)"""
