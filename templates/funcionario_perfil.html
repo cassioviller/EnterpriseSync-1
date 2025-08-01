@@ -1511,24 +1511,63 @@ function abrirModalNovoPonto() {
             tipoSelect.value = '';
         }
         
-        // Abrir modal
+        // Abrir modal com múltiplas tentativas
         const modalElement = document.getElementById('pontoModal');
         if (modalElement) {
             console.log('✅ Modal encontrado, abrindo...');
             
-            // Verificar se bootstrap existe antes de usar
-            if (typeof bootstrap !== 'undefined' && bootstrap.Modal) {
-                const modal = new bootstrap.Modal(modalElement);
-                modal.show();
-                console.log('✅ Modal exibido');
-            } else {
-                console.log('❌ Bootstrap Modal não disponível, usando jQuery');
-                if (typeof $ !== 'undefined') {
-                    $('#pontoModal').modal('show');
-                } else {
-                    alert('Erro: Biblioteca de modais não encontrada.');
+            // Tentar várias abordagens para abrir o modal
+            let modalAberto = false;
+            
+            // Tentativa 1: Bootstrap 5
+            if (typeof bootstrap !== 'undefined' && bootstrap.Modal && !modalAberto) {
+                try {
+                    const modal = new bootstrap.Modal(modalElement);
+                    modal.show();
+                    modalAberto = true;
+                    console.log('✅ Modal aberto com Bootstrap 5');
+                } catch (e) {
+                    console.log('⚠️ Erro ao usar Bootstrap 5:', e.message);
                 }
             }
+            
+            // Tentativa 2: jQuery Bootstrap
+            if (!modalAberto && typeof $ !== 'undefined' && $.fn.modal) {
+                try {
+                    $('#pontoModal').modal('show');
+                    modalAberto = true;
+                    console.log('✅ Modal aberto com jQuery Bootstrap');
+                } catch (e) {
+                    console.log('⚠️ Erro ao usar jQuery Bootstrap:', e.message);
+                }
+            }
+            
+            // Tentativa 3: Manipulação direta do DOM
+            if (!modalAberto) {
+                try {
+                    modalElement.classList.add('show');
+                    modalElement.style.display = 'block';
+                    modalElement.setAttribute('aria-modal', 'true');
+                    modalElement.removeAttribute('aria-hidden');
+                    
+                    // Adicionar backdrop
+                    const backdrop = document.createElement('div');
+                    backdrop.className = 'modal-backdrop fade show';
+                    backdrop.id = 'pontoModalBackdrop';
+                    document.body.appendChild(backdrop);
+                    
+                    modalAberto = true;
+                    console.log('✅ Modal aberto com manipulação DOM direta');
+                } catch (e) {
+                    console.log('⚠️ Erro na manipulação DOM:', e.message);
+                }
+            }
+            
+            if (!modalAberto) {
+                console.error('❌ Todas as tentativas falharam');
+                alert('Erro ao abrir modal. Recarregue a página e tente novamente.');
+            }
+            
         } else {
             console.error('❌ Modal pontoModal não encontrado no DOM');
             alert('Erro: Modal não encontrado. Recarregue a página.');
@@ -1536,12 +1575,35 @@ function abrirModalNovoPonto() {
         
     } catch (error) {
         console.error('❌ Erro ao abrir modal:', error);
-        // Log detalhado do erro
-        if (error.message.includes('Cannot read properties of null')) {
-            console.error('❌ Tentando acessar propriedade de elemento null');
-            console.error('❌ Verifique se todos os elementos HTML existem');
-        }
         alert('Erro ao abrir modal. Recarregue a página e tente novamente.');
+    }
+}
+
+// Função para fechar modal manualmente
+function fecharModalPonto() {
+    const modalElement = document.getElementById('pontoModal');
+    if (modalElement) {
+        // Tentar Bootstrap primeiro
+        if (typeof bootstrap !== 'undefined' && bootstrap.Modal) {
+            const modalInstance = bootstrap.Modal.getInstance(modalElement);
+            if (modalInstance) {
+                modalInstance.hide();
+            }
+        } else if (typeof $ !== 'undefined') {
+            $('#pontoModal').modal('hide');
+        } else {
+            // Fechamento manual
+            modalElement.classList.remove('show');
+            modalElement.style.display = 'none';
+            modalElement.setAttribute('aria-hidden', 'true');
+            modalElement.removeAttribute('aria-modal');
+            
+            // Remover backdrop
+            const backdrop = document.getElementById('pontoModalBackdrop');
+            if (backdrop) {
+                backdrop.remove();
+            }
+        }
     }
 }
 
