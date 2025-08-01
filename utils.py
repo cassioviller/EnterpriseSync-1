@@ -64,6 +64,137 @@ def calcular_horas_trabalhadas(hora_entrada, hora_saida, hora_almoco_saida=None,
         'extras': round(horas_extras, 2)
     }
 
+def calcular_valor_hora_corrigido(funcionario):
+    """
+    Calcula o valor/hora correto baseado na jornada real de trabalho
+    
+    FÓRMULA CORRIGIDA:
+    - Calcular dias úteis reais do mês
+    - Multiplicar por 8.8h (jornada efetiva diária)
+    - valor_hora = salario_mensal / horas_mensais_reais
+    """
+    if not funcionario or not funcionario.salario:
+        return 0.0
+    
+    from calcular_dias_uteis_mes import calcular_dias_uteis_mes
+    
+    # Data atual para cálculo
+    hoje = datetime.now().date()
+    
+    # Calcular dias úteis do mês atual
+    dias_uteis = calcular_dias_uteis_mes(hoje.year, hoje.month)
+    
+    # Horas mensais reais = dias_úteis × 8.8h
+    horas_mensais_reais = dias_uteis * 8.8
+    
+    # Valor/hora = salário ÷ horas mensais reais
+    if horas_mensais_reais > 0:
+        valor_hora = float(funcionario.salario) / horas_mensais_reais
+    else:
+        valor_hora = 0.0
+    
+    return round(valor_hora, 2)
+
+def calcular_custos_salariais_completos(funcionario_id, data_inicio, data_fim):
+    """
+    Calcula todos os custos salariais baseado na lógica correta:
+    
+    1. Horas normais: valor_hora × horas
+    2. Horas extras dias úteis: valor_hora × 1.5 × horas_extras
+    3. Horas extras sábados: valor_hora × 1.5 × horas_extras  
+    4. Horas extras domingos/feriados: valor_hora × 2.0 × horas_extras
+    5. Faltas justificadas: valor_hora × 8.8h (dia pago)
+    6. Faltas injustificadas: -valor_hora × 8.8h (desconto)
+    7. Atrasos: -valor_hora × horas_atraso (desconto proporcional)
+    """
+    from app import db
+    from models import Funcionario, RegistroPonto
+    
+    funcionario = Funcionario.query.get(funcionario_id)
+    if not funcionario:
+        return {
+            'custo_total': 0.0,
+            'valor_hora': 0.0,
+            'detalhamento': {}
+        }
+    
+    # Calcular valor/hora correto
+    valor_hora = calcular_valor_hora_corrigido(funcionario)
+    
+    # Buscar registros do período
+    registros = RegistroPonto.query.filter(
+        RegistroPonto.funcionario_id == funcionario_id,
+        RegistroPonto.data >= data_inicio,
+        RegistroPonto.data <= data_fim
+    ).all()
+    
+    # Inicializar contadores
+    custo_horas_normais = 0.0
+    custo_extras_50 = 0.0  # Dias úteis e sábados
+    custo_extras_100 = 0.0  # Domingos e feriados
+    custo_faltas_justificadas = 0.0
+    desconto_faltas_injustificadas = 0.0
+    desconto_atrasos = 0.0
+    
+    for registro in registros:
+        tipo = registro.tipo_registro or 'trabalho_normal'
+        
+        # HORAS NORMAIS E EXTRAS
+        if registro.horas_trabalhadas and registro.horas_trabalhadas > 0:
+            horas_trab = float(registro.horas_trabalhadas)
+            horas_extras = float(registro.horas_extras or 0)
+            
+            if tipo in ['trabalho_normal', 'trabalhado']:
+                # Dia normal: até 8.8h normais, resto extras 50%
+                horas_normais = min(horas_trab - horas_extras, 8.8)
+                custo_horas_normais += valor_hora * horas_normais
+                
+                if horas_extras > 0:
+                    custo_extras_50 += valor_hora * 1.5 * horas_extras
+                    
+            elif tipo == 'sabado_horas_extras':
+                # Sábado: todas extras 50%
+                custo_extras_50 += valor_hora * 1.5 * horas_trab
+                
+            elif tipo in ['domingo_horas_extras', 'feriado_trabalhado']:
+                # Domingo/Feriado: todas extras 100%
+                custo_extras_100 += valor_hora * 2.0 * horas_trab
+        
+        # FALTAS JUSTIFICADAS (pagar dia completo)
+        if tipo == 'falta_justificada':
+            custo_faltas_justificadas += valor_hora * 8.8
+        
+        # FALTAS INJUSTIFICADAS (descontar dia)
+        elif tipo == 'falta':
+            desconto_faltas_injustificadas += valor_hora * 8.8
+        
+        # ATRASOS (desconto proporcional)
+        if registro.total_atraso_horas and registro.total_atraso_horas > 0:
+            desconto_atrasos += valor_hora * float(registro.total_atraso_horas)
+    
+    # CUSTO TOTAL
+    custo_total = (
+        custo_horas_normais + 
+        custo_extras_50 + 
+        custo_extras_100 + 
+        custo_faltas_justificadas - 
+        desconto_faltas_injustificadas - 
+        desconto_atrasos
+    )
+    
+    return {
+        'custo_total': round(custo_total, 2),
+        'valor_hora': valor_hora,
+        'detalhamento': {
+            'horas_normais': round(custo_horas_normais, 2),
+            'extras_50': round(custo_extras_50, 2),
+            'extras_100': round(custo_extras_100, 2),
+            'faltas_justificadas': round(custo_faltas_justificadas, 2),
+            'desconto_faltas': round(desconto_faltas_injustificadas, 2),
+            'desconto_atrasos': round(desconto_atrasos, 2)
+        }
+    }
+
 def gerar_codigo_funcionario():
     """Gera código único para funcionário no formato VV001, VV002, etc."""
     from models import Funcionario  # Import local para evitar circular imports

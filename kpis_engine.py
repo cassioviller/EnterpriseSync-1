@@ -158,90 +158,34 @@ class KPIsEngine:
     
     def _calcular_custo_mensal(self, funcionario_id, data_inicio, data_fim):
         """
-        5. Custo Mão de Obra: Cálculo SIMPLIFICADO e CORRETO
+        5. Custo Mão de Obra: Usando nova lógica corrigida completa
         
-        LÓGICA CORRIGIDA: Salário proporcional apenas às horas efetivamente trabalhadas
+        Utiliza a função calcular_custos_salariais_completos() que implementa:
+        - Valor/hora baseado em dias úteis reais × 8.8h (jornada correta)
+        - Horas extras: 50% dias úteis/sábados, 100% domingos/feriados  
+        - Faltas justificadas: paga 8.8h
+        - Faltas injustificadas: desconta 8.8h
+        - Atrasos: desconto proporcional
         """
-        funcionario = Funcionario.query.get(funcionario_id)
-        if not funcionario or not funcionario.salario:
+        from utils import calcular_custos_salariais_completos
+        
+        try:
+            resultado = calcular_custos_salariais_completos(funcionario_id, data_inicio, data_fim)
+            return resultado['custo_total']
+        except Exception as e:
+            # Fallback para funcionário sem dados
+            funcionario = Funcionario.query.get(funcionario_id)
+            if funcionario and funcionario.salario:
+                # Usar valor proporcional simples como fallback
+                from calcular_dias_uteis_mes import calcular_dias_uteis_mes
+                dias_uteis = calcular_dias_uteis_mes(data_inicio.year, data_inicio.month) 
+                horas_mensais = dias_uteis * 8.8
+                valor_hora = float(funcionario.salario) / horas_mensais
+                
+                # Estimar horas trabalhadas no período
+                horas_trab = self._calcular_horas_trabalhadas(funcionario_id, data_inicio, data_fim)
+                return horas_trab * valor_hora
             return 0.0
-        
-        # Buscar registros de trabalho efetivo (exclui folgas e faltas não pagas)
-        registros = RegistroPonto.query.filter(
-            RegistroPonto.funcionario_id == funcionario_id,
-            RegistroPonto.data >= data_inicio,
-            RegistroPonto.data <= data_fim,
-            RegistroPonto.tipo_registro.in_([
-                'trabalho_normal', 'trabalhado',
-                'sabado_trabalhado', 'domingo_trabalhado', 'feriado_trabalhado',
-                'meio_periodo', 'falta_justificada'
-            ])
-        ).all()
-        
-        salario_mensal = float(funcionario.salario)
-        
-        # Calcular dias úteis reais do período (mais preciso)
-        dias_uteis_periodo = self._calcular_dias_uteis_periodo(data_inicio, data_fim)
-        horas_mensais_reais = dias_uteis_periodo * 8  # 8h por dia útil
-        
-        # LÓGICA CORRIGIDA: Se o funcionário trabalhou todas as horas esperadas,
-        # o custo deve ser igual ao salário mensal
-        
-        # Calcular total de horas efetivamente trabalhadas no período
-        total_horas_trabalhadas = sum(float(r.horas_trabalhadas or 0) for r in registros)
-        
-        # Se for mês completo e funcionário trabalhou normalmente,
-        # usar o salário mensal direto
-        if (data_inicio.day == 1 and 
-            data_fim.month == data_inicio.month and 
-            data_fim.day >= 28):  # Mês completo
-            
-            # Horário: 7h12 às 17h = 8h48min = 8.8h por dia
-            horas_diarias_contrato = 8.8
-            dias_uteis_mes = self._calcular_dias_uteis_mes(data_inicio.year, data_inicio.month)
-            horas_esperadas_mes = dias_uteis_mes * horas_diarias_contrato
-            
-            # Se trabalhou próximo às horas esperadas (±10%), usar salário integral
-            if abs(total_horas_trabalhadas - horas_esperadas_mes) <= (horas_esperadas_mes * 0.1):
-                valor_hora_base = salario_mensal / total_horas_trabalhadas
-            else:
-                # Caso tenha muitas faltas ou horas extras, calcular proporcionalmente
-                valor_hora_base = salario_mensal / horas_esperadas_mes
-        else:
-            # Para períodos parciais, usar cálculo proporcional
-            dias_uteis_periodo = self._calcular_dias_uteis_periodo(data_inicio, data_fim)
-            horas_esperadas_periodo = dias_uteis_periodo * 8.8
-            valor_hora_base = salario_mensal / (self._calcular_dias_uteis_mes(data_inicio.year, data_inicio.month) * 8.8)
-        
-        custo_total = 0.0
-        
-        for registro in registros:
-            tipo = registro.tipo_registro or 'trabalho_normal'
-            horas_reg = float(registro.horas_trabalhadas or 0)
-            
-            if tipo in ['trabalho_normal', 'trabalhado']:
-                # Trabalho normal: valor base por hora
-                custo_total += horas_reg * valor_hora_base
-                
-            elif tipo == 'sabado_trabalhado':
-                # Sábado: 50% adicional sobre valor base
-                custo_total += horas_reg * valor_hora_base * 1.5
-                
-            elif tipo in ['domingo_trabalhado', 'feriado_trabalhado']:
-                # Domingo/Feriado: 100% adicional sobre valor base  
-                custo_total += horas_reg * valor_hora_base * 2.0
-                
-            elif tipo == 'meio_periodo':
-                # Meio período: valor base
-                custo_total += horas_reg * valor_hora_base
-                
-            elif tipo == 'falta_justificada':
-                # Falta justificada: paga como trabalho normal (8h)
-                custo_total += 8.0 * valor_hora_base
-            
-            # Folgas (sabado_folga, domingo_folga) não têm custo
-        
-        return custo_total
     
     def _calcular_dias_uteis_mes(self, ano, mes):
         """Calcula dias úteis reais do mês (seg-sex, excluindo feriados)"""
