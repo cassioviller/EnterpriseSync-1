@@ -10,29 +10,14 @@ def fix_fotos_startup():
         import os
         import hashlib
         
-        # Buscar funcionários sem foto válida - compatível com qualquer versão do schema
-        try:
-            # Tentar usar a nova coluna se existir
-            result = db.session.execute(db.text("""
-                SELECT id, codigo, nome 
-                FROM funcionario 
-                WHERE (foto IS NULL OR foto = '') 
-                AND (foto_editada_usuario IS NULL OR foto_editada_usuario = false)
-            """))
-            funcionarios_problema_ids = [row[0] for row in result.fetchall()]
-        except:
-            # Fallback para versão antiga do schema (sem foto_editada_usuario)
-            result = db.session.execute(db.text("""
-                SELECT id, codigo, nome 
-                FROM funcionario 
-                WHERE (foto IS NULL OR foto = '')
-            """))
-            funcionarios_problema_ids = [row[0] for row in result.fetchall()]
-        
-        if not funcionarios_problema_ids:
-            return True  # Todos têm fotos válidas
-            
-        funcionarios_problema = Funcionario.query.filter(Funcionario.id.in_(funcionarios_problema_ids)).all()
+        # Buscar funcionários sem foto válida
+        funcionarios_problema = Funcionario.query.filter(
+            db.or_(
+                Funcionario.foto.is_(None),
+                Funcionario.foto == '',
+                ~Funcionario.foto.like('fotos_funcionarios/%')
+            )
+        ).all()
         
         if not funcionarios_problema:
             return True  # Todos têm fotos válidas

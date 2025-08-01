@@ -69,7 +69,6 @@ class Funcionario(db.Model):
     salario = db.Column(db.Float, default=0.0)
     ativo = db.Column(db.Boolean, default=True)
     foto = db.Column(db.String(255))  # Caminho para o arquivo de foto
-    foto_editada_usuario = db.Column(db.Boolean, default=False)  # Flag para indicar se foto foi editada pelo usuário
     departamento_id = db.Column(db.Integer, db.ForeignKey('departamento.id'))
     funcao_id = db.Column(db.Integer, db.ForeignKey('funcao.id'))
     horario_trabalho_id = db.Column(db.Integer, db.ForeignKey('horario_trabalho.id'))
