@@ -179,8 +179,20 @@ class KPIsEngine:
         ).all()
         
         salario_mensal = float(funcionario.salario)
-        # Base: 220 horas mensais (22 dias × 10h incluindo almoço)
-        valor_hora_base = salario_mensal / 220.0
+        
+        # Calcular dias úteis reais do período (mais preciso)
+        dias_uteis_periodo = self._calcular_dias_uteis_periodo(data_inicio, data_fim)
+        horas_mensais_reais = dias_uteis_periodo * 8  # 8h por dia útil
+        
+        # Se for cálculo mensal completo, usar dias úteis do mês
+        if (data_inicio.day == 1 and 
+            data_fim.month == data_inicio.month and 
+            data_fim.day >= 28):  # Mês completo ou quase
+            dias_uteis_mes = self._calcular_dias_uteis_mes(data_inicio.year, data_inicio.month)
+            valor_hora_base = salario_mensal / (dias_uteis_mes * 8)
+        else:
+            # Para períodos parciais, usar proporção
+            valor_hora_base = salario_mensal / (horas_mensais_reais or 176)  # Fallback 22*8
         
         custo_total = 0.0
         
@@ -211,6 +223,54 @@ class KPIsEngine:
             # Folgas (sabado_folga, domingo_folga) não têm custo
         
         return custo_total
+    
+    def _calcular_dias_uteis_mes(self, ano, mes):
+        """Calcula dias úteis reais do mês (seg-sex, excluindo feriados)"""
+        import calendar
+        from datetime import timedelta
+        
+        primeiro_dia = date(ano, mes, 1)
+        ultimo_dia = date(ano, mes, calendar.monthrange(ano, mes)[1])
+        
+        dias_uteis = 0
+        feriados = self._get_feriados_brasil(ano)
+        
+        data_atual = primeiro_dia
+        while data_atual <= ultimo_dia:
+            # Segunda a sexta (weekday 0-4)
+            if data_atual.weekday() < 5 and data_atual not in feriados:
+                dias_uteis += 1
+            data_atual += timedelta(days=1)
+        
+        return dias_uteis
+    
+    def _calcular_dias_uteis_periodo(self, data_inicio, data_fim):
+        """Calcula dias úteis em um período específico"""
+        from datetime import timedelta
+        
+        dias_uteis = 0
+        feriados = self._get_feriados_brasil(data_inicio.year)
+        
+        data_atual = data_inicio
+        while data_atual <= data_fim:
+            if data_atual.weekday() < 5 and data_atual not in feriados:
+                dias_uteis += 1
+            data_atual += timedelta(days=1)
+        
+        return dias_uteis
+    
+    def _get_feriados_brasil(self, ano):
+        """Feriados nacionais fixos do Brasil"""
+        return [
+            date(ano, 1, 1),   # Confraternização Universal
+            date(ano, 4, 21),  # Tiradentes  
+            date(ano, 5, 1),   # Dia do Trabalhador
+            date(ano, 9, 7),   # Independência do Brasil
+            date(ano, 10, 12), # Nossa Senhora Aparecida
+            date(ano, 11, 2),  # Finados
+            date(ano, 11, 15), # Proclamação da República
+            date(ano, 12, 25), # Natal
+        ]
     
     def _calcular_faltas_justificadas(self, funcionario_id, data_inicio, data_fim):
         """Calcular faltas justificadas (com ocorrências aprovadas)"""
