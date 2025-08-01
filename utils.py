@@ -8,8 +8,14 @@ from flask import current_app
 
 def calcular_horas_trabalhadas(hora_entrada, hora_saida, hora_almoco_saida=None, hora_almoco_retorno=None, data=None):
     """
-    Calcula as horas trabalhadas e horas extras
-    Considera adicional de 50% para sábados
+    Calcula as horas trabalhadas e horas extras baseado no horário real de trabalho
+    
+    HORÁRIO PADRÃO: 7h12 às 17h (9h48min no local, menos 1h almoço = 8h48min = 8.8h efetivas)
+    
+    Regras de horas extras:
+    - Dias normais: acima de 8.8h efetivas (50% adicional)
+    - Sábados: todas as horas são extras (50% adicional)
+    - Domingos/Feriados: todas as horas são extras (100% adicional)
     """
     if not hora_entrada or not hora_saida:
         return {'total': 0, 'extras': 0}
@@ -22,7 +28,7 @@ def calcular_horas_trabalhadas(hora_entrada, hora_saida, hora_almoco_saida=None,
     if saida < entrada:
         saida += timedelta(days=1)
     
-    # Calcular tempo total
+    # Calcular tempo total no local
     tempo_total = saida - entrada
     
     # Descontar almoço se informado
@@ -36,19 +42,22 @@ def calcular_horas_trabalhadas(hora_entrada, hora_saida, hora_almoco_saida=None,
         tempo_almoco = almoco_retorno - almoco_saida
         tempo_total -= tempo_almoco
     
-    # Converter para horas decimais
+    # Converter para horas decimais (tempo efetivo de trabalho)
     horas_trabalhadas = tempo_total.total_seconds() / 3600
     
-    # Calcular horas extras
+    # JORNADA PADRÃO: 8.8h efetivas (8h48min)
+    jornada_padrao = 8.8
+    
+    # Calcular horas extras baseado no tipo de dia
     if data and data.weekday() == 5:  # Sábado (0=segunda, 5=sábado)
-        # No sábado, todas as horas são consideradas extras
+        # No sábado, todas as horas são consideradas extras (50% adicional)
         horas_extras = horas_trabalhadas
     elif data and data.weekday() == 6:  # Domingo
-        # No domingo, todas as horas são consideradas extras
+        # No domingo, todas as horas são consideradas extras (100% adicional)
         horas_extras = horas_trabalhadas
     else:
-        # Dias normais: extras acima de 8 horas
-        horas_extras = max(0, horas_trabalhadas - 8)
+        # Dias normais: extras acima da jornada padrão de 8.8h
+        horas_extras = max(0, horas_trabalhadas - jornada_padrao)
     
     return {
         'total': round(horas_trabalhadas, 2),
