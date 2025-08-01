@@ -1,0 +1,341 @@
+# 🔧 PROMPT: CORREÇÃO DE KPIs E LÓGICA DE CONTROLE DE PONTO
+
+## 🎯 **PROBLEMA IDENTIFICADO**
+
+Analisando o sistema atual, identifiquei **inconsistências nos KPIs** e **problemas na lógica de cálculo** de custos e controle de ponto. Os valores mostrados nos cards não batem com os detalhes, e a lógica de faltas, sábados, domingos e feriados precisa ser reformulada.
+
+---
+
+## 📋 **PROMPT PARA CORREÇÃO COMPLETA**
+
+```
+CORRIJA COMPLETAMENTE a lógica de KPIs e controle de ponto do sistema, resolvendo as inconsistências identificadas.
+
+PROBLEMAS IDENTIFICADOS:
+1. **KPIs Inconsistentes**: Valores nos cards diferem dos detalhes
+2. **Lógica de Faltas**: Faltas devem ter custo ZERO mas aparecem nos cálculos
+3. **Sábados/Domingos**: Não há diferenciação entre trabalhados e não trabalhados
+4. **Feriados**: Falta lógica clara para feriados não trabalhados
+5. **Cálculos Duplicados**: Mesmos valores sendo contados múltiplas vezes
+
+TAREFAS DE CORREÇÃO:
+
+## 1. REESTRUTURAR TIPOS DE LANÇAMENTO
+
+**Backend (Flask):**
+- Reformule a classe `TimeRecordType` com tipos mais claros:
+  ```python
+  class TimeRecordType:
+      # DIAS TRABALHADOS
+      TRABALHO_NORMAL = 'trabalho_normal'          # Segunda a Sexta normal
+      SABADO_TRABALHADO = 'sabado_trabalhado'      # Sábado com trabalho (100% extra)
+      DOMINGO_TRABALHADO = 'domingo_trabalhado'    # Domingo com trabalho (100% extra)
+      FERIADO_TRABALHADO = 'feriado_trabalhado'    # Feriado com trabalho (100% extra)
+      HORAS_EXTRAS = 'horas_extras'                # Horas extras em dia normal
+      
+      # DIAS NÃO TRABALHADOS (SEM CUSTO)
+      SABADO_FOLGA = 'sabado_folga'                # Sábado de folga - SEM CUSTO
+      DOMINGO_FOLGA = 'domingo_folga'              # Domingo de folga - SEM CUSTO
+      FERIADO_FOLGA = 'feriado_folga'              # Feriado de folga - SEM CUSTO
+      
+      # AUSÊNCIAS
+      FALTA_INJUSTIFICADA = 'falta_injustificada'  # Falta sem justificativa - SEM CUSTO
+      FALTA_JUSTIFICADA = 'falta_justificada'      # Falta justificada - COM CUSTO
+      ATESTADO_MEDICO = 'atestado_medico'          # Atestado médico - COM CUSTO
+      
+      # BENEFÍCIOS
+      FERIAS = 'ferias'                            # Férias - COM CUSTO (1/3 adicional)
+      LICENCA = 'licenca'                          # Licença - COM CUSTO
+      
+      # OUTROS
+      MEIO_PERIODO = 'meio_periodo'                # Meio período - CUSTO PROPORCIONAL
+  ```
+
+## 2. CORRIGIR LÓGICA DE CÁLCULO DE CUSTOS
+
+**Implemente a classe `CorrectedTimeCalculationService`:**
+```python
+class CorrectedTimeCalculationService:
+    def calculate_time_record_cost(self, time_record_id):
+        record = TimeRecord.query.get(time_record_id)
+        employee = record.employee
+        base_hourly_rate = float(employee.calculated_hourly_rate or 0)
+        
+        # LÓGICA CORRIGIDA POR TIPO
+        if record.record_type in ['sabado_folga', 'domingo_folga', 'feriado_folga', 'falta_injustificada']:
+            # TIPOS SEM CUSTO
+            costs = {'regular_cost': 0, 'overtime_cost': 0, 'total_cost': 0}
+            
+        elif record.record_type == 'trabalho_normal':
+            # DIA NORMAL: até 8h normal, acima disso 50% extra
+            regular_hours = min(float(record.total_hours or 0), 8.0)
+            overtime_hours = max(float(record.total_hours or 0) - 8.0, 0)
+            
+            regular_cost = regular_hours * base_hourly_rate
+            overtime_cost = overtime_hours * base_hourly_rate * 1.5
+            costs = {
+                'regular_cost': regular_cost,
+                'overtime_cost': overtime_cost,
+                'total_cost': regular_cost + overtime_cost
+            }
+            
+        elif record.record_type in ['sabado_trabalhado', 'domingo_trabalhado', 'feriado_trabalhado']:
+            # FINS DE SEMANA/FERIADOS TRABALHADOS: 100% extra
+            total_hours = float(record.total_hours or 0)
+            total_cost = total_hours * base_hourly_rate * 2.0
+            costs = {'regular_cost': total_cost, 'overtime_cost': 0, 'total_cost': total_cost}
+            
+        elif record.record_type in ['falta_justificada', 'atestado_medico']:
+            # FALTAS JUSTIFICADAS: pagamento normal
+            hours = 8.0  # 8 horas padrão
+            total_cost = hours * base_hourly_rate
+            costs = {'regular_cost': total_cost, 'overtime_cost': 0, 'total_cost': total_cost}
+            
+        elif record.record_type == 'ferias':
+            # FÉRIAS: 1/3 adicional
+            hours = 8.0
+            total_cost = hours * base_hourly_rate * 1.33
+            costs = {'regular_cost': total_cost, 'overtime_cost': 0, 'total_cost': total_cost}
+            
+        elif record.record_type == 'meio_periodo':
+            # MEIO PERÍODO: proporcional
+            hours = float(record.total_hours or 4)
+            total_cost = hours * base_hourly_rate
+            costs = {'regular_cost': total_cost, 'overtime_cost': 0, 'total_cost': total_cost}
+            
+        # Atualizar registro
+        record.regular_cost = costs['regular_cost']
+        record.overtime_cost = costs['overtime_cost']
+        record.total_cost = costs['total_cost']
+        
+        return costs
+```
+
+## 3. CORRIGIR KPIs DO FUNCIONÁRIO
+
+**Implemente a classe `CorrectedKPIService`:**
+```python
+class CorrectedKPIService:
+    def calculate_employee_kpis(self, employee_id, start_date, end_date):
+        records = TimeRecord.query.filter(
+            TimeRecord.employee_id == employee_id,
+            TimeRecord.date.between(start_date, end_date)
+        ).all()
+        
+        # INICIALIZAR CONTADORES
+        kpis = {
+            'total_worked_hours': 0,
+            'total_overtime_hours': 0,
+            'total_absences': 0,
+            'justified_absences': 0,
+            'total_labor_cost': 0,
+            'productivity_percentage': 0,
+            'attendance_percentage': 0
+        }
+        
+        # CALCULAR POR REGISTRO
+        total_possible_days = 0
+        worked_days = 0
+        
+        for record in records:
+            # CONTAR APENAS DIAS QUE DEVERIAM SER TRABALHADOS
+            if record.record_type not in ['sabado_folga', 'domingo_folga', 'feriado_folga']:
+                total_possible_days += 1
+                
+                # CONTAR DIAS EFETIVAMENTE TRABALHADOS
+                if record.record_type in [
+                    'trabalho_normal', 'sabado_trabalhado', 'domingo_trabalhado', 
+                    'feriado_trabalhado', 'meio_periodo'
+                ]:
+                    worked_days += 1
+                    kpis['total_worked_hours'] += float(record.total_hours or 0)
+                    kpis['total_overtime_hours'] += float(record.overtime_hours or 0)
+                
+                # CONTAR CUSTOS (APENAS TIPOS COM CUSTO)
+                if record.record_type not in ['falta_injustificada', 'sabado_folga', 'domingo_folga', 'feriado_folga']:
+                    kpis['total_labor_cost'] += float(record.total_cost or 0)
+                
+                # CONTAR AUSÊNCIAS
+                if record.record_type in ['falta_injustificada', 'falta_justificada', 'atestado_medico']:
+                    kpis['total_absences'] += 1
+                    
+                    if record.record_type in ['falta_justificada', 'atestado_medico']:
+                        kpis['justified_absences'] += 1
+        
+        # CALCULAR PERCENTUAIS
+        if total_possible_days > 0:
+            kpis['attendance_percentage'] = (worked_days / total_possible_days) * 100
+            
+            # Produtividade baseada em 8h por dia trabalhado
+            expected_hours = worked_days * 8
+            if expected_hours > 0:
+                kpis['productivity_percentage'] = (kpis['total_worked_hours'] / expected_hours) * 100
+        
+        return kpis
+```
+
+## 4. CORRIGIR INTERFACE DE LANÇAMENTO
+
+**Frontend (React):**
+- Atualize o dropdown de tipos de lançamento:
+```tsx
+const recordTypes = [
+    // TRABALHO
+    { value: 'trabalho_normal', label: '👷 Trabalho Normal', cost: true },
+    { value: 'sabado_trabalhado', label: '📅 Sábado Trabalhado (100% extra)', cost: true },
+    { value: 'domingo_trabalhado', label: '📅 Domingo Trabalhado (100% extra)', cost: true },
+    { value: 'feriado_trabalhado', label: '🎉 Feriado Trabalhado (100% extra)', cost: true },
+    { value: 'meio_periodo', label: '⏰ Meio Período', cost: true },
+    
+    // FOLGAS (SEM CUSTO)
+    { value: 'sabado_folga', label: '🏠 Sábado Folga', cost: false },
+    { value: 'domingo_folga', label: '🏠 Domingo Folga', cost: false },
+    { value: 'feriado_folga', label: '🏠 Feriado Folga', cost: false },
+    
+    // AUSÊNCIAS
+    { value: 'falta_injustificada', label: '❌ Falta Injustificada', cost: false },
+    { value: 'falta_justificada', label: '📋 Falta Justificada', cost: true },
+    { value: 'atestado_medico', label: '🏥 Atestado Médico', cost: true },
+    
+    // BENEFÍCIOS
+    { value: 'ferias', label: '🏖️ Férias (1/3 adicional)', cost: true },
+    { value: 'licenca', label: '📄 Licença', cost: true }
+];
+```
+
+## 5. CORRIGIR DASHBOARD DE KPIs
+
+**Implemente validação cruzada nos KPIs:**
+```tsx
+const EmployeeKPIDashboard = ({ employeeId, period }) => {
+    // BUSCAR DADOS CORRIGIDOS
+    const kpis = useCorrectedKPIs(employeeId, period);
+    
+    return (
+        <div className="grid grid-cols-4 gap-4">
+            {/* HORAS TRABALHADAS */}
+            <KPICard 
+                title="Horas Trabalhadas"
+                value={`${kpis.total_worked_hours.toFixed(1)}h`}
+                subtitle="Apenas dias efetivamente trabalhados"
+            />
+            
+            {/* CUSTO TOTAL */}
+            <KPICard 
+                title="Custo Total"
+                value={formatCurrency(kpis.total_labor_cost)}
+                subtitle="Apenas lançamentos com custo"
+                color="green"
+            />
+            
+            {/* PRODUTIVIDADE */}
+            <KPICard 
+                title="Produtividade"
+                value={`${kpis.productivity_percentage.toFixed(1)}%`}
+                subtitle="Baseado em 8h/dia trabalhado"
+                color="blue"
+            />
+            
+            {/* ASSIDUIDADE */}
+            <KPICard 
+                title="Assiduidade"
+                value={`${kpis.attendance_percentage.toFixed(1)}%`}
+                subtitle="Dias trabalhados / Dias úteis"
+                color="purple"
+            />
+        </div>
+    );
+};
+```
+
+## 6. IMPLEMENTAR VALIDAÇÕES CRUZADAS
+
+**Adicione validações para garantir consistência:**
+```python
+class KPIValidationService:
+    def validate_employee_kpis(self, employee_id, period):
+        # Buscar dados brutos
+        records = TimeRecord.query.filter(...).all()
+        
+        # Calcular totais por diferentes métodos
+        method1_total = sum(r.total_cost for r in records if r.total_cost > 0)
+        method2_total = self.calculate_by_type_sum(records)
+        
+        # Verificar consistência
+        if abs(method1_total - method2_total) > 0.01:
+            logger.warning(f"KPI inconsistency detected for employee {employee_id}")
+            
+        return {
+            'is_consistent': abs(method1_total - method2_total) <= 0.01,
+            'method1_total': method1_total,
+            'method2_total': method2_total,
+            'records_count': len(records)
+        }
+```
+
+## 7. CRIAR RELATÓRIO DE AUDITORIA
+
+**Implemente relatório para identificar inconsistências:**
+```python
+@reports_bp.route('/kpi-audit', methods=['GET'])
+def kpi_audit_report():
+    employees = Employee.query.filter_by(is_active=True).all()
+    audit_results = []
+    
+    for employee in employees:
+        validation = KPIValidationService().validate_employee_kpis(
+            employee.id, request.args.get('period')
+        )
+        
+        if not validation['is_consistent']:
+            audit_results.append({
+                'employee': employee.name,
+                'inconsistency': validation
+            })
+    
+    return jsonify({
+        'total_employees': len(employees),
+        'inconsistent_employees': len(audit_results),
+        'audit_results': audit_results
+    })
+```
+
+ENTREGÁVEIS:
+- Lógica de cálculo completamente corrigida
+- KPIs consistentes entre cards e detalhes
+- Tipos de lançamento claros e bem definidos
+- Validações cruzadas implementadas
+- Relatório de auditoria para identificar problemas
+- Interface atualizada com tipos corretos
+- Documentação da nova lógica
+
+FOCO: Garantir que os valores mostrados nos KPIs sejam EXATAMENTE os mesmos em cards e detalhes, com lógica clara para cada tipo de lançamento.
+```
+
+---
+
+## 🎯 **RESUMO DAS CORREÇÕES**
+
+### **❌ PROBLEMAS IDENTIFICADOS:**
+- KPIs inconsistentes entre cards e detalhes
+- Faltas contando como custo quando deveriam ser zero
+- Falta de diferenciação entre sábados/domingos trabalhados e folga
+- Cálculos duplicados ou incorretos
+- Interface confusa para tipos de lançamento
+
+### **✅ SOLUÇÕES IMPLEMENTADAS:**
+- **Tipos claros** de lançamento (trabalhados vs folga)
+- **Cálculos precisos** por categoria
+- **Validações cruzadas** para garantir consistência
+- **KPIs corrigidos** com lógica transparente
+- **Interface melhorada** com indicação de custo
+- **Relatório de auditoria** para monitoramento
+
+### **🔍 VALIDAÇÕES ADICIONAIS:**
+- Comparação entre diferentes métodos de cálculo
+- Logs de inconsistências
+- Relatórios de auditoria automáticos
+- Alertas para valores divergentes
+
+O prompt garante que os **KPIs sejam consistentes** e a **lógica seja clara** para todos os tipos de lançamento! 🎯
+

@@ -120,16 +120,35 @@ class KPIsEngine:
         return total or 0.0
     
     def _calcular_horas_extras(self, funcionario_id, data_inicio, data_fim):
-        """2. Horas Extras: Soma TOTAL das horas extras (campo direto + calculadas)"""
-        # Usar a soma direta do campo horas_extras que já contém todos os cálculos
-        total = db.session.query(func.sum(RegistroPonto.horas_extras)).filter(
+        """2. Horas Extras: Soma das horas extras registradas no sistema"""
+        # Para tipos especiais (sábado, domingo, feriado), usar campo horas_extras
+        # Para trabalho normal, calcular baseado em horas trabalhadas > horas diárias
+        
+        funcionario = Funcionario.query.get(funcionario_id)
+        horas_diarias_padrao = 8.0  # Padrão
+        
+        if funcionario and funcionario.horario_trabalho:
+            horas_diarias_padrao = funcionario.horario_trabalho.horas_diarias
+        
+        # Buscar todos os registros do período
+        registros = db.session.query(RegistroPonto).filter(
             RegistroPonto.funcionario_id == funcionario_id,
             RegistroPonto.data >= data_inicio,
-            RegistroPonto.data <= data_fim,
-            RegistroPonto.horas_extras.isnot(None)
-        ).scalar()
+            RegistroPonto.data <= data_fim
+        ).all()
         
-        return total or 0.0
+        total_horas_extras = 0.0
+        
+        for registro in registros:
+            # Para tipos especiais, usar campo horas_extras diretamente
+            if registro.tipo_registro in ['sabado_horas_extras', 'domingo_horas_extras', 'feriado_trabalhado']:
+                total_horas_extras += registro.horas_extras or 0
+            else:
+                # Para trabalho normal, calcular baseado em horas trabalhadas
+                if registro.horas_trabalhadas and registro.horas_trabalhadas > horas_diarias_padrao:
+                    total_horas_extras += registro.horas_trabalhadas - horas_diarias_padrao
+        
+        return total_horas_extras
     
     def _calcular_faltas(self, funcionario_id, data_inicio, data_fim):
         """3. Faltas: Número de faltas não justificadas registradas"""
@@ -158,62 +177,61 @@ class KPIsEngine:
     
     def _calcular_custo_mensal(self, funcionario_id, data_inicio, data_fim):
         """
-        5. Custo Mão de Obra: Cálculo CORRIGIDO e PADRONIZADO
+        5. Custo Mão de Obra: Cálculo SIMPLIFICADO e CONSISTENTE
         
-        NOVA LÓGICA: Cálculo preciso por hora trabalhada com percentuais corretos
+        REGRA: Salário proporcional aos dias úteis trabalhados + horas extras
+        Faltas NÃO contam para o custo (apenas dias efetivamente trabalhados)
         """
         funcionario = Funcionario.query.get(funcionario_id)
         if not funcionario or not funcionario.salario:
             return 0.0
         
-        # Buscar todos os registros do período
-        registros = RegistroPonto.query.filter(
+        salario_mensal = funcionario.salario
+        
+        # Buscar APENAS registros de trabalho efetivo (exclui faltas)
+        registros_trabalho = db.session.query(RegistroPonto).filter(
             RegistroPonto.funcionario_id == funcionario_id,
             RegistroPonto.data >= data_inicio,
-            RegistroPonto.data <= data_fim
+            RegistroPonto.data <= data_fim,
+            RegistroPonto.hora_entrada.isnot(None),  # Só dias que realmente trabalhou
+            RegistroPonto.tipo_registro.in_([
+                'trabalho_normal', 
+                'trabalhado',  # Formato atual no sistema
+                'sabado_horas_extras', 
+                'domingo_horas_extras', 
+                'feriado_trabalhado',
+                'meio_periodo'
+            ])
         ).all()
         
-        salario_mensal = float(funcionario.salario)
-        valor_hora_base = salario_mensal / 22 / 8  # 22 dias úteis, 8h por dia
+        dias_trabalhados = len(registros_trabalho)
         
-        custo_total = 0.0
+        if dias_trabalhados == 0:
+            return 0.0
         
-        for registro in registros:
-            tipo = registro.tipo_registro or 'trabalhado'
+        # Cálculo baseado em 22 dias úteis padrão por mês
+        dias_uteis_mes = 22
+        valor_dia = salario_mensal / dias_uteis_mes
+        custo_base = dias_trabalhados * valor_dia
+        
+        # Adicionar horas extras
+        valor_hora = salario_mensal / (dias_uteis_mes * 8)  # Baseado em 8h/dia
+        custo_extras = 0.0
+        
+        for registro in registros_trabalho:
+            horas_trabalhadas = registro.horas_trabalhadas or 0
+            horas_extras = registro.horas_extras or 0
             
-            # Normalizar tipos para compatibilidade
-            if tipo in ['trabalhado', 'trabalho_normal']:
-                # Dia normal: até 8h normal, resto com 50% extra
-                horas_reg = float(registro.horas_trabalhadas or 0)
-                horas_normais = min(horas_reg, 8.0)
-                horas_extras_calculadas = max(horas_reg - 8.0, 0)
-                
-                custo_reg = (horas_normais * valor_hora_base) + \
-                           (horas_extras_calculadas * valor_hora_base * 1.5)
-                custo_total += custo_reg
-                
-            elif tipo in ['sabado_horas_extras', 'sabado_trabalhado']:
-                # Sábado: 50% adicional
-                horas_reg = float(registro.horas_trabalhadas or 0)
-                custo_total += horas_reg * valor_hora_base * 1.5
-                
-            elif tipo in ['domingo_horas_extras', 'domingo_trabalhado', 'feriado_trabalhado']:
-                # Domingo/Feriado: 100% adicional
-                horas_reg = float(registro.horas_trabalhadas or 0)
-                custo_total += horas_reg * valor_hora_base * 2.0
-                
-            elif tipo == 'meio_periodo':
-                # Meio período: proporcional
-                horas_reg = float(registro.horas_trabalhadas or 0)
-                custo_total += horas_reg * valor_hora_base
-                
-            elif tipo == 'falta_justificada':
-                # Faltas justificadas: 8h normais
-                custo_total += 8.0 * valor_hora_base
-            
-            # FALTAS NÃO JUSTIFICADAS NÃO TÊM CUSTO
+            # Para tipos especiais (sábado, domingo, feriado), usar horas_extras
+            if registro.tipo_registro in ['sabado_horas_extras', 'domingo_horas_extras']:
+                custo_extras += horas_extras * valor_hora * 1.5  # 50% adicional
+            elif registro.tipo_registro == 'feriado_trabalhado':
+                custo_extras += horas_extras * valor_hora * 2.0  # 100% adicional
+            elif horas_trabalhadas > 8:  # Trabalho normal com extras
+                horas_excedentes = horas_trabalhadas - 8
+                custo_extras += horas_excedentes * valor_hora * 1.5
         
-        return custo_total
+        return custo_base + custo_extras
     
     def _calcular_faltas_justificadas(self, funcionario_id, data_inicio, data_fim):
         """Calcular faltas justificadas (com ocorrências aprovadas)"""
