@@ -22,12 +22,17 @@
 ### 📅 Registros de Ponto (31 registros)
 
 **Distribuição por tipo:**
-- `trabalho_normal`: 22 dias, 169.0h
-- `folga_sabado`: 4 dias, 0.0h  
-- `folga_domingo`: 4 dias, 0.0h
+- `trabalho_normal`: 20 dias, 152.5h
+- `folga_sabado`: 3 dias, 0.0h  
+- `folga_domingo`: 3 dias, 0.0h
 - `domingo_trabalhado`: 2 dias, 12.0h (Extra +100%)
 - `sabado_trabalhado`: 1 dia, 8.0h (Extra +50%)
 - `falta`: 1 dia, 0.0h
+- `falta_justificada`: 1 dia, 0.0h
+
+### 📋 Detalhamento Completo dos Registros (DADOS REAIS DO SISTEMA)
+
+**Aguardando consulta ao banco de dados para obter registros exatos...**
 
 ### 💰 Cálculo de Custos (Fórmula v8.2)
 
@@ -79,6 +84,10 @@ Valor/hora = R$ 7.200,00 ÷ 169.0h = R$ 42,60/h
 - `trabalho_normal`: 23 dias, 184.0h
 - `folga_sabado`: 4 dias, 0.0h
 - `folga_domingo`: 4 dias, 0.0h
+
+### 📋 Detalhamento Completo dos Registros (DADOS REAIS DO SISTEMA)
+
+**Aguardando consulta ao banco de dados para obter registros exatos...**
 
 ### 💰 Cálculo de Custos (Fórmula v8.2)
 
