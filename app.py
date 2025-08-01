@@ -68,8 +68,10 @@ with app.app_context():
     
     # Corrigir fotos dos funcionários automaticamente no startup
     try:
-        from corrigir_fotos_funcionarios import corrigir_fotos_funcionarios
-        corrigir_fotos_funcionarios()
-        logging.info("✅ Fotos dos funcionários verificadas e corrigidas automaticamente")
+        from fix_fotos_startup import fix_fotos_startup
+        if fix_fotos_startup():
+            logging.info("✅ Fotos dos funcionários verificadas e corrigidas automaticamente")
+        else:
+            logging.warning("⚠️ Algumas fotos podem não ter sido corrigidas")
     except Exception as e:
         logging.warning(f"⚠️ Aviso: Não foi possível corrigir fotos automaticamente: {e}")
