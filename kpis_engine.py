@@ -160,34 +160,65 @@ class KPIsEngine:
     
     def _calcular_custo_mensal(self, funcionario_id, data_inicio, data_fim):
         """
-        5. Custo Mão de Obra: Usando nova lógica corrigida completa
+        5. Custo Mão de Obra: Lógica baseada em horas realmente trabalhadas
         
-        Utiliza a função calcular_custos_salariais_completos() que implementa:
-        - Valor/hora baseado em dias úteis reais × 8.8h (jornada correta)
-        - Horas extras: 50% dias úteis/sábados, 100% domingos/feriados  
-        - Faltas justificadas: paga 8.8h
-        - Faltas injustificadas: desconta 8.8h
-        - Atrasos: desconto proporcional
+        PRINCÍPIO CORRETO:
+        - Se funcionário trabalha todas as horas esperadas → Custo = Salário
+        - Se trabalha menos → Custo proporcional menor
+        - Se trabalha mais (extras) → Custo proporcional maior com multiplicadores
         """
-        from utils import calcular_custos_salariais_completos
-        
-        try:
-            resultado = calcular_custos_salariais_completos(funcionario_id, data_inicio, data_fim)
-            return resultado['custo_total']
-        except Exception as e:
-            # Fallback para funcionário sem dados
-            funcionario = Funcionario.query.get(funcionario_id)
-            if funcionario and funcionario.salario:
-                # Usar valor proporcional simples como fallback
-                from calcular_dias_uteis_mes import calcular_dias_uteis_mes
-                dias_uteis = calcular_dias_uteis_mes(data_inicio.year, data_inicio.month) 
-                horas_mensais = dias_uteis * 8.8
-                valor_hora = float(funcionario.salario) / horas_mensais
-                
-                # Estimar horas trabalhadas no período
-                horas_trab = self._calcular_horas_trabalhadas(funcionario_id, data_inicio, data_fim)
-                return horas_trab * valor_hora
+        funcionario = Funcionario.query.get(funcionario_id)
+        if not funcionario or not funcionario.salario:
             return 0.0
+        
+        # Calcular horas trabalhadas no período
+        horas_trabalhadas = self._calcular_horas_trabalhadas(funcionario_id, data_inicio, data_fim)
+        
+        if horas_trabalhadas == 0:
+            return 0.0
+        
+        # Para mês completo: usar proporção do salário
+        if (data_inicio.day == 1 and 
+            data_fim.month == data_inicio.month and 
+            data_fim.day >= 28):  # Mês completo
+            
+            # Determinar horas esperadas baseado no horário do funcionário
+            if funcionario.horario_trabalho and funcionario.horario_trabalho.horas_diarias:
+                horas_diarias = float(funcionario.horario_trabalho.horas_diarias)
+            else:
+                # Analisar padrão real do funcionário
+                dias_trabalhados = self._calcular_dias_com_lancamento(funcionario_id, data_inicio, data_fim)
+                if dias_trabalhados > 0:
+                    horas_diarias = horas_trabalhadas / dias_trabalhados
+                else:
+                    horas_diarias = 8.0  # Fallback
+            
+            from calcular_dias_uteis_mes import calcular_dias_uteis_mes
+            dias_uteis = calcular_dias_uteis_mes(data_inicio.year, data_inicio.month)
+            horas_esperadas_mes = dias_uteis * horas_diarias
+            
+            # Proporção: se trabalhou tudo, custo = salário
+            if horas_esperadas_mes > 0:
+                proporcao = horas_trabalhadas / horas_esperadas_mes
+                custo_base = float(funcionario.salario) * proporcao
+            else:
+                custo_base = 0.0
+        else:
+            # Para períodos parciais: usar valor/hora proporcional
+            from utils import calcular_valor_hora_corrigido
+            valor_hora = calcular_valor_hora_corrigido(funcionario)
+            custo_base = horas_trabalhadas * valor_hora
+        
+        # Adicionar custos de horas extras (se houver)
+        horas_extras = self._calcular_horas_extras(funcionario_id, data_inicio, data_fim)
+        if horas_extras > 0:
+            from utils import calcular_valor_hora_corrigido
+            valor_hora = calcular_valor_hora_corrigido(funcionario)
+            # Assumir média de 50% extra (pode ser refinado)
+            custo_extras = horas_extras * valor_hora * 0.5
+            custo_base += custo_extras
+        
+        return custo_base
     
     def _calcular_dias_uteis_mes(self, ano, mes):
         """Calcula dias úteis reais do mês (seg-sex, excluindo feriados)"""

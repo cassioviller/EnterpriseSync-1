@@ -66,11 +66,11 @@ def calcular_horas_trabalhadas(hora_entrada, hora_saida, hora_almoco_saida=None,
 
 def calcular_valor_hora_corrigido(funcionario):
     """
-    Calcula o valor/hora correto baseado na jornada real de trabalho
+    Calcula o valor/hora correto baseado no horário de trabalho do funcionário
     
     FÓRMULA CORRIGIDA:
-    - Calcular dias úteis reais do mês
-    - Multiplicar por 8.8h (jornada efetiva diária)
+    - Se funcionário tem horário cadastrado: usar horas_diarias do horário
+    - Se não tem horário: usar padrão 8.8h (7h12-17h com 1h almoço)  
     - valor_hora = salario_mensal / horas_mensais_reais
     """
     if not funcionario or not funcionario.salario:
@@ -84,8 +84,15 @@ def calcular_valor_hora_corrigido(funcionario):
     # Calcular dias úteis do mês atual
     dias_uteis = calcular_dias_uteis_mes(hoje.year, hoje.month)
     
-    # Horas mensais reais = dias_úteis × 8.8h
-    horas_mensais_reais = dias_uteis * 8.8
+    # Determinar horas diárias baseado no horário do funcionário
+    if funcionario.horario_trabalho and funcionario.horario_trabalho.horas_diarias:
+        horas_diarias = float(funcionario.horario_trabalho.horas_diarias)
+    else:
+        # Padrão: 7h12-17h = 9h48min - 1h almoço = 8h48min = 8.8h
+        horas_diarias = 8.8
+    
+    # Horas mensais reais = dias_úteis × horas_diarias
+    horas_mensais_reais = dias_uteis * horas_diarias
     
     # Valor/hora = salário ÷ horas mensais reais
     if horas_mensais_reais > 0:
