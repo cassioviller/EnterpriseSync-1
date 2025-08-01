@@ -165,7 +165,7 @@ Valor/hora = R$ 2.800,00 ÷ 184.0h = R$ 15,22/h
 2. **Horas Extras:** 0.0h
 3. **Faltas:** 0 dias
 4. **Atrasos:** 0.0h
-5. **Produtividade:** 90.9%
+5. **Produtividade:** 100.0%
 6. **Absenteísmo:** 0.0%
 7. **Média Diária:** 8.0h
 8. **Faltas Justificadas:** 0 dias
@@ -174,7 +174,7 @@ Valor/hora = R$ 2.800,00 ÷ 184.0h = R$ 15,22/h
 11. **Custo Transporte:** R$ 0,00
 12. **Outros Custos:** R$ 0,00
 13. **Horas Perdidas:** 0.0h
-14. **Eficiência:** 90.9%
+14. **Eficiência:** 100.0%
 15. **Valor Falta Justificada:** R$ 0,00
 16. **🔵 CUSTO TOTAL:** R$ 2.800,00
 

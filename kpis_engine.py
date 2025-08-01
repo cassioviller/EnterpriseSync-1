@@ -373,15 +373,20 @@ class KPIsEngine:
         return total or 0.0
     
     def _calcular_eficiencia(self, funcionario_id, data_inicio, data_fim):
-        """Calcular eficiência (produtividade ajustada por qualidade)"""
-        produtividade = self._calcular_produtividade(funcionario_id, data_inicio, data_fim)
-        faltas = self._calcular_faltas(funcionario_id, data_inicio, data_fim)
+        """14. Eficiência: Horas Trabalhadas / (Horas Trabalhadas + Horas Perdidas)"""
+        horas_trabalhadas = self._calcular_horas_trabalhadas(funcionario_id, data_inicio, data_fim)
+        horas_perdidas = self._calcular_horas_perdidas(funcionario_id, data_inicio, data_fim)
         
-        # Eficiência = Produtividade - penalização por faltas
-        penalizacao_faltas = min(faltas * 5, 20)  # Máximo 20% de penalização
-        eficiencia = max(0, produtividade - penalizacao_faltas)
+        # CORREÇÃO: Eficiência = Horas Trabalhadas / (Horas Trabalhadas + Horas Perdidas)
+        # Se não há horas perdidas, eficiência = 100%
+        if horas_perdidas == 0:
+            return 100.0
         
-        return eficiencia
+        horas_totais = horas_trabalhadas + horas_perdidas
+        if horas_totais == 0:
+            return 0.0
+        
+        return (horas_trabalhadas / horas_totais) * 100
     
     def _calcular_valor_falta_justificada(self, funcionario_id, data_inicio, data_fim):
         """Calcular valor pago em faltas justificadas"""
@@ -444,23 +449,22 @@ class KPIsEngine:
     def _calcular_produtividade(self, funcionario_id, data_inicio, data_fim):
         """9. Produtividade: Percentual de eficiência baseado no horário específico do funcionário"""
         horas_trabalhadas = self._calcular_horas_trabalhadas(funcionario_id, data_inicio, data_fim)
+        horas_extras = self._calcular_horas_extras(funcionario_id, data_inicio, data_fim)
+        horas_perdidas = self._calcular_horas_perdidas(funcionario_id, data_inicio, data_fim)
         
-        # Buscar funcionário e seu horário de trabalho
-        funcionario = Funcionario.query.get(funcionario_id)
-        if not funcionario or not funcionario.horario_trabalho:
-            # Se não tem horário específico, usar padrão de 8h/dia
-            dias_uteis = self._calcular_dias_uteis(data_inicio, data_fim)
-            horas_esperadas = dias_uteis * 8
-        else:
-            # Usar horas diárias específicas do horário de trabalho
-            horas_diarias_padrao = funcionario.horario_trabalho.horas_diarias
-            dias_uteis = self._calcular_dias_uteis(data_inicio, data_fim)
-            horas_esperadas = dias_uteis * horas_diarias_padrao
+        # CORREÇÃO: Produtividade = Horas Úteis / (Horas Úteis + Horas Perdidas)
+        # Se não há horas perdidas, produtividade = 100%
+        horas_uteis = horas_trabalhadas + horas_extras
         
-        if horas_esperadas == 0:
+        if horas_perdidas == 0:
+            # Sem perdas = 100% de produtividade
+            return 100.0
+        
+        horas_totais = horas_uteis + horas_perdidas
+        if horas_totais == 0:
             return 0.0
             
-        return (horas_trabalhadas / horas_esperadas) * 100
+        return (horas_uteis / horas_totais) * 100
     
     def _calcular_custo_alimentacao(self, funcionario_id, data_inicio, data_fim):
         """10. Custo Alimentação: Gasto total com alimentação no período"""
