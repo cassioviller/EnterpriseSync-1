@@ -1463,29 +1463,7 @@ function abrirModalNovoPonto() {
     console.log('🎯 Abrindo modal de novo registro...');
     
     try {
-        // Verificar se todos os elementos existem primeiro
-        const elementos_necessarios = [
-            'pontoModal',
-            'pontoForm', 
-            'data_ponto',
-            'tipo_lancamento',
-            'observacoes'
-        ];
-        
-        let elementos_faltando = [];
-        elementos_necessarios.forEach(id => {
-            if (!document.getElementById(id)) {
-                elementos_faltando.push(id);
-            }
-        });
-        
-        if (elementos_faltando.length > 0) {
-            console.error('❌ Elementos faltando:', elementos_faltando);
-            alert('Erro: Elementos do modal não encontrados: ' + elementos_faltando.join(', '));
-            return;
-        }
-        
-        // Limpar formulário
+        // Limpar formulário se existir
         const form = document.getElementById('pontoForm');
         if (form) {
             form.reset();
@@ -1512,25 +1490,41 @@ function abrirModalNovoPonto() {
             titulo.innerHTML = '<i class="fas fa-clock"></i> Novo Registro de Ponto';
         }
         
-        // Esconder campos opcionais inicialmente
+        // Esconder campos opcionais inicialmente (com verificação de existência)
         const campos_opcionais = ['campos_horario', 'campo_percentual_extras', 'alertaTipoLancamento'];
         campos_opcionais.forEach(id => {
             const elemento = document.getElementById(id);
-            if (elemento) {
+            if (elemento && elemento.style) {
                 elemento.style.display = 'none';
             }
         });
         
+        // Resetar select de tipo se existir
+        const tipoSelect = document.getElementById('tipo_lancamento');
+        if (tipoSelect) {
+            tipoSelect.value = '';
+        }
+        
         // Abrir modal
         const modalElement = document.getElementById('pontoModal');
-        console.log('✅ Modal encontrado, abrindo...');
-        const modal = new bootstrap.Modal(modalElement);
-        modal.show();
-        console.log('✅ Modal exibido');
+        if (modalElement) {
+            console.log('✅ Modal encontrado, abrindo...');
+            const modal = new bootstrap.Modal(modalElement);
+            modal.show();
+            console.log('✅ Modal exibido');
+        } else {
+            console.error('❌ Modal pontoModal não encontrado no DOM');
+            alert('Erro: Modal não encontrado. Recarregue a página.');
+        }
         
     } catch (error) {
         console.error('❌ Erro ao abrir modal:', error);
-        alert('Erro ao abrir modal: ' + error.message);
+        // Log detalhado do erro
+        if (error.message.includes('Cannot read properties of null')) {
+            console.error('❌ Tentando acessar propriedade de elemento null');
+            console.error('❌ Verifique se todos os elementos HTML existem');
+        }
+        alert('Erro ao abrir modal. Recarregue a página e tente novamente.');
     }
 }
 
