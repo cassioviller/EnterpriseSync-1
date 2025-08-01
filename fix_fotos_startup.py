@@ -10,14 +10,20 @@ def fix_fotos_startup():
         import os
         import hashlib
         
-        # Buscar funcionários sem foto válida
-        funcionarios_problema = Funcionario.query.filter(
-            db.or_(
-                Funcionario.foto.is_(None),
-                Funcionario.foto == '',
-                ~Funcionario.foto.like('fotos_funcionarios/%')
-            )
-        ).all()
+        # Buscar funcionários sem foto válida, EXCETO os que têm foto editada pelo usuário
+        # Usar SQL bruto para evitar problemas com schema
+        result = db.session.execute(db.text("""
+            SELECT id, codigo, nome 
+            FROM funcionario 
+            WHERE (foto IS NULL OR foto = '') 
+            AND (foto_editada_usuario IS NULL OR foto_editada_usuario = false)
+        """))
+        funcionarios_problema_ids = [row[0] for row in result.fetchall()]
+        
+        if not funcionarios_problema_ids:
+            return True  # Todos têm fotos válidas
+            
+        funcionarios_problema = Funcionario.query.filter(Funcionario.id.in_(funcionarios_problema_ids)).all()
         
         if not funcionarios_problema:
             return True  # Todos têm fotos válidas
