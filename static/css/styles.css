@@ -10,6 +10,18 @@
     --sige-info: #0dcaf0;
 }
 
+/* Navbar brand alignment fix */
+.navbar-brand {
+    display: flex !important;
+    align-items: center !important;
+    text-decoration: none !important;
+}
+
+.navbar-brand i {
+    line-height: 1 !important;
+    vertical-align: baseline !important;
+}
+
 /* Módulo selecionado em preto */
 .nav-link.active,
 .navbar-nav .nav-link.active {
