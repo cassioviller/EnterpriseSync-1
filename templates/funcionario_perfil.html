@@ -258,9 +258,9 @@
                         </div>
                     </div>
                     <div class="col-md-3">
-                        <div class="text-center p-3 border rounded bg-gradient-primary text-white">
-                            <h4 class="mb-1 fw-bold">R$ {{ '{:,.2f}'.format(kpis.custo_total) if kpis.custo_total is defined else '0,00' }}</h4>
-                            <small class="text-light">Custo Total</small>
+                        <div class="text-center p-3 border rounded bg-primary text-white">
+                            <h4 class="mb-1 fw-bold text-white">R$ {{ '{:,.2f}'.format(kpis.custo_total) if kpis.custo_total is defined else '0,00' }}</h4>
+                            <small class="text-white">🔵 Custo Total</small>
                         </div>
                     </div>
                 </div>
@@ -1515,9 +1515,20 @@ function abrirModalNovoPonto() {
         const modalElement = document.getElementById('pontoModal');
         if (modalElement) {
             console.log('✅ Modal encontrado, abrindo...');
-            const modal = new bootstrap.Modal(modalElement);
-            modal.show();
-            console.log('✅ Modal exibido');
+            
+            // Verificar se bootstrap existe antes de usar
+            if (typeof bootstrap !== 'undefined' && bootstrap.Modal) {
+                const modal = new bootstrap.Modal(modalElement);
+                modal.show();
+                console.log('✅ Modal exibido');
+            } else {
+                console.log('❌ Bootstrap Modal não disponível, usando jQuery');
+                if (typeof $ !== 'undefined') {
+                    $('#pontoModal').modal('show');
+                } else {
+                    alert('Erro: Biblioteca de modais não encontrada.');
+                }
+            }
         } else {
             console.error('❌ Modal pontoModal não encontrado no DOM');
             alert('Erro: Modal não encontrado. Recarregue a página.');
