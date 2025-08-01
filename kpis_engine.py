@@ -184,24 +184,34 @@ class KPIsEngine:
         dias_uteis_periodo = self._calcular_dias_uteis_periodo(data_inicio, data_fim)
         horas_mensais_reais = dias_uteis_periodo * 8  # 8h por dia útil
         
-        # Horário real de trabalho: 7h12 às 17h = 9h48min - 1h almoço = 8h48min = 8.8h
-        horas_diarias_reais = 8.8  # 8 horas e 48 minutos
+        # LÓGICA CORRIGIDA: Se o funcionário trabalhou todas as horas esperadas,
+        # o custo deve ser igual ao salário mensal
         
-        # Se for cálculo mensal completo, usar dias úteis do mês
+        # Calcular total de horas efetivamente trabalhadas no período
+        total_horas_trabalhadas = sum(float(r.horas_trabalhadas or 0) for r in registros)
+        
+        # Se for mês completo e funcionário trabalhou normalmente,
+        # usar o salário mensal direto
         if (data_inicio.day == 1 and 
             data_fim.month == data_inicio.month and 
-            data_fim.day >= 28):  # Mês completo ou quase
+            data_fim.day >= 28):  # Mês completo
+            
+            # Horário: 7h12 às 17h = 8h48min = 8.8h por dia
+            horas_diarias_contrato = 8.8
             dias_uteis_mes = self._calcular_dias_uteis_mes(data_inicio.year, data_inicio.month)
-            horas_mensais_reais = dias_uteis_mes * horas_diarias_reais
-            valor_hora_base = salario_mensal / horas_mensais_reais
+            horas_esperadas_mes = dias_uteis_mes * horas_diarias_contrato
+            
+            # Se trabalhou próximo às horas esperadas (±10%), usar salário integral
+            if abs(total_horas_trabalhadas - horas_esperadas_mes) <= (horas_esperadas_mes * 0.1):
+                valor_hora_base = salario_mensal / total_horas_trabalhadas
+            else:
+                # Caso tenha muitas faltas ou horas extras, calcular proporcionalmente
+                valor_hora_base = salario_mensal / horas_esperadas_mes
         else:
-            # Para períodos parciais, usar proporção baseada em dias úteis
+            # Para períodos parciais, usar cálculo proporcional
             dias_uteis_periodo = self._calcular_dias_uteis_periodo(data_inicio, data_fim)
-            horas_periodo = dias_uteis_periodo * horas_diarias_reais
-            # Calcular proporção mensal
-            dias_uteis_mes_completo = self._calcular_dias_uteis_mes(data_inicio.year, data_inicio.month)
-            horas_mes_completo = dias_uteis_mes_completo * horas_diarias_reais
-            valor_hora_base = salario_mensal / horas_mes_completo
+            horas_esperadas_periodo = dias_uteis_periodo * 8.8
+            valor_hora_base = salario_mensal / (self._calcular_dias_uteis_mes(data_inicio.year, data_inicio.month) * 8.8)
         
         custo_total = 0.0
         
