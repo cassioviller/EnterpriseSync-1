@@ -184,15 +184,24 @@ class KPIsEngine:
         dias_uteis_periodo = self._calcular_dias_uteis_periodo(data_inicio, data_fim)
         horas_mensais_reais = dias_uteis_periodo * 8  # 8h por dia útil
         
+        # Horário real de trabalho: 7h12 às 17h = 9h48min - 1h almoço = 8h48min = 8.8h
+        horas_diarias_reais = 8.8  # 8 horas e 48 minutos
+        
         # Se for cálculo mensal completo, usar dias úteis do mês
         if (data_inicio.day == 1 and 
             data_fim.month == data_inicio.month and 
             data_fim.day >= 28):  # Mês completo ou quase
             dias_uteis_mes = self._calcular_dias_uteis_mes(data_inicio.year, data_inicio.month)
-            valor_hora_base = salario_mensal / (dias_uteis_mes * 8)
+            horas_mensais_reais = dias_uteis_mes * horas_diarias_reais
+            valor_hora_base = salario_mensal / horas_mensais_reais
         else:
-            # Para períodos parciais, usar proporção
-            valor_hora_base = salario_mensal / (horas_mensais_reais or 176)  # Fallback 22*8
+            # Para períodos parciais, usar proporção baseada em dias úteis
+            dias_uteis_periodo = self._calcular_dias_uteis_periodo(data_inicio, data_fim)
+            horas_periodo = dias_uteis_periodo * horas_diarias_reais
+            # Calcular proporção mensal
+            dias_uteis_mes_completo = self._calcular_dias_uteis_mes(data_inicio.year, data_inicio.month)
+            horas_mes_completo = dias_uteis_mes_completo * horas_diarias_reais
+            valor_hora_base = salario_mensal / horas_mes_completo
         
         custo_total = 0.0
         

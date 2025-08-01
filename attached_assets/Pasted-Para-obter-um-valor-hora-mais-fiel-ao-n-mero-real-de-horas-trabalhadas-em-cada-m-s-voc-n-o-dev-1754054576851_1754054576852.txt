@@ -1,0 +1,54 @@
+Para obter um **valor hora mais fiel** ao número real de horas trabalhadas em cada mês, você não deve fixar os 220 h mensais (que correspondem a uma jornada de 44 h semanais). Em vez disso, calcule as horas mensais com base no calendário do período. A fórmula geral é:
+
+$$
+\text{valor\_hora} = \frac{\text{salário base}}{\text{horas trabalhadas no mês}}
+$$
+
+onde:
+
+$$
+\text{horas trabalhadas no mês} = \sum_{\substack{\text{dia útil}\\\text{do mês}}} \text{horas\_diárias} \;-\; \sum_{\substack{\text{feriados}\\\text{(se não trabalhados)}}} \text{horas\_perdidas} 
+$$
+
+Em termos práticos:
+
+1. **Conte quantos dias úteis há no mês**, excluindo finais de semana (e, se aplicável, os sábados) e feriados.
+2. **Multiplique cada dia útil pela carga horária diária** do seu contrato (por exemplo, 8 h/dia).
+3. **Ajuste para sábados ou feriados trabalhados**, se eles tiverem carga horária diferenciada (por exemplo, 4 h no sábado ou 100 % de adicional em feriados).
+
+Um pseudocódigo em Python seria:
+
+```python
+from datetime import date, timedelta
+import calendar
+import holidays  # biblioteca que lista feriados nacionais/estaduais
+
+def calcular_horas_mensais(ano, mes, horas_diarias=8, horas_sabado=0, feriados_pagados=False):
+    feriados = holidays.Brazil(years=ano)
+    total_horas = 0
+    # obtém quantos dias o mês tem
+    _, num_dias = calendar.monthrange(ano, mes)
+
+    for dia in range(1, num_dias + 1):
+        d = date(ano, mes, dia)
+        weekday = d.weekday()  # 0=segunda, 6=domingo
+        # verifica se é feriado
+        if d in feriados and not feriados_pagados:
+            continue
+        # dia de segunda a sexta
+        if weekday < 5:
+            total_horas += horas_diarias
+        # sábado
+        elif weekday == 5 and horas_sabado > 0:
+            total_horas += horas_sabado
+        # domingos normalmente não contam
+    return total_horas
+
+# Exemplo: julho de 2025, com carga de 8 h de segunda a sexta e sem trabalho aos sábados
+horas = calcular_horas_mensais(2025, 7, horas_diarias=8, horas_sabado=0, feriados_pagados=False)
+valor_hora = salario_base / horas
+```
+
+Assim, se julho tiver, por exemplo, 23 dias úteis (considerando feriados e fins de semana), as horas mensais serão 23 × 8 = 184. O valor da hora será `salário_base / 184`, e não `salário_base / 220`.
+
+Caso a empresa pague os feriados como dias normais de trabalho, inclua esses dias no somatório. Se houver sábados trabalhados, defina a carga horária do sábado (`horas_sabado`) e some ao total. Dessa forma, você adequa o cálculo à realidade de cada mês e obtém um custo de hora trabalhada mais preciso.
