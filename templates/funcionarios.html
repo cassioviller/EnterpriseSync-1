@@ -935,7 +935,7 @@ function toggleCamposTipoLancamento() {
     const camposHorarios = document.getElementById('campos_horarios');
     
     // Tipos que precisam de horários
-    const tiposComHorarios = ['trabalho_normal', 'sabado_horas_extras', 'domingo_horas_extras', 'feriado_trabalhado', 'meio_periodo'];
+    const tiposComHorarios = ['trabalho_normal', 'sabado_trabalhado', 'domingo_trabalhado', 'feriado_trabalhado'];
     
     if (tiposComHorarios.includes(tipo)) {
         camposHorarios.style.display = 'block';
@@ -955,18 +955,18 @@ function toggleCamposTipoLancamento() {
                 horaSaida.value = '17:00';
                 percentualExtras.value = '';
                 break;
-            case 'sabado_horas_extras':
+            case 'sabado_trabalhado':
                 horaEntrada.value = '07:00';
-                horaAlmocoInicio.value = '';
-                horaAlmocoFim.value = '';
-                horaSaida.value = '11:00';
+                horaAlmocoInicio.value = '12:00';
+                horaAlmocoFim.value = '13:00';
+                horaSaida.value = '16:00';
                 percentualExtras.value = '50';
                 break;
-            case 'domingo_horas_extras':
+            case 'domingo_trabalhado':
                 horaEntrada.value = '07:00';
-                horaAlmocoInicio.value = '';
-                horaAlmocoFim.value = '';
-                horaSaida.value = '11:00';
+                horaAlmocoInicio.value = '12:00';
+                horaAlmocoFim.value = '13:00';
+                horaSaida.value = '16:00';
                 percentualExtras.value = '100';
                 break;
             case 'feriado_trabalhado':
@@ -976,13 +976,7 @@ function toggleCamposTipoLancamento() {
                 horaSaida.value = '17:00';
                 percentualExtras.value = '100';
                 break;
-            case 'meio_periodo':
-                horaEntrada.value = '07:12';
-                horaAlmocoInicio.value = '';
-                horaAlmocoFim.value = '';
-                horaSaida.value = '11:12';
-                percentualExtras.value = '';
-                break;
+
         }
     } else {
         camposHorarios.style.display = 'none';

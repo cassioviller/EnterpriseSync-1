@@ -251,15 +251,26 @@
                         <div class="col-md-6">
                             <label for="tipo_registro_modal" class="form-label">Tipo de Registro *</label>
                             <select class="form-select" id="tipo_registro_modal" name="tipo_registro" required>
-                                <option value="trabalho_normal">Trabalho Normal</option>
-                                <option value="falta">Falta</option>
-                                <option value="falta_justificada">Falta Justificada</option>
-                                <option value="sabado_horas_extras">Sábado Horas Extras</option>
-                                <option value="domingo_horas_extras">Domingo Horas Extras</option>
-                                <option value="sabado_nao_trabalhado">Sábado Não Trabalhado</option>
-                                <option value="domingo_nao_trabalhado">Domingo Não Trabalhado</option>
-                                <option value="feriado_trabalhado">Feriado Trabalhado</option>
-                                <option value="meio_periodo">Meio Período</option>
+                                <option value="">Selecione o tipo...</option>
+                                
+                                <optgroup label="📋 TRABALHO">
+                                    <option value="trabalho_normal">👷 Trabalho Normal</option>
+                                    <option value="sabado_trabalhado">📅 Sábado Trabalhado (+50%)</option>
+                                    <option value="domingo_trabalhado">📅 Domingo Trabalhado (+100%)</option>
+                                    <option value="feriado_trabalhado">🎉 Feriado Trabalhado (+100%)</option>
+                                </optgroup>
+                                
+                                <optgroup label="⚠️ AUSÊNCIAS">
+                                    <option value="falta">❌ Falta</option>
+                                    <option value="falta_justificada">⚕️ Falta Justificada</option>
+                                    <option value="ferias">🏖️ Férias</option>
+                                </optgroup>
+                                
+                                <optgroup label="🏠 FOLGAS">
+                                    <option value="sabado_folga">📅 Sábado - Folga</option>
+                                    <option value="domingo_folga">📅 Domingo - Folga</option>
+                                    <option value="feriado_folga">🎉 Feriado - Folga</option>
+                                </optgroup>
                             </select>
                         </div>
                         <div class="col-md-6">
@@ -422,4 +433,72 @@ $('#pontoForm').submit(function(e) {
     });
 });
 </script>
+
+<script>
+// JavaScript para controlar campos baseado no tipo
+document.addEventListener('DOMContentLoaded', function() {
+    const tipoSelect = document.getElementById('tipo_registro_modal');
+    const horariosSection = document.getElementById('horariosSection');
+    
+    if (tipoSelect) {
+        tipoSelect.addEventListener('change', function() {
+            const tiposSemHorarios = ['falta', 'sabado_folga', 'domingo_folga', 'feriado_folga', 'ferias'];
+            
+            if (tiposSemHorarios.includes(this.value)) {
+                // Tipos sem horários - ocultar seção
+                if (horariosSection) {
+                    horariosSection.style.display = 'none';
+                }
+                
+                // Limpar campos de horário
+                const camposHorario = ['entrada_modal', 'saida_almoco_modal', 'retorno_almoco_modal', 'saida_modal'];
+                camposHorario.forEach(campo => {
+                    const elemento = document.getElementById(campo);
+                    if (elemento) elemento.value = '';
+                });
+                
+            } else {
+                // Tipos com horários - mostrar seção
+                if (horariosSection) {
+                    horariosSection.style.display = 'block';
+                }
+                
+                // Definir horários padrão baseado no tipo
+                const entrada = document.getElementById('entrada_modal');
+                const saidaAlmoco = document.getElementById('saida_almoco_modal');
+                const retornoAlmoco = document.getElementById('retorno_almoco_modal');
+                const saida = document.getElementById('saida_modal');
+                
+                switch(this.value) {
+                    case 'trabalho_normal':
+                        if (entrada) entrada.value = '07:00';
+                        if (saidaAlmoco) saidaAlmoco.value = '12:00';
+                        if (retornoAlmoco) retornoAlmoco.value = '13:00';
+                        if (saida) saida.value = '16:00';
+                        break;
+                    case 'sabado_trabalhado':
+                        if (entrada) entrada.value = '07:00';
+                        if (saidaAlmoco) saidaAlmoco.value = '12:00';
+                        if (retornoAlmoco) retornoAlmoco.value = '13:00';
+                        if (saida) saida.value = '16:00';
+                        break;
+                    case 'domingo_trabalhado':
+                        if (entrada) entrada.value = '07:00';
+                        if (saidaAlmoco) saidaAlmoco.value = '12:00';
+                        if (retornoAlmoco) retornoAlmoco.value = '13:00';
+                        if (saida) saida.value = '16:00';
+                        break;
+                    case 'feriado_trabalhado':
+                        if (entrada) entrada.value = '07:00';
+                        if (saidaAlmoco) saidaAlmoco.value = '12:00';
+                        if (retornoAlmoco) retornoAlmoco.value = '13:00';
+                        if (saida) saida.value = '16:00';
+                        break;
+                }
+            }
+        });
+    }
+});
+</script>
+
 {% endblock %}
