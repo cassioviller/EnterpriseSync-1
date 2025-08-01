@@ -17,6 +17,13 @@ Preferred communication style: Simple, everyday language.
 - **Files**: `correcao_completa_kpis.py`, `interface_tipos_registro.py`, `RELATORIO_IMPLEMENTACAO_COMPLETA.md`
 - **Result**: 100% consistency in main KPIs, clear cost logic for all record types
 
+### SIGE v8.1 - Complete KPI Engine Overhaul
+- **Date**: August 1, 2025 (Later)
+- **Change**: Implemented completely new KPI engine with expanded timesheet types and precise cost calculations
+- **Impact**: 10 standardized timesheet types, cost calculator based on specific work schedules, multiple record entry interface
+- **Files**: `kpis_engine_v8_1.py`, `migrar_tipos_v8_1.py`, `interface_lancamento_multiplo.py`, `RELATORIO_IMPLEMENTACAO_V8_1.md`
+- **Result**: 12 precise KPIs, cost calculation per project, automated migration system, 100% functional testing
+
 ## System Architecture
 
 ### Core Design Principles

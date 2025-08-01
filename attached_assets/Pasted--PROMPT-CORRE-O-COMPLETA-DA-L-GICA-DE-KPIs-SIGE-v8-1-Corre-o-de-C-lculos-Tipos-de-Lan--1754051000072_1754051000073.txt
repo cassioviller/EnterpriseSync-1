@@ -1,0 +1,880 @@
+# 🔧 PROMPT: CORREÇÃO COMPLETA DA LÓGICA DE KPIs - SIGE v8.1
+## Correção de Cálculos, Tipos de Lançamento e Custo de Mão de Obra
+
+---
+
+## 🎯 **OBJETIVO**
+
+Corrigir completamente a lógica de cálculo dos KPIs do SIGE, resolvendo as inconsistências entre cards e detalhes, implementando novos tipos de lançamento (férias, sábado/domingo não trabalhados, feriados) e ajustando o cálculo de custo de mão de obra baseado na alocação por obra via RDO.
+
+---
+
+## 🚨 **PROBLEMAS IDENTIFICADOS**
+
+### **1. Inconsistência de Valores**
+- **Card mostra**: R$ 2.877 (Fernando)
+- **Detalhes mostram**: R$ 3.594,22
+- **Diferença**: R$ 717,22 (25% de discrepância)
+
+### **2. Lógica de Faltas Incorreta**
+- **Problema**: Faltas descontam dinheiro mas não há lógica clara
+- **Necessário**: Faltas não justificadas devem descontar do salário
+- **Necessário**: Faltas justificadas não descontam mas têm custo
+
+### **3. Tipos de Lançamento Incompletos**
+- **Faltam**: Férias, Sábado não trabalhado, Domingo não trabalhado
+- **Problema**: Dificulta entendimento e cálculos corretos
+- **Necessário**: Lançamento obrigatório para todos os dias
+
+### **4. Custo de Mão de Obra Incorreto**
+- **Problema**: Não considera alocação por obra
+- **Necessário**: Custo baseado em tempo alocado × salário/hora
+- **Necessário**: Cálculo automático via RDO
+
+---
+
+## 🔄 **NOVA LÓGICA DE TIPOS DE LANÇAMENTO**
+
+### **Tipos Expandidos (10 total):**
+
+```python
+TIPOS_LANCAMENTO = {
+    # Tipos de Trabalho
+    'trabalho_normal': {
+        'nome': 'Trabalho Normal',
+        'cor': 'primary',
+        'conta_produtividade': True,
+        'conta_presenca': True,
+        'gera_custo': True,
+        'permite_horas_extras': True,
+        'descricao': 'Trabalho em dia útil normal'
+    },
+    'sabado_trabalhado': {
+        'nome': 'Sábado Trabalhado',
+        'cor': 'warning',
+        'conta_produtividade': False,  # Não conta para produtividade base
+        'conta_presenca': True,
+        'gera_custo': True,
+        'adicional_percentual': 50.0,  # 50% adicional
+        'descricao': 'Trabalho em sábado (todas as horas são extras)'
+    },
+    'domingo_trabalhado': {
+        'nome': 'Domingo Trabalhado',
+        'cor': 'danger',
+        'conta_produtividade': False,
+        'conta_presenca': True,
+        'gera_custo': True,
+        'adicional_percentual': 100.0,  # 100% adicional
+        'descricao': 'Trabalho em domingo (todas as horas são extras)'
+    },
+    'feriado_trabalhado': {
+        'nome': 'Feriado Trabalhado',
+        'cor': 'info',
+        'conta_produtividade': False,
+        'conta_presenca': True,
+        'gera_custo': True,
+        'adicional_percentual': 100.0,  # 100% adicional
+        'descricao': 'Trabalho em feriado (todas as horas são extras)'
+    },
+    
+    # Tipos de Ausência
+    'falta': {
+        'nome': 'Falta',
+        'cor': 'danger',
+        'conta_produtividade': True,  # Conta negativamente
+        'conta_presenca': False,
+        'gera_custo': False,
+        'desconta_salario': True,
+        'descricao': 'Falta não justificada (desconta do salário)'
+    },
+    'falta_justificada': {
+        'nome': 'Falta Justificada',
+        'cor': 'secondary',
+        'conta_produtividade': True,  # Conta como dia programado
+        'conta_presenca': False,
+        'gera_custo': True,  # Tem custo mas não desconta
+        'desconta_salario': False,
+        'descricao': 'Falta justificada (atestado, etc.)'
+    },
+    'ferias': {
+        'nome': 'Férias',
+        'cor': 'success',
+        'conta_produtividade': False,  # Não conta para produtividade
+        'conta_presenca': False,
+        'gera_custo': True,  # Férias têm custo
+        'desconta_salario': False,
+        'descricao': 'Período de férias'
+    },
+    
+    # Tipos de Folga
+    'sabado_folga': {
+        'nome': 'Sábado - Folga',
+        'cor': 'light',
+        'conta_produtividade': False,
+        'conta_presenca': False,
+        'gera_custo': False,
+        'descricao': 'Sábado de folga (não trabalhado)'
+    },
+    'domingo_folga': {
+        'nome': 'Domingo - Folga',
+        'cor': 'light',
+        'conta_produtividade': False,
+        'conta_presenca': False,
+        'gera_custo': False,
+        'descricao': 'Domingo de folga (não trabalhado)'
+    },
+    'feriado_folga': {
+        'nome': 'Feriado - Folga',
+        'cor': 'info',
+        'conta_produtividade': False,
+        'conta_presenca': False,
+        'gera_custo': False,
+        'descricao': 'Feriado não trabalhado'
+    }
+}
+```
+
+---
+
+## 💰 **NOVA LÓGICA DE CUSTO DE MÃO DE OBRA**
+
+### **1. Cálculo de Valor/Hora por Funcionário**
+
+```python
+def calcular_valor_hora_funcionario(funcionario):
+    """
+    Calcula o valor/hora baseado no horário de trabalho específico
+    """
+    if funcionario.salario <= 0:
+        # Funcionário horista - usar valor do horário
+        horario = funcionario.horario_trabalho
+        return horario.valor_hora if horario else 15.0
+    
+    # Funcionário CLT - calcular valor/hora baseado no salário
+    horario = funcionario.horario_trabalho
+    if not horario:
+        # Padrão: 220h/mês (8h × 22 dias úteis)
+        return funcionario.salario / 220.0
+    
+    # Cálculo específico por horário
+    horas_diarias = horario.horas_diarias
+    dias_semana = len(horario.dias_semana.split(','))  # Quantos dias trabalha
+    
+    # Considerar 4.33 semanas por mês em média
+    horas_mensais = horas_diarias * dias_semana * 4.33
+    
+    return funcionario.salario / horas_mensais
+
+# Exemplos:
+# Comercial (8,8h × 5 dias × 4.33 semanas = 190,52h/mês)
+# Estagiário (5h × 5 dias × 4.33 semanas = 108,25h/mês)
+# Obra (9h × 5 dias × 4.33 semanas = 194,85h/mês)
+```
+
+### **2. Custo por Obra via RDO**
+
+```python
+def calcular_custo_mao_obra_por_obra(funcionario_id, obra_id, data_inicio, data_fim):
+    """
+    Calcula custo de mão de obra baseado na alocação por obra
+    """
+    funcionario = Funcionario.query.get(funcionario_id)
+    valor_hora = calcular_valor_hora_funcionario(funcionario)
+    
+    # Buscar registros de ponto onde funcionário estava alocado na obra
+    registros = RegistroPonto.query.filter(
+        RegistroPonto.funcionario_id == funcionario_id,
+        RegistroPonto.obra_id == obra_id,  # Alocado na obra específica
+        RegistroPonto.data.between(data_inicio, data_fim)
+    ).all()
+    
+    custo_total = 0
+    
+    for registro in registros:
+        if registro.tipo_registro in ['trabalho_normal']:
+            # Horas normais
+            horas_normais = min(registro.horas_trabalhadas, funcionario.horario_trabalho.horas_diarias)
+            custo_normal = horas_normais * valor_hora
+            
+            # Horas extras (acima do horário)
+            if registro.horas_trabalhadas > funcionario.horario_trabalho.horas_diarias:
+                horas_extras = registro.horas_trabalhadas - funcionario.horario_trabalho.horas_diarias
+                custo_extra = horas_extras * valor_hora * 1.5  # 50% adicional
+            else:
+                custo_extra = 0
+            
+            custo_total += custo_normal + custo_extra
+            
+        elif registro.tipo_registro == 'sabado_trabalhado':
+            # Sábado: todas as horas com 50% adicional
+            custo_total += registro.horas_trabalhadas * valor_hora * 1.5
+            
+        elif registro.tipo_registro in ['domingo_trabalhado', 'feriado_trabalhado']:
+            # Domingo/Feriado: todas as horas com 100% adicional
+            custo_total += registro.horas_trabalhadas * valor_hora * 2.0
+            
+        elif registro.tipo_registro == 'falta_justificada':
+            # Falta justificada: custo normal sem desconto
+            horas_diarias = funcionario.horario_trabalho.horas_diarias
+            custo_total += horas_diarias * valor_hora
+            
+        # Faltas não justificadas não geram custo
+    
+    return custo_total
+
+def atualizar_custo_automatico_via_rdo(rdo_id):
+    """
+    Atualiza automaticamente o custo de mão de obra quando RDO é salvo
+    """
+    rdo = RDO.query.get(rdo_id)
+    
+    # Buscar funcionários presentes no RDO
+    funcionarios_presentes = extrair_funcionarios_do_rdo(rdo.funcionarios_presentes)
+    
+    for funcionario_id in funcionarios_presentes:
+        # Verificar se já existe registro de ponto para o dia
+        registro_existente = RegistroPonto.query.filter(
+            RegistroPonto.funcionario_id == funcionario_id,
+            RegistroPonto.data == rdo.data,
+            RegistroPonto.obra_id == rdo.obra_id
+        ).first()
+        
+        if not registro_existente:
+            # Criar registro automático baseado no RDO
+            funcionario = Funcionario.query.get(funcionario_id)
+            horas_diarias = funcionario.horario_trabalho.horas_diarias
+            
+            registro = RegistroPonto(
+                funcionario_id=funcionario_id,
+                obra_id=rdo.obra_id,
+                data=rdo.data,
+                tipo_registro='trabalho_normal',
+                horas_trabalhadas=horas_diarias,
+                observacoes=f'Gerado automaticamente via RDO #{rdo.id}',
+                admin_id=rdo.admin_id
+            )
+            
+            db.session.add(registro)
+    
+    db.session.commit()
+```
+
+---
+
+## 📊 **NOVA ENGINE DE KPIS CORRIGIDA**
+
+### **1. KPIs Básicos (Linha 1)**
+
+```python
+def calcular_kpis_funcionario_corrigidos(funcionario_id, data_inicio, data_fim):
+    """
+    Engine de KPIs corrigida com nova lógica
+    """
+    funcionario = Funcionario.query.get(funcionario_id)
+    
+    # Buscar todos os registros do período
+    registros = RegistroPonto.query.filter(
+        RegistroPonto.funcionario_id == funcionario_id,
+        RegistroPonto.data.between(data_inicio, data_fim)
+    ).all()
+    
+    # 1. HORAS TRABALHADAS (apenas tipos que geram trabalho efetivo)
+    tipos_trabalho = ['trabalho_normal', 'sabado_trabalhado', 'domingo_trabalhado', 'feriado_trabalhado']
+    horas_trabalhadas = sum([
+        r.horas_trabalhadas for r in registros 
+        if r.tipo_registro in tipos_trabalho
+    ])
+    
+    # 2. HORAS EXTRAS (lógica específica por tipo)
+    horas_extras = 0
+    for r in registros:
+        if r.tipo_registro == 'trabalho_normal':
+            # Trabalho normal: extras apenas acima do horário
+            horas_diarias = funcionario.horario_trabalho.horas_diarias if funcionario.horario_trabalho else 8.0
+            if r.horas_trabalhadas > horas_diarias:
+                horas_extras += (r.horas_trabalhadas - horas_diarias)
+        elif r.tipo_registro in ['sabado_trabalhado', 'domingo_trabalhado', 'feriado_trabalhado']:
+            # Tipos especiais: TODAS as horas são extras
+            horas_extras += r.horas_trabalhadas
+    
+    # 3. FALTAS (apenas não justificadas)
+    faltas = len([r for r in registros if r.tipo_registro == 'falta'])
+    
+    # 4. ATRASOS (apenas em trabalho normal)
+    total_atrasos_minutos = sum([
+        r.total_atraso_minutos for r in registros 
+        if r.tipo_registro == 'trabalho_normal' and r.total_atraso_minutos > 0
+    ])
+    atrasos_horas = total_atrasos_minutos / 60.0
+    
+    return {
+        'horas_trabalhadas': horas_trabalhadas,
+        'horas_extras': horas_extras,
+        'faltas': faltas,
+        'atrasos': atrasos_horas
+    }
+```
+
+### **2. KPIs Analíticos (Linha 2)**
+
+```python
+def calcular_kpis_analiticos_corrigidos(funcionario_id, data_inicio, data_fim, registros):
+    """
+    KPIs analíticos com lógica corrigida
+    """
+    funcionario = Funcionario.query.get(funcionario_id)
+    
+    # 5. PRODUTIVIDADE (baseada em dias programados para trabalhar)
+    tipos_programados = ['trabalho_normal', 'falta', 'falta_justificada']
+    dias_programados = len([r for r in registros if r.tipo_registro in tipos_programados])
+    
+    if dias_programados > 0:
+        horas_diarias = funcionario.horario_trabalho.horas_diarias if funcionario.horario_trabalho else 8.0
+        horas_esperadas = dias_programados * horas_diarias
+        
+        # Horas efetivamente trabalhadas (excluindo faltas)
+        tipos_trabalho = ['trabalho_normal']
+        horas_efetivas = sum([
+            r.horas_trabalhadas for r in registros 
+            if r.tipo_registro in tipos_trabalho
+        ])
+        
+        produtividade = (horas_efetivas / horas_esperadas) * 100 if horas_esperadas > 0 else 0
+    else:
+        produtividade = 0
+    
+    # 6. ABSENTEÍSMO (faltas não justificadas / dias programados)
+    faltas_nao_justificadas = len([r for r in registros if r.tipo_registro == 'falta'])
+    absenteismo = (faltas_nao_justificadas / dias_programados) * 100 if dias_programados > 0 else 0
+    
+    # 7. MÉDIA HORAS/DIA (apenas dias trabalhados)
+    dias_trabalhados = len([r for r in registros if r.tipo_registro in ['trabalho_normal', 'sabado_trabalhado', 'domingo_trabalhado', 'feriado_trabalhado']])
+    horas_trabalhadas_total = sum([r.horas_trabalhadas for r in registros if r.tipo_registro in ['trabalho_normal', 'sabado_trabalhado', 'domingo_trabalhado', 'feriado_trabalhado']])
+    media_horas_dia = horas_trabalhadas_total / dias_trabalhados if dias_trabalhados > 0 else 0
+    
+    # 8. FALTAS JUSTIFICADAS
+    faltas_justificadas = len([r for r in registros if r.tipo_registro == 'falta_justificada'])
+    
+    return {
+        'produtividade': produtividade,
+        'absenteismo': absenteismo,
+        'media_horas_dia': media_horas_dia,
+        'faltas_justificadas': faltas_justificadas
+    }
+```
+
+### **3. KPIs Financeiros (Linha 3)**
+
+```python
+def calcular_kpis_financeiros_corrigidos(funcionario_id, data_inicio, data_fim, registros):
+    """
+    KPIs financeiros com lógica corrigida
+    """
+    funcionario = Funcionario.query.get(funcionario_id)
+    valor_hora = calcular_valor_hora_funcionario(funcionario)
+    
+    # 9. CUSTO MÃO DE OBRA (baseado em registros efetivos)
+    custo_total = 0
+    
+    for registro in registros:
+        if registro.tipo_registro == 'trabalho_normal':
+            # Trabalho normal
+            horas_diarias = funcionario.horario_trabalho.horas_diarias if funcionario.horario_trabalho else 8.0
+            horas_normais = min(registro.horas_trabalhadas, horas_diarias)
+            custo_normal = horas_normais * valor_hora
+            
+            # Horas extras
+            if registro.horas_trabalhadas > horas_diarias:
+                horas_extras = registro.horas_trabalhadas - horas_diarias
+                custo_extra = horas_extras * valor_hora * 1.5
+            else:
+                custo_extra = 0
+            
+            custo_total += custo_normal + custo_extra
+            
+        elif registro.tipo_registro == 'sabado_trabalhado':
+            # Sábado: 50% adicional
+            custo_total += registro.horas_trabalhadas * valor_hora * 1.5
+            
+        elif registro.tipo_registro in ['domingo_trabalhado', 'feriado_trabalhado']:
+            # Domingo/Feriado: 100% adicional
+            custo_total += registro.horas_trabalhadas * valor_hora * 2.0
+            
+        elif registro.tipo_registro == 'falta_justificada':
+            # Falta justificada: custo normal
+            horas_diarias = funcionario.horario_trabalho.horas_diarias if funcionario.horario_trabalho else 8.0
+            custo_total += horas_diarias * valor_hora
+            
+        elif registro.tipo_registro == 'ferias':
+            # Férias: custo normal
+            horas_diarias = funcionario.horario_trabalho.horas_diarias if funcionario.horario_trabalho else 8.0
+            custo_total += horas_diarias * valor_hora
+        
+        # Faltas não justificadas: desconto do salário (custo negativo)
+        elif registro.tipo_registro == 'falta':
+            horas_diarias = funcionario.horario_trabalho.horas_diarias if funcionario.horario_trabalho else 8.0
+            custo_total -= horas_diarias * valor_hora  # Desconto
+    
+    # 10. CUSTO ALIMENTAÇÃO (mantém lógica atual)
+    custo_alimentacao = db.session.query(func.sum(RegistroAlimentacao.valor)).filter(
+        RegistroAlimentacao.funcionario_id == funcionario_id,
+        RegistroAlimentacao.data.between(data_inicio, data_fim)
+    ).scalar() or 0
+    
+    # 11. CUSTO TRANSPORTE (mantém lógica atual)
+    custo_transporte = calcular_custo_transporte(funcionario_id, data_inicio, data_fim)
+    
+    # 12. OUTROS CUSTOS (mantém lógica atual)
+    outros_custos = calcular_outros_custos(funcionario_id, data_inicio, data_fim)
+    
+    return {
+        'custo_mao_obra': max(0, custo_total),  # Não pode ser negativo no card
+        'custo_alimentacao': custo_alimentacao,
+        'custo_transporte': custo_transporte,
+        'outros_custos': outros_custos
+    }
+```
+
+### **4. KPIs Resumo (Linha 4)**
+
+```python
+def calcular_kpis_resumo_corrigidos(funcionario_id, data_inicio, data_fim, registros, kpis_basicos, kpis_analiticos):
+    """
+    KPIs de resumo com lógica corrigida
+    """
+    funcionario = Funcionario.query.get(funcionario_id)
+    valor_hora = calcular_valor_hora_funcionario(funcionario)
+    
+    # 13. HORAS PERDIDAS (faltas não justificadas + atrasos)
+    faltas_nao_justificadas = len([r for r in registros if r.tipo_registro == 'falta'])
+    horas_diarias = funcionario.horario_trabalho.horas_diarias if funcionario.horario_trabalho else 8.0
+    horas_perdidas_faltas = faltas_nao_justificadas * horas_diarias
+    horas_perdidas_total = horas_perdidas_faltas + kpis_basicos['atrasos']
+    
+    # 14. EFICIÊNCIA (produtividade ajustada por qualidade)
+    fator_qualidade = max(0.5, 1 - (kpis_basicos['atrasos'] / 100))
+    eficiencia = kpis_analiticos['produtividade'] * fator_qualidade
+    
+    # 15. VALOR FALTA JUSTIFICADA (custo das faltas justificadas)
+    faltas_justificadas = len([r for r in registros if r.tipo_registro == 'falta_justificada'])
+    valor_falta_justificada = faltas_justificadas * horas_diarias * valor_hora
+    
+    return {
+        'horas_perdidas': horas_perdidas_total,
+        'eficiencia': eficiencia,
+        'valor_falta_justificada': valor_falta_justificada
+    }
+```
+
+---
+
+## 🔧 **IMPLEMENTAÇÃO DE LANÇAMENTO MÚLTIPLO**
+
+### **1. Interface de Lançamento Múltiplo**
+
+```html
+<!-- Modal de Lançamento Múltiplo -->
+<div class="modal fade" id="modalLancamentoMultiplo" tabindex="-1">
+    <div class="modal-dialog modal-xl">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="fas fa-users"></i> Lançamento Múltiplo de Ponto
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="formLancamentoMultiplo">
+                    <!-- Configurações do Período -->
+                    <div class="row mb-3">
+                        <div class="col-md-3">
+                            <label class="form-label">Data Início *</label>
+                            <input type="date" class="form-control" id="dataInicio" required>
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">Data Fim *</label>
+                            <input type="date" class="form-control" id="dataFim" required>
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">Tipo de Lançamento *</label>
+                            <select class="form-select" id="tipoLancamento" required>
+                                <option value="">Selecione...</option>
+                                <option value="trabalho_normal">Trabalho Normal</option>
+                                <option value="sabado_trabalhado">Sábado Trabalhado</option>
+                                <option value="domingo_trabalhado">Domingo Trabalhado</option>
+                                <option value="feriado_trabalhado">Feriado Trabalhado</option>
+                                <option value="falta">Falta</option>
+                                <option value="falta_justificada">Falta Justificada</option>
+                                <option value="ferias">Férias</option>
+                                <option value="sabado_folga">Sábado - Folga</option>
+                                <option value="domingo_folga">Domingo - Folga</option>
+                                <option value="feriado_folga">Feriado - Folga</option>
+                            </select>
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">Obra</label>
+                            <select class="form-select" id="obraLancamento">
+                                <option value="">Selecione uma obra...</option>
+                                {% for obra in obras %}
+                                <option value="{{ obra.id }}">{{ obra.nome }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <!-- Seleção de Funcionários -->
+                    <div class="row mb-3">
+                        <div class="col-12">
+                            <label class="form-label">Funcionários *</label>
+                            <div class="d-flex gap-2 mb-2">
+                                <button type="button" class="btn btn-sm btn-outline-primary" onclick="selecionarTodos()">
+                                    <i class="fas fa-check-square"></i> Selecionar Todos
+                                </button>
+                                <button type="button" class="btn btn-sm btn-outline-secondary" onclick="limparSelecao()">
+                                    <i class="fas fa-square"></i> Limpar Seleção
+                                </button>
+                            </div>
+                            <div class="row" id="listFuncionarios">
+                                {% for funcionario in funcionarios %}
+                                <div class="col-md-4 mb-2">
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" 
+                                               value="{{ funcionario.id }}" 
+                                               id="func_{{ funcionario.id }}"
+                                               name="funcionarios_selecionados">
+                                        <label class="form-check-label" for="func_{{ funcionario.id }}">
+                                            <img src="{{ funcionario.foto or '/static/img/default-avatar.png' }}" 
+                                                 class="rounded-circle me-2" width="24" height="24">
+                                            {{ funcionario.nome }}
+                                        </label>
+                                    </div>
+                                </div>
+                                {% endfor %}
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Configurações Específicas por Tipo -->
+                    <div id="configEspecificas" style="display: none;">
+                        <!-- Trabalho Normal/Extras -->
+                        <div id="configTrabalho" style="display: none;">
+                            <div class="row mb-3">
+                                <div class="col-md-4">
+                                    <label class="form-label">Hora Entrada</label>
+                                    <input type="time" class="form-control" id="horaEntrada">
+                                </div>
+                                <div class="col-md-4">
+                                    <label class="form-label">Hora Saída</label>
+                                    <input type="time" class="form-control" id="horaSaida">
+                                </div>
+                                <div class="col-md-4">
+                                    <label class="form-label">Horas Trabalhadas</label>
+                                    <input type="number" class="form-control" id="horasTrabalhadas" 
+                                           step="0.1" min="0" max="24">
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Faltas -->
+                        <div id="configFalta" style="display: none;">
+                            <div class="row mb-3">
+                                <div class="col-12">
+                                    <label class="form-label">Motivo da Falta</label>
+                                    <textarea class="form-control" id="motivoFalta" rows="2" 
+                                              placeholder="Descreva o motivo da falta..."></textarea>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Férias -->
+                        <div id="configFerias" style="display: none;">
+                            <div class="row mb-3">
+                                <div class="col-md-6">
+                                    <label class="form-label">Período de Férias</label>
+                                    <input type="text" class="form-control" id="periodoFerias" 
+                                           placeholder="Ex: Férias 2025/1">
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label">Observações</label>
+                                    <input type="text" class="form-control" id="obsFerias" 
+                                           placeholder="Observações adicionais...">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Observações Gerais -->
+                    <div class="row mb-3">
+                        <div class="col-12">
+                            <label class="form-label">Observações (Opcional)</label>
+                            <textarea class="form-control" id="observacoesGerais" rows="2" 
+                                      placeholder="Observações sobre este lançamento..."></textarea>
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                    <i class="fas fa-times"></i> Cancelar
+                </button>
+                <button type="button" class="btn btn-primary" onclick="processarLancamentoMultiplo()">
+                    <i class="fas fa-save"></i> Processar Lançamentos
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// Controle de configurações específicas por tipo
+document.getElementById('tipoLancamento').addEventListener('change', function() {
+    const tipo = this.value;
+    const configEspecificas = document.getElementById('configEspecificas');
+    const configTrabalho = document.getElementById('configTrabalho');
+    const configFalta = document.getElementById('configFalta');
+    const configFerias = document.getElementById('configFerias');
+    
+    // Ocultar todas as configurações
+    configTrabalho.style.display = 'none';
+    configFalta.style.display = 'none';
+    configFerias.style.display = 'none';
+    
+    if (tipo) {
+        configEspecificas.style.display = 'block';
+        
+        if (['trabalho_normal', 'sabado_trabalhado', 'domingo_trabalhado', 'feriado_trabalhado'].includes(tipo)) {
+            configTrabalho.style.display = 'block';
+        } else if (['falta', 'falta_justificada'].includes(tipo)) {
+            configFalta.style.display = 'block';
+        } else if (tipo === 'ferias') {
+            configFerias.style.display = 'block';
+        }
+    } else {
+        configEspecificas.style.display = 'none';
+    }
+});
+
+function selecionarTodos() {
+    const checkboxes = document.querySelectorAll('input[name="funcionarios_selecionados"]');
+    checkboxes.forEach(cb => cb.checked = true);
+}
+
+function limparSelecao() {
+    const checkboxes = document.querySelectorAll('input[name="funcionarios_selecionados"]');
+    checkboxes.forEach(cb => cb.checked = false);
+}
+
+function processarLancamentoMultiplo() {
+    const form = document.getElementById('formLancamentoMultiplo');
+    const formData = new FormData(form);
+    
+    // Validações
+    const funcionariosSelecionados = document.querySelectorAll('input[name="funcionarios_selecionados"]:checked');
+    if (funcionariosSelecionados.length === 0) {
+        alert('Selecione pelo menos um funcionário!');
+        return;
+    }
+    
+    const dataInicio = document.getElementById('dataInicio').value;
+    const dataFim = document.getElementById('dataFim').value;
+    const tipoLancamento = document.getElementById('tipoLancamento').value;
+    
+    if (!dataInicio || !dataFim || !tipoLancamento) {
+        alert('Preencha todos os campos obrigatórios!');
+        return;
+    }
+    
+    // Preparar dados para envio
+    const dados = {
+        data_inicio: dataInicio,
+        data_fim: dataFim,
+        tipo_lancamento: tipoLancamento,
+        obra_id: document.getElementById('obraLancamento').value,
+        funcionarios: Array.from(funcionariosSelecionados).map(cb => cb.value),
+        observacoes: document.getElementById('observacoesGerais').value
+    };
+    
+    // Adicionar configurações específicas
+    if (['trabalho_normal', 'sabado_trabalhado', 'domingo_trabalhado', 'feriado_trabalhado'].includes(tipoLancamento)) {
+        dados.hora_entrada = document.getElementById('horaEntrada').value;
+        dados.hora_saida = document.getElementById('horaSaida').value;
+        dados.horas_trabalhadas = document.getElementById('horasTrabalhadas').value;
+    } else if (['falta', 'falta_justificada'].includes(tipoLancamento)) {
+        dados.motivo_falta = document.getElementById('motivoFalta').value;
+    } else if (tipoLancamento === 'ferias') {
+        dados.periodo_ferias = document.getElementById('periodoFerias').value;
+        dados.obs_ferias = document.getElementById('obsFerias').value;
+    }
+    
+    // Enviar para o servidor
+    fetch('/ponto/lancamento-multiplo', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(dados)
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            alert(`Lançamentos processados com sucesso!\n${data.total_lancamentos} registros criados.`);
+            $('#modalLancamentoMultiplo').modal('hide');
+            location.reload(); // Recarregar página para mostrar novos dados
+        } else {
+            alert('Erro ao processar lançamentos: ' + data.error);
+        }
+    })
+    .catch(error => {
+        console.error('Erro:', error);
+        alert('Erro ao processar lançamentos!');
+    });
+}
+</script>
+```
+
+### **2. Backend para Lançamento Múltiplo**
+
+```python
+@app.route('/ponto/lancamento-multiplo', methods=['POST'])
+@admin_required
+def lancamento_multiplo():
+    """
+    Processa lançamento múltiplo de ponto
+    """
+    try:
+        dados = request.get_json()
+        
+        data_inicio = datetime.strptime(dados['data_inicio'], '%Y-%m-%d').date()
+        data_fim = datetime.strptime(dados['data_fim'], '%Y-%m-%d').date()
+        tipo_lancamento = dados['tipo_lancamento']
+        funcionarios_ids = dados['funcionarios']
+        obra_id = dados.get('obra_id')
+        observacoes = dados.get('observacoes', '')
+        
+        total_lancamentos = 0
+        
+        # Iterar por cada dia do período
+        data_atual = data_inicio
+        while data_atual <= data_fim:
+            # Verificar se deve criar lançamento para este dia
+            dia_semana = data_atual.weekday() + 1  # 1=Segunda, 7=Domingo
+            
+            criar_lancamento = True
+            
+            # Lógica de filtro por tipo e dia da semana
+            if tipo_lancamento == 'sabado_trabalhado' and dia_semana != 6:
+                criar_lancamento = False
+            elif tipo_lancamento == 'domingo_trabalhado' and dia_semana != 7:
+                criar_lancamento = False
+            elif tipo_lancamento == 'sabado_folga' and dia_semana != 6:
+                criar_lancamento = False
+            elif tipo_lancamento == 'domingo_folga' and dia_semana != 7:
+                criar_lancamento = False
+            
+            if criar_lancamento:
+                # Criar lançamento para cada funcionário
+                for funcionario_id in funcionarios_ids:
+                    funcionario = Funcionario.query.get(funcionario_id)
+                    
+                    # Verificar se já existe registro para este dia
+                    registro_existente = RegistroPonto.query.filter(
+                        RegistroPonto.funcionario_id == funcionario_id,
+                        RegistroPonto.data == data_atual
+                    ).first()
+                    
+                    if not registro_existente:
+                        # Calcular horas baseado no tipo e horário do funcionário
+                        horas_trabalhadas = calcular_horas_por_tipo(
+                            tipo_lancamento, 
+                            funcionario, 
+                            dados
+                        )
+                        
+                        # Criar registro
+                        registro = RegistroPonto(
+                            funcionario_id=funcionario_id,
+                            obra_id=obra_id,
+                            data=data_atual,
+                            tipo_registro=tipo_lancamento,
+                            horas_trabalhadas=horas_trabalhadas,
+                            observacoes=f"{observacoes} (Lançamento múltiplo)",
+                            admin_id=session.get('admin_id')
+                        )
+                        
+                        # Configurações específicas por tipo
+                        if tipo_lancamento in ['trabalho_normal', 'sabado_trabalhado', 'domingo_trabalhado', 'feriado_trabalhado']:
+                            if dados.get('hora_entrada'):
+                                registro.hora_entrada = datetime.strptime(dados['hora_entrada'], '%H:%M').time()
+                            if dados.get('hora_saida'):
+                                registro.hora_saida = datetime.strptime(dados['hora_saida'], '%H:%M').time()
+                        
+                        db.session.add(registro)
+                        total_lancamentos += 1
+            
+            data_atual += timedelta(days=1)
+        
+        db.session.commit()
+        
+        return jsonify({
+            'success': True,
+            'total_lancamentos': total_lancamentos,
+            'message': f'{total_lancamentos} lançamentos criados com sucesso!'
+        })
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+def calcular_horas_por_tipo(tipo_lancamento, funcionario, dados):
+    """
+    Calcula horas trabalhadas baseado no tipo de lançamento
+    """
+    if dados.get('horas_trabalhadas'):
+        return float(dados['horas_trabalhadas'])
+    
+    # Usar horário padrão do funcionário
+    horario = funcionario.horario_trabalho
+    horas_diarias = horario.horas_diarias if horario else 8.0
+    
+    if tipo_lancamento in ['trabalho_normal']:
+        return horas_diarias
+    elif tipo_lancamento in ['sabado_trabalhado', 'domingo_trabalhado', 'feriado_trabalhado']:
+        return horas_diarias  # Pode ser customizado
+    elif tipo_lancamento in ['falta', 'falta_justificada', 'ferias']:
+        return 0.0  # Não trabalhou
+    else:
+        return 0.0  # Folgas
+```
+
+---
+
+## 🎯 **RESULTADO ESPERADO**
+
+### **Após Implementação:**
+
+1. **✅ Consistência de Valores**
+   - Cards e detalhes mostrarão valores idênticos
+   - Cálculos baseados na mesma engine
+
+2. **✅ Lógica de Faltas Clara**
+   - Faltas não justificadas: descontam do salário
+   - Faltas justificadas: têm custo mas não descontam
+
+3. **✅ Tipos Completos**
+   - 10 tipos de lançamento cobrindo todas as situações
+   - Lançamento obrigatório para melhor controle
+
+4. **✅ Custo por Obra Preciso**
+   - Baseado em alocação real via RDO
+   - Cálculo automático por tempo × valor/hora
+
+5. **✅ Lançamento Múltiplo Eficiente**
+   - Interface intuitiva para múltiplos funcionários
+   - Configurações específicas por tipo
+   - Validações automáticas
+
+**O sistema terá cálculos precisos, lógica clara e interface eficiente para gestão completa de ponto e custos!**
+
