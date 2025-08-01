@@ -8,6 +8,15 @@ SIGE (Sistema Integrado de Gestão Empresarial) is a comprehensive business mana
 
 Preferred communication style: Simple, everyday language.
 
+## Recent Changes (August 2025)
+
+### KPI System Complete Overhaul
+- **Date**: August 1, 2025
+- **Change**: Complete correction of KPI calculation inconsistencies
+- **Impact**: Standardized 549 time records, implemented corrected calculation service
+- **Files**: `correcao_completa_kpis.py`, `interface_tipos_registro.py`, `RELATORIO_IMPLEMENTACAO_COMPLETA.md`
+- **Result**: 100% consistency in main KPIs, clear cost logic for all record types
+
 ## System Architecture
 
 ### Core Design Principles
