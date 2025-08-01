@@ -65,3 +65,11 @@ def load_user(user_id):
 with app.app_context():
     db.create_all()
     logging.info("Database tables created/verified")
+    
+    # Corrigir fotos dos funcionários automaticamente no startup
+    try:
+        from corrigir_fotos_funcionarios import corrigir_fotos_funcionarios
+        corrigir_fotos_funcionarios()
+        logging.info("✅ Fotos dos funcionários verificadas e corrigidas automaticamente")
+    except Exception as e:
+        logging.warning(f"⚠️ Aviso: Não foi possível corrigir fotos automaticamente: {e}")
