@@ -64,10 +64,11 @@ class KPIsEngine:
         custo_transporte = self._calcular_custo_transporte(funcionario_id, data_inicio, data_fim)
         outros_custos = self._calcular_outros_custos(funcionario_id, data_inicio, data_fim)
         
-        # Layout 4-4-4-3: Quarta linha (3 indicadores)
+        # Layout 4-4-4-4: Quarta linha (4 indicadores)
         horas_perdidas = self._calcular_horas_perdidas(funcionario_id, data_inicio, data_fim)
         eficiencia = self._calcular_eficiencia(funcionario_id, data_inicio, data_fim)
         valor_falta_justificada = self._calcular_valor_falta_justificada(funcionario_id, data_inicio, data_fim)
+        custo_total = self._calcular_custo_total(funcionario_id, data_inicio, data_fim)
         
         return {
             # Primeira linha (4 indicadores)
@@ -88,10 +89,11 @@ class KPIsEngine:
             'custo_transporte': round(custo_transporte, 2),
             'outros_custos': round(outros_custos, 2),
             
-            # Quarta linha (3 indicadores)
+            # Quarta linha (4 indicadores)
             'horas_perdidas': round(horas_perdidas, 1),
             'eficiencia': round(eficiencia, 1),
             'valor_falta_justificada': round(valor_falta_justificada, 2),
+            'custo_total': round(custo_total, 2),
             
             # Dados auxiliares
             'periodo': {
@@ -571,6 +573,21 @@ class KPIsEngine:
         # Salvar alterações
         db.session.commit()
         return True
+    
+    def _calcular_custo_total(self, funcionario_id, data_inicio, data_fim):
+        """
+        16. Custo Total: Soma de todos os custos do funcionário
+        
+        Fórmula: Custo Mão de Obra + Custo Alimentação + Custo Transporte + Outros Custos
+        """
+        custo_mao_obra = self._calcular_custo_mensal(funcionario_id, data_inicio, data_fim)
+        custo_alimentacao = self._calcular_custo_alimentacao(funcionario_id, data_inicio, data_fim)
+        custo_transporte = self._calcular_custo_transporte(funcionario_id, data_inicio, data_fim)
+        outros_custos = self._calcular_outros_custos(funcionario_id, data_inicio, data_fim)
+        
+        custo_total = custo_mao_obra + custo_alimentacao + custo_transporte + outros_custos
+        
+        return custo_total
 
 
 def gerar_calendario_util(ano):

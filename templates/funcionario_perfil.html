@@ -237,24 +237,30 @@
                     </div>
                 </div>
                 
-                <!-- Linha 4: KPIs Resumo -->
+                <!-- Linha 4: KPIs Resumo (4 indicadores) -->
                 <div class="row mb-3">
-                    <div class="col-md-4">
+                    <div class="col-md-3">
                         <div class="text-center p-3 border rounded">
                             <h4 class="text-danger mb-1">{{ '{:.1f}h'.format(kpis.horas_perdidas) if kpis.horas_perdidas is defined else '0.0h' }}</h4>
                             <small class="text-muted">Horas Perdidas</small>
                         </div>
                     </div>
-                    <div class="col-md-4">
+                    <div class="col-md-3">
                         <div class="text-center p-3 border rounded">
                             <h4 class="text-secondary mb-1">{{ '{:.1f}%'.format(kpis.eficiencia) if kpis.eficiencia is defined else '0.0%' }}</h4>
                             <small class="text-muted">Eficiência</small>
                         </div>
                     </div>
-                    <div class="col-md-4">
+                    <div class="col-md-3">
                         <div class="text-center p-3 border rounded">
                             <h4 class="text-success mb-1">R$ {{ '{:,.2f}'.format(kpis.valor_falta_justificada) if kpis.valor_falta_justificada is defined else '0,00' }}</h4>
                             <small class="text-muted">Valor Falta Justificada</small>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="text-center p-3 border rounded bg-gradient-primary text-white">
+                            <h4 class="mb-1 fw-bold">R$ {{ '{:,.2f}'.format(kpis.custo_total) if kpis.custo_total is defined else '0,00' }}</h4>
+                            <small class="text-light">Custo Total</small>
                         </div>
                     </div>
                 </div>
