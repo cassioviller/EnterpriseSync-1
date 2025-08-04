@@ -166,7 +166,7 @@
                                         {% elif registro.tipo_registro == 'feriado_trabalhado' %}
                                             <span class="badge bg-info ms-1">FERIADO TRAB.</span>
                                         {% elif registro.tipo_registro == 'feriado_folga' %}
-                                            <span class="badge bg-secondary ms-1">FERIADO NORMAL</span>
+                                            <span class="badge ms-1" style="background-color: #8b5cf6; color: white;">FERIADO NORMAL</span>
                                         {% elif registro.tipo_registro == 'falta_justificada' %}
                                             <span class="badge bg-primary ms-1">JUSTIFICADA</span>
                                         {% elif registro.tipo_registro == 'falta' %}
@@ -195,7 +195,7 @@
                                         {% elif registro.tipo_registro == 'domingo_folga' %}
                                             <span class="badge bg-light text-dark">📅 Domingo - Folga</span>
                                         {% elif registro.tipo_registro == 'feriado_folga' %}
-                                            <span class="badge bg-secondary">🎉 Feriado - Folga</span>
+                                            <span class="badge" style="background-color: #8b5cf6; color: white;">🎉 Feriado - Folga</span>
                                         {% else %}
                                             <span class="badge bg-secondary">{{ registro.tipo_registro or 'Normal' }}</span>
                                         {% endif %}

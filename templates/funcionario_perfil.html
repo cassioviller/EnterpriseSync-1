@@ -366,7 +366,9 @@
                                         {% elif registro.tipo_registro == 'feriado_trabalhado' %}
                                             <span class="badge bg-info ms-2"><i class="fas fa-star"></i> FERIADO TRAB.</span>
                                         {% elif registro.tipo_registro == 'feriado' %}
-                                            <span class="badge bg-secondary ms-2"><i class="fas fa-home"></i> FERIADO</span>
+                                            <span class="badge ms-2" style="background-color: #8b5cf6; color: white;"><i class="fas fa-home"></i> FERIADO</span>
+                                        {% elif registro.tipo_registro == 'feriado_folga' %}
+                                            <span class="badge ms-2" style="background-color: #8b5cf6; color: white;"><i class="fas fa-home"></i> FERIADO</span>
                                         {% elif registro.tipo_registro == 'falta_justificada' %}
                                             <span class="badge bg-primary ms-2"><i class="fas fa-check"></i> JUSTIFICADA</span>
                                         {% elif registro.tipo_registro == 'falta' %}
