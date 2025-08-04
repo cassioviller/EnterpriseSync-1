@@ -1220,15 +1220,15 @@ function alterarTipoLancamento() {
     const tiposSemHorario = ['falta', 'falta_justificada', 'ferias', 'feriado_folga', 'sabado_folga', 'domingo_folga'];
     
     if (tiposComHorario.includes(tipo)) {
-        // Mostrar campos de horário
-        camposHorario.style.display = 'block';
-        btnHorarioPadrao.style.display = 'block';
+        // Mostrar campos de horário com verificação
+        if (camposHorario) camposHorario.style.display = 'block';
+        if (btnHorarioPadrao) btnHorarioPadrao.style.display = 'block';
         document.getElementById('hora_entrada_ponto').required = true;
         document.getElementById('hora_saida_ponto').required = true;
         
         if (tiposComExtras.includes(tipo)) {
             // Mostrar campo de percentual para tipos com extras
-            campoPercentual.style.display = 'block';
+            if (campoPercentual) campoPercentual.style.display = 'block';
             document.getElementById('percentual_extras').required = true;
             
             // Definir percentual padrão baseado no tipo
@@ -1241,16 +1241,16 @@ function alterarTipoLancamento() {
             }
         } else {
             // Esconder campo de percentual para trabalho normal
-            campoPercentual.style.display = 'none';
+            if (campoPercentual) campoPercentual.style.display = 'none';
             document.getElementById('percentual_extras').required = false;
             mostrarAlerta('alertaTrabalhado');
         }
         
     } else if (tiposSemHorario.includes(tipo)) {
-        // Esconder campos de horário
-        camposHorario.style.display = 'none';
-        btnHorarioPadrao.style.display = 'none';
-        campoPercentual.style.display = 'none';
+        // Esconder campos de horário com verificação
+        if (camposHorario) camposHorario.style.display = 'none';
+        if (btnHorarioPadrao) btnHorarioPadrao.style.display = 'none';
+        if (campoPercentual) campoPercentual.style.display = 'none';
         document.getElementById('hora_entrada_ponto').required = false;
         document.getElementById('hora_saida_ponto').required = false;
         document.getElementById('percentual_extras').required = false;
@@ -1274,9 +1274,9 @@ function alterarTipoLancamento() {
         
     } else {
         // Estado inicial - nenhum tipo selecionado
-        camposHorario.style.display = 'none';
-        btnHorarioPadrao.style.display = 'none';
-        campoPercentual.style.display = 'none';
+        if (camposHorario) camposHorario.style.display = 'none';
+        if (btnHorarioPadrao) btnHorarioPadrao.style.display = 'none';
+        if (campoPercentual) campoPercentual.style.display = 'none';
         document.getElementById('percentual_extras').required = false;
         const alertaTipoElementFinal = document.getElementById('alertaTipoLancamento');
         if (alertaTipoElementFinal) alertaTipoElementFinal.style.display = 'none';
@@ -2010,8 +2010,10 @@ $(document).ready(function() {
             document.getElementById('data_ponto').value = today;
             
             // Esconder campos de horário inicialmente
-            document.getElementById('camposHorario').style.display = 'none';
-            document.getElementById('btnHorarioPadrao').style.display = 'none';
+            const camposHorarioElement = document.getElementById('camposHorario');
+            const btnHorarioPadraoElement = document.getElementById('btnHorarioPadrao');
+            if (camposHorarioElement) camposHorarioElement.style.display = 'none';
+            if (btnHorarioPadraoElement) btnHorarioPadraoElement.style.display = 'none';
         }
     });
     

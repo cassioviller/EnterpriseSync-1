@@ -52,6 +52,20 @@ Preferred communication style: Simple, everyday language.
 - **Files**: `forcar_atualizacao_kpis.py`, `testar_funcionario_193h_especifico.py`, complete database correction applied
 - **Result**: Saturday records display correctly as 0h worked + extras based on employee's normal schedule, KPIs include all Saturday overtime in calculations, system shows proper values in interface
 
+### Critical Security Fix: Multi-Tenant Data Isolation
+- **Date**: August 4, 2025 (Critical Security Patch)
+- **Change**: Fixed critical security vulnerability where admin users could see data from other companies/administrators
+- **Impact**: Corrected data leakage in vehicle dashboard, KPI calculations, and reports where admin "alves" was seeing vehicles from other companies
+- **Files**: `views.py` (lines 416, 4647, 4622), `kpi_unificado.py` (line 183), `corrigir_vazamento_veiculos.py`
+- **Result**: Complete multi-tenant isolation implemented - each admin now sees only their own company data, no cross-contamination between different businesses
+
+### JavaScript Modal Fix: Null Reference Errors
+- **Date**: August 4, 2025 (UI/UX Critical Fix)
+- **Change**: Fixed recurring JavaScript error "Cannot read properties of null (reading 'style')" in point record editing modal
+- **Impact**: Eliminated crashes when opening edit modal for point records, improved robustness of DOM element access
+- **Files**: `templates/funcionario_perfil.html` (lines 1210-1285, 1330-1345, 2016-2019), `correcao_final_modal.py`
+- **Result**: Point record editing modal now opens reliably without JavaScript errors, all DOM manipulations protected with null checks, improved user experience
+
 ### Labor Cost Calculation Logic Complete Overhaul
 - **Date**: August 4, 2025 (Critical Fix)
 - **Change**: Completely rewrote `_calcular_custo_mensal` method with correct logic: Base Salary - (Daily_Value × Absences) + Overtime_Value
