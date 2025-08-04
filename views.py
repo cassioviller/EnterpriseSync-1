@@ -5457,6 +5457,7 @@ def editar_registro_ponto(registro_id):
         
         # Verificar permissões
         if not verificar_permissao_edicao_ponto(registro, current_user):
+            print(f"❌ Permissão negada para {current_user.email} editar registro {registro_id}")
             return jsonify({'error': 'Sem permissão para editar este registro'}), 403
         
         if request.method == 'GET':
@@ -5501,13 +5502,27 @@ def editar_registro_ponto(registro_id):
 
 def verificar_permissao_edicao_ponto(registro, usuario):
     """Verifica permissões para editar registro"""
-    if usuario.tipo_usuario == 'SUPER_ADMIN':
+    print(f"🔍 Verificando permissão: usuário {usuario.email} ({usuario.tipo_usuario})")
+    
+    # Usar o enum corretamente
+    from models import TipoUsuario
+    
+    if usuario.tipo_usuario == TipoUsuario.SUPER_ADMIN:
+        print("✅ Permissão concedida: SUPER_ADMIN")
         return True
-    elif usuario.tipo_usuario == 'ADMIN':
+    elif usuario.tipo_usuario == TipoUsuario.ADMIN:
         # Admin pode editar registros de funcionários sob sua gestão
         funcionario = Funcionario.query.get(registro.funcionario_id)
-        return funcionario and funcionario.admin_id == usuario.id
-    return False
+        if funcionario:
+            pode_editar = funcionario.admin_id == usuario.id
+            print(f"🔍 Admin {usuario.id} vs Funcionário admin_id {funcionario.admin_id}: {'✅' if pode_editar else '❌'}")
+            return pode_editar
+        else:
+            print("❌ Funcionário não encontrado")
+            return False
+    else:
+        print(f"❌ Tipo de usuário {usuario.tipo_usuario} não pode editar")
+        return False
 
 def serializar_registro_completo(registro, funcionario):
     """Serializa registro completo para frontend"""
@@ -5591,7 +5606,9 @@ def obter_horario_padrao_funcionario(funcionario):
 
 def obter_obras_usuario(usuario):
     """Retorna obras disponíveis para o usuário"""
-    if usuario.tipo_usuario == 'SUPER_ADMIN':
+    from models import TipoUsuario
+    
+    if usuario.tipo_usuario == TipoUsuario.SUPER_ADMIN:
         obras = Obra.query.filter_by(ativa=True).all()
     else:
         obras = Obra.query.filter_by(admin_id=usuario.id, ativa=True).all()
