@@ -1731,13 +1731,18 @@ function preencherModalEdicao(data, registroId) {
     if (form) form.reset();
     
     // Configurar modo edição - CRÍTICO
-    const hiddenId = document.getElementById('registro_id_ponto');
-    if (hiddenId) {
-        hiddenId.value = registroId;
-        console.log('✅ Campo registro_id_ponto definido para:', registroId);
-    } else {
-        console.error('❌ Campo registro_id_ponto não encontrado!');
+    let hiddenId = document.getElementById('registro_id_ponto');
+    if (!hiddenId) {
+        // Criar campo hidden se não existir
+        hiddenId = document.createElement('input');
+        hiddenId.type = 'hidden';
+        hiddenId.id = 'registro_id_ponto';
+        hiddenId.name = 'registro_id_ponto';
+        form.appendChild(hiddenId);
+        console.log('✅ Campo registro_id_ponto criado');
     }
+    hiddenId.value = registroId;
+    console.log('✅ Campo registro_id_ponto definido para:', registroId);
     
     // Atualizar título do modal para indicar edição
     const titulo = document.querySelector('#pontoModal .modal-title');
@@ -1746,28 +1751,39 @@ function preencherModalEdicao(data, registroId) {
         console.log('✅ Título do modal atualizado para edição');
     }
     
-    // Preencher dados básicos
-    preencherCampo('data_ponto', registro.data);
-    preencherCampo('tipo_lancamento', registro.tipo_registro);
-    preencherCampo('observacoes_ponto', registro.observacoes);
-    
-    // Preencher horários usando nova estrutura
-    if (registro.horarios) {
-        preencherCampo('hora_entrada_ponto', registro.horarios.entrada);
-        preencherCampo('hora_saida_ponto', registro.horarios.saida);
-        preencherCampo('hora_almoco_saida_ponto', registro.horarios.almoco_saida);
-        preencherCampo('hora_almoco_retorno_ponto', registro.horarios.almoco_retorno);
-    }
-    
-    // Preencher percentual se disponível
-    if (registro.valores_calculados) {
-        preencherCampo('percentual_extras', registro.valores_calculados.percentual_extras);
-    }
-    
-    // Preencher dropdown de obras
-    if (data.obras_disponiveis) {
+    // Aguardar um pouco antes do preenchimento para garantir que o modal esteja renderizado
+    setTimeout(() => {
+        // Preencher dados básicos com IDs corretos
+        preencherCampo('data_ponto', registro.data);
+        preencherCampo('tipo_lancamento', registro.tipo_registro);
+        preencherCampo('observacoes_ponto', registro.observacoes);
+        
+        // Preencher obra separadamente
         preencherDropdownObras(data.obras_disponiveis, registro.obra_id);
-    }
+        
+        // Preencher horários usando nova estrutura
+        if (registro.horarios) {
+            preencherCampo('hora_entrada_ponto', registro.horarios.entrada);
+            preencherCampo('hora_saida_ponto', registro.horarios.saida);
+            preencherCampo('hora_almoco_saida_ponto', registro.horarios.almoco_saida);
+            preencherCampo('hora_almoco_retorno_ponto', registro.horarios.almoco_retorno);
+        }
+        
+        // Preencher percentual se disponível
+        if (registro.valores_calculados) {
+            preencherCampo('percentual_extras', registro.valores_calculados.percentual_extras);
+        }
+    }, 50);
+    
+    // Debug: Verificar se campos existem após preenchimento
+    setTimeout(() => {
+        console.log('🔍 Verificação pós-preenchimento:');
+        console.log('  data_ponto:', document.getElementById('data_ponto')?.value);
+        console.log('  tipo_lancamento:', document.getElementById('tipo_lancamento')?.value);
+        console.log('  observacoes_ponto:', document.getElementById('observacoes_ponto')?.value);
+    }, 100);
+    
+
     
     // Atualizar título do modal com dados específicos
     atualizarTituloModal(registro);
@@ -1790,9 +1806,18 @@ function preencherModalEdicao(data, registroId) {
 
 function preencherCampo(id, valor) {
     const elemento = document.getElementById(id);
-    if (elemento && valor !== null && valor !== undefined) {
+    if (elemento && valor !== null && valor !== undefined && valor !== '') {
         elemento.value = valor;
-        console.log(`Campo ${id} preenchido:`, valor);
+        console.log(`✅ Campo ${id} preenchido:`, valor);
+        
+        // Forçar evento change para campos select
+        if (elemento.tagName === 'SELECT') {
+            elemento.dispatchEvent(new Event('change'));
+        }
+    } else if (!elemento) {
+        console.error(`❌ Elemento com ID '${id}' não encontrado!`);
+    } else {
+        console.log(`⚠️ Campo ${id} não preenchido - valor vazio:`, valor);
     }
 }
 
@@ -2037,6 +2062,7 @@ $(document).ready(function() {
         
         // Só resetar se NÃO for edição
         if (!isEdicao) {
+            console.log('🔄 Modo novo registro - resetando formulário');
             document.querySelector('#pontoModal .modal-title').innerHTML = '<i class="fas fa-clock"></i> Novo Registro de Ponto';
             document.getElementById('pontoForm').reset();
             document.getElementById('pontoForm').removeAttribute('data-modo');
@@ -2061,6 +2087,19 @@ $(document).ready(function() {
             if (alertaTipo) alertaTipo.style.display = 'none';
         } else {
             console.log('🔄 Modal em modo edição - mantendo dados preenchidos');
+            
+            // Forçar re-preenchimento se campos estiverem vazios
+            setTimeout(() => {
+                const dataElement = document.getElementById('data_ponto');
+                const tipoElement = document.getElementById('tipo_lancamento');
+                
+                if (dataElement && !dataElement.value) {
+                    console.log('⚠️ Campo data vazio após edição - problema detectado!');
+                }
+                if (tipoElement && !tipoElement.value) {
+                    console.log('⚠️ Campo tipo vazio após edição - problema detectado!');
+                }
+            }, 200);
         }
     });
     

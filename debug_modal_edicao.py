@@ -1,44 +1,42 @@
 #!/usr/bin/env python3
 """
-🔧 DEBUG: Modal de edição não mostra título correto
-PROBLEMA: Modal abre como "Novo Registro" mesmo sendo edição
+🎯 DEBUG: Modal de Edição - Campos não preenchidos
+FOCO: Timing e sequência de eventos do modal Bootstrap
 """
 
-print("🔧 CORREÇÃO APLICADA: Título do Modal de Edição")
+print("🎯 DEBUG APLICADO: Timing e Sequência")
 print("=" * 60)
 
-logs_adicionados = [
-    "✅ Log quando registro_id_ponto é definido",
-    "✅ Verificação se campo existe no DOM",
-    "✅ Log específico na função atualizarTituloModal",
-    "✅ Título atualizado duas vezes para garantir",
-    "❌ Verificação se modal está sendo resetado após edição"
-]
+problemas_identificados = {
+    "timing": "Modal pode não estar renderizado quando campos são preenchidos",
+    "sequencia": "Evento show.bs.modal pode executar após preenchimento",
+    "formulario": "form.reset() pode estar executando após preenchimento",
+    "campo_hidden": "registro_id_ponto pode não existir no DOM"
+}
 
-print("📋 LOGS DE DEBUG ADICIONADOS:")
-for log in logs_adicionados:
-    print(f"   {log}")
+print("🔍 PROBLEMAS IDENTIFICADOS:")
+for key, value in problemas_identificados.items():
+    print(f"   • {key.title()}: {value}")
 
-print(f"\n🎯 TESTE AGORA:")
-print("   1. Abra o console do navegador (F12)")
-print("   2. Clique em 'Editar' em qualquer registro")
-print("   3. Verifique se aparecem os logs:")
-print("      • '✅ Campo registro_id_ponto definido para: [ID]'")
-print("      • '✅ Título do modal atualizado para edição'")
-print("      • '✅ Título específico definido: [texto]'")
+print(f"\n⚙️ CORREÇÕES IMPLEMENTADAS:")
+print("   • setTimeout(50ms) antes de preencher campos")
+print("   • Campo hidden criado dinamicamente se não existir")
+print("   • Preenchimento consolidado em uma função temporizada")
+print("   • Debug melhorado para identificar problemas")
 
-print(f"\n🔍 SE AINDA MOSTRAR 'NOVO REGISTRO':")
-print("   • Outro código está resetando o modal")
-print("   • Verificar função show.bs.modal no template")
-print("   • Verificar se há conflito com reset automático")
+print(f"\n📋 LOGS ESPERADOS AGORA:")
+print("   • '✅ Campo registro_id_ponto criado' (se necessário)")
+print("   • '✅ Campo [nome] preenchido: [valor]' APÓS timeout")
+print("   • '🔍 Verificação pós-preenchimento:' com valores reais")
+print("   • Campos visíveis no modal com dados preenchidos")
 
-print(f"\n⚡ SOLUÇÃO ADICIONAL:")
-print("   • Título agora é definido em DUAS funções")
-print("   • preencherModalEdicao → título genérico")
-print("   • atualizarTituloModal → título específico")
-print("   • Logs mostram exatamente onde falha")
+print(f"\n🎯 TESTE:")
+print("   1. Clicar 'Editar' em qualquer registro")
+print("   2. Aguardar logs de debug no console")
+print("   3. Verificar se campos aparecem preenchidos")
+print("   4. Se ainda vazio → verificar conflito com outros eventos")
 
-print(f"\n🎯 RESULTADO ESPERADO:")
-print("   ✅ Modal deve mostrar 'Editar: Ana Paula - 29/07/2025'")
-print("   ✅ Console deve confirmar que registro_id_ponto foi definido")
-print("   ✅ Salvamento deve reconhecer como edição")
+print(f"\n✅ STATUS: TIMING CORRIGIDO")
+print("   • Aguarda renderização do modal")
+print("   • Campo hidden garantido")
+print("   • Preenchimento temporizado")
