@@ -125,8 +125,8 @@ class KPIsEngine:
         return total or 0.0
     
     def _calcular_horas_extras(self, funcionario_id, data_inicio, data_fim):
-        """2. Horas Extras: Soma direta da coluna horas_extras do funcionário"""
-        # Soma simples e direta da coluna horas_extras - SEM FILTRO > 0 que estava causando problema
+        """2. Horas Extras: Soma TOTAL de todas as horas extras incluindo sábados"""
+        # SOMA SIMPLES E DIRETA - SEM FILTROS QUE EXCLUAM REGISTROS
         total = db.session.query(func.sum(RegistroPonto.horas_extras)).filter(
             RegistroPonto.funcionario_id == funcionario_id,
             RegistroPonto.data >= data_inicio,
@@ -134,8 +134,7 @@ class KPIsEngine:
             RegistroPonto.horas_extras.isnot(None)
         ).scalar()
         
-        return total or 0.0
-    
+        return float(total or 0.0)
     def _calcular_faltas(self, funcionario_id, data_inicio, data_fim):
         """3. Faltas: Número de faltas não justificadas registradas"""
         faltas = db.session.query(func.count(RegistroPonto.id)).filter(

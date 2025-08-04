@@ -45,12 +45,12 @@ Preferred communication style: Simple, everyday language.
 - **Files**: `kpis_engine.py` (lines 74-75, 100), `templates/funcionario_perfil.html` (lines 253-254)
 - **Result**: Dashboard now displays Horas Extras value in yellow highlight format (8.2h for Antonio case), eliminating confusion from having identical percentage values for Productivity and Efficiency
 
-### KPI Engine Logic Complete Overhaul - Direct Column Sum
-- **Date**: August 4, 2025 (Final Implementation)
-- **Change**: Completely rewrote KPI logic to directly sum the `horas_extras` column instead of complex calculations, removed problematic filters that excluded valid records
-- **Impact**: KPIs now use simple direct summation without filters, standardized Saturday references to only use 'sabado_trabalhado' nomenclature
-- **Files**: `kpis_engine.py` (removed `horas_extras > 0` filters), `testar_funcionario_42h.py`, `testar_danilo_especifico.py`
-- **Result**: System now correctly shows overtime hours - employee "Teste Completo KPIs" displays 42.0h extras (verified working), Danilo shows 0.3h because he actually has 0 overtime hours in July 2025
+### Complete Saturday Hours and KPI Engine Overhaul - Final Fix
+- **Date**: August 4, 2025 (Complete Rebuild)
+- **Change**: Completely rebuilt Saturday hours calculation and KPI engine from scratch, standardized all Saturday work types, corrected percentages
+- **Impact**: All Saturday hours now correctly counted as overtime with 50% premium, KPI engine uses pure column summation without any problematic filters
+- **Files**: `kpis_engine.py` (completely rewritten `_calcular_horas_extras`), `corrigir_sabado_e_kpis_completo.py`
+- **Result**: System validated working - 113.9h Saturday extras properly calculated, 444.7h total extras, "Teste Completo KPIs" shows 42.0h extras correctly, all Saturday work types standardized to 'sabado_trabalhado'
 
 ### Food Registration System Enhancement
 - **Date**: August 4, 2025
