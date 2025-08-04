@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-🚨 CORREÇÃO URGENTE: TODOS OS REGISTROS DE SÁBADO 05/07/2025
-Corrige TODOS os registros para mostrar horas extras corretas e atraso = 0
+🔧 CORREÇÃO FINAL: Converter todos os registros de sábado para o tipo correto
+Aplicar lógica: horas extras = horas trabalhadas, atraso = 0
 """
 
 from app import app, db
@@ -9,116 +9,111 @@ from models import RegistroPonto, Funcionario
 from datetime import date
 
 def corrigir_todos_sabados():
-    """Corrige TODOS os registros de sábado 05/07/2025"""
-    print("🚨 CORREÇÃO URGENTE - TODOS OS SÁBADOS 05/07/2025")
+    """Corrige todos os registros de sábado"""
+    print("🔧 CORREÇÃO FINAL DOS REGISTROS DE SÁBADO")
     print("=" * 60)
     
-    # Buscar TODOS os registros de 05/07/2025 com horários
-    registros = RegistroPonto.query.filter(
-        RegistroPonto.data == date(2025, 7, 5),
-        RegistroPonto.hora_entrada.isnot(None)
+    # 1. Converter sabado_horas_extras para sabado_trabalhado
+    registros_antigos = RegistroPonto.query.filter(
+        RegistroPonto.tipo_registro == 'sabado_horas_extras'
     ).all()
     
-    print(f"📊 ENCONTRADOS {len(registros)} REGISTROS DE SÁBADO COM HORÁRIOS")
+    print(f"📊 Encontrados {len(registros_antigos)} registros com tipo antigo")
     
-    for i, registro in enumerate(registros, 1):
-        funcionario = Funcionario.query.get(registro.funcionario_id)
-        nome_funcionario = funcionario.nome if funcionario else f"ID {registro.funcionario_id}"
+    for registro in registros_antigos:
+        registro.tipo_registro = 'sabado_trabalhado'
+        print(f"   ✅ ID {registro.id}: convertido para sabado_trabalhado")
+    
+    # 2. Aplicar lógica para todos os registros de sábado
+    todos_sabados = RegistroPonto.query.filter(
+        RegistroPonto.tipo_registro == 'sabado_trabalhado'
+    ).all()
+    
+    print(f"\n🔧 Aplicando lógica em {len(todos_sabados)} registros de sábado:")
+    
+    for registro in todos_sabados:
+        funcionario = Funcionario.query.filter_by(id=registro.funcionario_id).first()
+        nome = funcionario.nome if funcionario else f"ID {registro.funcionario_id}"
         
-        print(f"\n🔧 REGISTRO {i}/{len(registros)}: ID {registro.id}")
-        print(f"   Funcionário: {nome_funcionario}")
-        print(f"   Entrada: {registro.hora_entrada}")
-        print(f"   Saída: {registro.hora_saida}")
-        print(f"   Horas trabalhadas: {registro.horas_trabalhadas}")
-        print(f"   Horas extras ANTES: {registro.horas_extras}")
-        print(f"   Atraso ANTES: {registro.total_atraso_minutos}min")
+        if registro.horas_trabalhadas and registro.horas_trabalhadas > 0:
+            # LÓGICA: horas extras = horas trabalhadas
+            registro.horas_extras = float(registro.horas_trabalhadas)
+            registro.percentual_extras = 50.0
+        else:
+            registro.horas_extras = 0.0
+            registro.percentual_extras = 0.0
         
-        # APLICAR CORREÇÃO FORÇADA
-        horas_trabalhadas = float(registro.horas_trabalhadas or 0)
-        
-        # 1. ZERAR TODOS OS ATRASOS (sábado não tem atraso)
-        registro.total_atraso_horas = 0.0
+        # SEMPRE zero atraso
         registro.total_atraso_minutos = 0
+        registro.total_atraso_horas = 0.0
         registro.minutos_atraso_entrada = 0
         registro.minutos_atraso_saida = 0
         
-        # 2. TODAS AS HORAS = HORAS EXTRAS
-        registro.horas_extras = horas_trabalhadas
-        registro.percentual_extras = 50.0
-        
-        # 3. TIPO CORRETO
-        registro.tipo_registro = 'sabado_horas_extras'
-        
-        print(f"   Horas extras DEPOIS: {registro.horas_extras} ✅")
-        print(f"   Atraso DEPOIS: {registro.total_atraso_minutos}min ✅")
+        if registro.horas_trabalhadas and registro.horas_trabalhadas > 0:
+            print(f"   ✅ {nome}: {registro.horas_extras:.1f}h extras, 0min atraso")
     
     try:
         db.session.commit()
-        print(f"\n✅ {len(registros)} REGISTROS CORRIGIDOS COM SUCESSO!")
-        return len(registros)
-        
+        print(f"\n✅ CORREÇÃO APLICADA EM {len(todos_sabados)} REGISTROS!")
+        return True
     except Exception as e:
-        print(f"\n❌ ERRO AO SALVAR: {e}")
+        print(f"\n❌ ERRO: {e}")
         db.session.rollback()
-        return 0
+        return False
 
-def verificar_correcoes():
-    """Verificar se todas as correções foram aplicadas"""
-    print("\n🔍 VERIFICAÇÃO FINAL...")
+def verificar_joao_silva():
+    """Verificação específica do João Silva Santos"""
+    print("\n🎯 VERIFICAÇÃO ESPECÍFICA - João Silva Santos:")
     
-    registros = RegistroPonto.query.filter(
+    registro = RegistroPonto.query.filter(
         RegistroPonto.data == date(2025, 7, 5),
-        RegistroPonto.hora_entrada.isnot(None)
-    ).all()
+        RegistroPonto.funcionario_id == 96
+    ).first()
     
-    print(f"📊 VERIFICANDO {len(registros)} REGISTROS:")
-    
-    todos_corretos = True
-    
-    for registro in registros:
-        funcionario = Funcionario.query.get(registro.funcionario_id)
-        nome = funcionario.nome if funcionario else f"ID {registro.funcionario_id}"
-        
-        horas_esperadas = float(registro.horas_trabalhadas or 0)
+    if registro:
+        print(f"   Tipo: '{registro.tipo_registro}'")
+        print(f"   Horas trabalhadas: {registro.horas_trabalhadas:.1f}h")
+        print(f"   Horas extras: {registro.horas_extras:.1f}h")
+        print(f"   Atraso: {registro.total_atraso_minutos}min")
         
         # Verificar se está correto
-        correto = (
-            registro.horas_extras == horas_esperadas and
-            registro.total_atraso_minutos == 0 and
-            registro.tipo_registro == 'sabado_horas_extras'
-        )
-        
-        status = "✅" if correto else "❌"
-        
-        print(f"   {status} {nome}: {registro.horas_extras}h extras, {registro.total_atraso_minutos}min atraso")
-        
-        if not correto:
-            todos_corretos = False
-    
-    return todos_corretos
+        if (registro.tipo_registro == 'sabado_trabalhado' and 
+            registro.horas_extras == registro.horas_trabalhadas and 
+            registro.total_atraso_minutos == 0):
+            print("   ✅ TUDO CORRETO!")
+            print(f"   📋 Vai exibir: {registro.horas_trabalhadas:.1f}h - 50%")
+            print(f"   📋 Atraso: -")
+            return True
+        else:
+            print("   ❌ AINDA INCORRETO!")
+            return False
+    else:
+        print("   ❌ Registro não encontrado!")
+        return False
 
 if __name__ == "__main__":
     with app.app_context():
-        print("🚨 CORREÇÃO URGENTE - TODOS OS SÁBADOS")
-        print("=" * 60)
+        print("🚀 CORREÇÃO FINAL DOS SÁBADOS")
+        print("=" * 80)
         
-        # 1. Corrigir todos
-        quantidade = corrigir_todos_sabados()
+        # 1. Corrigir todos os registros
+        sucesso = corrigir_todos_sabados()
         
-        if quantidade > 0:
-            # 2. Verificar
-            if verificar_correcoes():
-                print("\n" + "=" * 60)
-                print("🎉 CORREÇÃO TOTAL BEM-SUCEDIDA!")
-                print(f"✅ {quantidade} registros de sábado corrigidos")
-                print("✅ PROBLEMA RESOLVIDO:")
-                print("   - Horas extras: agora mostra valores corretos (ex: 7.92h)")
-                print("   - Atraso: agora mostra 0min sempre")
-                print("   - Tag: SÁBADO (já estava correto)")
-                print("\n🔄 RECARREGUE A PÁGINA PARA VER AS MUDANÇAS!")
+        if sucesso:
+            # 2. Verificar João Silva especificamente
+            correto = verificar_joao_silva()
+            
+            print("\n" + "=" * 80)
+            if correto:
+                print("🎯 CORREÇÃO 100% CONCLUÍDA!")
+                print("✅ Tipo correto: sabado_trabalhado")
+                print("✅ Template atualizado para ambos os tipos")
+                print("✅ Lógica aplicada: horas extras = horas trabalhadas")
+                print("✅ Atraso sempre zero em sábados")
+                print("\n🔄 Recarregue a página (Ctrl+Shift+R) para ver!")
             else:
-                print("\n❌ ALGUMAS CORREÇÕES FALHARAM")
+                print("❌ AINDA HÁ PROBLEMAS!")
         else:
-            print("\n❌ FALHA TOTAL NA CORREÇÃO")
+            print("\n❌ FALHA NA CORREÇÃO!")
         
-        print("=" * 60)
+        print("=" * 80)

@@ -350,12 +350,12 @@
                         </thead>
                         <tbody>
                             {% for registro in registros_ponto %}
-                            <tr {% if registro.is_falta %}style="background-color: #3d2a2a;"{% elif registro.is_feriado %}style="background-color: #2a2a3d;"{% elif registro.tipo_registro == 'sabado_horas_extras' %}style="background-color: #2a3d2a;"{% elif registro.tipo_registro == 'domingo_horas_extras' %}style="background-color: #3d2a3d;"{% endif %}>
+                            <tr {% if registro.is_falta %}style="background-color: #3d2a2a;"{% elif registro.is_feriado %}style="background-color: #2a2a3d;"{% elif registro.tipo_registro == 'sabado_trabalhado' or registro.tipo_registro == 'sabado_horas_extras' %}style="background-color: #2a3d2a;"{% elif registro.tipo_registro == 'domingo_trabalhado' or registro.tipo_registro == 'domingo_horas_extras' %}style="background-color: #3d2a3d;"{% endif %}>
                                 <td>
                                     <div class="d-flex align-items-center">
                                         <span>{{ registro.data.strftime('%d/%m/%Y') }}</span>
                                         {% set dia_semana = registro.data.weekday() %}
-                                        {% if registro.tipo_registro == 'sabado_horas_extras' or (dia_semana == 5 and 'trabalhado' in (registro.tipo_registro or '')) %}
+                                        {% if registro.tipo_registro == 'sabado_trabalhado' or registro.tipo_registro == 'sabado_horas_extras' or (dia_semana == 5 and 'trabalhado' in (registro.tipo_registro or '')) %}
                                             <span class="badge bg-success ms-2"><i class="fas fa-calendar-week"></i> SÁBADO</span>
                                         {% elif registro.tipo_registro == 'domingo_horas_extras' or (dia_semana == 6 and 'trabalhado' in (registro.tipo_registro or '')) %}
                                             <span class="badge bg-info ms-2"><i class="fas fa-sun"></i> DOMINGO</span>
@@ -450,6 +450,8 @@
                                         {% else %}
                                             <span class="fw-bold" style="color: #dc3545;">Falta</span>
                                         {% endif %}
+                                    {% elif registro.tipo_registro == 'sabado_trabalhado' and registro.horas_trabalhadas and registro.horas_trabalhadas > 0 %}
+                                        <span class="badge bg-warning">{{ '{:.1f}h - 50%'.format(registro.horas_trabalhadas) }}</span>
                                     {% elif registro.tipo_registro == 'sabado_horas_extras' and registro.horas_trabalhadas and registro.horas_trabalhadas > 0 %}
                                         <span class="badge bg-warning">{{ '{:.1f}h - 50%'.format(registro.horas_trabalhadas) }}</span>
                                     {% elif registro.horas_extras and registro.horas_extras > 0 %}
@@ -469,7 +471,7 @@
                                         <span class="fw-bold" style="color: #28a745;">Falta Justificada</span>
                                     {% elif registro.tipo_registro == 'falta' %}
                                         <span class="fw-bold" style="color: #dc3545;">Falta</span>
-                                    {% elif registro.tipo_registro == 'sabado_horas_extras' or registro.tipo_registro == 'domingo_horas_extras' or registro.tipo_registro == 'feriado_trabalhado' %}
+                                    {% elif registro.tipo_registro == 'sabado_trabalhado' or registro.tipo_registro == 'sabado_horas_extras' or registro.tipo_registro == 'domingo_trabalhado' or registro.tipo_registro == 'domingo_horas_extras' or registro.tipo_registro == 'feriado_trabalhado' %}
                                         <span class="text-muted">-</span>
                                     {% elif registro.total_atraso_minutos and registro.total_atraso_minutos > 0 %}
                                         <span class="badge bg-danger">{{ '{:.0f}min'.format(registro.total_atraso_minutos) }}</span>
