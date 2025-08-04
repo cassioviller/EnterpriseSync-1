@@ -1617,6 +1617,7 @@ function salvarPonto(event) {
     const registroId = document.getElementById('registro_id_ponto')?.value;
     
     console.log('Salvando ponto:', registroId ? 'Edição' : 'Novo');
+    console.log('📋 Valor do campo registro_id_ponto:', registroId);
     
     // Se for edição, usar PUT/POST com ID
     let url, method;
