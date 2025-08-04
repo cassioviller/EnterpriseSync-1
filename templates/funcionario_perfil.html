@@ -467,7 +467,7 @@
                                         <span class="fw-bold" style="color: #28a745;">Falta Justificada</span>
                                     {% elif registro.tipo_registro == 'falta' %}
                                         <span class="fw-bold" style="color: #dc3545;">Falta</span>
-                                    {% elif registro.tipo_registro in ['sabado_horas_extras', 'domingo_horas_extras', 'feriado_trabalhado'] %}
+                                    {% elif registro.tipo_registro == 'sabado_horas_extras' or registro.tipo_registro == 'domingo_horas_extras' or registro.tipo_registro == 'feriado_trabalhado' %}
                                         <span class="text-muted">-</span>
                                     {% elif registro.total_atraso_minutos and registro.total_atraso_minutos > 0 %}
                                         <span class="badge bg-danger">{{ '{:.0f}min'.format(registro.total_atraso_minutos) }}</span>
