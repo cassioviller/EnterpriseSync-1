@@ -5638,15 +5638,19 @@ def validar_dados_edicao_ponto(dados, registro):
     """Valida dados de edição com regras robustas"""
     erros = []
     
-    # Validar tipo de registro
+    # Validar tipo de registro (pode vir como tipo_lancamento ou tipo_registro)
     tipos_validos = [t['valor'] for t in obter_tipos_registro_validos()]
-    if dados.get('tipo_registro') not in tipos_validos:
-        erros.append('Tipo de registro inválido')
+    tipo_recebido = dados.get('tipo_lancamento') or dados.get('tipo_registro')
+    
+    print(f"🔍 Validando tipo: recebido='{tipo_recebido}', válidos={tipos_validos}")
+    
+    if tipo_recebido not in tipos_validos:
+        erros.append(f'Tipo de registro inválido: {tipo_recebido}')
     
     # Validar horários para tipos que trabalham
     tipos_trabalhados = ['trabalho_normal', 'sabado_trabalhado', 'domingo_trabalhado', 'feriado_trabalhado', 'meio_periodo']
     
-    if dados.get('tipo_registro') in tipos_trabalhados:
+    if tipo_recebido in tipos_trabalhados:
         if not dados.get('hora_entrada') or not dados.get('hora_saida'):
             erros.append('Horários de entrada e saída são obrigatórios')
         
@@ -5695,9 +5699,12 @@ def validar_sequencia_horarios_edicao(dados):
 
 def aplicar_edicao_registro(registro, dados):
     """Aplica edições ao registro"""
-    # Mapear tipo para banco
-    tipo_banco = mapear_tipo_para_banco(dados.get('tipo_registro'))
+    # Mapear tipo para banco (pode vir como tipo_lancamento ou tipo_registro)
+    tipo_recebido = dados.get('tipo_lancamento') or dados.get('tipo_registro')
+    tipo_banco = mapear_tipo_para_banco(tipo_recebido)
     registro.tipo_registro = tipo_banco
+    
+    print(f"🔄 Aplicando edição: tipo '{tipo_recebido}' → banco '{tipo_banco}'")
     
     # Atualizar horários
     for campo_front, campo_banco in [
