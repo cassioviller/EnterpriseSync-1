@@ -308,7 +308,7 @@
                         <div class="alert alert-info p-2">
                             <strong>Legenda:</strong>
                             <span class="badge bg-success ms-2"><i class="fas fa-calendar-week"></i> SÁBADO</span>
-                            <span class="badge bg-warning ms-2"><i class="fas fa-sun"></i> DOMINGO</span>
+                            <span class="badge bg-info ms-2"><i class="fas fa-sun"></i> DOMINGO</span>
                             <span class="badge bg-info ms-2"><i class="fas fa-star"></i> FERIADO TRAB.</span>
                             <span class="badge bg-secondary ms-2"><i class="fas fa-home"></i> FERIADO NORMAL</span>
                             <span class="badge bg-primary ms-2"><i class="fas fa-check"></i> JUSTIFICADA</span>
@@ -358,11 +358,11 @@
                                         {% if registro.tipo_registro == 'sabado_horas_extras' or (dia_semana == 5 and 'trabalhado' in (registro.tipo_registro or '')) %}
                                             <span class="badge bg-success ms-2"><i class="fas fa-calendar-week"></i> SÁBADO</span>
                                         {% elif registro.tipo_registro == 'domingo_horas_extras' or (dia_semana == 6 and 'trabalhado' in (registro.tipo_registro or '')) %}
-                                            <span class="badge bg-warning ms-2"><i class="fas fa-sun"></i> DOMINGO</span>
+                                            <span class="badge bg-info ms-2"><i class="fas fa-sun"></i> DOMINGO</span>
                                         {% elif registro.tipo_registro == 'sabado_nao_trabalhado' or (dia_semana == 5 and 'folga' in (registro.tipo_registro or '')) %}
-                                            <span class="badge bg-secondary ms-2"><i class="fas fa-calendar-times"></i> SÁB. FOLGA</span>
+                                            <span class="badge bg-success ms-2"><i class="fas fa-calendar-times"></i> SÁB. FOLGA</span>
                                         {% elif registro.tipo_registro == 'domingo_nao_trabalhado' or (dia_semana == 6 and 'folga' in (registro.tipo_registro or '')) %}
-                                            <span class="badge bg-light text-dark ms-2"><i class="fas fa-home"></i> DOM. FOLGA</span>
+                                            <span class="badge bg-info ms-2"><i class="fas fa-home"></i> DOM. FOLGA</span>
                                         {% elif registro.tipo_registro == 'feriado_trabalhado' %}
                                             <span class="badge bg-info ms-2"><i class="fas fa-star"></i> FERIADO TRAB.</span>
                                         {% elif registro.tipo_registro == 'feriado' %}
