@@ -68,7 +68,8 @@ class KPIsEngine:
         
         # Layout 4-4-4-4: Quarta linha (4 indicadores)
         horas_perdidas = self._calcular_horas_perdidas(funcionario_id, data_inicio, data_fim)
-        eficiencia = self._calcular_eficiencia(funcionario_id, data_inicio, data_fim)
+        # ALTERAÇÃO: Eficiência substituída por Horas Extras (duplicada estava confusa)
+        horas_extras_display = horas_extras  # Mostrar horas extras novamente para destaque
         valor_falta_justificada = self._calcular_valor_falta_justificada(funcionario_id, data_inicio, data_fim)
         custo_total = self._calcular_custo_total(funcionario_id, data_inicio, data_fim)
         
@@ -93,7 +94,7 @@ class KPIsEngine:
             
             # Quarta linha (4 indicadores)
             'horas_perdidas': round(horas_perdidas, 1),
-            'eficiencia': round(eficiencia, 1),
+            'eficiencia': round(horas_extras_display, 1),  # Agora mostra horas extras
             'valor_falta_justificada': round(valor_falta_justificada, 2),
             'custo_total': round(custo_total, 2),
             

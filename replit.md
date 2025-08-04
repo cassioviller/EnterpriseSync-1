@@ -38,6 +38,13 @@ Preferred communication style: Simple, everyday language.
 - **Files**: `kpis_engine.py` (lines 158, 332), `templates/funcionario_perfil.html`, `corrigir_todos_sabados.py`, `corrigir_sabado_final.py`, server restarted
 - **Result**: KPI engine now properly counts Saturday worked hours (should show 8.2h instead of 0.3h for Antonio), cost calculation includes 50% Saturday premium, template displays correctly with "7.9h - 50%" format, 62 Saturday records with 282.3h total extras properly calculated
 
+### KPI Dashboard Enhancement - Duplicate Metric Fix
+- **Date**: August 4, 2025 (Later)
+- **Change**: Replaced duplicate Efficiency KPI with Overtime Hours display to eliminate confusion between identical Productivity and Efficiency percentages
+- **Impact**: Fourth row now shows distinct KPIs: Horas Perdidas, Horas Extras (instead of Eficiência), Valor Falta Justificada, Custo Total
+- **Files**: `kpis_engine.py` (lines 74-75, 100), `templates/funcionario_perfil.html` (lines 253-254)
+- **Result**: Dashboard now displays Horas Extras value in yellow highlight format (8.2h for Antonio case), eliminating confusion from having identical percentage values for Productivity and Efficiency
+
 ### Food Registration System Enhancement
 - **Date**: August 4, 2025
 - **Change**: Implemented period-based food registration and enhanced UI filters
