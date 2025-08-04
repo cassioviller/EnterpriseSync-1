@@ -450,6 +450,8 @@
                                         {% else %}
                                             <span class="fw-bold" style="color: #dc3545;">Falta</span>
                                         {% endif %}
+                                    {% elif registro.tipo_registro == 'sabado_horas_extras' and registro.horas_trabalhadas and registro.horas_trabalhadas > 0 %}
+                                        <span class="badge bg-warning">{{ '{:.1f}h - 50%'.format(registro.horas_trabalhadas) }}</span>
                                     {% elif registro.horas_extras and registro.horas_extras > 0 %}
                                         {% if registro.percentual_extras %}
                                             <span class="badge bg-warning">{{ '{:.1f}h - {:.0f}%'.format(registro.horas_extras, registro.percentual_extras) }}</span>
