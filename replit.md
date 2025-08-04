@@ -45,6 +45,13 @@ Preferred communication style: Simple, everyday language.
 - **Files**: `kpis_engine.py` (lines 74-75, 100), `templates/funcionario_perfil.html` (lines 253-254)
 - **Result**: Dashboard now displays Horas Extras value in yellow highlight format (8.2h for Antonio case), eliminating confusion from having identical percentage values for Productivity and Efficiency
 
+### Two Distinct Overtime KPIs Implementation
+- **Date**: August 4, 2025 (Final Implementation)
+- **Change**: Implemented two separate KPIs for overtime hours - one showing hours and another showing monetary value
+- **Impact**: First row shows "Horas Extras" in hours format (e.g., 8.2h), fourth row shows "Valor Horas Extras" in R$ format with proper overtime multipliers
+- **Files**: `kpis_engine.py` (new `_calcular_valor_horas_extras` method), `templates/funcionario_perfil.html`, `correcao_producao_sabado.py`
+- **Result**: Clear distinction between overtime hours (8.2h) and their monetary value (R$ 137.56), with proper Saturday 1.5x, Sunday 2.0x, and normal 1.6x multipliers applied
+
 ### Food Registration System Enhancement
 - **Date**: August 4, 2025
 - **Change**: Implemented period-based food registration and enhanced UI filters
