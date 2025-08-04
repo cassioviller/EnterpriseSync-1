@@ -125,13 +125,14 @@ class KPIsEngine:
         return total or 0.0
     
     def _calcular_horas_extras(self, funcionario_id, data_inicio, data_fim):
-        """2. Horas Extras: Soma TOTAL das horas extras (campo direto + calculadas)"""
-        # Usar a soma direta do campo horas_extras que já contém todos os cálculos
+        """2. Horas Extras: Soma direta da coluna horas_extras do funcionário"""
+        # Soma simples e direta da coluna horas_extras
         total = db.session.query(func.sum(RegistroPonto.horas_extras)).filter(
             RegistroPonto.funcionario_id == funcionario_id,
             RegistroPonto.data >= data_inicio,
             RegistroPonto.data <= data_fim,
-            RegistroPonto.horas_extras.isnot(None)
+            RegistroPonto.horas_extras.isnot(None),
+            RegistroPonto.horas_extras > 0  # Apenas valores positivos
         ).scalar()
         
         return total or 0.0
@@ -647,12 +648,15 @@ class KPIsEngine:
         return custo_total
     
     def _calcular_valor_horas_extras(self, funcionario_id, data_inicio, data_fim):
-        """Calcular valor em R$ das horas extras com percentuais específicos"""
+        """15. Valor Horas Extras: Valor monetário baseado na coluna horas_extras e percentual_extras"""
         funcionario = Funcionario.query.get(funcionario_id)
         if not funcionario or not funcionario.salario:
             return 0.0
         
-        # Buscar registros do período
+        # Valor hora base (padrão 220 horas/mês para simplicidade)
+        valor_hora_base = funcionario.salario / 220
+        
+        # Buscar registros com horas extras e percentuais
         registros = RegistroPonto.query.filter(
             RegistroPonto.funcionario_id == funcionario_id,
             RegistroPonto.data >= data_inicio,
@@ -661,35 +665,30 @@ class KPIsEngine:
             RegistroPonto.horas_extras > 0
         ).all()
         
-        # Calcular valor/hora base
-        if funcionario.horario_trabalho:
-            horas_diarias = float(funcionario.horario_trabalho.horas_diarias or 8.0)
-        else:
-            horas_diarias = 8.0
-        
-        from calcular_dias_uteis_mes import calcular_dias_uteis_mes
-        dias_uteis = calcular_dias_uteis_mes(data_inicio.year, data_inicio.month)
-        horas_mensais = dias_uteis * horas_diarias
-        valor_hora = float(funcionario.salario) / horas_mensais if horas_mensais > 0 else 0.0
-        
-        valor_total_extras = 0.0
+        valor_total = 0.0
         
         for registro in registros:
-            horas_extras_reg = float(registro.horas_extras or 0)
+            horas_extras = registro.horas_extras or 0
+            if horas_extras <= 0:
+                continue
             
-            # Aplicar multiplicador por tipo
-            if registro.tipo_registro in ['sabado_trabalhado', 'sabado_horas_extras']:
-                multiplicador = 1.5  # 50% adicional
-            elif registro.tipo_registro in ['domingo_trabalhado', 'domingo_horas_extras', 'feriado_trabalhado']:
-                multiplicador = 2.0  # 100% adicional
+            # Usar percentual_extras do registro ou definir baseado no tipo
+            if registro.percentual_extras and registro.percentual_extras > 0:
+                percentual = registro.percentual_extras / 100  # Converter % para decimal
+                multiplicador = 1 + percentual  # 1 + 0.5 = 1.5 para sábado (50%)
             else:
-                # Horas extras normais (excesso da jornada)
-                multiplicador = 1.6  # 60% adicional padrão
+                # Fallback baseado no tipo de registro
+                if registro.tipo_registro in ['sabado_trabalhado', 'sabado_horas_extras']:
+                    multiplicador = 1.5  # 50% adicional
+                elif registro.tipo_registro in ['domingo_trabalhado', 'domingo_horas_extras', 'feriado_trabalhado']:
+                    multiplicador = 2.0  # 100% adicional  
+                else:
+                    multiplicador = 1.6  # 60% adicional
             
-            valor_extras_reg = horas_extras_reg * valor_hora * multiplicador
-            valor_total_extras += valor_extras_reg
+            valor_registro = horas_extras * valor_hora_base * multiplicador
+            valor_total += valor_registro
         
-        return valor_total_extras
+        return valor_total
 
 
 def gerar_calendario_util(ano):
