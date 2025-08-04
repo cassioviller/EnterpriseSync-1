@@ -5419,6 +5419,7 @@ def obter_registro_ponto(registro_id):
     """Obter dados de um registro de ponto individual para edição"""
     try:
         print(f"🔍 Buscando registro {registro_id} para edição individual")
+        print(f"🔐 Usuário logado: {current_user.email if current_user.is_authenticated else 'Não autenticado'}")
         
         # Buscar registro específico
         registro = RegistroPonto.query.get_or_404(registro_id)

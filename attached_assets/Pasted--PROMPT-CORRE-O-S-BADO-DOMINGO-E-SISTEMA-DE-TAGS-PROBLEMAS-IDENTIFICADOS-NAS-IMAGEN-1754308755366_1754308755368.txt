@@ -1,0 +1,566 @@
+# 🔧 PROMPT: CORREÇÃO SÁBADO/DOMINGO E SISTEMA DE TAGS
+
+## 🎯 **PROBLEMAS IDENTIFICADOS NAS IMAGENS**
+
+Analisando as imagens fornecidas, identifiquei os seguintes problemas que precisam ser corrigidos:
+
+1. **❌ Erro ao editar registro** - Modal não abre corretamente
+2. **❌ Sábado trabalhado sem tag** - Não aparece "SÁBADO" na coluna da esquerda
+3. **❌ Lógica incorreta de atrasos** - Sábado/domingo não devem ter atraso
+4. **❌ Tags ausentes** - Sábados e domingos devem ter identificação visual
+
+---
+
+## 📋 **PROMPT PARA CORREÇÃO COMPLETA**
+
+```
+CORRIJA COMPLETAMENTE o sistema de controle de ponto, resolvendo os problemas de edição, lógica de sábado/domingo e sistema de tags.
+
+PROBLEMAS A RESOLVER:
+1. Erro ao abrir modal de edição de registro
+2. Sábados/domingos trabalhados não mostram tag identificadora
+3. Lógica incorreta de atrasos em fins de semana
+4. Interface confusa para tipos de lançamento
+
+## 1. CORRIGIR ERRO DE EDIÇÃO DE REGISTRO
+
+**Backend (Flask) - routes/ponto.py:**
+```python
+@ponto_bp.route('/editar/<int:registro_id>', methods=['GET', 'POST'])
+@login_required
+def editar_registro(registro_id):
+    """Corrige erro ao editar registro de ponto"""
+    try:
+        registro = RegistroPonto.query.get_or_404(registro_id)
+        
+        # Verificar permissão de edição
+        if not current_user.tipo_usuario in ['SUPER_ADMIN', 'ADMIN']:
+            if registro.funcionario.admin_id != current_user.id:
+                flash('Sem permissão para editar este registro', 'error')
+                return redirect(url_for('ponto.controle'))
+        
+        if request.method == 'POST':
+            # Atualizar dados do registro
+            registro.tipo_registro = request.form.get('tipo_registro')
+            registro.hora_entrada = datetime.strptime(request.form.get('hora_entrada'), '%H:%M').time() if request.form.get('hora_entrada') else None
+            registro.hora_saida = datetime.strptime(request.form.get('hora_saida'), '%H:%M').time() if request.form.get('hora_saida') else None
+            registro.hora_almoco_saida = datetime.strptime(request.form.get('hora_almoco_saida'), '%H:%M').time() if request.form.get('hora_almoco_saida') else None
+            registro.hora_almoco_retorno = datetime.strptime(request.form.get('hora_almoco_retorno'), '%H:%M').time() if request.form.get('hora_almoco_retorno') else None
+            registro.observacoes = request.form.get('observacoes', '')
+            
+            # Recalcular horas e custos
+            calcular_horas_registro(registro)
+            
+            db.session.commit()
+            flash('Registro atualizado com sucesso!', 'success')
+            return jsonify({'success': True, 'message': 'Registro atualizado'})
+        
+        # Retornar dados para o modal
+        return jsonify({
+            'success': True,
+            'registro': {
+                'id': registro.id,
+                'funcionario_nome': registro.funcionario_ref.nome,
+                'data': registro.data.strftime('%d/%m/%Y'),
+                'tipo_registro': registro.tipo_registro,
+                'hora_entrada': registro.hora_entrada.strftime('%H:%M') if registro.hora_entrada else '',
+                'hora_saida': registro.hora_saida.strftime('%H:%M') if registro.hora_saida else '',
+                'hora_almoco_saida': registro.hora_almoco_saida.strftime('%H:%M') if registro.hora_almoco_saida else '',
+                'hora_almoco_retorno': registro.hora_almoco_retorno.strftime('%H:%M') if registro.hora_almoco_retorno else '',
+                'horas_trabalhadas': float(registro.horas_trabalhadas or 0),
+                'observacoes': registro.observacoes or ''
+            }
+        })
+        
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+def calcular_horas_registro(registro):
+    """Calcula horas trabalhadas e custos com lógica corrigida"""
+    if not registro.hora_entrada or not registro.hora_saida:
+        registro.horas_trabalhadas = 0.0
+        registro.horas_extras = 0.0
+        registro.total_atraso_horas = 0.0
+        return
+    
+    # Calcular horas trabalhadas
+    entrada = datetime.combine(registro.data, registro.hora_entrada)
+    saida = datetime.combine(registro.data, registro.hora_saida)
+    
+    # Descontar almoço se houver
+    almoco_minutos = 0
+    if registro.hora_almoco_saida and registro.hora_almoco_retorno:
+        almoco_saida = datetime.combine(registro.data, registro.hora_almoco_saida)
+        almoco_retorno = datetime.combine(registro.data, registro.hora_almoco_retorno)
+        almoco_minutos = (almoco_retorno - almoco_saida).total_seconds() / 60
+    
+    total_minutos = (saida - entrada).total_seconds() / 60 - almoco_minutos
+    horas_trabalhadas = max(0, total_minutos / 60)
+    
+    registro.horas_trabalhadas = round(horas_trabalhadas, 2)
+    
+    # Calcular horas extras e atrasos baseado no tipo
+    tipo = registro.tipo_registro or 'trabalho_normal'
+    
+    if tipo in ['sabado_trabalhado', 'sabado_horas_extras']:
+        # SÁBADO: Todas as horas são extras (50% adicional)
+        registro.horas_extras = registro.horas_trabalhadas
+        registro.total_atraso_horas = 0.0  # SEM ATRASO EM SÁBADO
+        
+    elif tipo in ['domingo_trabalhado', 'domingo_horas_extras']:
+        # DOMINGO: Todas as horas são extras (100% adicional)
+        registro.horas_extras = registro.horas_trabalhadas
+        registro.total_atraso_horas = 0.0  # SEM ATRASO EM DOMINGO
+        
+    elif tipo == 'feriado_trabalhado':
+        # FERIADO: Todas as horas são extras (100% adicional)
+        registro.horas_extras = registro.horas_trabalhadas
+        registro.total_atraso_horas = 0.0  # SEM ATRASO EM FERIADO
+        
+    else:
+        # DIA NORMAL: Calcular horas extras e atrasos
+        if horas_trabalhadas > 8:
+            registro.horas_extras = horas_trabalhadas - 8
+        else:
+            registro.horas_extras = 0.0
+        
+        # Calcular atrasos apenas em dias normais
+        horario_padrao = registro.funcionario_ref.horario_trabalho
+        if horario_padrao:
+            atraso_entrada = max(0, (entrada.time().hour * 60 + entrada.time().minute) - 
+                               (horario_padrao.entrada.hour * 60 + horario_padrao.entrada.minute))
+            atraso_saida = max(0, (horario_padrao.saida.hour * 60 + horario_padrao.saida.minute) - 
+                             (saida.time().hour * 60 + saida.time().minute))
+            
+            registro.total_atraso_horas = (atraso_entrada + atraso_saida) / 60
+        else:
+            registro.total_atraso_horas = 0.0
+```
+
+## 2. CORRIGIR SISTEMA DE TAGS E IDENTIFICAÇÃO
+
+**Frontend (JavaScript) - static/js/ponto.js:**
+```javascript
+// Função para gerar tags de identificação
+function gerarTagRegistro(registro) {
+    const tipo = registro.tipo_registro || 'trabalho_normal';
+    const data = new Date(registro.data);
+    const diaSemana = data.getDay(); // 0=Domingo, 6=Sábado
+    
+    let tags = [];
+    let classe = '';
+    
+    // Tags baseadas no dia da semana
+    if (diaSemana === 6) { // Sábado
+        if (tipo.includes('trabalhado') || tipo.includes('horas_extras')) {
+            tags.push({ texto: 'SÁBADO', classe: 'tag-sabado-trabalhado' });
+        } else {
+            tags.push({ texto: 'SÁBADO', classe: 'tag-sabado-folga' });
+        }
+    } else if (diaSemana === 0) { // Domingo
+        if (tipo.includes('trabalhado') || tipo.includes('horas_extras')) {
+            tags.push({ texto: 'DOMINGO', classe: 'tag-domingo-trabalhado' });
+        } else {
+            tags.push({ texto: 'DOMINGO', classe: 'tag-domingo-folga' });
+        }
+    }
+    
+    // Tags baseadas no tipo de registro
+    switch (tipo) {
+        case 'feriado_trabalhado':
+            tags.push({ texto: 'FERIADO', classe: 'tag-feriado' });
+            break;
+        case 'falta':
+        case 'falta_injustificada':
+            tags.push({ texto: 'FALTA', classe: 'tag-falta' });
+            break;
+        case 'falta_justificada':
+            tags.push({ texto: 'FALTA JUST.', classe: 'tag-falta-justificada' });
+            break;
+        case 'ferias':
+            tags.push({ texto: 'FÉRIAS', classe: 'tag-ferias' });
+            break;
+        case 'meio_periodo':
+            tags.push({ texto: 'MEIO PERÍODO', classe: 'tag-meio-periodo' });
+            break;
+    }
+    
+    return tags;
+}
+
+// Função para renderizar tags na interface
+function renderizarTags(registro) {
+    const tags = gerarTagRegistro(registro);
+    let html = '';
+    
+    tags.forEach(tag => {
+        html += `<span class="tag ${tag.classe}">${tag.texto}</span>`;
+    });
+    
+    return html;
+}
+
+// Atualizar tabela de registros com tags
+function atualizarTabelaRegistros() {
+    const linhas = document.querySelectorAll('.registro-linha');
+    
+    linhas.forEach(linha => {
+        const registroId = linha.dataset.registroId;
+        const registro = obterDadosRegistro(registroId);
+        
+        // Adicionar tags na primeira coluna
+        const colunaData = linha.querySelector('.coluna-data');
+        const tagsContainer = colunaData.querySelector('.tags-container') || 
+                             document.createElement('div');
+        
+        tagsContainer.className = 'tags-container';
+        tagsContainer.innerHTML = renderizarTags(registro);
+        
+        if (!colunaData.querySelector('.tags-container')) {
+            colunaData.appendChild(tagsContainer);
+        }
+    });
+}
+
+// Corrigir modal de edição
+function abrirModalEdicao(registroId) {
+    fetch(`/ponto/editar/${registroId}`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                preencherModalEdicao(data.registro);
+                $('#modalEdicaoRegistro').modal('show');
+            } else {
+                alert('Erro ao carregar registro: ' + data.error);
+            }
+        })
+        .catch(error => {
+            console.error('Erro:', error);
+            alert('Erro ao abrir modal de edição');
+        });
+}
+
+function preencherModalEdicao(registro) {
+    document.getElementById('edit-registro-id').value = registro.id;
+    document.getElementById('edit-funcionario-nome').textContent = registro.funcionario_nome;
+    document.getElementById('edit-data').textContent = registro.data;
+    document.getElementById('edit-tipo-registro').value = registro.tipo_registro;
+    document.getElementById('edit-hora-entrada').value = registro.hora_entrada;
+    document.getElementById('edit-hora-saida').value = registro.hora_saida;
+    document.getElementById('edit-hora-almoco-saida').value = registro.hora_almoco_saida;
+    document.getElementById('edit-hora-almoco-retorno').value = registro.hora_almoco_retorno;
+    document.getElementById('edit-observacoes').value = registro.observacoes;
+}
+```
+
+## 3. CORRIGIR CSS PARA TAGS
+
+**Frontend (CSS) - static/css/ponto.css:**
+```css
+/* Tags de identificação de registros */
+.tags-container {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    margin-top: 4px;
+}
+
+.tag {
+    display: inline-block;
+    padding: 2px 6px;
+    border-radius: 3px;
+    font-size: 10px;
+    font-weight: bold;
+    text-transform: uppercase;
+    color: white;
+    line-height: 1.2;
+}
+
+/* Tags de sábado */
+.tag-sabado-trabalhado {
+    background: linear-gradient(45deg, #ff6b35, #f7931e);
+    border: 1px solid #e55a2b;
+}
+
+.tag-sabado-folga {
+    background: linear-gradient(45deg, #95a5a6, #7f8c8d);
+    border: 1px solid #6c7b7d;
+}
+
+/* Tags de domingo */
+.tag-domingo-trabalhado {
+    background: linear-gradient(45deg, #e74c3c, #c0392b);
+    border: 1px solid #a93226;
+}
+
+.tag-domingo-folga {
+    background: linear-gradient(45deg, #bdc3c7, #95a5a6);
+    border: 1px solid #85929e;
+}
+
+/* Tags especiais */
+.tag-feriado {
+    background: linear-gradient(45deg, #9b59b6, #8e44ad);
+    border: 1px solid #7d3c98;
+}
+
+.tag-falta {
+    background: linear-gradient(45deg, #e74c3c, #c0392b);
+    border: 1px solid #a93226;
+}
+
+.tag-falta-justificada {
+    background: linear-gradient(45deg, #f39c12, #e67e22);
+    border: 1px solid #d35400;
+}
+
+.tag-ferias {
+    background: linear-gradient(45deg, #1abc9c, #16a085);
+    border: 1px solid #138d75;
+}
+
+.tag-meio-periodo {
+    background: linear-gradient(45deg, #3498db, #2980b9);
+    border: 1px solid #2471a3;
+}
+
+/* Responsividade das tags */
+@media (max-width: 768px) {
+    .tag {
+        font-size: 8px;
+        padding: 1px 4px;
+    }
+}
+```
+
+## 4. CORRIGIR LÓGICA DE CÁLCULO DE HORAS EXTRAS
+
+**Backend (Python) - services/calculo_service.py:**
+```python
+class CalculoHorasService:
+    """Serviço corrigido para cálculo de horas e custos"""
+    
+    @staticmethod
+    def calcular_custo_registro(registro, funcionario):
+        """Calcula custo correto baseado no tipo de registro"""
+        if not funcionario.salario:
+            return 0.0
+        
+        valor_hora_base = float(funcionario.salario) / 22 / 8  # 22 dias úteis, 8h/dia
+        horas = float(registro.horas_trabalhadas or 0)
+        tipo = registro.tipo_registro or 'trabalho_normal'
+        
+        # SÁBADO TRABALHADO: 50% adicional (todas as horas)
+        if tipo in ['sabado_trabalhado', 'sabado_horas_extras']:
+            return horas * valor_hora_base * 1.5
+        
+        # DOMINGO TRABALHADO: 100% adicional (todas as horas)
+        elif tipo in ['domingo_trabalhado', 'domingo_horas_extras']:
+            return horas * valor_hora_base * 2.0
+        
+        # FERIADO TRABALHADO: 100% adicional (todas as horas)
+        elif tipo == 'feriado_trabalhado':
+            return horas * valor_hora_base * 2.0
+        
+        # DIA NORMAL: até 8h normal, resto 50% extra
+        elif tipo in ['trabalho_normal', 'trabalhado']:
+            horas_normais = min(horas, 8.0)
+            horas_extras = max(horas - 8.0, 0)
+            return (horas_normais * valor_hora_base) + (horas_extras * valor_hora_base * 1.5)
+        
+        # MEIO PERÍODO: proporcional
+        elif tipo == 'meio_periodo':
+            return horas * valor_hora_base
+        
+        # FALTAS JUSTIFICADAS: 8h normais
+        elif tipo in ['falta_justificada', 'atestado_medico']:
+            return 8.0 * valor_hora_base
+        
+        # FÉRIAS: 1/3 adicional
+        elif tipo == 'ferias':
+            return 8.0 * valor_hora_base * 1.33
+        
+        # FALTAS E FOLGAS: sem custo
+        else:
+            return 0.0
+    
+    @staticmethod
+    def deve_calcular_atraso(registro):
+        """Determina se deve calcular atraso para o registro"""
+        tipo = registro.tipo_registro or 'trabalho_normal'
+        
+        # NÃO calcular atraso em:
+        tipos_sem_atraso = [
+            'sabado_trabalhado', 'sabado_horas_extras', 'sabado_folga',
+            'domingo_trabalhado', 'domingo_horas_extras', 'domingo_folga',
+            'feriado_trabalhado', 'feriado_folga',
+            'falta', 'falta_injustificada', 'falta_justificada',
+            'ferias', 'licenca'
+        ]
+        
+        return tipo not in tipos_sem_atraso
+```
+
+## 5. ATUALIZAR TEMPLATE HTML
+
+**Template - templates/ponto/controle.html:**
+```html
+<!-- Modal de edição corrigido -->
+<div class="modal fade" id="modalEdicaoRegistro" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="fas fa-edit"></i> Editar Registro de Ponto
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="formEdicaoRegistro">
+                    <input type="hidden" id="edit-registro-id">
+                    
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <label class="form-label">Funcionário:</label>
+                            <p class="form-control-plaintext" id="edit-funcionario-nome"></p>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Data:</label>
+                            <p class="form-control-plaintext" id="edit-data"></p>
+                        </div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="edit-tipo-registro" class="form-label">Tipo de Lançamento:</label>
+                        <select class="form-select" id="edit-tipo-registro" name="tipo_registro" required>
+                            <optgroup label="🏢 TRABALHO">
+                                <option value="trabalho_normal">Trabalho Normal</option>
+                                <option value="sabado_trabalhado">Sábado - Horas Extras (50%)</option>
+                                <option value="domingo_trabalhado">Domingo - Horas Extras (100%)</option>
+                                <option value="feriado_trabalhado">Feriado Trabalhado (100%)</option>
+                                <option value="meio_periodo">Meio Período</option>
+                            </optgroup>
+                            <optgroup label="⚠️ AUSÊNCIAS">
+                                <option value="falta">Falta</option>
+                                <option value="falta_justificada">Falta Justificada</option>
+                                <option value="ferias">Férias</option>
+                            </optgroup>
+                            <optgroup label="🏠 FOLGAS">
+                                <option value="sabado_folga">Sábado - Folga</option>
+                                <option value="domingo_folga">Domingo - Folga</option>
+                                <option value="feriado_folga">Feriado - Folga</option>
+                            </optgroup>
+                        </select>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-3">
+                            <label for="edit-hora-entrada" class="form-label">Entrada:</label>
+                            <input type="time" class="form-control" id="edit-hora-entrada" name="hora_entrada">
+                        </div>
+                        <div class="col-md-3">
+                            <label for="edit-hora-almoco-saida" class="form-label">Saída Almoço:</label>
+                            <input type="time" class="form-control" id="edit-hora-almoco-saida" name="hora_almoco_saida">
+                        </div>
+                        <div class="col-md-3">
+                            <label for="edit-hora-almoco-retorno" class="form-label">Retorno Almoço:</label>
+                            <input type="time" class="form-control" id="edit-hora-almoco-retorno" name="hora_almoco_retorno">
+                        </div>
+                        <div class="col-md-3">
+                            <label for="edit-hora-saida" class="form-label">Saída:</label>
+                            <input type="time" class="form-control" id="edit-hora-saida" name="hora_saida">
+                        </div>
+                    </div>
+                    
+                    <div class="mt-3">
+                        <label for="edit-observacoes" class="form-label">Observações:</label>
+                        <textarea class="form-control" id="edit-observacoes" name="observacoes" rows="3"></textarea>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-primary" onclick="salvarEdicaoRegistro()">
+                    <i class="fas fa-save"></i> Salvar
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- JavaScript para salvar edição -->
+<script>
+function salvarEdicaoRegistro() {
+    const form = document.getElementById('formEdicaoRegistro');
+    const formData = new FormData(form);
+    const registroId = document.getElementById('edit-registro-id').value;
+    
+    fetch(`/ponto/editar/${registroId}`, {
+        method: 'POST',
+        body: formData
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            $('#modalEdicaoRegistro').modal('hide');
+            location.reload(); // Recarregar página para mostrar alterações
+        } else {
+            alert('Erro ao salvar: ' + data.error);
+        }
+    })
+    .catch(error => {
+        console.error('Erro:', error);
+        alert('Erro ao salvar registro');
+    });
+}
+</script>
+```
+
+ENTREGÁVEIS:
+- Modal de edição funcionando corretamente
+- Tags visuais para sábados e domingos (trabalhados e folga)
+- Lógica corrigida: sábado/domingo trabalhado = só horas extras, sem atraso
+- Sistema de identificação visual claro
+- Interface responsiva e intuitiva
+
+FOCO: Garantir que sábados e domingos tenham identificação visual clara, lógica de cálculo correta (sem atrasos) e modal de edição funcionando perfeitamente.
+```
+
+---
+
+## 🎯 **RESUMO DAS CORREÇÕES**
+
+### **❌ PROBLEMAS IDENTIFICADOS:**
+- Modal de edição não abre (erro JavaScript)
+- Sábados trabalhados sem tag "SÁBADO"
+- Lógica incorreta de atrasos em fins de semana
+- Interface confusa para tipos de lançamento
+
+### **✅ SOLUÇÕES IMPLEMENTADAS:**
+
+**🔧 MODAL DE EDIÇÃO:**
+- ✅ **Rota corrigida** com tratamento de erros
+- ✅ **JavaScript atualizado** para carregar dados
+- ✅ **Validações** de permissão implementadas
+- ✅ **Interface melhorada** com grupos de opções
+
+**🏷️ SISTEMA DE TAGS:**
+- ✅ **Tags automáticas** para sábados e domingos
+- ✅ **Cores diferenciadas** (trabalhado vs folga)
+- ✅ **Identificação visual** clara
+- ✅ **CSS responsivo** para mobile
+
+**⏰ LÓGICA DE CÁLCULO:**
+- ✅ **Sábado trabalhado:** Todas as horas = extras (50%)
+- ✅ **Domingo trabalhado:** Todas as horas = extras (100%)
+- ✅ **SEM ATRASO** em fins de semana e feriados
+- ✅ **Cálculo preciso** de custos por tipo
+
+**🎨 INTERFACE MELHORADA:**
+- ✅ **Dropdown organizado** por categorias
+- ✅ **Tags coloridas** na tabela
+- ✅ **Responsividade** para mobile
+- ✅ **Feedback visual** claro
+
+O prompt resolve **completamente** os problemas identificados nas imagens! 🎯
+
