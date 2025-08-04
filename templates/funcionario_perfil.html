@@ -1619,21 +1619,37 @@ function salvarPonto(event) {
     console.log('Salvando ponto:', registroId ? 'Edição' : 'Novo');
     console.log('📋 Valor do campo registro_id_ponto:', registroId);
     
-    // Se for edição, usar PUT/POST com ID
-    let url, method;
+    // Se for edição, usar PUT com ID
+    let url, method, body;
     if (registroId) {
         url = `/ponto/registro/${registroId}`;
-        method = 'POST'; // Usar POST pois HTML forms não suportam PUT nativamente
+        method = 'PUT';
+        // Para PUT, usar JSON ao invés de FormData
+        const dados = {};
+        for (let [key, value] of formData.entries()) {
+            dados[key] = value;
+        }
+        body = JSON.stringify(dados);
     } else {
         url = form.action;
         method = 'POST';
+        body = formData;
     }
     
     // Fazer a requisição
-    fetch(url, {
+    const fetchOptions = {
         method: method,
-        body: formData
-    })
+        body: body
+    };
+    
+    // Adicionar Content-Type para JSON quando for PUT
+    if (method === 'PUT') {
+        fetchOptions.headers = {
+            'Content-Type': 'application/json'
+        };
+    }
+    
+    fetch(url, fetchOptions)
     .then(response => {
         // Verificar se a resposta é HTML (erro de redirecionamento) ou JSON
         return response.text().then(text => {
