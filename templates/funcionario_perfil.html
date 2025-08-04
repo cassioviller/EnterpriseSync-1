@@ -1793,39 +1793,91 @@ function mostrarInfoDebug(registro) {
 function abrirModalEdicao() {
     const modalElement = document.getElementById('pontoModal');
     if (!modalElement) {
+        console.error('❌ Modal pontoModal não encontrado no DOM');
         mostrarErro('Modal não encontrado');
         return;
     }
     
+    console.log('🔧 Tentando abrir modal...');
+    
     try {
+        // Método 1: Bootstrap 5
         if (typeof bootstrap !== 'undefined' && bootstrap.Modal) {
-            const modal = new bootstrap.Modal(modalElement);
+            const modal = new bootstrap.Modal(modalElement, {
+                backdrop: 'static',
+                keyboard: true
+            });
             modal.show();
             console.log('✅ Modal aberto com Bootstrap 5');
-        } else if (typeof $ !== 'undefined') {
-            $('#pontoModal').modal('show');
-            console.log('✅ Modal aberto com jQuery');
-        } else {
-            // Fallback manual
-            modalElement.classList.add('show');
-            modalElement.style.display = 'block';
-            modalElement.setAttribute('aria-modal', 'true');
-            modalElement.removeAttribute('aria-hidden');
-            console.log('✅ Modal aberto manualmente');
+            return;
         }
+        
+        // Método 2: jQuery se disponível
+        if (typeof $ !== 'undefined' && $.fn.modal) {
+            $('#pontoModal').modal({
+                backdrop: 'static',
+                keyboard: true,
+                show: true
+            });
+            console.log('✅ Modal aberto com jQuery');
+            return;
+        }
+        
+        // Método 3: Fallback manual mais robusto
+        console.log('📝 Usando fallback manual para abrir modal');
+        
+        // Remover classes de hide/fade que podem estar interferindo
+        modalElement.classList.remove('fade');
+        modalElement.style.display = 'block';
+        modalElement.classList.add('show');
+        modalElement.setAttribute('aria-modal', 'true');
+        modalElement.setAttribute('role', 'dialog');
+        modalElement.removeAttribute('aria-hidden');
+        
+        // Adicionar backdrop se não existir
+        let backdrop = document.querySelector('.modal-backdrop');
+        if (!backdrop) {
+            backdrop = document.createElement('div');
+            backdrop.className = 'modal-backdrop show';
+            backdrop.style.zIndex = '1040';
+            document.body.appendChild(backdrop);
+        }
+        
+        // Adicionar classe modal-open ao body
+        document.body.classList.add('modal-open');
+        document.body.style.overflow = 'hidden';
+        document.body.style.paddingRight = '0px';
+        
+        console.log('✅ Modal aberto manualmente');
+        
     } catch (e) {
         console.error('❌ Erro ao abrir modal:', e);
-        mostrarErro('Erro ao abrir modal de edição');
+        console.error('Detalhes do erro:', {
+            message: e.message,
+            stack: e.stack,
+            modalElement: modalElement,
+            bootstrapAvailable: typeof bootstrap !== 'undefined',
+            jqueryAvailable: typeof $ !== 'undefined'
+        });
+        mostrarErro('Erro ao abrir modal de edição: ' + e.message);
     }
 }
 
 function mostrarErro(mensagem) {
-    // Usar toast se disponível, senão alert
+    console.error('🚨 ERRO:', mensagem);
+    
+    // Tentar usar toast se disponível
     if (typeof showToast === 'function') {
-        showToast(mensagem, 'error');
-    } else {
-        alert(mensagem);
+        try {
+            showToast(mensagem, 'error');
+            return;
+        } catch (e) {
+            console.warn('Toast não funcionou, usando alert');
+        }
     }
+    
+    // Fallback para alert
+    alert('Erro: ' + mensagem);
 }
 
 function mostrarSucesso(mensagem) {
