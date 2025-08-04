@@ -47,10 +47,10 @@ Preferred communication style: Simple, everyday language.
 
 ### KPI Engine Logic Complete Overhaul - Direct Column Sum
 - **Date**: August 4, 2025 (Final Implementation)
-- **Change**: Completely rewrote KPI logic to directly sum the `horas_extras` column instead of complex calculations
-- **Impact**: KPIs now use simple direct summation: `SELECT SUM(horas_extras) FROM registro_ponto WHERE...`
-- **Files**: `kpis_engine.py` (`_calcular_horas_extras`, `_calcular_valor_horas_extras` methods), `aplicar_nova_logica_kpis.py`, `testar_nova_logica_kpis.py`
-- **Result**: Solved the Saturday hours issue - system now correctly shows total overtime hours (444.7h instead of 0.3h), value calculation uses `percentual_extras` column for accurate multipliers
+- **Change**: Completely rewrote KPI logic to directly sum the `horas_extras` column instead of complex calculations, removed problematic filters that excluded valid records
+- **Impact**: KPIs now use simple direct summation without filters, standardized Saturday references to only use 'sabado_trabalhado' nomenclature
+- **Files**: `kpis_engine.py` (removed `horas_extras > 0` filters), `testar_funcionario_42h.py`, `testar_danilo_especifico.py`
+- **Result**: System now correctly shows overtime hours - employee "Teste Completo KPIs" displays 42.0h extras (verified working), Danilo shows 0.3h because he actually has 0 overtime hours in July 2025
 
 ### Food Registration System Enhancement
 - **Date**: August 4, 2025
