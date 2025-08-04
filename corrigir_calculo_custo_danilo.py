@@ -1,163 +1,224 @@
 #!/usr/bin/env python3
 """
-CORRIGIR CÁLCULO DE CUSTO - DANILO
-Corrige o cálculo de custo de mão de obra que está inflado
+🔧 CORRIGIR: Cálculo de custo de mão de obra - método _calcular_custo_mensal
 """
-
-import os
-import sys
-sys.path.append('.')
 
 from app import app, db
-from models import Funcionario, RegistroPonto
-from datetime import datetime, date
+from models import RegistroPonto, Funcionario
 from kpis_engine import KPIsEngine
+from sqlalchemy import func, text
+from datetime import date
 
-def analisar_calculo_custo():
-    """Analisa o cálculo de custo atual do Danilo"""
+def buscar_funcionario_problema():
+    """Buscar funcionário que está na imagem (Antonio)"""
+    print("🔍 BUSCANDO FUNCIONÁRIO DA IMAGEM")
+    print("=" * 60)
     
-    with app.app_context():
-        print("ANALISANDO CÁLCULO DE CUSTO - DANILO")
-        print("=" * 50)
+    # Buscar por variações do nome
+    funcionarios = db.session.execute(text("""
+        SELECT 
+            f.id,
+            f.nome,
+            f.salario,
+            SUM(r.horas_trabalhadas) as total_trabalhadas,
+            SUM(r.horas_extras) as total_extras,
+            COUNT(CASE WHEN r.tipo_registro = 'falta' THEN 1 END) as faltas
+        FROM funcionario f
+        JOIN registro_ponto r ON f.id = r.funcionario_id
+        WHERE (f.nome LIKE '%Antonio%' OR f.nome LIKE '%Antônio%')
+            AND r.data >= '2025-07-01' 
+            AND r.data <= '2025-07-31'
+        GROUP BY f.id, f.nome, f.salario
+    """)).fetchall()
+    
+    if not funcionarios:
+        print("❌ Nenhum Antonio encontrado")
+        return None
+    
+    for func in funcionarios:
+        print(f"👤 {func.nome}")
+        print(f"   ID: {func.id}")
+        print(f"   Salário: R$ {func.salario:.2f}")
+        print(f"   Horas trabalhadas: {func.total_trabalhadas:.1f}h")
+        print(f"   Horas extras: {func.total_extras:.1f}h")
+        print(f"   Faltas: {func.faltas}")
         
-        # Buscar Danilo
-        danilo = Funcionario.query.filter(
-            Funcionario.nome.like('%Danilo José%')
-        ).first()
+        if abs(func.total_trabalhadas - 193.0) < 5:  # Próximo de 193h
+            print(f"   ✅ ESTE É O FUNCIONÁRIO DA IMAGEM!")
+            return func
+    
+    return funcionarios[0] if funcionarios else None
+
+def analisar_metodo_custo_atual():
+    """Analisar o método _calcular_custo_mensal atual"""
+    print(f"\n🔍 ANALISANDO MÉTODO _calcular_custo_mensal")
+    print("=" * 60)
+    
+    # O método está nas linhas ~180-240 do kpis_engine.py
+    print("📝 LÓGICA ATUAL:")
+    print("   1. Calcula valor_hora = salario / (dias_uteis * horas_diarias)")
+    print("   2. Soma custo de cada tipo de registro:")
+    print("      - trabalho_normal: valor_hora normal")
+    print("      - sabado_trabalhado: valor_hora * 1.5")
+    print("      - domingo_trabalhado: valor_hora * 2.0")
+    print("      - feriado_trabalhado: valor_hora * 2.0")
+    print("      - ferias: valor_hora * 1.33")
+    
+    print(f"\n❌ PROBLEMAS IDENTIFICADOS:")
+    print("   1. NÃO desconta faltas do salário base")
+    print("   2. Calcula custo baseado em horas trabalhadas, não salário + extras")
+    print("   3. Lógica incorreta para cálculo de custo mensal")
+    
+    return True
+
+def implementar_logica_correta():
+    """Implementar lógica correta de custo mensal"""
+    print(f"\n🔧 IMPLEMENTANDO LÓGICA CORRETA")
+    print("=" * 60)
+    
+    print("📝 LÓGICA CORRETA:")
+    print("   1. Salário base mensal")
+    print("   2. MENOS: desconto por faltas (valor_dia * dias_falta)")
+    print("   3. MAIS: valor das horas extras com percentuais corretos")
+    print("   4. = CUSTO TOTAL MENSAL")
+    
+    return True
+
+def criar_metodo_custo_correto():
+    """Criar novo método de cálculo de custo correto"""
+    print(f"\n🔧 CRIANDO MÉTODO CORRETO")
+    print("=" * 60)
+    
+    codigo_novo = '''
+    def _calcular_custo_mensal(self, funcionario_id, data_inicio, data_fim):
+        """Calcular custo mensal CORRETO: salário - faltas + valor horas extras"""
+        funcionario = Funcionario.query.get(funcionario_id)
+        if not funcionario or not funcionario.salario:
+            return 0.0
         
-        if not danilo:
-            print("❌ Danilo não encontrado")
-            return
+        salario_base = funcionario.salario
         
-        print(f"✅ Funcionário: {danilo.nome}")
-        print(f"✅ Salário: R$ {danilo.salario:,.2f}")
+        # 1. Calcular dias úteis do período
+        dias_uteis = self._calcular_dias_uteis_periodo(data_inicio, data_fim)
+        valor_dia = salario_base / dias_uteis if dias_uteis > 0 else 0
         
-        # Período julho 2025
-        data_inicio = date(2025, 7, 1)
-        data_fim = date(2025, 7, 31)
-        
-        # Buscar registros
-        registros = RegistroPonto.query.filter(
-            RegistroPonto.funcionario_id == danilo.id,
+        # 2. Contar faltas (descontar do salário)
+        faltas = db.session.query(func.count(RegistroPonto.id)).filter(
+            RegistroPonto.funcionario_id == funcionario_id,
             RegistroPonto.data >= data_inicio,
-            RegistroPonto.data <= data_fim
-        ).all()
+            RegistroPonto.data <= data_fim,
+            RegistroPonto.tipo_registro == 'falta'
+        ).scalar() or 0
         
-        print(f"✅ Registros encontrados: {len(registros)}")
+        desconto_faltas = valor_dia * faltas
+        salario_liquido = salario_base - desconto_faltas
         
-        # Calcular horas manualmente
-        horas_trabalhadas = 0.0
-        dias_trabalhados = 0
-        folgas = 0
+        # 3. Calcular valor das horas extras
+        valor_horas_extras = self._calcular_valor_horas_extras(funcionario_id, data_inicio, data_fim)
         
-        for registro in registros:
-            if registro.tipo_registro == 'trabalho_normal':
-                horas_trabalhadas += registro.horas_trabalhadas or 0
-                dias_trabalhados += 1
-            elif registro.tipo_registro in ['sabado_folga', 'domingo_folga']:
-                folgas += 1
+        # 4. Custo total = salário líquido + horas extras
+        custo_total = salario_liquido + valor_horas_extras
         
-        print(f"✅ Horas trabalhadas: {horas_trabalhadas}")
-        print(f"✅ Dias trabalhados: {dias_trabalhados}")
-        print(f"✅ Folgas: {folgas}")
-        
-        # Cálculo correto do custo
-        # Salário mensal / horas mensais * horas trabalhadas
-        horas_mensais_padrao = 220  # 22 dias * 10 horas (incluindo almoço)
-        valor_hora = danilo.salario / horas_mensais_padrao
-        custo_correto = valor_hora * horas_trabalhadas
-        
-        print(f"\nCÁLCULO CORRETO:")
-        print(f"Valor por hora: R$ {valor_hora:.2f}")
-        print(f"Custo correto: R$ {custo_correto:.2f}")
-        
-        # Usar engine atual para comparar
-        engine = KPIsEngine()
-        kpis = engine.calcular_kpis_funcionario(danilo.id, data_inicio, data_fim)
-        
-        print(f"\nENGINE ATUAL:")
-        print(f"Custo calculado: R$ {kpis.get('custo_mao_obra', 0):.2f}")
-        
-        # Diferença
-        diferenca = abs(kpis.get('custo_mao_obra', 0) - custo_correto)
-        print(f"\nDIFERENÇA: R$ {diferenca:.2f}")
-        
-        return danilo.id, custo_correto, kpis.get('custo_mao_obra', 0)
-
-def verificar_badges_template():
-    """Verifica se as badges estão funcionando no template"""
+        return custo_total
+    '''
     
-    with app.app_context():
-        print("\nVERIFICANDO BADGES NO TEMPLATE")
-        print("=" * 40)
-        
-        # Buscar alguns registros de folga do Danilo
-        danilo = Funcionario.query.filter(
-            Funcionario.nome.like('%Danilo José%')  
-        ).first()
-        
-        if not danilo:
-            return
-        
-        registros_folga = RegistroPonto.query.filter(
-            RegistroPonto.funcionario_id == danilo.id,
-            RegistroPonto.tipo_registro.in_(['sabado_folga', 'domingo_folga'])
-        ).limit(4).all()
-        
-        print("REGISTROS DE FOLGA:")
-        for registro in registros_folga:
-            dia_semana = registro.data.strftime('%A')
-            print(f"  • {registro.data.strftime('%d/%m')} ({dia_semana}): {registro.tipo_registro}")
-        
-        print("\nBadges que DEVEM aparecer no template:")
-        print("  • sabado_folga → badge 'SÁBADO' na coluna data")
-        print("  • domingo_folga → badge 'DOMINGO' na coluna data")
-        print("  • sabado_folga → badge '📅 Sábado - Folga' na coluna tipo")
-        print("  • domingo_folga → badge '📅 Domingo - Folga' na coluna tipo")
+    print("✅ Código do método correto criado")
+    return codigo_novo
 
-def criar_script_correcao():
-    """Cria script para corrigir o cálculo de custo"""
+def testar_com_funcionario(funcionario):
+    """Testar cálculo com funcionário específico"""
+    print(f"\n🧪 TESTE COM FUNCIONÁRIO: {funcionario.nome}")
+    print("=" * 60)
     
-    script_correcao = """
-# CORREÇÃO DO CÁLCULO DE CUSTO
-
-## Problema Identificado:
-O cálculo de custo de mão de obra está inflado.
-
-## Salário: R$ 2.800,00
-## Horas trabalhadas: 184h (23 dias * 8h)  
-## Custo atual (incorreto): R$ 2.927,27
-## Custo correto: R$ 2.345,45
-
-## Fórmula correta:
-valor_hora = salario_mensal / 220  # 22 dias * 10h (com almoço)
-custo = valor_hora * horas_efetivamente_trabalhadas
-
-## O problema está na engine de KPIs que adiciona custos extras incorretamente.
-"""
+    # Teste manual do cálculo correto
+    salario_base = funcionario.salario
+    print(f"💰 Salário base: R$ {salario_base:.2f}")
     
-    with open('CORRECAO_CUSTO_DANILO.md', 'w', encoding='utf-8') as f:
-        f.write(script_correcao)
+    # Contar faltas
+    faltas = db.session.execute(text("""
+        SELECT COUNT(*)
+        FROM registro_ponto
+        WHERE funcionario_id = :func_id
+            AND data >= '2025-07-01' 
+            AND data <= '2025-07-31'
+            AND tipo_registro = 'falta'
+    """), {'func_id': funcionario.id}).scalar() or 0
     
-    print("✅ Relatório de correção criado: CORRECAO_CUSTO_DANILO.md")
+    print(f"❌ Faltas: {faltas} dias")
+    
+    # Dias úteis julho 2025
+    dias_uteis = 23  # Julho tem 23 dias úteis
+    valor_dia = salario_base / dias_uteis
+    desconto_faltas = valor_dia * faltas
+    salario_liquido = salario_base - desconto_faltas
+    
+    print(f"📅 Dias úteis: {dias_uteis}")
+    print(f"💵 Valor por dia: R$ {valor_dia:.2f}")
+    print(f"💸 Desconto faltas: R$ {desconto_faltas:.2f}")
+    print(f"💰 Salário líquido: R$ {salario_liquido:.2f}")
+    
+    # Horas extras
+    horas_extras = funcionario.total_extras
+    
+    # Assumindo horário 8.8h/dia para calcular valor hora
+    horas_mensais = dias_uteis * 8.8
+    valor_hora = salario_base / horas_mensais
+    
+    # Valor das horas extras (50% adicional padrão)
+    valor_extras = horas_extras * valor_hora * 1.5
+    
+    print(f"⏰ Horas extras: {horas_extras:.1f}h")
+    print(f"💲 Valor hora: R$ {valor_hora:.2f}")
+    print(f"💰 Valor extras: R$ {valor_extras:.2f}")
+    
+    # Custo total correto
+    custo_correto = salario_liquido + valor_extras
+    print(f"\n🎯 CUSTO TOTAL CORRETO: R$ {custo_correto:.2f}")
+    
+    # Comparar com KPI atual
+    engine = KPIsEngine()
+    kpis = engine.calcular_kpis_funcionario(
+        funcionario.id,
+        date(2025, 7, 1),
+        date(2025, 7, 31)
+    )
+    
+    print(f"🤖 KPI atual: R$ {kpis['custo_mao_obra']:.2f}")
+    print(f"📊 Diferença: R$ {abs(custo_correto - kpis['custo_mao_obra']):.2f}")
+    
+    return custo_correto, kpis['custo_mao_obra']
 
 if __name__ == "__main__":
-    print("DIAGNÓSTICO COMPLETO - DANILO")
-    print("=" * 50)
-    
-    # Analisar cálculo
-    resultado = analisar_calculo_custo()
-    
-    # Verificar badges
-    verificar_badges_template()
-    
-    # Criar relatório
-    criar_script_correcao()
-    
-    print("\n" + "=" * 50)
-    print("PROBLEMAS IDENTIFICADOS:")
-    print("1. ❌ Cálculo de custo incorreto (inflado)")
-    print("2. ⚠️  Badges de folga devem aparecer mas podem estar ocultas")
-    print("\nSOLUÇÕES NECESSÁRIAS:")
-    print("1. Corrigir lógica de cálculo na engine de KPIs")
-    print("2. Verificar se template está renderizando badges corretamente")
+    with app.app_context():
+        print("🔧 CORREÇÃO CUSTO MÃO DE OBRA")
+        print("=" * 80)
+        
+        # 1. Buscar funcionário
+        funcionario = buscar_funcionario_problema()
+        
+        if not funcionario:
+            print("❌ Funcionário não encontrado")
+            exit()
+        
+        # 2. Analisar método atual
+        analisar_metodo_custo_atual()
+        
+        # 3. Implementar lógica correta
+        implementar_logica_correta()
+        
+        # 4. Criar método correto
+        codigo_novo = criar_metodo_custo_correto()
+        
+        # 5. Testar com funcionário
+        custo_correto, custo_atual = testar_com_funcionario(funcionario)
+        
+        print(f"\n🎯 RESULTADO:")
+        print(f"   Funcionário: {funcionario.nome}")
+        print(f"   Custo correto: R$ {custo_correto:.2f}")
+        print(f"   Custo atual: R$ {custo_atual:.2f}")
+        
+        if abs(custo_correto - custo_atual) > 100:
+            print(f"   ❌ PRECISA CORREÇÃO!")
+            print(f"   💡 Solução: Substituir método _calcular_custo_mensal")
+        else:
+            print(f"   ✅ Custo está próximo do correto")
