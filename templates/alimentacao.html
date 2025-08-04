@@ -520,8 +520,11 @@ $('#alimentacaoModal').on('show.bs.modal', function() {
         });
     }
 });
-</script>
-{% endblock %}
+
+// Handler para formulário de alimentação
+document.getElementById('alimentacaoForm').addEventListener('submit', function(e) {
+    e.preventDefault();
+    
     const selecionados = document.querySelectorAll('.funcionario-checkbox:checked');
     const formData = new FormData(this);
     
@@ -530,7 +533,7 @@ $('#alimentacaoModal').on('show.bs.modal', function() {
     
     // Adicionar cada funcionário selecionado
     selecionados.forEach(checkbox => {
-        formData.append('funcionarios_ids', checkbox.value);
+        formData.append('funcionarios_ids[]', checkbox.value);
     });
     
     // Enviar via fetch
@@ -569,4 +572,5 @@ function excluirRegistro(id) {
     }
 }
 </script>
+
 {% endblock %}
