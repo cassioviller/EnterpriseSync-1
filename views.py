@@ -407,10 +407,10 @@ def api_dashboard_dados():
         data_inicio = date.today().replace(day=1)
         data_fim = date.today()
     
-    # KPIs básicos atualizados
-    funcionarios_ativos = Funcionario.query.filter_by(ativo=True).count()
-    obras_ativas = Obra.query.filter_by(status='Em andamento').count()
-    veiculos_ativos = Veiculo.query.filter_by(status='Ativo').count()
+    # KPIs básicos atualizados - FILTRADOS POR ADMIN (MULTI-TENANT)
+    funcionarios_ativos = Funcionario.query.filter_by(ativo=True, admin_id=current_user.id).count()
+    obras_ativas = Obra.query.filter_by(status='Em andamento', admin_id=current_user.id).count()
+    veiculos_ativos = Veiculo.query.filter_by(status='Ativo', admin_id=current_user.id).count()
     
     # Custos do período
     custos_periodo = db.session.query(func.sum(CustoObra.valor)).filter(
@@ -4614,7 +4614,9 @@ def gerar_relatorio(tipo):
         })
     
     elif tipo == 'veiculos':
-        query = Veiculo.query
+        # CORRIGIDO: Filtrar veículos por admin_id (multi-tenant)
+        admin_id = current_user.id if hasattr(current_user, 'id') else None
+        query = Veiculo.query.filter_by(admin_id=admin_id)
         veiculos = query.all()
         
         html = '<div class="table-responsive"><table class="table table-striped">'
@@ -4637,10 +4639,11 @@ def gerar_relatorio(tipo):
         })
     
     elif tipo == 'dashboard-executivo':
-        # Dados consolidados para dashboard executivo
-        total_funcionarios = Funcionario.query.filter_by(ativo=True).count()
-        total_obras = Obra.query.filter_by(status='Em andamento').count()
-        total_veiculos = Veiculo.query.count()
+        # Dados consolidados para dashboard executivo - CORRIGIDO: Filtrar por admin_id
+        admin_id = current_user.id if hasattr(current_user, 'id') else None
+        total_funcionarios = Funcionario.query.filter_by(ativo=True, admin_id=admin_id).count()
+        total_obras = Obra.query.filter_by(status='Em andamento', admin_id=admin_id).count()
+        total_veiculos = Veiculo.query.filter_by(ativo=True, admin_id=admin_id).count()
         
         # Custos do mês atual
         hoje = date.today()

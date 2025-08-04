@@ -178,9 +178,12 @@ class KPIUnificado:
             Obra.status == 'Em andamento'
         ).count()
         
-        # Veículos (assumindo que todos são acessíveis por admin)
+        # CORRIGIDO: Veículos filtrados por admin_id (multi-tenant)
         from models import Veiculo
-        veiculos_ativos = Veiculo.query.filter(Veiculo.ativo == True).count()
+        veiculos_ativos = Veiculo.query.filter(
+            Veiculo.ativo == True,
+            Veiculo.admin_id == self.admin_id
+        ).count()
         
         # Custos do período
         custos = self.calcular_custos_periodo()
