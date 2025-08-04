@@ -155,7 +155,7 @@ class KPIsEngine:
             RegistroPonto.data <= data_fim,
             RegistroPonto.total_atraso_horas.isnot(None),
             # EXCLUIR tipos onde toda hora é extra (não há conceito de atraso)
-            ~RegistroPonto.tipo_registro.in_(['sabado_horas_extras', 'domingo_horas_extras', 'feriado_trabalhado'])
+            ~RegistroPonto.tipo_registro.in_(['sabado_trabalhado', 'sabado_horas_extras', 'domingo_trabalhado', 'domingo_horas_extras', 'feriado_trabalhado'])
         ).scalar()
         
         return total or 0.0
@@ -326,9 +326,9 @@ class KPIsEngine:
                 horas_extras = horas_trabalhadas - horas_diarias_padrao
                 
                 # Aplicar percentual correto baseado no tipo de lançamento
-                if registro.tipo_registro == 'sabado_horas_extras':
+                if registro.tipo_registro in ['sabado_trabalhado', 'sabado_horas_extras']:
                     percentual = 1.5  # 50% adicional
-                elif registro.tipo_registro in ['domingo_horas_extras', 'feriado_trabalhado']:
+                elif registro.tipo_registro in ['domingo_trabalhado', 'domingo_horas_extras', 'feriado_trabalhado']:
                     percentual = 2.0  # 100% adicional
                 else:
                     percentual = 1.5  # Padrão 50%

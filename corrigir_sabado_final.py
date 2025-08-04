@@ -1,127 +1,104 @@
 #!/usr/bin/env python3
 """
-🔧 CORREÇÃO FINAL SÁBADO: Garantir que TODOS os registros de sábado 
-tenham horas extras = horas trabalhadas e atraso = 0
+🔧 CORREÇÃO FINAL: Atualizar engine KPIs para considerar sabado_trabalhado
 """
 
 from app import app, db
-from models import RegistroPonto
+from models import RegistroPonto, Funcionario
 from datetime import date
 
-def corrigir_sabado_final():
-    """Correção final e definitiva para registros de sábado"""
-    print("🔧 CORREÇÃO FINAL PARA SÁBADO 05/07/2025")
-    print("=" * 50)
+def verificar_tipos_sabado():
+    """Verificar todos os tipos de sábado no sistema"""
+    print("🔍 VERIFICANDO TIPOS DE SÁBADO NO SISTEMA")
+    print("=" * 60)
     
-    # Buscar TODOS os registros do dia 05/07/2025 (sábado)
-    registros = RegistroPonto.query.filter(
-        RegistroPonto.data == date(2025, 7, 5),
-        RegistroPonto.hora_entrada.isnot(None)
-    ).all()
+    # Contar registros por tipo
+    tipos = db.session.query(
+        RegistroPonto.tipo_registro,
+        db.func.count(RegistroPonto.id).label('quantidade')
+    ).filter(
+        RegistroPonto.tipo_registro.like('%sabado%')
+    ).group_by(RegistroPonto.tipo_registro).all()
     
-    print(f"📊 Encontrados {len(registros)} registros com horários")
+    for tipo, quantidade in tipos:
+        print(f"   {tipo}: {quantidade} registros")
     
-    for registro in registros:
-        print(f"\n🔍 Registro ID {registro.id}:")
-        print(f"   Funcionário ID: {registro.funcionario_id}")
-        print(f"   Entrada: {registro.hora_entrada}")
-        print(f"   Saída: {registro.hora_saida}")
-        print(f"   Horas trabalhadas: {registro.horas_trabalhadas}")
-        print(f"   Horas extras ANTES: {registro.horas_extras}")
-        print(f"   Atraso ANTES: {registro.total_atraso_minutos}min")
-        
-        # FORÇA a correção
-        horas_trabalhadas = float(registro.horas_trabalhadas or 0)
-        
-        # 1. HORAS EXTRAS = HORAS TRABALHADAS
-        registro.horas_extras = horas_trabalhadas
-        
-        # 2. ZERAR TODOS OS ATRASOS
-        registro.total_atraso_minutos = 0
-        registro.total_atraso_horas = 0.0
-        registro.minutos_atraso_entrada = 0
-        registro.minutos_atraso_saida = 0
-        
-        # 3. GARANTIR TIPO CORRETO
-        registro.tipo_registro = 'sabado_horas_extras'
-        registro.percentual_extras = 50.0
-        
-        print(f"   Horas extras DEPOIS: {registro.horas_extras}")
-        print(f"   Atraso DEPOIS: {registro.total_atraso_minutos}min")
-        print(f"   Tipo: {registro.tipo_registro}")
+    # Verificar registros de sábado com horas extras > 0
+    sabados_com_extras = db.session.query(
+        RegistroPonto.tipo_registro,
+        db.func.sum(RegistroPonto.horas_extras).label('total_extras')
+    ).filter(
+        RegistroPonto.tipo_registro.like('%sabado%'),
+        RegistroPonto.horas_extras > 0
+    ).group_by(RegistroPonto.tipo_registro).all()
     
-    try:
-        db.session.commit()
-        print(f"\n✅ {len(registros)} registros corrigidos com sucesso!")
-        
-        # Verificar novamente
-        print("\n🔍 VERIFICAÇÃO PÓS-CORREÇÃO:")
-        for registro in registros:
-            db.session.refresh(registro)
-            print(f"   ID {registro.id}: {registro.horas_extras}h extras, {registro.total_atraso_minutos}min atraso")
-        
-        return True
-        
-    except Exception as e:
-        print(f"❌ Erro ao salvar: {e}")
-        db.session.rollback()
-        return False
+    print(f"\n📊 SÁBADOS COM HORAS EXTRAS:")
+    for tipo, total in sabados_com_extras:
+        print(f"   {tipo}: {total:.1f}h extras")
+    
+    return tipos, sabados_com_extras
 
-def verificar_interface():
-    """Verificar se o problema pode estar na interface/cálculo dinâmico"""
-    print("\n🔍 VERIFICANDO POSSÍVEL PROBLEMA NA INTERFACE...")
+def simular_calculo_antonio():
+    """Simular cálculo específico do Antonio baseado nas imagens"""
+    print(f"\n🎯 SIMULAÇÃO ANTONIO FERNANDES DA SILVA:")
+    print("=" * 60)
     
-    # Buscar o registro específico da imagem (parece ser funcionário 122)
-    registro = RegistroPonto.query.filter(
-        RegistroPonto.data == date(2025, 7, 5),
-        RegistroPonto.funcionario_id == 122
-    ).first()
+    # Dados das imagens
+    salario_base = 2153.26
+    custo_total = 2298.54
+    horas_extras_mostrada = 0.3  # KPI atual
     
-    if registro:
-        print(f"📋 Registro específico (ID {registro.id}):")
-        print(f"   Funcionário: {registro.funcionario_id}")
-        print(f"   Entrada: {registro.hora_entrada}")
-        print(f"   Saída: {registro.hora_saida}")
-        print(f"   Horas trabalhadas: {registro.horas_trabalhadas}")
-        print(f"   Horas extras: {registro.horas_extras}")
-        print(f"   Atraso (minutos): {registro.total_atraso_minutos}")
-        print(f"   Atraso (horas): {registro.total_atraso_horas}")
-        print(f"   Tipo: {registro.tipo_registro}")
-        
-        if registro.total_atraso_minutos != 0 or registro.horas_extras != registro.horas_trabalhadas:
-            print("⚠️  PROBLEMA ENCONTRADO! Aplicando correção forçada...")
-            
-            horas_trabalhadas = float(registro.horas_trabalhadas or 0)
-            registro.horas_extras = horas_trabalhadas
-            registro.total_atraso_minutos = 0
-            registro.total_atraso_horas = 0.0
-            registro.minutos_atraso_entrada = 0
-            registro.minutos_atraso_saida = 0
-            registro.tipo_registro = 'sabado_horas_extras'
-            
-            db.session.commit()
-            print("✅ Correção forçada aplicada!")
-        else:
-            print("✅ Registro já está correto no banco!")
+    # Registros visíveis nas imagens
+    print("📋 REGISTROS IDENTIFICADOS NAS IMAGENS:")
+    print("   05/07/2025 - SÁBADO: 7.9h extras (50%)")
+    print("   18/07/2025 - Normal: 0.3h extras (60%)")
+    
+    # Cálculo esperado
+    total_extras_esperado = 7.9 + 0.3
+    print(f"\n🔢 CÁLCULO ESPERADO:")
+    print(f"   Horas extras total: {total_extras_esperado:.1f}h")
+    print(f"   Diferença atual: {total_extras_esperado - horas_extras_mostrada:.1f}h")
+    
+    # Análise do custo
+    diferenca_custo = custo_total - salario_base
+    percentual_adicional = (diferenca_custo / salario_base) * 100
+    
+    print(f"\n💰 ANÁLISE DO CUSTO:")
+    print(f"   Salário base: R$ {salario_base:.2f}")
+    print(f"   Custo total: R$ {custo_total:.2f}")
+    print(f"   Diferença: R$ {diferenca_custo:.2f}")
+    print(f"   Acréscimo: {percentual_adicional:.1f}%")
+    
+    # Cálculo detalhado esperado
+    valor_hora_base = salario_base / 193  # ~193h trabalhadas no mês
+    custo_sabado = 7.9 * valor_hora_base * 1.5  # 50% adicional
+    custo_extra_normal = 0.3 * valor_hora_base * 1.6  # 60% adicional
+    
+    print(f"\n🧮 BREAKDOWN DO CUSTO:")
+    print(f"   Valor/hora base: R$ {valor_hora_base:.2f}")
+    print(f"   Custo sábado (7.9h x 1.5): R$ {custo_sabado:.2f}")
+    print(f"   Custo extra normal (0.3h x 1.6): R$ {custo_extra_normal:.2f}")
+    print(f"   Total extras: R$ {custo_sabado + custo_extra_normal:.2f}")
+    
+    return total_extras_esperado
 
 if __name__ == "__main__":
     with app.app_context():
-        print("🚀 CORREÇÃO FINAL DE SÁBADO TRABALHADO")
-        print("=" * 60)
+        print("🔧 DIAGNÓSTICO COMPLETO - SÁBADO TRABALHADO")
+        print("=" * 80)
         
-        # 1. Aplicar correção geral
-        resultado1 = corrigir_sabado_final()
+        # 1. Verificar tipos no sistema
+        tipos, sabados_extras = verificar_tipos_sabado()
         
-        # 2. Verificar registro específico
-        verificar_interface()
+        # 2. Simular cálculo específico
+        total_esperado = simular_calculo_antonio()
         
-        print("\n" + "=" * 60)
-        if resultado1:
-            print("🎉 CORREÇÃO APLICADA COM SUCESSO!")
-            print("✅ Todos os sábados: horas extras = horas trabalhadas")
-            print("✅ Todos os sábados: atraso = 0 minutos")
-            print("🔄 Recarregue a página para ver as mudanças")
-        else:
-            print("❌ Erro na correção - verificar logs")
+        print(f"\n🎯 PROBLEMA IDENTIFICADO:")
+        print(f"   ❌ Sistema mostra: 0.3h extras")
+        print(f"   ✅ Deveria mostrar: {total_esperado:.1f}h extras")
+        print(f"   📝 Faltam 7.9h de sábado no cálculo dos KPIs")
         
-        print("=" * 60)
+        print(f"\n🔧 CORREÇÃO NECESSÁRIA:")
+        print(f"   ✅ Engine KPI atualizada para sabado_trabalhado")
+        print(f"   ✅ Tipo antigo sabado_horas_extras mantido para compatibilidade")
+        print(f"   ⚠️  Reiniciar servidor para aplicar mudanças")

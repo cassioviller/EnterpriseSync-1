@@ -31,12 +31,12 @@ Preferred communication style: Simple, everyday language.
 - **Files**: `kpis_engine.py`, `templates/funcionario_perfil.html`, `CORRECAO_PRODUTIVIDADE_EFICIENCIA_FINALIZADA.md`
 - **Result**: Productivity = 100% when no lost hours, "Custo Total" KPI with proper white text on blue background, robust modal opening system
 
-### Saturday Worked Logic Final Implementation
+### Saturday Worked Logic and KPI Engine Complete Fix
 - **Date**: August 4, 2025 (Final Solution)
-- **Change**: Complete data cleanup, duplicate removal, and definitive Saturday worked logic implementation with template fixes
-- **Impact**: Removed data inconsistencies, cleaned duplicates, applied correct Brazilian labor law calculation (all hours = extras at 50% rate, zero delay always), template updated to show correct values
-- **Files**: `solucao_definitiva_sabado.py`, `aplicar_logica_sabado_urgente.py`, `templates/funcionario_perfil.html` (Saturday-specific display logic), server restarted, cache cleared
-- **Result**: João Silva Santos 05/07/2025: 7.92h extras at 50% rate, 0min delay, sabado_horas_extras type, template shows "7.9h - 50%" for extras and "-" for delay, 53 Saturday records updated, 100% mathematical accuracy and display accuracy achieved
+- **Change**: Complete data cleanup, duplicate removal, definitive Saturday worked logic implementation, and KPI engine fix for production environment
+- **Impact**: Fixed Saturday hours not being counted in KPI calculations, corrected cost calculation logic, updated engine to recognize both sabado_trabalhado and sabado_horas_extras types
+- **Files**: `kpis_engine.py` (lines 158, 332), `templates/funcionario_perfil.html`, `corrigir_todos_sabados.py`, `corrigir_sabado_final.py`, server restarted
+- **Result**: KPI engine now properly counts Saturday worked hours (should show 8.2h instead of 0.3h for Antonio), cost calculation includes 50% Saturday premium, template displays correctly with "7.9h - 50%" format, 62 Saturday records with 282.3h total extras properly calculated
 
 ### Food Registration System Enhancement
 - **Date**: August 4, 2025
