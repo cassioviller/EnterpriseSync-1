@@ -1714,10 +1714,20 @@ function preencherModalEdicao(data, registroId) {
     const form = document.getElementById('pontoForm');
     if (form) form.reset();
     
-    // Configurar modo edição
+    // Configurar modo edição - CRÍTICO
     const hiddenId = document.getElementById('registro_id_ponto');
     if (hiddenId) {
         hiddenId.value = registroId;
+        console.log('✅ Campo registro_id_ponto definido para:', registroId);
+    } else {
+        console.error('❌ Campo registro_id_ponto não encontrado!');
+    }
+    
+    // Atualizar título do modal para indicar edição
+    const titulo = document.querySelector('#pontoModal .modal-title');
+    if (titulo) {
+        titulo.innerHTML = `<i class="fas fa-edit"></i> Editar Registro de Ponto`;
+        console.log('✅ Título do modal atualizado para edição');
     }
     
     // Preencher dados básicos
@@ -1743,7 +1753,7 @@ function preencherModalEdicao(data, registroId) {
         preencherDropdownObras(data.obras_disponiveis, registro.obra_id);
     }
     
-    // Atualizar título do modal
+    // Atualizar título do modal com dados específicos
     atualizarTituloModal(registro);
     
     // Ajustar visibilidade dos campos
@@ -1783,6 +1793,7 @@ function atualizarTituloModal(registro) {
     const titulo = document.querySelector('#pontoModal .modal-title');
     if (titulo && registro.funcionario) {
         titulo.innerHTML = `<i class="fas fa-edit"></i> Editar: ${registro.funcionario.nome} - ${registro.data_formatada}`;
+        console.log('✅ Título específico definido:', titulo.innerHTML);
     }
 }
 
