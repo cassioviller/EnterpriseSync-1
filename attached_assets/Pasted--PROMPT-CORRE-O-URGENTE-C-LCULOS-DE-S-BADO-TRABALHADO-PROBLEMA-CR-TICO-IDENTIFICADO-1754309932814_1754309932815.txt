@@ -1,0 +1,419 @@
+# 🚨 PROMPT CORREÇÃO URGENTE: CÁLCULOS DE SÁBADO TRABALHADO
+
+## ⚠️ **PROBLEMA CRÍTICO IDENTIFICADO**
+
+O registro de **05/07/2025** já tem a tag "SÁBADO" mas os cálculos estão **INCORRETOS**:
+
+❌ **PROBLEMAS ATUAIS:**
+- **Horas Extras:** Mostra "-" (deveria ser 7.92h)
+- **Atraso:** Mostra "59min" (deveria ser 0min)
+- **Lógica:** Não está aplicando regra de sábado trabalhado
+
+✅ **RESULTADO ESPERADO:**
+- **Horas Extras:** 7.92h (todas as horas trabalhadas)
+- **Atraso:** 0min (sábado não tem atraso)
+- **Tag:** "SÁBADO" (já está correto)
+
+---
+
+## 🔧 **PROMPT PARA CORREÇÃO IMEDIATA DOS CÁLCULOS**
+
+```
+CORRIJA IMEDIATAMENTE os cálculos incorretos do registro de sábado. A tag já aparece mas os valores estão errados.
+
+PROBLEMA URGENTE:
+- Registro 05/07/2025 com tag "SÁBADO" ✅
+- Horas extras: "-" (ERRO - deveria ser 7.92h)
+- Atraso: "59min" (ERRO - deveria ser 0min)
+- Sistema não está aplicando lógica de sábado nos cálculos
+
+## 1. CORRIGIR FUNÇÃO DE CÁLCULO IMEDIATAMENTE
+
+**Backend - Adicionar/Corrigir em models.py ou services/calculo.py:**
+
+```python
+def corrigir_calculos_sabado_urgente():
+    """Corrige IMEDIATAMENTE os cálculos do registro de sábado"""
+    from app import db
+    from models import RegistroPonto
+    from datetime import date
+    
+    print("🚨 INICIANDO CORREÇÃO URGENTE DOS CÁLCULOS...")
+    
+    # Buscar registro específico de 05/07/2025
+    registro = RegistroPonto.query.filter(
+        RegistroPonto.data == date(2025, 7, 5)
+    ).first()
+    
+    if not registro:
+        print("❌ REGISTRO NÃO ENCONTRADO")
+        return False
+    
+    print(f"📍 REGISTRO ENCONTRADO: {registro.id}")
+    print(f"   Data: {registro.data}")
+    print(f"   Tipo: {registro.tipo_registro}")
+    print(f"   Horas trabalhadas: {registro.horas_trabalhadas}")
+    print(f"   Horas extras ANTES: {registro.horas_extras}")
+    print(f"   Atraso ANTES: {registro.total_atraso_horas}h ({registro.total_atraso_minutos}min)")
+    
+    # APLICAR CORREÇÃO FORÇADA PARA SÁBADO
+    if registro.data.weekday() == 5:  # Sábado = 5
+        print("🔧 APLICANDO CORREÇÃO DE SÁBADO TRABALHADO...")
+        
+        # 1. ZERAR TODOS OS ATRASOS (sábado não tem atraso)
+        registro.total_atraso_horas = 0.0
+        registro.total_atraso_minutos = 0
+        registro.minutos_atraso_entrada = 0
+        registro.minutos_atraso_saida = 0
+        
+        # 2. TODAS AS HORAS TRABALHADAS = HORAS EXTRAS
+        horas_trabalhadas = float(registro.horas_trabalhadas or 0)
+        registro.horas_extras = horas_trabalhadas
+        registro.percentual_extras = 50.0  # 50% adicional para sábado
+        
+        # 3. GARANTIR QUE TIPO ESTÁ CORRETO
+        if not registro.tipo_registro or 'sabado' not in registro.tipo_registro:
+            registro.tipo_registro = 'sabado_trabalhado'
+        
+        # 4. SALVAR ALTERAÇÕES
+        db.session.commit()
+        
+        print("✅ CORREÇÃO APLICADA COM SUCESSO!")
+        print(f"   Horas extras DEPOIS: {registro.horas_extras}")
+        print(f"   Atraso DEPOIS: {registro.total_atraso_horas}h ({registro.total_atraso_minutos}min)")
+        print(f"   Percentual extras: {registro.percentual_extras}%")
+        
+        return True
+    else:
+        print(f"⚠️  Data não é sábado: {registro.data.weekday()}")
+        return False
+
+# EXECUTAR CORREÇÃO IMEDIATA
+if __name__ == "__main__":
+    with app.app_context():
+        sucesso = corrigir_calculos_sabado_urgente()
+        if sucesso:
+            print("🎯 CORREÇÃO CONCLUÍDA - RECARREGUE A PÁGINA")
+        else:
+            print("❌ FALHA NA CORREÇÃO")
+```
+
+## 2. CORRIGIR FUNÇÃO GERAL DE RECÁLCULO
+
+**Backend - Atualizar função existente:**
+
+```python
+def recalcular_registro_ponto(registro_id):
+    """Recalcula registro aplicando lógica correta baseada no dia da semana"""
+    from app import db
+    from models import RegistroPonto
+    
+    registro = RegistroPonto.query.get(registro_id)
+    if not registro:
+        return False
+    
+    print(f"🔄 RECALCULANDO: {registro.data} (dia da semana: {registro.data.weekday()})")
+    
+    # Detectar tipo baseado no dia da semana se não estiver definido
+    dia_semana = registro.data.weekday()  # 0=Segunda, 5=Sábado, 6=Domingo
+    
+    # LÓGICA ESPECÍFICA PARA SÁBADO (dia 5)
+    if dia_semana == 5:  # SÁBADO
+        print("📅 SÁBADO DETECTADO - Aplicando lógica especial")
+        
+        # FORÇAR tipo como sábado trabalhado se tiver horários
+        if registro.hora_entrada and registro.hora_saida:
+            registro.tipo_registro = 'sabado_trabalhado'
+            
+            # ZERAR ATRASOS (sábado não tem atraso)
+            registro.total_atraso_horas = 0.0
+            registro.total_atraso_minutos = 0
+            registro.minutos_atraso_entrada = 0
+            registro.minutos_atraso_saida = 0
+            
+            # TODAS AS HORAS = EXTRAS (50%)
+            horas_trabalhadas = float(registro.horas_trabalhadas or 0)
+            registro.horas_extras = horas_trabalhadas
+            registro.percentual_extras = 50.0
+            
+            print(f"✅ SÁBADO: {horas_trabalhadas}h trabalhadas = {horas_trabalhadas}h extras (50%)")
+        else:
+            # Sábado sem horários = folga
+            registro.tipo_registro = 'sabado_folga'
+            registro.horas_extras = 0.0
+            registro.total_atraso_horas = 0.0
+            registro.total_atraso_minutos = 0
+    
+    # LÓGICA ESPECÍFICA PARA DOMINGO (dia 6)
+    elif dia_semana == 6:  # DOMINGO
+        print("📅 DOMINGO DETECTADO - Aplicando lógica especial")
+        
+        if registro.hora_entrada and registro.hora_saida:
+            registro.tipo_registro = 'domingo_trabalhado'
+            
+            # ZERAR ATRASOS (domingo não tem atraso)
+            registro.total_atraso_horas = 0.0
+            registro.total_atraso_minutos = 0
+            registro.minutos_atraso_entrada = 0
+            registro.minutos_atraso_saida = 0
+            
+            # TODAS AS HORAS = EXTRAS (100%)
+            horas_trabalhadas = float(registro.horas_trabalhadas or 0)
+            registro.horas_extras = horas_trabalhadas
+            registro.percentual_extras = 100.0
+            
+            print(f"✅ DOMINGO: {horas_trabalhadas}h trabalhadas = {horas_trabalhadas}h extras (100%)")
+        else:
+            registro.tipo_registro = 'domingo_folga'
+            registro.horas_extras = 0.0
+            registro.total_atraso_horas = 0.0
+            registro.total_atraso_minutos = 0
+    
+    # LÓGICA PARA DIAS NORMAIS (Segunda a Sexta)
+    else:
+        print("📅 DIA NORMAL - Aplicando lógica padrão")
+        
+        if not registro.tipo_registro:
+            registro.tipo_registro = 'trabalho_normal'
+        
+        # Calcular atrasos apenas em dias normais
+        calcular_atrasos_dia_normal(registro)
+        
+        # Calcular extras (acima de 8h = 50%)
+        horas_trabalhadas = float(registro.horas_trabalhadas or 0)
+        if horas_trabalhadas > 8:
+            registro.horas_extras = horas_trabalhadas - 8
+            registro.percentual_extras = 50.0
+        else:
+            registro.horas_extras = 0.0
+            registro.percentual_extras = 0.0
+    
+    # SALVAR ALTERAÇÕES
+    db.session.commit()
+    print(f"✅ RECÁLCULO CONCLUÍDO: {registro.tipo_registro}")
+    
+    return True
+
+def calcular_atrasos_dia_normal(registro):
+    """Calcula atrasos APENAS para dias normais (Segunda a Sexta)"""
+    funcionario = registro.funcionario_ref
+    
+    if not funcionario.horario_trabalho:
+        print("⚠️  Funcionário sem horário padrão - sem cálculo de atraso")
+        return
+    
+    horario_padrao = funcionario.horario_trabalho
+    
+    # Resetar atrasos
+    registro.minutos_atraso_entrada = 0
+    registro.minutos_atraso_saida = 0
+    
+    # Atraso na entrada
+    if registro.hora_entrada > horario_padrao.entrada:
+        atraso_entrada = (
+            datetime.combine(registro.data, registro.hora_entrada) - 
+            datetime.combine(registro.data, horario_padrao.entrada)
+        ).total_seconds() / 60
+        registro.minutos_atraso_entrada = int(atraso_entrada)
+        print(f"⏰ Atraso entrada: {registro.minutos_atraso_entrada}min")
+    
+    # Saída antecipada
+    if registro.hora_saida < horario_padrao.saida:
+        atraso_saida = (
+            datetime.combine(registro.data, horario_padrao.saida) - 
+            datetime.combine(registro.data, registro.hora_saida)
+        ).total_seconds() / 60
+        registro.minutos_atraso_saida = int(atraso_saida)
+        print(f"⏰ Saída antecipada: {registro.minutos_atraso_saida}min")
+    
+    # Total
+    registro.total_atraso_minutos = registro.minutos_atraso_entrada + registro.minutos_atraso_saida
+    registro.total_atraso_horas = round(registro.total_atraso_minutos / 60, 2)
+    
+    print(f"⏰ Total atrasos: {registro.total_atraso_minutos}min ({registro.total_atraso_horas}h)")
+```
+
+## 3. SCRIPT DE EXECUÇÃO IMEDIATA
+
+**Executar no terminal Flask/Python:**
+
+```python
+# Script para executar IMEDIATAMENTE
+from app import app
+
+with app.app_context():
+    print("🚨 EXECUTANDO CORREÇÃO URGENTE...")
+    
+    # Importar função
+    from models import corrigir_calculos_sabado_urgente
+    
+    # Executar correção
+    sucesso = corrigir_calculos_sabado_urgente()
+    
+    if sucesso:
+        print("🎯 SUCESSO! Recarregue a página para ver as correções")
+        print("✅ Resultado esperado:")
+        print("   - Horas extras: 7.92h")
+        print("   - Atraso: 0min")
+        print("   - Tag: SÁBADO (já está correto)")
+    else:
+        print("❌ FALHA na correção - verificar logs")
+```
+
+## 4. ATUALIZAR ROTA DE SALVAMENTO
+
+**Backend - routes/ponto.py - Garantir que salva corretamente:**
+
+```python
+@ponto_bp.route('/salvar-registro', methods=['POST'])
+@login_required
+def salvar_registro():
+    """Salva registro aplicando lógica correta IMEDIATAMENTE"""
+    try:
+        registro_id = request.form.get('registro_id')
+        tipo_registro = request.form.get('tipo_registro')
+        
+        if registro_id:
+            registro = RegistroPonto.query.get(registro_id)
+            
+            # Atualizar tipo
+            registro.tipo_registro = tipo_registro
+            
+            # APLICAR LÓGICA IMEDIATAMENTE baseada no tipo
+            if tipo_registro == 'sabado_trabalhado':
+                print(f"🔧 SALVANDO SÁBADO TRABALHADO: {registro.data}")
+                
+                # FORÇAR cálculos corretos
+                horas_trabalhadas = float(registro.horas_trabalhadas or 0)
+                
+                # ZERAR atrasos
+                registro.total_atraso_horas = 0.0
+                registro.total_atraso_minutos = 0
+                registro.minutos_atraso_entrada = 0
+                registro.minutos_atraso_saida = 0
+                
+                # TODAS as horas = extras
+                registro.horas_extras = horas_trabalhadas
+                registro.percentual_extras = 50.0
+                
+                print(f"✅ SÁBADO SALVO: {horas_trabalhadas}h extras, 0min atraso")
+            
+            elif tipo_registro == 'domingo_trabalhado':
+                horas_trabalhadas = float(registro.horas_trabalhadas or 0)
+                registro.total_atraso_horas = 0.0
+                registro.total_atraso_minutos = 0
+                registro.minutos_atraso_entrada = 0
+                registro.minutos_atraso_saida = 0
+                registro.horas_extras = horas_trabalhadas
+                registro.percentual_extras = 100.0
+            
+            # Salvar no banco
+            db.session.commit()
+            
+            return jsonify({
+                'success': True,
+                'message': 'Registro salvo com cálculos corretos!',
+                'debug': {
+                    'horas_extras': float(registro.horas_extras or 0),
+                    'atraso_minutos': int(registro.total_atraso_minutos or 0),
+                    'tipo': registro.tipo_registro
+                }
+            })
+        
+    except Exception as e:
+        print(f"❌ ERRO AO SALVAR: {e}")
+        db.session.rollback()
+        return jsonify({'success': False, 'error': str(e)})
+```
+
+## 5. VERIFICAÇÃO IMEDIATA
+
+**Adicionar ao template para debug em tempo real:**
+
+```html
+<script>
+// Debug em tempo real - adicionar temporariamente
+console.log("🔍 VERIFICANDO REGISTRO DE SÁBADO...");
+
+// Buscar linha do sábado
+document.querySelectorAll('tr').forEach(linha => {
+    if (linha.textContent.includes('05/07/2025') && linha.textContent.includes('SÁBADO')) {
+        console.log("📅 SÁBADO ENCONTRADO:");
+        
+        // Extrair valores da linha
+        const colunas = linha.querySelectorAll('td');
+        const horasTrabalhadas = colunas[5]?.textContent || 'N/A';
+        const horasExtras = colunas[6]?.textContent || 'N/A';
+        const atraso = colunas[8]?.textContent || 'N/A';
+        
+        console.log(`   Horas trabalhadas: ${horasTrabalhadas}`);
+        console.log(`   Horas extras: ${horasExtras} (deveria ser ${horasTrabalhadas})`);
+        console.log(`   Atraso: ${atraso} (deveria ser 0min)`);
+        
+        // Verificar se está correto
+        if (horasExtras === '-' || horasExtras === '0.0h') {
+            console.error("❌ HORAS EXTRAS INCORRETAS!");
+        }
+        
+        if (atraso !== '0min' && atraso !== '-') {
+            console.error("❌ ATRASO INCORRETO!");
+        }
+    }
+});
+</script>
+```
+
+## 6. TRANSFORMAÇÃO ESPERADA
+
+**ANTES (ATUAL):**
+```
+05/07/2025 | SÁBADO | 07:06 | 12:00 | 13:00 | 16:01 | 7.92h | - | 59min
+```
+
+**DEPOIS (CORRETO):**
+```
+05/07/2025 | SÁBADO | 07:06 | 12:00 | 13:00 | 16:01 | 7.92h | 7.92h | 0min
+```
+
+## AÇÃO IMEDIATA NECESSÁRIA:
+
+1. ✅ **Executar script** de correção urgente
+2. ✅ **Atualizar função** de recálculo
+3. ✅ **Corrigir rota** de salvamento
+4. ✅ **Testar** se valores estão corretos
+5. ✅ **Recarregar página** para verificar
+
+RESULTADO GARANTIDO:
+- ❌ Horas extras: "-" → ✅ Horas extras: "7.92h"
+- ❌ Atraso: "59min" → ✅ Atraso: "0min"
+- ✅ Tag: "SÁBADO" (já está correto)
+```
+
+---
+
+## 🚨 **RESUMO DA CORREÇÃO URGENTE**
+
+### **❌ PROBLEMA ATUAL:**
+- Tag "SÁBADO" ✅ (correto)
+- Horas extras: "-" ❌ (deveria ser 7.92h)
+- Atraso: "59min" ❌ (deveria ser 0min)
+
+### **🔧 CORREÇÃO APLICADA:**
+- **Script imediato** para corrigir o registro específico
+- **Função de recálculo** baseada no dia da semana
+- **Validação automática** para sábados/domingos
+- **Rota de salvamento** corrigida
+
+### **✅ RESULTADO ESPERADO:**
+```
+ANTES: 05/07/2025 | SÁBADO | 7.92h | - | 59min
+DEPOIS: 05/07/2025 | SÁBADO | 7.92h | 7.92h | 0min
+```
+
+### **🎯 LÓGICA IMPLEMENTADA:**
+- **Sábado trabalhado:** TODAS as horas = extras (50%), SEM atraso
+- **Detecção automática:** Baseada no dia da semana
+- **Correção forçada:** Para registros existentes
+
+O prompt fornece **correção imediata** para os cálculos incorretos! 🚀
+
