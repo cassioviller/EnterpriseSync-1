@@ -1,0 +1,365 @@
+# 🚨 PROMPT CORREÇÃO IMEDIATA: SÁBADO TRABALHADO
+
+## ⚠️ **PROBLEMA URGENTE IDENTIFICADO**
+
+O registro de **05/07/2025** foi definido como **"Sábado Trabalhado"** mas ainda mostra:
+- ❌ **59min de atraso** (deveria ser 0)
+- ❌ **Sem tag "SÁBADO"** (deveria aparecer)
+- ❌ **Lógica incorreta** aplicada
+
+**NECESSÁRIO CORREÇÃO IMEDIATA!**
+
+---
+
+## 🔧 **PROMPT PARA CORREÇÃO URGENTE**
+
+```
+CORRIJA IMEDIATAMENTE o problema do registro de sábado que não está aplicando a lógica correta após salvar.
+
+PROBLEMA CRÍTICO:
+- Registro 05/07/2025 definido como "Sábado Trabalhado"
+- Sistema ainda calcula atraso (59min) quando deveria ser 0
+- Tag "SÁBADO" não aparece na interface
+- Lógica de cálculo não está sendo aplicada
+
+## 1. CORRIGIR FUNÇÃO DE CÁLCULO IMEDIATAMENTE
+
+**Backend - models.py ou services/calculo.py:**
+```python
+def recalcular_registro_ponto(registro_id):
+    """Recalcula registro aplicando lógica correta IMEDIATAMENTE"""
+    from app import db
+    from models import RegistroPonto
+    
+    registro = RegistroPonto.query.get(registro_id)
+    if not registro:
+        return False
+    
+    # FORÇAR recálculo baseado no tipo
+    tipo = registro.tipo_registro
+    
+    print(f"🔍 RECALCULANDO: {registro.data} - Tipo: {tipo}")
+    
+    # SÁBADO TRABALHADO: LÓGICA ESPECIAL
+    if tipo in ['sabado_trabalhado', 'sabado_horas_extras']:
+        print("✅ APLICANDO LÓGICA DE SÁBADO")
+        
+        # ZERAR ATRASOS (sábado não tem atraso)
+        registro.minutos_atraso_entrada = 0
+        registro.minutos_atraso_saida = 0
+        registro.total_atraso_minutos = 0
+        registro.total_atraso_horas = 0.0
+        
+        # TODAS AS HORAS SÃO EXTRAS
+        horas_trabalhadas = float(registro.horas_trabalhadas or 0)
+        registro.horas_extras = horas_trabalhadas
+        registro.percentual_extras = 50.0  # 50% adicional
+        
+        print(f"✅ RESULTADO: {horas_trabalhadas}h extras, 0h atraso")
+    
+    # DOMINGO TRABALHADO: LÓGICA ESPECIAL  
+    elif tipo in ['domingo_trabalhado', 'domingo_horas_extras']:
+        print("✅ APLICANDO LÓGICA DE DOMINGO")
+        
+        registro.minutos_atraso_entrada = 0
+        registro.minutos_atraso_saida = 0
+        registro.total_atraso_minutos = 0
+        registro.total_atraso_horas = 0.0
+        
+        horas_trabalhadas = float(registro.horas_trabalhadas or 0)
+        registro.horas_extras = horas_trabalhadas
+        registro.percentual_extras = 100.0  # 100% adicional
+    
+    # FERIADO TRABALHADO: LÓGICA ESPECIAL
+    elif tipo == 'feriado_trabalhado':
+        print("✅ APLICANDO LÓGICA DE FERIADO")
+        
+        registro.minutos_atraso_entrada = 0
+        registro.minutos_atraso_saida = 0
+        registro.total_atraso_minutos = 0
+        registro.total_atraso_horas = 0.0
+        
+        horas_trabalhadas = float(registro.horas_trabalhadas or 0)
+        registro.horas_extras = horas_trabalhadas
+        registro.percentual_extras = 100.0
+    
+    # SALVAR ALTERAÇÕES
+    db.session.commit()
+    print(f"✅ REGISTRO ATUALIZADO: {registro.data}")
+    
+    return True
+
+# EXECUTAR CORREÇÃO IMEDIATA
+def corrigir_registro_sabado_urgente():
+    """Corrige o registro específico de 05/07/2025"""
+    from datetime import date
+    from models import RegistroPonto
+    
+    # Buscar registro específico
+    registro = RegistroPonto.query.filter(
+        RegistroPonto.data == date(2025, 7, 5),
+        RegistroPonto.tipo_registro.in_(['sabado_trabalhado', 'sabado_horas_extras'])
+    ).first()
+    
+    if registro:
+        print(f"🎯 ENCONTRADO REGISTRO: {registro.id} - {registro.data}")
+        sucesso = recalcular_registro_ponto(registro.id)
+        
+        if sucesso:
+            print("✅ CORREÇÃO APLICADA COM SUCESSO!")
+            return registro.id
+        else:
+            print("❌ ERRO NA CORREÇÃO")
+            return None
+    else:
+        print("❌ REGISTRO NÃO ENCONTRADO")
+        return None
+```
+
+## 2. CORRIGIR ROTA DE SALVAMENTO
+
+**Backend - routes/ponto.py:**
+```python
+@ponto_bp.route('/salvar-registro', methods=['POST'])
+@login_required
+def salvar_registro():
+    """Salva registro aplicando lógica correta IMEDIATAMENTE"""
+    try:
+        registro_id = request.form.get('registro_id')
+        tipo_registro = request.form.get('tipo_registro')
+        
+        if registro_id:
+            # EDIÇÃO
+            registro = RegistroPonto.query.get(registro_id)
+            registro.tipo_registro = tipo_registro
+            
+            # APLICAR LÓGICA IMEDIATAMENTE APÓS SALVAR
+            if tipo_registro in ['sabado_trabalhado', 'sabado_horas_extras']:
+                print(f"🔧 APLICANDO LÓGICA DE SÁBADO PARA: {registro.data}")
+                
+                # ZERAR ATRASOS IMEDIATAMENTE
+                registro.total_atraso_horas = 0.0
+                registro.total_atraso_minutos = 0
+                registro.minutos_atraso_entrada = 0
+                registro.minutos_atraso_saida = 0
+                
+                # DEFINIR TODAS AS HORAS COMO EXTRAS
+                registro.horas_extras = registro.horas_trabalhadas
+                registro.percentual_extras = 50.0
+                
+                print(f"✅ SÁBADO CORRIGIDO: {registro.horas_trabalhadas}h extras, 0 atraso")
+            
+            elif tipo_registro in ['domingo_trabalhado', 'domingo_horas_extras']:
+                registro.total_atraso_horas = 0.0
+                registro.total_atraso_minutos = 0
+                registro.minutos_atraso_entrada = 0
+                registro.minutos_atraso_saida = 0
+                registro.horas_extras = registro.horas_trabalhadas
+                registro.percentual_extras = 100.0
+        
+        db.session.commit()
+        
+        return jsonify({
+            'success': True,
+            'message': 'Registro salvo e recalculado!',
+            'registro_id': registro.id
+        })
+        
+    except Exception as e:
+        print(f"❌ ERRO AO SALVAR: {e}")
+        return jsonify({'success': False, 'error': str(e)})
+```
+
+## 3. ADICIONAR TAGS VISUAIS IMEDIATAMENTE
+
+**Frontend - JavaScript:**
+```javascript
+// Função para detectar e mostrar tags IMEDIATAMENTE
+function aplicarTagsImediatamente() {
+    console.log("🏷️ APLICANDO TAGS...");
+    
+    // Buscar todas as linhas da tabela
+    document.querySelectorAll('tr[data-date]').forEach(linha => {
+        const dataStr = linha.dataset.date;
+        const tipoRegistro = linha.dataset.tipo || '';
+        
+        // Converter data para verificar dia da semana
+        const data = new Date(dataStr + 'T00:00:00');
+        const diaSemana = data.getDay(); // 0=Domingo, 6=Sábado
+        
+        // Encontrar coluna da data (primeira coluna)
+        const colunaData = linha.querySelector('td:first-child');
+        
+        // Remover tags existentes
+        const tagsExistentes = colunaData.querySelectorAll('.tag-dia');
+        tagsExistentes.forEach(tag => tag.remove());
+        
+        // Adicionar tag baseada no dia
+        let tagHtml = '';
+        
+        if (diaSemana === 6) { // SÁBADO
+            if (tipoRegistro.includes('trabalhado') || tipoRegistro.includes('horas_extras')) {
+                tagHtml = '<span class="tag-dia tag-sabado-trabalhado">SÁBADO</span>';
+            } else {
+                tagHtml = '<span class="tag-dia tag-sabado-folga">SÁBADO</span>';
+            }
+        } else if (diaSemana === 0) { // DOMINGO
+            if (tipoRegistro.includes('trabalhado') || tipoRegistro.includes('horas_extras')) {
+                tagHtml = '<span class="tag-dia tag-domingo-trabalhado">DOMINGO</span>';
+            } else {
+                tagHtml = '<span class="tag-dia tag-domingo-folga">DOMINGO</span>';
+            }
+        }
+        
+        // Inserir tag no início da célula
+        if (tagHtml) {
+            colunaData.insertAdjacentHTML('afterbegin', tagHtml + '<br>');
+            console.log(`✅ TAG ADICIONADA: ${dataStr} - ${diaSemana === 6 ? 'SÁBADO' : 'DOMINGO'}`);
+        }
+    });
+}
+
+// EXECUTAR IMEDIATAMENTE quando a página carregar
+document.addEventListener('DOMContentLoaded', function() {
+    console.log("🚀 PÁGINA CARREGADA - APLICANDO CORREÇÕES...");
+    aplicarTagsImediatamente();
+    
+    // Aplicar novamente após 1 segundo (garantir que dados carregaram)
+    setTimeout(aplicarTagsImediatamente, 1000);
+});
+
+// CSS para as tags (adicionar ao head)
+const estiloTags = `
+<style>
+.tag-dia {
+    display: inline-block;
+    padding: 2px 6px;
+    border-radius: 3px;
+    font-size: 10px;
+    font-weight: bold;
+    color: white;
+    margin-bottom: 2px;
+}
+
+.tag-sabado-trabalhado {
+    background: #ff6b35;
+    border: 1px solid #e55a2b;
+}
+
+.tag-sabado-folga {
+    background: #95a5a6;
+    border: 1px solid #7f8c8d;
+}
+
+.tag-domingo-trabalhado {
+    background: #e74c3c;
+    border: 1px solid #c0392b;
+}
+
+.tag-domingo-folga {
+    background: #bdc3c7;
+    border: 1px solid #95a5a6;
+}
+</style>
+`;
+
+// Adicionar CSS ao head
+document.head.insertAdjacentHTML('beforeend', estiloTags);
+```
+
+## 4. SCRIPT DE CORREÇÃO IMEDIATA
+
+**Executar no terminal/console:**
+```python
+# Script para corrigir IMEDIATAMENTE o registro problemático
+from app import app, db
+from datetime import date
+
+with app.app_context():
+    print("🚨 INICIANDO CORREÇÃO URGENTE...")
+    
+    # Buscar registro de 05/07/2025
+    from models import RegistroPonto
+    
+    registro = RegistroPonto.query.filter(
+        RegistroPonto.data == date(2025, 7, 5)
+    ).first()
+    
+    if registro:
+        print(f"📍 REGISTRO ENCONTRADO: {registro.data}")
+        print(f"   Tipo atual: {registro.tipo_registro}")
+        print(f"   Atraso atual: {registro.total_atraso_horas}h")
+        print(f"   Horas extras: {registro.horas_extras}h")
+        
+        # APLICAR CORREÇÃO FORÇADA
+        if 'sabado' in (registro.tipo_registro or ''):
+            print("🔧 APLICANDO CORREÇÃO DE SÁBADO...")
+            
+            registro.total_atraso_horas = 0.0
+            registro.total_atraso_minutos = 0
+            registro.minutos_atraso_entrada = 0
+            registro.minutos_atraso_saida = 0
+            registro.horas_extras = registro.horas_trabalhadas
+            registro.percentual_extras = 50.0
+            
+            db.session.commit()
+            
+            print("✅ CORREÇÃO APLICADA!")
+            print(f"   Novo atraso: {registro.total_atraso_horas}h")
+            print(f"   Novas horas extras: {registro.horas_extras}h")
+        else:
+            print("⚠️  Tipo de registro não é sábado")
+    else:
+        print("❌ REGISTRO NÃO ENCONTRADO")
+```
+
+## 5. VERIFICAÇÃO IMEDIATA
+
+**Adicionar ao template para debug:**
+```html
+<!-- Debug info - remover após correção -->
+<script>
+console.log("🔍 DEBUG - Dados do registro:");
+document.querySelectorAll('tr').forEach((linha, index) => {
+    if (linha.textContent.includes('05/07/2025')) {
+        console.log(`Linha ${index}:`, linha.outerHTML);
+        console.log('Dataset:', linha.dataset);
+    }
+});
+</script>
+```
+
+AÇÃO IMEDIATA NECESSÁRIA:
+1. ✅ Executar script de correção no banco
+2. ✅ Atualizar função de cálculo
+3. ✅ Adicionar tags visuais
+4. ✅ Testar salvamento de registro
+5. ✅ Verificar se atraso zerou
+
+RESULTADO ESPERADO:
+- ❌ 59min atraso → ✅ 0min atraso  
+- ❌ Sem tag → ✅ Tag "SÁBADO" visível
+- ❌ Lógica incorreta → ✅ Todas horas = extras (50%)
+```
+
+---
+
+## 🚨 **AÇÃO IMEDIATA NECESSÁRIA**
+
+O problema é que o sistema **não está aplicando a lógica correta** após salvar o registro como "Sábado Trabalhado". 
+
+**🔧 CORREÇÕES URGENTES:**
+
+1. **Recálculo Forçado:** Script para corrigir o registro específico
+2. **Lógica de Salvamento:** Aplicar regras imediatamente após salvar
+3. **Tags Visuais:** JavaScript para mostrar "SÁBADO" na interface
+4. **Validação:** Verificar se as mudanças foram aplicadas
+
+**📊 RESULTADO ESPERADO:**
+```
+ANTES: 05/07/2025 | 7.92h | 59min atraso | Sem tag
+DEPOIS: 05/07/2025 | 7.92h extras | 0min atraso | TAG "SÁBADO"
+```
+
+O prompt fornece **correção imediata** para resolver o problema específico mostrado na imagem! 🎯
+

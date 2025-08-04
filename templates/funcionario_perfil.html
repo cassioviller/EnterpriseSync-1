@@ -354,13 +354,14 @@
                                 <td>
                                     <div class="d-flex align-items-center">
                                         <span>{{ registro.data.strftime('%d/%m/%Y') }}</span>
-                                        {% if registro.tipo_registro == 'sabado_horas_extras' %}
+                                        {% set dia_semana = registro.data.weekday() %}
+                                        {% if registro.tipo_registro == 'sabado_horas_extras' or (dia_semana == 5 and 'trabalhado' in (registro.tipo_registro or '')) %}
                                             <span class="badge bg-success ms-2"><i class="fas fa-calendar-week"></i> SÁBADO</span>
-                                        {% elif registro.tipo_registro == 'domingo_horas_extras' %}
+                                        {% elif registro.tipo_registro == 'domingo_horas_extras' or (dia_semana == 6 and 'trabalhado' in (registro.tipo_registro or '')) %}
                                             <span class="badge bg-warning ms-2"><i class="fas fa-sun"></i> DOMINGO</span>
-                                        {% elif registro.tipo_registro == 'sabado_nao_trabalhado' %}
+                                        {% elif registro.tipo_registro == 'sabado_nao_trabalhado' or (dia_semana == 5 and 'folga' in (registro.tipo_registro or '')) %}
                                             <span class="badge bg-secondary ms-2"><i class="fas fa-calendar-times"></i> SÁB. FOLGA</span>
-                                        {% elif registro.tipo_registro == 'domingo_nao_trabalhado' %}
+                                        {% elif registro.tipo_registro == 'domingo_nao_trabalhado' or (dia_semana == 6 and 'folga' in (registro.tipo_registro or '')) %}
                                             <span class="badge bg-light text-dark ms-2"><i class="fas fa-home"></i> DOM. FOLGA</span>
                                         {% elif registro.tipo_registro == 'feriado_trabalhado' %}
                                             <span class="badge bg-info ms-2"><i class="fas fa-star"></i> FERIADO TRAB.</span>
@@ -2053,6 +2054,70 @@ document.addEventListener('DOMContentLoaded', function() {
                     }
                 });
             }
+        });
+    }
+    
+    // Função para aplicar tags visuais baseadas no dia da semana
+    function aplicarTagsVisuais() {
+        console.log("🏷️ Aplicando tags visuais para sábados e domingos...");
+        
+        document.querySelectorAll('#pontoTable tbody tr').forEach((linha, index) => {
+            try {
+                // Buscar a data na primeira célula
+                const primeiraColuna = linha.querySelector('td:first-child');
+                if (!primeiraColuna) return;
+                
+                const textoData = primeiraColuna.textContent;
+                const matchData = textoData.match(/(\d{2})\/(\d{2})\/(\d{4})/);
+                
+                if (matchData) {
+                    const [, dia, mes, ano] = matchData;
+                    const data = new Date(ano, mes - 1, dia);
+                    const diaSemana = data.getDay(); // 0=domingo, 6=sábado
+                    
+                    // Verificar se já existe badge na célula
+                    const badgeExistente = primeiraColuna.querySelector('.badge');
+                    
+                    // Se é sábado (6) e não tem badge ainda
+                    if (diaSemana === 6 && !badgeExistente) {
+                        // Verificar se tem horários (trabalhado) ou não (folga)
+                        const colunaEntrada = linha.querySelector('td:nth-child(2)');
+                        const temHorario = colunaEntrada && !colunaEntrada.textContent.includes('-');
+                        
+                        if (temHorario) {
+                            primeiraColuna.innerHTML += '<br><span class="badge bg-success"><i class="fas fa-calendar-week"></i> SÁBADO</span>';
+                            console.log(`✅ Tag SÁBADO TRABALHADO adicionada para ${textoData}`);
+                        } else {
+                            primeiraColuna.innerHTML += '<br><span class="badge bg-secondary"><i class="fas fa-calendar-times"></i> SÁB. FOLGA</span>';
+                        }
+                    }
+                    
+                    // Se é domingo (0) e não tem badge ainda  
+                    else if (diaSemana === 0 && !badgeExistente) {
+                        const colunaEntrada = linha.querySelector('td:nth-child(2)');
+                        const temHorario = colunaEntrada && !colunaEntrada.textContent.includes('-');
+                        
+                        if (temHorario) {
+                            primeiraColuna.innerHTML += '<br><span class="badge bg-warning"><i class="fas fa-sun"></i> DOMINGO</span>';
+                            console.log(`✅ Tag DOMINGO TRABALHADO adicionada para ${textoData}`);
+                        } else {
+                            primeiraColuna.innerHTML += '<br><span class="badge bg-light text-dark"><i class="fas fa-home"></i> DOM. FOLGA</span>';
+                        }
+                    }
+                }
+            } catch (e) {
+                console.error(`❌ Erro ao processar linha ${index}:`, e);
+            }
+        });
+    }
+    
+    // Aplicar tags quando a página carregar
+    setTimeout(aplicarTagsVisuais, 500);
+    
+    // Aplicar tags quando a tabela for atualizada
+    if (typeof $ !== 'undefined') {
+        $('#pontoTable').on('draw.dt', function() {
+            setTimeout(aplicarTagsVisuais, 100);
         });
     }
 });

@@ -983,6 +983,37 @@ def novo_ponto():
         db.session.add(registro)
         db.session.commit()
         
+        # Aplicar lógica especial IMEDIATAMENTE para tipos específicos
+        if tipo_lancamento in ['sabado_horas_extras', 'sabado_trabalhado']:
+            print("✅ APLICANDO LÓGICA DE SÁBADO NO SALVAMENTO")
+            registro.total_atraso_horas = 0.0
+            registro.total_atraso_minutos = 0
+            registro.minutos_atraso_entrada = 0
+            registro.minutos_atraso_saida = 0
+            registro.horas_extras = registro.horas_trabalhadas or 0
+            registro.percentual_extras = 50.0
+            
+        elif tipo_lancamento in ['domingo_horas_extras', 'domingo_trabalhado']:
+            print("✅ APLICANDO LÓGICA DE DOMINGO NO SALVAMENTO")
+            registro.total_atraso_horas = 0.0
+            registro.total_atraso_minutos = 0
+            registro.minutos_atraso_entrada = 0
+            registro.minutos_atraso_saida = 0
+            registro.horas_extras = registro.horas_trabalhadas or 0
+            registro.percentual_extras = 100.0
+            
+        elif tipo_lancamento == 'feriado_trabalhado':
+            print("✅ APLICANDO LÓGICA DE FERIADO NO SALVAMENTO")
+            registro.total_atraso_horas = 0.0
+            registro.total_atraso_minutos = 0
+            registro.minutos_atraso_entrada = 0
+            registro.minutos_atraso_saida = 0
+            registro.horas_extras = registro.horas_trabalhadas or 0
+            registro.percentual_extras = 100.0
+        
+        # Salvar mudanças especiais
+        db.session.commit()
+        
         # Recalcular KPIs após inserção
         try:
             from kpis_engine import atualizar_calculos_ponto
