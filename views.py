@@ -5418,9 +5418,14 @@ def criar_registro_ponto():
 def obter_registro_ponto(registro_id):
     """Obter dados de um registro de ponto para edição"""
     try:
-        print(f"🔍 Buscando registro {registro_id} para usuário {current_user.id}")
+        # Log para debug
+        print(f"🔍 Tentativa de buscar registro {registro_id}")
+        if current_user and hasattr(current_user, 'id'):
+            print(f"   Usuario: {current_user.id} - {current_user.email}")
+        else:
+            print(f"   Usuario não autenticado adequadamente")
         
-        # Buscar registro sem restrições de usuário para permitir edição via interface
+        # Buscar registro
         registro = RegistroPonto.query.get(registro_id)
         
         if not registro:
@@ -5429,13 +5434,24 @@ def obter_registro_ponto(registro_id):
         
         print(f"✅ Registro {registro_id} encontrado: {registro.data} - {registro.tipo_registro}")
         
+        # Mapear tipos antigos para novos para compatibilidade
+        tipo_mapeado = registro.tipo_registro
+        if tipo_mapeado == 'trabalhado':
+            tipo_mapeado = 'trabalho_normal'
+        elif tipo_mapeado == 'sabado_horas_extras':
+            tipo_mapeado = 'sabado_trabalhado'
+        elif tipo_mapeado == 'domingo_horas_extras':
+            tipo_mapeado = 'domingo_trabalhado'
+        elif tipo_mapeado == 'feriado':
+            tipo_mapeado = 'feriado_folga'
+        
         # Retornar dados em formato JSON compatível com o frontend
-        return jsonify({
+        response_data = {
             'success': True,
             'id': registro.id,
             'funcionario_id': registro.funcionario_id,
             'data': registro.data.strftime('%Y-%m-%d') if registro.data else '',
-            'tipo_registro': registro.tipo_registro or 'trabalhado',
+            'tipo_registro': tipo_mapeado,
             'entrada': registro.hora_entrada.strftime('%H:%M') if registro.hora_entrada else '',
             'saida_almoco': registro.hora_almoco_saida.strftime('%H:%M') if registro.hora_almoco_saida else '',
             'retorno_almoco': registro.hora_almoco_retorno.strftime('%H:%M') if registro.hora_almoco_retorno else '',
@@ -5445,7 +5461,10 @@ def obter_registro_ponto(registro_id):
             'percentual_extras': float(registro.percentual_extras) if registro.percentual_extras else 0,
             'obra_id': registro.obra_id or '',
             'observacoes': registro.observacoes or ''
-        })
+        }
+        
+        print(f"📤 Retornando dados: tipo={tipo_mapeado}, obra={registro.obra_id}")
+        return jsonify(response_data)
         
     except Exception as e:
         print(f"❌ Erro ao obter registro {registro_id}: {e}")
@@ -5467,16 +5486,27 @@ def atualizar_registro_ponto(registro_id):
         # Suporte para dados JSON ou form
         if request.is_json:
             data_source = request.json
-            prefix = ''
         else:
             data_source = request.form
-            prefix = ''
         
         # Dados básicos
         data_str = data_source.get('data') or data_source.get('data_ponto')
+        if not data_str:
+            return jsonify({'error': 'Data é obrigatória'}), 400
+            
         data = datetime.strptime(data_str, '%Y-%m-%d').date()
-        tipo_registro = data_source.get('tipo_lancamento') or data_source.get('tipo_registro', 'trabalhado')
+        tipo_registro = data_source.get('tipo_lancamento') or data_source.get('tipo_registro', 'trabalho_normal')
         obra_id = data_source.get('obra_id') or data_source.get('obra_id_ponto') or None
+        
+        # Mapear tipos novos para antigos no banco
+        if tipo_registro == 'trabalho_normal':
+            tipo_registro = 'trabalhado'
+        elif tipo_registro == 'sabado_trabalhado':
+            tipo_registro = 'sabado_horas_extras'
+        elif tipo_registro == 'domingo_trabalhado':
+            tipo_registro = 'domingo_horas_extras'
+        elif tipo_registro == 'feriado_folga':
+            tipo_registro = 'feriado'
         
         if obra_id == '':
             obra_id = None
