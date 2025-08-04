@@ -2004,18 +2004,24 @@ $(document).ready(function() {
     document.getElementById('data_inicio_ocorrencia').value = today;
     document.getElementById('data_alimentacao').value = today;
     
-    // Reset do modal de ponto para novos registros
+    // Reset do modal de ponto para novos registros - VERSÃO CORRIGIDA
     $('#pontoModal').on('show.bs.modal', function (event) {
-        // Se não foi clique no botão editar, limpar o formulário para novo registro
-        if (!event.relatedTarget || !event.relatedTarget.classList.contains('btn-outline-warning')) {
+        // Verificar se tem registro_id_ponto já definido (modo edição)
+        const registroId = document.getElementById('registro_id_ponto')?.value;
+        const isEdicao = registroId && registroId !== '';
+        
+        console.log('🔄 Modal show event - Modo:', isEdicao ? 'Edição' : 'Novo', 'ID:', registroId);
+        
+        // Só resetar se NÃO for edição
+        if (!isEdicao) {
             document.querySelector('#pontoModal .modal-title').innerHTML = '<i class="fas fa-clock"></i> Novo Registro de Ponto';
             document.getElementById('pontoForm').reset();
             document.getElementById('pontoForm').removeAttribute('data-modo');
             
-            // Remover campo hidden se existir
+            // Limpar campo hidden para novo registro
             const hiddenId = document.getElementById('registro_id_ponto');
             if (hiddenId) {
-                hiddenId.remove();
+                hiddenId.value = '';
             }
             
             // Definir data padrão
@@ -2026,6 +2032,12 @@ $(document).ready(function() {
             const btnHorarioPadraoElement = document.getElementById('btnHorarioPadrao');
             if (camposHorarioElement) camposHorarioElement.style.display = 'none';
             if (btnHorarioPadraoElement) btnHorarioPadraoElement.style.display = 'none';
+            
+            // Esconder alerta de tipo de lançamento
+            const alertaTipo = document.getElementById('alertaTipoLancamento');
+            if (alertaTipo) alertaTipo.style.display = 'none';
+        } else {
+            console.log('🔄 Modal em modo edição - mantendo dados');
         }
     });
     
