@@ -1207,7 +1207,8 @@ function alterarTipoLancamento() {
     document.getElementById('percentual_extras').required = false;
     
     // Esconder todos os alertas primeiro
-    document.getElementById('alertaTipoLancamento').style.display = 'none';
+    const alertaTipo = document.getElementById('alertaTipoLancamento');
+    if (alertaTipo) alertaTipo.style.display = 'none';
     
     // Tipos que exigem horários (TRABALHO)
     const tiposComHorario = ['trabalho_normal', 'sabado_trabalhado', 'domingo_trabalhado', 'feriado_trabalhado', 'meio_periodo'];
@@ -1267,7 +1268,8 @@ function alterarTipoLancamento() {
                 break;
             default:
                 // Para outros tipos de folga (sábado/domingo)
-                document.getElementById('alertaTipoLancamento').style.display = 'none';
+                const alertaTipoElement = document.getElementById('alertaTipoLancamento');
+                if (alertaTipoElement) alertaTipoElement.style.display = 'none';
         }
         
     } else {
@@ -1276,7 +1278,8 @@ function alterarTipoLancamento() {
         btnHorarioPadrao.style.display = 'none';
         campoPercentual.style.display = 'none';
         document.getElementById('percentual_extras').required = false;
-        document.getElementById('alertaTipoLancamento').style.display = 'none';
+        const alertaTipoElementFinal = document.getElementById('alertaTipoLancamento');
+        if (alertaTipoElementFinal) alertaTipoElementFinal.style.display = 'none';
     }
 }
 
@@ -1322,17 +1325,20 @@ function preencherHorarioPadrao() {
 
 // Função para mostrar alerta específico do tipo de lançamento
 function mostrarAlerta(alertaId) {
-    // Esconder todos os alertas primeiro
+    // Esconder todos os alertas primeiro com verificação de existência
     const alertas = ['alertaTrabalhado', 'alertaFeriado', 'alertaFeriadoTrabalhado', 'alertaFalta', 'alertaFaltaJustificada', 'alertaSabadoHorasExtras', 'alertaDomingoHorasExtras'];
     alertas.forEach(id => {
-        document.getElementById(id).style.display = 'none';
+        const elemento = document.getElementById(id);
+        if (elemento) elemento.style.display = 'none';
     });
     
     // Mostrar o container de alertas
-    document.getElementById('alertaTipoLancamento').style.display = 'block';
+    const alertaTipoElement = document.getElementById('alertaTipoLancamento');
+    if (alertaTipoElement) alertaTipoElement.style.display = 'block';
     
     // Mostrar o alerta específico
-    document.getElementById(alertaId).style.display = 'block';
+    const alertaEspecifico = document.getElementById(alertaId);
+    if (alertaEspecifico) alertaEspecifico.style.display = 'block';
 }
 
 // Filtros rápidos para KPIs
@@ -1825,6 +1831,13 @@ function abrirModalEdicao() {
         
         // Método 3: Fallback manual mais robusto
         console.log('📝 Usando fallback manual para abrir modal');
+        
+        // Verificação adicional antes de manipular o elemento
+        if (!modalElement) {
+            console.error('❌ modalElement é null na linha 1837!');
+            mostrarErro('Erro crítico: elemento modal não disponível');
+            return;
+        }
         
         // Remover classes de hide/fade que podem estar interferindo
         modalElement.classList.remove('fade');
