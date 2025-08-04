@@ -156,7 +156,7 @@ class KPIsEngine:
             RegistroPonto.data <= data_fim,
             RegistroPonto.total_atraso_horas.isnot(None),
             # EXCLUIR tipos onde toda hora é extra (não há conceito de atraso)
-            ~RegistroPonto.tipo_registro.in_(['sabado_trabalhado', 'sabado_horas_extras', 'domingo_trabalhado', 'domingo_horas_extras', 'feriado_trabalhado'])
+            ~RegistroPonto.tipo_registro.in_(['sabado_trabalhado', 'sabado_trabalhado', 'domingo_trabalhado', 'domingo_horas_extras', 'feriado_trabalhado'])
         ).scalar()
         
         return total or 0.0
@@ -225,7 +225,7 @@ class KPIsEngine:
         # 2. Sábado trabalhado: aplicar apenas o adicional de 50% (não duplicar)
         # Para sábado: todas as horas são extras, então valor = valor_hora + 50%
         horas_sabado = (horas_por_tipo.get('sabado_trabalhado', 0.0) + 
-                       horas_por_tipo.get('sabado_horas_extras', 0.0))
+                       horas_por_tipo.get('sabado_trabalhado', 0.0))
         custo_total += horas_sabado * valor_hora * 1.5
         
         # 3. Domingo trabalhado (+100%)
@@ -327,7 +327,7 @@ class KPIsEngine:
                 horas_extras = horas_trabalhadas - horas_diarias_padrao
                 
                 # Aplicar percentual correto baseado no tipo de lançamento
-                if registro.tipo_registro in ['sabado_trabalhado', 'sabado_horas_extras']:
+                if registro.tipo_registro in ['sabado_trabalhado']:
                     percentual = 1.5  # 50% adicional
                 elif registro.tipo_registro in ['domingo_trabalhado', 'domingo_horas_extras', 'feriado_trabalhado']:
                     percentual = 2.0  # 100% adicional
@@ -573,7 +573,7 @@ class KPIsEngine:
         
         # Em sábado, domingo e feriado trabalhado não há conceito de atraso
         # pois toda hora trabalhada é considerada extra
-        if registro.tipo_registro not in ['sabado_horas_extras', 'domingo_horas_extras', 'feriado_trabalhado']:
+        if registro.tipo_registro not in ['sabado_trabalhado', 'domingo_horas_extras', 'feriado_trabalhado']:
             if registro.hora_entrada and registro.hora_entrada > horario_entrada:
                 # Atraso na entrada
                 entrada_minutos = registro.hora_entrada.hour * 60 + registro.hora_entrada.minute
@@ -612,11 +612,11 @@ class KPIsEngine:
             registro.horas_trabalhadas = max(0, total_minutos / 60.0)
             
             # CORREÇÃO CRÍTICA: Calcular horas extras baseado no tipo
-            if registro.tipo_registro in ['sabado_horas_extras', 'domingo_horas_extras', 'feriado_trabalhado']:
+            if registro.tipo_registro in ['sabado_trabalhado', 'domingo_horas_extras', 'feriado_trabalhado']:
                 # Para tipos especiais, TODAS as horas são extras
                 registro.horas_extras = registro.horas_trabalhadas
                 # Definir percentual correto automaticamente
-                if registro.tipo_registro == 'sabado_horas_extras':
+                if registro.tipo_registro == 'sabado_trabalhado':
                     registro.percentual_extras = 50.0
                 else:  # domingo_horas_extras, feriado_trabalhado
                     registro.percentual_extras = 100.0
@@ -655,13 +655,12 @@ class KPIsEngine:
         # Valor hora base (padrão 220 horas/mês para simplicidade)
         valor_hora_base = funcionario.salario / 220
         
-        # Buscar registros com horas extras e percentuais
+        # Buscar registros com horas extras e percentuais - SEM FILTRO > 0
         registros = RegistroPonto.query.filter(
             RegistroPonto.funcionario_id == funcionario_id,
             RegistroPonto.data >= data_inicio,
             RegistroPonto.data <= data_fim,
-            RegistroPonto.horas_extras.isnot(None),
-            RegistroPonto.horas_extras > 0
+            RegistroPonto.horas_extras.isnot(None)
         ).all()
         
         valor_total = 0.0
@@ -676,10 +675,10 @@ class KPIsEngine:
                 percentual = registro.percentual_extras / 100  # Converter % para decimal
                 multiplicador = 1 + percentual  # 1 + 0.5 = 1.5 para sábado (50%)
             else:
-                # Fallback baseado no tipo de registro
-                if registro.tipo_registro in ['sabado_trabalhado', 'sabado_horas_extras']:
+                # Fallback baseado no tipo de registro - APENAS sabado_trabalhado
+                if registro.tipo_registro == 'sabado_trabalhado':
                     multiplicador = 1.5  # 50% adicional
-                elif registro.tipo_registro in ['domingo_trabalhado', 'domingo_horas_extras', 'feriado_trabalhado']:
+                elif registro.tipo_registro in ['domingo_trabalhado', 'feriado_trabalhado']:
                     multiplicador = 2.0  # 100% adicional  
                 else:
                     multiplicador = 1.6  # 60% adicional
