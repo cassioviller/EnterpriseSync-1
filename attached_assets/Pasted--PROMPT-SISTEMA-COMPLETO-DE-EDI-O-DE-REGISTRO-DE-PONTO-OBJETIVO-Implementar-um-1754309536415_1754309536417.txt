@@ -1,0 +1,1125 @@
+# 🎯 PROMPT: SISTEMA COMPLETO DE EDIÇÃO DE REGISTRO DE PONTO
+
+## 📋 **OBJETIVO**
+
+Implementar um sistema **completo e robusto** de edição de registros de ponto que:
+- ✅ **Funcione perfeitamente** sem erros
+- ✅ **Aplique lógicas corretas** automaticamente
+- ✅ **Recalcule valores** em tempo real
+- ✅ **Valide permissões** adequadamente
+- ✅ **Interface intuitiva** e responsiva
+
+---
+
+## 🚀 **PROMPT PARA IMPLEMENTAÇÃO COMPLETA**
+
+```
+IMPLEMENTE um sistema COMPLETO de edição de registros de ponto com interface moderna, validações robustas e cálculos automáticos.
+
+## 1. BACKEND - ROTA DE EDIÇÃO ROBUSTA
+
+**routes/ponto.py:**
+```python
+from flask import Blueprint, request, jsonify, render_template
+from flask_login import login_required, current_user
+from datetime import datetime, time, date, timedelta
+from app import db
+from models import RegistroPonto, Funcionario, HorarioTrabalho
+import logging
+
+ponto_bp = Blueprint('ponto', __name__)
+logger = logging.getLogger(__name__)
+
+@ponto_bp.route('/editar/<int:registro_id>', methods=['GET', 'POST'])
+@login_required
+def editar_registro(registro_id):
+    """Sistema completo de edição de registro de ponto"""
+    try:
+        # Buscar registro
+        registro = RegistroPonto.query.get_or_404(registro_id)
+        funcionario = registro.funcionario_ref
+        
+        # Verificar permissões
+        if not verificar_permissao_edicao(registro, current_user):
+            return jsonify({
+                'success': False, 
+                'error': 'Sem permissão para editar este registro'
+            }), 403
+        
+        if request.method == 'GET':
+            # Retornar dados para o modal
+            return jsonify({
+                'success': True,
+                'registro': serializar_registro_edicao(registro, funcionario)
+            })
+        
+        elif request.method == 'POST':
+            # Processar edição
+            dados_edicao = extrair_dados_edicao(request)
+            
+            # Validar dados
+            validacao = validar_dados_edicao(dados_edicao, registro)
+            if not validacao['valido']:
+                return jsonify({
+                    'success': False,
+                    'error': validacao['erro']
+                })
+            
+            # Aplicar alterações
+            aplicar_alteracoes_registro(registro, dados_edicao)
+            
+            # Recalcular valores automaticamente
+            recalcular_registro_completo(registro)
+            
+            # Salvar no banco
+            db.session.commit()
+            
+            # Log da alteração
+            logger.info(f"Registro {registro_id} editado por {current_user.username}")
+            
+            return jsonify({
+                'success': True,
+                'message': 'Registro atualizado com sucesso!',
+                'registro_atualizado': serializar_registro_edicao(registro, funcionario)
+            })
+            
+    except Exception as e:
+        logger.error(f"Erro ao editar registro {registro_id}: {str(e)}")
+        db.session.rollback()
+        return jsonify({
+            'success': False,
+            'error': f'Erro interno: {str(e)}'
+        }), 500
+
+def verificar_permissao_edicao(registro, usuario):
+    """Verifica se o usuário pode editar o registro"""
+    if usuario.tipo_usuario == 'SUPER_ADMIN':
+        return True
+    
+    if usuario.tipo_usuario == 'ADMIN':
+        # Admin pode editar registros de seus funcionários
+        return registro.funcionario_ref.admin_id == usuario.id
+    
+    # Funcionários não podem editar registros
+    return False
+
+def serializar_registro_edicao(registro, funcionario):
+    """Serializa registro para edição no frontend"""
+    return {
+        'id': registro.id,
+        'funcionario': {
+            'id': funcionario.id,
+            'nome': funcionario.nome,
+            'codigo': funcionario.codigo
+        },
+        'data': registro.data.strftime('%Y-%m-%d'),
+        'data_formatada': registro.data.strftime('%d/%m/%Y'),
+        'dia_semana': obter_dia_semana(registro.data),
+        'tipo_registro': registro.tipo_registro or 'trabalho_normal',
+        'horarios': {
+            'entrada': registro.hora_entrada.strftime('%H:%M') if registro.hora_entrada else '',
+            'almoco_saida': registro.hora_almoco_saida.strftime('%H:%M') if registro.hora_almoco_saida else '',
+            'almoco_retorno': registro.hora_almoco_retorno.strftime('%H:%M') if registro.hora_almoco_retorno else '',
+            'saida': registro.hora_saida.strftime('%H:%M') if registro.hora_saida else ''
+        },
+        'calculados': {
+            'horas_trabalhadas': float(registro.horas_trabalhadas or 0),
+            'horas_extras': float(registro.horas_extras or 0),
+            'total_atraso_horas': float(registro.total_atraso_horas or 0),
+            'total_atraso_minutos': int(registro.total_atraso_minutos or 0)
+        },
+        'observacoes': registro.observacoes or '',
+        'obra': {
+            'id': registro.obra_id,
+            'nome': registro.obra_ref.nome if registro.obra_ref else 'Não definida'
+        },
+        'horario_padrao': obter_horario_padrao_funcionario(funcionario)
+    }
+
+def extrair_dados_edicao(request):
+    """Extrai dados do formulário de edição"""
+    return {
+        'tipo_registro': request.form.get('tipo_registro', '').strip(),
+        'hora_entrada': request.form.get('hora_entrada', '').strip(),
+        'hora_almoco_saida': request.form.get('hora_almoco_saida', '').strip(),
+        'hora_almoco_retorno': request.form.get('hora_almoco_retorno', '').strip(),
+        'hora_saida': request.form.get('hora_saida', '').strip(),
+        'observacoes': request.form.get('observacoes', '').strip(),
+        'obra_id': request.form.get('obra_id', type=int)
+    }
+
+def validar_dados_edicao(dados, registro):
+    """Valida dados de edição"""
+    erros = []
+    
+    # Validar tipo de registro
+    tipos_validos = [
+        'trabalho_normal', 'sabado_trabalhado', 'domingo_trabalhado',
+        'feriado_trabalhado', 'meio_periodo', 'falta', 'falta_justificada',
+        'ferias', 'licenca', 'sabado_folga', 'domingo_folga', 'feriado_folga'
+    ]
+    
+    if dados['tipo_registro'] not in tipos_validos:
+        erros.append('Tipo de registro inválido')
+    
+    # Validar horários se for tipo trabalhado
+    tipos_trabalhados = [
+        'trabalho_normal', 'sabado_trabalhado', 'domingo_trabalhado',
+        'feriado_trabalhado', 'meio_periodo'
+    ]
+    
+    if dados['tipo_registro'] in tipos_trabalhados:
+        if not dados['hora_entrada'] or not dados['hora_saida']:
+            erros.append('Horários de entrada e saída são obrigatórios para tipos trabalhados')
+        
+        # Validar formato dos horários
+        for campo, valor in [
+            ('entrada', dados['hora_entrada']),
+            ('saída', dados['hora_saida']),
+            ('saída almoço', dados['hora_almoco_saida']),
+            ('retorno almoço', dados['hora_almoco_retorno'])
+        ]:
+            if valor and not validar_formato_horario(valor):
+                erros.append(f'Formato inválido para {campo}: {valor}')
+        
+        # Validar sequência lógica dos horários
+        if dados['hora_entrada'] and dados['hora_saida']:
+            if not validar_sequencia_horarios(dados):
+                erros.append('Sequência de horários inválida')
+    
+    return {
+        'valido': len(erros) == 0,
+        'erro': '; '.join(erros) if erros else None
+    }
+
+def validar_formato_horario(horario_str):
+    """Valida formato HH:MM"""
+    try:
+        datetime.strptime(horario_str, '%H:%M')
+        return True
+    except ValueError:
+        return False
+
+def validar_sequencia_horarios(dados):
+    """Valida se os horários estão em sequência lógica"""
+    try:
+        horarios = []
+        
+        if dados['hora_entrada']:
+            horarios.append(('entrada', datetime.strptime(dados['hora_entrada'], '%H:%M').time()))
+        
+        if dados['hora_almoco_saida']:
+            horarios.append(('almoco_saida', datetime.strptime(dados['hora_almoco_saida'], '%H:%M').time()))
+        
+        if dados['hora_almoco_retorno']:
+            horarios.append(('almoco_retorno', datetime.strptime(dados['hora_almoco_retorno'], '%H:%M').time()))
+        
+        if dados['hora_saida']:
+            horarios.append(('saida', datetime.strptime(dados['hora_saida'], '%H:%M').time()))
+        
+        # Verificar se estão em ordem crescente
+        for i in range(1, len(horarios)):
+            if horarios[i][1] <= horarios[i-1][1]:
+                return False
+        
+        return True
+        
+    except ValueError:
+        return False
+
+def aplicar_alteracoes_registro(registro, dados):
+    """Aplica alterações ao registro"""
+    # Atualizar tipo
+    registro.tipo_registro = dados['tipo_registro']
+    
+    # Atualizar horários
+    registro.hora_entrada = datetime.strptime(dados['hora_entrada'], '%H:%M').time() if dados['hora_entrada'] else None
+    registro.hora_almoco_saida = datetime.strptime(dados['hora_almoco_saida'], '%H:%M').time() if dados['hora_almoco_saida'] else None
+    registro.hora_almoco_retorno = datetime.strptime(dados['hora_almoco_retorno'], '%H:%M').time() if dados['hora_almoco_retorno'] else None
+    registro.hora_saida = datetime.strptime(dados['hora_saida'], '%H:%M').time() if dados['hora_saida'] else None
+    
+    # Atualizar outros campos
+    registro.observacoes = dados['observacoes']
+    registro.obra_id = dados['obra_id']
+    
+    # Marcar como atualizado
+    registro.updated_at = datetime.utcnow()
+
+def recalcular_registro_completo(registro):
+    """Recalcula TODOS os valores do registro baseado no tipo"""
+    tipo = registro.tipo_registro or 'trabalho_normal'
+    
+    # Resetar valores calculados
+    registro.horas_trabalhadas = 0.0
+    registro.horas_extras = 0.0
+    registro.total_atraso_horas = 0.0
+    registro.total_atraso_minutos = 0
+    registro.minutos_atraso_entrada = 0
+    registro.minutos_atraso_saida = 0
+    registro.percentual_extras = 0.0
+    
+    # Tipos que não trabalham (sem cálculos)
+    tipos_sem_trabalho = [
+        'falta', 'falta_injustificada', 'sabado_folga', 
+        'domingo_folga', 'feriado_folga'
+    ]
+    
+    if tipo in tipos_sem_trabalho:
+        logger.info(f"Tipo {tipo}: sem trabalho, valores zerados")
+        return
+    
+    # Tipos que trabalham mas sem horários específicos
+    tipos_sem_horario = ['falta_justificada', 'ferias', 'licenca']
+    
+    if tipo in tipos_sem_horario:
+        registro.horas_trabalhadas = 8.0  # Padrão 8h
+        logger.info(f"Tipo {tipo}: 8h padrão aplicadas")
+        return
+    
+    # Calcular para tipos com horários
+    if not registro.hora_entrada or not registro.hora_saida:
+        logger.warning(f"Horários faltando para tipo {tipo}")
+        return
+    
+    # Calcular horas trabalhadas
+    horas_trabalhadas = calcular_horas_trabalhadas(registro)
+    registro.horas_trabalhadas = horas_trabalhadas
+    
+    # Aplicar lógica específica por tipo
+    if tipo == 'trabalho_normal':
+        # Dia normal: até 8h normal, resto extras (50%)
+        if horas_trabalhadas > 8:
+            registro.horas_extras = horas_trabalhadas - 8
+            registro.percentual_extras = 50.0
+        
+        # Calcular atrasos apenas em dias normais
+        calcular_atrasos_dia_normal(registro)
+        
+    elif tipo == 'sabado_trabalhado':
+        # Sábado: TODAS as horas são extras (50%)
+        registro.horas_extras = horas_trabalhadas
+        registro.percentual_extras = 50.0
+        # SEM atrasos em sábado
+        
+    elif tipo in ['domingo_trabalhado', 'feriado_trabalhado']:
+        # Domingo/Feriado: TODAS as horas são extras (100%)
+        registro.horas_extras = horas_trabalhadas
+        registro.percentual_extras = 100.0
+        # SEM atrasos em domingo/feriado
+        
+    elif tipo == 'meio_periodo':
+        # Meio período: proporcional, sem extras
+        pass  # Já calculado em horas_trabalhadas
+    
+    logger.info(f"Recálculo completo: {tipo} - {horas_trabalhadas}h trabalhadas, {registro.horas_extras}h extras")
+
+def calcular_horas_trabalhadas(registro):
+    """Calcula horas trabalhadas considerando almoço"""
+    entrada = datetime.combine(registro.data, registro.hora_entrada)
+    saida = datetime.combine(registro.data, registro.hora_saida)
+    
+    # Calcular total de minutos
+    total_minutos = (saida - entrada).total_seconds() / 60
+    
+    # Descontar almoço se houver
+    if registro.hora_almoco_saida and registro.hora_almoco_retorno:
+        almoco_saida = datetime.combine(registro.data, registro.hora_almoco_saida)
+        almoco_retorno = datetime.combine(registro.data, registro.hora_almoco_retorno)
+        almoco_minutos = (almoco_retorno - almoco_saida).total_seconds() / 60
+        total_minutos -= almoco_minutos
+    
+    return max(0, round(total_minutos / 60, 2))
+
+def calcular_atrasos_dia_normal(registro):
+    """Calcula atrasos apenas para dias normais"""
+    funcionario = registro.funcionario_ref
+    horario_padrao = funcionario.horario_trabalho
+    
+    if not horario_padrao:
+        return  # Sem horário padrão, sem cálculo de atraso
+    
+    # Atraso na entrada
+    entrada_esperada = horario_padrao.entrada
+    entrada_real = registro.hora_entrada
+    
+    if entrada_real > entrada_esperada:
+        atraso_entrada = (
+            datetime.combine(registro.data, entrada_real) - 
+            datetime.combine(registro.data, entrada_esperada)
+        ).total_seconds() / 60
+        registro.minutos_atraso_entrada = int(atraso_entrada)
+    
+    # Saída antecipada
+    saida_esperada = horario_padrao.saida
+    saida_real = registro.hora_saida
+    
+    if saida_real < saida_esperada:
+        atraso_saida = (
+            datetime.combine(registro.data, saida_esperada) - 
+            datetime.combine(registro.data, saida_real)
+        ).total_seconds() / 60
+        registro.minutos_atraso_saida = int(atraso_saida)
+    
+    # Total de atrasos
+    registro.total_atraso_minutos = registro.minutos_atraso_entrada + registro.minutos_atraso_saida
+    registro.total_atraso_horas = round(registro.total_atraso_minutos / 60, 2)
+
+def obter_dia_semana(data):
+    """Retorna nome do dia da semana"""
+    dias = ['Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado', 'Domingo']
+    return dias[data.weekday()]
+
+def obter_horario_padrao_funcionario(funcionario):
+    """Retorna horário padrão do funcionário"""
+    if funcionario.horario_trabalho:
+        return {
+            'entrada': funcionario.horario_trabalho.entrada.strftime('%H:%M'),
+            'saida_almoco': funcionario.horario_trabalho.saida_almoco.strftime('%H:%M'),
+            'retorno_almoco': funcionario.horario_trabalho.retorno_almoco.strftime('%H:%M'),
+            'saida': funcionario.horario_trabalho.saida.strftime('%H:%M')
+        }
+    return None
+```
+
+## 2. FRONTEND - MODAL DE EDIÇÃO MODERNO
+
+**templates/ponto/modal_edicao.html:**
+```html
+<!-- Modal de Edição de Registro -->
+<div class="modal fade" id="modalEdicaoRegistro" tabindex="-1" aria-labelledby="modalEdicaoLabel" aria-hidden="true">
+    <div class="modal-dialog modal-xl">
+        <div class="modal-content">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title" id="modalEdicaoLabel">
+                    <i class="fas fa-edit me-2"></i>Editar Registro de Ponto
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            
+            <div class="modal-body">
+                <!-- Loading Spinner -->
+                <div id="loadingEdicao" class="text-center py-4">
+                    <div class="spinner-border text-primary" role="status">
+                        <span class="visually-hidden">Carregando...</span>
+                    </div>
+                    <p class="mt-2">Carregando dados do registro...</p>
+                </div>
+                
+                <!-- Formulário de Edição -->
+                <form id="formEdicaoRegistro" style="display: none;">
+                    <input type="hidden" id="editRegistroId" name="registro_id">
+                    
+                    <!-- Informações do Funcionário -->
+                    <div class="row mb-4">
+                        <div class="col-md-8">
+                            <div class="card bg-light">
+                                <div class="card-body py-2">
+                                    <h6 class="card-title mb-1">
+                                        <i class="fas fa-user me-2"></i>
+                                        <span id="editFuncionarioNome"></span>
+                                        <small class="text-muted">(<span id="editFuncionarioCodigo"></span>)</small>
+                                    </h6>
+                                    <small class="text-muted">
+                                        <i class="fas fa-calendar me-1"></i>
+                                        <span id="editDataFormatada"></span> - <span id="editDiaSemana"></span>
+                                    </small>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div id="editHorarioPadrao" class="card bg-info text-white">
+                                <div class="card-body py-2">
+                                    <h6 class="card-title mb-1">
+                                        <i class="fas fa-clock me-2"></i>Horário Padrão
+                                    </h6>
+                                    <small id="editHorarioPadraoTexto">-</small>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Tipo de Lançamento -->
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <label for="editTipoRegistro" class="form-label fw-bold">
+                                <i class="fas fa-tags me-2"></i>Tipo de Lançamento
+                            </label>
+                            <select class="form-select form-select-lg" id="editTipoRegistro" name="tipo_registro" required>
+                                <optgroup label="🏢 TRABALHO">
+                                    <option value="trabalho_normal">Trabalho Normal</option>
+                                    <option value="sabado_trabalhado">Sábado Trabalhado (50% extra)</option>
+                                    <option value="domingo_trabalhado">Domingo Trabalhado (100% extra)</option>
+                                    <option value="feriado_trabalhado">Feriado Trabalhado (100% extra)</option>
+                                    <option value="meio_periodo">Meio Período</option>
+                                </optgroup>
+                                <optgroup label="⚠️ AUSÊNCIAS">
+                                    <option value="falta">Falta Injustificada</option>
+                                    <option value="falta_justificada">Falta Justificada</option>
+                                    <option value="ferias">Férias</option>
+                                    <option value="licenca">Licença</option>
+                                </optgroup>
+                                <optgroup label="🏠 FOLGAS">
+                                    <option value="sabado_folga">Sábado - Folga</option>
+                                    <option value="domingo_folga">Domingo - Folga</option>
+                                    <option value="feriado_folga">Feriado - Folga</option>
+                                </optgroup>
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label for="editObra" class="form-label fw-bold">
+                                <i class="fas fa-building me-2"></i>Obra
+                            </label>
+                            <select class="form-select form-select-lg" id="editObra" name="obra_id">
+                                <option value="">Selecione uma obra...</option>
+                                <!-- Carregado dinamicamente -->
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <!-- Horários -->
+                    <div id="editHorariosContainer" class="mb-4">
+                        <h6 class="fw-bold mb-3">
+                            <i class="fas fa-clock me-2"></i>Horários de Trabalho
+                        </h6>
+                        
+                        <div class="row">
+                            <div class="col-md-3">
+                                <label for="editHoraEntrada" class="form-label">
+                                    <i class="fas fa-sign-in-alt me-1 text-success"></i>Entrada
+                                </label>
+                                <input type="time" class="form-control form-control-lg" id="editHoraEntrada" name="hora_entrada">
+                            </div>
+                            <div class="col-md-3">
+                                <label for="editHoraAlmocoSaida" class="form-label">
+                                    <i class="fas fa-utensils me-1 text-warning"></i>Saída Almoço
+                                </label>
+                                <input type="time" class="form-control form-control-lg" id="editHoraAlmocoSaida" name="hora_almoco_saida">
+                            </div>
+                            <div class="col-md-3">
+                                <label for="editHoraAlmocoRetorno" class="form-label">
+                                    <i class="fas fa-utensils me-1 text-info"></i>Retorno Almoço
+                                </label>
+                                <input type="time" class="form-control form-control-lg" id="editHoraAlmocoRetorno" name="hora_almoco_retorno">
+                            </div>
+                            <div class="col-md-3">
+                                <label for="editHoraSaida" class="form-label">
+                                    <i class="fas fa-sign-out-alt me-1 text-danger"></i>Saída
+                                </label>
+                                <input type="time" class="form-control form-control-lg" id="editHoraSaida" name="hora_saida">
+                            </div>
+                        </div>
+                        
+                        <!-- Botões de Horário Padrão -->
+                        <div class="row mt-2">
+                            <div class="col-12">
+                                <button type="button" class="btn btn-outline-secondary btn-sm" id="btnAplicarHorarioPadrao">
+                                    <i class="fas fa-magic me-1"></i>Aplicar Horário Padrão
+                                </button>
+                                <button type="button" class="btn btn-outline-warning btn-sm ms-2" id="btnLimparHorarios">
+                                    <i class="fas fa-eraser me-1"></i>Limpar Horários
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Preview de Cálculos -->
+                    <div id="editPreviewCalculos" class="mb-4">
+                        <h6 class="fw-bold mb-3">
+                            <i class="fas fa-calculator me-2"></i>Preview de Cálculos
+                        </h6>
+                        
+                        <div class="row">
+                            <div class="col-md-3">
+                                <div class="card bg-primary text-white">
+                                    <div class="card-body text-center py-2">
+                                        <h5 class="card-title mb-1" id="previewHorasTrabalhadas">0.0h</h5>
+                                        <small>Horas Trabalhadas</small>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="card bg-success text-white">
+                                    <div class="card-body text-center py-2">
+                                        <h5 class="card-title mb-1" id="previewHorasExtras">0.0h</h5>
+                                        <small>Horas Extras</small>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="card bg-warning text-white">
+                                    <div class="card-body text-center py-2">
+                                        <h5 class="card-title mb-1" id="previewAtrasos">0min</h5>
+                                        <small>Atrasos</small>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="card bg-info text-white">
+                                    <div class="card-body text-center py-2">
+                                        <h5 class="card-title mb-1" id="previewPercentualExtras">0%</h5>
+                                        <small>% Extras</small>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Observações -->
+                    <div class="mb-3">
+                        <label for="editObservacoes" class="form-label fw-bold">
+                            <i class="fas fa-comment me-2"></i>Observações
+                        </label>
+                        <textarea class="form-control" id="editObservacoes" name="observacoes" rows="3" 
+                                  placeholder="Observações sobre este registro..."></textarea>
+                    </div>
+                </form>
+            </div>
+            
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                    <i class="fas fa-times me-2"></i>Cancelar
+                </button>
+                <button type="button" class="btn btn-primary" id="btnSalvarEdicao">
+                    <i class="fas fa-save me-2"></i>Salvar Alterações
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+```
+
+## 3. JAVASCRIPT - FUNCIONALIDADE COMPLETA
+
+**static/js/edicao-ponto.js:**
+```javascript
+class EdicaoRegistroPonto {
+    constructor() {
+        this.registroAtual = null;
+        this.obras = [];
+        this.inicializar();
+    }
+    
+    inicializar() {
+        // Event listeners
+        document.addEventListener('DOMContentLoaded', () => {
+            this.configurarEventListeners();
+            this.carregarObras();
+        });
+    }
+    
+    configurarEventListeners() {
+        // Botão salvar
+        document.getElementById('btnSalvarEdicao')?.addEventListener('click', () => {
+            this.salvarEdicao();
+        });
+        
+        // Mudança no tipo de registro
+        document.getElementById('editTipoRegistro')?.addEventListener('change', (e) => {
+            this.aoMudarTipoRegistro(e.target.value);
+        });
+        
+        // Mudança nos horários
+        ['editHoraEntrada', 'editHoraAlmocoSaida', 'editHoraAlmocoRetorno', 'editHoraSaida'].forEach(id => {
+            document.getElementById(id)?.addEventListener('change', () => {
+                this.calcularPreview();
+            });
+        });
+        
+        // Botões auxiliares
+        document.getElementById('btnAplicarHorarioPadrao')?.addEventListener('click', () => {
+            this.aplicarHorarioPadrao();
+        });
+        
+        document.getElementById('btnLimparHorarios')?.addEventListener('click', () => {
+            this.limparHorarios();
+        });
+    }
+    
+    async abrirModalEdicao(registroId) {
+        try {
+            // Mostrar loading
+            this.mostrarLoading(true);
+            
+            // Buscar dados do registro
+            const response = await fetch(`/ponto/editar/${registroId}`);
+            const data = await response.json();
+            
+            if (!data.success) {
+                throw new Error(data.error || 'Erro ao carregar registro');
+            }
+            
+            // Armazenar dados
+            this.registroAtual = data.registro;
+            
+            // Preencher formulário
+            this.preencherFormulario(data.registro);
+            
+            // Mostrar formulário
+            this.mostrarLoading(false);
+            
+            // Abrir modal
+            const modal = new bootstrap.Modal(document.getElementById('modalEdicaoRegistro'));
+            modal.show();
+            
+        } catch (error) {
+            console.error('Erro ao abrir modal:', error);
+            alert('Erro ao carregar registro: ' + error.message);
+            this.mostrarLoading(false);
+        }
+    }
+    
+    preencherFormulario(registro) {
+        // Dados básicos
+        document.getElementById('editRegistroId').value = registro.id;
+        document.getElementById('editFuncionarioNome').textContent = registro.funcionario.nome;
+        document.getElementById('editFuncionarioCodigo').textContent = registro.funcionario.codigo;
+        document.getElementById('editDataFormatada').textContent = registro.data_formatada;
+        document.getElementById('editDiaSemana').textContent = registro.dia_semana;
+        
+        // Tipo de registro
+        document.getElementById('editTipoRegistro').value = registro.tipo_registro;
+        
+        // Horários
+        document.getElementById('editHoraEntrada').value = registro.horarios.entrada;
+        document.getElementById('editHoraAlmocoSaida').value = registro.horarios.almoco_saida;
+        document.getElementById('editHoraAlmocoRetorno').value = registro.horarios.almoco_retorno;
+        document.getElementById('editHoraSaida').value = registro.horarios.saida;
+        
+        // Observações
+        document.getElementById('editObservacoes').value = registro.observacoes;
+        
+        // Obra
+        if (registro.obra.id) {
+            document.getElementById('editObra').value = registro.obra.id;
+        }
+        
+        // Horário padrão
+        if (registro.horario_padrao) {
+            const horarioPadraoTexto = `${registro.horario_padrao.entrada} - ${registro.horario_padrao.saida}`;
+            document.getElementById('editHorarioPadraoTexto').textContent = horarioPadraoTexto;
+        }
+        
+        // Configurar interface baseada no tipo
+        this.aoMudarTipoRegistro(registro.tipo_registro);
+        
+        // Calcular preview inicial
+        this.calcularPreview();
+    }
+    
+    aoMudarTipoRegistro(tipo) {
+        const horariosContainer = document.getElementById('editHorariosContainer');
+        const previewContainer = document.getElementById('editPreviewCalculos');
+        
+        // Tipos que precisam de horários
+        const tiposComHorarios = [
+            'trabalho_normal', 'sabado_trabalhado', 'domingo_trabalhado',
+            'feriado_trabalhado', 'meio_periodo'
+        ];
+        
+        if (tiposComHorarios.includes(tipo)) {
+            horariosContainer.style.display = 'block';
+            previewContainer.style.display = 'block';
+            
+            // Marcar campos obrigatórios
+            document.getElementById('editHoraEntrada').required = true;
+            document.getElementById('editHoraSaida').required = true;
+        } else {
+            horariosContainer.style.display = 'none';
+            previewContainer.style.display = 'none';
+            
+            // Remover obrigatoriedade
+            document.getElementById('editHoraEntrada').required = false;
+            document.getElementById('editHoraSaida').required = false;
+        }
+        
+        // Recalcular preview
+        this.calcularPreview();
+    }
+    
+    calcularPreview() {
+        if (!this.registroAtual) return;
+        
+        const tipo = document.getElementById('editTipoRegistro').value;
+        const entrada = document.getElementById('editHoraEntrada').value;
+        const saida = document.getElementById('editHoraSaida').value;
+        const almocoSaida = document.getElementById('editHoraAlmocoSaida').value;
+        const almocoRetorno = document.getElementById('editHoraAlmocoRetorno').value;
+        
+        let horasTrabalhadas = 0;
+        let horasExtras = 0;
+        let atrasos = 0;
+        let percentualExtras = 0;
+        
+        // Calcular apenas se tiver horários
+        if (entrada && saida) {
+            // Calcular horas trabalhadas
+            const entradaMinutos = this.horarioParaMinutos(entrada);
+            const saidaMinutos = this.horarioParaMinutos(saida);
+            let totalMinutos = saidaMinutos - entradaMinutos;
+            
+            // Descontar almoço
+            if (almocoSaida && almocoRetorno) {
+                const almocoSaidaMinutos = this.horarioParaMinutos(almocoSaida);
+                const almocoRetornoMinutos = this.horarioParaMinutos(almocoRetorno);
+                totalMinutos -= (almocoRetornoMinutos - almocoSaidaMinutos);
+            }
+            
+            horasTrabalhadas = Math.max(0, totalMinutos / 60);
+            
+            // Calcular extras baseado no tipo
+            switch (tipo) {
+                case 'trabalho_normal':
+                    if (horasTrabalhadas > 8) {
+                        horasExtras = horasTrabalhadas - 8;
+                        percentualExtras = 50;
+                    }
+                    // Calcular atrasos para dia normal
+                    atrasos = this.calcularAtrasosDiaNormal(entrada, saida);
+                    break;
+                    
+                case 'sabado_trabalhado':
+                    horasExtras = horasTrabalhadas;
+                    percentualExtras = 50;
+                    break;
+                    
+                case 'domingo_trabalhado':
+                case 'feriado_trabalhado':
+                    horasExtras = horasTrabalhadas;
+                    percentualExtras = 100;
+                    break;
+            }
+        }
+        
+        // Atualizar preview
+        document.getElementById('previewHorasTrabalhadas').textContent = `${horasTrabalhadas.toFixed(1)}h`;
+        document.getElementById('previewHorasExtras').textContent = `${horasExtras.toFixed(1)}h`;
+        document.getElementById('previewAtrasos').textContent = `${atrasos}min`;
+        document.getElementById('previewPercentualExtras').textContent = `${percentualExtras}%`;
+    }
+    
+    horarioParaMinutos(horario) {
+        const [horas, minutos] = horario.split(':').map(Number);
+        return horas * 60 + minutos;
+    }
+    
+    calcularAtrasosDiaNormal(entrada, saida) {
+        if (!this.registroAtual.horario_padrao) return 0;
+        
+        const horarioPadrao = this.registroAtual.horario_padrao;
+        let atrasoTotal = 0;
+        
+        // Atraso na entrada
+        const entradaMinutos = this.horarioParaMinutos(entrada);
+        const entradaPadraoMinutos = this.horarioParaMinutos(horarioPadrao.entrada);
+        
+        if (entradaMinutos > entradaPadraoMinutos) {
+            atrasoTotal += entradaMinutos - entradaPadraoMinutos;
+        }
+        
+        // Saída antecipada
+        const saidaMinutos = this.horarioParaMinutos(saida);
+        const saidaPadraoMinutos = this.horarioParaMinutos(horarioPadrao.saida);
+        
+        if (saidaMinutos < saidaPadraoMinutos) {
+            atrasoTotal += saidaPadraoMinutos - saidaMinutos;
+        }
+        
+        return atrasoTotal;
+    }
+    
+    aplicarHorarioPadrao() {
+        if (!this.registroAtual.horario_padrao) {
+            alert('Funcionário não possui horário padrão configurado');
+            return;
+        }
+        
+        const horario = this.registroAtual.horario_padrao;
+        document.getElementById('editHoraEntrada').value = horario.entrada;
+        document.getElementById('editHoraAlmocoSaida').value = horario.saida_almoco;
+        document.getElementById('editHoraAlmocoRetorno').value = horario.retorno_almoco;
+        document.getElementById('editHoraSaida').value = horario.saida;
+        
+        this.calcularPreview();
+    }
+    
+    limparHorarios() {
+        document.getElementById('editHoraEntrada').value = '';
+        document.getElementById('editHoraAlmocoSaida').value = '';
+        document.getElementById('editHoraAlmocoRetorno').value = '';
+        document.getElementById('editHoraSaida').value = '';
+        
+        this.calcularPreview();
+    }
+    
+    async salvarEdicao() {
+        try {
+            const form = document.getElementById('formEdicaoRegistro');
+            const formData = new FormData(form);
+            
+            // Validar formulário
+            if (!this.validarFormulario(formData)) {
+                return;
+            }
+            
+            // Desabilitar botão
+            const btnSalvar = document.getElementById('btnSalvarEdicao');
+            btnSalvar.disabled = true;
+            btnSalvar.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Salvando...';
+            
+            // Enviar dados
+            const registroId = formData.get('registro_id');
+            const response = await fetch(`/ponto/editar/${registroId}`, {
+                method: 'POST',
+                body: formData
+            });
+            
+            const data = await response.json();
+            
+            if (data.success) {
+                // Fechar modal
+                const modal = bootstrap.Modal.getInstance(document.getElementById('modalEdicaoRegistro'));
+                modal.hide();
+                
+                // Mostrar sucesso
+                this.mostrarSucesso('Registro atualizado com sucesso!');
+                
+                // Recarregar página ou atualizar tabela
+                setTimeout(() => {
+                    window.location.reload();
+                }, 1000);
+                
+            } else {
+                throw new Error(data.error || 'Erro ao salvar registro');
+            }
+            
+        } catch (error) {
+            console.error('Erro ao salvar:', error);
+            alert('Erro ao salvar registro: ' + error.message);
+        } finally {
+            // Reabilitar botão
+            const btnSalvar = document.getElementById('btnSalvarEdicao');
+            btnSalvar.disabled = false;
+            btnSalvar.innerHTML = '<i class="fas fa-save me-2"></i>Salvar Alterações';
+        }
+    }
+    
+    validarFormulario(formData) {
+        const tipo = formData.get('tipo_registro');
+        
+        // Tipos que precisam de horários
+        const tiposComHorarios = [
+            'trabalho_normal', 'sabado_trabalhado', 'domingo_trabalhado',
+            'feriado_trabalhado', 'meio_periodo'
+        ];
+        
+        if (tiposComHorarios.includes(tipo)) {
+            const entrada = formData.get('hora_entrada');
+            const saida = formData.get('hora_saida');
+            
+            if (!entrada || !saida) {
+                alert('Horários de entrada e saída são obrigatórios para este tipo de registro');
+                return false;
+            }
+        }
+        
+        return true;
+    }
+    
+    async carregarObras() {
+        try {
+            const response = await fetch('/api/obras');
+            const data = await response.json();
+            
+            if (data.success) {
+                this.obras = data.obras;
+                this.preencherSelectObras();
+            }
+        } catch (error) {
+            console.error('Erro ao carregar obras:', error);
+        }
+    }
+    
+    preencherSelectObras() {
+        const select = document.getElementById('editObra');
+        
+        // Limpar opções existentes (exceto a primeira)
+        while (select.children.length > 1) {
+            select.removeChild(select.lastChild);
+        }
+        
+        // Adicionar obras
+        this.obras.forEach(obra => {
+            const option = document.createElement('option');
+            option.value = obra.id;
+            option.textContent = obra.nome;
+            select.appendChild(option);
+        });
+    }
+    
+    mostrarLoading(mostrar) {
+        const loading = document.getElementById('loadingEdicao');
+        const form = document.getElementById('formEdicaoRegistro');
+        
+        if (mostrar) {
+            loading.style.display = 'block';
+            form.style.display = 'none';
+        } else {
+            loading.style.display = 'none';
+            form.style.display = 'block';
+        }
+    }
+    
+    mostrarSucesso(mensagem) {
+        // Criar toast de sucesso
+        const toast = document.createElement('div');
+        toast.className = 'toast align-items-center text-white bg-success border-0';
+        toast.setAttribute('role', 'alert');
+        toast.innerHTML = `
+            <div class="d-flex">
+                <div class="toast-body">
+                    <i class="fas fa-check-circle me-2"></i>${mensagem}
+                </div>
+                <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button>
+            </div>
+        `;
+        
+        // Adicionar ao container de toasts
+        let toastContainer = document.getElementById('toastContainer');
+        if (!toastContainer) {
+            toastContainer = document.createElement('div');
+            toastContainer.id = 'toastContainer';
+            toastContainer.className = 'toast-container position-fixed top-0 end-0 p-3';
+            document.body.appendChild(toastContainer);
+        }
+        
+        toastContainer.appendChild(toast);
+        
+        // Mostrar toast
+        const bsToast = new bootstrap.Toast(toast);
+        bsToast.show();
+        
+        // Remover após 5 segundos
+        setTimeout(() => {
+            toast.remove();
+        }, 5000);
+    }
+}
+
+// Instanciar classe
+const edicaoRegistroPonto = new EdicaoRegistroPonto();
+
+// Função global para abrir modal (chamada pelos botões da tabela)
+function abrirModalEdicao(registroId) {
+    edicaoRegistroPonto.abrirModalEdicao(registroId);
+}
+```
+
+## 4. CSS - ESTILOS MODERNOS
+
+**static/css/edicao-ponto.css:**
+```css
+/* Estilos para modal de edição */
+#modalEdicaoRegistro .modal-dialog {
+    max-width: 1200px;
+}
+
+#modalEdicaoRegistro .modal-header {
+    background: linear-gradient(135deg, #007bff, #0056b3);
+}
+
+#modalEdicaoRegistro .form-control:focus,
+#modalEdicaoRegistro .form-select:focus {
+    border-color: #007bff;
+    box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.25);
+}
+
+#modalEdicaoRegistro .card {
+    border: none;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+/* Preview de cálculos */
+#editPreviewCalculos .card {
+    transition: transform 0.2s;
+}
+
+#editPreviewCalculos .card:hover {
+    transform: translateY(-2px);
+}
+
+/* Loading spinner */
+#loadingEdicao .spinner-border {
+    width: 3rem;
+    height: 3rem;
+}
+
+/* Botões auxiliares */
+.btn-outline-secondary:hover,
+.btn-outline-warning:hover {
+    transform: translateY(-1px);
+}
+
+/* Toast personalizado */
+.toast {
+    min-width: 300px;
+}
+
+/* Responsividade */
+@media (max-width: 768px) {
+    #modalEdicaoRegistro .modal-dialog {
+        max-width: 95%;
+        margin: 10px auto;
+    }
+    
+    #modalEdicaoRegistro .row > div {
+        margin-bottom: 15px;
+    }
+}
+```
+
+ENTREGÁVEIS:
+- ✅ Sistema completo de edição funcionando
+- ✅ Interface moderna e responsiva
+- ✅ Validações robustas no backend e frontend
+- ✅ Cálculos automáticos em tempo real
+- ✅ Preview de valores antes de salvar
+- ✅ Tratamento de erros completo
+- ✅ Logs de auditoria
+- ✅ Permissões de acesso
+- ✅ Recálculo automático após edição
+
+FOCO: Criar um sistema de edição de registros de ponto profissional, robusto e fácil de usar, que aplique automaticamente todas as lógicas de cálculo corretas.
+```
+
+---
+
+## 🎯 **RESUMO DO SISTEMA DE EDIÇÃO**
+
+### **🔧 FUNCIONALIDADES PRINCIPAIS:**
+- ✅ **Modal moderno** com interface intuitiva
+- ✅ **Validações robustas** no backend e frontend
+- ✅ **Cálculos automáticos** em tempo real
+- ✅ **Preview de valores** antes de salvar
+- ✅ **Aplicação de horário padrão** com um clique
+- ✅ **Tratamento de erros** completo
+
+### **⚙️ LÓGICAS IMPLEMENTADAS:**
+- ✅ **Sábado trabalhado:** Todas horas = extras (50%), sem atraso
+- ✅ **Domingo trabalhado:** Todas horas = extras (100%), sem atraso
+- ✅ **Dia normal:** Até 8h normal, resto extras (50%), com atraso
+- ✅ **Tipos sem horário:** Faltas, férias, licenças
+
+### **🛡️ SEGURANÇA E AUDITORIA:**
+- ✅ **Controle de permissões** por tipo de usuário
+- ✅ **Logs de alterações** completos
+- ✅ **Validação de dados** rigorosa
+- ✅ **Rollback automático** em caso de erro
+
+### **🎨 INTERFACE MODERNA:**
+- ✅ **Design responsivo** para mobile
+- ✅ **Preview em tempo real** dos cálculos
+- ✅ **Feedback visual** claro
+- ✅ **Toasts de sucesso** e erro
+
+O prompt fornece um **sistema completo** de edição de registros de ponto, pronto para implementação! 🚀
+

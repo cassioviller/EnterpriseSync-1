@@ -5444,72 +5444,359 @@ def criar_registro_ponto():
         db.session.rollback()
         return jsonify({'error': str(e)}), 500
 
-@main_bp.route('/ponto/registro/<int:registro_id>', methods=['GET'])
+@main_bp.route('/ponto/registro/<int:registro_id>', methods=['GET', 'PUT'])
 @login_required
-def obter_registro_ponto(registro_id):
-    """Obter dados de um registro de ponto individual para edição"""
+def editar_registro_ponto(registro_id):
+    """Sistema completo de edição de registros de ponto"""
     try:
-        print(f"🔍 Buscando registro {registro_id} para edição individual")
-        print(f"🔐 Usuário logado: {current_user.email if current_user.is_authenticated else 'Não autenticado'}")
-        
-        # Buscar registro específico
         registro = RegistroPonto.query.get_or_404(registro_id)
-        
-        # Buscar funcionário para contexto
         funcionario = Funcionario.query.get(registro.funcionario_id)
+        
         if not funcionario:
             return jsonify({'error': 'Funcionário não encontrado'}), 404
         
-        print(f"✅ Registro encontrado: {funcionario.nome} - {registro.data} - {registro.tipo_registro}")
+        # Verificar permissões
+        if not verificar_permissao_edicao_ponto(registro, current_user):
+            return jsonify({'error': 'Sem permissão para editar este registro'}), 403
         
-        # Mapear tipos do banco para o frontend
-        tipo_frontend = registro.tipo_registro
-        if tipo_frontend == 'trabalhado':
-            tipo_frontend = 'trabalho_normal'
-        elif tipo_frontend == 'sabado_horas_extras':
-            tipo_frontend = 'sabado_trabalhado'
-        elif tipo_frontend == 'domingo_horas_extras':
-            tipo_frontend = 'domingo_trabalhado'
-        elif tipo_frontend == 'feriado':
-            tipo_frontend = 'feriado_folga'
-        elif tipo_frontend == 'falta_justificada':
-            tipo_frontend = 'falta_justificada'
-        
-        # Buscar todas as obras para dropdown
-        obras = Obra.query.filter_by(ativo=True).all()
-        
-        response_data = {
-            'success': True,
-            'registro': {
-                'id': registro.id,
-                'funcionario_id': registro.funcionario_id,
-                'funcionario_nome': funcionario.nome,
-                'data': registro.data.strftime('%Y-%m-%d'),
-                'tipo_registro': tipo_frontend,
-                'hora_entrada': registro.hora_entrada.strftime('%H:%M') if registro.hora_entrada else '',
-                'hora_almoco_saida': registro.hora_almoco_saida.strftime('%H:%M') if registro.hora_almoco_saida else '',
-                'hora_almoco_retorno': registro.hora_almoco_retorno.strftime('%H:%M') if registro.hora_almoco_retorno else '',
-                'hora_saida': registro.hora_saida.strftime('%H:%M') if registro.hora_saida else '',
-                'horas_trabalhadas': float(registro.horas_trabalhadas) if registro.horas_trabalhadas else 0,
-                'horas_extras': float(registro.horas_extras) if registro.horas_extras else 0,
-                'percentual_extras': float(registro.percentual_extras) if registro.percentual_extras else 0,
-                'obra_id': registro.obra_id or '',
-                'observacoes': registro.observacoes or ''
-            },
-            'obras_disponiveis': [{'id': obra.id, 'nome': obra.nome} for obra in obras]
-        }
-        
-        return jsonify(response_data)
-        
+        if request.method == 'GET':
+            # Retornar dados para edição
+            return jsonify({
+                'success': True,
+                'registro': serializar_registro_completo(registro, funcionario),
+                'obras_disponiveis': obter_obras_usuario(current_user),
+                'tipos_registro': obter_tipos_registro_validos()
+            })
+            
+        elif request.method == 'PUT':
+            # Processar edição
+            dados = request.get_json()
+            
+            # Validar dados de entrada
+            validacao = validar_dados_edicao_ponto(dados, registro)
+            if not validacao['valido']:
+                return jsonify({'success': False, 'error': validacao['erro']})
+            
+            # Aplicar alterações
+            aplicar_edicao_registro(registro, dados)
+            
+            # Recalcular valores baseado no tipo
+            recalcular_registro_automatico(registro)
+            
+            # Salvar alterações
+            db.session.commit()
+            
+            print(f"✅ Registro {registro_id} editado por {current_user.email}")
+            
+            return jsonify({
+                'success': True,
+                'message': 'Registro atualizado com sucesso!',
+                'registro': serializar_registro_completo(registro, funcionario)
+            })
+            
     except Exception as e:
-        print(f"❌ Erro ao obter registro {registro_id}: {e}")
-        import traceback
-        traceback.print_exc()
-        return jsonify({'error': f'Erro ao carregar dados: {str(e)}'}), 500
+        db.session.rollback()
+        print(f"❌ Erro ao editar registro {registro_id}: {e}")
+        return jsonify({'error': f'Erro interno: {str(e)}'}), 500
 
-@main_bp.route('/ponto/registro/<int:registro_id>', methods=['PUT', 'POST'])
+def verificar_permissao_edicao_ponto(registro, usuario):
+    """Verifica permissões para editar registro"""
+    if usuario.tipo_usuario == 'SUPER_ADMIN':
+        return True
+    elif usuario.tipo_usuario == 'ADMIN':
+        # Admin pode editar registros de funcionários sob sua gestão
+        funcionario = Funcionario.query.get(registro.funcionario_id)
+        return funcionario and funcionario.admin_id == usuario.id
+    return False
+
+def serializar_registro_completo(registro, funcionario):
+    """Serializa registro completo para frontend"""
+    # Mapear tipos do banco para frontend
+    tipo_frontend = mapear_tipo_para_frontend(registro.tipo_registro)
+    
+    return {
+        'id': registro.id,
+        'funcionario': {
+            'id': funcionario.id,
+            'nome': funcionario.nome,
+            'codigo': funcionario.codigo
+        },
+        'data': registro.data.strftime('%Y-%m-%d'),
+        'data_formatada': registro.data.strftime('%d/%m/%Y'),
+        'dia_semana': registro.data.strftime('%A'),
+        'tipo_registro': tipo_frontend,
+        'horarios': {
+            'hora_entrada': registro.hora_entrada.strftime('%H:%M') if registro.hora_entrada else '',
+            'hora_almoco_saida': registro.hora_almoco_saida.strftime('%H:%M') if registro.hora_almoco_saida else '',
+            'hora_almoco_retorno': registro.hora_almoco_retorno.strftime('%H:%M') if registro.hora_almoco_retorno else '',
+            'hora_saida': registro.hora_saida.strftime('%H:%M') if registro.hora_saida else ''
+        },
+        'valores_calculados': {
+            'horas_trabalhadas': float(registro.horas_trabalhadas or 0),
+            'horas_extras': float(registro.horas_extras or 0),
+            'percentual_extras': float(registro.percentual_extras or 0),
+            'total_atraso_horas': float(registro.total_atraso_horas or 0),
+            'total_atraso_minutos': int(registro.total_atraso_minutos or 0)
+        },
+        'obra_id': registro.obra_id,
+        'observacoes': registro.observacoes or '',
+        'horario_padrao': obter_horario_padrao_funcionario(funcionario)
+    }
+
+def mapear_tipo_para_frontend(tipo_banco):
+    """Mapeia tipos do banco para o frontend"""
+    mapeamento = {
+        'trabalhado': 'trabalho_normal',
+        'sabado_horas_extras': 'sabado_trabalhado',
+        'domingo_horas_extras': 'domingo_trabalhado',
+        'feriado': 'feriado_folga',
+        'feriado_trabalhado': 'feriado_trabalhado',
+        'falta_justificada': 'falta_justificada',
+        'falta': 'falta',
+        'ferias': 'ferias'
+    }
+    return mapeamento.get(tipo_banco, tipo_banco)
+
+def mapear_tipo_para_banco(tipo_frontend):
+    """Mapeia tipos do frontend para o banco"""
+    mapeamento = {
+        'trabalho_normal': 'trabalhado',
+        'sabado_trabalhado': 'sabado_horas_extras',
+        'domingo_trabalhado': 'domingo_horas_extras',
+        'feriado_folga': 'feriado',
+        'feriado_trabalhado': 'feriado_trabalhado',
+        'falta_justificada': 'falta_justificada',
+        'falta': 'falta',
+        'ferias': 'ferias'
+    }
+    return mapeamento.get(tipo_frontend, tipo_frontend)
+
+def obter_horario_padrao_funcionario(funcionario):
+    """Retorna horário padrão do funcionário"""
+    if funcionario.horario_trabalho_id:
+        horario = HorarioTrabalho.query.get(funcionario.horario_trabalho_id)
+        if horario:
+            return {
+                'entrada': horario.entrada.strftime('%H:%M') if horario.entrada else '08:00',
+                'saida': horario.saida.strftime('%H:%M') if horario.saida else '17:00',
+                'almoco_saida': horario.saida_almoco.strftime('%H:%M') if horario.saida_almoco else '12:00',
+                'almoco_retorno': horario.retorno_almoco.strftime('%H:%M') if horario.retorno_almoco else '13:00'
+            }
+    return {
+        'entrada': '08:00',
+        'saida': '17:00', 
+        'almoco_saida': '12:00',
+        'almoco_retorno': '13:00'
+    }
+
+def obter_obras_usuario(usuario):
+    """Retorna obras disponíveis para o usuário"""
+    if usuario.tipo_usuario == 'SUPER_ADMIN':
+        obras = Obra.query.filter_by(ativo=True).all()
+    else:
+        obras = Obra.query.filter_by(admin_id=usuario.id, ativo=True).all()
+    
+    return [{'id': obra.id, 'nome': obra.nome} for obra in obras]
+
+def obter_tipos_registro_validos():
+    """Retorna tipos de registro válidos"""
+    return [
+        {'valor': 'trabalho_normal', 'nome': 'Trabalho Normal'},
+        {'valor': 'sabado_trabalhado', 'nome': 'Sábado - Horas Extras'},
+        {'valor': 'domingo_trabalhado', 'nome': 'Domingo - Horas Extras'},
+        {'valor': 'feriado_trabalhado', 'nome': 'Feriado Trabalhado'},
+        {'valor': 'meio_periodo', 'nome': 'Meio Período'},
+        {'valor': 'falta', 'nome': 'Falta'},
+        {'valor': 'falta_justificada', 'nome': 'Falta Justificada'},
+        {'valor': 'ferias', 'nome': 'Férias'},
+        {'valor': 'feriado_folga', 'nome': 'Feriado Normal'},
+        {'valor': 'sabado_folga', 'nome': 'Sábado - Folga'},
+        {'valor': 'domingo_folga', 'nome': 'Domingo - Folga'}
+    ]
+
+def validar_dados_edicao_ponto(dados, registro):
+    """Valida dados de edição com regras robustas"""
+    erros = []
+    
+    # Validar tipo de registro
+    tipos_validos = [t['valor'] for t in obter_tipos_registro_validos()]
+    if dados.get('tipo_registro') not in tipos_validos:
+        erros.append('Tipo de registro inválido')
+    
+    # Validar horários para tipos que trabalham
+    tipos_trabalhados = ['trabalho_normal', 'sabado_trabalhado', 'domingo_trabalhado', 'feriado_trabalhado', 'meio_periodo']
+    
+    if dados.get('tipo_registro') in tipos_trabalhados:
+        if not dados.get('hora_entrada') or not dados.get('hora_saida'):
+            erros.append('Horários de entrada e saída são obrigatórios')
+        
+        # Validar formato de horários
+        for campo in ['hora_entrada', 'hora_saida', 'hora_almoco_saida', 'hora_almoco_retorno']:
+            valor = dados.get(campo)
+            if valor and not validar_formato_hora(valor):
+                erros.append(f'Formato inválido para {campo}')
+        
+        # Validar sequência lógica
+        if dados.get('hora_entrada') and dados.get('hora_saida'):
+            if not validar_sequencia_horarios_edicao(dados):
+                erros.append('Sequência de horários inválida')
+    
+    return {
+        'valido': len(erros) == 0,
+        'erro': '; '.join(erros) if erros else None
+    }
+
+def validar_formato_hora(hora_str):
+    """Valida formato HH:MM"""
+    try:
+        datetime.strptime(hora_str, '%H:%M')
+        return True
+    except ValueError:
+        return False
+
+def validar_sequencia_horarios_edicao(dados):
+    """Valida se horários estão em sequência lógica"""
+    try:
+        horarios = []
+        
+        for campo in ['hora_entrada', 'hora_almoco_saida', 'hora_almoco_retorno', 'hora_saida']:
+            valor = dados.get(campo)
+            if valor:
+                horarios.append(datetime.strptime(valor, '%H:%M').time())
+        
+        # Verificar ordem crescente
+        for i in range(1, len(horarios)):
+            if horarios[i] <= horarios[i-1]:
+                return False
+        
+        return True
+    except ValueError:
+        return False
+
+def aplicar_edicao_registro(registro, dados):
+    """Aplica edições ao registro"""
+    # Mapear tipo para banco
+    tipo_banco = mapear_tipo_para_banco(dados.get('tipo_registro'))
+    registro.tipo_registro = tipo_banco
+    
+    # Atualizar horários
+    for campo_front, campo_banco in [
+        ('hora_entrada', 'hora_entrada'),
+        ('hora_almoco_saida', 'hora_almoco_saida'),
+        ('hora_almoco_retorno', 'hora_almoco_retorno'),
+        ('hora_saida', 'hora_saida')
+    ]:
+        valor = dados.get(campo_front)
+        if valor:
+            setattr(registro, campo_banco, datetime.strptime(valor, '%H:%M').time())
+        else:
+            setattr(registro, campo_banco, None)
+    
+    # Atualizar outros campos
+    registro.obra_id = dados.get('obra_id')
+    registro.observacoes = dados.get('observacoes', '')
+
+def recalcular_registro_automatico(registro):
+    """Recalcula registro com lógica automática baseada no tipo"""
+    tipo = registro.tipo_registro
+    
+    # Resetar valores
+    registro.horas_trabalhadas = 0.0
+    registro.horas_extras = 0.0
+    registro.total_atraso_horas = 0.0
+    registro.total_atraso_minutos = 0
+    registro.minutos_atraso_entrada = 0
+    registro.minutos_atraso_saida = 0
+    registro.percentual_extras = 0.0
+    
+    # Tipos sem trabalho
+    tipos_sem_trabalho = ['falta', 'sabado_folga', 'domingo_folga', 'feriado']
+    if tipo in tipos_sem_trabalho:
+        return
+    
+    # Tipos especiais sem horários
+    if tipo in ['falta_justificada', 'ferias']:
+        registro.horas_trabalhadas = 8.0
+        return
+    
+    # Calcular para tipos com horários
+    if not registro.hora_entrada or not registro.hora_saida:
+        return
+    
+    # Calcular horas trabalhadas
+    horas = calcular_horas_trabalhadas_edicao(registro)
+    registro.horas_trabalhadas = horas
+    
+    # Aplicar lógica por tipo
+    if tipo == 'sabado_horas_extras':
+        # Sábado: todas as horas são extras (50%)
+        registro.horas_extras = horas
+        registro.percentual_extras = 50.0
+        # Sem atrasos
+        
+    elif tipo in ['domingo_horas_extras', 'feriado_trabalhado']:
+        # Domingo/Feriado: todas as horas são extras (100%)
+        registro.horas_extras = horas
+        registro.percentual_extras = 100.0
+        # Sem atrasos
+        
+    elif tipo == 'trabalhado':
+        # Trabalho normal: até 8h normais, resto extras (50%)
+        if horas > 8:
+            registro.horas_extras = horas - 8
+            registro.percentual_extras = 50.0
+        
+        # Calcular atrasos apenas em dias normais
+        calcular_atrasos_trabalho_normal(registro)
+
+def calcular_horas_trabalhadas_edicao(registro):
+    """Calcula horas trabalhadas considerando almoço"""
+    entrada = datetime.combine(registro.data, registro.hora_entrada)
+    saida = datetime.combine(registro.data, registro.hora_saida)
+    
+    total_minutos = (saida - entrada).total_seconds() / 60
+    
+    # Subtrair almoço se definido
+    if registro.hora_almoco_saida and registro.hora_almoco_retorno:
+        almoco_saida = datetime.combine(registro.data, registro.hora_almoco_saida)
+        almoco_retorno = datetime.combine(registro.data, registro.hora_almoco_retorno)
+        minutos_almoco = (almoco_retorno - almoco_saida).total_seconds() / 60
+        total_minutos -= minutos_almoco
+    
+    return total_minutos / 60.0
+
+def calcular_atrasos_trabalho_normal(registro):
+    """Calcula atrasos apenas para trabalho normal"""
+    funcionario = Funcionario.query.get(registro.funcionario_id)
+    if not funcionario or not funcionario.horario_trabalho_id:
+        return
+    
+    horario_padrao = HorarioTrabalho.query.get(funcionario.horario_trabalho_id)
+    if not horario_padrao:
+        return
+    
+    # Calcular atraso de entrada
+    if registro.hora_entrada and horario_padrao.entrada:
+        entrada_esperada = datetime.combine(registro.data, horario_padrao.entrada)
+        entrada_real = datetime.combine(registro.data, registro.hora_entrada)
+        
+        if entrada_real > entrada_esperada:
+            minutos_atraso = (entrada_real - entrada_esperada).total_seconds() / 60
+            registro.minutos_atraso_entrada = int(minutos_atraso)
+            registro.total_atraso_minutos += int(minutos_atraso)
+    
+    # Converter total para horas
+    registro.total_atraso_horas = registro.total_atraso_minutos / 60.0
+
+@main_bp.route('/ponto/registro/<int:registro_id>', methods=['GET'])
+@login_required  
+def obter_registro_ponto(registro_id):
+    """Método GET separado para compatibilidade"""
+    return editar_registro_ponto(registro_id)
+
+@main_bp.route('/ponto/registro/<int:registro_id>/legacy', methods=['PUT', 'POST'])
 @login_required
-def atualizar_registro_ponto(registro_id):
+def atualizar_registro_ponto_legacy(registro_id):
     """Atualizar um registro de ponto individual"""
     try:
         print(f"✏️ Atualizando registro {registro_id}")

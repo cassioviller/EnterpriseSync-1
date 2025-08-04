@@ -1651,148 +1651,170 @@ function salvarPonto(event) {
     return false; // Impedir submit normal do form
 }
 
-// Funções de edição e exclusão  
+// Sistema moderno de edição de registros
 function editarPonto(id) {
-    console.log('🔧 Editando registro:', id);
+    console.log('🔧 Iniciando edição do registro:', id);
     
-    // Buscar dados do registro com melhor tratamento de erros
-    fetch(`/ponto/registro/${id}`)
-        .then(response => {
-            // Verificar se a resposta é HTML (erro de autenticação) ou JSON
-            return response.text().then(text => {
-                if (text.trim().startsWith('<!DOCTYPE') || text.trim().startsWith('<html')) {
-                    throw new Error('Erro de autenticação - faça login novamente');
-                }
-                try {
-                    return JSON.parse(text);
-                } catch (e) {
-                    console.error('Resposta não é JSON válido:', text);
-                    throw new Error('Erro no servidor ao carregar dados');
-                }
-            });
-        })
-        .then(data => {
-            console.log('✅ Dados carregados:', data);
-            
-            // Limpar formulário antes de preencher
-            const form = document.getElementById('pontoForm');
-            if (form) {
-                form.reset();
-            }
-            
-            // Verificar se temos dados no formato correto
-            if (!data.success || !data.registro) {
-                throw new Error('Dados de resposta inválidos');
-            }
-            
-            const registro = data.registro;
-            
-            // Preencher o modal com os dados - usando estrutura correta
-            const dataEl = document.getElementById('data_ponto');
-            const tipoEl = document.getElementById('tipo_lancamento');
-            const obraEl = document.getElementById('obra_id_ponto');
-            
-            if (dataEl) {
-                dataEl.value = registro.data;
-                console.log('Data definida:', registro.data);
-            }
-            if (tipoEl) {
-                tipoEl.value = registro.tipo_registro;
-                console.log('Tipo definido:', registro.tipo_registro);
-            }
-            
-            // Preencher dropdown de obras
-            if (obraEl && data.obras_disponiveis) {
-                obraEl.innerHTML = '<option value="">Selecione uma obra...</option>';
-                data.obras_disponiveis.forEach(obra => {
-                    const option = document.createElement('option');
-                    option.value = obra.id;
-                    option.textContent = obra.nome;
-                    option.selected = (obra.id == registro.obra_id);
-                    obraEl.appendChild(option);
-                });
-                console.log('Obras carregadas, obra selecionada:', registro.obra_id);
-            }
-            
-            // Preencher horários
-            const entradaEl = document.getElementById('hora_entrada_ponto');
-            const saidaEl = document.getElementById('hora_saida_ponto');
-            const almocoSaidaEl = document.getElementById('hora_almoco_saida_ponto');
-            const almocoRetornoEl = document.getElementById('hora_almoco_retorno_ponto');
-            const percentualEl = document.getElementById('percentual_extras');
-            const observacoesEl = document.getElementById('observacoes_ponto');
-            
-            if (entradaEl) entradaEl.value = registro.hora_entrada || '';
-            if (saidaEl) saidaEl.value = registro.hora_saida || '';
-            if (almocoSaidaEl) almocoSaidaEl.value = registro.hora_almoco_saida || '';
-            if (almocoRetornoEl) almocoRetornoEl.value = registro.hora_almoco_retorno || '';
-            if (percentualEl) percentualEl.value = registro.percentual_extras || 0;
-            if (observacoesEl) observacoesEl.value = registro.observacoes || '';
-            
-            // Alterar o título do modal
-            const titulo = document.querySelector('#pontoModal .modal-title');
-            if (titulo) {
-                titulo.innerHTML = `<i class="fas fa-edit"></i> Editar: ${registro.funcionario_nome}`;
-            }
-            
-            // Configurar campo hidden com ID do registro
-            let hiddenId = document.getElementById('registro_id_ponto');
-            if (hiddenId) {
-                hiddenId.value = id;
-            } else {
-                console.error('Campo registro_id_ponto não encontrado');
-            }
-            
-            // Ajustar visibilidade dos campos baseado no tipo
-            if (typeof alterarTipoLancamento === 'function') {
-                alterarTipoLancamento();
-            }
-            
-            // Abrir modal usando múltiplas tentativas
-            const modalElement = document.getElementById('pontoModal');
-            if (modalElement) {
-                console.log('✅ Modal encontrado, abrindo...');
-                
-                try {
-                    // Tentar Bootstrap 5
-                    if (typeof bootstrap !== 'undefined' && bootstrap.Modal) {
-                        const modal = new bootstrap.Modal(modalElement);
-                        modal.show();
-                        console.log('✅ Modal aberto com Bootstrap 5');
-                    }
-                    // Fallback para jQuery
-                    else if (typeof $ !== 'undefined') {
-                        $('#pontoModal').modal('show');
-                        console.log('✅ Modal aberto com jQuery');
-                    }
-                    // Fallback manual
-                    else {
-                        modalElement.classList.add('show');
-                        modalElement.style.display = 'block';
-                        modalElement.setAttribute('aria-modal', 'true');
-                        modalElement.removeAttribute('aria-hidden');
-                        console.log('✅ Modal aberto manualmente');
-                    }
-                } catch (e) {
-                    console.error('❌ Erro ao abrir modal:', e);
-                    alert('Erro ao abrir modal de edição');
-                }
-            } else {
-                console.error('❌ Modal pontoModal não encontrado no DOM');
-                alert('Erro: Modal não encontrado');
-            }
-        })
-        .catch(error => {
-            console.error('❌ Erro ao carregar registro:', error);
-            alert('Erro ao carregar dados do registro: ' + error.message);
-            
-            // Mostrar detalhes do erro
-            if (error.message.includes('Cannot read properties of null')) {
-                alert('Erro: Dados do registro não puderam ser carregados. Verifique se o registro existe.');
-            } else {
-                alert('Erro ao carregar dados do registro: ' + error.message);
-            }
+    // Buscar dados completos do registro
+    fetch(`/ponto/registro/${id}`, {
+        method: 'GET',
+        headers: {
+            'Content-Type': 'application/json'
+        }
+    })
+    .then(response => {
+        if (!response.ok) {
+            throw new Error(`Erro HTTP: ${response.status}`);
+        }
+        return response.json();
+    })
+    .then(data => {
+        if (!data.success) {
+            throw new Error(data.error || 'Erro ao carregar dados');
+        }
+        
+        console.log('✅ Dados carregados:', data);
+        preencherModalEdicao(data, id);
+        abrirModalEdicao();
+    })
+    .catch(error => {
+        console.error('❌ Erro ao carregar registro:', error);
+        mostrarErro('Erro ao carregar dados: ' + error.message);
+    });
+}
+
+function preencherModalEdicao(data, registroId) {
+    const registro = data.registro;
+    
+    // Limpar formulário
+    const form = document.getElementById('pontoForm');
+    if (form) form.reset();
+    
+    // Configurar modo edição
+    const hiddenId = document.getElementById('registro_id_ponto');
+    if (hiddenId) {
+        hiddenId.value = registroId;
+    }
+    
+    // Preencher dados básicos
+    preencherCampo('data_ponto', registro.data);
+    preencherCampo('tipo_lancamento', registro.tipo_registro);
+    preencherCampo('observacoes_ponto', registro.observacoes);
+    
+    // Preencher horários usando nova estrutura
+    if (registro.horarios) {
+        preencherCampo('hora_entrada_ponto', registro.horarios.hora_entrada);
+        preencherCampo('hora_saida_ponto', registro.horarios.hora_saida);
+        preencherCampo('hora_almoco_saida_ponto', registro.horarios.hora_almoco_saida);
+        preencherCampo('hora_almoco_retorno_ponto', registro.horarios.hora_almoco_retorno);
+    }
+    
+    // Preencher percentual se disponível
+    if (registro.valores_calculados) {
+        preencherCampo('percentual_extras', registro.valores_calculados.percentual_extras);
+    }
+    
+    // Preencher dropdown de obras
+    preencherDropdownObras(data.obras_disponiveis, registro.obra_id);
+    
+    // Atualizar título do modal
+    atualizarTituloModal(registro);
+    
+    // Ajustar visibilidade dos campos
+    if (typeof alterarTipoLancamento === 'function') {
+        alterarTipoLancamento();
+    }
+    
+    // Mostrar informações de debug
+    mostrarInfoDebug(registro);
+}
+
+function preencherCampo(id, valor) {
+    const elemento = document.getElementById(id);
+    if (elemento && valor !== null && valor !== undefined) {
+        elemento.value = valor;
+        console.log(`Campo ${id} preenchido:`, valor);
+    }
+}
+
+function preencherDropdownObras(obras, obraIdSelecionada) {
+    const obraEl = document.getElementById('obra_id_ponto');
+    if (!obraEl || !obras) return;
+    
+    obraEl.innerHTML = '<option value="">Selecione uma obra...</option>';
+    obras.forEach(obra => {
+        const option = document.createElement('option');
+        option.value = obra.id;
+        option.textContent = obra.nome;
+        option.selected = (obra.id == obraIdSelecionada);
+        obraEl.appendChild(option);
+    });
+    
+    console.log('Obras carregadas:', obras.length);
+}
+
+function atualizarTituloModal(registro) {
+    const titulo = document.querySelector('#pontoModal .modal-title');
+    if (titulo && registro.funcionario) {
+        titulo.innerHTML = `<i class="fas fa-edit"></i> Editar: ${registro.funcionario.nome} - ${registro.data_formatada}`;
+    }
+}
+
+function mostrarInfoDebug(registro) {
+    if (registro.valores_calculados) {
+        console.log('📊 Valores calculados:', {
+            horas_trabalhadas: registro.valores_calculados.horas_trabalhadas,
+            horas_extras: registro.valores_calculados.horas_extras,
+            atraso_horas: registro.valores_calculados.total_atraso_horas,
+            percentual_extras: registro.valores_calculados.percentual_extras
         });
+    }
+}
+
+function abrirModalEdicao() {
+    const modalElement = document.getElementById('pontoModal');
+    if (!modalElement) {
+        mostrarErro('Modal não encontrado');
+        return;
+    }
+    
+    try {
+        if (typeof bootstrap !== 'undefined' && bootstrap.Modal) {
+            const modal = new bootstrap.Modal(modalElement);
+            modal.show();
+            console.log('✅ Modal aberto com Bootstrap 5');
+        } else if (typeof $ !== 'undefined') {
+            $('#pontoModal').modal('show');
+            console.log('✅ Modal aberto com jQuery');
+        } else {
+            // Fallback manual
+            modalElement.classList.add('show');
+            modalElement.style.display = 'block';
+            modalElement.setAttribute('aria-modal', 'true');
+            modalElement.removeAttribute('aria-hidden');
+            console.log('✅ Modal aberto manualmente');
+        }
+    } catch (e) {
+        console.error('❌ Erro ao abrir modal:', e);
+        mostrarErro('Erro ao abrir modal de edição');
+    }
+}
+
+function mostrarErro(mensagem) {
+    // Usar toast se disponível, senão alert
+    if (typeof showToast === 'function') {
+        showToast(mensagem, 'error');
+    } else {
+        alert(mensagem);
+    }
+}
+
+function mostrarSucesso(mensagem) {
+    if (typeof showToast === 'function') {
+        showToast(mensagem, 'success');
+    } else {
+        alert(mensagem);
+    }
 }
 
 function excluirPonto(id) {
@@ -2119,6 +2141,183 @@ document.addEventListener('DOMContentLoaded', function() {
         $('#pontoTable').on('draw.dt', function() {
             setTimeout(aplicarTagsVisuais, 100);
         });
+    }
+    
+    // Sistema moderno de salvamento com validações
+    function salvarPonto(event) {
+        event.preventDefault();
+        
+        const form = document.getElementById('pontoForm');
+        const registroId = document.getElementById('registro_id_ponto')?.value;
+        const isEdicao = registroId && registroId !== '';
+        
+        console.log(`💾 Salvando registro (${isEdicao ? 'edição' : 'novo'}):`, registroId);
+        
+        // Coletar dados do formulário
+        const dadosFormulario = coletarDadosFormulario(form);
+        
+        // Validar dados antes do envio
+        const validacao = validarDadosFormulario(dadosFormulario);
+        if (!validacao.valido) {
+            mostrarErro('Erro de validação: ' + validacao.erro);
+            return false;
+        }
+        
+        // Mostrar loading
+        mostrarLoading(true);
+        
+        // Determinar método e URL
+        const url = isEdicao ? `/ponto/registro/${registroId}` : '/novo-ponto';
+        const method = isEdicao ? 'PUT' : 'POST';
+        
+        console.log('📤 Enviando dados:', dadosFormulario);
+        
+        // Enviar requisição
+        fetch(url, {
+            method: method,
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(dadosFormulario)
+        })
+        .then(response => {
+            if (!response.ok) {
+                throw new Error(`Erro HTTP: ${response.status}`);
+            }
+            return response.json();
+        })
+        .then(data => {
+            mostrarLoading(false);
+            
+            if (data.success) {
+                mostrarSucesso(data.message || `Registro ${isEdicao ? 'atualizado' : 'criado'} com sucesso!`);
+                
+                // Fechar modal
+                fecharModalPonto();
+                
+                // Recarregar página para mostrar mudanças
+                setTimeout(() => location.reload(), 1000);
+            } else {
+                throw new Error(data.error || 'Erro desconhecido');
+            }
+        })
+        .catch(error => {
+            mostrarLoading(false);
+            console.error('❌ Erro ao salvar:', error);
+            mostrarErro('Erro ao salvar: ' + error.message);
+        });
+        
+        return false;
+    }
+
+    function coletarDadosFormulario(form) {
+        const dados = {};
+        const formData = new FormData(form);
+        
+        // Coletar todos os campos
+        for (let [key, value] of formData.entries()) {
+            // Mapear nomes de campos do formulário para API
+            switch(key) {
+                case 'tipo_lancamento':
+                    dados.tipo_registro = value;
+                    break;
+                case 'obra_id_ponto':
+                    dados.obra_id = value ? parseInt(value) : null;
+                    break;
+                case 'observacoes_ponto':
+                    dados.observacoes = value;
+                    break;
+                default:
+                    dados[key] = value;
+            }
+        }
+        
+        return dados;
+    }
+
+    function validarDadosFormulario(dados) {
+        const erros = [];
+        
+        // Validar tipo de registro
+        if (!dados.tipo_registro) {
+            erros.push('Tipo de registro é obrigatório');
+        }
+        
+        // Validar data
+        if (!dados.data) {
+            erros.push('Data é obrigatória');
+        }
+        
+        // Validar horários para tipos que trabalham
+        const tiposQueTrabalham = [
+            'trabalho_normal', 'sabado_trabalhado', 'domingo_trabalhado', 
+            'feriado_trabalhado', 'meio_periodo'
+        ];
+        
+        if (tiposQueTrabalham.includes(dados.tipo_registro)) {
+            if (!dados.hora_entrada) {
+                erros.push('Horário de entrada é obrigatório');
+            }
+            if (!dados.hora_saida) {
+                erros.push('Horário de saída é obrigatório');
+            }
+            
+            // Validar formato de horários
+            const horariosParaValidar = [
+                'hora_entrada', 'hora_saida', 'hora_almoco_saida', 'hora_almoco_retorno'
+            ];
+            
+            horariosParaValidar.forEach(campo => {
+                const valor = dados[campo];
+                if (valor && !validarFormatoHorario(valor)) {
+                    erros.push(`Formato inválido para ${campo.replace('_', ' ')}`);
+                }
+            });
+        }
+        
+        return {
+            valido: erros.length === 0,
+            erro: erros.join('; ')
+        };
+    }
+
+    function validarFormatoHorario(horario) {
+        const regex = /^([01]?[0-9]|2[0-3]):[0-5][0-9]$/;
+        return regex.test(horario);
+    }
+
+    function mostrarLoading(mostrar) {
+        const botaoSalvar = document.querySelector('#pontoModal .btn-primary[type="submit"]');
+        if (botaoSalvar) {
+            if (mostrar) {
+                botaoSalvar.disabled = true;
+                botaoSalvar.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Salvando...';
+            } else {
+                botaoSalvar.disabled = false;
+                botaoSalvar.innerHTML = '<i class="fas fa-save"></i> Salvar';
+            }
+        }
+    }
+
+    function fecharModalPonto() {
+        const modalElement = document.getElementById('pontoModal');
+        if (modalElement) {
+            try {
+                if (typeof bootstrap !== 'undefined' && bootstrap.Modal) {
+                    const modal = bootstrap.Modal.getInstance(modalElement);
+                    if (modal) modal.hide();
+                } else if (typeof $ !== 'undefined') {
+                    $('#pontoModal').modal('hide');
+                } else {
+                    modalElement.classList.remove('show');
+                    modalElement.style.display = 'none';
+                    modalElement.removeAttribute('aria-modal');
+                    modalElement.setAttribute('aria-hidden', 'true');
+                }
+            } catch (e) {
+                console.error('Erro ao fechar modal:', e);
+            }
+        }
     }
 });
 
