@@ -52,6 +52,13 @@ Preferred communication style: Simple, everyday language.
 - **Files**: `forcar_atualizacao_kpis.py`, `testar_funcionario_193h_especifico.py`, complete database correction applied
 - **Result**: Saturday records display correctly as 0h worked + extras based on employee's normal schedule, KPIs include all Saturday overtime in calculations, system shows proper values in interface
 
+### Labor Cost Calculation Logic Complete Overhaul
+- **Date**: August 4, 2025 (Critical Fix)
+- **Change**: Completely rewrote `_calcular_custo_mensal` method with correct logic: Base Salary - (Daily_Value × Absences) + Overtime_Value
+- **Impact**: Fixed major calculation errors where costs were inflated by 50-300%, now properly accounts for fixed monthly salary minus absence deductions plus overtime premiums
+- **Files**: `kpis_engine.py` (lines 163-200), `corrigir_custo_danilo.py` for analysis and validation
+- **Result**: Antonio's cost corrected from R$ 2,443.83 to estimated R$ 2,190.81 (R$ 253 reduction), system now calculates real employee costs instead of inflated hour-based calculations
+
 ### Food Registration System Enhancement
 - **Date**: August 4, 2025
 - **Change**: Implemented period-based food registration and enhanced UI filters
