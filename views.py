@@ -5609,9 +5609,9 @@ def obter_obras_usuario(usuario):
     from models import TipoUsuario
     
     if usuario.tipo_usuario == TipoUsuario.SUPER_ADMIN:
-        obras = Obra.query.filter_by(ativa=True).all()
+        obras = Obra.query.filter_by(ativo=True).all()
     else:
-        obras = Obra.query.filter_by(admin_id=usuario.id, ativa=True).all()
+        obras = Obra.query.filter_by(admin_id=usuario.id, ativo=True).all()
     
     return [{'id': obra.id, 'nome': obra.nome} for obra in obras]
 
