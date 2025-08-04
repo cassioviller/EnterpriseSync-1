@@ -725,6 +725,7 @@
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
             <form method="POST" id="pontoForm" action="{{ url_for('main.novo_ponto') }}" onsubmit="return salvarPonto(event)">
+                <input type="hidden" id="registro_id_ponto" name="registro_id_ponto" value="">
                 <div class="modal-body">
                     <input type="hidden" id="funcionario_id" name="funcionario_id" value="{{ funcionario.id }}">
                     
@@ -1643,8 +1644,18 @@ function salvarPonto(event) {
         body: formData
     })
     .then(response => {
-        if (!response.ok) throw new Error('Erro na requisição');
-        return response.json();
+        // Verificar se a resposta é HTML (erro de redirecionamento) ou JSON
+        return response.text().then(text => {
+            if (text.trim().startsWith('<!DOCTYPE') || text.trim().startsWith('<html')) {
+                throw new Error('Erro de autenticação ou servidor - resposta HTML recebida');
+            }
+            try {
+                return JSON.parse(text);
+            } catch (e) {
+                console.error('Resposta não é JSON válido:', text);
+                throw new Error('Resposta inválida do servidor');
+            }
+        });
     })
     .then(data => {
         if (data.success) {

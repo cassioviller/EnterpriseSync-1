@@ -915,16 +915,29 @@ def editar_funcionario(id):
     return redirect(url_for('main.funcionario_perfil', id=id, edit=1))
 
 @main_bp.route('/funcionarios/ponto/novo', methods=['POST'])
+@main_bp.route('/novo-ponto', methods=['POST'])
 @login_required
 def novo_ponto():
-    """Criar novo registro de ponto com suporte a tipos de lançamento"""
+    """Criar novo registro de ponto com suporte a tipos de lançamento e resposta JSON"""
     try:
-        funcionario_id = request.form.get('funcionario_id')
-        data = datetime.strptime(request.form.get('data'), '%Y-%m-%d').date()
-        tipo_lancamento = request.form.get('tipo_lancamento')
-        obra_id = request.form.get('obra_id') if request.form.get('obra_id') else None
-        percentual_extras = float(request.form.get('percentual_extras', 0)) if request.form.get('percentual_extras') else 0.0
-        observacoes = request.form.get('observacoes', '')
+        # Suporte para dados JSON ou form
+        if request.is_json:
+            data_source = request.json
+        else:
+            data_source = request.form
+        
+        funcionario_id = data_source.get('funcionario_id')
+        data_str = data_source.get('data_ponto') or data_source.get('data')
+        data = datetime.strptime(data_str, '%Y-%m-%d').date()
+        tipo_lancamento = data_source.get('tipo_lancamento', 'trabalhado')
+        obra_id = data_source.get('obra_id_ponto') or data_source.get('obra_id') or None
+        percentual_extras = float(data_source.get('percentual_extras', 0)) if data_source.get('percentual_extras') else 0.0
+        observacoes = data_source.get('observacoes_ponto') or data_source.get('observacoes', '')
+        
+        if obra_id == '':
+            obra_id = None
+        elif obra_id:
+            obra_id = int(obra_id)
         
         # Verificar se já existe registro para esta data
         registro_existente = RegistroPonto.query.filter_by(
@@ -933,12 +946,11 @@ def novo_ponto():
         ).first()
         
         if registro_existente:
-            flash('Já existe um registro de ponto para esta data.', 'error')
-            return redirect(request.referrer or url_for('main.funcionario_perfil', id=funcionario_id))
+            return jsonify({'error': 'Já existe um registro de ponto para esta data.'}), 400
         
         # Criar registro baseado no tipo de lançamento
         registro = RegistroPonto(
-            funcionario_id=funcionario_id,
+            funcionario_id=int(funcionario_id),
             obra_id=obra_id,
             data=data,
             observacoes=observacoes,
@@ -946,39 +958,27 @@ def novo_ponto():
             percentual_extras=percentual_extras
         )
         
-        if tipo_lancamento == 'trabalhado':
-            # Registro normal de trabalho
-            registro.hora_entrada = datetime.strptime(request.form.get('hora_entrada'), '%H:%M').time() if request.form.get('hora_entrada') else None
-            registro.hora_saida = datetime.strptime(request.form.get('hora_saida'), '%H:%M').time() if request.form.get('hora_saida') else None
-            registro.hora_almoco_saida = datetime.strptime(request.form.get('hora_almoco_saida'), '%H:%M').time() if request.form.get('hora_almoco_saida') else None
-            registro.hora_almoco_retorno = datetime.strptime(request.form.get('hora_almoco_retorno'), '%H:%M').time() if request.form.get('hora_almoco_retorno') else None
+        # Adicionar horários se não for falta ou feriado
+        if tipo_lancamento not in ['falta', 'falta_justificada', 'feriado']:
+            entrada = data_source.get('hora_entrada_ponto') or data_source.get('hora_entrada')
+            saida_almoco = data_source.get('hora_almoco_saida_ponto') or data_source.get('hora_almoco_saida')
+            retorno_almoco = data_source.get('hora_almoco_retorno_ponto') or data_source.get('hora_almoco_retorno')
+            saida = data_source.get('hora_saida_ponto') or data_source.get('hora_saida')
             
-        elif tipo_lancamento == 'feriado_trabalhado':
-            # Trabalho em feriado = 100% extra
-            registro.hora_entrada = datetime.strptime(request.form.get('hora_entrada'), '%H:%M').time() if request.form.get('hora_entrada') else None
-            registro.hora_saida = datetime.strptime(request.form.get('hora_saida'), '%H:%M').time() if request.form.get('hora_saida') else None
-            registro.hora_almoco_saida = datetime.strptime(request.form.get('hora_almoco_saida'), '%H:%M').time() if request.form.get('hora_almoco_saida') else None
-            registro.hora_almoco_retorno = datetime.strptime(request.form.get('hora_almoco_retorno'), '%H:%M').time() if request.form.get('hora_almoco_retorno') else None
-            # Marcar como feriado trabalhado para cálculo especial
-            registro.observacoes = f"FERIADO_TRABALHADO: {observacoes}"
-            
-        elif tipo_lancamento in ['sabado_horas_extras', 'domingo_horas_extras']:
-            # Trabalho em fim de semana com horas extras
-            registro.hora_entrada = datetime.strptime(request.form.get('hora_entrada'), '%H:%M').time() if request.form.get('hora_entrada') else None
-            registro.hora_saida = datetime.strptime(request.form.get('hora_saida'), '%H:%M').time() if request.form.get('hora_saida') else None
-            registro.hora_almoco_saida = datetime.strptime(request.form.get('hora_almoco_saida'), '%H:%M').time() if request.form.get('hora_almoco_saida') else None
-            registro.hora_almoco_retorno = datetime.strptime(request.form.get('hora_almoco_retorno'), '%H:%M').time() if request.form.get('hora_almoco_retorno') else None
-            
-            # Marcar tipo específico para cálculo com percentual configurado
-            percentual_info = f" (Extra: {percentual_extras}%)" if percentual_extras > 0 else ""
-            registro.observacoes = f"{tipo_lancamento.upper()}{percentual_info}: {observacoes}"
-            
-        elif tipo_lancamento in ['falta', 'falta_justificada', 'feriado']:
-            # Tipos sem horários - apenas marcação
-            registro.observacoes = f"{tipo_lancamento.upper()}: {observacoes}"
-            
-            # Para falta justificada, apenas registrar o ponto (sem criar ocorrência)
-            # Ocorrências serão gerenciadas separadamente se necessário
+            if entrada:
+                registro.hora_entrada = datetime.strptime(entrada, '%H:%M').time()
+            if saida_almoco:
+                registro.hora_almoco_saida = datetime.strptime(saida_almoco, '%H:%M').time()
+            if retorno_almoco:
+                registro.hora_almoco_retorno = datetime.strptime(retorno_almoco, '%H:%M').time()
+            if saida:
+                registro.hora_saida = datetime.strptime(saida, '%H:%M').time()
+        
+        # Percentual de extras baseado no tipo
+        if tipo_lancamento == 'sabado_horas_extras':
+            registro.percentual_extras = 50.0
+        elif tipo_lancamento in ['domingo_horas_extras', 'feriado_trabalhado']:
+            registro.percentual_extras = 100.0
         
         db.session.add(registro)
         db.session.commit()
@@ -991,13 +991,14 @@ def novo_ponto():
             # KPIs engine não disponível, continuar sem erro
             pass
         
-        flash(f'Registro de ponto ({tipo_lancamento}) criado com sucesso!', 'success')
-        return redirect(request.referrer or url_for('main.funcionario_perfil', id=funcionario_id))
+        return jsonify({'success': True, 'message': f'Registro de ponto ({tipo_lancamento}) criado com sucesso!'})
         
     except Exception as e:
         db.session.rollback()
-        flash(f'Erro ao criar registro de ponto: {str(e)}', 'error')
-        return redirect(request.referrer or url_for('main.funcionarios'))
+        print(f"❌ Erro ao criar registro: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
 
 @main_bp.route('/funcionarios/<int:funcionario_id>/horario-padrao')
 @login_required 
