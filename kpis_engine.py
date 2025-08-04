@@ -126,13 +126,12 @@ class KPIsEngine:
     
     def _calcular_horas_extras(self, funcionario_id, data_inicio, data_fim):
         """2. Horas Extras: Soma direta da coluna horas_extras do funcionário"""
-        # Soma simples e direta da coluna horas_extras
+        # Soma simples e direta da coluna horas_extras - SEM FILTRO > 0 que estava causando problema
         total = db.session.query(func.sum(RegistroPonto.horas_extras)).filter(
             RegistroPonto.funcionario_id == funcionario_id,
             RegistroPonto.data >= data_inicio,
             RegistroPonto.data <= data_fim,
-            RegistroPonto.horas_extras.isnot(None),
-            RegistroPonto.horas_extras > 0  # Apenas valores positivos
+            RegistroPonto.horas_extras.isnot(None)
         ).scalar()
         
         return total or 0.0
