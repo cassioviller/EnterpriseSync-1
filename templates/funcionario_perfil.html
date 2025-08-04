@@ -1677,30 +1677,56 @@ function salvarPonto(event) {
 function editarPonto(id) {
     console.log('🔧 Editando registro:', id);
     
-    // Buscar dados do registro
+    // Buscar dados do registro com melhor tratamento de erros
     fetch(`/ponto/registro/${id}`)
         .then(response => {
-            if (!response.ok) throw new Error('Erro ao carregar dados');
-            return response.json();
+            // Verificar se a resposta é HTML (erro de autenticação) ou JSON
+            return response.text().then(text => {
+                if (text.trim().startsWith('<!DOCTYPE') || text.trim().startsWith('<html')) {
+                    throw new Error('Erro de autenticação - faça login novamente');
+                }
+                try {
+                    return JSON.parse(text);
+                } catch (e) {
+                    console.error('Resposta não é JSON válido:', text);
+                    throw new Error('Erro no servidor ao carregar dados');
+                }
+            });
         })
         .then(data => {
-            console.log('Dados carregados:', data);
+            console.log('✅ Dados carregados:', data);
             
-            // Preencher o modal com os dados - verificar elementos principais
+            // Limpar formulário antes de preencher
+            const form = document.getElementById('pontoForm');
+            if (form) {
+                form.reset();
+            }
+            
+            // Preencher o modal com os dados - usando IDs corretos
             const dataEl = document.getElementById('data_ponto');
             const tipoEl = document.getElementById('tipo_lancamento');
             const obraEl = document.getElementById('obra_id_ponto');
             
-            if (dataEl) dataEl.value = data.data;
-            if (tipoEl) tipoEl.value = data.tipo_registro;
-            if (obraEl) obraEl.value = data.obra_id || '';
-            // Verificar se os elementos existem antes de definir valores
+            if (dataEl) {
+                dataEl.value = data.data;
+                console.log('Data definida:', data.data);
+            }
+            if (tipoEl) {
+                tipoEl.value = data.tipo_registro;
+                console.log('Tipo definido:', data.tipo_registro);
+            }
+            if (obraEl) {
+                obraEl.value = data.obra_id || '';
+                console.log('Obra definida:', data.obra_id);
+            }
+            
+            // Preencher horários
             const entradaEl = document.getElementById('hora_entrada_ponto');
             const saidaEl = document.getElementById('hora_saida_ponto');
             const almocoSaidaEl = document.getElementById('hora_almoco_saida_ponto');
             const almocoRetornoEl = document.getElementById('hora_almoco_retorno_ponto');
             const percentualEl = document.getElementById('percentual_extras');
-            const observacoesEl = document.getElementById('observacoes');
+            const observacoesEl = document.getElementById('observacoes_ponto');
             
             if (entradaEl) entradaEl.value = data.entrada || '';
             if (saidaEl) saidaEl.value = data.saida || '';
@@ -1710,38 +1736,61 @@ function editarPonto(id) {
             if (observacoesEl) observacoesEl.value = data.observacoes || '';
             
             // Alterar o título do modal
-            document.querySelector('#pontoModal .modal-title').innerHTML = '<i class="fas fa-edit"></i> Editar Registro de Ponto';
-            
-            // Adicionar campo hidden com ID do registro
-            let formPonto = document.getElementById('pontoForm');
-            let hiddenId = document.getElementById('registro_id_ponto');
-            if (!hiddenId) {
-                hiddenId = document.createElement('input');
-                hiddenId.type = 'hidden';
-                hiddenId.id = 'registro_id_ponto';
-                hiddenId.name = 'registro_id';
-                formPonto.appendChild(hiddenId);
+            const titulo = document.querySelector('#pontoModal .modal-title');
+            if (titulo) {
+                titulo.innerHTML = '<i class="fas fa-edit"></i> Editar Registro de Ponto';
             }
-            hiddenId.value = id;
             
-            // Configurar modo de edição
-            formPonto.setAttribute('data-modo', 'edicao');
+            // Configurar campo hidden com ID do registro
+            let hiddenId = document.getElementById('registro_id_ponto');
+            if (hiddenId) {
+                hiddenId.value = id;
+            } else {
+                console.error('Campo registro_id_ponto não encontrado');
+            }
             
             // Ajustar visibilidade dos campos baseado no tipo
-            alterarTipoLancamento();
+            if (typeof alterarTipoLancamento === 'function') {
+                alterarTipoLancamento();
+            }
             
-            // Abrir modal com verificação
+            // Abrir modal usando múltiplas tentativas
             const modalElement = document.getElementById('pontoModal');
             if (modalElement) {
-                const modal = new bootstrap.Modal(modalElement);
-                modal.show();
+                console.log('✅ Modal encontrado, abrindo...');
+                
+                try {
+                    // Tentar Bootstrap 5
+                    if (typeof bootstrap !== 'undefined' && bootstrap.Modal) {
+                        const modal = new bootstrap.Modal(modalElement);
+                        modal.show();
+                        console.log('✅ Modal aberto com Bootstrap 5');
+                    }
+                    // Fallback para jQuery
+                    else if (typeof $ !== 'undefined') {
+                        $('#pontoModal').modal('show');
+                        console.log('✅ Modal aberto com jQuery');
+                    }
+                    // Fallback manual
+                    else {
+                        modalElement.classList.add('show');
+                        modalElement.style.display = 'block';
+                        modalElement.setAttribute('aria-modal', 'true');
+                        modalElement.removeAttribute('aria-hidden');
+                        console.log('✅ Modal aberto manualmente');
+                    }
+                } catch (e) {
+                    console.error('❌ Erro ao abrir modal:', e);
+                    alert('Erro ao abrir modal de edição');
+                }
             } else {
-                console.error('Modal pontoModal não encontrado');
+                console.error('❌ Modal pontoModal não encontrado no DOM');
                 alert('Erro: Modal não encontrado');
             }
         })
         .catch(error => {
-            console.error('Erro ao carregar registro:', error);
+            console.error('❌ Erro ao carregar registro:', error);
+            alert('Erro ao carregar dados do registro: ' + error.message);
             
             // Mostrar detalhes do erro
             if (error.message.includes('Cannot read properties of null')) {

@@ -5416,18 +5416,22 @@ def criar_registro_ponto():
 @main_bp.route('/ponto/registro/<int:registro_id>', methods=['GET'])
 @login_required
 def obter_registro_ponto(registro_id):
-    """Obter dados de um registro de ponto com verificação de acesso"""
+    """Obter dados de um registro de ponto para edição"""
     try:
-        # Buscar registro sem restrições para permitir edição via interface
+        print(f"🔍 Buscando registro {registro_id} para usuário {current_user.id}")
+        
+        # Buscar registro sem restrições de usuário para permitir edição via interface
         registro = RegistroPonto.query.get(registro_id)
         
         if not registro:
-            print(f"❌ Registro {registro_id} não encontrado para usuário {current_user.id}")
-            return jsonify({'error': 'Registro não encontrado'}), 404
+            print(f"❌ Registro {registro_id} não encontrado")
+            return jsonify({'error': 'Dados do registro não puderam ser carregados. Verifique se o registro existe.'}), 404
         
-        print(f"✅ Registro {registro_id} encontrado: {registro.data}")
+        print(f"✅ Registro {registro_id} encontrado: {registro.data} - {registro.tipo_registro}")
         
+        # Retornar dados em formato JSON compatível com o frontend
         return jsonify({
+            'success': True,
             'id': registro.id,
             'funcionario_id': registro.funcionario_id,
             'data': registro.data.strftime('%Y-%m-%d') if registro.data else '',
@@ -5439,9 +5443,10 @@ def obter_registro_ponto(registro_id):
             'horas_trabalhadas': float(registro.horas_trabalhadas) if registro.horas_trabalhadas else 0,
             'horas_extras': float(registro.horas_extras) if registro.horas_extras else 0,
             'percentual_extras': float(registro.percentual_extras) if registro.percentual_extras else 0,
-            'obra_id': registro.obra_id,
+            'obra_id': registro.obra_id or '',
             'observacoes': registro.observacoes or ''
         })
+        
     except Exception as e:
         print(f"❌ Erro ao obter registro {registro_id}: {e}")
         import traceback
