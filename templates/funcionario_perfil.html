@@ -1772,7 +1772,14 @@ function preencherModalEdicao(data, registroId) {
     // Atualizar título do modal com dados específicos
     atualizarTituloModal(registro);
     
-    // Ajustar visibilidade dos campos
+    // Garantir que campos de horário sejam visíveis para edição
+    const camposHorario = document.getElementById('campos_horario');
+    if (camposHorario) {
+        camposHorario.style.display = 'block';
+        console.log('✅ Campos de horário tornados visíveis');
+    }
+    
+    // Ajustar visibilidade dos campos baseado no tipo
     if (typeof alterarTipoLancamento === 'function') {
         alterarTipoLancamento();
     }
@@ -2044,7 +2051,7 @@ $(document).ready(function() {
             document.getElementById('data_ponto').value = today;
             
             // Esconder campos de horário inicialmente
-            const camposHorarioElement = document.getElementById('camposHorario');
+            const camposHorarioElement = document.getElementById('campos_horario');
             const btnHorarioPadraoElement = document.getElementById('btnHorarioPadrao');
             if (camposHorarioElement) camposHorarioElement.style.display = 'none';
             if (btnHorarioPadraoElement) btnHorarioPadraoElement.style.display = 'none';
@@ -2053,7 +2060,7 @@ $(document).ready(function() {
             const alertaTipo = document.getElementById('alertaTipoLancamento');
             if (alertaTipo) alertaTipo.style.display = 'none';
         } else {
-            console.log('🔄 Modal em modo edição - mantendo dados');
+            console.log('🔄 Modal em modo edição - mantendo dados preenchidos');
         }
     });
     
