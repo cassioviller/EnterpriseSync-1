@@ -724,7 +724,7 @@
                 <h5 class="modal-title" id="pontoModalLabel">Novo Registro de Ponto</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
-            <form method="POST" id="pontoForm" action="{{ url_for('main.novo_ponto') }}" onsubmit="return submeterFormularioPonto(event)">
+            <form method="POST" id="pontoForm" action="{{ url_for('main.novo_ponto') }}" onsubmit="return salvarPonto(event)">
                 <div class="modal-body">
                     <input type="hidden" id="funcionario_id" name="funcionario_id" value="{{ funcionario.id }}">
                     
@@ -1605,6 +1605,51 @@ function fecharModalPonto() {
             }
         }
     }
+}
+
+// Função para salvar ponto (novo ou edição)
+function salvarPonto(event) {
+    event.preventDefault();
+    
+    const form = document.getElementById('pontoForm');
+    const formData = new FormData(form);
+    const registroId = document.getElementById('registro_id_ponto')?.value;
+    
+    console.log('Salvando ponto:', registroId ? 'Edição' : 'Novo');
+    
+    // Se for edição, usar PUT/POST com ID
+    let url, method;
+    if (registroId) {
+        url = `/ponto/registro/${registroId}`;
+        method = 'POST'; // Usar POST pois HTML forms não suportam PUT nativamente
+    } else {
+        url = form.action;
+        method = 'POST';
+    }
+    
+    // Fazer a requisição
+    fetch(url, {
+        method: method,
+        body: formData
+    })
+    .then(response => {
+        if (!response.ok) throw new Error('Erro na requisição');
+        return response.json();
+    })
+    .then(data => {
+        if (data.success) {
+            alert(registroId ? 'Registro atualizado com sucesso!' : 'Registro criado com sucesso!');
+            location.reload(); // Recarregar a página para atualizar a tabela
+        } else {
+            throw new Error(data.error || 'Erro desconhecido');
+        }
+    })
+    .catch(error => {
+        console.error('Erro ao salvar:', error);
+        alert('Erro ao salvar registro: ' + error.message);
+    });
+    
+    return false; // Impedir submit normal do form
 }
 
 // Funções de edição e exclusão  
