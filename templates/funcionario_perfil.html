@@ -1296,6 +1296,16 @@ function alterarTipoLancamento() {
 }
 
 // Preencher horário padrão do funcionário
+// Função para corrigir imagem quebrada
+function corrigirImagemQuebrada(img) {
+    if (img.dataset.nome) {
+        img.src = criarAvatarSVG(img.dataset.nome, img.width || 120);
+        img.onerror = null; // Evitar loop infinito
+    } else {
+        img.src = '/static/images/default-avatar.svg';
+    }
+}
+
 function preencherHorarioPadrao() {
     const funcionarioId = document.getElementById('funcionario_id').value;
     

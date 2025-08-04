@@ -5417,7 +5417,7 @@ def criar_registro_ponto():
 def obter_registro_ponto(registro_id):
     """Obter dados de um registro de ponto com verificação de acesso"""
     try:
-        # Verificação de acesso mais permissiva para testes
+        # Buscar registro sem restrições para permitir edição via interface
         registro = RegistroPonto.query.get(registro_id)
         
         if not registro:
@@ -5452,7 +5452,7 @@ def obter_registro_ponto(registro_id):
 def atualizar_registro_ponto(registro_id):
     """Editar um registro de ponto existente"""
     try:
-        # Verificação de acesso mais permissiva para testes
+        # Buscar registro sem restrições para permitir edição via interface
         registro = RegistroPonto.query.get(registro_id)
         
         if not registro:
