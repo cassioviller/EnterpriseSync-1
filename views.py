@@ -5526,10 +5526,10 @@ def serializar_registro_completo(registro, funcionario):
         'dia_semana': registro.data.strftime('%A'),
         'tipo_registro': tipo_frontend,
         'horarios': {
-            'hora_entrada': registro.hora_entrada.strftime('%H:%M') if registro.hora_entrada else '',
-            'hora_almoco_saida': registro.hora_almoco_saida.strftime('%H:%M') if registro.hora_almoco_saida else '',
-            'hora_almoco_retorno': registro.hora_almoco_retorno.strftime('%H:%M') if registro.hora_almoco_retorno else '',
-            'hora_saida': registro.hora_saida.strftime('%H:%M') if registro.hora_saida else ''
+            'entrada': registro.hora_entrada.strftime('%H:%M') if registro.hora_entrada else '',
+            'almoco_saida': registro.hora_almoco_saida.strftime('%H:%M') if registro.hora_almoco_saida else '',
+            'almoco_retorno': registro.hora_almoco_retorno.strftime('%H:%M') if registro.hora_almoco_retorno else '',
+            'saida': registro.hora_saida.strftime('%H:%M') if registro.hora_saida else ''
         },
         'valores_calculados': {
             'horas_trabalhadas': float(registro.horas_trabalhadas or 0),
@@ -5592,9 +5592,9 @@ def obter_horario_padrao_funcionario(funcionario):
 def obter_obras_usuario(usuario):
     """Retorna obras disponíveis para o usuário"""
     if usuario.tipo_usuario == 'SUPER_ADMIN':
-        obras = Obra.query.filter_by(ativo=True).all()
+        obras = Obra.query.filter_by(ativa=True).all()
     else:
-        obras = Obra.query.filter_by(admin_id=usuario.id, ativo=True).all()
+        obras = Obra.query.filter_by(admin_id=usuario.id, ativa=True).all()
     
     return [{'id': obra.id, 'nome': obra.nome} for obra in obras]
 

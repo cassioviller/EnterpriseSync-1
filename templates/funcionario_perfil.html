@@ -1709,10 +1709,10 @@ function preencherModalEdicao(data, registroId) {
     
     // Preencher horários usando nova estrutura
     if (registro.horarios) {
-        preencherCampo('hora_entrada_ponto', registro.horarios.hora_entrada);
-        preencherCampo('hora_saida_ponto', registro.horarios.hora_saida);
-        preencherCampo('hora_almoco_saida_ponto', registro.horarios.hora_almoco_saida);
-        preencherCampo('hora_almoco_retorno_ponto', registro.horarios.hora_almoco_retorno);
+        preencherCampo('hora_entrada_ponto', registro.horarios.entrada);
+        preencherCampo('hora_saida_ponto', registro.horarios.saida);
+        preencherCampo('hora_almoco_saida_ponto', registro.horarios.almoco_saida);
+        preencherCampo('hora_almoco_retorno_ponto', registro.horarios.almoco_retorno);
     }
     
     // Preencher percentual se disponível
@@ -1721,7 +1721,9 @@ function preencherModalEdicao(data, registroId) {
     }
     
     // Preencher dropdown de obras
-    preencherDropdownObras(data.obras_disponiveis, registro.obra_id);
+    if (data.obras_disponiveis) {
+        preencherDropdownObras(data.obras_disponiveis, registro.obra_id);
+    }
     
     // Atualizar título do modal
     atualizarTituloModal(registro);
