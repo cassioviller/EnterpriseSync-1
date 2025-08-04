@@ -168,20 +168,55 @@ def calcular_horas_por_tipo(funcionario, tipo_registro, horas_padrao):
     return horas_padrao
 
 def criar_ou_atualizar_registro(funcionario_id, data, tipo_registro, obra_id, horas_trabalhadas, observacoes):
-    """Cria ou atualiza registro de ponto"""
+    """Cria ou atualiza registro de ponto com lógica correta por tipo"""
     
     try:
+        funcionario = Funcionario.query.get(funcionario_id)
+        if not funcionario:
+            return {'erro': f'Funcionário {funcionario_id} não encontrado'}
+        
         # Verificar se já existe
         registro_existente = RegistroPonto.query.filter(
             RegistroPonto.funcionario_id == funcionario_id,
             RegistroPonto.data == data
         ).first()
         
+        # Mapear tipos novos para antigos no banco
+        tipo_banco = tipo_registro
+        if tipo_registro == 'trabalho_normal':
+            tipo_banco = 'trabalhado'
+        elif tipo_registro == 'sabado_trabalhado':
+            tipo_banco = 'sabado_horas_extras'
+        elif tipo_registro == 'domingo_trabalhado':
+            tipo_banco = 'domingo_horas_extras'
+        elif tipo_registro == 'feriado_folga':
+            tipo_banco = 'feriado'
+            
+        # Calcular horas extras baseado no tipo
+        horas_extras = 0.0
+        percentual_extras = 0.0
+        
+        # Para sábado/domingo/feriado trabalhado: TODAS as horas são extras
+        if tipo_registro in ['sabado_trabalhado', 'domingo_trabalhado', 'feriado_trabalhado']:
+            horas_extras = horas_trabalhadas
+            if tipo_registro == 'sabado_trabalhado':
+                percentual_extras = 50.0  # +50% para sábado
+            else:  # domingo_trabalhado, feriado_trabalhado
+                percentual_extras = 100.0  # +100% para domingo/feriado
+        elif tipo_registro == 'trabalho_normal' and horas_trabalhadas > 0:
+            # Para trabalho normal: apenas horas acima da jornada
+            horas_jornada = funcionario.horario_trabalho.horas_diarias if funcionario.horario_trabalho else 8.0
+            horas_extras = max(0, horas_trabalhadas - horas_jornada)
+            if horas_extras > 0:
+                percentual_extras = 50.0  # Padrão para horas extras normais
+        
         if registro_existente:
             # Atualizar existente
-            registro_existente.tipo_registro = tipo_registro
+            registro_existente.tipo_registro = tipo_banco
             registro_existente.obra_id = obra_id
             registro_existente.horas_trabalhadas = horas_trabalhadas
+            registro_existente.horas_extras = horas_extras
+            registro_existente.percentual_extras = percentual_extras
             registro_existente.observacoes = f"{observacoes} (atualizado)"
             
             return {'atualizado': True, 'registro_id': registro_existente.id}
@@ -191,9 +226,11 @@ def criar_ou_atualizar_registro(funcionario_id, data, tipo_registro, obra_id, ho
             novo_registro = RegistroPonto(
                 funcionario_id=funcionario_id,
                 data=data,
-                tipo_registro=tipo_registro,
+                tipo_registro=tipo_banco,
                 obra_id=obra_id,
                 horas_trabalhadas=horas_trabalhadas,
+                horas_extras=horas_extras,
+                percentual_extras=percentual_extras,
                 observacoes=observacoes
             )
             
