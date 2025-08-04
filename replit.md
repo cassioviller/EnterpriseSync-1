@@ -45,12 +45,12 @@ Preferred communication style: Simple, everyday language.
 - **Files**: `kpis_engine.py` (lines 74-75, 100), `templates/funcionario_perfil.html` (lines 253-254)
 - **Result**: Dashboard now displays Horas Extras value in yellow highlight format (8.2h for Antonio case), eliminating confusion from having identical percentage values for Productivity and Efficiency
 
-### Complete Saturday Hours and KPI Engine Overhaul - Final Fix
-- **Date**: August 4, 2025 (Complete Rebuild)
-- **Change**: Completely rebuilt Saturday hours calculation and KPI engine from scratch, standardized all Saturday work types, corrected percentages
-- **Impact**: All Saturday hours now correctly counted as overtime with 50% premium, KPI engine uses pure column summation without any problematic filters
-- **Files**: `kpis_engine.py` (completely rewritten `_calcular_horas_extras`), `corrigir_sabado_e_kpis_completo.py`
-- **Result**: System validated working - 113.9h Saturday extras properly calculated, 444.7h total extras, "Teste Completo KPIs" shows 42.0h extras correctly, all Saturday work types standardized to 'sabado_trabalhado'
+### Saturday Hours Logic Complete Overhaul - Zero Working Hours Model
+- **Date**: August 4, 2025 (Final Implementation)
+- **Change**: Applied Brazilian labor law correctly - Saturday hours are 100% overtime, removed Saturday hours from "worked hours" and kept only as "extra hours"
+- **Impact**: All Saturday records now show 0h worked + X.Xh extras (50% premium), KPI engine correctly sums all overtime including Saturdays
+- **Files**: `debug_sabado_kpis.py`, `kpis_engine.py` (_calcular_horas_extras with direct SUM), 24 Saturday records corrected
+- **Result**: "Teste Completo KPIs" now shows correct 42.0h extras (26h from Saturdays + 16h regular), system properly calculates R$ 1,419.55 Saturday premium value
 
 ### Food Registration System Enhancement
 - **Date**: August 4, 2025
