@@ -526,26 +526,26 @@ class KPIsEngine:
             horario_entrada = horario.entrada
             horario_saida = horario.saida
         
-        # Calcular atrasos APENAS para tipos normais (não para sábado/domingo/feriado)
+        # LÓGICA CORRIGIDA: Calcular atrasos APENAS para tipos normais
         minutos_atraso_entrada = 0
         minutos_atraso_saida = 0
         
         # Em sábado, domingo e feriado trabalhado não há conceito de atraso
         # pois toda hora trabalhada é considerada extra
         if registro.tipo_registro not in ['sabado_trabalhado', 'domingo_horas_extras', 'feriado_trabalhado']:
+            # ATRASO NA ENTRADA: sempre calcular se chegou após horário previsto
             if registro.hora_entrada and registro.hora_entrada > horario_entrada:
-                # Atraso na entrada
                 entrada_minutos = registro.hora_entrada.hour * 60 + registro.hora_entrada.minute
                 previsto_minutos = horario_entrada.hour * 60 + horario_entrada.minute
                 minutos_atraso_entrada = entrada_minutos - previsto_minutos
             
+            # SAÍDA ANTECIPADA: calcular se saiu antes do horário previsto
             if registro.hora_saida and registro.hora_saida < horario_saida:
-                # Saída antecipada
                 saida_minutos = registro.hora_saida.hour * 60 + registro.hora_saida.minute
                 previsto_minutos = horario_saida.hour * 60 + horario_saida.minute
                 minutos_atraso_saida = previsto_minutos - saida_minutos
         
-        # Atualizar campos de atraso
+        # SEMPRE atualizar campos de atraso (mesmo que zero)
         registro.minutos_atraso_entrada = minutos_atraso_entrada
         registro.minutos_atraso_saida = minutos_atraso_saida
         registro.total_atraso_minutos = minutos_atraso_entrada + minutos_atraso_saida
@@ -570,7 +570,7 @@ class KPIsEngine:
             total_minutos = saida_minutos - entrada_minutos - tempo_almoco
             registro.horas_trabalhadas = max(0, total_minutos / 60.0)
             
-            # CORREÇÃO CRÍTICA: Calcular horas extras baseado no tipo
+            # CORREÇÃO: Calcular horas extras independente de atrasos
             if registro.tipo_registro in ['sabado_trabalhado', 'domingo_horas_extras', 'feriado_trabalhado']:
                 # Para tipos especiais, TODAS as horas são extras
                 registro.horas_extras = registro.horas_trabalhadas
@@ -580,11 +580,24 @@ class KPIsEngine:
                 else:  # domingo_horas_extras, feriado_trabalhado
                     registro.percentual_extras = 100.0
             else:
-                # Para trabalho normal, apenas horas acima da jornada padrão
+                # LÓGICA CORRETA: Para trabalho normal, horas extras = tempo trabalhado ALÉM da jornada padrão
                 horas_jornada = funcionario.horario_trabalho.horas_diarias if funcionario.horario_trabalho else 8.0
-                registro.horas_extras = max(0, registro.horas_trabalhadas - horas_jornada)
-                if registro.horas_extras > 0:
-                    registro.percentual_extras = 50.0  # Padrão para horas extras normais
+                
+                # Calcular quanto tempo DEVERIA trabalhar vs quanto REALMENTE trabalhou
+                # Exemplo: Jornada 8h, trabalhou 8.5h, atraso 0.25h
+                # Horas extras = max(0, saída_real - saída_prevista) convertido em horas
+                
+                if registro.hora_saida and registro.hora_saida > horario_saida:
+                    # Saída após o horário = horas extras
+                    saida_real_min = registro.hora_saida.hour * 60 + registro.hora_saida.minute
+                    saida_prev_min = horario_saida.hour * 60 + horario_saida.minute
+                    minutos_extras = saida_real_min - saida_prev_min
+                    registro.horas_extras = max(0, minutos_extras / 60.0)
+                    if registro.horas_extras > 0:
+                        registro.percentual_extras = 50.0
+                else:
+                    registro.horas_extras = 0.0
+                    registro.percentual_extras = 0.0
         
         # Salvar alterações
         db.session.commit()
