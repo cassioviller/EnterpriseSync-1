@@ -5416,97 +5416,209 @@ def criar_registro_ponto():
 @main_bp.route('/ponto/registro/<int:registro_id>', methods=['GET'])
 @login_required
 def obter_registro_ponto(registro_id):
-    """Obter dados de um registro de ponto para edição"""
+    """Obter dados de um registro de ponto individual para edição"""
     try:
-        # Log para debug
-        print(f"🔍 Tentativa de buscar registro {registro_id}")
-        if current_user and hasattr(current_user, 'id'):
-            print(f"   Usuario: {current_user.id} - {current_user.email}")
-        else:
-            print(f"   Usuario não autenticado adequadamente")
+        print(f"🔍 Buscando registro {registro_id} para edição individual")
         
-        # Buscar registro
-        registro = RegistroPonto.query.get(registro_id)
+        # Buscar registro específico
+        registro = RegistroPonto.query.get_or_404(registro_id)
         
-        if not registro:
-            print(f"❌ Registro {registro_id} não encontrado")
-            return jsonify({'error': 'Dados do registro não puderam ser carregados. Verifique se o registro existe.'}), 404
+        # Buscar funcionário para contexto
+        funcionario = Funcionario.query.get(registro.funcionario_id)
+        if not funcionario:
+            return jsonify({'error': 'Funcionário não encontrado'}), 404
         
-        print(f"✅ Registro {registro_id} encontrado: {registro.data} - {registro.tipo_registro}")
+        print(f"✅ Registro encontrado: {funcionario.nome} - {registro.data} - {registro.tipo_registro}")
         
-        # Mapear tipos antigos para novos para compatibilidade
-        tipo_mapeado = registro.tipo_registro
-        if tipo_mapeado == 'trabalhado':
-            tipo_mapeado = 'trabalho_normal'
-        elif tipo_mapeado == 'sabado_horas_extras':
-            tipo_mapeado = 'sabado_trabalhado'
-        elif tipo_mapeado == 'domingo_horas_extras':
-            tipo_mapeado = 'domingo_trabalhado'
-        elif tipo_mapeado == 'feriado':
-            tipo_mapeado = 'feriado_folga'
+        # Mapear tipos do banco para o frontend
+        tipo_frontend = registro.tipo_registro
+        if tipo_frontend == 'trabalhado':
+            tipo_frontend = 'trabalho_normal'
+        elif tipo_frontend == 'sabado_horas_extras':
+            tipo_frontend = 'sabado_trabalhado'
+        elif tipo_frontend == 'domingo_horas_extras':
+            tipo_frontend = 'domingo_trabalhado'
+        elif tipo_frontend == 'feriado':
+            tipo_frontend = 'feriado_folga'
+        elif tipo_frontend == 'falta_justificada':
+            tipo_frontend = 'falta_justificada'
         
-        # Retornar dados em formato JSON compatível com o frontend
+        # Buscar todas as obras para dropdown
+        obras = Obra.query.filter_by(ativo=True).all()
+        
         response_data = {
             'success': True,
-            'id': registro.id,
-            'funcionario_id': registro.funcionario_id,
-            'data': registro.data.strftime('%Y-%m-%d') if registro.data else '',
-            'tipo_registro': tipo_mapeado,
-            'entrada': registro.hora_entrada.strftime('%H:%M') if registro.hora_entrada else '',
-            'saida_almoco': registro.hora_almoco_saida.strftime('%H:%M') if registro.hora_almoco_saida else '',
-            'retorno_almoco': registro.hora_almoco_retorno.strftime('%H:%M') if registro.hora_almoco_retorno else '',
-            'saida': registro.hora_saida.strftime('%H:%M') if registro.hora_saida else '',
-            'horas_trabalhadas': float(registro.horas_trabalhadas) if registro.horas_trabalhadas else 0,
-            'horas_extras': float(registro.horas_extras) if registro.horas_extras else 0,
-            'percentual_extras': float(registro.percentual_extras) if registro.percentual_extras else 0,
-            'obra_id': registro.obra_id or '',
-            'observacoes': registro.observacoes or ''
+            'registro': {
+                'id': registro.id,
+                'funcionario_id': registro.funcionario_id,
+                'funcionario_nome': funcionario.nome,
+                'data': registro.data.strftime('%Y-%m-%d'),
+                'tipo_registro': tipo_frontend,
+                'hora_entrada': registro.hora_entrada.strftime('%H:%M') if registro.hora_entrada else '',
+                'hora_almoco_saida': registro.hora_almoco_saida.strftime('%H:%M') if registro.hora_almoco_saida else '',
+                'hora_almoco_retorno': registro.hora_almoco_retorno.strftime('%H:%M') if registro.hora_almoco_retorno else '',
+                'hora_saida': registro.hora_saida.strftime('%H:%M') if registro.hora_saida else '',
+                'horas_trabalhadas': float(registro.horas_trabalhadas) if registro.horas_trabalhadas else 0,
+                'horas_extras': float(registro.horas_extras) if registro.horas_extras else 0,
+                'percentual_extras': float(registro.percentual_extras) if registro.percentual_extras else 0,
+                'obra_id': registro.obra_id or '',
+                'observacoes': registro.observacoes or ''
+            },
+            'obras_disponiveis': [{'id': obra.id, 'nome': obra.nome} for obra in obras]
         }
         
-        print(f"📤 Retornando dados: tipo={tipo_mapeado}, obra={registro.obra_id}")
         return jsonify(response_data)
         
     except Exception as e:
         print(f"❌ Erro ao obter registro {registro_id}: {e}")
         import traceback
         traceback.print_exc()
-        return jsonify({'error': f'Erro interno do servidor: {str(e)}'}), 500
+        return jsonify({'error': f'Erro ao carregar dados: {str(e)}'}), 500
 
 @main_bp.route('/ponto/registro/<int:registro_id>', methods=['PUT', 'POST'])
 @login_required
 def atualizar_registro_ponto(registro_id):
-    """Editar um registro de ponto existente"""
+    """Atualizar um registro de ponto individual"""
     try:
-        # Buscar registro sem restrições para permitir edição via interface
-        registro = RegistroPonto.query.get(registro_id)
+        print(f"✏️ Atualizando registro {registro_id}")
         
-        if not registro:
-            return jsonify({'error': 'Registro não encontrado'}), 404
+        # Buscar registro específico
+        registro = RegistroPonto.query.get_or_404(registro_id)
         
-        # Suporte para dados JSON ou form
+        # Buscar funcionário
+        funcionario = Funcionario.query.get(registro.funcionario_id)
+        if not funcionario:
+            return jsonify({'error': 'Funcionário não encontrado'}), 404
+        
+        # Obter dados do request
         if request.is_json:
             data_source = request.json
         else:
             data_source = request.form
         
-        # Dados básicos
-        data_str = data_source.get('data') or data_source.get('data_ponto')
+        print(f"📝 Dados recebidos: {data_source}")
+        
+        # Validar e processar dados básicos
+        data_str = data_source.get('data')
         if not data_str:
             return jsonify({'error': 'Data é obrigatória'}), 400
             
         data = datetime.strptime(data_str, '%Y-%m-%d').date()
-        tipo_registro = data_source.get('tipo_lancamento') or data_source.get('tipo_registro', 'trabalho_normal')
-        obra_id = data_source.get('obra_id') or data_source.get('obra_id_ponto') or None
+        tipo_frontend = data_source.get('tipo_registro', 'trabalho_normal')
+        obra_id = data_source.get('obra_id') or None
+        observacoes = data_source.get('observacoes', '')
         
-        # Mapear tipos novos para antigos no banco
-        if tipo_registro == 'trabalho_normal':
-            tipo_registro = 'trabalhado'
-        elif tipo_registro == 'sabado_trabalhado':
-            tipo_registro = 'sabado_horas_extras'
-        elif tipo_registro == 'domingo_trabalhado':
-            tipo_registro = 'domingo_horas_extras'
-        elif tipo_registro == 'feriado_folga':
-            tipo_registro = 'feriado'
+        # Converter tipo frontend para banco
+        tipo_banco = tipo_frontend
+        if tipo_frontend == 'trabalho_normal':
+            tipo_banco = 'trabalhado'
+        elif tipo_frontend == 'sabado_trabalhado':
+            tipo_banco = 'sabado_horas_extras'
+        elif tipo_frontend == 'domingo_trabalhado':
+            tipo_banco = 'domingo_horas_extras'
+        elif tipo_frontend == 'feriado_folga':
+            tipo_banco = 'feriado'
+        
+        # Processar horários baseado no tipo
+        if tipo_frontend in ['trabalho_normal', 'sabado_trabalhado', 'domingo_trabalhado', 'feriado_trabalhado']:
+            # Tipos que requerem horários
+            entrada_str = data_source.get('hora_entrada', '')
+            saida_almoco_str = data_source.get('hora_almoco_saida', '')
+            retorno_almoco_str = data_source.get('hora_almoco_retorno', '')
+            saida_str = data_source.get('hora_saida', '')
+            
+            # Converter horários
+            hora_entrada = datetime.strptime(entrada_str, '%H:%M').time() if entrada_str else None
+            hora_almoco_saida = datetime.strptime(saida_almoco_str, '%H:%M').time() if saida_almoco_str else None
+            hora_almoco_retorno = datetime.strptime(retorno_almoco_str, '%H:%M').time() if retorno_almoco_str else None
+            hora_saida = datetime.strptime(saida_str, '%H:%M').time() if saida_str else None
+            
+            # Calcular horas trabalhadas
+            horas_trabalhadas = 0.0
+            if hora_entrada and hora_saida:
+                # Calcular total de horas
+                entrada_minutos = hora_entrada.hour * 60 + hora_entrada.minute
+                saida_minutos = hora_saida.hour * 60 + hora_saida.minute
+                
+                # Ajustar se passou da meia-noite
+                if saida_minutos < entrada_minutos:
+                    saida_minutos += 24 * 60
+                
+                total_minutos = saida_minutos - entrada_minutos
+                
+                # Subtrair almoço se ambos horários estiverem definidos
+                if hora_almoco_saida and hora_almoco_retorno:
+                    almoco_saida_min = hora_almoco_saida.hour * 60 + hora_almoco_saida.minute
+                    almoco_retorno_min = hora_almoco_retorno.hour * 60 + hora_almoco_retorno.minute
+                    
+                    if almoco_retorno_min > almoco_saida_min:
+                        total_minutos -= (almoco_retorno_min - almoco_saida_min)
+                
+                horas_trabalhadas = total_minutos / 60.0
+            
+            # Calcular horas extras baseado no tipo
+            horas_extras = 0.0
+            percentual_extras = 0.0
+            
+            if tipo_frontend in ['sabado_trabalhado', 'domingo_trabalhado', 'feriado_trabalhado']:
+                # Para fim de semana/feriado: TODAS as horas são extras
+                horas_extras = horas_trabalhadas
+                if tipo_frontend == 'sabado_trabalhado':
+                    percentual_extras = 50.0
+                else:  # domingo_trabalhado, feriado_trabalhado
+                    percentual_extras = 100.0
+            elif tipo_frontend == 'trabalho_normal' and horas_trabalhadas > 0:
+                # Para trabalho normal: apenas horas acima da jornada
+                horas_jornada = funcionario.horario_trabalho.horas_diarias if funcionario.horario_trabalho else 8.0
+                horas_extras = max(0, horas_trabalhadas - horas_jornada)
+                if horas_extras > 0:
+                    percentual_extras = 50.0
+            
+        else:
+            # Tipos sem horários (faltas, férias, etc.)
+            hora_entrada = None
+            hora_almoco_saida = None
+            hora_almoco_retorno = None
+            hora_saida = None
+            horas_trabalhadas = 0.0
+            horas_extras = 0.0
+            percentual_extras = 0.0
+        
+        # Atualizar registro
+        registro.data = data
+        registro.tipo_registro = tipo_banco
+        registro.obra_id = int(obra_id) if obra_id else None
+        registro.hora_entrada = hora_entrada
+        registro.hora_almoco_saida = hora_almoco_saida
+        registro.hora_almoco_retorno = hora_almoco_retorno
+        registro.hora_saida = hora_saida
+        registro.horas_trabalhadas = horas_trabalhadas
+        registro.horas_extras = horas_extras
+        registro.percentual_extras = percentual_extras
+        registro.observacoes = observacoes
+        
+        db.session.commit()
+        
+        print(f"✅ Registro {registro_id} atualizado: {tipo_banco}, {horas_trabalhadas}h, {horas_extras}h extras")
+        
+        return jsonify({
+            'success': True,
+            'message': 'Registro atualizado com sucesso',
+            'registro': {
+                'id': registro.id,
+                'tipo_registro': tipo_banco,
+                'horas_trabalhadas': horas_trabalhadas,
+                'horas_extras': horas_extras,
+                'percentual_extras': percentual_extras
+            }
+        })
+        
+    except Exception as e:
+        db.session.rollback()
+        print(f"❌ Erro ao atualizar registro {registro_id}: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': f'Erro ao salvar: {str(e)}'}), 500
         
         if obra_id == '':
             obra_id = None

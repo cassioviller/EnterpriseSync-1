@@ -1679,22 +1679,38 @@ function editarPonto(id) {
                 form.reset();
             }
             
-            // Preencher o modal com os dados - usando IDs corretos
+            // Verificar se temos dados no formato correto
+            if (!data.success || !data.registro) {
+                throw new Error('Dados de resposta inválidos');
+            }
+            
+            const registro = data.registro;
+            
+            // Preencher o modal com os dados - usando estrutura correta
             const dataEl = document.getElementById('data_ponto');
             const tipoEl = document.getElementById('tipo_lancamento');
             const obraEl = document.getElementById('obra_id_ponto');
             
             if (dataEl) {
-                dataEl.value = data.data;
-                console.log('Data definida:', data.data);
+                dataEl.value = registro.data;
+                console.log('Data definida:', registro.data);
             }
             if (tipoEl) {
-                tipoEl.value = data.tipo_registro;
-                console.log('Tipo definido:', data.tipo_registro);
+                tipoEl.value = registro.tipo_registro;
+                console.log('Tipo definido:', registro.tipo_registro);
             }
-            if (obraEl) {
-                obraEl.value = data.obra_id || '';
-                console.log('Obra definida:', data.obra_id);
+            
+            // Preencher dropdown de obras
+            if (obraEl && data.obras_disponiveis) {
+                obraEl.innerHTML = '<option value="">Selecione uma obra...</option>';
+                data.obras_disponiveis.forEach(obra => {
+                    const option = document.createElement('option');
+                    option.value = obra.id;
+                    option.textContent = obra.nome;
+                    option.selected = (obra.id == registro.obra_id);
+                    obraEl.appendChild(option);
+                });
+                console.log('Obras carregadas, obra selecionada:', registro.obra_id);
             }
             
             // Preencher horários
@@ -1705,17 +1721,17 @@ function editarPonto(id) {
             const percentualEl = document.getElementById('percentual_extras');
             const observacoesEl = document.getElementById('observacoes_ponto');
             
-            if (entradaEl) entradaEl.value = data.entrada || '';
-            if (saidaEl) saidaEl.value = data.saida || '';
-            if (almocoSaidaEl) almocoSaidaEl.value = data.saida_almoco || '';
-            if (almocoRetornoEl) almocoRetornoEl.value = data.retorno_almoco || '';
-            if (percentualEl) percentualEl.value = data.percentual_extras || 0;
-            if (observacoesEl) observacoesEl.value = data.observacoes || '';
+            if (entradaEl) entradaEl.value = registro.hora_entrada || '';
+            if (saidaEl) saidaEl.value = registro.hora_saida || '';
+            if (almocoSaidaEl) almocoSaidaEl.value = registro.hora_almoco_saida || '';
+            if (almocoRetornoEl) almocoRetornoEl.value = registro.hora_almoco_retorno || '';
+            if (percentualEl) percentualEl.value = registro.percentual_extras || 0;
+            if (observacoesEl) observacoesEl.value = registro.observacoes || '';
             
             // Alterar o título do modal
             const titulo = document.querySelector('#pontoModal .modal-title');
             if (titulo) {
-                titulo.innerHTML = '<i class="fas fa-edit"></i> Editar Registro de Ponto';
+                titulo.innerHTML = `<i class="fas fa-edit"></i> Editar: ${registro.funcionario_nome}`;
             }
             
             // Configurar campo hidden com ID do registro
