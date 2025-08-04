@@ -4004,15 +4004,37 @@ def alimentacao():
 @main_bp.route('/alimentacao/novo', methods=['POST'])
 @login_required
 def nova_alimentacao():
-    """Criar registros de alimentação para múltiplos funcionários"""
+    """Criar registros de alimentação para múltiplos funcionários (data única ou período)"""
     try:
+        # Detectar se é lançamento por período
+        data_inicio = request.form.get('data_inicio')
+        data_fim = request.form.get('data_fim')
+        data_unica = request.form.get('data')
+        
+        # Determinar datas para processar
+        datas_processamento = []
+        
+        if data_inicio and data_fim:
+            # Lançamento por período
+            inicio = datetime.strptime(data_inicio, '%Y-%m-%d').date()
+            fim = datetime.strptime(data_fim, '%Y-%m-%d').date()
+            
+            # Gerar lista de datas do período
+            data_atual = inicio
+            while data_atual <= fim:
+                datas_processamento.append(data_atual)
+                data_atual += timedelta(days=1)
+        elif data_unica:
+            # Lançamento de data única
+            datas_processamento.append(datetime.strptime(data_unica, '%Y-%m-%d').date())
+        else:
+            return jsonify({'success': False, 'message': 'Data é obrigatória'}), 400
+        
         # Dados básicos do formulário
-        data = datetime.strptime(request.form.get('data'), '%Y-%m-%d').date()
         tipo = request.form.get('tipo')
         valor = float(request.form.get('valor'))
         obra_id = request.form.get('obra_id')
         restaurante_id = request.form.get('restaurante_id')
-        
         observacoes = request.form.get('observacoes')
         
         # Validar campos obrigatórios
@@ -4028,45 +4050,64 @@ def nova_alimentacao():
             return jsonify({'success': False, 'message': 'Nenhum funcionário selecionado'}), 400
         
         registros_criados = []
+        total_dias = len(datas_processamento)
         
-        # Criar um registro para cada funcionário
-        for funcionario_id in funcionarios_ids:
-            funcionario = Funcionario.query.get(funcionario_id)
-            if not funcionario:
-                continue
+        # Criar registros para cada funcionário em cada data
+        for data in datas_processamento:
+            for funcionario_id in funcionarios_ids:
+                funcionario = Funcionario.query.get(funcionario_id)
+                if not funcionario:
+                    continue
                 
-            registro = RegistroAlimentacao(
-                funcionario_id=int(funcionario_id),
-                obra_id=int(obra_id),
-                restaurante_id=int(restaurante_id),
-                data=data,
-                tipo=tipo,
-                valor=valor,
-                observacoes=observacoes
-            )
-            
-            db.session.add(registro)
-            registros_criados.append(f"{funcionario.nome} - {tipo}")
-            
-            # Adicionar custo à obra (sempre, pois é obrigatório)
-            custo = CustoObra(
-                obra_id=int(obra_id),
-                tipo='alimentacao',
-                descricao=f'Alimentação - {tipo} - {funcionario.nome}',
-                valor=valor,
-                data=data
-            )
-            db.session.add(custo)
+                # Verificar se já existe registro para este funcionário nesta data e tipo
+                registro_existente = RegistroAlimentacao.query.filter_by(
+                    funcionario_id=int(funcionario_id),
+                    data=data,
+                    tipo=tipo
+                ).first()
+                
+                if registro_existente:
+                    continue  # Pular se já existe
+                    
+                registro = RegistroAlimentacao(
+                    funcionario_id=int(funcionario_id),
+                    obra_id=int(obra_id),
+                    restaurante_id=int(restaurante_id),
+                    data=data,
+                    tipo=tipo,
+                    valor=valor,
+                    observacoes=observacoes
+                )
+                
+                db.session.add(registro)
+                registros_criados.append(f"{funcionario.nome} - {tipo} - {data.strftime('%d/%m/%Y')}")
+                
+                # Adicionar custo à obra (sempre, pois é obrigatório)
+                custo = CustoObra(
+                    obra_id=int(obra_id),
+                    tipo='alimentacao',
+                    descricao=f'Alimentação - {tipo} - {funcionario.nome} - {data.strftime("%d/%m/%Y")}',
+                    valor=valor,
+                    data=data
+                )
+                db.session.add(custo)
         
         db.session.commit()
         
         total_registros = len(registros_criados)
         valor_total = total_registros * valor
         
+        if total_dias > 1:
+            message = f'{total_registros} registros criados para {total_dias} dias! Valor total: R$ {valor_total:.2f}'
+        else:
+            message = f'{total_registros} registros criados com sucesso! Valor total: R$ {valor_total:.2f}'
+        
         return jsonify({
             'success': True, 
-            'message': f'{total_registros} registros criados com sucesso! Valor total: R$ {valor_total:.2f}',
-            'registros': registros_criados
+            'message': message,
+            'registros': registros_criados[:10],  # Limitar para não sobrecarregar
+            'total_dias': total_dias,
+            'total_registros': total_registros
         })
         
     except Exception as e:

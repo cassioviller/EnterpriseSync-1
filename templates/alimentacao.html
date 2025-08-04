@@ -166,10 +166,38 @@
                         </div>
                         <div class="card-body">
                             <div class="row">
+                                <div class="col-md-12 mb-3">
+                                    <div class="form-check form-switch">
+                                        <input class="form-check-input" type="checkbox" id="lancamentoPeriodo">
+                                        <label class="form-check-label fw-bold" for="lancamentoPeriodo">
+                                            <i class="fas fa-calendar-week me-1"></i> Lançamento por Período
+                                        </label>
+                                        <small class="text-muted d-block">Marque para lançar em múltiplos dias consecutivos</small>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <!-- Data Única -->
+                            <div class="row" id="dataUnica">
                                 <div class="col-md-4 mb-3">
                                     <label for="data" class="form-label fw-bold">Data *</label>
                                     <input type="date" class="form-control form-control-lg" id="data" name="data" required>
                                 </div>
+                            </div>
+                            
+                            <!-- Período -->
+                            <div class="row" id="dataPeriodo" style="display: none;">
+                                <div class="col-md-6 mb-3">
+                                    <label for="data_inicio" class="form-label fw-bold">Data Inicial *</label>
+                                    <input type="date" class="form-control form-control-lg" id="data_inicio" name="data_inicio">
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label for="data_fim" class="form-label fw-bold">Data Final *</label>
+                                    <input type="date" class="form-control form-control-lg" id="data_fim" name="data_fim">
+                                </div>
+                            </div>
+                            
+                            <div class="row">
                                 <div class="col-md-4 mb-3">
                                     <label for="tipo" class="form-label fw-bold">Tipo de Refeição *</label>
                                     <select class="form-select form-select-lg" id="tipo" name="tipo" required>
@@ -330,9 +358,53 @@ $(document).ready(function() {
     // Configurar data padrão
     document.getElementById('data').valueAsDate = new Date();
     
+    // Configurar alternância entre data única e período
+    setupPeriodoToggle();
+    
     // Event listeners para seleção múltipla
     setupMultiSelectionFunctionality();
 });
+
+function setupPeriodoToggle() {
+    const togglePeriodo = document.getElementById('lancamentoPeriodo');
+    const dataUnica = document.getElementById('dataUnica');
+    const dataPeriodo = document.getElementById('dataPeriodo');
+    const dataInput = document.getElementById('data');
+    const dataInicioInput = document.getElementById('data_inicio');
+    const dataFimInput = document.getElementById('data_fim');
+    
+    togglePeriodo.addEventListener('change', function() {
+        if (this.checked) {
+            // Modo período
+            dataUnica.style.display = 'none';
+            dataPeriodo.style.display = 'block';
+            
+            // Remover obrigatoriedade da data única e adicionar no período
+            dataInput.removeAttribute('required');
+            dataInicioInput.setAttribute('required', '');
+            dataFimInput.setAttribute('required', '');
+            
+            // Configurar valores padrão
+            const hoje = new Date().toISOString().split('T')[0];
+            const proximaSemana = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+            dataInicioInput.value = hoje;
+            dataFimInput.value = proximaSemana;
+        } else {
+            // Modo data única
+            dataUnica.style.display = 'block';
+            dataPeriodo.style.display = 'none';
+            
+            // Remover obrigatoriedade do período e adicionar na data única
+            dataInput.setAttribute('required', '');
+            dataInicioInput.removeAttribute('required');
+            dataFimInput.removeAttribute('required');
+            
+            // Limpar valores do período
+            dataInicioInput.value = '';
+            dataFimInput.value = '';
+        }
+    });
+}
 
 function setupMultiSelectionFunctionality() {
     const checkboxes = document.querySelectorAll('.funcionario-checkbox');
@@ -348,10 +420,30 @@ function setupMultiSelectionFunctionality() {
         const selecionados = document.querySelectorAll('.funcionario-checkbox:checked');
         const count = selecionados.length;
         const valorUnitario = parseFloat(valorInput.value) || 0;
-        const total = count * valorUnitario;
+        
+        // Calcular total considerando período
+        const isPeriodo = document.getElementById('lancamentoPeriodo').checked;
+        let diasPeriodo = 1;
+        
+        if (isPeriodo) {
+            const dataInicio = document.getElementById('data_inicio').value;
+            const dataFim = document.getElementById('data_fim').value;
+            
+            if (dataInicio && dataFim) {
+                const inicio = new Date(dataInicio);
+                const fim = new Date(dataFim);
+                diasPeriodo = Math.ceil((fim - inicio) / (1000 * 60 * 60 * 24)) + 1;
+            }
+        }
+        
+        const total = count * valorUnitario * diasPeriodo;
         
         contadorSelecionados.textContent = count;
         valorTotal.textContent = `R$ ${total.toFixed(2).replace('.', ',')}`;
+        
+        if (isPeriodo && diasPeriodo > 1) {
+            valorTotal.innerHTML += `<br><small class="text-muted">(${count} funcionários × ${diasPeriodo} dias)</small>`;
+        }
         
         // Habilitar/desabilitar botão salvar
         const obraId = document.getElementById('obra_id').value;
@@ -386,6 +478,10 @@ function setupMultiSelectionFunctionality() {
     // Event listeners para dropdowns obrigatórios
     document.getElementById('obra_id').addEventListener('change', atualizarContadores);
     document.getElementById('restaurante_id').addEventListener('change', atualizarContadores);
+    
+    // Event listeners para mudanças nas datas do período
+    document.getElementById('data_inicio').addEventListener('change', atualizarContadores);
+    document.getElementById('data_fim').addEventListener('change', atualizarContadores);
     
     // Funcionalidade de busca
     buscaInput.addEventListener('input', function() {
