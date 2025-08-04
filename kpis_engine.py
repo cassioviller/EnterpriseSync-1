@@ -221,8 +221,10 @@ class KPIsEngine:
                         horas_por_tipo.get('falta_justificada', 0.0))
         custo_total += horas_normais * valor_hora
         
-        # 2. Sábado trabalhado (+50%)
-        horas_sabado = horas_por_tipo.get('sabado_trabalhado', 0.0)
+        # 2. Sábado trabalhado: aplicar apenas o adicional de 50% (não duplicar)
+        # Para sábado: todas as horas são extras, então valor = valor_hora + 50%
+        horas_sabado = (horas_por_tipo.get('sabado_trabalhado', 0.0) + 
+                       horas_por_tipo.get('sabado_horas_extras', 0.0))
         custo_total += horas_sabado * valor_hora * 1.5
         
         # 3. Domingo trabalhado (+100%)
