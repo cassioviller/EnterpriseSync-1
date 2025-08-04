@@ -68,8 +68,8 @@ class KPIsEngine:
         
         # Layout 4-4-4-4: Quarta linha (4 indicadores)
         horas_perdidas = self._calcular_horas_perdidas(funcionario_id, data_inicio, data_fim)
-        # ALTERAÇÃO: Eficiência substituída por Horas Extras (duplicada estava confusa)
-        horas_extras_display = horas_extras  # Mostrar horas extras novamente para destaque
+        # Calcular valor em R$ das horas extras
+        valor_horas_extras = self._calcular_valor_horas_extras(funcionario_id, data_inicio, data_fim)
         valor_falta_justificada = self._calcular_valor_falta_justificada(funcionario_id, data_inicio, data_fim)
         custo_total = self._calcular_custo_total(funcionario_id, data_inicio, data_fim)
         
@@ -94,7 +94,7 @@ class KPIsEngine:
             
             # Quarta linha (4 indicadores)
             'horas_perdidas': round(horas_perdidas, 1),
-            'eficiencia': round(horas_extras_display, 1),  # Agora mostra horas extras
+            'eficiencia': round(valor_horas_extras, 2),  # Agora mostra valor R$ das horas extras
             'valor_falta_justificada': round(valor_falta_justificada, 2),
             'custo_total': round(custo_total, 2),
             
@@ -645,6 +645,51 @@ class KPIsEngine:
         custo_total = custo_mao_obra + custo_alimentacao + custo_transporte + outros_custos
         
         return custo_total
+    
+    def _calcular_valor_horas_extras(self, funcionario_id, data_inicio, data_fim):
+        """Calcular valor em R$ das horas extras com percentuais específicos"""
+        funcionario = Funcionario.query.get(funcionario_id)
+        if not funcionario or not funcionario.salario:
+            return 0.0
+        
+        # Buscar registros do período
+        registros = RegistroPonto.query.filter(
+            RegistroPonto.funcionario_id == funcionario_id,
+            RegistroPonto.data >= data_inicio,
+            RegistroPonto.data <= data_fim,
+            RegistroPonto.horas_extras.isnot(None),
+            RegistroPonto.horas_extras > 0
+        ).all()
+        
+        # Calcular valor/hora base
+        if funcionario.horario_trabalho:
+            horas_diarias = float(funcionario.horario_trabalho.horas_diarias or 8.0)
+        else:
+            horas_diarias = 8.0
+        
+        from calcular_dias_uteis_mes import calcular_dias_uteis_mes
+        dias_uteis = calcular_dias_uteis_mes(data_inicio.year, data_inicio.month)
+        horas_mensais = dias_uteis * horas_diarias
+        valor_hora = float(funcionario.salario) / horas_mensais if horas_mensais > 0 else 0.0
+        
+        valor_total_extras = 0.0
+        
+        for registro in registros:
+            horas_extras_reg = float(registro.horas_extras or 0)
+            
+            # Aplicar multiplicador por tipo
+            if registro.tipo_registro in ['sabado_trabalhado', 'sabado_horas_extras']:
+                multiplicador = 1.5  # 50% adicional
+            elif registro.tipo_registro in ['domingo_trabalhado', 'domingo_horas_extras', 'feriado_trabalhado']:
+                multiplicador = 2.0  # 100% adicional
+            else:
+                # Horas extras normais (excesso da jornada)
+                multiplicador = 1.6  # 60% adicional padrão
+            
+            valor_extras_reg = horas_extras_reg * valor_hora * multiplicador
+            valor_total_extras += valor_extras_reg
+        
+        return valor_total_extras
 
 
 def gerar_calendario_util(ano):
