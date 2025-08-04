@@ -1,166 +1,96 @@
 #!/usr/bin/env python3
 """
-🔧 APLICAÇÃO DEFINITIVA DA LÓGICA DE SÁBADO TRABALHADO
-Corrige TODOS os cálculos para o registro de 05/07/2025
+🎯 APLICAÇÃO DEFINITIVA: Lógica Correta Atrasos vs Horas Extras
+Ana Paula - 29/07/2025: 07:30 entrada, 18:00 saída
+Padrão Comercial Vale Verde: 07:12-17:00
+RESULTADO: 18min atraso + 1h extras
 """
 
 from app import app, db
 from models import RegistroPonto, Funcionario
-from datetime import date
+from datetime import datetime, time
 
-def aplicar_logica_sabado_completa():
-    """Aplica a lógica completa de sábado trabalhado para todos os registros"""
-    print("🔧 APLICANDO LÓGICA COMPLETA DE SÁBADO TRABALHADO")
-    print("=" * 60)
-    
-    # Buscar TODOS os registros de 05/07/2025 (sábado)
-    registros = RegistroPonto.query.filter(
-        RegistroPonto.data == date(2025, 7, 5)
-    ).all()
-    
-    print(f"📊 Encontrados {len(registros)} registros do dia 05/07/2025")
-    
-    for registro in registros:
-        funcionario = Funcionario.query.filter_by(id=registro.funcionario_id).first()
-        nome = funcionario.nome if funcionario else f"ID {registro.funcionario_id}"
+def aplicar_logica_definitiva():
+    with app.app_context():
+        print("🎯 APLICAÇÃO: Lógica Definitiva Ana Paula 29/07/2025")
+        print("=" * 60)
         
-        print(f"\n🔧 PROCESSANDO: {nome}")
-        print(f"   ID do registro: {registro.id}")
-        print(f"   Horas trabalhadas: {registro.horas_trabalhadas}")
-        print(f"   Entrada: {registro.hora_entrada}")
-        print(f"   Saída: {registro.hora_saida}")
+        # Buscar Ana Paula
+        ana_paula = Funcionario.query.filter(Funcionario.nome.ilike('%Ana Paula%')).first()
         
-        # Se tem horários de entrada e saída registrados, aplicar lógica
-        if registro.hora_entrada and registro.hora_saida and registro.horas_trabalhadas and registro.horas_trabalhadas > 0:
-            print("   ✅ Registro válido com horas trabalhadas")
+        # Buscar registro do dia 29/07
+        registro = RegistroPonto.query.filter(
+            RegistroPonto.funcionario_id == ana_paula.id,
+            RegistroPonto.data == datetime(2025, 7, 29).date()
+        ).first()
+        
+        if not registro:
+            print("❌ Registro não encontrado")
+            return
             
-            # LÓGICA DE SÁBADO TRABALHADO:
-            # 1. Tipo = sabado_horas_extras
-            registro.tipo_registro = 'sabado_horas_extras'
-            
-            # 2. TODAS as horas trabalhadas = horas extras (50% adicional)
-            horas_trabalhadas = float(registro.horas_trabalhadas)
-            registro.horas_extras = horas_trabalhadas
-            registro.percentual_extras = 50.0
-            
-            # 3. ZERO atraso (sábados não têm atraso)
-            registro.total_atraso_minutos = 0
-            registro.total_atraso_horas = 0.0
-            registro.minutos_atraso_entrada = 0
-            registro.minutos_atraso_saida = 0
-            
-            print(f"   ✅ APLICADO:")
-            print(f"      Tipo: {registro.tipo_registro}")
-            print(f"      Horas extras: {registro.horas_extras}h")
-            print(f"      Percentual: {registro.percentual_extras}%")
-            print(f"      Atraso: {registro.total_atraso_minutos}min")
-            
+        print(f"📋 SITUAÇÃO ATUAL:")
+        print(f"   • Horário padrão: {ana_paula.horario_trabalho.nome}")
+        print(f"   • Entrada padrão: {ana_paula.horario_trabalho.entrada}")
+        print(f"   • Saída padrão: {ana_paula.horario_trabalho.saida}")
+        print(f"   • Entrada real: {registro.hora_entrada}")
+        print(f"   • Saída real: {registro.hora_saida}")
+        
+        # APLICAR LÓGICA CORRETA
+        # Horário Comercial Vale Verde: 07:12-17:00
+        entrada_padrao = ana_paula.horario_trabalho.entrada  # 07:12
+        saida_padrao = ana_paula.horario_trabalho.saida      # 17:00
+        
+        # CALCULAR ATRASO (entrada)
+        if registro.hora_entrada > entrada_padrao:
+            entrada_real_min = registro.hora_entrada.hour * 60 + registro.hora_entrada.minute
+            entrada_prev_min = entrada_padrao.hour * 60 + entrada_padrao.minute
+            atraso_min = entrada_real_min - entrada_prev_min
         else:
-            print("   ⚠️  Registro sem horas válidas - mantendo como está")
-            # Mesmo assim, garantir zero atraso
-            registro.total_atraso_minutos = 0
-            registro.total_atraso_horas = 0.0
-            registro.tipo_registro = 'sabado_horas_extras'
-    
-    try:
+            atraso_min = 0
+            
+        # CALCULAR HORAS EXTRAS (saída)
+        if registro.hora_saida > saida_padrao:
+            saida_real_min = registro.hora_saida.hour * 60 + registro.hora_saida.minute
+            saida_prev_min = saida_padrao.hour * 60 + saida_padrao.minute
+            extras_min = saida_real_min - saida_prev_min
+        else:
+            extras_min = 0
+            
+        print(f"\n🔍 CÁLCULOS:")
+        print(f"   • Entrada: {registro.hora_entrada} vs {entrada_padrao}")
+        print(f"   • Atraso: {atraso_min} min = {atraso_min/60:.2f}h")
+        print(f"   • Saída: {registro.hora_saida} vs {saida_padrao}")
+        print(f"   • Extras: {extras_min} min = {extras_min/60:.2f}h")
+        
+        # APLICAR CORREÇÕES
+        registro.minutos_atraso_entrada = atraso_min
+        registro.total_atraso_minutos = atraso_min
+        registro.total_atraso_horas = atraso_min / 60.0
+        registro.horas_extras = extras_min / 60.0
+        registro.percentual_extras = 50.0 if extras_min > 0 else 0.0
+        
+        # Recalcular horas trabalhadas
+        entrada_min = registro.hora_entrada.hour * 60 + registro.hora_entrada.minute
+        saida_min = registro.hora_saida.hour * 60 + registro.hora_saida.minute
+        almoco_min = 60  # 1 hora
+        total_min = saida_min - entrada_min - almoco_min
+        registro.horas_trabalhadas = total_min / 60.0
+        
         db.session.commit()
-        print("\n✅ LÓGICA DE SÁBADO APLICADA COM SUCESSO!")
-        return True
-    except Exception as e:
-        print(f"\n❌ ERRO: {e}")
-        db.session.rollback()
-        return False
-
-def verificar_resultado():
-    """Verifica se a lógica foi aplicada corretamente"""
-    print("\n🔍 VERIFICAÇÃO DO RESULTADO")
-    print("=" * 60)
-    
-    # Buscar o registro específico do João Silva Santos
-    registro = RegistroPonto.query.filter(
-        RegistroPonto.data == date(2025, 7, 5),
-        RegistroPonto.funcionario_id == 96  # João Silva Santos
-    ).first()
-    
-    if registro:
-        funcionario = Funcionario.query.filter_by(id=registro.funcionario_id).first()
         
-        print(f"📋 VERIFICAÇÃO - {funcionario.nome}:")
-        print(f"   Tipo: '{registro.tipo_registro}'")
-        print(f"   Horas trabalhadas: {registro.horas_trabalhadas}")
-        print(f"   Horas extras: {registro.horas_extras}")
-        print(f"   Percentual: {registro.percentual_extras}%")
-        print(f"   Atraso: {registro.total_atraso_minutos}min")
+        print(f"\n✅ RESULTADO FINAL:")
+        print(f"   • Atraso: {registro.minutos_atraso_entrada} min")
+        print(f"   • Horas extras: {registro.horas_extras} h")
+        print(f"   • Horas trabalhadas: {registro.horas_trabalhadas} h")
         
-        # Verificar se está correto
-        if (registro.tipo_registro == 'sabado_horas_extras' and 
-            registro.horas_extras > 0 and 
-            registro.total_atraso_minutos == 0 and
-            registro.percentual_extras == 50.0):
-            print("   ✅ CORRETO!")
-            return True
-        else:
-            print("   ❌ AINDA INCORRETO!")
-            return False
-    else:
-        print("   ❌ Registro não encontrado!")
-        return False
-
-def verificar_todos_registros():
-    """Verifica todos os registros de sábado"""
-    print("\n📊 VERIFICAÇÃO GERAL")
-    print("=" * 60)
-    
-    registros = RegistroPonto.query.filter(
-        RegistroPonto.data == date(2025, 7, 5),
-        RegistroPonto.horas_trabalhadas > 0
-    ).all()
-    
-    print(f"📈 Registros com horas trabalhadas: {len(registros)}")
-    
-    corretos = 0
-    for registro in registros:
-        funcionario = Funcionario.query.filter_by(id=registro.funcionario_id).first()
-        nome = funcionario.nome if funcionario else f"ID {registro.funcionario_id}"
+        # VALIDAÇÃO
+        atraso_ok = registro.minutos_atraso_entrada == 18
+        extras_ok = registro.horas_extras == 1.0
         
-        # Verificar se está correto
-        if (registro.tipo_registro == 'sabado_horas_extras' and 
-            registro.horas_extras > 0 and 
-            registro.total_atraso_minutos == 0):
-            print(f"   ✅ {nome}: {registro.horas_extras}h extras, 0min atraso")
-            corretos += 1
-        else:
-            print(f"   ❌ {nome}: {registro.horas_extras}h extras, {registro.total_atraso_minutos}min atraso")
-    
-    print(f"\n📊 RESULTADO: {corretos}/{len(registros)} corretos")
-    return corretos == len(registros)
+        print(f"\n🎯 VALIDAÇÃO:")
+        print(f"   • 18min atraso: {'✅' if atraso_ok else '❌'}")
+        print(f"   • 1h extras: {'✅' if extras_ok else '❌'}")
+        print(f"   • Lógica correta: {'✅' if atraso_ok and extras_ok else '❌'}")
 
 if __name__ == "__main__":
-    with app.app_context():
-        print("🚀 CORREÇÃO DEFINITIVA DOS CÁLCULOS DE SÁBADO")
-        print("=" * 80)
-        
-        # 1. Aplicar lógica completa
-        sucesso = aplicar_logica_sabado_completa()
-        
-        if sucesso:
-            # 2. Verificar resultado específico
-            resultado_especifico = verificar_resultado()
-            
-            # 3. Verificar todos os registros
-            resultado_geral = verificar_todos_registros()
-            
-            print("\n" + "=" * 80)
-            if resultado_especifico and resultado_geral:
-                print("🎯 CORREÇÃO 100% CONCLUÍDA!")
-                print("✅ João Silva Santos 05/07/2025 deve mostrar:")
-                print("   - Horas extras: 7.9h - 50%")
-                print("   - Atraso: - (zero)")
-                print("   - Tag: SÁBADO")
-                print("\n🔄 Recarregue a página para ver as mudanças!")
-            else:
-                print("❌ AINDA HÁ PROBLEMAS - verificar manualmente")
-        else:
-            print("\n❌ FALHA NA APLICAÇÃO DA LÓGICA")
-        
-        print("=" * 80)
+    aplicar_logica_definitiva()
