@@ -24,52 +24,101 @@
 
 <!-- Filtros Rápidos -->
 <div class="card mb-4">
+    <div class="card-header">
+        <h5 class="card-title mb-0">
+            <i class="fas fa-filter"></i> Filtros de Obras
+        </h5>
+    </div>
     <div class="card-body">
-        <form method="GET" id="filtroForm" class="row g-3 align-items-end">
-            <div class="col-md-4">
-                <label for="nome" class="form-label">Nome da Obra</label>
-                <input type="text" class="form-control" id="nome" name="nome" 
-                       value="{{ filtros.nome }}" placeholder="Buscar por nome...">
+        <!-- Filtros Rápidos por Status -->
+        <div class="mb-3">
+            <label class="form-label fw-bold">Filtros Rápidos por Status:</label>
+            <div class="btn-group flex-wrap" role="group">
+                <a href="{{ url_for('main.obras') }}" class="btn btn-outline-primary {{ 'active' if not filtros.status else '' }}">
+                    <i class="fas fa-list"></i> Todas
+                </a>
+                <a href="{{ url_for('main.obras', status='Planejamento') }}" class="btn btn-outline-info {{ 'active' if filtros.status == 'Planejamento' else '' }}">
+                    <i class="fas fa-drafting-compass"></i> Planejamento
+                </a>
+                <a href="{{ url_for('main.obras', status='Em Andamento') }}" class="btn btn-outline-warning {{ 'active' if filtros.status == 'Em Andamento' else '' }}">
+                    <i class="fas fa-play-circle"></i> Em Andamento
+                </a>
+                <a href="{{ url_for('main.obras', status='Concluída') }}" class="btn btn-outline-success {{ 'active' if filtros.status == 'Concluída' else '' }}">
+                    <i class="fas fa-check-circle"></i> Concluídas
+                </a>
+                <a href="{{ url_for('main.obras', status='Pausada') }}" class="btn btn-outline-secondary {{ 'active' if filtros.status == 'Pausada' else '' }}">
+                    <i class="fas fa-pause-circle"></i> Pausadas
+                </a>
+                <a href="{{ url_for('main.obras', status='Cancelada') }}" class="btn btn-outline-danger {{ 'active' if filtros.status == 'Cancelada' else '' }}">
+                    <i class="fas fa-times-circle"></i> Canceladas
+                </a>
+            </div>
+        </div>
+
+        <form method="GET" id="filtroForm">
+            <div class="row align-items-end">
+                <div class="col-md-4">
+                    <label for="nome" class="form-label">Buscar por Nome</label>
+                    <div class="input-group">
+                        <span class="input-group-text"><i class="fas fa-search"></i></span>
+                        <input type="text" class="form-control" id="nome" name="nome" 
+                               value="{{ filtros.nome }}" placeholder="Digite o nome da obra...">
+                    </div>
+                </div>
+                
+                <div class="col-md-2">
+                    <label for="status" class="form-label">Status Específico</label>
+                    <select class="form-select" id="status" name="status">
+                        <option value="">Todos os Status</option>
+                        <option value="Planejamento" {{ 'selected' if filtros.status == 'Planejamento' else '' }}>Planejamento</option>
+                        <option value="Em Andamento" {{ 'selected' if filtros.status == 'Em Andamento' else '' }}>Em Andamento</option>
+                        <option value="Concluída" {{ 'selected' if filtros.status == 'Concluída' else '' }}>Concluída</option>
+                        <option value="Pausada" {{ 'selected' if filtros.status == 'Pausada' else '' }}>Pausada</option>
+                        <option value="Cancelada" {{ 'selected' if filtros.status == 'Cancelada' else '' }}>Cancelada</option>
+                    </select>
+                </div>
+                
+                <div class="col-md-2">
+                    <label for="data_inicio" class="form-label">Data Inicial</label>
+                    <input type="date" class="form-control" id="data_inicio" name="data_inicio" 
+                           value="{{ filtros.data_inicio }}">
+                </div>
+                
+                <div class="col-md-2">
+                    <label for="data_fim" class="form-label">Data Final</label>
+                    <input type="date" class="form-control" id="data_fim" name="data_fim" 
+                           value="{{ filtros.data_fim }}">
+                </div>
+                
+                <div class="col-md-2">
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-search"></i> Filtrar
+                    </button>
+                </div>
             </div>
             
-            <div class="col-md-3">
-                <label for="status" class="form-label">Status</label>
-                <select class="form-select" id="status" name="status">
-                    <option value="">Todos os Status</option>
-                    {% for status in status_options %}
-                        <option value="{{ status }}" {{ 'selected' if filtros.status == status else '' }}>
-                            {{ status }}
-                        </option>
-                    {% endfor %}
-                </select>
-            </div>
-            
-            <div class="col-md-2">
-                <label for="data_inicio" class="form-label">Data Inicial</label>
-                <input type="date" class="form-control" id="data_inicio" name="data_inicio" 
-                       value="{{ filtros.data_inicio }}">
-            </div>
-            
-            <div class="col-md-2">
-                <label for="data_fim" class="form-label">Data Final</label>
-                <input type="date" class="form-control" id="data_fim" name="data_fim" 
-                       value="{{ filtros.data_fim }}">
-            </div>
-            
-            <div class="col-md-1">
-                <button type="button" class="btn btn-outline-secondary btn-sm" 
-                        onclick="setDateRange('mes_atual')">Mês Atual</button>
+            <!-- Botões de Período Rápido -->
+            <div class="row mt-3">
+                <div class="col-12">
+                    <label class="form-label fw-bold">Períodos Rápidos:</label>
+                    <div class="btn-group flex-wrap" role="group">
+                        <button type="button" class="btn btn-outline-secondary btn-sm" 
+                                onclick="setDateRange('mes_atual')">Mês Atual</button>
+                        <button type="button" class="btn btn-outline-secondary btn-sm" 
+                                onclick="setDateRange('ultimo_mes')">Último Mês</button>
+                        <button type="button" class="btn btn-outline-secondary btn-sm" 
+                                onclick="setDateRange('ultimos_3_meses')">Últimos 3 Meses</button>
+                        <button type="button" class="btn btn-outline-secondary btn-sm" 
+                                onclick="setDateRange('ano_atual')">Ano Atual</button>
+                        <button type="button" class="btn btn-outline-secondary btn-sm" 
+                                onclick="setDateRange('ultimo_ano')">Último Ano</button>
+                        <a href="{{ url_for('main.obras') }}" class="btn btn-outline-danger btn-sm">
+                            <i class="fas fa-times"></i> Limpar Filtros
+                        </a>
+                    </div>
+                </div>
             </div>
         </form>
-        
-        <div class="mt-3">
-            <button type="submit" form="filtroForm" class="btn btn-outline-primary">
-                <i class="fas fa-search"></i> Filtrar
-            </button>
-            <a href="{{ url_for('main.obras') }}" class="btn btn-outline-secondary">
-                <i class="fas fa-times"></i> Limpar
-            </a>
-        </div>
     </div>
 </div>
 
@@ -659,5 +708,45 @@ $(document).ready(function() {
         $('#filtroForm').submit();
     });
 });
+
+// Função para definir períodos rápidos
+function setDateRange(periodo) {
+    const dataInicioInput = document.getElementById('data_inicio');
+    const dataFimInput = document.getElementById('data_fim');
+    const hoje = new Date();
+    let dataInicio, dataFim;
+
+    switch(periodo) {
+        case 'mes_atual':
+            dataInicio = new Date(hoje.getFullYear(), hoje.getMonth(), 1);
+            dataFim = new Date(hoje.getFullYear(), hoje.getMonth() + 1, 0);
+            break;
+        case 'ultimo_mes':
+            dataInicio = new Date(hoje.getFullYear(), hoje.getMonth() - 1, 1);
+            dataFim = new Date(hoje.getFullYear(), hoje.getMonth(), 0);
+            break;
+        case 'ultimos_3_meses':
+            dataInicio = new Date(hoje.getFullYear(), hoje.getMonth() - 2, 1);
+            dataFim = hoje;
+            break;
+        case 'ano_atual':
+            dataInicio = new Date(hoje.getFullYear(), 0, 1);
+            dataFim = hoje;
+            break;
+        case 'ultimo_ano':
+            dataInicio = new Date(hoje.getFullYear() - 1, 0, 1);
+            dataFim = new Date(hoje.getFullYear() - 1, 11, 31);
+            break;
+        default:
+            return;
+    }
+
+    // Formatar datas para YYYY-MM-DD
+    dataInicioInput.value = dataInicio.toISOString().split('T')[0];
+    dataFimInput.value = dataFim.toISOString().split('T')[0];
+    
+    // Auto-submit do formulário
+    document.getElementById('filtroForm').submit();
+}
 </script>
 {% endblock %}
