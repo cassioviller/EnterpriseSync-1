@@ -20,8 +20,8 @@ Preferred communication style: Simple, everyday language.
 - **Date**: August 5, 2025 (Final Implementation)
 - **Change**: Fixed incorrect overtime calculation logic for all timesheet records
 - **Impact**: Corrected calculation based on individual employee work schedules (entry anticipation + late departure)
-- **Files**: `kpis_engine.py` (lines 583-601), `encontrar_registro_correto.py`, `aplicar_correcao_geral_horas_extras.py`
-- **Result**: Example case 07:05-17:50 vs 07:12-17:00 schedule now correctly shows 0.95h (7min early + 50min late = 57min total) instead of 1.8h, all overtime calculations now use proper minute-based logic
+- **Files**: `kpis_engine.py` (lines 583-601), `aplicar_correcao_geral_horas_extras.py`
+- **Result**: Example case 07:05-17:50 vs 07:12-17:00 schedule now correctly shows 0.95h (7min early + 50min late = 57min total) instead of 1.8h, all overtime calculations now use proper minute-based logic, 43 records corrected automatically
 
 
 ### KPI System Complete Overhaul
