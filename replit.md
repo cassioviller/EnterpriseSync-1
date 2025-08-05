@@ -9,6 +9,13 @@ SIGE (Sistema Integrado de Gestão Empresarial) is a comprehensive business mana
 Preferred communication style: Simple, everyday language.
 
 ## Recent Changes (August 2025)
+### Food Registration System - Critical JavaScript Bug Fixed
+- **Date**: August 5, 2025 (Critical Fix)
+- **Change**: Fixed JavaScript bug causing individual food entries to save with incorrect dates (August instead of selected July dates)
+- **Impact**: Individual food registrations now save with correct user-selected dates; period-based entries were already working correctly
+- **Files**: `templates/alimentacao.html` (removed `valueAsDate = new Date()` and automatic date assignments), `corrigir_data_periodo_atual.py` for data correction
+- **Result**: Individual food entry for 30/07/2025 now saves correctly instead of creating multiple August entries, period entries (18/07 to 18/07) continue working properly
+
 ### Overtime Calculation Logic - Complete Fix Applied
 - **Date**: August 5, 2025 (Final Implementation)
 - **Change**: Fixed incorrect overtime calculation logic for all timesheet records

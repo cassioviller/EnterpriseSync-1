@@ -436,8 +436,9 @@ function setupPeriodoToggle() {
             dataInicioInput.setAttribute('required', '');
             dataFimInput.setAttribute('required', '');
             
-            // NÃO configurar valores padrão - deixar usuário escolher datas
-            // CORREÇÃO: Removidos valores automáticos que forçavam datas atuais
+            // CRÍTICO: Limpar campo data única para não interferir
+            dataInput.value = '';
+            
         } else {
             // Modo data única
             dataUnica.style.display = 'block';
@@ -448,7 +449,7 @@ function setupPeriodoToggle() {
             dataInicioInput.removeAttribute('required');
             dataFimInput.removeAttribute('required');
             
-            // Limpar valores do período
+            // CRÍTICO: Limpar campos de período para não interferir
             dataInicioInput.value = '';
             dataFimInput.value = '';
         }

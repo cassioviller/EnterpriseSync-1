@@ -1,100 +1,129 @@
 #!/usr/bin/env python3
 """
-CORREÇÃO URGENTE: Problema de Data no Lançamento por Período
-Problema identificado: Sistema salvando data atual em vez da data selecionada
+CORREÇÃO URGENTE: Registros de Alimentação com Data Incorreta
+Corrigir registros de 30/07/2025 que foram salvos em agosto
 """
 
 from app import app, db
-from models import RegistroAlimentacao, Funcionario
-from datetime import datetime, date
+from models import RegistroAlimentacao
+from datetime import date, datetime
+from sqlalchemy import and_
 
-def identificar_problema_data():
-    """Identifica exatamente onde está o problema de data"""
+def identificar_registros_incorretos():
+    """Identifica registros que foram salvos com data errada"""
     
     with app.app_context():
-        print("🔍 IDENTIFICANDO PROBLEMA DE DATA")
-        print("=" * 50)
+        print("🔍 IDENTIFICANDO REGISTROS COM DATA INCORRETA")
+        print("=" * 60)
         
-        # Buscar registros recentes que deveriam ser de julho mas estão em agosto
-        registros_suspeitos = RegistroAlimentacao.query.filter(
-            RegistroAlimentacao.data >= date(2025, 8, 1)  # Registros em agosto
-        ).order_by(RegistroAlimentacao.id.desc()).limit(5).all()
+        # Buscar registros de agosto que podem ter sido criados incorretamente
+        registros_agosto = RegistroAlimentacao.query.filter(
+            RegistroAlimentacao.data >= date(2025, 8, 1),
+            RegistroAlimentacao.data <= date(2025, 8, 5)
+        ).order_by(RegistroAlimentacao.data, RegistroAlimentacao.funcionario_id).all()
         
-        print("📋 REGISTROS SUSPEITOS (devem ser julho mas estão agosto):")
-        for reg in registros_suspeitos:
+        print(f"📊 Encontrados {len(registros_agosto)} registros em agosto (01-05/08)")
+        
+        # Agrupar por data para análise
+        por_data = {}
+        for registro in registros_agosto:
+            data_str = registro.data.strftime('%d/%m/%Y')
+            if data_str not in por_data:
+                por_data[data_str] = []
+            por_data[data_str].append(registro)
+        
+        print("\n📅 Registros por data:")
+        for data_str, regs in por_data.items():
+            print(f"   {data_str}: {len(regs)} registros")
+            
+            # Mostrar detalhes dos primeiros registros
+            for i, reg in enumerate(regs[:3]):
+                from models import Funcionario
+                funcionario = Funcionario.query.get(reg.funcionario_id)
+                funcionario_nome = funcionario.nome if funcionario else f"ID:{reg.funcionario_id}"
+                print(f"      {i+1}. {funcionario_nome} - {reg.tipo} - R$ {reg.valor}")
+            
+            if len(regs) > 3:
+                print(f"      ... e mais {len(regs) - 3} registros")
+        
+        return registros_agosto
+
+def corrigir_para_30_julho():
+    """Corrige registros para 30/07/2025"""
+    
+    with app.app_context():
+        print("\n🔧 CORREÇÃO: Movendo registros para 30/07/2025")
+        print("-" * 50)
+        
+        # Data de destino
+        data_correta = date(2025, 7, 30)
+        
+        # Buscar registros de agosto recentes (últimos 2 dias)
+        registros_recentes = RegistroAlimentacao.query.filter(
+            RegistroAlimentacao.data >= date(2025, 8, 1),
+            RegistroAlimentacao.data <= date(2025, 8, 5)
+        ).all()
+        
+        print(f"📋 Registros a corrigir: {len(registros_recentes)}")
+        
+        # Confirmar se devemos corrigir
+        resposta = input("❓ Corrigir todas as datas para 30/07/2025? (s/n): ")
+        
+        if resposta.lower() == 's':
+            corrigidos = 0
+            
+            for registro in registros_recentes:
+                data_original = registro.data
+                registro.data = data_correta
+                
+                from models import Funcionario
+                funcionario = Funcionario.query.get(registro.funcionario_id)
+                funcionario_nome = funcionario.nome if funcionario else f"ID:{registro.funcionario_id}"
+                print(f"   ✅ {funcionario_nome}: {data_original} → {data_correta}")
+                corrigidos += 1
+            
             try:
-                funcionario = Funcionario.query.filter_by(id=reg.funcionario_id).first()
-                nome = funcionario.nome if funcionario else f"ID:{reg.funcionario_id}"
+                db.session.commit()
+                print(f"\n🎉 SUCESSO: {corrigidos} registros corrigidos!")
+                print(f"   Todos os registros agora estão em 30/07/2025")
                 
-                print(f"   ID {reg.id}: {nome}")
-                print(f"      Data: {reg.data} (mês {reg.data.month})")
-                if hasattr(reg, 'created_at') and reg.created_at:
-                    print(f"      Criado: {reg.created_at}")
-                print()
             except Exception as e:
-                print(f"   Erro ao processar registro {reg.id}: {str(e)}")
-
-def testar_conversao_data_manual():
-    """Testa conversão de data manualmente"""
-    
-    print("🧪 TESTE MANUAL DE CONVERSÃO:")
-    print("-" * 40)
-    
-    # Testar os casos que estão dando problema
-    casos = [
-        "2025-07-15",  # Julho - como deveria ser
-        "2025-08-05",  # Agosto - como está sendo salvo
-    ]
-    
-    for caso in casos:
-        try:
-            data_convertida = datetime.strptime(caso, '%Y-%m-%d').date()
-            print(f"   '{caso}' → {data_convertida} (mês {data_convertida.month})")
-        except Exception as e:
-            print(f"   Erro em '{caso}': {str(e)}")
-
-def encontrar_linha_problema():
-    """Simula o problema para encontrar a linha específica"""
-    
-    print("\n🔧 SIMULANDO O PROBLEMA:")
-    print("-" * 40)
-    
-    # Simular dados que vêm do formulário (período julho)
-    data_inicio_form = "2025-07-01"
-    data_fim_form = "2025-07-07"
-    
-    print(f"Frontend envia: {data_inicio_form} até {data_fim_form}")
-    
-    # Simular conversão no backend
-    try:
-        from datetime import timedelta
-        
-        inicio = datetime.strptime(data_inicio_form, '%Y-%m-%d').date()
-        fim = datetime.strptime(data_fim_form, '%Y-%m-%d').date()
-        
-        print(f"Backend converte para: {inicio} até {fim}")
-        print(f"Mês início: {inicio.month}, Mês fim: {fim.month}")
-        
-        # Gerar datas do período
-        datas_processamento = []
-        data_atual = inicio
-        while data_atual <= fim:
-            datas_processamento.append(data_atual)
-            data_atual += timedelta(days=1)
-        
-        print(f"Datas geradas: {datas_processamento}")
-        
-        # Verificar se as datas estão corretas
-        for data in datas_processamento:
-            if data.month != 7:
-                print(f"❌ ERRO: Data {data} não é julho!")
-            else:
-                print(f"✅ OK: Data {data} é julho")
+                db.session.rollback()
+                print(f"\n❌ ERRO: {str(e)}")
                 
-    except Exception as e:
-        print(f"❌ Erro na conversão: {str(e)}")
+        else:
+            print("⚠️ Correção cancelada pelo usuário")
+
+def verificar_registros_julho():
+    """Verifica se há registros em julho para referência"""
+    
+    with app.app_context():
+        print("\n📊 VERIFICAÇÃO: Registros em julho")
+        print("-" * 40)
+        
+        registros_julho = RegistroAlimentacao.query.filter(
+            and_(
+                RegistroAlimentacao.data >= date(2025, 7, 1),
+                RegistroAlimentacao.data <= date(2025, 7, 31)
+            )
+        ).order_by(RegistroAlimentacao.data.desc()).all()
+        
+        print(f"Total em julho: {len(registros_julho)}")
+        
+        # Mostrar últimos registros
+        if registros_julho:
+            print("Últimos registros de julho:")
+            for reg in registros_julho[:5]:
+                from models import Funcionario
+                funcionario = Funcionario.query.get(reg.funcionario_id)
+                funcionario_nome = funcionario.nome if funcionario else f"ID:{reg.funcionario_id}"
+                print(f"   {reg.data.strftime('%d/%m/%Y')}: {funcionario_nome} - {reg.tipo}")
 
 if __name__ == "__main__":
-    identificar_problema_data()
-    testar_conversao_data_manual()
-    encontrar_linha_problema()
+    registros_incorretos = identificar_registros_incorretos()
+    verificar_registros_julho()
+    
+    if registros_incorretos:
+        corrigir_para_30_julho()
+    else:
+        print("\n✅ Nenhum registro incorreto encontrado")
