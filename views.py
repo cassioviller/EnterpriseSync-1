@@ -4227,6 +4227,76 @@ def nova_alimentacao():
         db.session.rollback()
         return jsonify({'success': False, 'message': f'Erro ao criar registros: {str(e)}'}), 500
 
+@main_bp.route('/alimentacao/excluir_massa', methods=['POST'])
+@login_required
+def excluir_alimentacao_massa():
+    """Excluir registros de alimentação em massa (para corrigir registros com data incorreta)"""
+    try:
+        data_inicio = request.form.get('data_inicio_exclusao')
+        data_fim = request.form.get('data_fim_exclusao')
+        
+        if not data_inicio or not data_fim:
+            return jsonify({'success': False, 'message': 'Datas são obrigatórias'}), 400
+        
+        # Converter datas
+        inicio = datetime.strptime(data_inicio, '%Y-%m-%d').date()
+        fim = datetime.strptime(data_fim, '%Y-%m-%d').date()
+        
+        # Buscar registros no período especificado
+        registros = RegistroAlimentacao.query.filter(
+            and_(
+                RegistroAlimentacao.data >= inicio,
+                RegistroAlimentacao.data <= fim
+            )
+        ).all()
+        
+        if not registros:
+            return jsonify({'success': False, 'message': 'Nenhum registro encontrado no período'}), 400
+        
+        # Filtrar apenas registros do admin atual
+        registros_admin = []
+        for registro in registros:
+            funcionario = Funcionario.query.get(registro.funcionario_id)
+            if funcionario and funcionario.admin_id == current_user.id:
+                registros_admin.append(registro)
+        
+        if not registros_admin:
+            return jsonify({'success': False, 'message': 'Nenhum registro encontrado para sua empresa'}), 400
+        
+        # Log para auditoria
+        print(f"🗑️ EXCLUSÃO EM MASSA: {len(registros_admin)} registros de {inicio} a {fim}")
+        print(f"   Usuário: {current_user.username}")
+        
+        # Excluir registros
+        count = len(registros_admin)
+        for registro in registros_admin:
+            # Remover custos relacionados também
+            custos_relacionados = CustoObra.query.filter(
+                and_(
+                    CustoObra.tipo == 'alimentacao',
+                    CustoObra.data == registro.data,
+                    CustoObra.descricao.contains(registro.funcionario_ref.nome)
+                )
+            ).all()
+            
+            for custo in custos_relacionados:
+                db.session.delete(custo)
+            
+            db.session.delete(registro)
+        
+        db.session.commit()
+        
+        return jsonify({
+            'success': True, 
+            'message': f'{count} registros excluídos com sucesso',
+            'count': count
+        })
+        
+    except Exception as e:
+        db.session.rollback()
+        print(f"❌ Erro na exclusão em massa: {str(e)}")
+        return jsonify({'success': False, 'message': f'Erro: {str(e)}'}), 500
+
 @main_bp.route('/alimentacao/<int:id>/editar', methods=['POST'])
 @login_required
 def editar_alimentacao(id):

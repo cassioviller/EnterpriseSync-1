@@ -127,6 +127,9 @@
                 <button type="button" class="btn btn-secondary btn-sm" onclick="limparFiltros()">
                     <i class="fas fa-times"></i> Limpar
                 </button>
+                <button type="button" class="btn btn-warning btn-sm ms-2" onclick="abrirExclusaoMassa()" title="Excluir registros com data incorreta">
+                    <i class="fas fa-trash-alt"></i> Exclusão em Massa
+                </button>
             </div>
         </div>
     </div>
@@ -392,6 +395,71 @@
         </div>
     </div>
 </div>
+
+<!-- Modal de Exclusão em Massa -->
+<div class="modal fade" id="modalExclusaoMassa" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header bg-danger text-white">
+                <h5 class="modal-title">
+                    <i class="fas fa-exclamation-triangle me-2"></i>
+                    Exclusão em Massa de Registros
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <form id="formExclusaoMassa">
+                <div class="modal-body">
+                    <div class="alert alert-warning">
+                        <i class="fas fa-exclamation-triangle me-2"></i>
+                        <strong>ATENÇÃO:</strong> Esta ação irá excluir TODOS os registros no período especificado e NÃO pode ser desfeita!
+                    </div>
+                    
+                    <div class="card">
+                        <div class="card-header">
+                            <h6 class="mb-0">Período para Exclusão</h6>
+                        </div>
+                        <div class="card-body">
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <label for="data_inicio_exclusao" class="form-label fw-bold">Data Inicial *</label>
+                                    <input type="date" class="form-control" id="data_inicio_exclusao" name="data_inicio_exclusao" required>
+                                </div>
+                                <div class="col-md-6">
+                                    <label for="data_fim_exclusao" class="form-label fw-bold">Data Final *</label>
+                                    <input type="date" class="form-control" id="data_fim_exclusao" name="data_fim_exclusao" required>
+                                </div>
+                            </div>
+                            
+                            <div class="mt-3">
+                                <button type="button" class="btn btn-outline-danger btn-sm" onclick="preencherPeriodoAgosto()">
+                                    <i class="fas fa-calendar me-1"></i>01/08 a 05/08/2025 (Registros Incorretos)
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="mt-3">
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="confirmarExclusao" required>
+                            <label class="form-check-label fw-bold text-danger" for="confirmarExclusao">
+                                Eu entendo que esta ação é IRREVERSÍVEL e confirmo a exclusão
+                            </label>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                        <i class="fas fa-times me-2"></i>Cancelar
+                    </button>
+                    <button type="submit" class="btn btn-danger" id="btnExcluirMassa" disabled>
+                        <i class="fas fa-trash-alt me-2"></i>Excluir Registros
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
 {% endblock %}
 
 {% block scripts %}
@@ -635,6 +703,76 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
             });
         }
+    }
+});
+
+// ================== EXCLUSÃO EM MASSA ==================
+function abrirExclusaoMassa() {
+    const modal = new bootstrap.Modal(document.getElementById('modalExclusaoMassa'));
+    modal.show();
+}
+
+function preencherPeriodoAgosto() {
+    document.getElementById('data_inicio_exclusao').value = '2025-08-01';
+    document.getElementById('data_fim_exclusao').value = '2025-08-05';
+    habilitarBotaoExclusao();
+}
+
+function habilitarBotaoExclusao() {
+    const dataInicio = document.getElementById('data_inicio_exclusao').value;
+    const dataFim = document.getElementById('data_fim_exclusao').value;
+    const confirmacao = document.getElementById('confirmarExclusao').checked;
+    
+    const btnExcluir = document.getElementById('btnExcluirMassa');
+    btnExcluir.disabled = !(dataInicio && dataFim && confirmacao);
+}
+
+// Event listeners para exclusão em massa
+document.addEventListener('DOMContentLoaded', function() {
+    // Habilitar/desabilitar botão conforme preenchimento
+    const camposExclusao = ['data_inicio_exclusao', 'data_fim_exclusao', 'confirmarExclusao'];
+    camposExclusao.forEach(id => {
+        const elemento = document.getElementById(id);
+        if (elemento) {
+            elemento.addEventListener('change', habilitarBotaoExclusao);
+        }
+    });
+    
+    // Formulário de exclusão em massa
+    const formExclusao = document.getElementById('formExclusaoMassa');
+    if (formExclusao) {
+        formExclusao.addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            const dataInicio = document.getElementById('data_inicio_exclusao').value;
+            const dataFim = document.getElementById('data_fim_exclusao').value;
+            
+            if (!confirm(`CONFIRMA a exclusão de TODOS os registros de ${dataInicio} a ${dataFim}?\n\nEsta ação NÃO pode ser desfeita!`)) {
+                return;
+            }
+            
+            const formData = new FormData();
+            formData.append('data_inicio_exclusao', dataInicio);
+            formData.append('data_fim_exclusao', dataFim);
+            
+            fetch('/alimentacao/excluir_massa', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    alert(`✅ ${data.count} registros excluídos com sucesso!`);
+                    location.reload(); // Recarregegar página para atualizar lista
+                } else {
+                    alert(`❌ Erro: ${data.message}`);
+                }
+            })
+            .catch(error => {
+                console.error('Erro:', error);
+                alert('❌ Erro ao excluir registros');
+            });
+        });
     }
 });
 
