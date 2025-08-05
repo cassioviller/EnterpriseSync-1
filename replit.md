@@ -16,13 +16,13 @@ Preferred communication style: Simple, everyday language.
 - **Files**: `templates/alimentacao.html` (removed `valueAsDate = new Date()` and automatic date assignments), `corrigir_data_periodo_atual.py` for data correction
 - **Result**: Individual food entry for 30/07/2025 now saves correctly instead of creating multiple August entries, period entries (18/07 to 18/07) continue working properly
 
-### Overtime Calculation Logic - Complete Fix Applied
+### Overtime Calculation Logic - Complete System Overhaul
 - **Date**: August 5, 2025 (Final Implementation)
-- **Change**: Fixed incorrect overtime calculation logic for all timesheet records and delay calculations
-- **Impact**: Corrected calculation based on individual employee work schedules using precise minute-based logic for overtime (early arrival + late departure) and delays (late arrival + early departure)
-- **Files**: `kpis_engine.py` (lines 583-601), `aplicar_correcao_geral_horas_extras.py`, `corrigir_todos_calculos_definitivo.py`, `HOTFIX_HORAS_EXTRAS_PRODUCAO.py`
-- **Result**: All 391 timesheet records corrected - João Silva Santos 31/07 shows 0.95h extras (7min+50min), Ana Paula Rodrigues 29/07 shows 1.0h extras + 0.3h delays (18min late + 60min overtime), system now uses proper individual schedule-based calculations instead of fixed 8-hour base
-- **Production Deployment**: `HOTFIX_HORAS_EXTRAS_PRODUCAO.py` ready for production deployment with complete instructions in `INSTRUCOES_DEPLOY_HOTFIX.md`
+- **Change**: Completely consolidated all overtime calculation logic across multiple conflicting files into single standardized approach
+- **Impact**: Fixed multiple conflicting logic implementations in kpis_engine.py, utils.py, views.py causing interface inconsistencies; all calculations now use unified 07:12-17:00 standard schedule with independent overtime/delay calculations
+- **Files**: `kpis_engine.py` (lines 576-614), `CORRECAO_HORAS_EXTRAS_COMPLETA.py`, `corrigir_registros_especificos.py`, `HOTFIX_HORAS_EXTRAS_PRODUCAO.py`, `INSTRUCOES_DEPLOY_HOTFIX_FINAL.md`
+- **Result**: System-wide consolidation completed - João Silva Santos 31/07 shows correct 0.95h extras (7min early + 50min late), Ana Paula Rodrigues 29/07 shows 1.0h extras + 0.3h delays calculated independently, interface now reflects accurate calculations
+- **Production Deployment**: Complete hotfix available with detailed instructions for production environment
 
 
 ### KPI System Complete Overhaul
