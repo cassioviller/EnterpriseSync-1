@@ -142,9 +142,9 @@
                 </thead>
                 <tbody>
                     {% for registro in registros %}
-                    <tr>
-                        <td>
-                            <div class="d-flex align-items-center">
+                    <tr id="registro-{{ registro.id }}" data-registro-id="{{ registro.id }}">
+                        <td class="funcionario-cell">
+                            <div class="d-flex align-items-center view-mode">
                                 <div class="avatar-sm me-2">
                                     <div class="bg-primary text-white rounded-circle d-flex align-items-center justify-content-center" style="width: 32px; height: 32px; font-size: 12px;">
                                         {{ registro.funcionario.nome[:2].upper() if registro.funcionario else '?' }}
@@ -152,27 +152,81 @@
                                 </div>
                                 <strong>{{ registro.funcionario.nome if registro.funcionario else 'Nome não encontrado' }}</strong>
                             </div>
+                            <select class="form-select form-select-sm edit-mode d-none" name="funcionario_id">
+                                {% for func in funcionarios %}
+                                <option value="{{ func.id }}" {% if func.id == registro.funcionario_id %}selected{% endif %}>
+                                    {{ func.nome }}
+                                </option>
+                                {% endfor %}
+                            </select>
                         </td>
-                        <td>{{ registro.data.strftime('%d/%m/%Y') }}</td>
-                        <td>
-                            {% if registro.tipo == 'cafe' %}
-                                <span class="badge bg-warning">Café da Manhã</span>
-                            {% elif registro.tipo == 'almoco' %}
-                                <span class="badge bg-success">Almoço</span>
-                            {% elif registro.tipo == 'jantar' %}
-                                <span class="badge bg-primary">Jantar</span>
-                            {% else %}
-                                <span class="badge bg-secondary">Lanche</span>
-                            {% endif %}
+                        <td class="data-cell">
+                            <span class="view-mode">{{ registro.data.strftime('%d/%m/%Y') }}</span>
+                            <input type="date" class="form-control form-control-sm edit-mode d-none" 
+                                   value="{{ registro.data.strftime('%Y-%m-%d') }}" name="data">
                         </td>
-                        <td>R$ {{ '{:,.2f}'.format(registro.valor) }}</td>
-                        <td>{{ registro.obra_ref.nome if registro.obra_ref else '-' }}</td>
-                        <td>{{ registro.restaurante_ref.nome if registro.restaurante_ref else '-' }}</td>
-                        <td>{{ registro.observacoes or '-' }}</td>
+                        <td class="tipo-cell">
+                            <span class="view-mode">
+                                {% if registro.tipo == 'cafe' %}
+                                    <span class="badge bg-warning">Café da Manhã</span>
+                                {% elif registro.tipo == 'almoco' %}
+                                    <span class="badge bg-success">Almoço</span>
+                                {% elif registro.tipo == 'jantar' %}
+                                    <span class="badge bg-primary">Jantar</span>
+                                {% else %}
+                                    <span class="badge bg-secondary">Lanche</span>
+                                {% endif %}
+                            </span>
+                            <select class="form-select form-select-sm edit-mode d-none" name="tipo">
+                                <option value="cafe" {% if registro.tipo == 'cafe' %}selected{% endif %}>Café da Manhã</option>
+                                <option value="almoco" {% if registro.tipo == 'almoco' %}selected{% endif %}>Almoço</option>
+                                <option value="jantar" {% if registro.tipo == 'jantar' %}selected{% endif %}>Jantar</option>
+                                <option value="lanche" {% if registro.tipo == 'lanche' %}selected{% endif %}>Lanche</option>
+                            </select>
+                        </td>
+                        <td class="valor-cell">
+                            <span class="view-mode">R$ {{ '{:,.2f}'.format(registro.valor) }}</span>
+                            <input type="number" step="0.01" class="form-control form-control-sm edit-mode d-none" 
+                                   value="{{ registro.valor }}" name="valor" min="0">
+                        </td>
+                        <td class="obra-cell">
+                            <span class="view-mode">{{ registro.obra_ref.nome if registro.obra_ref else '-' }}</span>
+                            <select class="form-select form-select-sm edit-mode d-none" name="obra_id">
+                                <option value="">Selecione uma obra</option>
+                                {% for obra in obras %}
+                                <option value="{{ obra.id }}" {% if obra.id == registro.obra_id %}selected{% endif %}>
+                                    {{ obra.nome }}
+                                </option>
+                                {% endfor %}
+                            </select>
+                        </td>
+                        <td class="restaurante-cell">
+                            <span class="view-mode">{{ registro.restaurante_ref.nome if registro.restaurante_ref else '-' }}</span>
+                            <select class="form-select form-select-sm edit-mode d-none" name="restaurante_id">
+                                <option value="">Selecione um restaurante</option>
+                                {% for rest in restaurantes %}
+                                <option value="{{ rest.id }}" {% if rest.id == registro.restaurante_id %}selected{% endif %}>
+                                    {{ rest.nome }}
+                                </option>
+                                {% endfor %}
+                            </select>
+                        </td>
+                        <td class="observacoes-cell">
+                            <span class="view-mode">{{ registro.observacoes or '-' }}</span>
+                            <input type="text" class="form-control form-control-sm edit-mode d-none" 
+                                   value="{{ registro.observacoes or '' }}" name="observacoes" 
+                                   placeholder="Observações">
+                        </td>
                         <td>
                             <div class="btn-group btn-group-sm">
-                                <button class="btn btn-outline-primary" onclick="editarRegistro({{ registro.id }})">
+                                <button class="btn btn-outline-primary btn-editar" onclick="editarRegistroInline({{ registro.id }})">
                                     <i class="fas fa-edit"></i>
+                                </button>
+                                <button class="btn btn-outline-success btn-salvar d-none" onclick="salvarEdicao({{ registro.id }})">
+                                    <i class="fas fa-save"></i>
+                                </button>
+                                <button class="btn btn-outline-secondary btn-cancelar d-none" onclick="cancelarEdicao({{ registro.id }})">
+                                    <i class="fas fa-times"></i>
                                 </button>
                                 <button class="btn btn-outline-danger" onclick="excluirRegistro({{ registro.id }})">
                                     <i class="fas fa-trash"></i>
@@ -585,6 +639,223 @@ function limparFiltros() {
     document.getElementById('dataFim').value = '';
     let table = $('#alimentacaoTable').DataTable();
     table.search('').columns().search('').draw();
+}
+
+// Sistema de edição inline
+let registroOriginal = {};
+
+function editarRegistroInline(registroId) {
+    const row = document.querySelector(`#registro-${registroId}`);
+    
+    // Salvar dados originais
+    registroOriginal[registroId] = {
+        funcionario_id: row.querySelector('[name="funcionario_id"]').value,
+        data: row.querySelector('[name="data"]').value,
+        tipo: row.querySelector('[name="tipo"]').value,
+        valor: row.querySelector('[name="valor"]').value,
+        obra_id: row.querySelector('[name="obra_id"]').value,
+        restaurante_id: row.querySelector('[name="restaurante_id"]').value,
+        observacoes: row.querySelector('[name="observacoes"]').value
+    };
+    
+    // Alternar para modo edição
+    row.querySelectorAll('.view-mode').forEach(el => el.classList.add('d-none'));
+    row.querySelectorAll('.edit-mode').forEach(el => el.classList.remove('d-none'));
+    
+    // Alternar botões
+    row.querySelector('.btn-editar').classList.add('d-none');
+    row.querySelector('.btn-salvar').classList.remove('d-none');
+    row.querySelector('.btn-cancelar').classList.remove('d-none');
+    
+    // Adicionar classe visual
+    row.classList.add('table-warning');
+}
+
+function cancelarEdicao(registroId) {
+    const row = document.querySelector(`#registro-${registroId}`);
+    
+    // Restaurar valores originais
+    if (registroOriginal[registroId]) {
+        Object.keys(registroOriginal[registroId]).forEach(field => {
+            const input = row.querySelector(`[name="${field}"]`);
+            if (input) {
+                input.value = registroOriginal[registroId][field];
+            }
+        });
+    }
+    
+    // Voltar ao modo visualização
+    voltarModoVisualizacao(registroId);
+}
+
+function voltarModoVisualizacao(registroId) {
+    const row = document.querySelector(`#registro-${registroId}`);
+    
+    // Alternar para modo visualização
+    row.querySelectorAll('.view-mode').forEach(el => el.classList.remove('d-none'));
+    row.querySelectorAll('.edit-mode').forEach(el => el.classList.add('d-none'));
+    
+    // Alternar botões
+    row.querySelector('.btn-editar').classList.remove('d-none');
+    row.querySelector('.btn-salvar').classList.add('d-none');
+    row.querySelector('.btn-cancelar').classList.add('d-none');
+    
+    // Remover classe visual
+    row.classList.remove('table-warning');
+}
+
+function salvarEdicao(registroId) {
+    const row = document.querySelector(`#registro-${registroId}`);
+    
+    // Coletar dados do formulário
+    const formData = {
+        funcionario_id: row.querySelector('[name="funcionario_id"]').value,
+        data: row.querySelector('[name="data"]').value,
+        tipo: row.querySelector('[name="tipo"]').value,
+        valor: parseFloat(row.querySelector('[name="valor"]').value),
+        obra_id: row.querySelector('[name="obra_id"]').value || null,
+        restaurante_id: row.querySelector('[name="restaurante_id"]').value || null,
+        observacoes: row.querySelector('[name="observacoes"]').value
+    };
+    
+    // Validações básicas
+    if (!formData.funcionario_id || !formData.data || !formData.tipo || !formData.valor) {
+        alert('Preencha todos os campos obrigatórios: Funcionário, Data, Tipo e Valor');
+        return;
+    }
+    
+    if (formData.valor <= 0) {
+        alert('O valor deve ser maior que zero');
+        return;
+    }
+    
+    // Desabilitar botões durante salvamento
+    const btnSalvar = row.querySelector('.btn-salvar');
+    const btnCancelar = row.querySelector('.btn-cancelar');
+    btnSalvar.disabled = true;
+    btnCancelar.disabled = true;
+    btnSalvar.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+    
+    // Enviar dados via AJAX
+    fetch(`/alimentacao/editar/${registroId}`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(formData)
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            // Atualizar interface com novos dados
+            atualizarVisualizacaoRegistro(registroId, data.registro);
+            voltarModoVisualizacao(registroId);
+            
+            // Mostrar mensagem de sucesso
+            mostrarToast('Registro atualizado com sucesso!', 'success');
+        } else {
+            throw new Error(data.message || 'Erro ao salvar');
+        }
+    })
+    .catch(error => {
+        console.error('Erro:', error);
+        alert('Erro ao salvar registro: ' + error.message);
+    })
+    .finally(() => {
+        // Reabilitar botões
+        btnSalvar.disabled = false;
+        btnCancelar.disabled = false;
+        btnSalvar.innerHTML = '<i class="fas fa-save"></i>';
+    });
+}
+
+function atualizarVisualizacaoRegistro(registroId, dadosAtualizados) {
+    const row = document.querySelector(`#registro-${registroId}`);
+    
+    // Atualizar campos de visualização
+    const funcionarioCell = row.querySelector('.funcionario-cell .view-mode strong');
+    if (funcionarioCell) {
+        funcionarioCell.textContent = dadosAtualizados.funcionario_nome;
+    }
+    
+    const dataCell = row.querySelector('.data-cell .view-mode');
+    if (dataCell) {
+        dataCell.textContent = dadosAtualizados.data_formatada;
+    }
+    
+    const tipoCell = row.querySelector('.tipo-cell .view-mode');
+    if (tipoCell) {
+        const tipoMap = {
+            'cafe': '<span class="badge bg-warning">Café da Manhã</span>',
+            'almoco': '<span class="badge bg-success">Almoço</span>',
+            'jantar': '<span class="badge bg-primary">Jantar</span>',
+            'lanche': '<span class="badge bg-secondary">Lanche</span>'
+        };
+        tipoCell.innerHTML = tipoMap[dadosAtualizados.tipo] || '<span class="badge bg-secondary">Lanche</span>';
+    }
+    
+    const valorCell = row.querySelector('.valor-cell .view-mode');
+    if (valorCell) {
+        valorCell.textContent = `R$ ${parseFloat(dadosAtualizados.valor).toLocaleString('pt-BR', {minimumFractionDigits: 2})}`;
+    }
+    
+    const obraCell = row.querySelector('.obra-cell .view-mode');
+    if (obraCell) {
+        obraCell.textContent = dadosAtualizados.obra_nome || '-';
+    }
+    
+    const restauranteCell = row.querySelector('.restaurante-cell .view-mode');
+    if (restauranteCell) {
+        restauranteCell.textContent = dadosAtualizados.restaurante_nome || '-';
+    }
+    
+    const observacoesCell = row.querySelector('.observacoes-cell .view-mode');
+    if (observacoesCell) {
+        observacoesCell.textContent = dadosAtualizados.observacoes || '-';
+    }
+}
+
+function mostrarToast(message, type = 'info') {
+    // Criar toast simples
+    const toast = document.createElement('div');
+    toast.className = `alert alert-${type === 'success' ? 'success' : 'danger'} position-fixed`;
+    toast.style.cssText = 'top: 20px; right: 20px; z-index: 9999; max-width: 300px;';
+    toast.innerHTML = `
+        <div class="d-flex align-items-center">
+            <i class="fas fa-${type === 'success' ? 'check-circle' : 'exclamation-circle'} me-2"></i>
+            ${message}
+        </div>
+    `;
+    
+    document.body.appendChild(toast);
+    
+    // Remover após 3 segundos
+    setTimeout(() => {
+        toast.remove();
+    }, 3000);
+}
+
+function excluirRegistro(registroId) {
+    if (!confirm('Tem certeza que deseja excluir este registro?')) {
+        return;
+    }
+    
+    fetch(`/alimentacao/excluir/${registroId}`, {
+        method: 'DELETE'
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            document.querySelector(`#registro-${registroId}`).remove();
+            mostrarToast('Registro excluído com sucesso!', 'success');
+        } else {
+            throw new Error(data.message || 'Erro ao excluir');
+        }
+    })
+    .catch(error => {
+        console.error('Erro:', error);
+        alert('Erro ao excluir registro: ' + error.message);
+    });
     
     // Event listeners para mudanças nas datas do período
     document.getElementById('data_inicio').addEventListener('change', atualizarContadores);
