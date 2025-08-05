@@ -20,8 +20,9 @@ Preferred communication style: Simple, everyday language.
 - **Date**: August 5, 2025 (Final Implementation)
 - **Change**: Fixed incorrect overtime calculation logic for all timesheet records and delay calculations
 - **Impact**: Corrected calculation based on individual employee work schedules using precise minute-based logic for overtime (early arrival + late departure) and delays (late arrival + early departure)
-- **Files**: `kpis_engine.py` (lines 583-601), `aplicar_correcao_geral_horas_extras.py`, `corrigir_todos_calculos_definitivo.py`
+- **Files**: `kpis_engine.py` (lines 583-601), `aplicar_correcao_geral_horas_extras.py`, `corrigir_todos_calculos_definitivo.py`, `HOTFIX_HORAS_EXTRAS_PRODUCAO.py`
 - **Result**: All 391 timesheet records corrected - João Silva Santos 31/07 shows 0.95h extras (7min+50min), Ana Paula Rodrigues 29/07 shows 1.0h extras + 0.3h delays (18min late + 60min overtime), system now uses proper individual schedule-based calculations instead of fixed 8-hour base
+- **Production Deployment**: `HOTFIX_HORAS_EXTRAS_PRODUCAO.py` ready for production deployment with complete instructions in `INSTRUCOES_DEPLOY_HOTFIX.md`
 
 
 ### KPI System Complete Overhaul
