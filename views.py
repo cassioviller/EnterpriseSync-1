@@ -4242,6 +4242,15 @@ def nova_alimentacao():
         db.session.rollback()
         return jsonify({'success': False, 'message': f'Erro ao criar registros: {str(e)}'}), 500
 
+# Propostas (placeholder temporário)
+@main_bp.route('/propostas')
+@login_required
+def lista_propostas():
+    """Página de propostas - em desenvolvimento"""
+    return render_template('propostas.html', 
+                         page_title="Propostas Comerciais",
+                         message="Módulo de propostas em desenvolvimento")
+
 # Relatórios
 @main_bp.route('/relatorios')
 @login_required
