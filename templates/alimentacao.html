@@ -157,7 +157,10 @@
                 <tbody>
                     {% for registro in registros %}
                     <tr id="registro-{{ registro.id }}" data-registro-id="{{ registro.id }}">
-                        <td class="funcionario-nome">{{ registro.funcionario_ref.nome if registro.funcionario_ref else '-' }}</td>
+                        <td class="funcionario-nome">
+                            <strong>{{ registro.funcionario_ref.nome if registro.funcionario_ref else 'Funcionário não encontrado' }}</strong>
+                            <br><small class="text-muted">ID: {{ registro.funcionario_id }}</small>
+                        </td>
                         <td class="data-registro">{{ registro.data.strftime('%d/%m/%Y') }}</td>
                         <td class="tipo-refeicao">
                             {% if registro.tipo == 'cafe' %}
@@ -176,10 +179,10 @@
                         <td class="observacoes-registro">{{ registro.observacoes or '-' }}</td>
                         <td>
                             <div class="btn-group btn-group-sm">
-                                <button class="btn btn-outline-primary btn-editar" data-id="{{ registro.id }}" onclick="editarRegistroInline({{ registro.id }})">
+                                <button class="btn btn-outline-primary btn-editar" data-id="{{ registro.id }}" onclick="editarRegistroInline({{ registro.id }})" title="Editar inline">
                                     <i class="fas fa-edit"></i>
                                 </button>
-                                <button class="btn btn-outline-danger" onclick="excluirRegistro({{ registro.id }})">
+                                <button class="btn btn-outline-danger" onclick="excluirRegistro({{ registro.id }})" title="Excluir registro">
                                     <i class="fas fa-trash"></i>
                                 </button>
                             </div>
@@ -835,44 +838,6 @@ function showToast(message, type = 'info') {
         }
     }, 3000);
 }
-    
-    // Event listeners para dropdowns obrigatórios
-    document.getElementById('obra_id').addEventListener('change', atualizarContadores);
-    document.getElementById('restaurante_id').addEventListener('change', atualizarContadores);
-    
-    // Event listeners para mudanças nas datas do período
-    document.getElementById('data_inicio').addEventListener('change', atualizarContadores);
-    document.getElementById('data_fim').addEventListener('change', atualizarContadores);
-    
-    // Funcionalidade de busca
-    buscaInput.addEventListener('input', function() {
-        const termo = this.value.toLowerCase();
-        const funcionarios = document.querySelectorAll('.funcionario-item');
-        
-        funcionarios.forEach(item => {
-            const nome = item.getAttribute('data-nome');
-            if (nome.includes(termo)) {
-                item.style.display = '';
-            } else {
-                item.style.display = 'none';
-            }
-        });
-        
-        // Atualizar "Selecionar Todos" considerando apenas visíveis
-        atualizarContadores();
-    });
-    
-    // Reset form quando modal é fechado
-    $('#alimentacaoModal').on('hidden.bs.modal', function() {
-        document.getElementById('alimentacaoForm').reset();
-        checkboxes.forEach(checkbox => checkbox.checked = false);
-        atualizarContadores();
-        buscaInput.value = '';
-        
-        // Mostrar todos os funcionários
-        document.querySelectorAll('.funcionario-item').forEach(item => {
-            item.style.display = '';
-        });
     });
 }
 
@@ -912,122 +877,15 @@ document.getElementById('alimentacaoForm').addEventListener('submit', function(e
     });
 });
 
-// Função para editar registro
-function editarRegistro(id) {
-    fetch(`/alimentacao/${id}/editar`)
-        .then(response => response.json())
-        .then(data => {
-            // Preencher modal com dados do registro
-            document.getElementById('modalTitle').textContent = 'Editar Registro de Alimentação';
-            document.getElementById('data').value = data.data;
-            document.getElementById('tipo').value = data.tipo;
-            document.getElementById('valor').value = data.valor;
-            document.getElementById('obra_id').value = data.obra_id;
-            document.getElementById('restaurante_id').value = data.restaurante_id;
-            document.getElementById('observacoes').value = data.observacoes;
-            
-            // Selecionar apenas o funcionário específico
-            document.querySelectorAll('.funcionario-checkbox').forEach(checkbox => {
-                checkbox.checked = checkbox.value == data.funcionario_id;
-                checkbox.disabled = checkbox.value != data.funcionario_id;
-            });
-            
-            // Atualizar URL do formulário para edição
-            document.getElementById('alimentacaoForm').action = `/alimentacao/${id}/editar`;
-            
-            // Mostrar modal
-            $('#alimentacaoModal').modal('show');
-        })
-        .catch(error => {
-            console.error('Erro:', error);
-            alert('Erro ao carregar dados para edição');
-        });
-}
-
-// Função para excluir registro  
-function excluirRegistro(id) {
-    if (confirm('Tem certeza que deseja excluir este registro?')) {
-        fetch(`/alimentacao/${id}/excluir`, {
-            method: 'DELETE'
-        })
-        .then(response => response.json())
-        .then(data => {
-            if (data.success) {
-                location.reload();
-            } else {
-                alert('Erro: ' + data.message);
-            }
-        })
-        .catch(error => {
-            console.error('Erro:', error);
-            alert('Erro ao excluir registro');
-        });
+// ================== INICIALIZAÇÃO ==================
+document.addEventListener('DOMContentLoaded', function() {
+    // Inicializar contadores do modal
+    if (typeof initializeModalCounters === 'function') {
+        initializeModalCounters();
     }
-}
-
-// Reset form quando abrir modal para novo registro
-$('#alimentacaoModal').on('show.bs.modal', function() {
-    // Se não está editando, resetar para novo registro
-    if (document.getElementById('modalTitle').textContent.includes('Novo')) {
-        document.getElementById('alimentacaoForm').action = "{{ url_for('main.nova_alimentacao') }}";
-        
-        // Habilitar todos os checkboxes
-        document.querySelectorAll('.funcionario-checkbox').forEach(checkbox => {
-            checkbox.disabled = false;
-        });
-    }
+    
+    console.log('✅ Sistema de controle de alimentação carregado');
 });
-
-// Handler para formulário de alimentação
-document.getElementById('alimentacaoForm').addEventListener('submit', function(e) {
-    e.preventDefault();
-    
-    const selecionados = document.querySelectorAll('.funcionario-checkbox:checked');
-    const formData = new FormData(this);
-    
-    // Remover funcionario_id do FormData se existir
-    formData.delete('funcionario_id');
-    
-    // Adicionar cada funcionário selecionado
-    selecionados.forEach(checkbox => {
-        formData.append('funcionarios_ids[]', checkbox.value);
-    });
-    
-    // Enviar via fetch
-    fetch(this.action, {
-        method: 'POST',
-        body: formData
-    })
-    .then(response => response.json())
-    .then(data => {
-        if (data.success) {
-            alert(data.message);
-            $('#alimentacaoModal').modal('hide');
-            location.reload();
-        } else {
-            alert(data.message || 'Erro ao salvar registros de alimentação');
-        }
-    })
-    .catch(error => {
-        console.error('Erro:', error);
-        alert('Erro ao salvar registros de alimentação');
-    });
-});
-
-function editarRegistro(id) {
-    // Implementar edição
-    alert('Funcionalidade de edição será implementada na próxima versão');
-}
-
-function excluirRegistro(id) {
-    if (confirm('Tem certeza que deseja excluir este registro?')) {
-        const form = document.createElement('form');
-        form.method = 'POST';
-        form.action = '/alimentacao/' + id + '/excluir';
-        document.body.appendChild(form);
-        form.submit();
-    }
-}
 </script>
 
 {% endblock %}
