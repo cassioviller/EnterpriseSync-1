@@ -877,14 +877,149 @@ document.getElementById('alimentacaoForm').addEventListener('submit', function(e
     });
 });
 
-// ================== INICIALIZAÇÃO ==================
-document.addEventListener('DOMContentLoaded', function() {
-    // Inicializar contadores do modal
-    if (typeof initializeModalCounters === 'function') {
-        initializeModalCounters();
+// ================== EDIÇÃO INLINE ==================
+function editarRegistroInline(id) {
+    const row = document.getElementById(`registro-${id}`);
+    if (!row) return;
+    
+    // Pegar dados originais
+    const originalData = {
+        data: row.querySelector('.data-registro').textContent,
+        funcionario: row.querySelector('.funcionario-nome').textContent.trim().split('\n')[0],
+        tipo: row.querySelector('.tipo-refeicao .badge').textContent,
+        valor: row.querySelector('.valor-registro').textContent.replace('R$ ', '').replace(',', '.'),
+        obra: row.querySelector('.obra-nome').textContent,
+        observacoes: row.querySelector('.observacoes-registro').textContent
+    };
+    
+    // Substituir células por inputs
+    row.innerHTML = `
+        <td>
+            <strong>${originalData.funcionario}</strong>
+            <br><small class="text-muted">Editando...</small>
+        </td>
+        <td>
+            <input type="date" class="form-control form-control-sm" value="${convertDateToInput(originalData.data)}" id="edit-data-${id}">
+        </td>
+        <td>
+            <select class="form-select form-select-sm" id="edit-tipo-${id}">
+                <option value="cafe" ${getTipoFromBadge(originalData.tipo) === 'cafe' ? 'selected' : ''}>Café da Manhã</option>
+                <option value="almoco" ${getTipoFromBadge(originalData.tipo) === 'almoco' ? 'selected' : ''}>Almoço</option>
+                <option value="jantar" ${getTipoFromBadge(originalData.tipo) === 'jantar' ? 'selected' : ''}>Jantar</option>
+                <option value="lanche" ${getTipoFromBadge(originalData.tipo) === 'lanche' ? 'selected' : ''}>Lanche</option>
+            </select>
+        </td>
+        <td>
+            <input type="number" class="form-control form-control-sm" step="0.01" value="${originalData.valor}" id="edit-valor-${id}" placeholder="0.00">
+        </td>
+        <td>${originalData.obra}</td>
+        <td>-</td>
+        <td>
+            <input type="text" class="form-control form-control-sm" value="${originalData.observacoes === '-' ? '' : originalData.observacoes}" id="edit-obs-${id}" placeholder="Observações">
+        </td>
+        <td>
+            <div class="btn-group btn-group-sm">
+                <button class="btn btn-success" onclick="salvarEdicaoInline(${id})" title="Salvar alterações">
+                    <i class="fas fa-check"></i>
+                </button>
+                <button class="btn btn-secondary" onclick="cancelarEdicaoInline(${id})" title="Cancelar edição">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+        </td>
+    `;
+}
+
+function getTipoFromBadge(badgeText) {
+    const tipos = {
+        'Café da Manhã': 'cafe',
+        'Almoço': 'almoco', 
+        'Jantar': 'jantar',
+        'Lanche': 'lanche'
+    };
+    return tipos[badgeText] || 'almoco';
+}
+
+function convertDateToInput(dateStr) {
+    // Converter de dd/mm/yyyy para yyyy-mm-dd
+    const parts = dateStr.split('/');
+    if (parts.length === 3) {
+        return `${parts[2]}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`;
+    }
+    return dateStr;
+}
+
+function salvarEdicaoInline(id) {
+    const data = document.getElementById(`edit-data-${id}`).value;
+    const tipo = document.getElementById(`edit-tipo-${id}`).value;
+    const valor = document.getElementById(`edit-valor-${id}`).value;
+    const observacoes = document.getElementById(`edit-obs-${id}`).value;
+    
+    // Validações básicas
+    if (!data || !valor) {
+        showToast('Preencha todos os campos obrigatórios', 'error');
+        return;
     }
     
-    console.log('✅ Sistema de controle de alimentação carregado');
+    // Enviar dados
+    const formData = new FormData();
+    formData.append('data', data);
+    formData.append('tipo', tipo);
+    formData.append('valor', valor);
+    formData.append('observacoes', observacoes);
+    
+    fetch(`/alimentacao/${id}/editar`, {
+        method: 'POST',
+        body: formData
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            showToast('Registro atualizado com sucesso!', 'success');
+            // Recarregar a página após 1 segundo
+            setTimeout(() => location.reload(), 1000);
+        } else {
+            showToast('Erro ao salvar: ' + data.message, 'error');
+        }
+    })
+    .catch(error => {
+        console.error('Erro:', error);
+        showToast('Erro de conexão', 'error');
+    });
+}
+
+function cancelarEdicaoInline(id) {
+    // Recarregar página para cancelar edição
+    location.reload();
+}
+
+function excluirRegistro(id) {
+    if (confirm('Tem certeza que deseja excluir este registro?')) {
+        fetch(`/alimentacao/${id}/excluir`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                showToast('Registro excluído com sucesso!', 'success');
+                document.getElementById(`registro-${id}`).remove();
+            } else {
+                showToast('Erro ao excluir: ' + data.message, 'error');
+            }
+        })
+        .catch(error => {
+            console.error('Erro:', error);
+            showToast('Erro de conexão', 'error');
+        });
+    }
+}
+
+// ================== INICIALIZAÇÃO ==================
+document.addEventListener('DOMContentLoaded', function() {
+    console.log('✅ Sistema de edição inline carregado');
 });
 </script>
 

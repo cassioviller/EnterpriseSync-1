@@ -4146,7 +4146,7 @@ def nova_alimentacao():
         db.session.rollback()
         return jsonify({'success': False, 'message': f'Erro ao criar registros: {str(e)}'}), 500
 
-@main_bp.route('/alimentacao/editar/<int:id>', methods=['POST'])
+@main_bp.route('/alimentacao/<int:id>/editar', methods=['POST'])
 @login_required
 def editar_alimentacao(id):
     """Editar registro de alimentação via AJAX (inline)"""
@@ -4157,35 +4157,44 @@ def editar_alimentacao(id):
         if registro.funcionario_ref.admin_id != current_user.id:
             return jsonify({'success': False, 'message': 'Acesso negado.'}), 403
         
-        # Dados do JSON
-        dados = request.get_json()
+        # Dados do FormData
+        data_str = request.form.get('data')
+        tipo = request.form.get('tipo')
+        valor_str = request.form.get('valor')
+        observacoes = request.form.get('observacoes')
         
-        # Atualizar campos conforme enviados
-        if 'data' in dados:
-            registro.data = datetime.strptime(dados['data'], '%Y-%m-%d').date()
+        # Validações e conversões
+        if data_str:
+            registro.data = datetime.strptime(data_str, '%Y-%m-%d').date()
             
-        if 'tipo' in dados:
-            registro.tipo = dados['tipo']
+        if tipo:
+            registro.tipo = tipo
             
-        if 'valor' in dados:
-            registro.valor = float(dados['valor'])
+        if valor_str:
+            registro.valor = float(valor_str)
             
-        if 'observacoes' in dados:
-            registro.observacoes = dados['observacoes']
+        if observacoes is not None:  # Permitir string vazia
+            registro.observacoes = observacoes.strip() if observacoes.strip() else None
         
         db.session.commit()
         
         return jsonify({
             'success': True,
-            'message': 'Registro atualizado com sucesso'
+            'message': 'Registro atualizado com sucesso!'
         })
         
+    except ValueError as e:
+        db.session.rollback()
+        return jsonify({
+            'success': False,
+            'message': f'Dados inválidos: {str(e)}'
+        }), 400
     except Exception as e:
         db.session.rollback()
         return jsonify({
             'success': False,
-            'message': str(e)
-        }), 400
+            'message': f'Erro interno: {str(e)}'
+        }), 500
 
 @main_bp.route('/alimentacao/excluir/<int:id>', methods=['POST'])
 @login_required
