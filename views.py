@@ -4082,6 +4082,21 @@ def nova_alimentacao():
         else:
             return jsonify({'success': False, 'message': 'Data é obrigatória'}), 400
         
+        # DEBUG: Log dos dados recebidos
+        print(f"🔍 DEBUG - Dados do formulário:")
+        print(f"   data_inicio: {data_inicio}")
+        print(f"   data_fim: {data_fim}")
+        print(f"   data_unica: {data_unica}")
+        
+        if data_inicio and data_fim:
+            print(f"   Convertendo datas do período...")
+            print(f"   inicio convertido: {inicio}")
+            print(f"   fim convertido: {fim}")
+        elif data_unica:
+            print(f"   Data única convertida: {datetime.strptime(data_unica, '%Y-%m-%d').date()}")
+        
+        print(f"   Datas para processamento: {datas_processamento}")
+        
         # Dados básicos do formulário
         tipo = request.form.get('tipo')
         valor = float(request.form.get('valor'))
