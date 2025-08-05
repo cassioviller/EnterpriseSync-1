@@ -90,30 +90,17 @@ def aplicar_correcao_producao():
             db.session.commit()
             print(f"\n🎉 SUCESSO: {registros_corrigidos} registros corrigidos!")
             
-            # Verificar casos específicos
-            print("\n🔍 VERIFICAÇÃO FINAL:")
+            # Estatísticas finais
+            total_registros = RegistroPonto.query.filter(
+                RegistroPonto.tipo_registro == 'trabalho_normal',
+                RegistroPonto.hora_entrada.isnot(None),
+                RegistroPonto.hora_saida.isnot(None)
+            ).count()
             
-            # João Silva Santos 31/07/2025
-            joao_31 = RegistroPonto.query.filter(
-                RegistroPonto.data == date(2025, 7, 31),
-                RegistroPonto.hora_entrada == time(7, 5),
-                RegistroPonto.hora_saida == time(17, 50)
-            ).first()
-            
-            if joao_31:
-                func = Funcionario.query.get(joao_31.funcionario_id)
-                print(f"✅ {func.nome} 31/07: {joao_31.horas_extras}h extras - {joao_31.percentual_extras}%")
-            
-            # Ana Paula 29/07/2025
-            ana_29 = RegistroPonto.query.filter(
-                RegistroPonto.data == date(2025, 7, 29),
-                RegistroPonto.hora_entrada == time(7, 30),
-                RegistroPonto.hora_saida == time(18, 0)
-            ).first()
-            
-            if ana_29:
-                func2 = Funcionario.query.get(ana_29.funcionario_id)
-                print(f"✅ {func2.nome} 29/07: {ana_29.horas_extras}h extras, {ana_29.total_atraso_horas}h atrasos")
+            print(f"\n📊 ESTATÍSTICAS:")
+            print(f"   Total de registros processados: {total_registros}")
+            print(f"   Registros corrigidos: {registros_corrigidos}")
+            print(f"   Taxa de correção: {(registros_corrigidos/total_registros*100):.1f}%")
             
             print("\n✅ HOTFIX APLICADO COM SUCESSO!")
             

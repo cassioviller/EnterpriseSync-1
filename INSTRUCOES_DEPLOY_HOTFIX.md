@@ -31,32 +31,33 @@ sudo systemctl restart gunicorn  # ou seu comando de restart
 
 O script deve mostrar:
 ```
-✅ João Silva Santos 31/07: 0.95h extras - 50%
-✅ Ana Paula Rodrigues 29/07: 1.0h extras, 0.3h atrasos
+📊 ESTATÍSTICAS:
+   Total de registros processados: XXX
+   Registros corrigidos: XXX
+   Taxa de correção: XX.X%
 ✅ HOTFIX APLICADO COM SUCESSO!
 ```
 
 ## 🔍 VALIDAÇÃO
 
-Após executar, verifique na interface:
-- João Silva Santos 31/07/2025: deve mostrar **"0.95h - 50%"**
-- Ana Paula Rodrigues 29/07/2025: deve mostrar **"1.0h - 50%"** e **18min atraso**
+Após executar, verifique registros na interface:
+- Todos os cálculos de horas extras devem estar baseados no horário individual
+- Atrasos calculados por entrada tardia + saída antecipada
+- Horas extras calculadas por entrada antecipada + saída posterior
 
 ## 📊 LÓGICA APLICADA
 
 **Horário padrão**: 07:12-17:00 (todos funcionários)
 
-**João Silva Santos 31/07:**
-- Real: 07:05-17:50
-- Antecipação: 07:12 - 07:05 = 7min
-- Prolongamento: 17:50 - 17:00 = 50min
-- **Total extras: 57min = 0.95h**
+**Fórmulas de cálculo:**
+- **Atrasos**: entrada tardia + saída antecipada (em minutos)
+- **Horas extras**: entrada antecipada + saída posterior (em minutos)
+- **Percentual**: 50% para qualquer hora extra > 0
 
-**Ana Paula Rodrigues 29/07:**
-- Real: 07:30-18:00
-- Atraso: 07:30 - 07:12 = 18min = 0.3h
-- Prolongamento: 18:00 - 17:00 = 60min = 1.0h
-- **Resultado: 1.0h extras + 0.3h atrasos**
+**Exemplo prático:**
+- Horário real: 07:05-17:50 vs Padrão: 07:12-17:00
+- Extras: 7min (antecipação) + 50min (prolongamento) = 57min = 0.95h
+- Resultado: 0.95h extras com 50% adicional
 
 ## ⚠️ BACKUP
 Recomenda-se fazer backup do banco antes de executar (opcional, pois a correção é segura).
