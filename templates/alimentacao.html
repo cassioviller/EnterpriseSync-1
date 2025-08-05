@@ -407,8 +407,8 @@ $(document).ready(function() {
         responsive: true
     });
     
-    // Configurar data padrão
-    document.getElementById('data').valueAsDate = new Date();
+    // NÃO configurar data padrão - deixar usuário escolher
+    // CORREÇÃO: Removido valueAsDate = new Date() que forçava data atual
     
     // Configurar alternância entre data única e período
     setupPeriodoToggle();
@@ -436,11 +436,8 @@ function setupPeriodoToggle() {
             dataInicioInput.setAttribute('required', '');
             dataFimInput.setAttribute('required', '');
             
-            // Configurar valores padrão
-            const hoje = new Date().toISOString().split('T')[0];
-            const proximaSemana = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
-            dataInicioInput.value = hoje;
-            dataFimInput.value = proximaSemana;
+            // NÃO configurar valores padrão - deixar usuário escolher datas
+            // CORREÇÃO: Removidos valores automáticos que forçavam datas atuais
         } else {
             // Modo data única
             dataUnica.style.display = 'block';
@@ -549,6 +546,70 @@ function setupMultiSelectionFunctionality() {
     // Inicializar contadores
     atualizarContadores();
 }
+
+// ================== DEBUG CRÍTICO ==================
+// DEBUG: Monitorar envio do formulário para identificar problema de data
+document.addEventListener('DOMContentLoaded', function() {
+    const form = document.getElementById('alimentacaoForm');
+    if (form) {
+        form.addEventListener('submit', function(e) {
+            console.log('🔍 DEBUG CRÍTICO: Formulário de alimentação sendo enviado');
+            
+            // Capturar todos os valores dos campos de data
+            const dataUnica = document.getElementById('data').value;
+            const dataInicio = document.getElementById('data_inicio').value;
+            const dataFim = document.getElementById('data_fim').value;
+            
+            console.log('📅 Valores dos campos de data:');
+            console.log('   data única:', dataUnica);
+            console.log('   data início:', dataInicio);
+            console.log('   data fim:', dataFim);
+            
+            // ALERTA se data está em agosto
+            if (dataUnica && dataUnica.includes('2025-08')) {
+                console.error('🚨 PROBLEMA: Data única em agosto!', dataUnica);
+            }
+            if (dataInicio && dataInicio.includes('2025-08')) {
+                console.error('🚨 PROBLEMA: Data início em agosto!', dataInicio);
+            }
+            if (dataFim && dataFim.includes('2025-08')) {
+                console.error('🚨 PROBLEMA: Data fim em agosto!', dataFim);
+            }
+        });
+        
+        // DEBUG: Monitorar mudanças nos campos de data
+        const dataField = document.getElementById('data');
+        const dataInicioField = document.getElementById('data_inicio');
+        const dataFimField = document.getElementById('data_fim');
+        
+        if (dataField) {
+            dataField.addEventListener('change', function() {
+                console.log('📅 Data única alterada para:', this.value);
+                if (this.value && this.value.includes('2025-08')) {
+                    console.error('🚨 ALERTA: Data única foi alterada para agosto!');
+                }
+            });
+        }
+        
+        if (dataInicioField) {
+            dataInicioField.addEventListener('change', function() {
+                console.log('📅 Data início alterada para:', this.value);
+                if (this.value && this.value.includes('2025-08')) {
+                    console.error('🚨 ALERTA: Data início foi alterada para agosto!');
+                }
+            });
+        }
+        
+        if (dataFimField) {
+            dataFimField.addEventListener('change', function() {
+                console.log('📅 Data fim alterada para:', this.value);
+                if (this.value && this.value.includes('2025-08')) {
+                    console.error('🚨 ALERTA: Data fim foi alterada para agosto!');
+                }
+            });
+        }
+    }
+});
 
 // ================== FILTROS RÁPIDOS ==================
 function aplicarFiltros() {

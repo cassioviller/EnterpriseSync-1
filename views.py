@@ -4077,8 +4077,18 @@ def nova_alimentacao():
                 datas_processamento.append(data_atual)
                 data_atual += timedelta(days=1)
         elif data_unica:
-            # Lançamento de data única
-            datas_processamento.append(datetime.strptime(data_unica, '%Y-%m-%d').date())
+            # Lançamento de data única - ADICIONAR DEBUG
+            print(f"   📅 LANÇAMENTO INDIVIDUAL - data_unica: '{data_unica}'")
+            data_convertida = datetime.strptime(data_unica, '%Y-%m-%d').date()
+            print(f"   📅 Data convertida: {data_convertida} (mês {data_convertida.month})")
+            
+            # VERIFICAR SE ESTÁ SENDO ALTERADA PARA O MÊS ATUAL
+            if data_convertida.month == 8:  # Agosto (mês atual)
+                print(f"   🚨 PROBLEMA DETECTADO: Data convertida está em agosto!")
+                print(f"   Original string: '{data_unica}'")
+                print(f"   Resultado conversão: {data_convertida}")
+            
+            datas_processamento.append(data_convertida)
         else:
             return jsonify({'success': False, 'message': 'Data é obrigatória'}), 400
         
