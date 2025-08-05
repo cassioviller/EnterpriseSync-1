@@ -83,6 +83,55 @@
     </div>
 </div>
 
+<!-- Filtros Rápidos -->
+<div class="card mb-4">
+    <div class="card-header">
+        <h5 class="card-title mb-0">
+            <i class="fas fa-filter"></i> Filtros Rápidos
+        </h5>
+    </div>
+    <div class="card-body">
+        <div class="row">
+            <div class="col-md-3">
+                <label class="form-label">Período:</label>
+                <div class="btn-group w-100" role="group">
+                    <button type="button" class="btn btn-outline-primary btn-sm filtro-periodo" data-periodo="hoje">Hoje</button>
+                    <button type="button" class="btn btn-outline-primary btn-sm filtro-periodo" data-periodo="semana">Semana</button>
+                    <button type="button" class="btn btn-outline-primary btn-sm filtro-periodo" data-periodo="mes">Mês</button>
+                    <button type="button" class="btn btn-outline-primary btn-sm filtro-periodo" data-periodo="todos">Todos</button>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <label class="form-label">Data Início:</label>
+                <input type="date" class="form-control form-control-sm" id="dataInicio" value="{{ request.args.get('data_inicio', '') }}">
+            </div>
+            <div class="col-md-3">
+                <label class="form-label">Data Fim:</label>
+                <input type="date" class="form-control form-control-sm" id="dataFim" value="{{ request.args.get('data_fim', '') }}">
+            </div>
+            <div class="col-md-3">
+                <label class="form-label">Funcionário:</label>
+                <select class="form-select form-select-sm" id="filtroFuncionario">
+                    <option value="">Todos os funcionários</option>
+                    {% for funcionario in funcionarios %}
+                    <option value="{{ funcionario.id }}">{{ funcionario.nome }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+        </div>
+        <div class="row mt-3">
+            <div class="col-md-12">
+                <button type="button" class="btn btn-primary btn-sm" onclick="aplicarFiltros()">
+                    <i class="fas fa-search"></i> Aplicar Filtros
+                </button>
+                <button type="button" class="btn btn-secondary btn-sm" onclick="limparFiltros()">
+                    <i class="fas fa-times"></i> Limpar
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
 <!-- Tabela de Registros -->
 <div class="card">
     <div class="card-header">
@@ -107,10 +156,10 @@
                 </thead>
                 <tbody>
                     {% for registro in registros %}
-                    <tr>
-                        <td>{{ registro.funcionario.nome if registro.funcionario else '-' }}</td>
-                        <td>{{ registro.data.strftime('%d/%m/%Y') }}</td>
-                        <td>
+                    <tr id="registro-{{ registro.id }}" data-registro-id="{{ registro.id }}">
+                        <td class="funcionario-nome">{{ registro.funcionario_ref.nome if registro.funcionario_ref else '-' }}</td>
+                        <td class="data-registro">{{ registro.data.strftime('%d/%m/%Y') }}</td>
+                        <td class="tipo-refeicao">
                             {% if registro.tipo == 'cafe' %}
                                 <span class="badge bg-warning">Café da Manhã</span>
                             {% elif registro.tipo == 'almoco' %}
@@ -121,13 +170,13 @@
                                 <span class="badge bg-secondary">Lanche</span>
                             {% endif %}
                         </td>
-                        <td>R$ {{ '{:,.2f}'.format(registro.valor) }}</td>
-                        <td>{{ registro.obra_ref.nome if registro.obra_ref else '-' }}</td>
+                        <td class="valor-registro">R$ {{ '{:,.2f}'.format(registro.valor) }}</td>
+                        <td class="obra-nome">{{ registro.obra_ref.nome if registro.obra_ref else '-' }}</td>
                         <td>{{ registro.restaurante_ref.nome if registro.restaurante_ref else '-' }}</td>
-                        <td>{{ registro.observacoes or '-' }}</td>
+                        <td class="observacoes-registro">{{ registro.observacoes or '-' }}</td>
                         <td>
                             <div class="btn-group btn-group-sm">
-                                <button class="btn btn-outline-primary" onclick="editarRegistro({{ registro.id }})">
+                                <button class="btn btn-outline-primary btn-editar" data-id="{{ registro.id }}" onclick="editarRegistroInline({{ registro.id }})">
                                     <i class="fas fa-edit"></i>
                                 </button>
                                 <button class="btn btn-outline-danger" onclick="excluirRegistro({{ registro.id }})">
@@ -474,6 +523,318 @@ function setupMultiSelectionFunctionality() {
     
     // Event listener para mudança no valor
     valorInput.addEventListener('input', atualizarContadores);
+    
+    // Event listeners para mudança na obra e restaurante
+    document.getElementById('obra_id').addEventListener('change', atualizarContadores);
+    document.getElementById('restaurante_id').addEventListener('change', atualizarContadores);
+    
+    // Event listener para busca de funcionários
+    buscaInput.addEventListener('input', function() {
+        const termo = this.value.toLowerCase();
+        const items = document.querySelectorAll('.funcionario-item');
+        
+        items.forEach(item => {
+            const nome = item.dataset.nome;
+            if (nome.includes(termo)) {
+                item.style.display = 'block';
+            } else {
+                item.style.display = 'none';
+            }
+        });
+    });
+    
+    // Inicializar contadores
+    atualizarContadores();
+}
+
+// ================== FILTROS RÁPIDOS ==================
+function aplicarFiltros() {
+    const dataInicio = document.getElementById('dataInicio').value;
+    const dataFim = document.getElementById('dataFim').value;
+    const funcionarioId = document.getElementById('filtroFuncionario').value;
+    
+    const params = new URLSearchParams();
+    if (dataInicio) params.append('data_inicio', dataInicio);
+    if (dataFim) params.append('data_fim', dataFim);
+    if (funcionarioId) params.append('funcionario_id', funcionarioId);
+    
+    window.location.href = `${window.location.pathname}?${params.toString()}`;
+}
+
+function limparFiltros() {
+    document.getElementById('dataInicio').value = '';
+    document.getElementById('dataFim').value = '';
+    document.getElementById('filtroFuncionario').value = '';
+    document.querySelectorAll('.filtro-periodo').forEach(b => b.classList.remove('active'));
+    window.location.href = window.location.pathname;
+}
+
+// Filtros de período
+document.addEventListener('DOMContentLoaded', function() {
+    document.querySelectorAll('.filtro-periodo').forEach(btn => {
+        btn.addEventListener('click', function() {
+            const periodo = this.dataset.periodo;
+            const hoje = new Date();
+            let dataInicio, dataFim;
+
+            switch(periodo) {
+                case 'hoje':
+                    dataInicio = dataFim = hoje.toISOString().split('T')[0];
+                    break;
+                case 'semana':
+                    const inicioSemana = new Date(hoje.setDate(hoje.getDate() - hoje.getDay()));
+                    const fimSemana = new Date(hoje.setDate(inicioSemana.getDate() + 6));
+                    dataInicio = inicioSemana.toISOString().split('T')[0];
+                    dataFim = fimSemana.toISOString().split('T')[0];
+                    break;
+                case 'mes':
+                    dataInicio = new Date(hoje.getFullYear(), hoje.getMonth(), 1).toISOString().split('T')[0];
+                    dataFim = new Date(hoje.getFullYear(), hoje.getMonth() + 1, 0).toISOString().split('T')[0];
+                    break;
+                case 'todos':
+                    dataInicio = dataFim = '';
+                    break;
+            }
+
+            document.getElementById('dataInicio').value = dataInicio;
+            document.getElementById('dataFim').value = dataFim;
+            
+            // Marcar botão ativo
+            document.querySelectorAll('.filtro-periodo').forEach(b => b.classList.remove('active'));
+            this.classList.add('active');
+        });
+    });
+});
+
+// ================== EDIÇÃO INLINE ==================
+let registroEditandoId = null;
+let dadosOriginais = {};
+
+function editarRegistroInline(id) {
+    if (registroEditandoId && registroEditandoId !== id) {
+        cancelarEdicao(registroEditandoId);
+    }
+    
+    registroEditandoId = id;
+    const row = document.getElementById(`registro-${id}`);
+    
+    // Salvar dados originais
+    dadosOriginais[id] = {
+        data: row.querySelector('.data-registro').textContent,
+        tipo: row.querySelector('.tipo-refeicao .badge').textContent,
+        valor: row.querySelector('.valor-registro').textContent,
+        observacoes: row.querySelector('.observacoes-registro').textContent
+    };
+    
+    // Converter células em campos editáveis
+    converterParaEdicao(row, id);
+}
+
+function converterParaEdicao(row, id) {
+    // Data
+    const dataCell = row.querySelector('.data-registro');
+    const dataAtual = dataCell.textContent.split('/').reverse().join('-'); // DD/MM/YYYY -> YYYY-MM-DD
+    dataCell.innerHTML = `<input type="date" class="form-control form-control-sm" value="${dataAtual}" id="edit-data-${id}">`;
+    
+    // Tipo
+    const tipoCell = row.querySelector('.tipo-refeicao');
+    const tipoAtual = tipoCell.querySelector('.badge').textContent.toLowerCase();
+    let tipoValue = '';
+    if (tipoAtual.includes('café')) tipoValue = 'cafe';
+    else if (tipoAtual.includes('almoço')) tipoValue = 'almoco';
+    else if (tipoAtual.includes('jantar')) tipoValue = 'jantar';
+    else tipoValue = 'lanche';
+    
+    tipoCell.innerHTML = `
+        <select class="form-select form-select-sm" id="edit-tipo-${id}">
+            <option value="cafe" ${tipoValue === 'cafe' ? 'selected' : ''}>Café da Manhã</option>
+            <option value="almoco" ${tipoValue === 'almoco' ? 'selected' : ''}>Almoço</option>
+            <option value="lanche" ${tipoValue === 'lanche' ? 'selected' : ''}>Lanche</option>
+            <option value="jantar" ${tipoValue === 'jantar' ? 'selected' : ''}>Jantar</option>
+        </select>
+    `;
+    
+    // Valor
+    const valorCell = row.querySelector('.valor-registro');
+    const valorAtual = valorCell.textContent.replace('R$ ', '').replace(',', '.');
+    valorCell.innerHTML = `<input type="number" class="form-control form-control-sm" step="0.01" value="${valorAtual}" id="edit-valor-${id}">`;
+    
+    // Observações
+    const obsCell = row.querySelector('.observacoes-registro');
+    const obsAtual = obsCell.textContent === '-' ? '' : obsCell.textContent;
+    obsCell.innerHTML = `<input type="text" class="form-control form-control-sm" value="${obsAtual}" id="edit-obs-${id}" placeholder="Observações">`;
+    
+    // Botões de ação
+    const actionsCell = row.querySelector('td:last-child');
+    actionsCell.innerHTML = `
+        <div class="btn-group btn-group-sm">
+            <button class="btn btn-success" onclick="salvarEdicao(${id})">
+                <i class="fas fa-check"></i>
+            </button>
+            <button class="btn btn-secondary" onclick="cancelarEdicao(${id})">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+    `;
+}
+
+function salvarEdicao(id) {
+    const row = document.getElementById(`registro-${id}`);
+    
+    const dados = {
+        data: document.getElementById(`edit-data-${id}`).value,
+        tipo: document.getElementById(`edit-tipo-${id}`).value,
+        valor: document.getElementById(`edit-valor-${id}`).value,
+        observacoes: document.getElementById(`edit-obs-${id}`).value
+    };
+    
+    // Enviar para o servidor
+    fetch(`/alimentacao/editar/${id}`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(dados)
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            // Atualizar a linha com os novos dados
+            atualizarLinhaTabela(row, dados);
+            registroEditandoId = null;
+            delete dadosOriginais[id];
+            
+            // Mostrar mensagem de sucesso
+            showToast('Registro atualizado com sucesso!', 'success');
+        } else {
+            showToast('Erro ao atualizar registro: ' + data.message, 'error');
+        }
+    })
+    .catch(error => {
+        console.error('Erro:', error);
+        showToast('Erro de conexão', 'error');
+    });
+}
+
+function cancelarEdicao(id) {
+    const row = document.getElementById(`registro-${id}`);
+    const original = dadosOriginais[id];
+    
+    if (original) {
+        // Restaurar dados originais
+        row.querySelector('.data-registro').textContent = original.data;
+        row.querySelector('.tipo-refeicao').innerHTML = obterBadgeTipo(original.tipo);
+        row.querySelector('.valor-registro').textContent = original.valor;
+        row.querySelector('.observacoes-registro').textContent = original.observacoes;
+        
+        // Restaurar botões
+        row.querySelector('td:last-child').innerHTML = `
+            <div class="btn-group btn-group-sm">
+                <button class="btn btn-outline-primary btn-editar" onclick="editarRegistroInline(${id})">
+                    <i class="fas fa-edit"></i>
+                </button>
+                <button class="btn btn-outline-danger" onclick="excluirRegistro(${id})">
+                    <i class="fas fa-trash"></i>
+                </button>
+            </div>
+        `;
+    }
+    
+    registroEditandoId = null;
+    delete dadosOriginais[id];
+}
+
+function atualizarLinhaTabela(row, dados) {
+    // Data
+    const dataFormatada = new Date(dados.data).toLocaleDateString('pt-BR');
+    row.querySelector('.data-registro').textContent = dataFormatada;
+    
+    // Tipo
+    row.querySelector('.tipo-refeicao').innerHTML = obterBadgeTipo(dados.tipo);
+    
+    // Valor
+    const valorFormatado = parseFloat(dados.valor).toLocaleString('pt-BR', {
+        style: 'currency',
+        currency: 'BRL'
+    });
+    row.querySelector('.valor-registro').textContent = valorFormatado;
+    
+    // Observações
+    row.querySelector('.observacoes-registro').textContent = dados.observacoes || '-';
+    
+    // Restaurar botões
+    row.querySelector('td:last-child').innerHTML = `
+        <div class="btn-group btn-group-sm">
+            <button class="btn btn-outline-primary btn-editar" onclick="editarRegistroInline(${row.dataset.registroId})">
+                <i class="fas fa-edit"></i>
+            </button>
+            <button class="btn btn-outline-danger" onclick="excluirRegistro(${row.dataset.registroId})">
+                <i class="fas fa-trash"></i>
+            </button>
+        </div>
+    `;
+}
+
+function obterBadgeTipo(tipo) {
+    if (typeof tipo === 'string') {
+        if (tipo.includes('Café')) return '<span class="badge bg-warning">Café da Manhã</span>';
+        if (tipo.includes('Almoço')) return '<span class="badge bg-success">Almoço</span>';
+        if (tipo.includes('Jantar')) return '<span class="badge bg-primary">Jantar</span>';
+        return '<span class="badge bg-secondary">Lanche</span>';
+    }
+    
+    const badges = {
+        'cafe': '<span class="badge bg-warning">Café da Manhã</span>',
+        'almoco': '<span class="badge bg-success">Almoço</span>',
+        'jantar': '<span class="badge bg-primary">Jantar</span>',
+        'lanche': '<span class="badge bg-secondary">Lanche</span>'
+    };
+    return badges[tipo] || '<span class="badge bg-secondary">Lanche</span>';
+}
+
+function excluirRegistro(id) {
+    if (confirm('Tem certeza que deseja excluir este registro?')) {
+        fetch(`/alimentacao/excluir/${id}`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                document.getElementById(`registro-${id}`).remove();
+                showToast('Registro excluído com sucesso!', 'success');
+            } else {
+                showToast('Erro ao excluir registro: ' + data.message, 'error');
+            }
+        })
+        .catch(error => {
+            console.error('Erro:', error);
+            showToast('Erro de conexão', 'error');
+        });
+    }
+}
+
+function showToast(message, type = 'info') {
+    // Criar toast simples
+    const toast = document.createElement('div');
+    toast.className = `alert alert-${type === 'success' ? 'success' : 'danger'} alert-dismissible fade show position-fixed`;
+    toast.style.cssText = 'top: 20px; right: 20px; z-index: 9999; min-width: 300px;';
+    toast.innerHTML = `
+        ${message}
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    `;
+    
+    document.body.appendChild(toast);
+    
+    // Remover após 3 segundos
+    setTimeout(() => {
+        if (toast.parentNode) {
+            toast.parentNode.removeChild(toast);
+        }
+    }, 3000);
+}
     
     // Event listeners para dropdowns obrigatórios
     document.getElementById('obra_id').addEventListener('change', atualizarContadores);

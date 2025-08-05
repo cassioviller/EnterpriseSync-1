@@ -4146,63 +4146,48 @@ def nova_alimentacao():
         db.session.rollback()
         return jsonify({'success': False, 'message': f'Erro ao criar registros: {str(e)}'}), 500
 
-@main_bp.route('/alimentacao/<int:id>/editar', methods=['GET', 'POST'])
+@main_bp.route('/alimentacao/editar/<int:id>', methods=['POST'])
 @login_required
 def editar_alimentacao(id):
-    """Editar registro de alimentação"""
-    registro = RegistroAlimentacao.query.get_or_404(id)
-    
-    # Verificar se o funcionário pertence ao admin atual
-    if registro.funcionario_ref.admin_id != current_user.id:
-        flash('Acesso negado.', 'danger')
-        return redirect(url_for('main.alimentacao'))
-    
-    if request.method == 'POST':
-        try:
-            registro.data = datetime.strptime(request.form.get('data'), '%Y-%m-%d').date()
-            registro.tipo = request.form.get('tipo')
-            registro.valor = float(request.form.get('valor'))
-            registro.obra_id = int(request.form.get('obra_id'))
-            registro.restaurante_id = int(request.form.get('restaurante_id'))
-            registro.observacoes = request.form.get('observacoes')
+    """Editar registro de alimentação via AJAX (inline)"""
+    try:
+        registro = RegistroAlimentacao.query.get_or_404(id)
+        
+        # Verificar se o funcionário pertence ao admin atual
+        if registro.funcionario_ref.admin_id != current_user.id:
+            return jsonify({'success': False, 'message': 'Acesso negado.'}), 403
+        
+        # Dados do JSON
+        dados = request.get_json()
+        
+        # Atualizar campos conforme enviados
+        if 'data' in dados:
+            registro.data = datetime.strptime(dados['data'], '%Y-%m-%d').date()
             
-            db.session.commit()
+        if 'tipo' in dados:
+            registro.tipo = dados['tipo']
             
-            if request.headers.get('Content-Type') == 'application/json':
-                return jsonify({'success': True, 'message': 'Registro atualizado com sucesso!'})
-            else:
-                flash('Registro atualizado com sucesso!', 'success')
-                return redirect(url_for('main.alimentacao'))
+        if 'valor' in dados:
+            registro.valor = float(dados['valor'])
             
-        except Exception as e:
-            db.session.rollback()
-            if request.headers.get('Content-Type') == 'application/json':
-                return jsonify({'success': False, 'message': f'Erro ao atualizar: {str(e)}'}), 500
-            else:
-                flash(f'Erro ao atualizar: {str(e)}', 'danger')
-                return redirect(url_for('main.alimentacao'))
-    
-    # GET - retornar dados para edição (via AJAX)
-    funcionarios = Funcionario.query.filter_by(ativo=True, admin_id=current_user.id).order_by(Funcionario.nome).all()
-    obras = Obra.query.filter_by(status='Em andamento', admin_id=current_user.id).order_by(Obra.nome).all()
-    restaurantes = Restaurante.query.filter_by(ativo=True, admin_id=current_user.id).order_by(Restaurante.nome).all()
-    
-    return jsonify({
-        'id': registro.id,
-        'funcionario_id': registro.funcionario_id,
-        'funcionario_nome': registro.funcionario_ref.nome,
-        'data': registro.data.strftime('%Y-%m-%d'),
-        'tipo': registro.tipo,
-        'valor': float(registro.valor),
-        'obra_id': registro.obra_id,
-        'restaurante_id': registro.restaurante_id,
-        'observacoes': registro.observacoes or '',
-        'funcionarios': [{'id': f.id, 'nome': f.nome} for f in funcionarios],
-        'obras': [{'id': o.id, 'nome': o.nome} for o in obras],
-        'restaurantes': [{'id': r.id, 'nome': r.nome} for r in restaurantes]
-    })
+        if 'observacoes' in dados:
+            registro.observacoes = dados['observacoes']
+        
+        db.session.commit()
+        
+        return jsonify({
+            'success': True,
+            'message': 'Registro atualizado com sucesso'
+        })
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({
+            'success': False,
+            'message': str(e)
+        }), 400
 
-@main_bp.route('/alimentacao/<int:id>/excluir', methods=['DELETE'])
+@main_bp.route('/alimentacao/excluir/<int:id>', methods=['POST'])
 @login_required
 def excluir_alimentacao(id):
     """Excluir registro de alimentação"""
