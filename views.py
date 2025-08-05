@@ -8,8 +8,7 @@ from utils import calcular_horas_trabalhadas, calcular_custo_real_obra, calcular
 from kpis_engine import kpis_engine
 from auth import super_admin_required, admin_required, funcionario_required, get_tenant_filter, can_access_data
 from datetime import datetime, date, timedelta
-from sqlalchemy import func, desc, or_, and_, text, case, extract
-from sqlalchemy.orm import joinedload
+from sqlalchemy import func, desc, or_, and_
 
 import os
 import json
@@ -3992,17 +3991,11 @@ def alimentacao():
         funcionarios_admin = Funcionario.query.filter_by(ativo=True, admin_id=current_user.id).order_by(Funcionario.nome).all()
         funcionarios_ids = [f.id for f in funcionarios_admin]
         
-        # Filtrar registros pelos funcionários do admin COM JOIN para nomes
+        # Filtrar registros pelos funcionários do admin
         if funcionarios_ids:
-            registros = RegistroAlimentacao.query.join(
-                Funcionario, RegistroAlimentacao.funcionario_id == Funcionario.id
-            ).filter(
+            registros = RegistroAlimentacao.query.filter(
                 RegistroAlimentacao.funcionario_id.in_(funcionarios_ids)
-            ).options(
-                joinedload(RegistroAlimentacao.funcionario),
-                joinedload(RegistroAlimentacao.obra_ref),
-                joinedload(RegistroAlimentacao.restaurante_ref)
-            ).order_by(RegistroAlimentacao.data.desc()).limit(100).all()
+            ).order_by(RegistroAlimentacao.data.desc()).limit(50).all()
         else:
             registros = []
         
@@ -4039,95 +4032,6 @@ def alimentacao():
                          obras=obras,
                          restaurantes=restaurantes,
                          date=date)
-
-@main_bp.route('/alimentacao/editar/<int:registro_id>', methods=['POST'])
-@login_required
-def editar_alimentacao(registro_id):
-    """Editar registro de alimentação via AJAX"""
-    try:
-        registro = RegistroAlimentacao.query.get_or_404(registro_id)
-        
-        # Verificar se o registro pertence ao admin atual
-        funcionario = Funcionario.query.get(registro.funcionario_id)
-        if not funcionario or funcionario.admin_id != current_user.id:
-            return jsonify({'success': False, 'message': 'Acesso negado'}), 403
-            
-        data = request.get_json()
-        
-        # Validações
-        if not data.get('funcionario_id') or not data.get('data') or not data.get('tipo') or not data.get('valor'):
-            return jsonify({'success': False, 'message': 'Campos obrigatórios não preenchidos'}), 400
-            
-        valor = float(data['valor'])
-        if valor <= 0:
-            return jsonify({'success': False, 'message': 'Valor deve ser maior que zero'}), 400
-            
-        # Verificar se funcionário pertence ao admin
-        novo_funcionario = Funcionario.query.get(data['funcionario_id'])
-        if not novo_funcionario or novo_funcionario.admin_id != current_user.id:
-            return jsonify({'success': False, 'message': 'Funcionário não encontrado'}), 400
-            
-        # Atualizar registro
-        registro.funcionario_id = data['funcionario_id']
-        registro.data = datetime.strptime(data['data'], '%Y-%m-%d').date()
-        registro.tipo = data['tipo']
-        registro.valor = valor
-        registro.obra_id = int(data['obra_id']) if data.get('obra_id') else None
-        registro.restaurante_id = int(data['restaurante_id']) if data.get('restaurante_id') else None
-        registro.observacoes = data.get('observacoes', '').strip() or None
-        
-        db.session.commit()
-        
-        # Buscar dados atualizados para resposta
-        registro_atualizado = RegistroAlimentacao.query.options(
-            joinedload(RegistroAlimentacao.funcionario),
-            joinedload(RegistroAlimentacao.obra_ref),
-            joinedload(RegistroAlimentacao.restaurante_ref)
-        ).get(registro_id)
-        
-        return jsonify({
-            'success': True,
-            'message': 'Registro atualizado com sucesso',
-            'registro': {
-                'funcionario_nome': registro_atualizado.funcionario.nome,
-                'data_formatada': registro_atualizado.data.strftime('%d/%m/%Y'),
-                'tipo': registro_atualizado.tipo,
-                'valor': float(registro_atualizado.valor),
-                'obra_nome': registro_atualizado.obra_ref.nome if registro_atualizado.obra_ref else None,
-                'restaurante_nome': registro_atualizado.restaurante_ref.nome if registro_atualizado.restaurante_ref else None,
-                'observacoes': registro_atualizado.observacoes
-            }
-        })
-        
-    except ValueError as e:
-        return jsonify({'success': False, 'message': 'Dados inválidos'}), 400
-    except Exception as e:
-        db.session.rollback()
-        return jsonify({'success': False, 'message': f'Erro interno: {str(e)}'}), 500
-
-@main_bp.route('/alimentacao/excluir/<int:registro_id>', methods=['DELETE'])
-@login_required
-def excluir_alimentacao(registro_id):
-    """Excluir registro de alimentação via AJAX"""
-    try:
-        registro = RegistroAlimentacao.query.get_or_404(registro_id)
-        
-        # Verificar se o registro pertence ao admin atual
-        funcionario = Funcionario.query.get(registro.funcionario_id)
-        if not funcionario or funcionario.admin_id != current_user.id:
-            return jsonify({'success': False, 'message': 'Acesso negado'}), 403
-            
-        db.session.delete(registro)
-        db.session.commit()
-        
-        return jsonify({
-            'success': True,
-            'message': 'Registro excluído com sucesso'
-        })
-        
-    except Exception as e:
-        db.session.rollback()
-        return jsonify({'success': False, 'message': f'Erro ao excluir: {str(e)}'}), 500
 
 @main_bp.route('/alimentacao/novo', methods=['POST'])
 @login_required
@@ -4242,19 +4146,2891 @@ def nova_alimentacao():
         db.session.rollback()
         return jsonify({'success': False, 'message': f'Erro ao criar registros: {str(e)}'}), 500
 
-# Propostas (placeholder temporário)
-@main_bp.route('/propostas')
+@main_bp.route('/alimentacao/<int:id>/editar', methods=['GET', 'POST'])
 @login_required
-def lista_propostas():
-    """Página de propostas - em desenvolvimento"""
-    return render_template('propostas.html', 
-                         page_title="Propostas Comerciais",
-                         message="Módulo de propostas em desenvolvimento")
+def editar_alimentacao(id):
+    """Editar registro de alimentação"""
+    registro = RegistroAlimentacao.query.get_or_404(id)
+    
+    # Verificar se o funcionário pertence ao admin atual
+    if registro.funcionario_ref.admin_id != current_user.id:
+        flash('Acesso negado.', 'danger')
+        return redirect(url_for('main.alimentacao'))
+    
+    if request.method == 'POST':
+        try:
+            registro.data = datetime.strptime(request.form.get('data'), '%Y-%m-%d').date()
+            registro.tipo = request.form.get('tipo')
+            registro.valor = float(request.form.get('valor'))
+            registro.obra_id = int(request.form.get('obra_id'))
+            registro.restaurante_id = int(request.form.get('restaurante_id'))
+            registro.observacoes = request.form.get('observacoes')
+            
+            db.session.commit()
+            
+            if request.headers.get('Content-Type') == 'application/json':
+                return jsonify({'success': True, 'message': 'Registro atualizado com sucesso!'})
+            else:
+                flash('Registro atualizado com sucesso!', 'success')
+                return redirect(url_for('main.alimentacao'))
+            
+        except Exception as e:
+            db.session.rollback()
+            if request.headers.get('Content-Type') == 'application/json':
+                return jsonify({'success': False, 'message': f'Erro ao atualizar: {str(e)}'}), 500
+            else:
+                flash(f'Erro ao atualizar: {str(e)}', 'danger')
+                return redirect(url_for('main.alimentacao'))
+    
+    # GET - retornar dados para edição (via AJAX)
+    funcionarios = Funcionario.query.filter_by(ativo=True, admin_id=current_user.id).order_by(Funcionario.nome).all()
+    obras = Obra.query.filter_by(status='Em andamento', admin_id=current_user.id).order_by(Obra.nome).all()
+    restaurantes = Restaurante.query.filter_by(ativo=True, admin_id=current_user.id).order_by(Restaurante.nome).all()
+    
+    return jsonify({
+        'id': registro.id,
+        'funcionario_id': registro.funcionario_id,
+        'funcionario_nome': registro.funcionario_ref.nome,
+        'data': registro.data.strftime('%Y-%m-%d'),
+        'tipo': registro.tipo,
+        'valor': float(registro.valor),
+        'obra_id': registro.obra_id,
+        'restaurante_id': registro.restaurante_id,
+        'observacoes': registro.observacoes or '',
+        'funcionarios': [{'id': f.id, 'nome': f.nome} for f in funcionarios],
+        'obras': [{'id': o.id, 'nome': o.nome} for o in obras],
+        'restaurantes': [{'id': r.id, 'nome': r.nome} for r in restaurantes]
+    })
+
+@main_bp.route('/alimentacao/<int:id>/excluir', methods=['DELETE'])
+@login_required
+def excluir_alimentacao(id):
+    """Excluir registro de alimentação"""
+    try:
+        registro = RegistroAlimentacao.query.get_or_404(id)
+        
+        # Verificar se o funcionário pertence ao admin atual
+        if registro.funcionario_ref.admin_id != current_user.id:
+            return jsonify({'success': False, 'message': 'Acesso negado.'}), 403
+        
+        # Remover custo associado na obra (se existir)
+        custo_obra = CustoObra.query.filter_by(
+            obra_id=registro.obra_id,
+            tipo='alimentacao',
+            valor=registro.valor,
+            data=registro.data
+        ).filter(CustoObra.descricao.like(f'%{registro.funcionario_ref.nome}%')).first()
+        
+        if custo_obra:
+            db.session.delete(custo_obra)
+        
+        # Excluir registro
+        funcionario_nome = registro.funcionario_ref.nome
+        tipo = registro.tipo
+        db.session.delete(registro)
+        db.session.commit()
+        
+        return jsonify({
+            'success': True, 
+            'message': f'Registro de {tipo} de {funcionario_nome} excluído com sucesso!'
+        })
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'message': f'Erro ao excluir: {str(e)}'}), 500
 
 # Relatórios
 @main_bp.route('/relatorios')
 @login_required
 def relatorios():
+    # Buscar dados para filtros
     obras = Obra.query.all()
     departamentos = Departamento.query.all()
+    
     return render_template('relatorios.html', obras=obras, departamentos=departamentos)
+
+@main_bp.route('/relatorios/dados-graficos', methods=['POST'])
+@login_required
+def dados_graficos():
+    from datetime import datetime, timedelta
+    import json
+    from sqlalchemy import func, extract
+    
+    filtros = request.get_json()
+    
+    # Processar filtros de data
+    data_inicio = datetime.strptime(filtros.get('dataInicio', ''), '%Y-%m-%d').date() if filtros.get('dataInicio') else None
+    data_fim = datetime.strptime(filtros.get('dataFim', ''), '%Y-%m-%d').date() if filtros.get('dataFim') else None
+    obra_id = filtros.get('obra') if filtros.get('obra') else None
+    departamento_id = filtros.get('departamento') if filtros.get('departamento') else None
+    
+    # Data padrão (últimos 6 meses)
+    if not data_inicio or not data_fim:
+        hoje = date.today()
+        data_fim = hoje
+        data_inicio = date(hoje.year, hoje.month - 5 if hoje.month > 5 else hoje.month + 7, 1)
+        if hoje.month <= 5:
+            data_inicio = data_inicio.replace(year=hoje.year - 1)
+    
+    # 1. Evolução de Custos
+    custos_query = db.session.query(
+        extract('month', CustoObra.data).label('mes'),
+        extract('year', CustoObra.data).label('ano'),
+        CustoObra.tipo,
+        func.sum(CustoObra.valor).label('total')
+    ).filter(
+        CustoObra.data >= data_inicio,
+        CustoObra.data <= data_fim
+    )
+    
+    if obra_id:
+        custos_query = custos_query.filter(CustoObra.obra_id == obra_id)
+    
+    custos_dados = custos_query.group_by(
+        extract('year', CustoObra.data),
+        extract('month', CustoObra.data),
+        CustoObra.tipo
+    ).all()
+    
+    # Processar dados de custos
+    meses_labels = []
+    mao_obra_dados = []
+    alimentacao_dados = []
+    veiculos_dados = []
+    
+    # Gerar lista de meses
+    current_date = data_inicio.replace(day=1)
+    while current_date <= data_fim:
+        mes_nome = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun',
+                   'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'][current_date.month - 1]
+        meses_labels.append(f"{mes_nome}/{current_date.year}")
+        
+        # Buscar dados do mês
+        mao_obra_mes = sum(d.total for d in custos_dados if d.mes == current_date.month and d.ano == current_date.year and d.tipo == 'mao_obra')
+        alimentacao_mes = sum(d.total for d in custos_dados if d.mes == current_date.month and d.ano == current_date.year and d.tipo == 'alimentacao')
+        veiculos_mes = sum(d.total for d in custos_dados if d.mes == current_date.month and d.ano == current_date.year and d.tipo == 'veiculo')
+        
+        mao_obra_dados.append(float(mao_obra_mes))
+        alimentacao_dados.append(float(alimentacao_mes))
+        veiculos_dados.append(float(veiculos_mes))
+        
+        # Próximo mês
+        if current_date.month == 12:
+            current_date = current_date.replace(year=current_date.year + 1, month=1)
+        else:
+            current_date = current_date.replace(month=current_date.month + 1)
+    
+    # 2. Produtividade por Departamento
+    produtividade_query = db.session.query(
+        Departamento.nome,
+        func.avg(RegistroPonto.horas_trabalhadas).label('media_horas')
+    ).join(
+        Funcionario, Departamento.id == Funcionario.departamento_id
+    ).join(
+        RegistroPonto, Funcionario.id == RegistroPonto.funcionario_id
+    ).filter(
+        RegistroPonto.data >= data_inicio,
+        RegistroPonto.data <= data_fim
+    )
+    
+    if departamento_id:
+        produtividade_query = produtividade_query.filter(Departamento.id == departamento_id)
+    
+    produtividade_dados = produtividade_query.group_by(Departamento.nome).all()
+    
+    # 3. Distribuição de Custos
+    distribuicao_dados = db.session.query(
+        CustoObra.tipo,
+        func.sum(CustoObra.valor).label('total')
+    ).filter(
+        CustoObra.data >= data_inicio,
+        CustoObra.data <= data_fim
+    )
+    
+    if obra_id:
+        distribuicao_dados = distribuicao_dados.filter(CustoObra.obra_id == obra_id)
+    
+    distribuicao_dados = distribuicao_dados.group_by(CustoObra.tipo).all()
+    
+    # 4. Horas Trabalhadas vs Extras
+    horas_query = db.session.query(
+        extract('month', RegistroPonto.data).label('mes'),
+        extract('year', RegistroPonto.data).label('ano'),
+        func.sum(RegistroPonto.horas_trabalhadas).label('horas_normais'),
+        func.sum(RegistroPonto.horas_extras).label('horas_extras')
+    ).filter(
+        RegistroPonto.data >= data_inicio,
+        RegistroPonto.data <= data_fim
+    )
+    
+    if departamento_id:
+        horas_query = horas_query.join(Funcionario).filter(Funcionario.departamento_id == departamento_id)
+    
+    horas_dados = horas_query.group_by(
+        extract('year', RegistroPonto.data),
+        extract('month', RegistroPonto.data)
+    ).all()
+    
+    # Processar dados de horas
+    horas_normais_dados = []
+    horas_extras_dados = []
+    
+    current_date = data_inicio.replace(day=1)
+    while current_date <= data_fim:
+        horas_mes = next((h for h in horas_dados if h.mes == current_date.month and h.ano == current_date.year), None)
+        
+        horas_normais_dados.append(float(horas_mes.horas_normais or 0) if horas_mes else 0)
+        horas_extras_dados.append(float(horas_mes.horas_extras or 0) if horas_mes else 0)
+        
+        # Próximo mês
+        if current_date.month == 12:
+            current_date = current_date.replace(year=current_date.year + 1, month=1)
+        else:
+            current_date = current_date.replace(month=current_date.month + 1)
+    
+    return jsonify({
+        'evolucao': {
+            'labels': meses_labels,
+            'mao_obra': mao_obra_dados,
+            'alimentacao': alimentacao_dados,
+            'veiculos': veiculos_dados
+        },
+        'produtividade': {
+            'labels': [p.nome for p in produtividade_dados],
+            'valores': [float(p.media_horas or 0) for p in produtividade_dados]
+        },
+        'distribuicao': {
+            'valores': [float(d.total) for d in distribuicao_dados]
+        },
+        'horas': {
+            'labels': meses_labels,
+            'normais': horas_normais_dados,
+            'extras': horas_extras_dados
+        }
+    })
+
+@main_bp.route('/relatorios/gerar/<tipo>', methods=['GET', 'POST'])
+@login_required
+def gerar_relatorio(tipo):
+    # Processar filtros de GET ou POST
+    if request.method == 'POST':
+        filtros = request.get_json() or {}
+    else:
+        filtros = request.args.to_dict()
+    
+    # Processar filtros
+    data_inicio = datetime.strptime(filtros.get('dataInicio', ''), '%Y-%m-%d').date() if filtros.get('dataInicio') else None
+    data_fim = datetime.strptime(filtros.get('dataFim', ''), '%Y-%m-%d').date() if filtros.get('dataFim') else None
+    obra_id = int(filtros.get('obra')) if filtros.get('obra') else None
+    departamento_id = int(filtros.get('departamento')) if filtros.get('departamento') else None
+    
+    if tipo == 'funcionarios':
+        query = Funcionario.query
+        if departamento_id:
+            query = query.filter_by(departamento_id=departamento_id)
+        funcionarios = query.all()
+        
+        html = '<div class="table-responsive"><table class="table table-striped">'
+        html += '<thead><tr><th>Código</th><th>Nome</th><th>CPF</th><th>Departamento</th><th>Função</th><th>Data Admissão</th><th>Salário</th><th>Status</th></tr></thead><tbody>'
+        
+        for f in funcionarios:
+            status_badge = '<span class="badge bg-success">Ativo</span>' if f.ativo else '<span class="badge bg-danger">Inativo</span>'
+            html += f'<tr><td>{f.codigo or "-"}</td><td>{f.nome}</td><td>{f.cpf}</td><td>{f.departamento_ref.nome if f.departamento_ref else "-"}</td>'
+            html += f'<td>{f.funcao_ref.nome if f.funcao_ref else "-"}</td><td>{f.data_admissao.strftime("%d/%m/%Y") if f.data_admissao else "-"}</td>'
+            html += f'<td>R$ {f.salario:,.2f}</td><td>{status_badge}</td></tr>'
+        
+        html += '</tbody></table></div>'
+        
+        return jsonify({
+            'titulo': f'Lista de Funcionários ({len(funcionarios)} registros)',
+            'html': html
+        })
+    
+    elif tipo == 'ponto':
+        query = RegistroPonto.query
+        if data_inicio:
+            query = query.filter(RegistroPonto.data >= data_inicio)
+        if data_fim:
+            query = query.filter(RegistroPonto.data <= data_fim)
+        if obra_id:
+            query = query.filter_by(obra_id=obra_id)
+        if departamento_id:
+            query = query.join(Funcionario).filter(Funcionario.departamento_id == departamento_id)
+        
+        registros = query.options(joinedload(RegistroPonto.funcionario_ref), joinedload(RegistroPonto.obra_ref)).order_by(RegistroPonto.data.desc()).all()
+        
+        html = '<div class="table-responsive"><table class="table table-striped">'
+        html += '<thead><tr><th>Data</th><th>Funcionário</th><th>Obra</th><th>Entrada</th><th>Saída</th><th>Horas Trabalhadas</th><th>Horas Extras</th><th>Atrasos</th></tr></thead><tbody>'
+        
+        for r in registros:
+            html += f'<tr><td>{r.data.strftime("%d/%m/%Y")}</td>'
+            html += f'<td>{r.funcionario_ref.nome if r.funcionario_ref else "-"}</td>'
+            html += f'<td>{r.obra_ref.nome if r.obra_ref else "-"}</td>'
+            html += f'<td>{r.hora_entrada.strftime("%H:%M") if r.hora_entrada else "-"}</td>'
+            html += f'<td>{r.hora_saida.strftime("%H:%M") if r.hora_saida else "-"}</td>'
+            html += f'<td>{r.horas_trabalhadas:.2f}h</td>'
+            html += f'<td>{r.horas_extras:.2f}h</td>'
+            html += f'<td>{r.total_atraso_minutos or 0} min</td></tr>'
+        
+        html += '</tbody></table></div>'
+        
+        return jsonify({
+            'titulo': f'Relatório de Ponto ({len(registros)} registros)',
+            'html': html
+        })
+    
+    elif tipo == 'horas-extras':
+        query = RegistroPonto.query.filter(RegistroPonto.horas_extras > 0)
+        if data_inicio:
+            query = query.filter(RegistroPonto.data >= data_inicio)
+        if data_fim:
+            query = query.filter(RegistroPonto.data <= data_fim)
+        if obra_id:
+            query = query.filter_by(obra_id=obra_id)
+        if departamento_id:
+            query = query.join(Funcionario).filter(Funcionario.departamento_id == departamento_id)
+        
+        registros = query.options(joinedload(RegistroPonto.funcionario_ref), joinedload(RegistroPonto.obra_ref)).order_by(RegistroPonto.data.desc()).all()
+        
+        html = '<div class="table-responsive"><table class="table table-striped">'
+        html += '<thead><tr><th>Data</th><th>Funcionário</th><th>Obra</th><th>Horas Extras</th><th>Valor Estimado</th></tr></thead><tbody>'
+        
+        total_horas = 0
+        total_valor = 0
+        
+        for r in registros:
+            valor_hora = (r.funcionario.salario / 220) * 1.5 if r.funcionario.salario else 0
+            valor_extras = r.horas_extras * valor_hora
+            total_horas += r.horas_extras
+            total_valor += valor_extras
+            
+            html += f'<tr><td>{r.data.strftime("%d/%m/%Y")}</td>'
+            html += f'<td>{r.funcionario.nome}</td>'
+            html += f'<td>{r.obra.nome if r.obra else "-"}</td>'
+            html += f'<td>{r.horas_extras:.2f}h</td>'
+            html += f'<td>R$ {valor_extras:.2f}</td></tr>'
+        
+        html += f'<tr class="table-info"><td colspan="3"><strong>TOTAL</strong></td><td><strong>{total_horas:.2f}h</strong></td><td><strong>R$ {total_valor:.2f}</strong></td></tr>'
+        html += '</tbody></table></div>'
+        
+        return jsonify({
+            'titulo': f'Relatório de Horas Extras ({len(registros)} registros)',
+            'html': html
+        })
+    
+    elif tipo == 'alimentacao':
+        query = RegistroAlimentacao.query
+        if data_inicio:
+            query = query.filter(RegistroAlimentacao.data >= data_inicio)
+        if data_fim:
+            query = query.filter(RegistroAlimentacao.data <= data_fim)
+        if obra_id:
+            query = query.filter_by(obra_id=obra_id)
+        if departamento_id:
+            query = query.join(Funcionario).filter(Funcionario.departamento_id == departamento_id)
+        
+        registros = query.join(Funcionario).order_by(RegistroAlimentacao.data.desc()).all()
+        
+        html = '<div class="table-responsive"><table class="table table-striped">'
+        html += '<thead><tr><th>Data</th><th>Funcionário</th><th>Tipo</th><th>Restaurante</th><th>Obra</th><th>Valor</th></tr></thead><tbody>'
+        
+        total_valor = 0
+        
+        for r in registros:
+            total_valor += r.valor
+            html += f'<tr><td>{r.data.strftime("%d/%m/%Y")}</td>'
+            html += f'<td>{r.funcionario.nome}</td>'
+            html += f'<td>{r.tipo.title()}</td>'
+            html += f'<td>{r.restaurante.nome if r.restaurante else "-"}</td>'
+            html += f'<td>{r.obra.nome if r.obra else "-"}</td>'
+            html += f'<td>R$ {r.valor:.2f}</td></tr>'
+        
+        html += f'<tr class="table-info"><td colspan="5"><strong>TOTAL</strong></td><td><strong>R$ {total_valor:.2f}</strong></td></tr>'
+        html += '</tbody></table></div>'
+        
+        return jsonify({
+            'titulo': f'Relatório de Alimentação ({len(registros)} registros)',
+            'html': html
+        })
+    
+    elif tipo == 'obras':
+        query = Obra.query
+        if obra_id:
+            query = query.filter_by(id=obra_id)
+        
+        obras = query.all()
+        
+        html = '<div class="table-responsive"><table class="table table-striped">'
+        html += '<thead><tr><th>Nome</th><th>Responsável</th><th>Data Início</th><th>Previsão Fim</th><th>Orçamento</th><th>Status</th><th>Funcionários</th></tr></thead><tbody>'
+        
+        for obra in obras:
+            funcionarios_obra = db.session.query(func.count(FuncionarioObra.id)).filter_by(obra_id=obra.id).scalar()
+            
+            html += f'<tr><td>{obra.nome}</td>'
+            html += f'<td>{obra.responsavel.nome if obra.responsavel else "-"}</td>'
+            html += f'<td>{obra.data_inicio.strftime("%d/%m/%Y") if obra.data_inicio else "-"}</td>'
+            html += f'<td>{obra.data_previsao_fim.strftime("%d/%m/%Y") if obra.data_previsao_fim else "-"}</td>'
+            html += f'<td>R$ {obra.orcamento:,.2f}</td>'
+            html += f'<td><span class="badge bg-primary">{obra.status}</span></td>'
+            html += f'<td>{funcionarios_obra}</td></tr>'
+        
+        html += '</tbody></table></div>'
+        
+        return jsonify({
+            'titulo': f'Lista de Obras ({len(obras)} registros)',
+            'html': html
+        })
+    
+    elif tipo == 'custos-obra':
+        query = CustoObra.query
+        if data_inicio:
+            query = query.filter(CustoObra.data >= data_inicio)
+        if data_fim:
+            query = query.filter(CustoObra.data <= data_fim)
+        if obra_id:
+            query = query.filter_by(obra_id=obra_id)
+        
+        custos = query.join(Obra).order_by(CustoObra.data.desc()).all()
+        
+        html = '<div class="table-responsive"><table class="table table-striped">'
+        html += '<thead><tr><th>Data</th><th>Obra</th><th>Tipo</th><th>Descrição</th><th>Valor</th></tr></thead><tbody>'
+        
+        total_custos = 0
+        
+        for custo in custos:
+            total_custos += custo.valor
+            html += f'<tr><td>{custo.data.strftime("%d/%m/%Y")}</td>'
+            html += f'<td>{custo.obra.nome}</td>'
+            html += f'<td>{custo.tipo.title()}</td>'
+            html += f'<td>{custo.descricao or "-"}</td>'
+            html += f'<td>R$ {custo.valor:.2f}</td></tr>'
+        
+        html += f'<tr class="table-info"><td colspan="4"><strong>TOTAL</strong></td><td><strong>R$ {total_custos:.2f}</strong></td></tr>'
+        html += '</tbody></table></div>'
+        
+        return jsonify({
+            'titulo': f'Custos por Obra ({len(custos)} registros)',
+            'html': html
+        })
+    
+    elif tipo == 'veiculos':
+        # CORRIGIDO: Filtrar veículos por admin_id (multi-tenant)
+        admin_id = current_user.id if hasattr(current_user, 'id') else None
+        query = Veiculo.query.filter_by(admin_id=admin_id)
+        veiculos = query.all()
+        
+        html = '<div class="table-responsive"><table class="table table-striped">'
+        html += '<thead><tr><th>Placa</th><th>Marca/Modelo</th><th>Ano</th><th>Tipo</th><th>KM Atual</th><th>Status</th><th>Próxima Manutenção</th></tr></thead><tbody>'
+        
+        for veiculo in veiculos:
+            html += f'<tr><td>{veiculo.placa}</td>'
+            html += f'<td>{veiculo.marca} {veiculo.modelo}</td>'
+            html += f'<td>{veiculo.ano or "-"}</td>'
+            html += f'<td>{veiculo.tipo}</td>'
+            html += f'<td>{veiculo.km_atual or 0:,} km</td>'
+            html += f'<td><span class="badge bg-info">{veiculo.status}</span></td>'
+            html += f'<td>{veiculo.data_proxima_manutencao.strftime("%d/%m/%Y") if veiculo.data_proxima_manutencao else "-"}</td></tr>'
+        
+        html += '</tbody></table></div>'
+        
+        return jsonify({
+            'titulo': f'Relatório de Veículos ({len(veiculos)} registros)',
+            'html': html
+        })
+    
+    elif tipo == 'dashboard-executivo':
+        # Dados consolidados para dashboard executivo - CORRIGIDO: Filtrar por admin_id
+        admin_id = current_user.id if hasattr(current_user, 'id') else None
+        total_funcionarios = Funcionario.query.filter_by(ativo=True, admin_id=admin_id).count()
+        total_obras = Obra.query.filter_by(status='Em andamento', admin_id=admin_id).count()
+        total_veiculos = Veiculo.query.filter_by(ativo=True, admin_id=admin_id).count()
+        
+        # Custos do mês atual
+        hoje = date.today()
+        primeiro_dia_mes = hoje.replace(day=1)
+        
+        custos_mes = db.session.query(func.sum(CustoObra.valor)).filter(
+            CustoObra.data >= primeiro_dia_mes,
+            CustoObra.data <= hoje
+        ).scalar() or 0
+        
+        # Horas trabalhadas do mês
+        horas_mes = db.session.query(func.sum(RegistroPonto.horas_trabalhadas)).filter(
+            RegistroPonto.data >= primeiro_dia_mes,
+            RegistroPonto.data <= hoje
+        ).scalar() or 0
+        
+        # Alimentação do mês
+        alimentacao_mes = db.session.query(func.sum(RegistroAlimentacao.valor)).filter(
+            RegistroAlimentacao.data >= primeiro_dia_mes,
+            RegistroAlimentacao.data <= hoje
+        ).scalar() or 0
+        
+        html = '<div class="row">'
+        html += f'<div class="col-md-3"><div class="card text-center"><div class="card-body"><h2 class="text-primary">{total_funcionarios}</h2><p>Funcionários Ativos</p></div></div></div>'
+        html += f'<div class="col-md-3"><div class="card text-center"><div class="card-body"><h2 class="text-success">{total_obras}</h2><p>Obras em Andamento</p></div></div></div>'
+        html += f'<div class="col-md-3"><div class="card text-center"><div class="card-body"><h2 class="text-warning">{total_veiculos}</h2><p>Veículos</p></div></div></div>'
+        html += f'<div class="col-md-3"><div class="card text-center"><div class="card-body"><h2 class="text-info">R$ {custos_mes:,.0f}</h2><p>Custos do Mês</p></div></div></div>'
+        html += '</div>'
+        
+        html += '<div class="row mt-4">'
+        html += f'<div class="col-md-6"><div class="card"><div class="card-body"><h5>Resumo Mensal</h5><p><strong>Horas Trabalhadas:</strong> {horas_mes:.0f}h</p><p><strong>Custo por Hora:</strong> R$ {(custos_mes/horas_mes if horas_mes > 0 else 0):.2f}</p></div></div></div>'
+        html += f'<div class="col-md-6"><div class="card"><div class="card-body"><h5>Alimentação</h5><p><strong>Gasto Mensal:</strong> R$ {alimentacao_mes:,.2f}</p><p><strong>Média por Funcionário:</strong> R$ {(alimentacao_mes/total_funcionarios if total_funcionarios > 0 else 0):.2f}</p></div></div></div>'
+        html += '</div>'
+        
+        return jsonify({
+            'titulo': 'Dashboard Executivo',
+            'html': html
+        })
+    
+    elif tipo == 'progresso-obras':
+        obras = Obra.query.all()
+        
+        html = '<div class="table-responsive"><table class="table table-striped">'
+        html += '<thead><tr><th>Obra</th><th>Progresso</th><th>Orçamento</th><th>Gasto Atual</th><th>Saldo</th><th>% Utilizado</th></tr></thead><tbody>'
+        
+        for obra in obras:
+            gasto_atual = db.session.query(func.sum(CustoObra.valor)).filter_by(obra_id=obra.id).scalar() or 0
+            saldo = obra.orcamento - gasto_atual
+            percentual = (gasto_atual / obra.orcamento * 100) if obra.orcamento > 0 else 0
+            
+            cor_saldo = 'text-success' if saldo > 0 else 'text-danger'
+            
+            html += f'<tr><td>{obra.nome}</td>'
+            html += f'<td><span class="badge bg-info">{obra.status}</span></td>'
+            html += f'<td>R$ {obra.orcamento:,.2f}</td>'
+            html += f'<td>R$ {gasto_atual:,.2f}</td>'
+            html += f'<td class="{cor_saldo}">R$ {saldo:,.2f}</td>'
+            html += f'<td>{percentual:.1f}%</td></tr>'
+        
+        html += '</tbody></table></div>'
+        
+        return jsonify({
+            'titulo': f'Progresso das Obras ({len(obras)} registros)',
+            'html': html
+        })
+    
+    elif tipo == 'rentabilidade':
+        # Análise de rentabilidade por obra
+        obras = Obra.query.all()
+        
+        html = '<div class="table-responsive"><table class="table table-striped">'
+        html += '<thead><tr><th>Obra</th><th>Receita Prevista</th><th>Custos</th><th>Margem</th><th>% Margem</th><th>Status</th></tr></thead><tbody>'
+        
+        for obra in obras:
+            custos_obra = db.session.query(func.sum(CustoObra.valor)).filter_by(obra_id=obra.id).scalar() or 0
+            receita_prevista = obra.orcamento * 1.3  # Assumindo 30% de margem padrão
+            margem = receita_prevista - custos_obra
+            percentual_margem = (margem / receita_prevista * 100) if receita_prevista > 0 else 0
+            
+            cor_margem = 'text-success' if margem > 0 else 'text-danger'
+            
+            html += f'<tr><td>{obra.nome}</td>'
+            html += f'<td>R$ {receita_prevista:,.2f}</td>'
+            html += f'<td>R$ {custos_obra:,.2f}</td>'
+            html += f'<td class="{cor_margem}">R$ {margem:,.2f}</td>'
+            html += f'<td class="{cor_margem}">{percentual_margem:.1f}%</td>'
+            html += f'<td><span class="badge bg-primary">{obra.status}</span></td></tr>'
+        
+        html += '</tbody></table></div>'
+        
+        return jsonify({
+            'titulo': f'Análise de Rentabilidade ({len(obras)} obras)',
+            'html': html
+        })
+    
+    else:
+        return jsonify({
+            'titulo': 'Relatório não implementado',
+            'html': '<div class="alert alert-info">Este tipo de relatório ainda não foi implementado.</div>'
+        })
+
+@main_bp.route('/relatorios/exportar/<tipo>', methods=['GET', 'POST'])
+@login_required
+def exportar_relatorio(tipo):
+    """Exporta relatório em formato específico"""
+    from relatorios_funcionais import gerar_relatorio_funcional
+    
+    # Processar filtros e formato
+    if request.method == 'POST':
+        filtros = request.get_json() or {}
+        formato = filtros.get('formato', 'csv')
+    else:
+        filtros = request.args.to_dict()
+        formato = filtros.get('formato', 'csv')
+    
+    try:
+        return gerar_relatorio_funcional(tipo, formato, filtros)
+    except Exception as e:
+        return jsonify({'erro': str(e)}), 500
+
+@main_bp.route('/funcionarios/<int:funcionario_id>/ocorrencias/nova', methods=['POST'])
+@login_required
+def nova_ocorrencia(funcionario_id):
+    """Cria nova ocorrência para funcionário"""
+    funcionario = Funcionario.query.get_or_404(funcionario_id)
+    
+    try:
+        # Criar ocorrência baseada no modelo existente
+        ocorrencia = Ocorrencia(
+            funcionario_id=funcionario_id,
+            tipo=request.form.get('tipo'),
+            data_inicio=datetime.strptime(request.form.get('data_inicio'), '%Y-%m-%d').date(),
+            data_fim=datetime.strptime(request.form.get('data_fim'), '%Y-%m-%d').date() if request.form.get('data_fim') else None,
+            status=request.form.get('status', 'Pendente'),
+            descricao=request.form.get('descricao', '')
+        )
+        
+        db.session.add(ocorrencia)
+        db.session.commit()
+        
+        flash('Ocorrência registrada com sucesso!', 'success')
+        
+    except Exception as e:
+        db.session.rollback()
+        flash(f'Erro ao registrar ocorrência: {str(e)}', 'error')
+        
+    return redirect(url_for('main.funcionario_perfil', id=funcionario_id))
+
+@main_bp.route('/funcionarios/ocorrencias/<int:ocorrencia_id>/editar', methods=['POST'])
+@login_required
+def editar_ocorrencia(ocorrencia_id):
+    """Edita ocorrência existente"""
+    ocorrencia = Ocorrencia.query.get_or_404(ocorrencia_id)
+    
+    try:
+        ocorrencia.tipo = request.form.get('tipo')
+        ocorrencia.data_inicio = datetime.strptime(request.form.get('data_inicio'), '%Y-%m-%d').date()
+        ocorrencia.data_fim = datetime.strptime(request.form.get('data_fim'), '%Y-%m-%d').date() if request.form.get('data_fim') else None
+        ocorrencia.status = request.form.get('status')
+        ocorrencia.descricao = request.form.get('descricao', '')
+        
+        db.session.commit()
+        flash('Ocorrência atualizada com sucesso!', 'success')
+        
+    except Exception as e:
+        db.session.rollback()
+        flash(f'Erro ao atualizar ocorrência: {str(e)}', 'error')
+        
+    return redirect(url_for('main.funcionario_perfil', id=ocorrencia.funcionario_id))
+
+@main_bp.route('/funcionarios/ocorrencias/<int:ocorrencia_id>/excluir', methods=['POST'])
+@login_required
+def excluir_ocorrencia(ocorrencia_id):
+    """Exclui ocorrência"""
+    ocorrencia = Ocorrencia.query.get_or_404(ocorrencia_id)
+    funcionario_id = ocorrencia.funcionario_id
+    
+    try:
+        db.session.delete(ocorrencia)
+        db.session.commit()
+        flash('Ocorrência excluída com sucesso!', 'success')
+        
+    except Exception as e:
+        db.session.rollback()
+        flash(f'Erro ao excluir ocorrência: {str(e)}', 'error')
+        
+    return redirect(url_for('main.funcionario_perfil', id=funcionario_id))
+
+# === ROTAS FINANCEIRAS ===
+
+@main_bp.route('/financeiro')
+@login_required
+def financeiro_dashboard():
+    """Dashboard principal do módulo financeiro"""
+    # Filtros de data
+    data_inicio = request.args.get('data_inicio')
+    data_fim = request.args.get('data_fim')
+    
+    if not data_inicio:
+        data_inicio = date.today().replace(day=1)
+    else:
+        data_inicio = datetime.strptime(data_inicio, '%Y-%m-%d').date()
+    
+    if not data_fim:
+        data_fim = date.today()
+    else:
+        data_fim = datetime.strptime(data_fim, '%Y-%m-%d').date()
+    
+    # Importar módulo financeiro
+    from financeiro import obter_kpis_financeiros, calcular_fluxo_caixa_periodo
+    
+    # KPIs financeiros
+    kpis = obter_kpis_financeiros(data_inicio, data_fim)
+    
+    # Fluxo de caixa detalhado
+    fluxo = calcular_fluxo_caixa_periodo(data_inicio, data_fim)
+    
+    # Receitas recentes
+    receitas_recentes = Receita.query.filter(
+        Receita.data_receita >= data_inicio,
+        Receita.data_receita <= data_fim
+    ).order_by(Receita.data_receita.desc()).limit(10).all()
+    
+    # Centros de custo ativos
+    centros_custo = CentroCusto.query.filter_by(ativo=True).all()
+    
+    return render_template('financeiro/dashboard.html',
+                         kpis=kpis,
+                         fluxo=fluxo,
+                         receitas_recentes=receitas_recentes,
+                         centros_custo=centros_custo,
+                         data_inicio=data_inicio,
+                         data_fim=data_fim)
+
+@main_bp.route('/financeiro/receitas')
+@login_required
+def receitas():
+    """Página de gestão de receitas"""
+    # Filtros
+    data_inicio = request.args.get('data_inicio')
+    data_fim = request.args.get('data_fim')
+    status_filtro = request.args.get('status', '')
+    obra_filtro = request.args.get('obra_id', '')
+    
+    query = Receita.query
+    
+    if data_inicio:
+        query = query.filter(Receita.data_receita >= datetime.strptime(data_inicio, '%Y-%m-%d').date())
+    if data_fim:
+        query = query.filter(Receita.data_receita <= datetime.strptime(data_fim, '%Y-%m-%d').date())
+    if status_filtro:
+        query = query.filter(Receita.status == status_filtro)
+    if obra_filtro:
+        query = query.filter(Receita.obra_id == int(obra_filtro))
+    
+    receitas = query.order_by(Receita.data_receita.desc()).all()
+    
+    # Dados para formulários
+    obras = Obra.query.filter_by(status='Em andamento').all()
+    centros_custo = CentroCusto.query.filter_by(ativo=True).all()
+    
+    return render_template('financeiro/receitas.html',
+                         receitas=receitas,
+                         obras=obras,
+                         centros_custo=centros_custo,
+                         data_inicio=data_inicio,
+                         data_fim=data_fim,
+                         status_filtro=status_filtro,
+                         obra_filtro=obra_filtro)
+
+@main_bp.route('/financeiro/fluxo-caixa')
+@login_required
+def fluxo_caixa():
+    """Página de fluxo de caixa"""
+    from financeiro import calcular_fluxo_caixa_periodo
+    
+    # Filtros padrão
+    data_inicio = request.args.get('data_inicio', date.today().replace(day=1).strftime('%Y-%m-%d'))
+    data_fim = request.args.get('data_fim', date.today().strftime('%Y-%m-%d'))
+    obra_id = request.args.get('obra_id', 0, type=int)
+    centro_custo_id = request.args.get('centro_custo_id', 0, type=int)
+    tipo_movimento = request.args.get('tipo_movimento', '')
+    categoria = request.args.get('categoria', '')
+    
+    # Converter datas
+    data_inicio_dt = datetime.strptime(data_inicio, '%Y-%m-%d').date()
+    data_fim_dt = datetime.strptime(data_fim, '%Y-%m-%d').date()
+    
+    # Calcular fluxo
+    fluxo = calcular_fluxo_caixa_periodo(
+        data_inicio_dt, 
+        data_fim_dt,
+        obra_id if obra_id != 0 else None,
+        centro_custo_id if centro_custo_id != 0 else None
+    )
+    
+    # Filtrar movimentos adicionalmente
+    movimentos_filtrados = fluxo['movimentos']
+    if tipo_movimento:
+        movimentos_filtrados = [m for m in movimentos_filtrados if m.tipo_movimento == tipo_movimento]
+    if categoria:
+        movimentos_filtrados = [m for m in movimentos_filtrados if m.categoria == categoria]
+    
+    # Dados para formulários
+    obras = Obra.query.all()
+    centros_custo = CentroCusto.query.filter_by(ativo=True).all()
+    
+    return render_template('financeiro/fluxo_caixa.html',
+                         fluxo=fluxo,
+                         movimentos=movimentos_filtrados,
+                         obras=obras,
+                         centros_custo=centros_custo,
+                         filtros={
+                             'data_inicio': data_inicio,
+                             'data_fim': data_fim,
+                             'obra_id': obra_id,
+                             'centro_custo_id': centro_custo_id,
+                             'tipo_movimento': tipo_movimento,
+                             'categoria': categoria
+                         })
+
+@main_bp.route('/financeiro/centros-custo')
+@login_required
+def centros_custo():
+    """Página de gestão de centros de custo"""
+    centros = CentroCusto.query.all()
+    return render_template('financeiro/centros_custo.html', centros=centros)
+
+# ============================================================================
+# ROTAS RDO (RELATÓRIO DIÁRIO DE OBRA)
+# ============================================================================
+
+@main_bp.route('/rdo')
+@login_required
+def lista_rdos():
+    """Lista todos os RDOs com filtros"""
+    page = request.args.get('page', 1, type=int)
+    
+    # Filtros
+    obra_id = request.args.get('obra_id')
+    data_inicio = request.args.get('data_inicio')
+    data_fim = request.args.get('data_fim')
+    status = request.args.get('status')
+    
+    # Query base
+    query = RDO.query
+    
+    # Aplicar filtros
+    if obra_id:
+        query = query.filter(RDO.obra_id == obra_id)
+    if data_inicio:
+        query = query.filter(RDO.data_relatorio >= datetime.strptime(data_inicio, '%Y-%m-%d').date())
+    if data_fim:
+        query = query.filter(RDO.data_relatorio <= datetime.strptime(data_fim, '%Y-%m-%d').date())
+    if status:
+        query = query.filter(RDO.status == status)
+    
+    # Ordenação e paginação
+    rdos = query.order_by(RDO.data_relatorio.desc()).paginate(
+        page=page, per_page=20, error_out=False
+    )
+    
+    # Dados para filtros
+    obras = Obra.query.all()
+    
+    return render_template('rdo/lista_rdos.html', 
+                         rdos=rdos, 
+                         obras=obras,
+                         filtros={
+                             'obra_id': obra_id,
+                             'data_inicio': data_inicio,
+                             'data_fim': data_fim,
+                             'status': status
+                         })
+
+@main_bp.route('/rdo/novo')
+@login_required
+def novo_rdo():
+    """Formulário para criar novo RDO"""
+    from models import ServicoObra
+    
+    # Dados para template
+    obras = Obra.query.filter_by(ativo=True).all()
+    funcionarios = Funcionario.query.filter_by(ativo=True).order_by(Funcionario.nome).all()
+    # Query específica para evitar erro categoria_id
+    servicos_data = db.session.query(
+        Servico.id,
+        Servico.nome,
+        Servico.categoria,
+        Servico.unidade_medida,
+        Servico.unidade_simbolo,
+        Servico.custo_unitario
+    ).filter(Servico.ativo == True).all()
+    
+    # Converter para objetos acessíveis no template
+    servicos = []
+    for row in servicos_data:
+        servico_obj = type('Servico', (), {
+            'id': row.id,
+            'nome': row.nome,
+            'categoria': row.categoria,
+            'unidade_medida': row.unidade_medida,
+            'unidade_simbolo': row.unidade_simbolo,
+            'custo_unitario': row.custo_unitario
+        })()
+        servicos.append(servico_obj)
+    
+    # Obter obra pré-selecionada se houver
+    obra_id = request.args.get('obra_id')
+    servicos_obra = []
+    if obra_id:
+        servicos_obra = db.session.query(ServicoObra, Servico).join(
+            Servico, ServicoObra.servico_id == Servico.id
+        ).filter(
+            ServicoObra.obra_id == obra_id,
+            ServicoObra.ativo == True
+        ).all()
+    
+    return render_template('rdo_novo.html', 
+                         obras=obras,
+                         funcionarios=funcionarios,
+                         servicos=servicos,
+                         servicos_obra=servicos_obra,
+                         obra_id=obra_id,
+                         data_hoje=datetime.now().strftime('%Y-%m-%d'))
+
+@main_bp.route('/rdo/criar', methods=['POST'])
+@login_required
+def criar_rdo():
+    """Processar criação de novo RDO"""
+    try:
+        # Gerar número único do RDO
+        import uuid
+        numero_rdo = f"RDO-{datetime.now().year}-{str(uuid.uuid4())[:8].upper()}"
+        
+        rdo = RDO(
+            numero_rdo=numero_rdo,
+            data_relatorio=datetime.strptime(request.form.get('data_relatorio'), '%Y-%m-%d').date(),
+            obra_id=request.form.get('obra_id'),
+            criado_por_id=current_user.id,
+            tempo_manha=request.form.get('tempo_manha', ''),
+            tempo_tarde=request.form.get('tempo_tarde', ''),
+            tempo_noite=request.form.get('tempo_noite', ''),
+            observacoes_meteorologicas=request.form.get('observacoes_meteorologicas', ''),
+            comentario_geral=request.form.get('comentario_geral', ''),
+            status=request.form.get('status', 'Rascunho')
+        )
+        
+        db.session.add(rdo)
+        db.session.commit()
+        
+        flash('RDO criado com sucesso!', 'success')
+        return redirect(url_for('main.visualizar_rdo', id=rdo.id))
+        
+    except Exception as e:
+        db.session.rollback()
+        flash(f'Erro ao criar RDO: {str(e)}', 'error')
+        return redirect(url_for('main.novo_rdo'))
+
+@main_bp.route('/rdo/<int:id>')
+@login_required
+def visualizar_rdo(id):
+    """Visualizar detalhes de um RDO"""
+    rdo = RDO.query.get_or_404(id)
+    return render_template('rdo/visualizar_rdo.html', rdo=rdo)
+
+@main_bp.route('/rdo/<int:id>/editar')
+@login_required
+def editar_rdo(id):
+    """Formulário para editar RDO"""
+    rdo = RDO.query.get_or_404(id)
+    obras = Obra.query.all()
+    funcionarios = Funcionario.query.filter_by(ativo=True).order_by(Funcionario.nome).all()
+    
+    return render_template('rdo/formulario_rdo.html', 
+                         rdo=rdo,
+                         obras=obras,
+                         funcionarios=funcionarios,
+                         modo='editar')
+
+@main_bp.route('/rdo/<int:id>/excluir', methods=['POST'])
+@login_required
+def excluir_rdo(id):
+    """Excluir RDO"""
+    try:
+        rdo = RDO.query.get_or_404(id)
+        db.session.delete(rdo)
+        db.session.commit()
+        
+        flash('RDO excluído com sucesso!', 'success')
+        return redirect(url_for('main.lista_rdos'))
+        
+    except Exception as e:
+        db.session.rollback()
+        flash(f'Erro ao excluir RDO: {str(e)}', 'error')
+        return redirect(url_for('main.lista_rdos'))
+
+@main_bp.route('/financeiro/centros-custo/novo', methods=['GET', 'POST'])
+@login_required
+def novo_centro_custo():
+    """Criar novo centro de custo"""
+    from financeiro import gerar_codigo_centro_custo
+    
+    if request.method == 'POST':
+        try:
+            centro = CentroCusto(
+                codigo=request.form.get('codigo'),
+                nome=request.form.get('nome'),
+                descricao=request.form.get('descricao'),
+                tipo=request.form.get('tipo'),
+                obra_id=int(request.form.get('obra_id')) if request.form.get('obra_id') != '0' else None,
+                departamento_id=int(request.form.get('departamento_id')) if request.form.get('departamento_id') != '0' else None,
+                ativo=bool(request.form.get('ativo'))
+            )
+            
+            db.session.add(centro)
+            db.session.commit()
+            flash('Centro de custo cadastrado com sucesso!', 'success')
+            return redirect(url_for('main.centros_custo'))
+        except Exception as e:
+            db.session.rollback()
+            flash(f'Erro ao cadastrar centro de custo: {str(e)}', 'error')
+    
+    # Dados para formulário
+    obras = Obra.query.all()
+    departamentos = Departamento.query.all()
+    codigo_padrao = gerar_codigo_centro_custo()
+    
+    return render_template('financeiro/centro_custo_form.html', 
+                         titulo='Novo Centro de Custo',
+                         codigo_padrao=codigo_padrao,
+                         obras=obras,
+                         departamentos=departamentos)
+
+@main_bp.route('/financeiro/sincronizar-fluxo', methods=['POST'])
+@login_required
+def sincronizar_fluxo():
+    """Sincronizar dados do fluxo de caixa"""
+    try:
+        from financeiro import sincronizar_fluxo_caixa
+        sincronizar_fluxo_caixa()
+        
+        if request.is_json:
+            return jsonify({'success': True, 'message': 'Fluxo de caixa sincronizado com sucesso!'})
+        else:
+            flash('Fluxo de caixa sincronizado com sucesso!', 'success')
+            return redirect(url_for('main.fluxo_caixa'))
+    except Exception as e:
+        if request.is_json:
+            return jsonify({'success': False, 'message': str(e)})
+        else:
+            flash(f'Erro ao sincronizar fluxo de caixa: {str(e)}', 'error')
+            return redirect(url_for('main.fluxo_caixa'))
+
+@main_bp.route('/horarios')
+@login_required
+def horarios():
+    """Página de gestão de horários de trabalho"""
+    horarios = HorarioTrabalho.query.all()
+    return render_template('horarios.html', horarios=horarios)
+
+@main_bp.route('/horarios/novo', methods=['POST'])
+@login_required
+def novo_horario():
+    """Criar novo horário de trabalho"""
+    try:
+        nome = request.form.get('nome')
+        entrada = request.form.get('entrada')
+        saida_almoco = request.form.get('saida_almoco')
+        retorno_almoco = request.form.get('retorno_almoco')
+        saida = request.form.get('saida')
+        dias_semana = request.form.get('dias_semana')
+        
+        # Verificar se já existe horário com o mesmo nome
+        horario_existente = HorarioTrabalho.query.filter_by(nome=nome).first()
+        if horario_existente:
+            flash('Já existe um horário com este nome!', 'error')
+            return redirect(url_for('main.horarios'))
+        
+        # Calcular horas diárias
+        entrada_time = datetime.strptime(entrada, '%H:%M').time()
+        saida_almoco_time = datetime.strptime(saida_almoco, '%H:%M').time()
+        retorno_almoco_time = datetime.strptime(retorno_almoco, '%H:%M').time()
+        saida_time = datetime.strptime(saida, '%H:%M').time()
+        
+        # Calcular horas trabalhadas (manhã + tarde)
+        manha_inicio = datetime.combine(date.today(), entrada_time)
+        manha_fim = datetime.combine(date.today(), saida_almoco_time)
+        tarde_inicio = datetime.combine(date.today(), retorno_almoco_time)
+        tarde_fim = datetime.combine(date.today(), saida_time)
+        
+        horas_manha = (manha_fim - manha_inicio).total_seconds() / 3600
+        horas_tarde = (tarde_fim - tarde_inicio).total_seconds() / 3600
+        horas_diarias = horas_manha + horas_tarde
+        
+        # Calcular valor da hora (baseado no salário mínimo padrão)
+        valor_hora = 12.00  # Valor padrão, pode ser ajustado
+        
+        # Criar horário
+        horario = HorarioTrabalho(
+            nome=nome,
+            entrada=entrada_time,
+            saida_almoco=saida_almoco_time,
+            retorno_almoco=retorno_almoco_time,
+            saida=saida_time,
+            dias_semana=dias_semana,
+            horas_diarias=horas_diarias,
+            valor_hora=valor_hora
+        )
+        
+        db.session.add(horario)
+        db.session.commit()
+        
+        flash('Horário de trabalho criado com sucesso!', 'success')
+        return redirect(url_for('main.horarios'))
+        
+    except Exception as e:
+        db.session.rollback()
+        flash(f'Erro ao criar horário: {str(e)}', 'error')
+        return redirect(url_for('main.horarios'))
+
+@main_bp.route('/horarios/editar/<int:id>', methods=['POST'])
+@login_required
+def editar_horario(id):
+    """Editar horário de trabalho"""
+    try:
+        horario = HorarioTrabalho.query.get_or_404(id)
+        
+        nome = request.form.get('nome')
+        entrada = request.form.get('entrada')
+        saida_almoco = request.form.get('saida_almoco')
+        retorno_almoco = request.form.get('retorno_almoco')
+        saida = request.form.get('saida')
+        dias_semana = request.form.get('dias_semana')
+        
+        # Verificar se já existe outro horário com o mesmo nome
+        horario_existente = HorarioTrabalho.query.filter(
+            HorarioTrabalho.nome == nome,
+            HorarioTrabalho.id != id
+        ).first()
+        if horario_existente:
+            flash('Já existe um horário com este nome!', 'error')
+            return redirect(url_for('main.horarios'))
+        
+        # Calcular horas diárias
+        entrada_time = datetime.strptime(entrada, '%H:%M').time()
+        saida_almoco_time = datetime.strptime(saida_almoco, '%H:%M').time()
+        retorno_almoco_time = datetime.strptime(retorno_almoco, '%H:%M').time()
+        saida_time = datetime.strptime(saida, '%H:%M').time()
+        
+        # Calcular horas trabalhadas (manhã + tarde)
+        manha_inicio = datetime.combine(date.today(), entrada_time)
+        manha_fim = datetime.combine(date.today(), saida_almoco_time)
+        tarde_inicio = datetime.combine(date.today(), retorno_almoco_time)
+        tarde_fim = datetime.combine(date.today(), saida_time)
+        
+        horas_manha = (manha_fim - manha_inicio).total_seconds() / 3600
+        horas_tarde = (tarde_fim - tarde_inicio).total_seconds() / 3600
+        horas_diarias = horas_manha + horas_tarde
+        
+        # Atualizar horário
+        horario.nome = nome
+        horario.entrada = entrada_time
+        horario.saida_almoco = saida_almoco_time
+        horario.retorno_almoco = retorno_almoco_time
+        horario.saida = saida_time
+        horario.dias_semana = dias_semana
+        horario.horas_diarias = horas_diarias
+        
+        db.session.commit()
+        
+        flash('Horário de trabalho atualizado com sucesso!', 'success')
+        return redirect(url_for('main.horarios'))
+        
+    except Exception as e:
+        db.session.rollback()
+        flash(f'Erro ao atualizar horário: {str(e)}', 'error')
+        return redirect(url_for('main.horarios'))
+
+@main_bp.route('/horarios/excluir/<int:id>', methods=['POST'])
+@login_required
+def excluir_horario(id):
+    """Excluir horário de trabalho"""
+    try:
+        horario = HorarioTrabalho.query.get_or_404(id)
+        
+        # Verificar se há funcionários usando este horário
+        funcionarios_usando = Funcionario.query.filter_by(horario_trabalho_id=id).count()
+        if funcionarios_usando > 0:
+            flash(f'Não é possível excluir. Existem {funcionarios_usando} funcionários usando este horário.', 'error')
+            return redirect(url_for('main.horarios'))
+        
+        db.session.delete(horario)
+        db.session.commit()
+        
+        flash('Horário de trabalho excluído com sucesso!', 'success')
+        return redirect(url_for('main.horarios'))
+        
+    except Exception as e:
+        db.session.rollback()
+        flash(f'Erro ao excluir horário: {str(e)}', 'error')
+        return redirect(url_for('main.horarios'))
+
+# ==========================================
+# MÓDULOS CRUD - CONTROLE DE PONTO, OUTROS CUSTOS E ALIMENTAÇÃO
+# ==========================================
+
+@main_bp.route('/controle-ponto')
+@login_required
+def controle_ponto():
+    """Página principal do controle de ponto"""
+    # Filtros
+    funcionario_id = request.args.get('funcionario_id')
+    data_inicio = request.args.get('data_inicio')
+    data_fim = request.args.get('data_fim')
+    tipo_registro = request.args.get('tipo_registro')
+    
+    # Query base
+    query = RegistroPonto.query
+    
+    # Aplicar filtros
+    if funcionario_id:
+        query = query.filter(RegistroPonto.funcionario_id == funcionario_id)
+    
+    if data_inicio:
+        query = query.filter(RegistroPonto.data >= datetime.strptime(data_inicio, '%Y-%m-%d').date())
+    
+    if data_fim:
+        query = query.filter(RegistroPonto.data <= datetime.strptime(data_fim, '%Y-%m-%d').date())
+    
+    if tipo_registro:
+        query = query.filter(RegistroPonto.tipo_registro == tipo_registro)
+    
+    # Buscar registros com joins
+    registros = query.options(
+        joinedload(RegistroPonto.funcionario),
+        joinedload(RegistroPonto.obra)
+    ).order_by(RegistroPonto.data.desc()).all()
+    
+    # Dados para formulário
+    funcionarios = Funcionario.query.filter_by(ativo=True).order_by(Funcionario.nome).all()
+    obras = Obra.query.filter_by(status='Em andamento').order_by(Obra.nome).all()
+    
+    return render_template('controle_ponto.html',
+                         registros=registros,
+                         funcionarios=funcionarios,
+                         obras=obras)
+
+@main_bp.route('/ponto/registro', methods=['POST'])
+@login_required
+def criar_registro_ponto():
+    """Criar novo registro de ponto"""
+    try:
+        funcionario_id = request.form.get('funcionario_id')
+        data = datetime.strptime(request.form.get('data'), '%Y-%m-%d').date()
+        tipo_registro = request.form.get('tipo_registro', 'trabalho_normal')
+        obra_id = request.form.get('obra_id') or None
+        
+        # Criar registro
+        registro = RegistroPonto(
+            funcionario_id=funcionario_id,
+            data=data,
+            tipo_registro=tipo_registro,
+            obra_id=obra_id
+        )
+        
+        # Adicionar horários se não for falta
+        if tipo_registro not in ['falta', 'falta_justificada']:
+            entrada = request.form.get('entrada')
+            saida_almoco = request.form.get('saida_almoco')
+            retorno_almoco = request.form.get('retorno_almoco')
+            saida = request.form.get('saida')
+            
+            if entrada:
+                registro.hora_entrada = datetime.strptime(entrada, '%H:%M').time()
+            if saida_almoco:
+                registro.hora_almoco_saida = datetime.strptime(saida_almoco, '%H:%M').time()
+            if retorno_almoco:
+                registro.hora_almoco_retorno = datetime.strptime(retorno_almoco, '%H:%M').time()
+            if saida:
+                registro.hora_saida = datetime.strptime(saida, '%H:%M').time()
+        
+        # Percentual de extras baseado no tipo
+        if tipo_registro == 'sabado_horas_extras':
+            registro.percentual_extras = 50.0
+        elif tipo_registro in ['domingo_horas_extras', 'feriado_trabalhado']:
+            registro.percentual_extras = 100.0
+        else:
+            percentual_extras = request.form.get('percentual_extras')
+            registro.percentual_extras = float(percentual_extras) if percentual_extras else 0.0
+        
+        # Observações
+        registro.observacoes = request.form.get('observacoes')
+        
+        db.session.add(registro)
+        db.session.commit()
+        
+        return jsonify({'success': True})
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500
+
+@main_bp.route('/ponto/registro/<int:registro_id>', methods=['GET', 'PUT'])
+@login_required
+def editar_registro_ponto(registro_id):
+    """Sistema completo de edição de registros de ponto"""
+    try:
+        registro = RegistroPonto.query.get_or_404(registro_id)
+        funcionario = Funcionario.query.get(registro.funcionario_id)
+        
+        if not funcionario:
+            return jsonify({'error': 'Funcionário não encontrado'}), 404
+        
+        # Verificar permissões
+        if not verificar_permissao_edicao_ponto(registro, current_user):
+            print(f"❌ Permissão negada para {current_user.email} editar registro {registro_id}")
+            return jsonify({'error': 'Sem permissão para editar este registro'}), 403
+        
+        if request.method == 'GET':
+            # Retornar dados para edição
+            return jsonify({
+                'success': True,
+                'registro': serializar_registro_completo(registro, funcionario),
+                'obras_disponiveis': obter_obras_usuario(current_user),
+                'tipos_registro': obter_tipos_registro_validos()
+            })
+            
+        elif request.method == 'PUT':
+            # Processar edição
+            dados = request.get_json()
+            
+            # Validar dados de entrada
+            validacao = validar_dados_edicao_ponto(dados, registro)
+            if not validacao['valido']:
+                return jsonify({'success': False, 'error': validacao['erro']})
+            
+            # Aplicar alterações
+            aplicar_edicao_registro(registro, dados)
+            
+            # Recalcular valores baseado no tipo
+            recalcular_registro_automatico(registro)
+            
+            # Salvar alterações
+            db.session.commit()
+            
+            print(f"✅ Registro {registro_id} editado por {current_user.email}")
+            
+            return jsonify({
+                'success': True,
+                'message': 'Registro atualizado com sucesso!',
+                'registro': serializar_registro_completo(registro, funcionario)
+            })
+            
+    except Exception as e:
+        db.session.rollback()
+        print(f"❌ Erro ao editar registro {registro_id}: {e}")
+        return jsonify({'error': f'Erro interno: {str(e)}'}), 500
+
+def verificar_permissao_edicao_ponto(registro, usuario):
+    """Verifica permissões para editar registro"""
+    print(f"🔍 Verificando permissão: usuário {usuario.email} ({usuario.tipo_usuario})")
+    
+    # Usar o enum corretamente
+    from models import TipoUsuario
+    
+    if usuario.tipo_usuario == TipoUsuario.SUPER_ADMIN:
+        print("✅ Permissão concedida: SUPER_ADMIN")
+        return True
+    elif usuario.tipo_usuario == TipoUsuario.ADMIN:
+        # Admin pode editar registros de funcionários sob sua gestão
+        funcionario = Funcionario.query.get(registro.funcionario_id)
+        if funcionario:
+            pode_editar = funcionario.admin_id == usuario.id
+            print(f"🔍 Admin {usuario.id} vs Funcionário admin_id {funcionario.admin_id}: {'✅' if pode_editar else '❌'}")
+            return pode_editar
+        else:
+            print("❌ Funcionário não encontrado")
+            return False
+    else:
+        print(f"❌ Tipo de usuário {usuario.tipo_usuario} não pode editar")
+        return False
+
+def serializar_registro_completo(registro, funcionario):
+    """Serializa registro completo para frontend"""
+    # Mapear tipos do banco para frontend
+    tipo_frontend = mapear_tipo_para_frontend(registro.tipo_registro)
+    
+    return {
+        'id': registro.id,
+        'funcionario': {
+            'id': funcionario.id,
+            'nome': funcionario.nome,
+            'codigo': funcionario.codigo
+        },
+        'data': registro.data.strftime('%Y-%m-%d'),
+        'data_formatada': registro.data.strftime('%d/%m/%Y'),
+        'dia_semana': registro.data.strftime('%A'),
+        'tipo_registro': tipo_frontend,
+        'horarios': {
+            'entrada': registro.hora_entrada.strftime('%H:%M') if registro.hora_entrada else '',
+            'almoco_saida': registro.hora_almoco_saida.strftime('%H:%M') if registro.hora_almoco_saida else '',
+            'almoco_retorno': registro.hora_almoco_retorno.strftime('%H:%M') if registro.hora_almoco_retorno else '',
+            'saida': registro.hora_saida.strftime('%H:%M') if registro.hora_saida else ''
+        },
+        'valores_calculados': {
+            'horas_trabalhadas': float(registro.horas_trabalhadas or 0),
+            'horas_extras': float(registro.horas_extras or 0),
+            'percentual_extras': float(registro.percentual_extras or 0),
+            'total_atraso_horas': float(registro.total_atraso_horas or 0),
+            'total_atraso_minutos': int(registro.total_atraso_minutos or 0)
+        },
+        'obra_id': registro.obra_id,
+        'observacoes': registro.observacoes or '',
+        'horario_padrao': obter_horario_padrao_funcionario(funcionario)
+    }
+
+def mapear_tipo_para_frontend(tipo_banco):
+    """Mapeia tipos do banco para o frontend"""
+    mapeamento = {
+        'trabalhado': 'trabalho_normal',
+        'sabado_horas_extras': 'sabado_trabalhado',
+        'domingo_horas_extras': 'domingo_trabalhado',
+        'feriado': 'feriado_folga',
+        'feriado_trabalhado': 'feriado_trabalhado',
+        'falta_justificada': 'falta_justificada',
+        'falta': 'falta',
+        'ferias': 'ferias'
+    }
+    return mapeamento.get(tipo_banco, tipo_banco)
+
+def mapear_tipo_para_banco(tipo_frontend):
+    """Mapeia tipos do frontend para o banco"""
+    mapeamento = {
+        'trabalho_normal': 'trabalhado',
+        'sabado_trabalhado': 'sabado_horas_extras',
+        'domingo_trabalhado': 'domingo_horas_extras',
+        'feriado_folga': 'feriado',
+        'feriado_trabalhado': 'feriado_trabalhado',
+        'falta_justificada': 'falta_justificada',
+        'falta': 'falta',
+        'ferias': 'ferias'
+    }
+    return mapeamento.get(tipo_frontend, tipo_frontend)
+
+def obter_horario_padrao_funcionario(funcionario):
+    """Retorna horário padrão do funcionário"""
+    if funcionario.horario_trabalho_id:
+        horario = HorarioTrabalho.query.get(funcionario.horario_trabalho_id)
+        if horario:
+            return {
+                'entrada': horario.entrada.strftime('%H:%M') if horario.entrada else '08:00',
+                'saida': horario.saida.strftime('%H:%M') if horario.saida else '17:00',
+                'almoco_saida': horario.saida_almoco.strftime('%H:%M') if horario.saida_almoco else '12:00',
+                'almoco_retorno': horario.retorno_almoco.strftime('%H:%M') if horario.retorno_almoco else '13:00'
+            }
+    return {
+        'entrada': '08:00',
+        'saida': '17:00', 
+        'almoco_saida': '12:00',
+        'almoco_retorno': '13:00'
+    }
+
+def obter_obras_usuario(usuario):
+    """Retorna obras disponíveis para o usuário"""
+    from models import TipoUsuario
+    
+    if usuario.tipo_usuario == TipoUsuario.SUPER_ADMIN:
+        obras = Obra.query.filter_by(ativo=True).all()
+    else:
+        obras = Obra.query.filter_by(admin_id=usuario.id, ativo=True).all()
+    
+    return [{'id': obra.id, 'nome': obra.nome} for obra in obras]
+
+def obter_tipos_registro_validos():
+    """Retorna tipos de registro válidos"""
+    return [
+        {'valor': 'trabalho_normal', 'nome': 'Trabalho Normal'},
+        {'valor': 'sabado_trabalhado', 'nome': 'Sábado - Horas Extras'},
+        {'valor': 'domingo_trabalhado', 'nome': 'Domingo - Horas Extras'},
+        {'valor': 'feriado_trabalhado', 'nome': 'Feriado Trabalhado'},
+        {'valor': 'meio_periodo', 'nome': 'Meio Período'},
+        {'valor': 'falta', 'nome': 'Falta'},
+        {'valor': 'falta_justificada', 'nome': 'Falta Justificada'},
+        {'valor': 'ferias', 'nome': 'Férias'},
+        {'valor': 'feriado_folga', 'nome': 'Feriado Normal'},
+        {'valor': 'sabado_folga', 'nome': 'Sábado - Folga'},
+        {'valor': 'domingo_folga', 'nome': 'Domingo - Folga'}
+    ]
+
+def validar_dados_edicao_ponto(dados, registro):
+    """Valida dados de edição com regras robustas"""
+    erros = []
+    
+    # Validar tipo de registro (pode vir como tipo_lancamento ou tipo_registro)
+    tipos_validos = [t['valor'] for t in obter_tipos_registro_validos()]
+    tipo_recebido = dados.get('tipo_lancamento') or dados.get('tipo_registro')
+    
+    print(f"🔍 Validando tipo: recebido='{tipo_recebido}', válidos={tipos_validos}")
+    
+    if tipo_recebido not in tipos_validos:
+        erros.append(f'Tipo de registro inválido: {tipo_recebido}')
+    
+    # Validar horários para tipos que trabalham
+    tipos_trabalhados = ['trabalho_normal', 'sabado_trabalhado', 'domingo_trabalhado', 'feriado_trabalhado', 'meio_periodo']
+    
+    if tipo_recebido in tipos_trabalhados:
+        if not dados.get('hora_entrada') or not dados.get('hora_saida'):
+            erros.append('Horários de entrada e saída são obrigatórios')
+        
+        # Validar formato de horários
+        for campo in ['hora_entrada', 'hora_saida', 'hora_almoco_saida', 'hora_almoco_retorno']:
+            valor = dados.get(campo)
+            if valor and not validar_formato_hora(valor):
+                erros.append(f'Formato inválido para {campo}')
+        
+        # Validar sequência lógica
+        if dados.get('hora_entrada') and dados.get('hora_saida'):
+            if not validar_sequencia_horarios_edicao(dados):
+                erros.append('Sequência de horários inválida')
+    
+    return {
+        'valido': len(erros) == 0,
+        'erro': '; '.join(erros) if erros else None
+    }
+
+def validar_formato_hora(hora_str):
+    """Valida formato HH:MM"""
+    try:
+        datetime.strptime(hora_str, '%H:%M')
+        return True
+    except ValueError:
+        return False
+
+def validar_sequencia_horarios_edicao(dados):
+    """Valida se horários estão em sequência lógica"""
+    try:
+        horarios = []
+        
+        for campo in ['hora_entrada', 'hora_almoco_saida', 'hora_almoco_retorno', 'hora_saida']:
+            valor = dados.get(campo)
+            if valor:
+                horarios.append(datetime.strptime(valor, '%H:%M').time())
+        
+        # Verificar ordem crescente
+        for i in range(1, len(horarios)):
+            if horarios[i] <= horarios[i-1]:
+                return False
+        
+        return True
+    except ValueError:
+        return False
+
+def aplicar_edicao_registro(registro, dados):
+    """Aplica edições ao registro"""
+    # Mapear tipo para banco (pode vir como tipo_lancamento ou tipo_registro)
+    tipo_recebido = dados.get('tipo_lancamento') or dados.get('tipo_registro')
+    tipo_banco = mapear_tipo_para_banco(tipo_recebido)
+    registro.tipo_registro = tipo_banco
+    
+    print(f"🔄 Aplicando edição: tipo '{tipo_recebido}' → banco '{tipo_banco}'")
+    
+    # Atualizar horários
+    for campo_front, campo_banco in [
+        ('hora_entrada', 'hora_entrada'),
+        ('hora_almoco_saida', 'hora_almoco_saida'),
+        ('hora_almoco_retorno', 'hora_almoco_retorno'),
+        ('hora_saida', 'hora_saida')
+    ]:
+        valor = dados.get(campo_front)
+        if valor:
+            setattr(registro, campo_banco, datetime.strptime(valor, '%H:%M').time())
+        else:
+            setattr(registro, campo_banco, None)
+    
+    # Atualizar outros campos
+    registro.obra_id = dados.get('obra_id')
+    registro.observacoes = dados.get('observacoes', '')
+
+def recalcular_registro_automatico(registro):
+    """Recalcula registro com lógica automática baseada no tipo"""
+    tipo = registro.tipo_registro
+    
+    # Resetar valores
+    registro.horas_trabalhadas = 0.0
+    registro.horas_extras = 0.0
+    registro.total_atraso_horas = 0.0
+    registro.total_atraso_minutos = 0
+    registro.minutos_atraso_entrada = 0
+    registro.minutos_atraso_saida = 0
+    registro.percentual_extras = 0.0
+    
+    # Tipos sem trabalho
+    tipos_sem_trabalho = ['falta', 'sabado_folga', 'domingo_folga', 'feriado']
+    if tipo in tipos_sem_trabalho:
+        return
+    
+    # Tipos especiais sem horários
+    if tipo in ['falta_justificada', 'ferias']:
+        registro.horas_trabalhadas = 8.0
+        return
+    
+    # Calcular para tipos com horários
+    if not registro.hora_entrada or not registro.hora_saida:
+        return
+    
+    # Calcular horas trabalhadas
+    horas = calcular_horas_trabalhadas_edicao(registro)
+    registro.horas_trabalhadas = horas
+    
+    # Aplicar lógica por tipo
+    if tipo == 'sabado_horas_extras':
+        # Sábado: todas as horas são extras (50%)
+        registro.horas_extras = horas
+        registro.percentual_extras = 50.0
+        # Sem atrasos
+        
+    elif tipo in ['domingo_horas_extras', 'feriado_trabalhado']:
+        # Domingo/Feriado: todas as horas são extras (100%)
+        registro.horas_extras = horas
+        registro.percentual_extras = 100.0
+        # Sem atrasos
+        
+    elif tipo == 'trabalhado':
+        # Trabalho normal: até 8h normais, resto extras (50%)
+        if horas > 8:
+            registro.horas_extras = horas - 8
+            registro.percentual_extras = 50.0
+        
+        # Calcular atrasos apenas em dias normais
+        calcular_atrasos_trabalho_normal(registro)
+
+def calcular_horas_trabalhadas_edicao(registro):
+    """Calcula horas trabalhadas considerando almoço"""
+    entrada = datetime.combine(registro.data, registro.hora_entrada)
+    saida = datetime.combine(registro.data, registro.hora_saida)
+    
+    total_minutos = (saida - entrada).total_seconds() / 60
+    
+    # Subtrair almoço se definido
+    if registro.hora_almoco_saida and registro.hora_almoco_retorno:
+        almoco_saida = datetime.combine(registro.data, registro.hora_almoco_saida)
+        almoco_retorno = datetime.combine(registro.data, registro.hora_almoco_retorno)
+        minutos_almoco = (almoco_retorno - almoco_saida).total_seconds() / 60
+        total_minutos -= minutos_almoco
+    
+    return total_minutos / 60.0
+
+def calcular_atrasos_trabalho_normal(registro):
+    """Calcula atrasos apenas para trabalho normal"""
+    funcionario = Funcionario.query.get(registro.funcionario_id)
+    if not funcionario or not funcionario.horario_trabalho_id:
+        return
+    
+    horario_padrao = HorarioTrabalho.query.get(funcionario.horario_trabalho_id)
+    if not horario_padrao:
+        return
+    
+    # Calcular atraso de entrada
+    if registro.hora_entrada and horario_padrao.entrada:
+        entrada_esperada = datetime.combine(registro.data, horario_padrao.entrada)
+        entrada_real = datetime.combine(registro.data, registro.hora_entrada)
+        
+        if entrada_real > entrada_esperada:
+            minutos_atraso = (entrada_real - entrada_esperada).total_seconds() / 60
+            registro.minutos_atraso_entrada = int(minutos_atraso)
+            registro.total_atraso_minutos += int(minutos_atraso)
+    
+    # Converter total para horas
+    registro.total_atraso_horas = registro.total_atraso_minutos / 60.0
+
+@main_bp.route('/ponto/registro/<int:registro_id>', methods=['GET'])
+@login_required  
+def obter_registro_ponto(registro_id):
+    """Método GET separado para compatibilidade"""
+    return editar_registro_ponto(registro_id)
+
+@main_bp.route('/ponto/registro/<int:registro_id>/legacy', methods=['PUT', 'POST'])
+@login_required
+def atualizar_registro_ponto_legacy(registro_id):
+    """Atualizar um registro de ponto individual"""
+    try:
+        print(f"✏️ Atualizando registro {registro_id}")
+        
+        # Buscar registro específico
+        registro = RegistroPonto.query.get_or_404(registro_id)
+        
+        # Buscar funcionário
+        funcionario = Funcionario.query.get(registro.funcionario_id)
+        if not funcionario:
+            return jsonify({'error': 'Funcionário não encontrado'}), 404
+        
+        # Obter dados do request
+        if request.is_json:
+            data_source = request.json
+        else:
+            data_source = request.form
+        
+        print(f"📝 Dados recebidos: {data_source}")
+        
+        # Validar e processar dados básicos
+        data_str = data_source.get('data')
+        if not data_str:
+            return jsonify({'error': 'Data é obrigatória'}), 400
+            
+        data = datetime.strptime(data_str, '%Y-%m-%d').date()
+        tipo_frontend = data_source.get('tipo_registro', 'trabalho_normal')
+        obra_id = data_source.get('obra_id') or None
+        observacoes = data_source.get('observacoes', '')
+        
+        # Converter tipo frontend para banco
+        tipo_banco = tipo_frontend
+        if tipo_frontend == 'trabalho_normal':
+            tipo_banco = 'trabalhado'
+        elif tipo_frontend == 'sabado_trabalhado':
+            tipo_banco = 'sabado_horas_extras'
+        elif tipo_frontend == 'domingo_trabalhado':
+            tipo_banco = 'domingo_horas_extras'
+        elif tipo_frontend == 'feriado_folga':
+            tipo_banco = 'feriado'
+        
+        # Processar horários baseado no tipo
+        if tipo_frontend in ['trabalho_normal', 'sabado_trabalhado', 'domingo_trabalhado', 'feriado_trabalhado']:
+            # Tipos que requerem horários
+            entrada_str = data_source.get('hora_entrada', '')
+            saida_almoco_str = data_source.get('hora_almoco_saida', '')
+            retorno_almoco_str = data_source.get('hora_almoco_retorno', '')
+            saida_str = data_source.get('hora_saida', '')
+            
+            # Converter horários
+            hora_entrada = datetime.strptime(entrada_str, '%H:%M').time() if entrada_str else None
+            hora_almoco_saida = datetime.strptime(saida_almoco_str, '%H:%M').time() if saida_almoco_str else None
+            hora_almoco_retorno = datetime.strptime(retorno_almoco_str, '%H:%M').time() if retorno_almoco_str else None
+            hora_saida = datetime.strptime(saida_str, '%H:%M').time() if saida_str else None
+            
+            # Calcular horas trabalhadas
+            horas_trabalhadas = 0.0
+            if hora_entrada and hora_saida:
+                # Calcular total de horas
+                entrada_minutos = hora_entrada.hour * 60 + hora_entrada.minute
+                saida_minutos = hora_saida.hour * 60 + hora_saida.minute
+                
+                # Ajustar se passou da meia-noite
+                if saida_minutos < entrada_minutos:
+                    saida_minutos += 24 * 60
+                
+                total_minutos = saida_minutos - entrada_minutos
+                
+                # Subtrair almoço se ambos horários estiverem definidos
+                if hora_almoco_saida and hora_almoco_retorno:
+                    almoco_saida_min = hora_almoco_saida.hour * 60 + hora_almoco_saida.minute
+                    almoco_retorno_min = hora_almoco_retorno.hour * 60 + hora_almoco_retorno.minute
+                    
+                    if almoco_retorno_min > almoco_saida_min:
+                        total_minutos -= (almoco_retorno_min - almoco_saida_min)
+                
+                horas_trabalhadas = total_minutos / 60.0
+            
+            # Calcular horas extras baseado no tipo
+            horas_extras = 0.0
+            percentual_extras = 0.0
+            
+            if tipo_frontend in ['sabado_trabalhado', 'domingo_trabalhado', 'feriado_trabalhado']:
+                # Para fim de semana/feriado: TODAS as horas são extras
+                horas_extras = horas_trabalhadas
+                if tipo_frontend == 'sabado_trabalhado':
+                    percentual_extras = 50.0
+                else:  # domingo_trabalhado, feriado_trabalhado
+                    percentual_extras = 100.0
+            elif tipo_frontend == 'trabalho_normal' and horas_trabalhadas > 0:
+                # Para trabalho normal: apenas horas acima da jornada
+                horas_jornada = funcionario.horario_trabalho.horas_diarias if funcionario.horario_trabalho else 8.0
+                horas_extras = max(0, horas_trabalhadas - horas_jornada)
+                if horas_extras > 0:
+                    percentual_extras = 50.0
+            
+        else:
+            # Tipos sem horários (faltas, férias, etc.)
+            hora_entrada = None
+            hora_almoco_saida = None
+            hora_almoco_retorno = None
+            hora_saida = None
+            horas_trabalhadas = 0.0
+            horas_extras = 0.0
+            percentual_extras = 0.0
+        
+        # Atualizar registro
+        registro.data = data
+        registro.tipo_registro = tipo_banco
+        registro.obra_id = int(obra_id) if obra_id else None
+        registro.hora_entrada = hora_entrada
+        registro.hora_almoco_saida = hora_almoco_saida
+        registro.hora_almoco_retorno = hora_almoco_retorno
+        registro.hora_saida = hora_saida
+        registro.horas_trabalhadas = horas_trabalhadas
+        registro.horas_extras = horas_extras
+        registro.percentual_extras = percentual_extras
+        registro.observacoes = observacoes
+        
+        db.session.commit()
+        
+        print(f"✅ Registro {registro_id} atualizado: {tipo_banco}, {horas_trabalhadas}h, {horas_extras}h extras")
+        
+        return jsonify({
+            'success': True,
+            'message': 'Registro atualizado com sucesso',
+            'registro': {
+                'id': registro.id,
+                'tipo_registro': tipo_banco,
+                'horas_trabalhadas': horas_trabalhadas,
+                'horas_extras': horas_extras,
+                'percentual_extras': percentual_extras
+            }
+        })
+        
+    except Exception as e:
+        db.session.rollback()
+        print(f"❌ Erro ao atualizar registro {registro_id}: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': f'Erro ao salvar: {str(e)}'}), 500
+        
+        if obra_id == '':
+            obra_id = None
+        elif obra_id:
+            obra_id = int(obra_id)
+        
+        # Atualizar dados básicos
+        registro.data = data
+        registro.tipo_registro = tipo_registro
+        registro.obra_id = obra_id
+        
+        # Limpar horários primeiro
+        registro.hora_entrada = None
+        registro.hora_almoco_saida = None
+        registro.hora_almoco_retorno = None
+        registro.hora_saida = None
+        registro.horas_trabalhadas = 0
+        registro.horas_extras = 0
+        
+        # Adicionar horários se não for falta ou feriado
+        if tipo_registro not in ['falta', 'falta_justificada', 'feriado']:
+            entrada = data_source.get('hora_entrada') or data_source.get('hora_entrada_ponto')
+            saida_almoco = data_source.get('hora_almoco_saida') or data_source.get('hora_almoco_saida_ponto')
+            retorno_almoco = data_source.get('hora_almoco_retorno') or data_source.get('hora_almoco_retorno_ponto')
+            saida = data_source.get('hora_saida') or data_source.get('hora_saida_ponto')
+            
+            if entrada:
+                registro.hora_entrada = datetime.strptime(entrada, '%H:%M').time()
+            if saida_almoco:
+                registro.hora_almoco_saida = datetime.strptime(saida_almoco, '%H:%M').time()
+            if retorno_almoco:
+                registro.hora_almoco_retorno = datetime.strptime(retorno_almoco, '%H:%M').time()
+            if saida:
+                registro.hora_saida = datetime.strptime(saida, '%H:%M').time()
+                
+        # Percentual de extras baseado no tipo
+        if tipo_registro == 'sabado_horas_extras':
+            registro.percentual_extras = 50.0
+        elif tipo_registro in ['domingo_horas_extras', 'feriado_trabalhado']:
+            registro.percentual_extras = 100.0
+        else:
+            percentual_extras = data_source.get('percentual_extras')
+            registro.percentual_extras = float(percentual_extras) if percentual_extras else 0.0
+        
+        # Observações
+        registro.observacoes = data_source.get('observacoes') or data_source.get('observacoes_ponto', '')
+        
+        db.session.commit()
+        
+        return jsonify({'success': True, 'message': 'Registro atualizado com sucesso!'})
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500
+
+@main_bp.route('/ponto/registro/<int:registro_id>', methods=['DELETE'])
+@login_required
+def excluir_registro_ponto(registro_id):
+    """Excluir um registro de ponto"""
+    try:
+        registro = RegistroPonto.query.get_or_404(registro_id)
+        
+        db.session.delete(registro)
+        db.session.commit()
+        
+        return jsonify({'success': True, 'message': 'Registro excluído com sucesso!'})
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500
+
+@main_bp.route('/outros-custos')
+@login_required
+def controle_outros_custos():
+    """Página principal do controle de outros custos"""
+    # Filtros
+    funcionario_id = request.args.get('funcionario_id')
+    data_inicio = request.args.get('data_inicio')
+    data_fim = request.args.get('data_fim')
+    tipo = request.args.get('tipo')
+    
+    # Query base
+    query = OutroCusto.query
+    
+    # Aplicar filtros
+    if funcionario_id:
+        query = query.filter(OutroCusto.funcionario_id == funcionario_id)
+    
+    if data_inicio:
+        query = query.filter(OutroCusto.data >= datetime.strptime(data_inicio, '%Y-%m-%d').date())
+    
+    if data_fim:
+        query = query.filter(OutroCusto.data <= datetime.strptime(data_fim, '%Y-%m-%d').date())
+    
+    if tipo:
+        query = query.filter(OutroCusto.tipo == tipo)
+    
+    # Buscar registros com joins
+    custos = query.options(
+        joinedload(OutroCusto.funcionario)
+    ).order_by(OutroCusto.data.desc()).all()
+    
+    # Dados para formulário
+    funcionarios = Funcionario.query.filter_by(ativo=True).order_by(Funcionario.nome).all()
+    
+    return render_template('controle_outros_custos.html',
+                         custos=custos,
+                         funcionarios=funcionarios)
+
+@main_bp.route('/outros-custos/custo', methods=['POST'])
+@login_required
+def criar_outro_custo_crud():
+    """Criar novo custo"""
+    try:
+        funcionario_id = request.form.get('funcionario_id')
+        data = datetime.strptime(request.form.get('data'), '%Y-%m-%d').date()
+        tipo = request.form.get('tipo')
+        valor = float(request.form.get('valor'))
+        descricao = request.form.get('descricao')
+        
+        # Criar custo
+        custo = OutroCusto(
+            funcionario_id=funcionario_id,
+            data=data,
+            tipo=tipo,
+            valor=valor,
+            descricao=descricao
+        )
+        
+        db.session.add(custo)
+        db.session.commit()
+        
+        return jsonify({'success': True})
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500
+
+@main_bp.route('/outros-custos/custo/<int:custo_id>', methods=['GET'])
+@login_required
+def obter_outro_custo_crud(custo_id):
+    """Obter dados de um custo"""
+    custo = OutroCusto.query.get_or_404(custo_id)
+    
+    return jsonify({
+        'id': custo.id,
+        'funcionario_id': custo.funcionario_id,
+        'data': custo.data.isoformat(),
+        'tipo': custo.tipo,
+        'valor': custo.valor,
+        'descricao': custo.descricao
+    })
+
+@main_bp.route('/outros-custos/custo/<int:custo_id>', methods=['PUT'])
+@login_required
+def atualizar_outro_custo_crud(custo_id):
+    """Atualizar custo"""
+    try:
+        custo = OutroCusto.query.get_or_404(custo_id)
+        
+        custo.funcionario_id = request.form.get('funcionario_id')
+        custo.data = datetime.strptime(request.form.get('data'), '%Y-%m-%d').date()
+        custo.tipo = request.form.get('tipo')
+        custo.valor = float(request.form.get('valor'))
+        custo.descricao = request.form.get('descricao')
+        
+        db.session.commit()
+        
+        return jsonify({'success': True})
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500
+
+@main_bp.route('/outros-custos/custo/<int:custo_id>', methods=['DELETE'])
+@login_required
+def excluir_outro_custo_crud(custo_id):
+    """Excluir custo"""
+    try:
+        custo = OutroCusto.query.get_or_404(custo_id)
+        db.session.delete(custo)
+        db.session.commit()
+        
+        return jsonify({'success': True})
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500
+
+@main_bp.route('/alimentacao')
+@login_required
+def controle_alimentacao():
+    """Página principal do controle de alimentação"""
+    # Filtros
+    funcionario_id = request.args.get('funcionario_id')
+    restaurante_id = request.args.get('restaurante_id')
+    data_inicio = request.args.get('data_inicio')
+    data_fim = request.args.get('data_fim')
+    tipo_refeicao = request.args.get('tipo_refeicao')
+    
+    # Query base
+    query = RegistroAlimentacao.query
+    
+    # Aplicar filtros
+    if funcionario_id:
+        query = query.filter(RegistroAlimentacao.funcionario_id == funcionario_id)
+    
+    if restaurante_id:
+        query = query.filter(RegistroAlimentacao.restaurante_id == restaurante_id)
+    
+    if data_inicio:
+        query = query.filter(RegistroAlimentacao.data >= datetime.strptime(data_inicio, '%Y-%m-%d').date())
+    
+    if data_fim:
+        query = query.filter(RegistroAlimentacao.data <= datetime.strptime(data_fim, '%Y-%m-%d').date())
+    
+    if tipo_refeicao:
+        query = query.filter(RegistroAlimentacao.tipo_refeicao == tipo_refeicao)
+    
+    # Buscar registros com joins
+    registros = query.options(
+        joinedload(RegistroAlimentacao.funcionario),
+        joinedload(RegistroAlimentacao.restaurante)
+    ).order_by(RegistroAlimentacao.data.desc()).all()
+    
+    # Dados para formulário
+    funcionarios = Funcionario.query.filter_by(ativo=True).order_by(Funcionario.nome).all()
+    restaurantes = Restaurante.query.filter_by(ativo=True).order_by(Restaurante.nome).all()
+    
+    return render_template('controle_alimentacao.html',
+                         registros=registros,
+                         funcionarios=funcionarios,
+                         restaurantes=restaurantes)
+
+@main_bp.route('/alimentacao/registro', methods=['POST'])
+@login_required
+def criar_registro_alimentacao():
+    """Criar novo registro de alimentação"""
+    try:
+        funcionario_id = request.form.get('funcionario_id')
+        restaurante_id = request.form.get('restaurante_id')
+        data = datetime.strptime(request.form.get('data'), '%Y-%m-%d').date()
+        tipo_refeicao = request.form.get('tipo_refeicao')
+        valor = float(request.form.get('valor'))
+        quantidade = int(request.form.get('quantidade', 1))
+        observacoes = request.form.get('observacoes')
+        
+        # Criar registro
+        registro = RegistroAlimentacao(
+            funcionario_id=funcionario_id,
+            restaurante_id=restaurante_id,
+            data=data,
+            tipo_refeicao=tipo_refeicao,
+            valor=valor,
+            quantidade=quantidade,
+            observacoes=observacoes
+        )
+        
+        db.session.add(registro)
+        db.session.commit()
+        
+        return jsonify({'success': True})
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500
+
+@main_bp.route('/alimentacao/registro/<int:registro_id>', methods=['GET'])
+@login_required
+def obter_registro_alimentacao(registro_id):
+    """Obter dados de um registro de alimentação"""
+    registro = RegistroAlimentacao.query.get_or_404(registro_id)
+    
+    return jsonify({
+        'id': registro.id,
+        'funcionario_id': registro.funcionario_id,
+        'restaurante_id': registro.restaurante_id,
+        'data': registro.data.isoformat(),
+        'tipo_refeicao': registro.tipo_refeicao,
+        'valor': registro.valor,
+        'quantidade': registro.quantidade,
+        'observacoes': registro.observacoes
+    })
+
+@main_bp.route('/alimentacao/registro/<int:registro_id>', methods=['PUT'])
+@login_required
+def atualizar_registro_alimentacao(registro_id):
+    """Atualizar registro de alimentação"""
+    try:
+        registro = RegistroAlimentacao.query.get_or_404(registro_id)
+        
+        registro.funcionario_id = request.form.get('funcionario_id')
+        registro.restaurante_id = request.form.get('restaurante_id')
+        registro.data = datetime.strptime(request.form.get('data'), '%Y-%m-%d').date()
+        registro.tipo_refeicao = request.form.get('tipo_refeicao')
+        registro.valor = float(request.form.get('valor'))
+        registro.quantidade = int(request.form.get('quantidade', 1))
+        registro.observacoes = request.form.get('observacoes')
+        
+        db.session.commit()
+        
+        return jsonify({'success': True})
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500
+
+@main_bp.route('/alimentacao/registro/<int:registro_id>', methods=['DELETE'])
+@login_required
+def excluir_registro_alimentacao(registro_id):
+    """Excluir registro de alimentação"""
+    try:
+        registro = RegistroAlimentacao.query.get_or_404(registro_id)
+        db.session.delete(registro)
+        db.session.commit()
+        
+        return jsonify({'success': True})
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500
+
+
+
+# API Endpoints para RDO
+@main_bp.route("/api/obras/autocomplete")
+@login_required
+def api_obras_autocomplete():
+    """API para autocomplete de obras"""
+    try:
+        q = request.args.get("q", "").strip()
+        
+        # Query base - obras ativas
+        query = Obra.query.filter(Obra.ativo == True)
+        
+        # Se tem termo de busca, filtrar
+        if q:
+            query = query.filter(
+                or_(
+                    Obra.nome.ilike(f"%{q}%"),
+                    Obra.codigo.ilike(f"%{q}%"),
+                    Obra.endereco.ilike(f"%{q}%")
+                )
+            )
+        
+        # Limitar resultados e ordenar
+        obras = query.order_by(Obra.nome).limit(20).all()
+        
+        # Debug - log para verificar
+        print(f"Buscando obras com termo: '{q}' - Encontradas: {len(obras)}")
+        
+        resultado = []
+        for obra in obras:
+            resultado.append({
+                "id": obra.id,
+                "nome": obra.nome,
+                "codigo": obra.codigo or "S/C",
+                "endereco": obra.endereco or "Endereço não informado",
+                "area_total_m2": float(obra.area_total_m2) if obra.area_total_m2 else 0,
+                "status": obra.status or "Em andamento"
+            })
+        
+        return jsonify(resultado)
+        
+    except Exception as e:
+        print(f"Erro no endpoint obras_autocomplete: {str(e)}")
+        return jsonify([]), 500
+
+@main_bp.route("/api/obras/todas")
+@login_required
+def api_obras_todas():
+    """API para carregar todas as obras (fallback)"""
+    try:
+        obras = Obra.query.filter(Obra.ativo == True).order_by(Obra.nome).all()
+        
+        return jsonify([{
+            "id": obra.id,
+            "nome": obra.nome,
+            "codigo": obra.codigo or "S/C",
+            "endereco": obra.endereco or "Endereço não informado"
+        } for obra in obras])
+        
+    except Exception as e:
+        print(f"Erro ao carregar todas as obras: {str(e)}")
+        return jsonify([]), 500
+
+@main_bp.route("/api/funcionarios/rdo-autocomplete")
+@login_required
+def api_funcionarios_rdo_autocomplete():
+    """API para autocomplete de funcionários com dados de ponto"""
+    try:
+        q = request.args.get("q", "").strip()
+        data_rdo = request.args.get("data_rdo")
+        
+        # Query base - funcionários ativos
+        query = Funcionario.query.filter(Funcionario.ativo == True)
+        
+        # Se tem termo de busca
+        if q:
+            query = query.filter(
+                or_(
+                    Funcionario.nome.ilike(f"%{q}%"),
+                    Funcionario.codigo.ilike(f"%{q}%"),
+                    Funcionario.cpf.ilike(f"%{q}%")
+                )
+            )
+        
+        funcionarios = query.order_by(Funcionario.nome).limit(20).all()
+        
+        print(f"Buscando funcionários: '{q}' - Encontrados: {len(funcionarios)}")
+        
+        resultado = []
+        for func in funcionarios:
+            # Buscar dados do ponto para a data
+            presente_hoje = False
+            horas_trabalhadas = 0
+            
+            if data_rdo:
+                try:
+                    data_consulta = datetime.strptime(data_rdo, "%Y-%m-%d").date()
+                    registro_ponto = RegistroPonto.query.filter_by(
+                        funcionario_id=func.id,
+                        data=data_consulta
+                    ).first()
+                    
+                    if registro_ponto:
+                        presente_hoje = bool(registro_ponto.hora_entrada)
+                        horas_trabalhadas = registro_ponto.horas_trabalhadas or 0
+                except:
+                    pass
+            
+            resultado.append({
+                "id": func.id,
+                "nome": func.nome,
+                "codigo": func.codigo or f"F{func.id:03d}",
+                "funcao": func.funcao.nome if func.funcao else "Não definida",
+                "salario": float(func.salario) if func.salario else 0,
+                "presente_hoje": presente_hoje,
+                "horas_trabalhadas": horas_trabalhadas
+            })
+        
+        return jsonify(resultado)
+        
+    except Exception as e:
+        print(f"Erro no endpoint funcionarios_rdo_autocomplete: {str(e)}")
+        return jsonify([]), 500
+
+@main_bp.route("/api/funcionarios/todos")
+@login_required
+def api_funcionarios_todos():
+    """API para carregar todos os funcionários (fallback)"""
+    try:
+        funcionarios = Funcionario.query.filter(Funcionario.ativo == True).order_by(Funcionario.nome).all()
+        
+        return jsonify([{
+            "id": func.id,
+            "nome": func.nome,
+            "codigo": func.codigo or f"F{func.id:03d}",
+            "funcao": func.funcao.nome if func.funcao else "Não definida"
+        } for func in funcionarios])
+        
+    except Exception as e:
+        print(f"Erro ao carregar funcionários: {str(e)}")
+        return jsonify([]), 500
+
+@main_bp.route('/api/servicos/autocomplete')
+@login_required  
+def api_servicos_autocomplete():
+    """API para autocomplete de serviços"""
+    q = request.args.get("q", "")
+    ativo = request.args.get("ativo", "true").lower() == "true"
+    
+    # Query específica para evitar erro categoria_id
+    query = db.session.query(
+        Servico.id,
+        Servico.nome,
+        Servico.categoria,
+        Servico.unidade_medida,
+        Servico.unidade_simbolo,
+        Servico.custo_unitario
+    ).filter(Servico.ativo == ativo)
+    
+    if q:
+        query = query.filter(
+            or_(
+                Servico.nome.ilike(f"%{q}%"),
+                Servico.categoria.ilike(f"%{q}%")
+            )
+        )
+    
+    servicos_data = query.limit(10).all()
+    
+    return jsonify([{
+        "id": row.id,
+        "nome": row.nome,
+        "categoria": row.categoria,
+        "unidade_medida": row.unidade_medida,
+        "unidade_simbolo": row.unidade_simbolo,
+        "custo_unitario": float(row.custo_unitario) if row.custo_unitario else 0
+    } for row in servicos_data])
+
+@main_bp.route("/api/servicos/<int:servico_id>")
+@login_required
+def api_servico_detalhes(servico_id):
+    """API para detalhes de um serviço específico com subatividades"""
+    servico = Servico.query.get_or_404(servico_id)
+    
+    subatividades = SubAtividade.query.filter_by(servico_id=servico_id).all()
+    
+    return jsonify({
+        "id": servico.id,
+        "nome": servico.nome,
+        "categoria": servico.categoria,
+        "unidade_medida": servico.unidade_medida,
+        "unidade_simbolo": servico.unidade_simbolo,
+        "custo_unitario": float(servico.custo_unitario) if servico.custo_unitario else 0,
+        "subatividades": [{
+            "id": sub.id,
+            "nome": sub.nome,
+            "descricao": sub.descricao
+        } for sub in subatividades]
+    })
+
+@main_bp.route("/api/equipamentos/autocomplete")
+@login_required
+def api_equipamentos_autocomplete():
+    """API para autocomplete de equipamentos/veículos"""
+    q = request.args.get("q", "")
+    ativo = request.args.get("ativo", "true").lower() == "true"
+    
+    query = Veiculo.query.filter(Veiculo.ativo == ativo)
+    
+    if q:
+        query = query.filter(
+            or_(
+                Veiculo.marca.ilike(f"%{q}%"),
+                Veiculo.modelo.ilike(f"%{q}%"),
+                Veiculo.placa.ilike(f"%{q}%"),
+                Veiculo.tipo.ilike(f"%{q}%")
+            )
+        )
+    
+    veiculos = query.limit(10).all()
+    
+    return jsonify([{
+        "id": veiculo.id,
+        "nome": f"{veiculo.marca} {veiculo.modelo}",
+        "placa": veiculo.placa,
+        "tipo": veiculo.tipo,
+        "status": veiculo.status
+    } for veiculo in veiculos])
+
+@main_bp.route("/api/ponto/funcionario/<int:funcionario_id>/data/<string:data>")
+@login_required
+def api_ponto_funcionario_data(funcionario_id, data):
+    """API para buscar dados de ponto de um funcionário em uma data específica"""
+    try:
+        funcionario = Funcionario.query.get_or_404(funcionario_id)
+        data_consulta = datetime.strptime(data, "%Y-%m-%d").date()
+        
+        registro_ponto = RegistroPonto.query.filter_by(
+            funcionario_id=funcionario_id,
+            data=data_consulta
+        ).first()
+        
+        if registro_ponto:
+            return jsonify({
+                "success": True,
+                "funcionario": {
+                    "id": funcionario.id,
+                    "nome": funcionario.nome,
+                    "codigo": funcionario.codigo,
+                    "funcao": funcionario.funcao.nome if funcionario.funcao else "Sem função"
+                },
+                "registro_ponto": {
+                    "hora_entrada": registro_ponto.hora_entrada.strftime("%H:%M") if registro_ponto.hora_entrada else None,
+                    "hora_saida": registro_ponto.hora_saida.strftime("%H:%M") if registro_ponto.hora_saida else None,
+                    "horas_trabalhadas": registro_ponto.horas_trabalhadas or 0,
+                    "tipo_registro": registro_ponto.tipo_registro
+                }
+            })
+        else:
+            return jsonify({
+                "success": False,
+                "message": "Nenhum registro de ponto encontrado para esta data"
+            })
+    
+    except Exception as e:
+        return jsonify({
+            "success": False,
+            "message": f"Erro ao buscar dados: {str(e)}"
+        }), 500
+
+@main_bp.route("/api/rdo/salvar", methods=["POST"])
+@login_required
+def api_rdo_salvar():
+    """API para salvar RDO como rascunho"""
+    try:
+        dados = request.get_json()
+        
+        # Validações básicas
+        if not dados.get("data_relatorio") or not dados.get("obra_id"):
+            return jsonify({
+                "success": False,
+                "message": "Data do relatório e obra são obrigatórios"
+            }), 400
+        
+        # Gerar número único do RDO
+        import uuid
+        numero_rdo = f"RDO-{datetime.now().year}-{str(uuid.uuid4())[:8].upper()}"
+        
+        rdo = RDO(
+            numero_rdo=numero_rdo,
+            data_relatorio=datetime.strptime(dados["data_relatorio"], "%Y-%m-%d").date(),
+            obra_id=dados["obra_id"],
+            criado_por_id=current_user.id,
+            tempo_manha=dados.get("tempo_manha", ""),
+            tempo_tarde=dados.get("tempo_tarde", ""),
+            tempo_noite=dados.get("tempo_noite", ""),
+            observacoes_meteorologicas=dados.get("observacoes_meteorologicas", ""),
+            comentario_geral=dados.get("comentario_geral", ""),
+            status="Rascunho"
+        )
+        
+        db.session.add(rdo)
+        db.session.commit()
+        
+        return jsonify({
+            "success": True,
+            "message": "RDO salvo como rascunho com sucesso",
+            "rdo_id": rdo.id
+        })
+    
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({
+            "success": False,
+            "message": f"Erro ao salvar RDO: {str(e)}"
+        }), 500
+
+@main_bp.route("/api/rdo/finalizar", methods=["POST"])
+@login_required
+def api_rdo_finalizar():
+    """API para finalizar RDO"""
+    try:
+        dados = request.get_json()
+        
+        # Validações obrigatórias
+        if not dados.get("data_relatorio") or not dados.get("obra_id"):
+            return jsonify({
+                "success": False,
+                "message": "Data do relatório e obra são obrigatórios"
+            }), 400
+        
+        # Gerar número único do RDO
+        import uuid
+        numero_rdo = f"RDO-{datetime.now().year}-{str(uuid.uuid4())[:8].upper()}"
+        
+        rdo = RDO(
+            numero_rdo=numero_rdo,
+            data_relatorio=datetime.strptime(dados["data_relatorio"], "%Y-%m-%d").date(),
+            obra_id=dados["obra_id"],
+            criado_por_id=current_user.id,
+            tempo_manha=dados.get("tempo_manha", ""),
+            tempo_tarde=dados.get("tempo_tarde", ""),
+            tempo_noite=dados.get("tempo_noite", ""),
+            observacoes_meteorologicas=dados.get("observacoes_meteorologicas", ""),
+            comentario_geral=dados.get("comentario_geral", ""),
+            status="Finalizado"
+        )
+        
+        db.session.add(rdo)
+        db.session.flush()  # Para obter o ID do RDO
+        
+        # Salvar dados de mão de obra
+        for func_data in dados.get("funcionarios", []):
+            if func_data.get("funcionario_id"):
+                rdo_mao_obra = RDOMaoObra(
+                    rdo_id=rdo.id,
+                    funcionario_id=func_data["funcionario_id"],
+                    horas_trabalhadas=float(func_data.get("horas", 0)),
+                    funcao_exercida=func_data.get("funcao_exercida", ""),
+                    presente=func_data.get("presente", True)
+                )
+                db.session.add(rdo_mao_obra)
+        
+        # Salvar atividades
+        for ativ_data in dados.get("atividades", []):
+            if ativ_data.get("servico_id"):
+                rdo_atividade = RDOAtividade(
+                    rdo_id=rdo.id,
+                    servico_id=ativ_data["servico_id"],
+                    quantidade=float(ativ_data.get("quantidade", 0)),
+                    tempo_execucao=float(ativ_data.get("tempo", 0)),
+                    observacoes=ativ_data.get("observacoes", "")
+                )
+                db.session.add(rdo_atividade)
+        
+        # Salvar equipamentos
+        for equip_data in dados.get("equipamentos", []):
+            if equip_data.get("equipamento_id"):
+                rdo_equipamento = RDOEquipamento(
+                    rdo_id=rdo.id,
+                    veiculo_id=equip_data["equipamento_id"],
+                    horas_uso=float(equip_data.get("horas_uso", 0)),
+                    status=equip_data.get("status", "operando"),
+                    observacoes=equip_data.get("observacoes", "")
+                )
+                db.session.add(rdo_equipamento)
+        
+        # Salvar ocorrências
+        for ocorr_data in dados.get("ocorrencias", []):
+            if ocorr_data.get("tipo") and ocorr_data.get("descricao"):
+                rdo_ocorrencia = RDOOcorrencia(
+                    rdo_id=rdo.id,
+                    tipo=ocorr_data["tipo"],
+                    gravidade=ocorr_data.get("gravidade", "media"),
+                    descricao=ocorr_data["descricao"]
+                )
+                db.session.add(rdo_ocorrencia)
+        
+        db.session.commit()
+        
+        return jsonify({
+            "success": True,
+            "message": "RDO finalizado com sucesso",
+            "rdo_id": rdo.id
+        })
+    
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({
+            "success": False,
+            "message": f"Erro ao finalizar RDO: {str(e)}"
+        }), 500
+
+# API para carregar serviços de uma obra específica
+@main_bp.route('/api/obras/<int:obra_id>/servicos')
+@login_required
+def api_servicos_obra(obra_id):
+    """API para carregar serviços associados a uma obra"""
+    try:
+        servicos_obra = db.session.query(
+            Servico.id,
+            Servico.nome,
+            Servico.categoria,
+            Servico.unidade_medida,
+            ServicoObra.quantidade_planejada,
+            ServicoObra.observacoes
+        ).join(
+            ServicoObra, Servico.id == ServicoObra.servico_id
+        ).filter(
+            ServicoObra.obra_id == obra_id,
+            Servico.ativo == True
+        ).order_by(Servico.nome).all()
+        
+        servicos_data = []
+        for servico in servicos_obra:
+            servicos_data.append({
+                'id': servico.id,
+                'nome': servico.nome,
+                'categoria': servico.categoria,
+                'unidade_medida': servico.unidade_medida,
+                'unidade_simbolo': get_simbolo_unidade(servico.unidade_medida),
+                'quantidade_planejada': float(servico.quantidade_planejada) if servico.quantidade_planejada else 0,
+                'observacoes': servico.observacoes
+            })
+        
+        return jsonify({
+            'success': True,
+            'servicos': servicos_data
+        })
+        
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+# API para buscar último RDO de uma obra
+@main_bp.route('/api/obras/<int:obra_id>/ultimo-rdo')
+@login_required
+def api_ultimo_rdo_obra(obra_id):
+    """API para buscar o último RDO de uma obra para pré-popular valores"""
+    try:
+        # Buscar o RDO mais recente desta obra
+        ultimo_rdo = RDO.query.filter_by(
+            obra_id=obra_id
+        ).order_by(RDO.data.desc()).first()
+        
+        if not ultimo_rdo:
+            return jsonify({
+                'success': False,
+                'message': 'Nenhum RDO anterior encontrado'
+            })
+        
+        # Extrair atividades do JSON armazenado
+        atividades = {}
+        if ultimo_rdo.dados_atividades:
+            try:
+                atividades_json = json.loads(ultimo_rdo.dados_atividades)
+                for atividade in atividades_json:
+                    if atividade.get('servico_id'):
+                        atividades[str(atividade['servico_id'])] = {
+                            'quantidade': atividade.get('quantidade', 0),
+                            'percentual': atividade.get('percentual', 0),
+                            'observacoes': atividade.get('observacoes', ''),
+                            'tempo': atividade.get('tempo', 0)
+                        }
+            except json.JSONDecodeError:
+                pass
+        
+        return jsonify({
+            'success': True,
+            'rdo_id': ultimo_rdo.id,
+            'data_relatorio': ultimo_rdo.data_relatorio.isoformat(),
+            'atividades': atividades
+        })
+        
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+
+
+# ================================
+# MÓDULO DE PROPOSTAS COMERCIAIS
+# ================================
+
+@main_bp.route("/propostas")
+@login_required
+@admin_required
+def lista_propostas():
+    """Lista todas as propostas comerciais"""
+    try:
+        from propostas_engine import propostas_engine
+        
+        # Filtros
+        status_filtro = request.args.get("status")
+        
+        # Buscar propostas com isolamento multi-tenant
+        propostas = propostas_engine.listar_propostas(
+            admin_id=current_user.id,
+            status=status_filtro
+        ).all()
+        
+        # Estatísticas
+        stats = propostas_engine.estatisticas_propostas(admin_id=current_user.id)
+        
+        return render_template("propostas/lista_propostas.html",
+                             propostas=propostas,
+                             stats=stats,
+                             StatusProposta=StatusProposta)
+        
+    except Exception as e:
+        flash(f"Erro ao carregar propostas: {str(e)}", "danger")
+        return redirect(url_for("main.dashboard"))
+
+@main_bp.route("/propostas/nova")
+@login_required
+@admin_required
+def nova_proposta():
+    """Formulário para criar nova proposta"""
+    try:
+        # Buscar dados para o formulário
+        funcionarios = Funcionario.query.filter_by(
+            ativo=True, 
+            admin_id=current_user.id
+        ).order_by(Funcionario.nome).all()
+        
+        servicos = Servico.query.filter_by(ativo=True).order_by(Servico.nome).all()
+        
+        return render_template("propostas/proposta_form.html",
+                             funcionarios=funcionarios,
+                             servicos=servicos,
+                             acao="criar")
+        
+    except Exception as e:
+        flash(f"Erro ao carregar formulário: {str(e)}", "danger")
+        return redirect(url_for("main.lista_propostas"))
+
+@main_bp.route("/propostas/criar", methods=["POST"])
+@login_required
+@admin_required
+def criar_proposta():
+    """Criar nova proposta comercial"""
+    try:
+        from propostas_engine import propostas_engine
+        
+        # Dados básicos da proposta
+        dados_proposta = {
+            "cliente_nome": request.form["cliente_nome"],
+            "cliente_documento": request.form.get("cliente_documento", ""),
+            "cliente_endereco": request.form.get("cliente_endereco", ""),
+            "cliente_telefone": request.form.get("cliente_telefone", ""),
+            "cliente_email": request.form.get("cliente_email", ""),
+            "titulo_projeto": request.form["titulo_projeto"],
+            "descricao_projeto": request.form.get("descricao_projeto", ""),
+            "local_execucao": request.form["local_execucao"],
+            "area_total_m2": request.form.get("area_total_m2", "0"),
+            "peso_total_kg": request.form.get("peso_total_kg", "0"),
+            "desconto_percentual": request.form.get("desconto_percentual", "0"),
+            "margem_lucro_percentual": request.form.get("margem_lucro_percentual", "30"),
+            "prazo_execucao_dias": request.form.get("prazo_execucao_dias", "30"),
+            "data_validade": request.form.get("data_validade"),
+            "observacoes": request.form.get("observacoes", ""),
+            "condicoes_pagamento": request.form.get("condicoes_pagamento", ""),
+            "garantias": request.form.get("garantias", ""),
+            "responsavel_comercial_id": request.form.get("responsavel_comercial_id")
+        }
+        
+        # Itens de serviço (enviados via JavaScript)
+        itens_json = request.form.get("itens_servicos", "[]")
+        itens_dados = json.loads(itens_json) if itens_json else []
+        
+        if not itens_dados:
+            flash("É necessário adicionar pelo menos um serviço à proposta.", "warning")
+            return redirect(url_for("main.nova_proposta"))
+        
+        # Criar proposta
+        proposta = propostas_engine.criar_proposta(
+            dados_proposta, 
+            itens_dados, 
+            admin_id=current_user.id
+        )
+        
+        if proposta:
+            flash(f"Proposta {proposta.numero_proposta} criada com sucesso!", "success")
+            return redirect(url_for("main.visualizar_proposta", id=proposta.id))
+        else:
+            flash("Erro ao criar proposta. Tente novamente.", "danger")
+            return redirect(url_for("main.nova_proposta"))
+        
+    except Exception as e:
+        flash(f"Erro ao criar proposta: {str(e)}", "danger")
+        return redirect(url_for("main.nova_proposta"))
+
+@main_bp.route("/propostas/<int:id>")
+@login_required
+@admin_required
+def visualizar_proposta(id):
+    """Visualizar detalhes da proposta"""
+    try:
+        proposta = Proposta.query.get_or_404(id)
+        
+        # Verificar acesso multi-tenant
+        if proposta.admin_id != current_user.id:
+            flash("Acesso negado.", "danger")
+            return redirect(url_for("main.lista_propostas"))
+        
+        return render_template("propostas/visualizar_proposta.html",
+                             proposta=proposta,
+                             StatusProposta=StatusProposta)
+        
+    except Exception as e:
+        flash(f"Erro ao carregar proposta: {str(e)}", "danger")
+        return redirect(url_for("main.lista_propostas"))
+
+@main_bp.route("/propostas/<int:id>/pdf")
+@login_required
+@admin_required
+def gerar_pdf_proposta(id):
+    """Gerar PDF da proposta"""
+    try:
+        from propostas_engine import propostas_engine
+        from flask import send_file
+        
+        proposta = Proposta.query.get_or_404(id)
+        
+        # Verificar acesso multi-tenant
+        if proposta.admin_id != current_user.id:
+            flash("Acesso negado.", "danger")
+            return redirect(url_for("main.lista_propostas"))
+        
+        # Gerar PDF
+        pdf_path = propostas_engine.gerar_pdf_proposta(id)
+        
+        if pdf_path:
+            return send_file(
+                pdf_path,
+                as_attachment=True,
+                download_name=f"Proposta_{proposta.numero_proposta}.pdf",
+                mimetype="application/pdf"
+            )
+        else:
+            flash("Erro ao gerar PDF da proposta.", "danger")
+            return redirect(url_for("main.visualizar_proposta", id=id))
+        
+    except Exception as e:
+        flash(f"Erro ao gerar PDF: {str(e)}", "danger")
+        return redirect(url_for("main.visualizar_proposta", id=id))
+
+@main_bp.route("/propostas/<int:id>/converter-obra", methods=["POST"])
+@login_required
+@admin_required
+def converter_proposta_obra(id):
+    """Converter proposta aprovada em obra"""
+    try:
+        from propostas_engine import propostas_engine
+        
+        proposta = Proposta.query.get_or_404(id)
+        
+        # Verificar acesso multi-tenant
+        if proposta.admin_id != current_user.id:
+            return jsonify({"success": False, "message": "Acesso negado."}), 403
+        
+        # Verificar se está aprovada
+        if proposta.status != StatusProposta.APROVADA:
+            return jsonify({
+                "success": False, 
+                "message": "Proposta precisa estar aprovada para ser convertida em obra."
+            }), 400
+        
+        # Converter para obra
+        obra = propostas_engine.converter_proposta_para_obra(id)
+        
+        if obra:
+            return jsonify({
+                "success": True,
+                "message": f"Proposta convertida para obra {obra.codigo}",
+                "obra_id": obra.id,
+                "obra_codigo": obra.codigo
+            })
+        else:
+            return jsonify({"success": False, "message": "Erro ao converter proposta em obra"}), 400
+        
+    except Exception as e:
+        return jsonify({"success": False, "message": str(e)}), 500
+
+@main_bp.route("/api/servicos/<int:id>/preco")
+@login_required
+def api_preco_servico(id):
+    """API para buscar preço unitário de um serviço"""
+    try:
+        servico = Servico.query.get_or_404(id)
+        return jsonify({
+            "success": True,
+            "preco_unitario": float(servico.preco_unitario),
+            "unidade": servico.unidade_medida,
+            "nome": servico.nome
+        })
+    except Exception as e:
+        return jsonify({"success": False, "message": str(e)}), 500
+
+@main_bp.route("/api/propostas/calcular-valores", methods=["POST"])
+@login_required
+def api_calcular_valores_proposta():
+    """API para calcular valores da proposta em tempo real"""
+    try:
+        from propostas_engine import propostas_engine
+        
+        itens_dados = request.json.get("itens", [])
+        
+        if not itens_dados:
+            return jsonify({"success": False, "message": "Nenhum item informado"}), 400
+        
+        calculo = propostas_engine.calcular_valores_proposta(itens_dados)
+        
+        return jsonify({
+            "success": True,
+            "valor_total": calculo["valor_total"],
+            "itens_processados": len(calculo["itens_processados"])
+        })
+        
+    except Exception as e:
+        return jsonify({"success": False, "message": str(e)}), 500
+
