@@ -4098,8 +4098,19 @@ def nova_alimentacao():
         # Lista de funcionários selecionados (checkboxes no modal)
         funcionarios_ids = request.form.getlist('funcionarios_ids[]')
         
+        # DEBUG: Verificar se os funcionários estão chegando
         if not funcionarios_ids:
-            return jsonify({'success': False, 'message': 'Nenhum funcionário selecionado'}), 400
+            # Tentar outras formas de pegar os funcionários
+            funcionarios_ids = request.form.getlist('funcionarios_ids')
+            if not funcionarios_ids:
+                funcionarios_ids = request.form.getlist('funcionario_id')
+                if not funcionarios_ids:
+                    # Lista todos os campos do form para debug
+                    form_fields = list(request.form.keys())
+                    return jsonify({
+                        'success': False, 
+                        'message': f'Nenhum funcionário selecionado. Campos recebidos: {form_fields}'
+                    }), 400
         
         registros_criados = []
         total_dias = len(datas_processamento)

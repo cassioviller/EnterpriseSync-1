@@ -303,7 +303,7 @@
                                     <div class="col-md-6 mb-2 funcionario-item" data-nome="{{ funcionario.nome.lower() }}">
                                         <div class="form-check">
                                             <input class="form-check-input funcionario-checkbox" type="checkbox" 
-                                                   value="{{ funcionario.id }}" id="func_{{ funcionario.id }}">
+                                                   name="funcionarios_ids[]" value="{{ funcionario.id }}" id="func_{{ funcionario.id }}">
                                             <label class="form-check-label d-flex align-items-center" 
                                                    for="func_{{ funcionario.id }}">
                                                 <div class="rounded-circle bg-primary text-white me-2 d-flex align-items-center justify-content-center" 
