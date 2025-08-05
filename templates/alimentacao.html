@@ -555,6 +555,10 @@ document.addEventListener('DOMContentLoaded', function() {
         form.addEventListener('submit', function(e) {
             console.log('🔍 DEBUG CRÍTICO: Formulário de alimentação sendo enviado');
             
+            // Identificar tipo de lançamento
+            const isPeriodo = document.getElementById('lancamentoPeriodo').checked;
+            console.log('📋 Tipo de lançamento:', isPeriodo ? 'PERÍODO' : 'INDIVIDUAL');
+            
             // Capturar todos os valores dos campos de data
             const dataUnica = document.getElementById('data').value;
             const dataInicio = document.getElementById('data_inicio').value;
@@ -565,15 +569,37 @@ document.addEventListener('DOMContentLoaded', function() {
             console.log('   data início:', dataInicio);
             console.log('   data fim:', dataFim);
             
-            // ALERTA se data está em agosto
-            if (dataUnica && dataUnica.includes('2025-08')) {
-                console.error('🚨 PROBLEMA: Data única em agosto!', dataUnica);
+            // CAPTURAR DADOS DO FORMDATA EXATAMENTE COMO SERÁ ENVIADO
+            const formData = new FormData(this);
+            console.log('📤 FormData que será enviado ao servidor:');
+            for (let [key, value] of formData.entries()) {
+                if (key.includes('data')) {
+                    console.log(`   ${key}: '${value}'`);
+                    
+                    // ALERTA ESPECÍFICO por tipo de lançamento
+                    if (key === 'data' && !isPeriodo && value && value.includes('2025-08')) {
+                        console.error('🚨 PROBLEMA INDIVIDUAL: Campo "data" em agosto!', value);
+                    }
+                    if ((key === 'data_inicio' || key === 'data_fim') && isPeriodo && value && value.includes('2025-08')) {
+                        console.error('🚨 PROBLEMA PERÍODO: Campo em agosto!', key, value);
+                    }
+                }
             }
-            if (dataInicio && dataInicio.includes('2025-08')) {
-                console.error('🚨 PROBLEMA: Data início em agosto!', dataInicio);
-            }
-            if (dataFim && dataFim.includes('2025-08')) {
-                console.error('🚨 PROBLEMA: Data fim em agosto!', dataFim);
+            
+            // VERIFICAR SE HÁ DISCREPÂNCIA ENTRE DOM E FORMDATA
+            if (!isPeriodo) {
+                console.log('🔍 VERIFICAÇÃO INDIVIDUAL:');
+                console.log('   DOM data.value:', dataUnica);
+                console.log('   FormData data:', formData.get('data'));
+                if (dataUnica !== formData.get('data')) {
+                    console.error('🚨 DISCREPÂNCIA: DOM diferente do FormData!');
+                }
+            } else {
+                console.log('🔍 VERIFICAÇÃO PERÍODO:');
+                console.log('   DOM data_inicio.value:', dataInicio);
+                console.log('   DOM data_fim.value:', dataFim);
+                console.log('   FormData data_inicio:', formData.get('data_inicio'));
+                console.log('   FormData data_fim:', formData.get('data_fim'));
             }
         });
         
