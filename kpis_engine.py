@@ -580,23 +580,28 @@ class KPIsEngine:
                 else:  # domingo_horas_extras, feriado_trabalhado
                     registro.percentual_extras = 100.0
             else:
-                # LÓGICA CORRETA: Para trabalho normal, horas extras = tempo trabalhado ALÉM da jornada padrão
-                horas_jornada = funcionario.horario_trabalho.horas_diarias if funcionario.horario_trabalho else 8.0
+                # LÓGICA CORRETA: Horas extras = entrada antecipada + saída posterior
+                minutos_extras_total = 0
                 
-                # Calcular quanto tempo DEVERIA trabalhar vs quanto REALMENTE trabalhou
-                # Exemplo: Jornada 8h, trabalhou 8.5h, atraso 0.25h
-                # Horas extras = max(0, saída_real - saída_prevista) convertido em horas
+                # EXTRAS POR ENTRADA ANTECIPADA
+                if registro.hora_entrada and registro.hora_entrada < horario_entrada:
+                    entrada_real_min = registro.hora_entrada.hour * 60 + registro.hora_entrada.minute
+                    entrada_prev_min = horario_entrada.hour * 60 + horario_entrada.minute
+                    minutos_extras_entrada = entrada_prev_min - entrada_real_min
+                    minutos_extras_total += minutos_extras_entrada
                 
+                # EXTRAS POR SAÍDA POSTERIOR
                 if registro.hora_saida and registro.hora_saida > horario_saida:
-                    # Saída após o horário = horas extras
                     saida_real_min = registro.hora_saida.hour * 60 + registro.hora_saida.minute
                     saida_prev_min = horario_saida.hour * 60 + horario_saida.minute
-                    minutos_extras = saida_real_min - saida_prev_min
-                    registro.horas_extras = max(0, minutos_extras / 60.0)
-                    if registro.horas_extras > 0:
-                        registro.percentual_extras = 50.0
+                    minutos_extras_saida = saida_real_min - saida_prev_min
+                    minutos_extras_total += minutos_extras_saida
+                
+                # Aplicar horas extras totais
+                registro.horas_extras = minutos_extras_total / 60.0
+                if registro.horas_extras > 0:
+                    registro.percentual_extras = 50.0
                 else:
-                    registro.horas_extras = 0.0
                     registro.percentual_extras = 0.0
         
         # Salvar alterações
