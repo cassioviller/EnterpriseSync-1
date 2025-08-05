@@ -16,13 +16,13 @@ Preferred communication style: Simple, everyday language.
 - **Files**: `templates/alimentacao.html` (removed `valueAsDate = new Date()` and automatic date assignments), `corrigir_data_periodo_atual.py` for data correction
 - **Result**: Individual food entry for 30/07/2025 now saves correctly instead of creating multiple August entries, period entries (18/07 to 18/07) continue working properly
 
-### Overtime Calculation Logic - Complete System Overhaul
+### Overtime Calculation Logic - Complete System Overhaul & Automatic Deployment
 - **Date**: August 5, 2025 (Final Implementation)
-- **Change**: Completely consolidated all overtime calculation logic across multiple conflicting files into single standardized approach
+- **Change**: Completely consolidated all overtime calculation logic across multiple conflicting files into single standardized approach with automatic deployment system
 - **Impact**: Fixed multiple conflicting logic implementations in kpis_engine.py, utils.py, views.py causing interface inconsistencies; all calculations now use unified 07:12-17:00 standard schedule with independent overtime/delay calculations
-- **Files**: `kpis_engine.py` (lines 576-614), `CORRECAO_HORAS_EXTRAS_COMPLETA.py`, `corrigir_registros_especificos.py`, `HOTFIX_HORAS_EXTRAS_PRODUCAO.py`, `INSTRUCOES_DEPLOY_HOTFIX_FINAL.md`
+- **Files**: `kpis_engine.py` (lines 576-614), `CORRECAO_HORAS_EXTRAS_COMPLETA.py`, `corrigir_registros_especificos.py`, `HOTFIX_HORAS_EXTRAS_PRODUCAO.py`, `auto_deploy_producao.py`, `deploy_automatico.sh`, `webhook_deploy.py`
 - **Result**: System-wide consolidation completed - João Silva Santos 31/07 shows correct 0.95h extras (7min early + 50min late), Ana Paula Rodrigues 29/07 shows 1.0h extras + 0.3h delays calculated independently, interface now reflects accurate calculations
-- **Production Deployment**: Complete hotfix available with detailed instructions for production environment
+- **Production Deployment**: Complete automatic deployment system created with 3 execution methods: shell script (./deploy_automatico.sh), Python script (auto_deploy_producao.py --auto), and HTTP webhook (webhook_deploy.py) - all validate cases and generate reports automatically without manual intervention
 
 
 ### KPI System Complete Overhaul
