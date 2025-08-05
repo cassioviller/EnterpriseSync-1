@@ -4082,20 +4082,37 @@ def nova_alimentacao():
         else:
             return jsonify({'success': False, 'message': 'Data é obrigatória'}), 400
         
-        # DEBUG: Log dos dados recebidos
-        print(f"🔍 DEBUG - Dados do formulário:")
-        print(f"   data_inicio: {data_inicio}")
-        print(f"   data_fim: {data_fim}")
-        print(f"   data_unica: {data_unica}")
+        # DEBUG CRÍTICO: Log completo dos dados
+        print(f"🔍 DEBUG CRÍTICO - Dados do formulário:")
+        print(f"   data_inicio: '{data_inicio}' (tipo: {type(data_inicio)})")
+        print(f"   data_fim: '{data_fim}' (tipo: {type(data_fim)})")
+        print(f"   data_unica: '{data_unica}' (tipo: {type(data_unica)})")
+        
+        # Log de todos os campos do formulário para debug
+        print(f"   Todos os campos form: {dict(request.form)}")
         
         if data_inicio and data_fim:
-            print(f"   Convertendo datas do período...")
-            print(f"   inicio convertido: {inicio}")
-            print(f"   fim convertido: {fim}")
+            print(f"   🔄 Convertendo datas do período...")
+            print(f"   inicio str: '{data_inicio}' → convertido: {inicio} (mês {inicio.month})")
+            print(f"   fim str: '{data_fim}' → convertido: {fim} (mês {fim.month})")
+            
+            # Verificar se as datas estão no mês correto
+            if inicio.month != 7 or fim.month != 7:
+                print(f"   ⚠️ ALERTA: Datas não estão em julho!")
+                print(f"   início mês: {inicio.month}, fim mês: {fim.month}")
+                
         elif data_unica:
-            print(f"   Data única convertida: {datetime.strptime(data_unica, '%Y-%m-%d').date()}")
+            data_convertida = datetime.strptime(data_unica, '%Y-%m-%d').date()
+            print(f"   Data única: '{data_unica}' → convertida: {data_convertida} (mês {data_convertida.month})")
+            if data_convertida.month != 7:
+                print(f"   ⚠️ ALERTA: Data única não está em julho! Mês: {data_convertida.month}")
         
-        print(f"   Datas para processamento: {datas_processamento}")
+        print(f"   📅 Datas para processamento: {datas_processamento}")
+        
+        # Verificar cada data individualmente
+        for i, data in enumerate(datas_processamento):
+            if data.month != 7:
+                print(f"   ❌ ERRO: Data {i+1}: {data} está no mês {data.month}, não julho!")
         
         # Dados básicos do formulário
         tipo = request.form.get('tipo')
@@ -4147,6 +4164,11 @@ def nova_alimentacao():
                 if registro_existente:
                     continue  # Pular se já existe
                     
+                # DEBUG: Log antes de criar registro
+                print(f"   🔨 Criando registro para {funcionario.nome}:")
+                print(f"      Data sendo salva: {data} (mês {data.month})")
+                print(f"      Tipo: {tipo}, Valor: R$ {valor}")
+                
                 registro = RegistroAlimentacao(
                     funcionario_id=int(funcionario_id),
                     obra_id=int(obra_id),
@@ -4156,6 +4178,9 @@ def nova_alimentacao():
                     valor=valor,
                     observacoes=observacoes
                 )
+                
+                # DEBUG: Verificar se a data do objeto está correta
+                print(f"      Objeto registro.data: {registro.data} (mês {registro.data.month})")
                 
                 db.session.add(registro)
                 registros_criados.append(f"{funcionario.nome} - {tipo} - {data.strftime('%d/%m/%Y')}")
