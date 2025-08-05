@@ -838,8 +838,6 @@ function showToast(message, type = 'info') {
         }
     }, 3000);
 }
-    });
-}
 
 // Interceptar submit do formulário para enviar funcionários selecionados
 document.getElementById('alimentacaoForm').addEventListener('submit', function(e) {
@@ -1017,9 +1015,77 @@ function excluirRegistro(id) {
     }
 }
 
-// ================== INICIALIZAÇÃO ==================
+// ================== FILTROS RÁPIDOS ==================
+function aplicarFiltros() {
+    const dataInicio = document.getElementById('dataInicio').value;
+    const dataFim = document.getElementById('dataFim').value;
+    const funcionarioId = document.getElementById('filtroFuncionario').value;
+    
+    // Construir URL com parâmetros
+    let url = '/alimentacao?';
+    const params = [];
+    
+    if (dataInicio) params.push(`data_inicio=${dataInicio}`);
+    if (dataFim) params.push(`data_fim=${dataFim}`);
+    if (funcionarioId) params.push(`funcionario_id=${funcionarioId}`);
+    
+    url += params.join('&');
+    window.location.href = url;
+}
+
+function limparFiltros() {
+    document.getElementById('dataInicio').value = '';
+    document.getElementById('dataFim').value = '';
+    document.getElementById('filtroFuncionario').value = '';
+    window.location.href = '/alimentacao';
+}
+
+// Filtros por período
 document.addEventListener('DOMContentLoaded', function() {
-    console.log('✅ Sistema de edição inline carregado');
+    // Event listeners para botões de período
+    document.querySelectorAll('.filtro-periodo').forEach(btn => {
+        btn.addEventListener('click', function() {
+            const periodo = this.getAttribute('data-periodo');
+            const hoje = new Date();
+            let dataInicio, dataFim;
+            
+            // Remover active de outros botões
+            document.querySelectorAll('.filtro-periodo').forEach(b => b.classList.remove('active'));
+            this.classList.add('active');
+            
+            switch(periodo) {
+                case 'hoje':
+                    dataInicio = dataFim = hoje.toISOString().split('T')[0];
+                    break;
+                case 'semana':
+                    const inicioSemana = new Date(hoje);
+                    inicioSemana.setDate(hoje.getDate() - hoje.getDay());
+                    dataInicio = inicioSemana.toISOString().split('T')[0];
+                    dataFim = hoje.toISOString().split('T')[0];
+                    break;
+                case 'mes':
+                    dataInicio = new Date(hoje.getFullYear(), hoje.getMonth(), 1).toISOString().split('T')[0];
+                    dataFim = hoje.toISOString().split('T')[0];
+                    break;
+                case 'todos':
+                    dataInicio = dataFim = '';
+                    break;
+            }
+            
+            // Atualizar campos
+            document.getElementById('dataInicio').value = dataInicio;
+            document.getElementById('dataFim').value = dataFim;
+            
+            // Aplicar filtro automaticamente
+            if (periodo !== 'todos') {
+                aplicarFiltros();
+            } else {
+                limparFiltros();
+            }
+        });
+    });
+    
+    console.log('✅ Sistema de filtros e edição inline carregado');
 });
 </script>
 

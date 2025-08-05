@@ -3991,11 +3991,31 @@ def alimentacao():
         funcionarios_admin = Funcionario.query.filter_by(ativo=True, admin_id=current_user.id).order_by(Funcionario.nome).all()
         funcionarios_ids = [f.id for f in funcionarios_admin]
         
-        # Filtrar registros pelos funcionários do admin
+        # Filtrar registros pelos funcionários do admin + filtros da URL
         if funcionarios_ids:
-            registros = RegistroAlimentacao.query.filter(
+            query = RegistroAlimentacao.query.filter(
                 RegistroAlimentacao.funcionario_id.in_(funcionarios_ids)
-            ).order_by(RegistroAlimentacao.data.desc()).limit(50).all()
+            )
+            
+            # Aplicar filtros da URL
+            data_inicio = request.args.get('data_inicio')
+            data_fim = request.args.get('data_fim')
+            funcionario_id = request.args.get('funcionario_id')
+            
+            if data_inicio:
+                from datetime import datetime
+                data_inicio_obj = datetime.strptime(data_inicio, '%Y-%m-%d').date()
+                query = query.filter(RegistroAlimentacao.data >= data_inicio_obj)
+                
+            if data_fim:
+                from datetime import datetime
+                data_fim_obj = datetime.strptime(data_fim, '%Y-%m-%d').date()
+                query = query.filter(RegistroAlimentacao.data <= data_fim_obj)
+                
+            if funcionario_id:
+                query = query.filter(RegistroAlimentacao.funcionario_id == int(funcionario_id))
+            
+            registros = query.order_by(RegistroAlimentacao.data.desc()).limit(100).all()
         else:
             registros = []
         
