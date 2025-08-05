@@ -17,9 +17,8 @@ def aplicar_correcao_producao():
         
         registros_corrigidos = 0
         
-        # Buscar todos registros de trabalho normal
+        # Buscar TODOS os registros com horários informados
         registros = RegistroPonto.query.filter(
-            RegistroPonto.tipo_registro == 'trabalho_normal',
             RegistroPonto.hora_entrada.isnot(None),
             RegistroPonto.hora_saida.isnot(None)
         ).all()
@@ -29,56 +28,68 @@ def aplicar_correcao_producao():
         for registro in registros:
             funcionario = Funcionario.query.get(registro.funcionario_id)
             
-            # Horário padrão: 07:12-17:00 (todos funcionários)
-            padrao_entrada_min = 7 * 60 + 12  # 432 min
-            padrao_saida_min = 17 * 60         # 1020 min
+            # Valores anteriores para log
+            old_extra = registro.horas_extras or 0
+            old_atraso = registro.total_atraso_horas or 0
             
-            # Horário real
-            real_entrada_min = registro.hora_entrada.hour * 60 + registro.hora_entrada.minute
-            real_saida_min = registro.hora_saida.hour * 60 + registro.hora_saida.minute
-            
-            # CALCULAR ATRASOS
-            atraso_entrada = max(0, real_entrada_min - padrao_entrada_min)
-            atraso_saida = max(0, padrao_saida_min - real_saida_min)
-            total_atraso_min = atraso_entrada + atraso_saida
-            
-            # CALCULAR EXTRAS
-            extra_entrada = max(0, padrao_entrada_min - real_entrada_min)
-            extra_saida = max(0, real_saida_min - padrao_saida_min)
-            total_extra_min = extra_entrada + extra_saida
-            
-            # Converter para horas
-            atraso_horas = total_atraso_min / 60.0
-            extra_horas = total_extra_min / 60.0
-            
-            # Verificar se precisa correção
-            needs_fix = (
-                abs(registro.horas_extras - extra_horas) > 0.01 or
-                abs(registro.total_atraso_horas - atraso_horas) > 0.01
-            )
-            
-            if needs_fix:
-                # Valores anteriores para log
-                old_extra = registro.horas_extras
-                old_atraso = registro.total_atraso_horas
+            # APLICAR LÓGICA BASEADA NO TIPO DE REGISTRO
+            if registro.tipo_registro in ['sabado_trabalhado', 'sabado_horas_extras', 'domingo_trabalhado', 'domingo_horas_extras', 'feriado_trabalhado']:
+                # TIPOS ESPECIAIS: TODAS as horas são extras, SEM atrasos
+                registro.horas_extras = registro.horas_trabalhadas or 0
+                registro.total_atraso_horas = 0
+                registro.total_atraso_minutos = 0
+                registro.minutos_atraso_entrada = 0
+                registro.minutos_atraso_saida = 0
                 
-                # Aplicar correções
-                registro.horas_extras = round(extra_horas, 2)
-                registro.total_atraso_horas = round(atraso_horas, 2)
+                if registro.tipo_registro in ['sabado_trabalhado', 'sabado_horas_extras']:
+                    registro.percentual_extras = 50.0
+                else:  # domingo, feriado
+                    registro.percentual_extras = 100.0
+            else:
+                # TIPOS NORMAIS: Calcular extras e atrasos independentemente
+                
+                # Horário padrão: 07:12-17:00 (todos funcionários)
+                padrao_entrada_min = 7 * 60 + 12  # 432 min
+                padrao_saida_min = 17 * 60         # 1020 min
+                
+                # Horário real
+                real_entrada_min = registro.hora_entrada.hour * 60 + registro.hora_entrada.minute
+                real_saida_min = registro.hora_saida.hour * 60 + registro.hora_saida.minute
+                
+                # CALCULAR ATRASOS (chegou depois OU saiu antes)
+                atraso_entrada = max(0, real_entrada_min - padrao_entrada_min)
+                atraso_saida = max(0, padrao_saida_min - real_saida_min)
+                total_atraso_min = atraso_entrada + atraso_saida
+                
+                # CALCULAR EXTRAS (chegou antes OU saiu depois)
+                extra_entrada = max(0, padrao_entrada_min - real_entrada_min)
+                extra_saida = max(0, real_saida_min - padrao_saida_min)
+                total_extra_min = extra_entrada + extra_saida
+                
+                # Converter para horas
+                atraso_horas = round(total_atraso_min / 60.0, 2)
+                extra_horas = round(total_extra_min / 60.0, 2)
+                
+                # Aplicar valores
+                registro.horas_extras = extra_horas
+                registro.total_atraso_horas = atraso_horas
                 registro.total_atraso_minutos = total_atraso_min
                 registro.minutos_atraso_entrada = atraso_entrada
                 registro.minutos_atraso_saida = atraso_saida
                 
                 # Percentual de extras
-                if registro.horas_extras > 0:
-                    registro.percentual_extras = 50.0
-                else:
-                    registro.percentual_extras = 0.0
+                registro.percentual_extras = 50.0 if registro.horas_extras > 0 else 0.0
                 
-                # Recalcular horas trabalhadas
-                total_min = real_saida_min - real_entrada_min - 60  # Menos 1h almoço
-                registro.horas_trabalhadas = round(max(0, total_min / 60.0), 2)
-                
+                # Recalcular horas trabalhadas se necessário
+                if not registro.horas_trabalhadas or registro.horas_trabalhadas <= 0:
+                    total_min = real_saida_min - real_entrada_min - 60  # Menos 1h almoço
+                    registro.horas_trabalhadas = round(max(0, total_min / 60.0), 2)
+            
+            # Verificar se houve mudança significativa
+            mudou_extras = abs((registro.horas_extras or 0) - old_extra) > 0.01
+            mudou_atrasos = abs((registro.total_atraso_horas or 0) - old_atraso) > 0.01
+            
+            if mudou_extras or mudou_atrasos:
                 print(f"✅ {funcionario.nome} {registro.data}: "
                       f"Extras {old_extra}h→{registro.horas_extras}h, "
                       f"Atrasos {old_atraso}h→{registro.total_atraso_horas}h")
@@ -92,7 +103,6 @@ def aplicar_correcao_producao():
             
             # Estatísticas finais
             total_registros = RegistroPonto.query.filter(
-                RegistroPonto.tipo_registro == 'trabalho_normal',
                 RegistroPonto.hora_entrada.isnot(None),
                 RegistroPonto.hora_saida.isnot(None)
             ).count()

@@ -570,39 +570,47 @@ class KPIsEngine:
             total_minutos = saida_minutos - entrada_minutos - tempo_almoco
             registro.horas_trabalhadas = max(0, total_minutos / 60.0)
             
-            # CORREÇÃO: Calcular horas extras independente de atrasos
-            if registro.tipo_registro in ['sabado_trabalhado', 'domingo_horas_extras', 'feriado_trabalhado']:
-                # Para tipos especiais, TODAS as horas são extras
-                registro.horas_extras = registro.horas_trabalhadas
-                # Definir percentual correto automaticamente
-                if registro.tipo_registro == 'sabado_trabalhado':
+            # LÓGICA CONSOLIDADA: Usar horário padrão 07:12-17:00
+            horario_entrada_padrao = time(7, 12)
+            horario_saida_padrao = time(17, 0)
+            
+            if registro.tipo_registro in ['sabado_trabalhado', 'sabado_horas_extras', 'domingo_trabalhado', 'domingo_horas_extras', 'feriado_trabalhado']:
+                # TIPOS ESPECIAIS: TODAS as horas são extras, SEM atrasos
+                registro.horas_extras = registro.horas_trabalhadas or 0
+                registro.total_atraso_horas = 0
+                registro.total_atraso_minutos = 0
+                registro.minutos_atraso_entrada = 0
+                registro.minutos_atraso_saida = 0
+                
+                if registro.tipo_registro in ['sabado_trabalhado', 'sabado_horas_extras']:
                     registro.percentual_extras = 50.0
-                else:  # domingo_horas_extras, feriado_trabalhado
+                else:  # domingo, feriado
                     registro.percentual_extras = 100.0
             else:
-                # LÓGICA CORRETA: Horas extras = entrada antecipada + saída posterior
-                minutos_extras_total = 0
+                # TIPOS NORMAIS: Calcular extras e atrasos independentemente
+                entrada_real_min = registro.hora_entrada.hour * 60 + registro.hora_entrada.minute
+                saida_real_min = registro.hora_saida.hour * 60 + registro.hora_saida.minute
+                entrada_padrao_min = horario_entrada_padrao.hour * 60 + horario_entrada_padrao.minute
+                saida_padrao_min = horario_saida_padrao.hour * 60 + horario_saida_padrao.minute
                 
-                # EXTRAS POR ENTRADA ANTECIPADA
-                if registro.hora_entrada and registro.hora_entrada < horario_entrada:
-                    entrada_real_min = registro.hora_entrada.hour * 60 + registro.hora_entrada.minute
-                    entrada_prev_min = horario_entrada.hour * 60 + horario_entrada.minute
-                    minutos_extras_entrada = entrada_prev_min - entrada_real_min
-                    minutos_extras_total += minutos_extras_entrada
+                # ATRASOS (chegou depois OU saiu antes)
+                atraso_entrada_min = max(0, entrada_real_min - entrada_padrao_min)
+                atraso_saida_min = max(0, saida_padrao_min - saida_real_min)
+                total_atraso_min = atraso_entrada_min + atraso_saida_min
                 
-                # EXTRAS POR SAÍDA POSTERIOR
-                if registro.hora_saida and registro.hora_saida > horario_saida:
-                    saida_real_min = registro.hora_saida.hour * 60 + registro.hora_saida.minute
-                    saida_prev_min = horario_saida.hour * 60 + horario_saida.minute
-                    minutos_extras_saida = saida_real_min - saida_prev_min
-                    minutos_extras_total += minutos_extras_saida
+                # HORAS EXTRAS (chegou antes OU saiu depois)
+                extra_entrada_min = max(0, entrada_padrao_min - entrada_real_min)
+                extra_saida_min = max(0, saida_real_min - saida_padrao_min)
+                total_extra_min = extra_entrada_min + extra_saida_min
                 
-                # Aplicar horas extras corretas (em horas, não minutos)
-                registro.horas_extras = round(minutos_extras_total / 60.0, 2)
-                if registro.horas_extras > 0:
-                    registro.percentual_extras = 50.0
-                else:
-                    registro.percentual_extras = 0.0
+                # APLICAR VALORES
+                registro.minutos_atraso_entrada = atraso_entrada_min
+                registro.minutos_atraso_saida = atraso_saida_min
+                registro.total_atraso_minutos = total_atraso_min
+                registro.total_atraso_horas = round(total_atraso_min / 60.0, 2)
+                
+                registro.horas_extras = round(total_extra_min / 60.0, 2)
+                registro.percentual_extras = 50.0 if registro.horas_extras > 0 else 0.0
         
         # Salvar alterações
         db.session.commit()

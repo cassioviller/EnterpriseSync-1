@@ -45,19 +45,20 @@ def calcular_horas_trabalhadas(hora_entrada, hora_saida, hora_almoco_saida=None,
     # Converter para horas decimais (tempo efetivo de trabalho)
     horas_trabalhadas = tempo_total.total_seconds() / 3600
     
-    # JORNADA PADRÃO: 8.8h efetivas (8h48min)
-    jornada_padrao = 8.8
+    # ATENÇÃO: Esta função foi substituída pela lógica consolidada
+    # Usar apenas para referência. A lógica real está em kpis_engine.py
+    # HORÁRIO PADRÃO: 07:12-17:00 para todos os funcionários
     
-    # Calcular horas extras baseado no tipo de dia
-    if data and data.weekday() == 5:  # Sábado (0=segunda, 5=sábado)
-        # No sábado, todas as horas são consideradas extras (50% adicional)
-        horas_extras = horas_trabalhadas
+    # Calcular horas extras baseado na nova lógica consolidada
+    if data and data.weekday() == 5:  # Sábado
+        horas_extras = horas_trabalhadas  # Todas as horas são extras (50%)
     elif data and data.weekday() == 6:  # Domingo
-        # No domingo, todas as horas são consideradas extras (100% adicional)
-        horas_extras = horas_trabalhadas
+        horas_extras = horas_trabalhadas  # Todas as horas são extras (100%)
     else:
-        # Dias normais: extras acima da jornada padrão de 8.8h
-        horas_extras = max(0, horas_trabalhadas - jornada_padrao)
+        # Dias normais: usar lógica de entrada antecipada + saída posterior
+        # Esta função é mantida para compatibilidade, mas a lógica real
+        # está implementada em kpis_engine.py com base no horário individual
+        horas_extras = max(0, horas_trabalhadas - 8.8)
     
     return {
         'total': round(horas_trabalhadas, 2),
