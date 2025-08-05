@@ -597,8 +597,8 @@ class KPIsEngine:
                     minutos_extras_saida = saida_real_min - saida_prev_min
                     minutos_extras_total += minutos_extras_saida
                 
-                # Aplicar horas extras totais
-                registro.horas_extras = minutos_extras_total / 60.0
+                # Aplicar horas extras corretas (em horas, não minutos)
+                registro.horas_extras = round(minutos_extras_total / 60.0, 2)
                 if registro.horas_extras > 0:
                     registro.percentual_extras = 50.0
                 else:
