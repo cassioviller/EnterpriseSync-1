@@ -3991,11 +3991,17 @@ def alimentacao():
         funcionarios_admin = Funcionario.query.filter_by(ativo=True, admin_id=current_user.id).order_by(Funcionario.nome).all()
         funcionarios_ids = [f.id for f in funcionarios_admin]
         
-        # Filtrar registros pelos funcionários do admin
+        # Filtrar registros pelos funcionários do admin COM JOIN para nomes
         if funcionarios_ids:
-            registros = RegistroAlimentacao.query.filter(
+            registros = RegistroAlimentacao.query.join(
+                Funcionario, RegistroAlimentacao.funcionario_id == Funcionario.id
+            ).filter(
                 RegistroAlimentacao.funcionario_id.in_(funcionarios_ids)
-            ).order_by(RegistroAlimentacao.data.desc()).limit(50).all()
+            ).options(
+                joinedload(RegistroAlimentacao.funcionario),
+                joinedload(RegistroAlimentacao.obra_ref),
+                joinedload(RegistroAlimentacao.restaurante_ref)
+            ).order_by(RegistroAlimentacao.data.desc()).limit(100).all()
         else:
             registros = []
         

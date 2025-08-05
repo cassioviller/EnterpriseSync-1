@@ -16,6 +16,41 @@
     </div>
 </div>
 
+<!-- Filtros Rápidos por Período -->
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-body">
+                <div class="d-flex flex-wrap align-items-center gap-2">
+                    <h6 class="mb-0 me-3">
+                        <i class="fas fa-filter"></i> Filtros Rápidos:
+                    </h6>
+                    <button class="btn btn-outline-primary btn-sm" onclick="filtrarPeriodo('hoje')">
+                        <i class="fas fa-calendar-day"></i> Hoje
+                    </button>
+                    <button class="btn btn-outline-primary btn-sm" onclick="filtrarPeriodo('semana')">
+                        <i class="fas fa-calendar-week"></i> Esta Semana
+                    </button>
+                    <button class="btn btn-outline-primary btn-sm" onclick="filtrarPeriodo('mes')">
+                        <i class="fas fa-calendar-month"></i> Este Mês
+                    </button>
+                    <button class="btn btn-outline-secondary btn-sm" onclick="limparFiltros()">
+                        <i class="fas fa-times"></i> Limpar
+                    </button>
+                    <div class="ms-auto">
+                        <input type="date" class="form-control form-control-sm d-inline-block" style="width: auto;" id="dataInicio" placeholder="Data Início">
+                        <span class="mx-2">até</span>
+                        <input type="date" class="form-control form-control-sm d-inline-block" style="width: auto;" id="dataFim" placeholder="Data Fim">
+                        <button class="btn btn-primary btn-sm ms-2" onclick="filtrarPorDatas()">
+                            <i class="fas fa-search"></i> Filtrar
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
 <!-- Resumo -->
 <div class="row mb-4">
     <div class="col-md-3">
@@ -108,7 +143,16 @@
                 <tbody>
                     {% for registro in registros %}
                     <tr>
-                        <td>{{ registro.funcionario.nome if registro.funcionario else '-' }}</td>
+                        <td>
+                            <div class="d-flex align-items-center">
+                                <div class="avatar-sm me-2">
+                                    <div class="bg-primary text-white rounded-circle d-flex align-items-center justify-content-center" style="width: 32px; height: 32px; font-size: 12px;">
+                                        {{ registro.funcionario.nome[:2].upper() if registro.funcionario else '?' }}
+                                    </div>
+                                </div>
+                                <strong>{{ registro.funcionario.nome if registro.funcionario else 'Nome não encontrado' }}</strong>
+                            </div>
+                        </td>
                         <td>{{ registro.data.strftime('%d/%m/%Y') }}</td>
                         <td>
                             {% if registro.tipo == 'cafe' %}
@@ -345,14 +389,18 @@
 {% block scripts %}
 <script>
 $(document).ready(function() {
-    // Inicializar DataTable
+    // Inicializar DataTable com filtros
     $('#alimentacaoTable').DataTable({
         language: {
             url: '//cdn.datatables.net/plug-ins/1.13.6/i18n/pt-BR.json'
         },
         order: [[1, 'desc']],
         pageLength: 25,
-        responsive: true
+        responsive: true,
+        dom: 'Bfrtip',
+        buttons: [
+            'copy', 'csv', 'excel', 'pdf', 'print'
+        ]
     });
     
     // Configurar data padrão
@@ -478,6 +526,65 @@ function setupMultiSelectionFunctionality() {
     // Event listeners para dropdowns obrigatórios
     document.getElementById('obra_id').addEventListener('change', atualizarContadores);
     document.getElementById('restaurante_id').addEventListener('change', atualizarContadores);
+}
+
+// Filtros rápidos por período
+function filtrarPeriodo(periodo) {
+    let hoje = new Date();
+    let dataInicio, dataFim = hoje;
+    
+    switch(periodo) {
+        case 'hoje':
+            dataInicio = hoje;
+            break;
+        case 'semana':
+            dataInicio = new Date(hoje);
+            dataInicio.setDate(hoje.getDate() - hoje.getDay());
+            break;
+        case 'mes':
+            dataInicio = new Date(hoje.getFullYear(), hoje.getMonth(), 1);
+            break;
+    }
+    
+    document.getElementById('dataInicio').value = dataInicio.toISOString().split('T')[0];
+    document.getElementById('dataFim').value = dataFim.toISOString().split('T')[0];
+    filtrarPorDatas();
+}
+
+function filtrarPorDatas() {
+    let dataInicio = document.getElementById('dataInicio').value;
+    let dataFim = document.getElementById('dataFim').value;
+    
+    if (!dataInicio || !dataFim) {
+        alert('Selecione as datas de início e fim');
+        return;
+    }
+    
+    // Aplicar filtro na tabela
+    let table = $('#alimentacaoTable').DataTable();
+    
+    // Filtro customizado por data
+    $.fn.dataTable.ext.search.push(function(settings, data, dataIndex) {
+        let dataRegistro = data[1]; // Coluna da data
+        let [dia, mes, ano] = dataRegistro.split('/');
+        let dataComp = new Date(ano, mes - 1, dia);
+        let inicio = new Date(dataInicio);
+        let fim = new Date(dataFim);
+        
+        return dataComp >= inicio && dataComp <= fim;
+    });
+    
+    table.draw();
+    
+    // Remover filtro após aplicar
+    $.fn.dataTable.ext.search.pop();
+}
+
+function limparFiltros() {
+    document.getElementById('dataInicio').value = '';
+    document.getElementById('dataFim').value = '';
+    let table = $('#alimentacaoTable').DataTable();
+    table.search('').columns().search('').draw();
     
     // Event listeners para mudanças nas datas do período
     document.getElementById('data_inicio').addEventListener('change', atualizarContadores);
