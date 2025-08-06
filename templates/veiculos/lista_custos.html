@@ -172,11 +172,13 @@
                             <td>
                                 <div class="btn-group btn-group-sm">
                                     <button type="button" class="btn btn-outline-primary" 
-                                            onclick="editarCusto({{ custo.id }})" title="Editar">
+                                            onclick="editarCusto({{ custo.id }})" title="Editar" 
+                                            data-custo-id="{{ custo.id }}">
                                         <i class="fas fa-edit"></i>
                                     </button>
                                     <button type="button" class="btn btn-outline-danger" 
-                                            onclick="excluirCusto({{ custo.id }}, '{{ custo.tipo_custo }}', {{ custo.valor }})" title="Excluir">
+                                            onclick="excluirCusto({{ custo.id }}, '{{ custo.tipo_custo }}', {{ custo.valor }})" title="Excluir"
+                                            data-custo-id="{{ custo.id }}">
                                         <i class="fas fa-trash"></i>
                                     </button>
                                 </div>
