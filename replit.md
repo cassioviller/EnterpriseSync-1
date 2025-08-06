@@ -88,12 +88,14 @@ Preferred communication style: Simple, everyday language.
 - **Files**: `kpis_engine.py` (lines 163-200), `corrigir_custo_danilo.py` for analysis and validation
 - **Result**: Antonio's cost corrected from R$ 2,443.83 to estimated R$ 2,190.81 (R$ 253 reduction), system now calculates real employee costs instead of inflated hour-based calculations
 
-### Time Tracking Logic - Independent Delays and Overtime Calculation
-- **Date**: August 4, 2025 (Final Implementation)  
-- **Change**: Implemented independent calculation of delays vs overtime hours based on actual work schedules
-- **Impact**: System now correctly calculates delays from late entry and overtime from extended departure separately, following user specification
-- **Files**: `kpis_engine.py` (lines 532-600), `aplicar_logica_sabado_definitiva.py`
-- **Result**: Ana Paula 29/07/2025 example: 07:30 entry (18min delay) + 18:00 exit (1h overtime) calculated independently against 07:12-17:00 standard schedule
+### Overtime Calculation Logic - Employee Standard Schedule Based
+- **Date**: August 6, 2025 (Final Implementation)
+- **Change**: Implemented correct overtime calculation based on each employee's registered standard work schedule from "horários de trabalho" system
+- **Impact**: System now uses employee's actual registered schedule as baseline for calculations, applying ONLY to normal workdays (preserves Saturday/Sunday/holiday logic)
+- **Files**: `kpis_engine.py` (lines 593-640), `models.py` (horario_trabalho_ref relationship), `RELATORIO_NOVA_LOGICA_HORAS_EXTRAS.md`
+- **Result**: Carlos Silva Teste example: 09:00-18:00 vs 09:00-16:00 standard = 2.00h extras (0min early + 120min late), system automatically detects and uses registered schedule per employee
+- **Logic**: Early arrival + Late departure = Overtime hours, Late arrival + Early departure = Delay hours (calculated independently)
+- **Restriction**: Logic applies ONLY to 'trabalho_normal' type records, Saturday/Sunday/holiday calculations remain unchanged as per user requirement
 
 ### Food Registration System Enhancement
 - **Date**: August 4, 2025

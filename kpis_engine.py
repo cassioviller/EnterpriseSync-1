@@ -26,7 +26,7 @@ from models import (
 from sqlalchemy import func, extract, and_, or_
 
 
-class KPIsEngine:
+class CalculadoraKPI:
     """Engine principal para cálculo de todos os KPIs"""
     
     def __init__(self):
@@ -587,23 +587,46 @@ class KPIsEngine:
                 else:  # domingo, feriado
                     registro.percentual_extras = 100.0
             else:
-                # TIPOS NORMAIS: Calcular extras e atrasos independentemente
+                # TIPOS NORMAIS: Calcular extras e atrasos baseado no horário padrão do funcionário
                 entrada_real_min = registro.hora_entrada.hour * 60 + registro.hora_entrada.minute
                 saida_real_min = registro.hora_saida.hour * 60 + registro.hora_saida.minute
-                entrada_padrao_min = horario_entrada_padrao.hour * 60 + horario_entrada_padrao.minute
-                saida_padrao_min = horario_saida_padrao.hour * 60 + horario_saida_padrao.minute
                 
-                # ATRASOS (chegou depois OU saiu antes)
+                # USAR HORÁRIO PADRÃO DO FUNCIONÁRIO (cadastrado em horários de trabalho)
+                # Se não houver horário específico, usar padrão 07:12-17:00
+                if funcionario.horario_trabalho_ref:
+                    entrada_padrao_funcionario = funcionario.horario_trabalho_ref.entrada
+                    saida_padrao_funcionario = funcionario.horario_trabalho_ref.saida
+                    print(f"📋 USANDO HORÁRIO CADASTRADO: {funcionario.nome} - {entrada_padrao_funcionario} às {saida_padrao_funcionario}")
+                else:
+                    entrada_padrao_funcionario = time(7, 12)  # 07:12
+                    saida_padrao_funcionario = time(17, 0)    # 17:00
+                    print(f"📋 USANDO HORÁRIO PADRÃO: {funcionario.nome} - 07:12 às 17:00")
+                
+                entrada_padrao_min = entrada_padrao_funcionario.hour * 60 + entrada_padrao_funcionario.minute
+                saida_padrao_min = saida_padrao_funcionario.hour * 60 + saida_padrao_funcionario.minute
+                
+                # CALCULAR ATRASOS (chegou depois OU saiu antes do horário padrão)
                 atraso_entrada_min = max(0, entrada_real_min - entrada_padrao_min)
                 atraso_saida_min = max(0, saida_padrao_min - saida_real_min)
                 total_atraso_min = atraso_entrada_min + atraso_saida_min
                 
-                # HORAS EXTRAS (chegou antes OU saiu depois)
-                extra_entrada_min = max(0, entrada_padrao_min - entrada_real_min)
-                extra_saida_min = max(0, saida_real_min - saida_padrao_min)
+                # CALCULAR HORAS EXTRAS (chegou antes OU saiu depois do horário padrão)
+                # LÓGICA CORRETA: Entrada antecipada + Saída atrasada = Horas Extras
+                extra_entrada_min = max(0, entrada_padrao_min - entrada_real_min)  # Chegou antes
+                extra_saida_min = max(0, saida_real_min - saida_padrao_min)       # Saiu depois
                 total_extra_min = extra_entrada_min + extra_saida_min
                 
-                # APLICAR VALORES
+                # LOG DETALHADO PARA DEBUG
+                if total_extra_min > 0 or total_atraso_min > 0:
+                    print(f"👤 {funcionario.nome} - {registro.data}:")
+                    print(f"   Horário padrão: {entrada_padrao_funcionario}-{saida_padrao_funcionario}")
+                    print(f"   Horário real: {registro.hora_entrada}-{registro.hora_saida}")
+                    print(f"   Extras entrada: {extra_entrada_min}min (chegou {extra_entrada_min}min antes)")
+                    print(f"   Extras saída: {extra_saida_min}min (saiu {extra_saida_min}min depois)")
+                    print(f"   Total extras: {total_extra_min}min = {round(total_extra_min/60, 2)}h")
+                    print(f"   Atrasos: {total_atraso_min}min = {round(total_atraso_min/60, 2)}h")
+                
+                # APLICAR VALORES CALCULADOS
                 registro.minutos_atraso_entrada = atraso_entrada_min
                 registro.minutos_atraso_saida = atraso_saida_min
                 registro.total_atraso_minutos = total_atraso_min
@@ -726,7 +749,7 @@ def gerar_calendario_util(ano):
 
 
 # Instância global do engine
-kpis_engine = KPIsEngine()
+kpis_engine = CalculadoraKPI()
 
 # Funções de compatibilidade para as views
 def calcular_kpis_funcionario_v3(funcionario_id, data_inicio=None, data_fim=None):

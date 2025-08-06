@@ -73,6 +73,9 @@ class Funcionario(db.Model):
     funcao_id = db.Column(db.Integer, db.ForeignKey('funcao.id'))
     horario_trabalho_id = db.Column(db.Integer, db.ForeignKey('horario_trabalho.id'))
     admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=True)  # Para isolamento multi-tenant
+    
+    # Relacionamento com horário de trabalho
+    horario_trabalho_ref = db.relationship('HorarioTrabalho')
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     
     # Relacionamentos
