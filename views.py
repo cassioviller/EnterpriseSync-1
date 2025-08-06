@@ -5237,12 +5237,27 @@ def novo_rdo():
             ServicoObra.ativo == True
         ).all()
     
-    return render_template('rdo_novo.html', 
+    # Buscar atividades da RDO anterior para auto-preenchimento
+    atividades_anteriores = []
+    if obra_id:
+        rdo_anterior = RDO.query.filter_by(obra_id=obra_id).order_by(RDO.data_relatorio.desc()).first()
+        if rdo_anterior and rdo_anterior.atividades:
+            atividades_anteriores = [{
+                'descricao': atividade.descricao_atividade,
+                'percentual': atividade.percentual_conclusao,
+                'observacoes': atividade.observacoes_tecnicas or ''
+            } for atividade in rdo_anterior.atividades]
+    
+    return render_template('rdo/formulario_rdo.html',
+                         modo='novo', 
                          obras=obras,
                          funcionarios=funcionarios,
                          servicos=servicos,
                          servicos_obra=servicos_obra,
                          obra_id=obra_id,
+                         atividades_anteriores=atividades_anteriores,
+                         funcionarios_json=json.dumps([{'id': f.id, 'nome': f.nome} for f in funcionarios]),
+                         obras_json=json.dumps([{'id': o.id, 'nome': o.nome} for o in obras]),
                          data_hoje=datetime.now().strftime('%Y-%m-%d'))
 
 @main_bp.route('/rdo/criar', methods=['POST'])
@@ -5268,6 +5283,29 @@ def criar_rdo():
         )
         
         db.session.add(rdo)
+        db.session.flush()  # Para obter o ID
+        
+        # Processar atividades do formulário
+        import re
+        for key in request.form:
+            if key.startswith('atividade_descricao_'):
+                match = re.match(r'atividade_descricao_(\d+)', key)
+                if match:
+                    contador = match.group(1)
+                    descricao = request.form.get(f'atividade_descricao_{contador}')
+                    percentual = request.form.get(f'atividade_percentual_{contador}')
+                    observacoes = request.form.get(f'atividade_observacoes_{contador}', '')
+                    
+                    if descricao and percentual:
+                        from models import RDOAtividade
+                        atividade = RDOAtividade(
+                            rdo_id=rdo.id,
+                            descricao_atividade=descricao,
+                            percentual_conclusao=float(percentual),
+                            observacoes_tecnicas=observacoes if observacoes else None
+                        )
+                        db.session.add(atividade)
+        
         db.session.commit()
         
         flash('RDO criado com sucesso!', 'success')
@@ -5298,6 +5336,50 @@ def editar_rdo(id):
                          obras=obras,
                          funcionarios=funcionarios,
                          modo='editar')
+
+@main_bp.route('/api/rdo/atividades-anteriores/<int:obra_id>')
+@login_required
+def api_atividades_anteriores(obra_id):
+    """API para buscar atividades da RDO anterior de uma obra"""
+    try:
+        # Buscar RDO mais recente da obra (excluindo a data atual)
+        data_hoje = request.args.get('data_atual')
+        query = RDO.query.filter_by(obra_id=obra_id)
+        
+        # Excluir a data atual se fornecida
+        if data_hoje:
+            query = query.filter(RDO.data_relatorio < datetime.strptime(data_hoje, '%Y-%m-%d').date())
+        
+        rdo_anterior = query.order_by(RDO.data_relatorio.desc()).first()
+        
+        if not rdo_anterior or not rdo_anterior.atividades:
+            return jsonify({
+                'success': True,
+                'atividades': [],
+                'message': 'Nenhuma atividade anterior encontrada'
+            })
+        
+        atividades = [{
+            'descricao': atividade.descricao_atividade,
+            'percentual': atividade.percentual_conclusao,
+            'observacoes': atividade.observacoes_tecnicas or '',
+            'rdo_anterior': rdo_anterior.numero_rdo,
+            'data_anterior': rdo_anterior.data_relatorio.strftime('%d/%m/%Y')
+        } for atividade in rdo_anterior.atividades]
+        
+        return jsonify({
+            'success': True,
+            'atividades': atividades,
+            'rdo_anterior': rdo_anterior.numero_rdo,
+            'data_anterior': rdo_anterior.data_relatorio.strftime('%d/%m/%Y'),
+            'message': f'{len(atividades)} atividades encontradas do RDO {rdo_anterior.numero_rdo}'
+        })
+        
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'message': f'Erro ao buscar atividades anteriores: {str(e)}'
+        }), 500
 
 @main_bp.route('/rdo/<int:id>/excluir', methods=['POST'])
 @login_required

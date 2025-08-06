@@ -130,16 +130,24 @@
             <h5 class="mb-0">
                 <i class="fas fa-tasks"></i> Atividades Executadas
             </h5>
-            <button type="button" class="btn btn-sm btn-outline-primary" onclick="adicionarAtividade()">
-                <i class="fas fa-plus"></i> Adicionar
-            </button>
+            <div class="btn-group">
+                <button type="button" class="btn btn-sm btn-outline-success" onclick="carregarAtividadesAnteriores()" id="btn-carregar-anteriores">
+                    <i class="fas fa-history"></i> Carregar RDO Anterior
+                </button>
+                <button type="button" class="btn btn-sm btn-outline-primary" onclick="adicionarAtividade()">
+                    <i class="fas fa-plus"></i> Adicionar
+                </button>
+            </div>
         </div>
         <div class="card-body">
             <div id="atividades-container">
                 <!-- Atividades serão adicionadas dinamicamente aqui -->
             </div>
             <div class="text-muted" id="atividades-vazio" style="display: none;">
-                <i class="fas fa-info-circle"></i> Nenhuma atividade adicionada. Clique em "Adicionar" para incluir atividades.
+                <i class="fas fa-info-circle"></i> Nenhuma atividade adicionada. Clique em "Carregar RDO Anterior" para importar atividades ou "Adicionar" para criar nova atividade.
+            </div>
+            <div class="alert alert-info" id="atividades-info" style="display: none;">
+                <i class="fas fa-info-circle"></i> <span id="atividades-info-texto"></span>
             </div>
         </div>
     </div>
@@ -309,7 +317,7 @@ function adicionarEquipamento() {
     document.getElementById('equipamentos-vazio').style.display = 'none';
 }
 
-function adicionarAtividade() {
+function adicionarAtividade(dados = null) {
     contadorAtividades++;
     const container = document.getElementById('atividades-container');
     const html = `
@@ -323,17 +331,17 @@ function adicionarAtividade() {
             <div class="row">
                 <div class="col-md-8">
                     <label class="form-label">Descrição da Atividade</label>
-                    <textarea class="form-control" name="atividade_descricao_${contadorAtividades}" rows="3" required></textarea>
+                    <textarea class="form-control" name="atividade_descricao_${contadorAtividades}" rows="3" required>${dados ? dados.descricao : ''}</textarea>
                 </div>
                 <div class="col-md-4">
                     <label class="form-label">Percentual de Conclusão (%)</label>
-                    <input type="number" class="form-control" name="atividade_percentual_${contadorAtividades}" min="0" max="100" required>
+                    <input type="number" class="form-control" name="atividade_percentual_${contadorAtividades}" min="0" max="100" value="${dados ? dados.percentual : ''}" required>
                 </div>
             </div>
             <div class="row mt-3">
                 <div class="col-12">
                     <label class="form-label">Observações Técnicas</label>
-                    <textarea class="form-control" name="atividade_observacoes_${contadorAtividades}" rows="2"></textarea>
+                    <textarea class="form-control" name="atividade_observacoes_${contadorAtividades}" rows="2">${dados ? dados.observacoes : ''}</textarea>
                 </div>
             </div>
         </div>
@@ -427,13 +435,109 @@ document.getElementById('fotos').addEventListener('change', function(e) {
     });
 });
 
+// Função para carregar atividades da RDO anterior
+function carregarAtividadesAnteriores() {
+    const obraSelect = document.querySelector('select[name="obra_id"]');
+    const dataInput = document.querySelector('input[name="data_relatorio"]');
+    
+    if (!obraSelect.value) {
+        alert('Por favor, selecione uma obra primeiro.');
+        return;
+    }
+    
+    const btnCarregar = document.getElementById('btn-carregar-anteriores');
+    btnCarregar.disabled = true;
+    btnCarregar.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Carregando...';
+    
+    let url = `/api/rdo/atividades-anteriores/${obraSelect.value}`;
+    if (dataInput.value) {
+        url += `?data_atual=${dataInput.value}`;
+    }
+    
+    fetch(url)
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                // Limpar atividades existentes
+                document.getElementById('atividades-container').innerHTML = '';
+                contadorAtividades = 0;
+                
+                if (data.atividades.length > 0) {
+                    // Adicionar cada atividade anterior
+                    data.atividades.forEach(atividade => {
+                        adicionarAtividade(atividade);
+                    });
+                    
+                    // Mostrar informação
+                    const infoDiv = document.getElementById('atividades-info');
+                    const infoTexto = document.getElementById('atividades-info-texto');
+                    infoTexto.textContent = `${data.atividades.length} atividades carregadas do RDO ${data.rdo_anterior} (${data.data_anterior}). Você pode complementar com novas porcentagens.`;
+                    infoDiv.style.display = 'block';
+                } else {
+                    document.getElementById('atividades-info').style.display = 'none';
+                    alert('Nenhuma atividade anterior encontrada para esta obra.');
+                }
+                
+                verificarVazios();
+            } else {
+                alert('Erro ao carregar atividades anteriores: ' + data.message);
+            }
+        })
+        .catch(error => {
+            console.error('Erro:', error);
+            alert('Erro ao carregar atividades anteriores.');
+        })
+        .finally(() => {
+            btnCarregar.disabled = false;
+            btnCarregar.innerHTML = '<i class="fas fa-history"></i> Carregar RDO Anterior';
+        });
+}
+
+// Detectar mudança da obra para habilitar/desabilitar botão
+function onObraChange() {
+    const obraSelect = document.querySelector('select[name="obra_id"]');
+    const btnCarregar = document.getElementById('btn-carregar-anteriores');
+    
+    if (obraSelect.value) {
+        btnCarregar.disabled = false;
+        btnCarregar.title = 'Carregar atividades da RDO anterior desta obra';
+    } else {
+        btnCarregar.disabled = true;
+        btnCarregar.title = 'Selecione uma obra primeiro';
+    }
+}
+
 // Inicializar interface
 $(document).ready(function() {
     verificarVazios();
     
-    // Adicionar um item inicial de cada seção se estivermos criando um novo RDO
-    {% if modo != 'editar' %}
-    // Interface limpa, usuário adiciona conforme necessário
+    // Configurar evento de mudança da obra
+    const obraSelect = document.querySelector('select[name="obra_id"]');
+    if (obraSelect) {
+        obraSelect.addEventListener('change', onObraChange);
+        onObraChange(); // Chamada inicial
+    }
+    
+    // Auto-carregar atividades se obra já estiver selecionada (vindo de URL)
+    {% if obra_id and atividades_anteriores %}
+    setTimeout(() => {
+        {% for atividade in atividades_anteriores %}
+        adicionarAtividade({
+            descricao: `{{ atividade.descricao|e }}`,
+            percentual: {{ atividade.percentual }},
+            observacoes: `{{ atividade.observacoes|e }}`
+        });
+        {% endfor %}
+        
+        if ({{ atividades_anteriores|length }} > 0) {
+            const infoDiv = document.getElementById('atividades-info');
+            const infoTexto = document.getElementById('atividades-info-texto');
+            infoTexto.textContent = `{{ atividades_anteriores|length }} atividades pré-carregadas da RDO anterior. Você pode ajustar as porcentagens conforme necessário.`;
+            infoDiv.style.display = 'block';
+        }
+        
+        verificarVazios();
+    }, 100);
     {% endif %}
 });
 </script>
