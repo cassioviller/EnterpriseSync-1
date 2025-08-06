@@ -1,0 +1,482 @@
+{% extends "layout.html" %}
+
+{% block title %}Gerenciar Horários Padrão - SIGE{% endblock %}
+
+{% block content %}
+<div class="container-fluid mt-4">
+    <!-- Cabeçalho -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <h2 class="text-primary mb-1">
+                        <i class="fas fa-clock me-2"></i>Gerenciar Horários Padrão
+                    </h2>
+                    <p class="text-muted mb-0">Configure horários padrão para cálculo preciso de horas extras</p>
+                </div>
+                <button class="btn btn-primary" onclick="abrirModalNovoHorario()">
+                    <i class="fas fa-plus me-2"></i>Novo Horário Padrão
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Cards de Resumo -->
+    <div class="row mb-4">
+        <div class="col-md-3">
+            <div class="card bg-primary text-white">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between">
+                        <div>
+                            <h6 class="card-title">Total Funcionários</h6>
+                            <h4 class="mb-0" id="total-funcionarios">{{ total_funcionarios }}</h4>
+                        </div>
+                        <i class="fas fa-users fa-2x opacity-75"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-success text-white">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between">
+                        <div>
+                            <h6 class="card-title">Com Horário Padrão</h6>
+                            <h4 class="mb-0" id="com-horario">{{ com_horario_padrao }}</h4>
+                        </div>
+                        <i class="fas fa-check-circle fa-2x opacity-75"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-warning text-white">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between">
+                        <div>
+                            <h6 class="card-title">Sem Horário Padrão</h6>
+                            <h4 class="mb-0" id="sem-horario">{{ sem_horario_padrao }}</h4>
+                        </div>
+                        <i class="fas fa-exclamation-circle fa-2x opacity-75"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-info text-white">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between">
+                        <div>
+                            <h6 class="card-title">Horário Comum</h6>
+                            <h4 class="mb-0">07:12 - 17:00</h4>
+                        </div>
+                        <i class="fas fa-clock fa-2x opacity-75"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Filtros -->
+    <div class="row mb-3">
+        <div class="col-md-6">
+            <div class="input-group">
+                <span class="input-group-text"><i class="fas fa-search"></i></span>
+                <input type="text" class="form-control" placeholder="Buscar funcionário..." id="filtro-funcionario">
+            </div>
+        </div>
+        <div class="col-md-3">
+            <select class="form-select" id="filtro-status">
+                <option value="">Todos os Status</option>
+                <option value="com-horario">Com Horário Padrão</option>
+                <option value="sem-horario">Sem Horário Padrão</option>
+            </select>
+        </div>
+        <div class="col-md-3">
+            <button class="btn btn-outline-primary w-100" onclick="aplicarHorarioPadraoTodos()">
+                <i class="fas fa-magic me-2"></i>Aplicar Horário Comum a Todos
+            </button>
+        </div>
+    </div>
+
+    <!-- Tabela de Funcionários -->
+    <div class="card">
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-hover" id="tabela-horarios">
+                    <thead class="table-dark">
+                        <tr>
+                            <th>Funcionário</th>
+                            <th>Horário Atual</th>
+                            <th>Intervalo Almoço</th>
+                            <th>Vigência</th>
+                            <th>Status</th>
+                            <th>Ações</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for funcionario in funcionarios %}
+                        <tr data-funcionario-id="{{ funcionario.id }}">
+                            <td>
+                                <div class="d-flex align-items-center">
+                                    <div class="avatar-sm me-3">
+                                        <img src="{{ funcionario.foto or '/static/img/default-avatar.svg' }}" 
+                                             class="rounded-circle" width="40" height="40">
+                                    </div>
+                                    <div>
+                                        <h6 class="mb-0">{{ funcionario.nome }}</h6>
+                                        <small class="text-muted">{{ funcionario.codigo }}</small>
+                                    </div>
+                                </div>
+                            </td>
+                            <td>
+                                {% if funcionario.horarios_padrao %}
+                                    {% set horario = funcionario.horarios_padrao | selectattr('ativo') | first %}
+                                    {% if horario %}
+                                        <span class="badge bg-success">
+                                            {{ horario.entrada_padrao.strftime('%H:%M') }} - {{ horario.saida_padrao.strftime('%H:%M') }}
+                                        </span>
+                                    {% else %}
+                                        <span class="badge bg-secondary">Não definido</span>
+                                    {% endif %}
+                                {% else %}
+                                    <span class="badge bg-secondary">Não definido</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if funcionario.horarios_padrao %}
+                                    {% set horario = funcionario.horarios_padrao | selectattr('ativo') | first %}
+                                    {% if horario and horario.saida_almoco_padrao and horario.retorno_almoco_padrao %}
+                                        <small class="text-muted">
+                                            {{ horario.saida_almoco_padrao.strftime('%H:%M') }} - {{ horario.retorno_almoco_padrao.strftime('%H:%M') }}
+                                        </small>
+                                    {% else %}
+                                        <small class="text-muted">-</small>
+                                    {% endif %}
+                                {% else %}
+                                    <small class="text-muted">-</small>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if funcionario.horarios_padrao %}
+                                    {% set horario = funcionario.horarios_padrao | selectattr('ativo') | first %}
+                                    {% if horario %}
+                                        <small class="text-success">
+                                            Desde {{ horario.data_inicio.strftime('%d/%m/%Y') }}
+                                        </small>
+                                    {% else %}
+                                        <small class="text-muted">-</small>
+                                    {% endif %}
+                                {% else %}
+                                    <small class="text-muted">-</small>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if funcionario.horarios_padrao and (funcionario.horarios_padrao | selectattr('ativo') | first) %}
+                                    <span class="badge bg-success">
+                                        <i class="fas fa-check-circle me-1"></i>Configurado
+                                    </span>
+                                {% else %}
+                                    <span class="badge bg-warning">
+                                        <i class="fas fa-exclamation-triangle me-1"></i>Pendente
+                                    </span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <div class="btn-group btn-group-sm">
+                                    {% if funcionario.horarios_padrao and (funcionario.horarios_padrao | selectattr('ativo') | first) %}
+                                        <button class="btn btn-outline-primary" 
+                                                onclick="editarHorario({{ funcionario.id }})"
+                                                title="Editar horário">
+                                            <i class="fas fa-edit"></i>
+                                        </button>
+                                        <button class="btn btn-outline-info" 
+                                                onclick="visualizarHistorico({{ funcionario.id }})"
+                                                title="Ver histórico">
+                                            <i class="fas fa-history"></i>
+                                        </button>
+                                    {% else %}
+                                        <button class="btn btn-primary" 
+                                                onclick="criarHorario({{ funcionario.id }})"
+                                                title="Criar horário padrão">
+                                            <i class="fas fa-plus"></i>
+                                        </button>
+                                    {% endif %}
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Novo/Editar Horário Padrão -->
+<div class="modal fade" id="modalHorarioPadrao" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="fas fa-clock me-2"></i>Configurar Horário Padrão
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form id="formHorarioPadrao">
+                <div class="modal-body">
+                    <input type="hidden" id="funcionario_id" name="funcionario_id">
+                    
+                    <!-- Funcionário (se for edição específica) -->
+                    <div class="row mb-3" id="divFuncionario" style="display: none;">
+                        <div class="col-12">
+                            <label class="form-label">Funcionário</label>
+                            <input type="text" class="form-control" id="nome_funcionario" readonly>
+                        </div>
+                    </div>
+
+                    <!-- Horários -->
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <label class="form-label">
+                                <i class="fas fa-sign-in-alt me-1 text-success"></i>Horário de Entrada
+                            </label>
+                            <input type="time" class="form-control" id="entrada_padrao" name="entrada_padrao" 
+                                   value="07:12" required>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">
+                                <i class="fas fa-sign-out-alt me-1 text-danger"></i>Horário de Saída
+                            </label>
+                            <input type="time" class="form-control" id="saida_padrao" name="saida_padrao" 
+                                   value="17:00" required>
+                        </div>
+                    </div>
+
+                    <!-- Intervalo de Almoço -->
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <label class="form-label">
+                                <i class="fas fa-utensils me-1 text-warning"></i>Saída Almoço
+                            </label>
+                            <input type="time" class="form-control" id="saida_almoco_padrao" name="saida_almoco_padrao" 
+                                   value="12:00">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">
+                                <i class="fas fa-utensils me-1 text-warning"></i>Retorno Almoço
+                            </label>
+                            <input type="time" class="form-control" id="retorno_almoco_padrao" name="retorno_almoco_padrao" 
+                                   value="13:00">
+                        </div>
+                    </div>
+
+                    <!-- Vigência -->
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <label class="form-label">Data de Início</label>
+                            <input type="date" class="form-control" id="data_inicio" name="data_inicio" 
+                                   value="{{ date.today().strftime('%Y-%m-%d') }}" required>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Data de Fim <small class="text-muted">(opcional)</small></label>
+                            <input type="date" class="form-control" id="data_fim" name="data_fim">
+                        </div>
+                    </div>
+
+                    <!-- Prévia de Carga Horária -->
+                    <div class="alert alert-info">
+                        <h6><i class="fas fa-calculator me-2"></i>Prévia de Carga Horária</h6>
+                        <div class="row">
+                            <div class="col-md-4">
+                                <strong>Carga Diária:</strong> <span id="carga-diaria">8.0h</span>
+                            </div>
+                            <div class="col-md-4">
+                                <strong>Carga Semanal:</strong> <span id="carga-semanal">40h</span>
+                            </div>
+                            <div class="col-md-4">
+                                <strong>Carga Mensal:</strong> <span id="carga-mensal">~176h</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-save me-2"></i>Salvar Horário Padrão
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Scripts -->
+<script>
+// Variáveis globais
+let tabelaHorarios;
+
+document.addEventListener('DOMContentLoaded', function() {
+    // Inicializar DataTable
+    tabelaHorarios = $('#tabela-horarios').DataTable({
+        language: {
+            url: '//cdn.datatables.net/plug-ins/1.13.4/i18n/pt-BR.json'
+        },
+        pageLength: 25,
+        order: [[0, 'asc']]
+    });
+
+    // Filtros
+    $('#filtro-funcionario').on('keyup', function() {
+        tabelaHorarios.column(0).search(this.value).draw();
+    });
+
+    $('#filtro-status').on('change', function() {
+        const filtro = this.value;
+        if (filtro === 'com-horario') {
+            tabelaHorarios.column(4).search('Configurado').draw();
+        } else if (filtro === 'sem-horario') {
+            tabelaHorarios.column(4).search('Pendente').draw();
+        } else {
+            tabelaHorarios.column(4).search('').draw();
+        }
+    });
+
+    // Atualizar prévia quando horários mudarem
+    ['entrada_padrao', 'saida_padrao', 'saida_almoco_padrao', 'retorno_almoco_padrao'].forEach(id => {
+        document.getElementById(id).addEventListener('change', atualizarPrevia);
+    });
+
+    atualizarPrevia();
+});
+
+function abrirModalNovoHorario() {
+    $('#modalHorarioPadrao').modal('show');
+    $('#funcionario_id').val('');
+    $('#divFuncionario').hide();
+    $('.modal-title').html('<i class="fas fa-clock me-2"></i>Novo Horário Padrão');
+}
+
+function criarHorario(funcionarioId) {
+    $('#funcionario_id').val(funcionarioId);
+    $('#modalHorarioPadrao').modal('show');
+    $('#divFuncionario').show();
+    
+    // Buscar nome do funcionário
+    const linha = $(`tr[data-funcionario-id="${funcionarioId}"]`);
+    const nome = linha.find('h6').text();
+    $('#nome_funcionario').val(nome);
+    
+    $('.modal-title').html('<i class="fas fa-clock me-2"></i>Criar Horário Padrão');
+}
+
+function editarHorario(funcionarioId) {
+    // Implementar busca e carregamento dos dados existentes
+    $('#funcionario_id').val(funcionarioId);
+    $('#modalHorarioPadrao').modal('show');
+    $('#divFuncionario').show();
+    
+    const linha = $(`tr[data-funcionario-id="${funcionarioId}"]`);
+    const nome = linha.find('h6').text();
+    $('#nome_funcionario').val(nome);
+    
+    $('.modal-title').html('<i class="fas fa-edit me-2"></i>Editar Horário Padrão');
+    
+    // Aqui deveria buscar os dados via AJAX
+    // Por enquanto, manter valores padrão
+}
+
+function atualizarPrevia() {
+    const entrada = document.getElementById('entrada_padrao').value;
+    const saida = document.getElementById('saida_padrao').value;
+    const saidaAlmoco = document.getElementById('saida_almoco_padrao').value;
+    const retornoAlmoco = document.getElementById('retorno_almoco_padrao').value;
+
+    if (entrada && saida) {
+        // Calcular horas
+        const [hEntrada, mEntrada] = entrada.split(':').map(Number);
+        const [hSaida, mSaida] = saida.split(':').map(Number);
+        
+        let minutosTrabalhados = (hSaida * 60 + mSaida) - (hEntrada * 60 + mEntrada);
+        
+        // Descontar almoço se informado
+        if (saidaAlmoco && retornoAlmoco) {
+            const [hSaidaAlmoco, mSaidaAlmoco] = saidaAlmoco.split(':').map(Number);
+            const [hRetornoAlmoco, mRetornoAlmoco] = retornoAlmoco.split(':').map(Number);
+            
+            const minutosAlmoco = (hRetornoAlmoco * 60 + mRetornoAlmoco) - (hSaidaAlmoco * 60 + mSaidaAlmoco);
+            minutosTrabalhados -= minutosAlmoco;
+        }
+        
+        const horasDiarias = minutosTrabalhados / 60;
+        const horasSemanais = horasDiarias * 5;
+        const horasMensais = horasDiarias * 22; // Aproximadamente
+        
+        document.getElementById('carga-diaria').textContent = horasDiarias.toFixed(1) + 'h';
+        document.getElementById('carga-semanal').textContent = horasSemanais.toFixed(0) + 'h';
+        document.getElementById('carga-mensal').textContent = '~' + horasMensais.toFixed(0) + 'h';
+    }
+}
+
+function aplicarHorarioPadraoTodos() {
+    if (confirm('Aplicar horário padrão (07:12 - 17:00) para TODOS os funcionários sem horário configurado?')) {
+        // Implementar aplicação em massa
+        fetch('/horarios_padrao/aplicar_todos', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                entrada_padrao: '07:12',
+                saida_padrao: '17:00',
+                saida_almoco_padrao: '12:00',
+                retorno_almoco_padrao: '13:00'
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                alert(`Horário padrão aplicado para ${data.count} funcionários!`);
+                location.reload();
+            } else {
+                alert('Erro: ' + data.message);
+            }
+        })
+        .catch(error => {
+            console.error('Erro:', error);
+            alert('Erro ao aplicar horários padrão');
+        });
+    }
+}
+
+// Submissão do formulário
+document.getElementById('formHorarioPadrao').addEventListener('submit', function(e) {
+    e.preventDefault();
+    
+    const formData = new FormData(this);
+    const funcionarioId = formData.get('funcionario_id');
+    
+    const url = funcionarioId ? `/horarios_padrao/${funcionarioId}` : '/horarios_padrao';
+    const method = funcionarioId ? 'PUT' : 'POST';
+    
+    fetch(url, {
+        method: method,
+        body: formData
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            alert('Horário padrão salvo com sucesso!');
+            $('#modalHorarioPadrao').modal('hide');
+            location.reload();
+        } else {
+            alert('Erro: ' + data.message);
+        }
+    })
+    .catch(error => {
+        console.error('Erro:', error);
+        alert('Erro ao salvar horário padrão');
+    });
+});
+</script>
+{% endblock %}
