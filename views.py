@@ -740,104 +740,47 @@ def api_notificacoes_avancadas():
 @main_bp.route('/funcionarios')
 @login_required
 def funcionarios():
-    try:
-        # Filtros de data dos parâmetros
-        data_inicio = request.args.get('data_inicio')
-        data_fim = request.args.get('data_fim')
-        
-        # Definir período padrão (mês atual)
-        if not data_inicio:
-            data_inicio = date.today().replace(day=1)
-        else:
-            data_inicio = datetime.strptime(data_inicio, '%Y-%m-%d').date()
-        
-        if not data_fim:
-            data_fim = date.today()
-        else:
-            data_fim = datetime.strptime(data_fim, '%Y-%m-%d').date()
-        
-        # Calcular KPIs gerais dos funcionários para o período com filtro por admin - VERSÃO SEGURA
-        try:
-            from utils import calcular_kpis_funcionarios_geral
-            kpis_geral = calcular_kpis_funcionarios_geral(data_inicio, data_fim, current_user.id)
-            if not kpis_geral or 'funcionarios' not in kpis_geral:
-                raise Exception("Formato inválido de retorno dos KPIs")
-        except Exception as e:
-            print(f"Erro nos KPIs gerais, usando versão simplificada: {e}")
-            # Fallback seguro - buscar funcionários diretamente
-            funcionarios_ativos = Funcionario.query.filter_by(
-                ativo=True, 
-                admin_id=current_user.id
-            ).order_by(Funcionario.nome).all()
-            
-            kpis_geral = {
-                'funcionarios': [{
-                    'funcionario_id': f.id,
-                    'funcionario_nome': f.nome,
-                    'funcionario_codigo': f.codigo or f"F{f.id:03d}",
-                    'funcionario_foto': f.foto_url or '/static/images/default-avatar.svg',
-                    'custo_total': f.salario or 0,
-                    'horas': {'total_horas': 160, 'percentual_extras': 5},
-                    'presenca': {'percentual_presenca': 95}
-                } for f in funcionarios_ativos],
-                'total_funcionarios': len(funcionarios_ativos),
-                'total_custo_geral': sum(f.salario or 0 for f in funcionarios_ativos),
-                'total_horas_geral': len(funcionarios_ativos) * 160
-            }
-        
-        # Buscar obras ativas do admin para o modal de lançamento múltiplo
-        obras_ativas = Obra.query.filter_by(
-            admin_id=current_user.id,
-            status='Em andamento'  
-        ).order_by(Obra.nome).all()
-        
-        # Buscar funcionários ativos do admin para o modal
-        funcionarios = Funcionario.query.filter_by(
-            admin_id=current_user.id,
-            ativo=True
-        ).order_by(Funcionario.nome).all()
-        
-        return render_template('funcionarios.html', 
-                             funcionarios=kpis_geral['funcionarios'],
-                             total_funcionarios=kpis_geral['total_funcionarios'],
-                             total_custo_geral=kpis_geral['total_custo_geral'],
-                             total_horas_geral=kpis_geral['total_horas_geral'],
-                             media_custo_funcionario=kpis_geral.get('media_custo_funcionario', 0),
-                             obras_ativas=obras_ativas,
-                             departamentos=Departamento.query.all(),
-                             funcoes=Funcao.query.all(),
-                             horarios=HorarioTrabalho.query.all(),
-                             data_inicio=data_inicio,
-                             data_fim=data_fim)
+    # Filtros de data dos parâmetros
+    data_inicio = request.args.get('data_inicio')
+    data_fim = request.args.get('data_fim')
     
-    except Exception as e:
-        # Fallback completo em caso de erro geral
-        print(f"Erro geral na página de funcionários: {e}")
-        flash('Erro temporário na página de funcionários. Dados básicos exibidos.', 'warning')
-        
-        funcionarios_basicos = Funcionario.query.filter_by(
-            ativo=True, 
-            admin_id=current_user.id
-        ).order_by(Funcionario.nome).all()
-        
-        return render_template('funcionarios.html', 
-                             funcionarios=[{
-                                 'funcionario_id': f.id,
-                                 'funcionario_nome': f.nome,
-                                 'funcionario_codigo': f.codigo or f"F{f.id:03d}",
-                                 'funcionario_foto': f.foto_url or '/static/images/default-avatar.svg',
-                                 'custo_total': f.salario or 0
-                             } for f in funcionarios_basicos],
-                             total_funcionarios=len(funcionarios_basicos),
-                             total_custo_geral=sum(f.salario or 0 for f in funcionarios_basicos),
-                             total_horas_geral=len(funcionarios_basicos) * 160,
-                             media_custo_funcionario=0,
-                             obras_ativas=[],
-                             departamentos=Departamento.query.all(),
-                             funcoes=Funcao.query.all(),
-                             horarios=HorarioTrabalho.query.all(),
-                             data_inicio=date.today().replace(day=1),
-                             data_fim=date.today())
+    # Definir período padrão (mês atual)
+    if not data_inicio:
+        data_inicio = date.today().replace(day=1)
+    else:
+        data_inicio = datetime.strptime(data_inicio, '%Y-%m-%d').date()
+    
+    if not data_fim:
+        data_fim = date.today()
+    else:
+        data_fim = datetime.strptime(data_fim, '%Y-%m-%d').date()
+    
+    # Calcular KPIs gerais dos funcionários para o período com filtro por admin
+    from utils import calcular_kpis_funcionarios_geral
+    kpis_geral = calcular_kpis_funcionarios_geral(data_inicio, data_fim, current_user.id)
+    
+    # Buscar obras ativas do admin para o modal de lançamento múltiplo
+    obras_ativas = Obra.query.filter_by(
+        admin_id=current_user.id,
+        status='Em andamento'  
+    ).order_by(Obra.nome).all()
+    
+    # Buscar funcionários ativos do admin para o modal
+    funcionarios = Funcionario.query.filter_by(
+        admin_id=current_user.id,
+        ativo=True
+    ).order_by(Funcionario.nome).all()
+    
+    return render_template('funcionarios.html', 
+                         funcionarios_kpis=kpis_geral['funcionarios_kpis'],
+                         funcionarios=funcionarios,
+                         kpis_geral=kpis_geral,
+                         obras_ativas=obras_ativas,
+                         departamentos=Departamento.query.all(),
+                         funcoes=Funcao.query.all(),
+                         horarios=HorarioTrabalho.query.all(),
+                         data_inicio=data_inicio,
+                         data_fim=data_fim)
 
 @main_bp.route('/funcionarios/novo', methods=['GET', 'POST'])
 @login_required
