@@ -1,0 +1,417 @@
+{% extends "base.html" %}
+
+{% block title %}Custos - {{ veiculo.placa }} - SIGE{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <!-- Header -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <h2 class="mb-1">
+                        <i class="fas fa-coins me-2 text-warning"></i>
+                        Custos do Veículo {{ veiculo.placa }}
+                    </h2>
+                    <p class="text-muted mb-0">{{ veiculo.marca }} {{ veiculo.modelo }} - Histórico de custos e despesas</p>
+                </div>
+                <div class="d-flex gap-2">
+                    <a href="{{ url_for('main.detalhes_veiculo', id=veiculo.id) }}" class="btn btn-outline-secondary">
+                        <i class="fas fa-arrow-left me-1"></i> Voltar
+                    </a>
+                    <a href="{{ url_for('main.novo_custo_veiculo', id=veiculo.id) }}" class="btn btn-success">
+                        <i class="fas fa-plus me-1"></i> Novo Custo
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Estatísticas -->
+    <div class="row mb-4">
+        <div class="col-md-4">
+            <div class="card bg-primary text-white">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between">
+                        <div>
+                            <h6 class="card-title">Total Gasto</h6>
+                            <h4 class="mb-0">R$ {{ "{:,.2f}".format(total_gasto) }}</h4>
+                        </div>
+                        <div class="align-self-center">
+                            <i class="fas fa-chart-line fa-2x opacity-75"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card bg-warning text-white">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between">
+                        <div>
+                            <h6 class="card-title">Este Mês</h6>
+                            <h4 class="mb-0">R$ {{ "{:,.2f}".format(custo_mes) }}</h4>
+                        </div>
+                        <div class="align-self-center">
+                            <i class="fas fa-calendar-month fa-2x opacity-75"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card bg-info text-white">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between">
+                        <div>
+                            <h6 class="card-title">Total de Registros</h6>
+                            <h4 class="mb-0">{{ custos.total }}</h4>
+                        </div>
+                        <div class="align-self-center">
+                            <i class="fas fa-list-ol fa-2x opacity-75"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Filtros -->
+    <div class="card mb-4">
+        <div class="card-header">
+            <h5 class="mb-0">
+                <i class="fas fa-filter me-2"></i>
+                Filtros
+            </h5>
+        </div>
+        <div class="card-body">
+            <form method="GET" class="row align-items-end">
+                <div class="col-md-3">
+                    <label class="form-label">Tipo de Custo</label>
+                    <select name="tipo" class="form-select">
+                        <option value="">Todos os tipos</option>
+                        <option value="combustivel" {% if filtros.tipo == 'combustivel' %}selected{% endif %}>Combustível</option>
+                        <option value="manutencao" {% if filtros.tipo == 'manutencao' %}selected{% endif %}>Manutenção</option>
+                        <option value="seguro" {% if filtros.tipo == 'seguro' %}selected{% endif %}>Seguro</option>
+                        <option value="multa" {% if filtros.tipo == 'multa' %}selected{% endif %}>Multa</option>
+                        <option value="lavagem" {% if filtros.tipo == 'lavagem' %}selected{% endif %}>Lavagem</option>
+                        <option value="outros" {% if filtros.tipo == 'outros' %}selected{% endif %}>Outros</option>
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">Data Início</label>
+                    <input type="date" name="data_inicio" class="form-control" value="{{ filtros.data_inicio }}">
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">Data Fim</label>
+                    <input type="date" name="data_fim" class="form-control" value="{{ filtros.data_fim }}">
+                </div>
+                <div class="col-md-3">
+                    <button type="submit" class="btn btn-primary w-100">
+                        <i class="fas fa-search me-1"></i> Filtrar
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Lista de Custos -->
+    <div class="card">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <h5 class="mb-0">
+                <i class="fas fa-list me-2"></i>
+                Histórico de Custos
+            </h5>
+            <span class="badge bg-secondary">{{ custos.total }} registros</span>
+        </div>
+        <div class="card-body">
+            {% if custos.items %}
+            <div class="table-responsive">
+                <table class="table table-hover">
+                    <thead>
+                        <tr>
+                            <th>Data</th>
+                            <th>Tipo</th>
+                            <th>Descrição</th>
+                            <th>Obra</th>
+                            <th>Valor</th>
+                            <th>Fornecedor</th>
+                            <th>KM</th>
+                            <th width="120">Ações</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for custo in custos.items %}
+                        <tr>
+                            <td>{{ custo.data_custo.strftime('%d/%m/%Y') }}</td>
+                            <td>
+                                {% set tipo_icons = {
+                                    'combustivel': 'fas fa-gas-pump text-success',
+                                    'manutencao': 'fas fa-tools text-warning',
+                                    'seguro': 'fas fa-shield-alt text-info',
+                                    'multa': 'fas fa-exclamation-triangle text-danger',
+                                    'lavagem': 'fas fa-soap text-primary',
+                                    'outros': 'fas fa-question-circle text-secondary'
+                                } %}
+                                <i class="{{ tipo_icons.get(custo.tipo_custo, 'fas fa-question-circle') }} me-1"></i>
+                                {{ custo.tipo_custo.title() }}
+                            </td>
+                            <td>
+                                <span class="text-truncate d-inline-block" style="max-width: 200px;">
+                                    {{ custo.descricao or 'Sem descrição' }}
+                                </span>
+                            </td>
+                            <td>
+                                <span class="badge bg-light text-dark">{{ custo.obra.nome }}</span>
+                            </td>
+                            <td>
+                                <strong class="text-success">R$ {{ "{:,.2f}".format(custo.valor) }}</strong>
+                            </td>
+                            <td>{{ custo.fornecedor or '-' }}</td>
+                            <td>{{ "{:,}".format(custo.km_atual) if custo.km_atual else '-' }}</td>
+                            <td>
+                                <div class="btn-group btn-group-sm">
+                                    <button type="button" class="btn btn-outline-primary" 
+                                            onclick="editarCusto({{ custo.id }})" title="Editar">
+                                        <i class="fas fa-edit"></i>
+                                    </button>
+                                    <button type="button" class="btn btn-outline-danger" 
+                                            onclick="excluirCusto({{ custo.id }}, '{{ custo.tipo_custo }}', {{ custo.valor }})" title="Excluir">
+                                        <i class="fas fa-trash"></i>
+                                    </button>
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Paginação -->
+            {% if custos.pages > 1 %}
+            <nav aria-label="Navegação dos custos">
+                <ul class="pagination justify-content-center mt-4">
+                    {% if custos.has_prev %}
+                        <li class="page-item">
+                            <a class="page-link" href="{{ url_for('main.lista_custos_veiculo', id=veiculo.id, page=custos.prev_num, **filtros) }}">
+                                <i class="fas fa-chevron-left"></i>
+                            </a>
+                        </li>
+                    {% endif %}
+                    
+                    {% for page_num in custos.iter_pages(left_edge=1, right_edge=1, left_current=1, right_current=2) %}
+                        {% if page_num %}
+                            {% if page_num != custos.page %}
+                                <li class="page-item">
+                                    <a class="page-link" href="{{ url_for('main.lista_custos_veiculo', id=veiculo.id, page=page_num, **filtros) }}">{{ page_num }}</a>
+                                </li>
+                            {% else %}
+                                <li class="page-item active">
+                                    <span class="page-link">{{ page_num }}</span>
+                                </li>
+                            {% endif %}
+                        {% else %}
+                            <li class="page-item disabled">
+                                <span class="page-link">...</span>
+                            </li>
+                        {% endif %}
+                    {% endfor %}
+                    
+                    {% if custos.has_next %}
+                        <li class="page-item">
+                            <a class="page-link" href="{{ url_for('main.lista_custos_veiculo', id=veiculo.id, page=custos.next_num, **filtros) }}">
+                                <i class="fas fa-chevron-right"></i>
+                            </a>
+                        </li>
+                    {% endif %}
+                </ul>
+            </nav>
+            {% endif %}
+            {% else %}
+            <div class="text-center py-5">
+                <i class="fas fa-coins fa-3x text-muted mb-3"></i>
+                <h5 class="text-muted">Nenhum custo registrado</h5>
+                <p class="text-muted">Este veículo ainda não possui custos registrados.</p>
+                <a href="{{ url_for('main.novo_custo_veiculo', id=veiculo.id) }}" class="btn btn-success">
+                    <i class="fas fa-plus me-1"></i> Registrar Primeiro Custo
+                </a>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<!-- Modal de Edição -->
+<div class="modal fade" id="modalEditarCusto" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="fas fa-edit me-2"></i>
+                    Editar Custo
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="formEditarCusto">
+                    <input type="hidden" id="edit_custo_id">
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Data do Custo</label>
+                            <input type="date" id="edit_data_custo" class="form-control" required>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Tipo de Custo</label>
+                            <select id="edit_tipo_custo" class="form-select" required>
+                                <option value="combustivel">Combustível</option>
+                                <option value="manutencao">Manutenção</option>
+                                <option value="seguro">Seguro</option>
+                                <option value="multa">Multa</option>
+                                <option value="lavagem">Lavagem</option>
+                                <option value="outros">Outros</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Obra</label>
+                            <select id="edit_obra_id" class="form-select" required>
+                                <!-- Obras serão carregadas via JavaScript -->
+                            </select>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Valor</label>
+                            <div class="input-group">
+                                <span class="input-group-text">R$</span>
+                                <input type="number" id="edit_valor" class="form-control" step="0.01" min="0" required>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">KM Atual</label>
+                            <input type="number" id="edit_km_atual" class="form-control" min="0">
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Fornecedor</label>
+                            <input type="text" id="edit_fornecedor" class="form-control">
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Descrição</label>
+                        <textarea id="edit_descricao" class="form-control" rows="3"></textarea>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-primary" onclick="salvarEdicaoCusto()">
+                    <i class="fas fa-save me-1"></i> Salvar
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function editarCusto(id) {
+    // Carregar obras disponíveis
+    fetch('/api/obras-disponiveis')
+        .then(response => response.json())
+        .then(obrasData => {
+            const selectObra = document.getElementById('edit_obra_id');
+            selectObra.innerHTML = '';
+            
+            if (obrasData.success) {
+                obrasData.obras.forEach(obra => {
+                    const option = document.createElement('option');
+                    option.value = obra.id;
+                    option.textContent = obra.nome;
+                    selectObra.appendChild(option);
+                });
+            }
+            
+            // Carregar dados do custo
+            return fetch(`/api/custos-veiculo/${id}`);
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                const dados = data.dados;
+                document.getElementById('edit_custo_id').value = dados.id;
+                document.getElementById('edit_data_custo').value = dados.data_custo;
+                document.getElementById('edit_tipo_custo').value = dados.tipo_custo;
+                document.getElementById('edit_obra_id').value = dados.obra_id;
+                document.getElementById('edit_valor').value = dados.valor;
+                document.getElementById('edit_km_atual').value = dados.km_atual || '';
+                document.getElementById('edit_fornecedor').value = dados.fornecedor;
+                document.getElementById('edit_descricao').value = dados.descricao;
+                
+                new bootstrap.Modal(document.getElementById('modalEditarCusto')).show();
+            } else {
+                alert('Erro ao carregar dados do custo: ' + data.message);
+            }
+        })
+        .catch(error => {
+            console.error('Erro:', error);
+            alert('Erro ao carregar dados do custo.');
+        });
+}
+
+function salvarEdicaoCusto() {
+    const id = document.getElementById('edit_custo_id').value;
+    const dados = {
+        data_custo: document.getElementById('edit_data_custo').value,
+        tipo_custo: document.getElementById('edit_tipo_custo').value,
+        obra_id: parseInt(document.getElementById('edit_obra_id').value),
+        valor: parseFloat(document.getElementById('edit_valor').value),
+        km_atual: document.getElementById('edit_km_atual').value,
+        fornecedor: document.getElementById('edit_fornecedor').value,
+        descricao: document.getElementById('edit_descricao').value
+    };
+    
+    fetch(`/api/custos-veiculo/${id}`, {
+        method: 'PUT',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(dados)
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            bootstrap.Modal.getInstance(document.getElementById('modalEditarCusto')).hide();
+            location.reload();
+        } else {
+            alert('Erro ao salvar: ' + data.message);
+        }
+    })
+    .catch(error => {
+        console.error('Erro:', error);
+        alert('Erro ao salvar alterações.');
+    });
+}
+
+function excluirCusto(id, tipo, valor) {
+    if (confirm(`Tem certeza que deseja excluir este custo de ${tipo} (R$ ${valor.toFixed(2)})?`)) {
+        fetch(`/api/custos-veiculo/${id}`, {
+            method: 'DELETE'
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                location.reload();
+            } else {
+                alert('Erro ao excluir: ' + data.message);
+            }
+        })
+        .catch(error => {
+            console.error('Erro:', error);
+            alert('Erro ao excluir custo.');
+        });
+    }
+}
+</script>
+{% endblock %}

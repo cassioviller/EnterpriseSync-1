@@ -22,8 +22,11 @@
                     <a href="{{ url_for('main.novo_uso_veiculo', id=veiculo.id) }}" class="btn btn-success">
                         <i class="fas fa-plus me-1"></i> Novo Uso
                     </a>
-                    <a href="{{ url_for('main.novo_custo_veiculo_form', id=veiculo.id) }}" class="btn btn-warning">
+                    <a href="{{ url_for('main.novo_custo_veiculo', id=veiculo.id) }}" class="btn btn-warning">
                         <i class="fas fa-plus me-1"></i> Novo Custo
+                    </a>
+                    <a href="{{ url_for('main.lista_custos_veiculo', id=veiculo.id) }}" class="btn btn-outline-warning">
+                        <i class="fas fa-list me-1"></i> Ver Custos
                     </a>
                 </div>
             </div>

@@ -4414,6 +4414,302 @@ def excluir_alimentacao(id):
             'message': f'Erro interno ao excluir registro: {str(e)}'
         }), 500
 
+# ================================
+# CRUD COMPLETO DE CUSTOS DE VEÍCULOS
+# ================================
+
+@main_bp.route('/veiculos/<int:id>/custos')
+@login_required
+def lista_custos_veiculo(id):
+    """Listar todos os custos de um veículo"""
+    veiculo = Veiculo.query.get_or_404(id)
+    
+    # Verificar acesso multi-tenant
+    if veiculo.admin_id != current_user.id:
+        flash('Acesso negado.', 'error')
+        return redirect(url_for('main.veiculos'))
+    
+    # Filtros da URL
+    page = request.args.get('page', 1, type=int)
+    tipo_filtro = request.args.get('tipo', '')
+    data_inicio = request.args.get('data_inicio', '')
+    data_fim = request.args.get('data_fim', '')
+    
+    # Query base
+    query = CustoVeiculo.query.filter_by(veiculo_id=id)
+    
+    # Aplicar filtros
+    if tipo_filtro:
+        query = query.filter(CustoVeiculo.tipo_custo == tipo_filtro)
+    if data_inicio:
+        query = query.filter(CustoVeiculo.data_custo >= datetime.strptime(data_inicio, '%Y-%m-%d').date())
+    if data_fim:
+        query = query.filter(CustoVeiculo.data_custo <= datetime.strptime(data_fim, '%Y-%m-%d').date())
+    
+    # Paginar resultados
+    custos = query.order_by(CustoVeiculo.data_custo.desc()).paginate(
+        page=page, per_page=20, error_out=False
+    )
+    
+    # Estatísticas
+    total_gasto = db.session.query(db.func.sum(CustoVeiculo.valor)).filter_by(veiculo_id=id).scalar() or 0
+    custo_mes = db.session.query(db.func.sum(CustoVeiculo.valor)).filter(
+        CustoVeiculo.veiculo_id == id,
+        CustoVeiculo.data_custo >= date.today().replace(day=1)
+    ).scalar() or 0
+    
+    return render_template('veiculos/lista_custos.html',
+                         veiculo=veiculo,
+                         custos=custos,
+                         total_gasto=total_gasto,
+                         custo_mes=custo_mes,
+                         filtros={
+                             'tipo': tipo_filtro,
+                             'data_inicio': data_inicio,
+                             'data_fim': data_fim
+                         })
+
+@main_bp.route('/veiculos/<int:id>/custos/novo', methods=['GET', 'POST'])
+@login_required
+def novo_custo_veiculo(id):
+    """Criar novo custo para veículo"""
+    veiculo = Veiculo.query.get_or_404(id)
+    
+    # Verificar acesso multi-tenant
+    if veiculo.admin_id != current_user.id:
+        flash('Acesso negado.', 'error')
+        return redirect(url_for('main.veiculos'))
+    
+    if request.method == 'POST':
+        try:
+            # Capturar dados do formulário
+            data_custo = datetime.strptime(request.form['data_custo'], '%Y-%m-%d').date()
+            obra_id = int(request.form['obra_id'])
+            valor = float(request.form['valor'])
+            tipo_custo = request.form['tipo_custo']
+            descricao = request.form.get('descricao', '').strip()
+            km_atual = request.form.get('km_atual')
+            fornecedor = request.form.get('fornecedor', '').strip()
+            
+            # Validações
+            if valor <= 0:
+                flash('O valor deve ser maior que zero.', 'error')
+                raise ValueError('Valor inválido')
+                
+            # Verificar se a obra pertence ao admin atual
+            obra = Obra.query.get_or_404(obra_id)
+            if obra.admin_id != current_user.id:
+                flash('Obra não encontrada ou acesso negado.', 'error')
+                raise ValueError('Obra inválida')
+            
+            # Criar novo custo
+            custo = CustoVeiculo(
+                veiculo_id=id,
+                obra_id=obra_id,
+                data_custo=data_custo,
+                valor=valor,
+                tipo_custo=tipo_custo,
+                descricao=descricao if descricao else None,
+                km_atual=int(km_atual) if km_atual else None,
+                fornecedor=fornecedor if fornecedor else None
+            )
+            
+            db.session.add(custo)
+            
+            # Atualizar KM do veículo se fornecido
+            if km_atual and int(km_atual) > (veiculo.km_atual or 0):
+                veiculo.km_atual = int(km_atual)
+            
+            # Registrar custo na obra
+            custo_obra = CustoObra(
+                obra_id=obra_id,
+                tipo='veiculo',
+                descricao=f"Veículo {veiculo.placa} - {tipo_custo.title()}: {descricao or 'Sem descrição'}",
+                valor=valor,
+                data=data_custo
+            )
+            db.session.add(custo_obra)
+            
+            db.session.commit()
+            
+            flash(f'Custo de {tipo_custo} registrado com sucesso!', 'success')
+            return redirect(url_for('main.lista_custos_veiculo', id=id))
+            
+        except ValueError:
+            # Erro já tratado com flash
+            pass
+        except Exception as e:
+            db.session.rollback()
+            flash(f'Erro ao registrar custo: {str(e)}', 'error')
+    
+    # GET: mostrar formulário
+    obras = Obra.query.filter_by(admin_id=current_user.id, ativo=True).all()
+    return render_template('veiculos/novo_custo.html',
+                         veiculo=veiculo,
+                         obras=obras,
+                         today=date.today().strftime('%Y-%m-%d'),
+                         form_data=request.form)
+
+@main_bp.route('/api/custos-veiculo/<int:id>', methods=['GET'])
+@login_required
+def api_obter_custo_veiculo(id):
+    """API para obter dados de um custo para edição"""
+    try:
+        custo = CustoVeiculo.query.get_or_404(id)
+        
+        # Verificar acesso multi-tenant
+        if custo.veiculo.admin_id != current_user.id:
+            return jsonify({'success': False, 'message': 'Acesso negado.'}), 403
+        
+        return jsonify({
+            'success': True,
+            'dados': {
+                'id': custo.id,
+                'data_custo': custo.data_custo.strftime('%Y-%m-%d'),
+                'obra_id': custo.obra_id,
+                'valor': custo.valor,
+                'tipo_custo': custo.tipo_custo,
+                'descricao': custo.descricao or '',
+                'km_atual': custo.km_atual,
+                'fornecedor': custo.fornecedor or '',
+                'veiculo_placa': custo.veiculo.placa,
+                'obra_nome': custo.obra.nome
+            }
+        })
+        
+    except Exception as e:
+        return jsonify({'success': False, 'message': f'Erro: {str(e)}'}), 500
+
+@main_bp.route('/api/custos-veiculo/<int:id>', methods=['PUT'])
+@login_required
+def api_editar_custo_veiculo(id):
+    """API para editar custo de veículo"""
+    try:
+        custo = CustoVeiculo.query.get_or_404(id)
+        
+        # Verificar acesso multi-tenant
+        if custo.veiculo.admin_id != current_user.id:
+            return jsonify({'success': False, 'message': 'Acesso negado.'}), 403
+        
+        dados = request.get_json()
+        
+        # Validações
+        if not dados.get('data_custo') or not dados.get('obra_id') or not dados.get('valor') or not dados.get('tipo_custo'):
+            return jsonify({'success': False, 'message': 'Campos obrigatórios não preenchidos.'}), 400
+        
+        valor = float(dados['valor'])
+        if valor <= 0:
+            return jsonify({'success': False, 'message': 'O valor deve ser maior que zero.'}), 400
+        
+        # Verificar obra
+        obra = Obra.query.get(dados['obra_id'])
+        if not obra or obra.admin_id != current_user.id:
+            return jsonify({'success': False, 'message': 'Obra inválida.'}), 400
+        
+        # Salvar valores antigos para atualizar CustoObra relacionado
+        valor_antigo = custo.valor
+        data_antiga = custo.data_custo
+        obra_antiga_id = custo.obra_id
+        
+        # Atualizar custo
+        custo.data_custo = datetime.strptime(dados['data_custo'], '%Y-%m-%d').date()
+        custo.obra_id = dados['obra_id']
+        custo.valor = valor
+        custo.tipo_custo = dados['tipo_custo']
+        custo.descricao = dados.get('descricao', '').strip() or None
+        custo.km_atual = int(dados['km_atual']) if dados.get('km_atual') else None
+        custo.fornecedor = dados.get('fornecedor', '').strip() or None
+        
+        # Atualizar KM do veículo se fornecido e maior
+        if custo.km_atual and custo.km_atual > (custo.veiculo.km_atual or 0):
+            custo.veiculo.km_atual = custo.km_atual
+        
+        # Atualizar CustoObra relacionado
+        custo_obra = CustoObra.query.filter(
+            CustoObra.obra_id == obra_antiga_id,
+            CustoObra.tipo == 'veiculo',
+            CustoObra.valor == valor_antigo,
+            CustoObra.data == data_antiga,
+            CustoObra.descricao.contains(custo.veiculo.placa)
+        ).first()
+        
+        if custo_obra:
+            custo_obra.obra_id = custo.obra_id
+            custo_obra.valor = custo.valor
+            custo_obra.data = custo.data_custo
+            custo_obra.descricao = f"Veículo {custo.veiculo.placa} - {custo.tipo_custo.title()}: {custo.descricao or 'Sem descrição'}"
+        
+        db.session.commit()
+        
+        return jsonify({
+            'success': True,
+            'message': 'Custo atualizado com sucesso!'
+        })
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'message': f'Erro: {str(e)}'}), 500
+
+@main_bp.route('/api/custos-veiculo/<int:id>', methods=['DELETE'])
+@login_required
+def api_excluir_custo_veiculo(id):
+    """API para excluir custo de veículo"""
+    try:
+        custo = CustoVeiculo.query.get_or_404(id)
+        
+        # Verificar acesso multi-tenant
+        if custo.veiculo.admin_id != current_user.id:
+            return jsonify({'success': False, 'message': 'Acesso negado.'}), 403
+        
+        # Dados para log
+        veiculo_placa = custo.veiculo.placa
+        tipo_custo = custo.tipo_custo
+        valor = custo.valor
+        data = custo.data_custo
+        
+        # Remover CustoObra relacionado
+        custo_obra = CustoObra.query.filter(
+            CustoObra.obra_id == custo.obra_id,
+            CustoObra.tipo == 'veiculo',
+            CustoObra.valor == custo.valor,
+            CustoObra.data == custo.data_custo,
+            CustoObra.descricao.contains(custo.veiculo.placa)
+        ).first()
+        
+        if custo_obra:
+            db.session.delete(custo_obra)
+        
+        # Excluir custo
+        db.session.delete(custo)
+        db.session.commit()
+        
+        return jsonify({
+            'success': True,
+            'message': f'Custo de {tipo_custo} do veículo {veiculo_placa} (R$ {valor:.2f}) excluído com sucesso!'
+        })
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'message': f'Erro: {str(e)}'}), 500
+
+@main_bp.route('/api/obras-disponiveis')
+@login_required
+def api_obras_disponiveis():
+    """API para obter obras do admin atual (para dropdowns)"""
+    try:
+        obras = Obra.query.filter_by(admin_id=current_user.id, ativo=True).all()
+        
+        return jsonify({
+            'success': True,
+            'obras': [{
+                'id': obra.id,
+                'nome': obra.nome
+            } for obra in obras]
+        })
+        
+    except Exception as e:
+        return jsonify({'success': False, 'message': f'Erro: {str(e)}'}), 500
+
 # Relatórios
 @main_bp.route('/relatorios')
 @login_required
