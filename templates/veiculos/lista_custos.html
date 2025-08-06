@@ -318,32 +318,22 @@
 
 {% block extra_js %}
 <script>
-// Aguardar DOM estar completamente carregado
-document.addEventListener('DOMContentLoaded', function() {
-    console.log('🚗 CRUD de Custos de Veículos carregado');
-});
+// CRUD de Custos de Veículos - Funções Globais
+console.log('🚗 Carregando CRUD de custos...');
 
-function editarCusto(id) {
-    console.log(`🔧 Editando custo ID: ${id}`);
+// Função para editar custo
+window.editarCusto = function(id) {
+    console.log('🔧 Editando custo ID:', id);
     
-    try {
-        // Carregar obras disponíveis primeiro
-        fetch('/api/obras-disponiveis')
-            .then(response => {
-                console.log('📊 Resposta obras disponíveis:', response.status);
-                return response.json();
-            })
-            .then(obrasData => {
-                console.log('📊 Dados das obras:', obrasData);
-                
-                const selectObra = document.getElementById('edit_obra_id');
-                if (!selectObra) {
-                    console.error('❌ Elemento edit_obra_id não encontrado!');
-                    return;
-                }
-                
+    // Primeiro, carregar obras disponíveis
+    fetch('/api/obras-disponiveis')
+        .then(response => response.json())
+        .then(obrasData => {
+            console.log('📊 Obras carregadas:', obrasData);
+            
+            const selectObra = document.getElementById('edit_obra_id');
+            if (selectObra) {
                 selectObra.innerHTML = '';
-                
                 if (obrasData.success && obrasData.obras) {
                     obrasData.obras.forEach(obra => {
                         const option = document.createElement('option');
@@ -351,158 +341,105 @@ function editarCusto(id) {
                         option.textContent = obra.nome;
                         selectObra.appendChild(option);
                     });
-                    console.log(`✅ ${obrasData.obras.length} obras carregadas`);
                 }
-                
-                // Carregar dados do custo
-                return fetch(`/api/custos-veiculo/${id}`);
-            })
-            .then(response => {
-                console.log('💰 Resposta custo:', response.status);
-                return response.json();
-            })
-            .then(data => {
-                console.log('💰 Dados do custo:', data);
-                
-                if (data.success) {
-                    const dados = data.dados;
-                    
-                    // Verificar se elementos existem antes de preenchê-los
-                    const elementos = {
-                        'edit_custo_id': dados.id,
-                        'edit_data_custo': dados.data_custo,
-                        'edit_tipo_custo': dados.tipo_custo,
-                        'edit_obra_id': dados.obra_id,
-                        'edit_valor': dados.valor,
-                        'edit_km_atual': dados.km_atual || '',
-                        'edit_fornecedor': dados.fornecedor || '',
-                        'edit_descricao': dados.descricao || ''
-                    };
-                    
-                    for (const [elementId, valor] of Object.entries(elementos)) {
-                        const elemento = document.getElementById(elementId);
-                        if (elemento) {
-                            elemento.value = valor;
-                            console.log(`✅ ${elementId} = ${valor}`);
-                        } else {
-                            console.error(`❌ Elemento ${elementId} não encontrado!`);
-                        }
-                    }
-                    
-                    // Abrir modal
-                    const modal = document.getElementById('modalEditarCusto');
-                    if (modal) {
-                        new bootstrap.Modal(modal).show();
-                        console.log('✅ Modal aberto');
-                    } else {
-                        console.error('❌ Modal não encontrado!');
-                    }
-                } else {
-                    console.error('❌ Erro na resposta:', data.message);
-                    alert('Erro ao carregar dados do custo: ' + data.message);
-                }
-            })
-            .catch(error => {
-                console.error('❌ Erro na requisição:', error);
-                alert('Erro ao carregar dados do custo.');
-            });
-    } catch (error) {
-        console.error('❌ Erro geral:', error);
-        alert('Erro ao processar ação de edição.');
-    }
-}
-
-function salvarEdicaoCusto() {
-    console.log('💾 Salvando edição do custo');
-    
-    try {
-        const id = document.getElementById('edit_custo_id').value;
-        console.log(`💾 ID do custo: ${id}`);
-        
-        const dados = {
-            data_custo: document.getElementById('edit_data_custo').value,
-            tipo_custo: document.getElementById('edit_tipo_custo').value,
-            obra_id: parseInt(document.getElementById('edit_obra_id').value),
-            valor: parseFloat(document.getElementById('edit_valor').value),
-            km_atual: document.getElementById('edit_km_atual').value,
-            fornecedor: document.getElementById('edit_fornecedor').value,
-            descricao: document.getElementById('edit_descricao').value
-        };
-        
-        console.log('💾 Dados a enviar:', dados);
-        
-        fetch(`/api/custos-veiculo/${id}`, {
-            method: 'PUT',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify(dados)
+            }
+            
+            // Carregar dados do custo
+            return fetch(`/api/custos-veiculo/${id}`);
         })
-        .then(response => {
-            console.log('💾 Resposta do servidor:', response.status);
-            return response.json();
-        })
+        .then(response => response.json())
         .then(data => {
-            console.log('💾 Resultado:', data);
+            console.log('💰 Dados do custo:', data);
             
             if (data.success) {
-                const modalInstance = bootstrap.Modal.getInstance(document.getElementById('modalEditarCusto'));
-                if (modalInstance) {
-                    modalInstance.hide();
-                }
-                alert('Custo atualizado com sucesso!');
-                location.reload();
+                const dados = data.dados;
+                
+                // Preencher campos do modal
+                document.getElementById('edit_custo_id').value = dados.id;
+                document.getElementById('edit_data_custo').value = dados.data_custo;
+                document.getElementById('edit_tipo_custo').value = dados.tipo_custo;
+                document.getElementById('edit_obra_id').value = dados.obra_id;
+                document.getElementById('edit_valor').value = dados.valor;
+                document.getElementById('edit_km_atual').value = dados.km_atual || '';
+                document.getElementById('edit_fornecedor').value = dados.fornecedor || '';
+                document.getElementById('edit_descricao').value = dados.descricao || '';
+                
+                // Abrir modal
+                new bootstrap.Modal(document.getElementById('modalEditarCusto')).show();
             } else {
-                alert('Erro ao salvar: ' + data.message);
+                alert('Erro: ' + data.message);
             }
         })
         .catch(error => {
-            console.error('❌ Erro ao salvar:', error);
-            alert('Erro ao salvar alterações.');
+            console.error('❌ Erro:', error);
+            alert('Erro ao carregar dados do custo.');
         });
-    } catch (error) {
-        console.error('❌ Erro geral ao salvar:', error);
-        alert('Erro ao processar salvamento.');
-    }
-}
+};
 
-function excluirCusto(id, tipo, valor) {
-    console.log(`🗑️ Excluindo custo ID: ${id}, Tipo: ${tipo}, Valor: ${valor}`);
+// Função para salvar edição
+window.salvarEdicaoCusto = function() {
+    console.log('💾 Salvando edição...');
     
-    try {
-        const valorFormatado = typeof valor === 'number' ? valor.toFixed(2) : parseFloat(valor).toFixed(2);
-        
-        if (confirm(`Tem certeza que deseja excluir este custo de ${tipo} (R$ ${valorFormatado})?`)) {
-            console.log('🗑️ Confirmação de exclusão recebida');
-            
-            fetch(`/api/custos-veiculo/${id}`, {
-                method: 'DELETE'
-            })
-            .then(response => {
-                console.log('🗑️ Resposta do servidor:', response.status);
-                return response.json();
-            })
-            .then(data => {
-                console.log('🗑️ Resultado:', data);
-                
-                if (data.success) {
-                    alert('Custo excluído com sucesso!');
-                    location.reload();
-                } else {
-                    alert('Erro ao excluir: ' + data.message);
-                }
-            })
-            .catch(error => {
-                console.error('❌ Erro ao excluir:', error);
-                alert('Erro ao excluir custo.');
-            });
+    const id = document.getElementById('edit_custo_id').value;
+    const dados = {
+        data_custo: document.getElementById('edit_data_custo').value,
+        tipo_custo: document.getElementById('edit_tipo_custo').value,
+        obra_id: parseInt(document.getElementById('edit_obra_id').value),
+        valor: parseFloat(document.getElementById('edit_valor').value),
+        km_atual: document.getElementById('edit_km_atual').value || null,
+        fornecedor: document.getElementById('edit_fornecedor').value || null,
+        descricao: document.getElementById('edit_descricao').value || null
+    };
+    
+    fetch(`/api/custos-veiculo/${id}`, {
+        method: 'PUT',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(dados)
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            bootstrap.Modal.getInstance(document.getElementById('modalEditarCusto')).hide();
+            alert('Custo atualizado com sucesso!');
+            location.reload();
         } else {
-            console.log('🗑️ Exclusão cancelada pelo usuário');
+            alert('Erro: ' + data.message);
         }
-    } catch (error) {
-        console.error('❌ Erro geral na exclusão:', error);
-        alert('Erro ao processar exclusão.');
+    })
+    .catch(error => {
+        console.error('❌ Erro:', error);
+        alert('Erro ao salvar alterações.');
+    });
+};
+
+// Função para excluir custo
+window.excluirCusto = function(id, tipo, valor) {
+    console.log('🗑️ Excluindo custo:', id, tipo, valor);
+    
+    const valorFormatado = typeof valor === 'number' ? valor.toFixed(2) : parseFloat(valor).toFixed(2);
+    
+    if (confirm(`Confirma a exclusão do custo de ${tipo} no valor de R$ ${valorFormatado}?`)) {
+        fetch(`/api/custos-veiculo/${id}`, {
+            method: 'DELETE'
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                alert('Custo excluído com sucesso!');
+                location.reload();
+            } else {
+                alert('Erro: ' + data.message);
+            }
+        })
+        .catch(error => {
+            console.error('❌ Erro:', error);
+            alert('Erro ao excluir custo.');
+        });
     }
-}
+};
+
+console.log('✅ CRUD de custos carregado - Funções: editarCusto, excluirCusto, salvarEdicaoCusto');
 </script>
 {% endblock %}
