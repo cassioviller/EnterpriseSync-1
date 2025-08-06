@@ -125,16 +125,36 @@ class CalculadoraKPI:
         return total or 0.0
     
     def _calcular_horas_extras(self, funcionario_id, data_inicio, data_fim):
-        """2. Horas Extras: Soma TOTAL de todas as horas extras incluindo sábados"""
-        # SOMA SIMPLES E DIRETA - SEM FILTROS QUE EXCLUAM REGISTROS
-        total = db.session.query(func.sum(RegistroPonto.horas_extras)).filter(
+        """2. Horas Extras: Baseado em horário padrão (07:12-17:00)"""
+        
+        # Buscar registros do período com horários válidos
+        registros = RegistroPonto.query.filter(
             RegistroPonto.funcionario_id == funcionario_id,
             RegistroPonto.data >= data_inicio,
             RegistroPonto.data <= data_fim,
-            RegistroPonto.horas_extras.isnot(None)
-        ).scalar()
+            RegistroPonto.hora_entrada.isnot(None),
+            RegistroPonto.hora_saida.isnot(None)
+        ).all()
         
-        return float(total or 0.0)
+        total_horas_extras = 0.0
+        
+        # Horário padrão fixo: 07:12 às 17:00
+        entrada_padrao_min = 7 * 60 + 12   # 432 min (07:12)
+        saida_padrao_min = 17 * 60          # 1020 min (17:00)
+        
+        for registro in registros:
+            # Converter horários reais para minutos
+            entrada_real_min = registro.hora_entrada.hour * 60 + registro.hora_entrada.minute
+            saida_real_min = registro.hora_saida.hour * 60 + registro.hora_saida.minute
+            
+            # Calcular extras (apenas se houver)
+            extras_entrada = max(0, entrada_padrao_min - entrada_real_min)  # Entrada antecipada
+            extras_saida = max(0, saida_real_min - saida_padrao_min)        # Saída atrasada
+            
+            # Somar ao total (converter para horas)
+            total_horas_extras += (extras_entrada + extras_saida) / 60
+        
+        return round(total_horas_extras, 2)
     def _calcular_faltas(self, funcionario_id, data_inicio, data_fim):
         """3. Faltas: Número de faltas não justificadas registradas"""
         faltas = db.session.query(func.count(RegistroPonto.id)).filter(
