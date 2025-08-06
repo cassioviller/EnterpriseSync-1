@@ -358,15 +358,16 @@ def dashboard():
         Funcionario.admin_id == admin_id
     ).group_by(Departamento.nome).all()
     
-    # Custos por obra no período
+    # Usar dados corretos dos KPIs unificados
+    obras_com_custos = kpis_dashboard.get('obras', [])
     custos_recentes = []
-    for obra in Obra.query.limit(10).all():
-        custo_obra = calcular_custo_real_obra(obra.id, data_inicio, data_fim)
-        if custo_obra['custo_total'] > 0:
-            custos_recentes.append({
-                'nome': obra.nome,
-                'total_custo': custo_obra['custo_total']
-            })
+    
+    # Converter formato para o template
+    for obra in obras_com_custos:
+        custos_recentes.append({
+            'nome': obra['nome'],
+            'total_custo': obra['custo_total']
+        })
     
     # Garantir que custos_detalhados tenha as chaves esperadas pelo template
     custos_dashboard = {

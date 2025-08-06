@@ -188,12 +188,49 @@ class KPIUnificado:
         # Custos do período
         custos = self.calcular_custos_periodo()
         
+        # Lista de obras com custos (para dashboard principal)
+        obras = []
+        obras_do_admin = Obra.query.filter_by(admin_id=self.admin_id, ativo=True).all()
+        
+        for obra in obras_do_admin:
+            kpi_obra = self.calcular_kpis_obra(obra.id)
+            obras.append({
+                'id': obra.id,
+                'nome': obra.nome,
+                'status': obra.status,
+                'custo_total': kpi_obra['custo_total'],
+                'custos_detalhados': kpi_obra['custos_detalhados'],
+                'dias_trabalhados': kpi_obra['dias_trabalhados'],
+                'funcionarios_periodo': kpi_obra['funcionarios_periodo']
+            })
+        
+        # Ordenar obras por custo total (decrescente)
+        obras.sort(key=lambda x: x['custo_total'], reverse=True)
+        
+        # Custos recentes (últimos 10)
+        custos_recentes = []
+        
+        # Buscar de CustoObra (que já consolida todos os tipos)
+        custos_db = db.session.query(CustoObra, Obra.nome).join(Obra).filter(
+            Obra.admin_id == self.admin_id,
+            CustoObra.data >= self.data_inicio,
+            CustoObra.data <= self.data_fim
+        ).order_by(CustoObra.data.desc()).limit(10).all()
+        
+        for custo_obra, obra_nome in custos_db:
+            custos_recentes.append({
+                'obra': obra_nome,
+                'custo_total': custo_obra.valor
+            })
+        
         return {
             'funcionarios_ativos': funcionarios_ativos,
             'obras_ativas': obras_ativas,
             'veiculos_ativos': veiculos_ativos,
             'custos_periodo': custos['total'],
-            'custos_detalhados': custos
+            'custos_detalhados': custos,
+            'obras': obras,
+            'custos_recentes': custos_recentes
         }
     
     def calcular_kpis_obra(self, obra_id):
