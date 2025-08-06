@@ -31,7 +31,8 @@ Preferred communication style: Simple, everyday language.
 - **Visuals**: Font Awesome 6 for icons, SVG avatars for employees.
 
 ### Key Modules & Features
-- **Employee Management**: Comprehensive profiles, time tracking (Ponto) with standard working hours and precise overtime calculation, KPI dashboard (15 KPIs), food expense tracking (Alimentação), and other costs management. Includes custom work schedules and detailed labor cost calculations.
+- **Employee Management**: Comprehensive profiles, time tracking (Ponto) with standard working hours system and selective overtime calculation (preserves Saturday/holiday logic, applies standard hours to normal workdays), KPI dashboard (15 KPIs), food expense tracking (Alimentação), and other costs management. Includes custom work schedules and detailed labor cost calculations.
+- **Standard Working Hours System**: Complete implementation with HorarioPadrao model, selective overtime calculation that differentiates between normal workdays (uses standard hours) and special days (Saturday/holidays maintain original logic), administrative interface for managing standard hours, and full integration with KPI engine.
 - **Project Management (Obras)**: Tracking construction projects, budget management, timeline, status, and integrated financial KPIs (e.g., Cost/m², Profit Margin, Budget Deviation). Includes Daily Work Report (RDO) system and period-based food registration.
 - **Vehicle Management**: Fleet tracking, status, and maintenance with multi-tenant data isolation.
 - **Financial Management**: Includes `CentroCusto`, `Receita`, `OrcamentoObra`, `FluxoCaixa` models, and a dedicated financial calculation engine with strategic KPIs.
