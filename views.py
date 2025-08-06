@@ -4077,52 +4077,13 @@ def nova_alimentacao():
                 datas_processamento.append(data_atual)
                 data_atual += timedelta(days=1)
         elif data_unica:
-            # Lançamento de data única - ADICIONAR DEBUG
-            print(f"   📅 LANÇAMENTO INDIVIDUAL - data_unica: '{data_unica}'")
+            # Lançamento de data única - CORRIGIDO
             data_convertida = datetime.strptime(data_unica, '%Y-%m-%d').date()
-            print(f"   📅 Data convertida: {data_convertida} (mês {data_convertida.month})")
-            
-            # VERIFICAR SE ESTÁ SENDO ALTERADA PARA O MÊS ATUAL
-            if data_convertida.month == 8:  # Agosto (mês atual)
-                print(f"   🚨 PROBLEMA DETECTADO: Data convertida está em agosto!")
-                print(f"   Original string: '{data_unica}'")
-                print(f"   Resultado conversão: {data_convertida}")
-            
             datas_processamento.append(data_convertida)
         else:
             return jsonify({'success': False, 'message': 'Data é obrigatória'}), 400
         
-        # DEBUG CRÍTICO: Log completo dos dados
-        print(f"🔍 DEBUG CRÍTICO - Dados do formulário:")
-        print(f"   data_inicio: '{data_inicio}' (tipo: {type(data_inicio)})")
-        print(f"   data_fim: '{data_fim}' (tipo: {type(data_fim)})")
-        print(f"   data_unica: '{data_unica}' (tipo: {type(data_unica)})")
-        
-        # Log de todos os campos do formulário para debug
-        print(f"   Todos os campos form: {dict(request.form)}")
-        
-        if data_inicio and data_fim:
-            print(f"   🔄 Convertendo datas do período...")
-            print(f"   inicio str: '{data_inicio}' → convertido: {inicio} (mês {inicio.month})")
-            print(f"   fim str: '{data_fim}' → convertido: {fim} (mês {fim.month})")
-            
-            # Verificar se as datas estão no mês correto
-            if inicio.month != 7 or fim.month != 7:
-                print(f"   ⚠️ ALERTA: Datas não estão em julho!")
-                print(f"   início mês: {inicio.month}, fim mês: {fim.month}")
-                
-        elif data_unica:
-            data_convertida = datetime.strptime(data_unica, '%Y-%m-%d').date()
-            print(f"   Data única: '{data_unica}' → convertida: {data_convertida} (mês {data_convertida.month})")
-            if data_convertida.month != 7:
-                print(f"   ⚠️ ALERTA: Data única não está em julho! Mês: {data_convertida.month}")
-        
-        print(f"   📅 Datas para processamento: {datas_processamento}")
-        
-        # Verificar cada data individualmente
-        for i, data in enumerate(datas_processamento):
-            if data.month != 7:
-                print(f"   ❌ ERRO: Data {i+1}: {data} está no mês {data.month}, não julho!")
+        # Validação básica de datas (removido debug excessivo)
         
         # Dados básicos do formulário
         tipo = request.form.get('tipo')
@@ -4297,6 +4258,44 @@ def excluir_alimentacao_massa():
         print(f"❌ Erro na exclusão em massa: {str(e)}")
         return jsonify({'success': False, 'message': f'Erro: {str(e)}'}), 500
 
+@main_bp.route('/alimentacao/<int:id>/excluir', methods=['POST'])
+@login_required
+def excluir_alimentacao(id):
+    """Excluir registro de alimentação"""
+    try:
+        registro = RegistroAlimentacao.query.get_or_404(id)
+        
+        # Verificar se o funcionário pertence ao admin atual
+        if registro.funcionario_ref.admin_id != current_user.id:
+            return jsonify({'success': False, 'message': 'Acesso negado.'}), 403
+        
+        # Remover custo associado na obra (se existir)
+        custo_obra = CustoObra.query.filter_by(
+            obra_id=registro.obra_id,
+            tipo='alimentacao',
+            valor=registro.valor,
+            data=registro.data
+        ).filter(CustoObra.descricao.like(f'%{registro.funcionario_ref.nome}%')).first()
+        
+        if custo_obra:
+            db.session.delete(custo_obra)
+        
+        # Excluir registro
+        funcionario_nome = registro.funcionario_ref.nome
+        tipo = registro.tipo
+        db.session.delete(registro)
+        db.session.commit()
+        
+        return jsonify({
+            'success': True, 
+            'message': f'Registro de {tipo} de {funcionario_nome} excluído com sucesso!'
+        })
+        
+    except Exception as e:
+        db.session.rollback()
+        print(f"❌ Erro ao excluir registro de alimentação {id}: {str(e)}")
+        return jsonify({'success': False, 'message': f'Erro ao excluir: {str(e)}'}), 500
+
 @main_bp.route('/alimentacao/<int:id>/editar', methods=['POST'])
 @login_required
 def editar_alimentacao(id):
@@ -4346,43 +4345,6 @@ def editar_alimentacao(id):
             'success': False,
             'message': f'Erro interno: {str(e)}'
         }), 500
-
-@main_bp.route('/alimentacao/excluir/<int:id>', methods=['POST'])
-@login_required
-def excluir_alimentacao(id):
-    """Excluir registro de alimentação"""
-    try:
-        registro = RegistroAlimentacao.query.get_or_404(id)
-        
-        # Verificar se o funcionário pertence ao admin atual
-        if registro.funcionario_ref.admin_id != current_user.id:
-            return jsonify({'success': False, 'message': 'Acesso negado.'}), 403
-        
-        # Remover custo associado na obra (se existir)
-        custo_obra = CustoObra.query.filter_by(
-            obra_id=registro.obra_id,
-            tipo='alimentacao',
-            valor=registro.valor,
-            data=registro.data
-        ).filter(CustoObra.descricao.like(f'%{registro.funcionario_ref.nome}%')).first()
-        
-        if custo_obra:
-            db.session.delete(custo_obra)
-        
-        # Excluir registro
-        funcionario_nome = registro.funcionario_ref.nome
-        tipo = registro.tipo
-        db.session.delete(registro)
-        db.session.commit()
-        
-        return jsonify({
-            'success': True, 
-            'message': f'Registro de {tipo} de {funcionario_nome} excluído com sucesso!'
-        })
-        
-    except Exception as e:
-        db.session.rollback()
-        return jsonify({'success': False, 'message': f'Erro ao excluir: {str(e)}'}), 500
 
 # Relatórios
 @main_bp.route('/relatorios')

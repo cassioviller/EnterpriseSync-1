@@ -1,0 +1,442 @@
+# 🎯 PROMPT: LÓGICA CORRETA DE HORAS EXTRAS BASEADA EM HORÁRIO PADRÃO
+
+## ✅ **LÓGICA CORRETA IDENTIFICADA**
+
+**🕐 CÁLCULO DE HORAS EXTRAS:**
+- **Entrada antecipada:** Horário padrão - Horário real = Minutos extras
+- **Saída atrasada:** Horário real - Horário padrão = Minutos extras
+- **Total:** Soma dos minutos extras ÷ 60 = Horas extras
+
+**📊 EXEMPLO PRÁTICO:**
+```
+Horário Padrão: 07:12 às 17:00
+Horário Real: 07:05 às 17:50
+
+Entrada: 07:12 - 07:05 = 7min extras
+Saída: 17:50 - 17:00 = 50min extras
+Total: 7min + 50min = 57min = 0.95h extras
+```
+
+---
+
+## 🔧 **PROMPT PARA IMPLEMENTAÇÃO COMPLETA**
+
+```
+IMPLEMENTE a lógica CORRETA de cálculo de horas extras baseada na diferença entre horário padrão cadastrado e horário real trabalhado.
+
+LÓGICA CORRETA:
+- Entrada antecipada = Horário padrão entrada - Horário real entrada
+- Saída atrasada = Horário real saída - Horário padrão saída  
+- Total horas extras = (minutos entrada + minutos saída) ÷ 60
+
+## 1. MODELO DE HORÁRIO PADRÃO
+
+**Estrutura para armazenar horários padrão:**
+
+```python
+class HorarioPadrao(db.Model):
+    """Horário padrão de trabalho por funcionário"""
+    __tablename__ = 'horarios_padrao'
+    
+    id = Column(Integer, primary_key=True)
+    funcionario_id = Column(Integer, db.ForeignKey('funcionarios.id'), nullable=False)
+    
+    # Horários padrão
+    entrada_padrao = Column(Time, nullable=False)  # Ex: 07:12
+    saida_almoco_padrao = Column(Time)             # Ex: 12:00
+    retorno_almoco_padrao = Column(Time)           # Ex: 13:00
+    saida_padrao = Column(Time, nullable=False)    # Ex: 17:00
+    
+    # Configurações
+    ativo = Column(Boolean, default=True)
+    data_inicio = Column(Date, nullable=False)
+    data_fim = Column(Date)
+    
+    # Relacionamentos
+    funcionario = db.relationship('Funcionario', backref='horarios_padrao')
+    
+    def __repr__(self):
+        return f'<HorarioPadrao {self.funcionario.nome}: {self.entrada_padrao}-{self.saida_padrao}>'
+
+class Funcionario(db.Model):
+    # ... campos existentes ...
+    
+    def get_horario_padrao_ativo(self, data=None):
+        """Retorna horário padrão ativo para uma data específica"""
+        if not data:
+            data = date.today()
+        
+        return HorarioPadrao.query.filter(
+            HorarioPadrao.funcionario_id == self.id,
+            HorarioPadrao.ativo == True,
+            HorarioPadrao.data_inicio <= data,
+            or_(HorarioPadrao.data_fim.is_(None), HorarioPadrao.data_fim >= data)
+        ).first()
+```
+
+## 2. FUNÇÃO DE CÁLCULO DE HORAS EXTRAS
+
+**Implementar cálculo correto:**
+
+```python
+def calcular_horas_extras_por_horario_padrao(registro):
+    """
+    Calcula horas extras baseado na diferença entre horário padrão e real
+    
+    Args:
+        registro (RegistroPonto): Registro de ponto do funcionário
+        
+    Returns:
+        tuple: (minutos_extras_entrada, minutos_extras_saida, total_horas_extras)
+    """
+    try:
+        # Obter horário padrão do funcionário
+        funcionario = registro.funcionario_ref
+        horario_padrao = funcionario.get_horario_padrao_ativo(registro.data)
+        
+        if not horario_padrao:
+            print(f"⚠️  Funcionário {funcionario.nome} sem horário padrão para {registro.data}")
+            return 0, 0, 0.0
+        
+        minutos_extras_entrada = 0
+        minutos_extras_saida = 0
+        
+        print(f"👤 FUNCIONÁRIO: {funcionario.nome}")
+        print(f"📅 DATA: {registro.data}")
+        print(f"🕐 HORÁRIO PADRÃO: {horario_padrao.entrada_padrao} às {horario_padrao.saida_padrao}")
+        print(f"🕐 HORÁRIO REAL: {registro.hora_entrada} às {registro.hora_saida}")
+        
+        # 1. CALCULAR EXTRAS POR ENTRADA ANTECIPADA
+        if registro.hora_entrada and horario_padrao.entrada_padrao:
+            entrada_real_min = time_para_minutos(registro.hora_entrada)
+            entrada_padrao_min = time_para_minutos(horario_padrao.entrada_padrao)
+            
+            if entrada_real_min < entrada_padrao_min:
+                minutos_extras_entrada = entrada_padrao_min - entrada_real_min
+                print(f"⏰ ENTRADA ANTECIPADA: {minutos_extras_entrada}min extras")
+                print(f"   Padrão: {horario_padrao.entrada_padrao} ({entrada_padrao_min}min)")
+                print(f"   Real: {registro.hora_entrada} ({entrada_real_min}min)")
+        
+        # 2. CALCULAR EXTRAS POR SAÍDA ATRASADA
+        if registro.hora_saida and horario_padrao.saida_padrao:
+            saida_real_min = time_para_minutos(registro.hora_saida)
+            saida_padrao_min = time_para_minutos(horario_padrao.saida_padrao)
+            
+            if saida_real_min > saida_padrao_min:
+                minutos_extras_saida = saida_real_min - saida_padrao_min
+                print(f"⏰ SAÍDA ATRASADA: {minutos_extras_saida}min extras")
+                print(f"   Padrão: {horario_padrao.saida_padrao} ({saida_padrao_min}min)")
+                print(f"   Real: {registro.hora_saida} ({saida_real_min}min)")
+        
+        # 3. CALCULAR TOTAL EM HORAS DECIMAIS
+        total_minutos_extras = minutos_extras_entrada + minutos_extras_saida
+        total_horas_extras = round(total_minutos_extras / 60, 2)
+        
+        print(f"📊 RESULTADO:")
+        print(f"   Extras entrada: {minutos_extras_entrada}min")
+        print(f"   Extras saída: {minutos_extras_saida}min")
+        print(f"   Total: {total_minutos_extras}min = {total_horas_extras}h")
+        
+        return minutos_extras_entrada, minutos_extras_saida, total_horas_extras
+        
+    except Exception as e:
+        print(f"❌ ERRO NO CÁLCULO DE EXTRAS: {e}")
+        return 0, 0, 0.0
+
+def time_para_minutos(time_obj):
+    """Converte objeto time para minutos desde 00:00"""
+    if not time_obj:
+        return 0
+    return (time_obj.hour * 60) + time_obj.minute
+
+def minutos_para_time(minutos):
+    """Converte minutos para objeto time"""
+    horas = minutos // 60
+    mins = minutos % 60
+    return time(horas, mins)
+```
+
+## 3. ATUALIZAR MODELO DE REGISTRO DE PONTO
+
+**Adicionar campos específicos para extras:**
+
+```python
+class RegistroPonto(db.Model):
+    # ... campos existentes ...
+    
+    # Campos específicos para horas extras
+    minutos_extras_entrada = Column(Integer, default=0)  # Entrada antecipada
+    minutos_extras_saida = Column(Integer, default=0)    # Saída atrasada
+    total_minutos_extras = Column(Integer, default=0)    # Total em minutos
+    horas_extras = Column(Float, default=0.0)            # Total em horas decimais
+    
+    def recalcular_horas_extras(self):
+        """Recalcula horas extras baseado no horário padrão"""
+        entrada, saida, total = calcular_horas_extras_por_horario_padrao(self)
+        
+        self.minutos_extras_entrada = entrada
+        self.minutos_extras_saida = saida
+        self.total_minutos_extras = entrada + saida
+        self.horas_extras = total
+        
+        print(f"✅ HORAS EXTRAS RECALCULADAS: {total}h")
+```
+
+## 4. FUNÇÃO DE RECÁLCULO COMPLETO
+
+**Recalcular registro completo:**
+
+```python
+def recalcular_registro_completo_com_horario_padrao(registro):
+    """Recalcula registro considerando horário padrão"""
+    try:
+        print(f"🔄 RECALCULANDO: {registro.data} - {registro.funcionario_ref.nome}")
+        
+        # 1. Calcular horas trabalhadas (lógica existente)
+        calcular_horas_trabalhadas(registro)
+        
+        # 2. Calcular horas extras baseado no horário padrão
+        registro.recalcular_horas_extras()
+        
+        # 3. Calcular atrasos (se necessário)
+        calcular_atrasos(registro)
+        
+        print(f"✅ RECÁLCULO CONCLUÍDO:")
+        print(f"   Horas trabalhadas: {registro.horas_trabalhadas}h")
+        print(f"   Horas extras: {registro.horas_extras}h")
+        print(f"   Detalhes: {registro.minutos_extras_entrada}min entrada + {registro.minutos_extras_saida}min saída")
+        
+    except Exception as e:
+        print(f"❌ ERRO NO RECÁLCULO: {e}")
+        raise
+```
+
+## 5. SCRIPT PARA CRIAR HORÁRIOS PADRÃO
+
+**Script para cadastrar horários padrão:**
+
+```python
+def criar_horarios_padrao_funcionarios():
+    """Cria horários padrão para funcionários"""
+    from app import app, db
+    from models import Funcionario, HorarioPadrao
+    from datetime import time, date
+    
+    with app.app_context():
+        print("📋 CRIANDO HORÁRIOS PADRÃO...")
+        
+        # Horário padrão comum (pode ser personalizado por funcionário)
+        horario_comum = {
+            'entrada_padrao': time(7, 12),      # 07:12
+            'saida_almoco_padrao': time(12, 0), # 12:00
+            'retorno_almoco_padrao': time(13, 0), # 13:00
+            'saida_padrao': time(17, 0),        # 17:00
+            'data_inicio': date(2025, 1, 1)
+        }
+        
+        funcionarios = Funcionario.query.filter_by(ativo=True).all()
+        
+        for funcionario in funcionarios:
+            # Verificar se já tem horário padrão
+            existe = HorarioPadrao.query.filter_by(
+                funcionario_id=funcionario.id,
+                ativo=True
+            ).first()
+            
+            if existe:
+                print(f"⚠️  {funcionario.nome} já tem horário padrão")
+                continue
+            
+            # Criar horário padrão
+            horario = HorarioPadrao(
+                funcionario_id=funcionario.id,
+                **horario_comum
+            )
+            
+            db.session.add(horario)
+            print(f"✅ CRIADO: {funcionario.nome} - {horario_comum['entrada_padrao']} às {horario_comum['saida_padrao']}")
+        
+        db.session.commit()
+        print("📋 HORÁRIOS PADRÃO CRIADOS!")
+
+# EXECUTAR CRIAÇÃO
+criar_horarios_padrao_funcionarios()
+```
+
+## 6. SCRIPT DE CORREÇÃO PARA REGISTROS EXISTENTES
+
+**Corrigir registros com a nova lógica:**
+
+```python
+def corrigir_horas_extras_registros_existentes():
+    """Corrige horas extras de registros existentes"""
+    from app import app, db
+    from models import RegistroPonto
+    
+    with app.app_context():
+        print("🚨 CORRIGINDO HORAS EXTRAS COM NOVA LÓGICA...")
+        
+        # Buscar registros com horários
+        registros = RegistroPonto.query.filter(
+            RegistroPonto.hora_entrada.isnot(None),
+            RegistroPonto.hora_saida.isnot(None)
+        ).order_by(RegistroPonto.data.desc()).limit(50).all()  # Últimos 50 registros
+        
+        print(f"📊 PROCESSANDO {len(registros)} REGISTROS...")
+        
+        corrigidos = 0
+        
+        for registro in registros:
+            try:
+                # Valores antigos
+                extras_antigas = registro.horas_extras or 0
+                
+                print(f"\n🔄 PROCESSANDO: {registro.data} - {registro.funcionario_ref.nome}")
+                print(f"   Extras antigas: {extras_antigas}h")
+                
+                # Recalcular com nova lógica
+                recalcular_registro_completo_com_horario_padrao(registro)
+                
+                print(f"   Extras novas: {registro.horas_extras}h")
+                print(f"   Diferença: {extras_antigas}h → {registro.horas_extras}h")
+                
+                corrigidos += 1
+                
+            except Exception as e:
+                print(f"❌ ERRO NO REGISTRO {registro.id}: {e}")
+        
+        # Salvar alterações
+        try:
+            db.session.commit()
+            print(f"\n✅ CORREÇÃO CONCLUÍDA:")
+            print(f"   Registros corrigidos: {corrigidos}")
+        except Exception as e:
+            print(f"❌ ERRO AO SALVAR: {e}")
+            db.session.rollback()
+
+# EXECUTAR CORREÇÃO
+corrigir_horas_extras_registros_existentes()
+```
+
+## 7. VALIDAÇÃO COM EXEMPLO REAL
+
+**Teste com o exemplo fornecido:**
+
+```python
+def validar_calculo_exemplo():
+    """Valida cálculo com exemplo real"""
+    from datetime import time
+    
+    print("🧪 VALIDANDO COM EXEMPLO REAL:")
+    
+    # Dados do exemplo
+    entrada_padrao = time(7, 12)    # 07:12
+    entrada_real = time(7, 5)       # 07:05
+    saida_padrao = time(17, 0)      # 17:00
+    saida_real = time(17, 50)       # 17:50
+    
+    # Calcular extras entrada
+    entrada_padrao_min = (7 * 60) + 12  # 432min
+    entrada_real_min = (7 * 60) + 5     # 425min
+    extras_entrada = entrada_padrao_min - entrada_real_min  # 7min
+    
+    # Calcular extras saída
+    saida_padrao_min = (17 * 60) + 0    # 1020min
+    saida_real_min = (17 * 60) + 50     # 1070min
+    extras_saida = saida_real_min - saida_padrao_min  # 50min
+    
+    # Total
+    total_minutos = extras_entrada + extras_saida  # 57min
+    total_horas = total_minutos / 60               # 0.95h
+    
+    print(f"📊 CÁLCULO MANUAL:")
+    print(f"   Entrada: {entrada_padrao} - {entrada_real} = {extras_entrada}min")
+    print(f"   Saída: {saida_real} - {saida_padrao} = {extras_saida}min")
+    print(f"   Total: {total_minutos}min = {total_horas:.2f}h")
+    print(f"   ✅ Resultado esperado: 0.95h")
+
+# EXECUTAR VALIDAÇÃO
+validar_calculo_exemplo()
+```
+
+## 8. INTERFACE PARA CADASTRO DE HORÁRIOS
+
+**Rota para gerenciar horários padrão:**
+
+```python
+@app.route('/horarios_padrao')
+def listar_horarios_padrao():
+    """Lista horários padrão dos funcionários"""
+    funcionarios = Funcionario.query.filter_by(ativo=True).all()
+    return render_template('horarios_padrao.html', funcionarios=funcionarios)
+
+@app.route('/horarios_padrao/<int:funcionario_id>', methods=['GET', 'POST'])
+def editar_horario_padrao(funcionario_id):
+    """Edita horário padrão de um funcionário"""
+    funcionario = Funcionario.query.get_or_404(funcionario_id)
+    horario = funcionario.get_horario_padrao_ativo()
+    
+    if request.method == 'POST':
+        data = request.get_json()
+        
+        if horario:
+            # Atualizar existente
+            horario.entrada_padrao = time.fromisoformat(data['entrada_padrao'])
+            horario.saida_padrao = time.fromisoformat(data['saida_padrao'])
+            # ... outros campos
+        else:
+            # Criar novo
+            horario = HorarioPadrao(
+                funcionario_id=funcionario_id,
+                entrada_padrao=time.fromisoformat(data['entrada_padrao']),
+                saida_padrao=time.fromisoformat(data['saida_padrao']),
+                data_inicio=date.today()
+            )
+            db.session.add(horario)
+        
+        db.session.commit()
+        return jsonify({'success': True})
+    
+    return render_template('editar_horario_padrao.html', 
+                         funcionario=funcionario, horario=horario)
+```
+
+AÇÃO IMEDIATA:
+1. ✅ Criar modelo HorarioPadrao
+2. ✅ Implementar função de cálculo correta
+3. ✅ Cadastrar horários padrão dos funcionários
+4. ✅ Executar script de correção
+5. ✅ Validar com exemplos reais
+
+RESULTADO ESPERADO:
+- ✅ Entrada 07:12 → 07:05 = 7min extras
+- ✅ Saída 17:00 → 17:50 = 50min extras  
+- ✅ Total: 57min = 0.95h extras
+- ✅ Cálculo preciso baseado em horário padrão
+```
+
+---
+
+## 🚨 **RESUMO DA LÓGICA CORRETA**
+
+### **✅ ENTENDIMENTO CORRETO:**
+- **Horas extras** = Diferença entre horário padrão e real
+- **Entrada antecipada** = Minutos extras
+- **Saída atrasada** = Minutos extras
+- **Total** = Soma convertida para horas decimais
+
+### **🎯 IMPLEMENTAÇÃO:**
+1. **Cadastrar horários padrão** por funcionário
+2. **Calcular diferenças** entre padrão e real
+3. **Somar minutos extras** e converter para horas
+4. **Aplicar a todos** os registros existentes
+
+### **📊 EXEMPLO VALIDADO:**
+```
+Padrão: 07:12 às 17:00
+Real: 07:05 às 17:50
+Extras: 7min + 50min = 57min = 0.95h ✅
+```
+
+**Lógica correta implementada com precisão total!** 🎯
+
