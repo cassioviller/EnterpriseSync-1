@@ -4350,39 +4350,69 @@ def editar_alimentacao(id):
 @main_bp.route('/alimentacao/excluir/<int:id>', methods=['POST'])
 @login_required
 def excluir_alimentacao(id):
-    """Excluir registro de alimentação"""
+    """Excluir registro de alimentação com validações aprimoradas"""
     try:
+        # Log para debug
+        print(f"🗑️ EXCLUSÃO SOLICITADA: ID {id}")
+        
         registro = RegistroAlimentacao.query.get_or_404(id)
         
         # Verificar se o funcionário pertence ao admin atual
         if registro.funcionario_ref.admin_id != current_user.id:
-            return jsonify({'success': False, 'message': 'Acesso negado.'}), 403
+            print(f"❌ ACESSO NEGADO: Admin {current_user.id} tentou excluir registro do admin {registro.funcionario_ref.admin_id}")
+            return jsonify({'success': False, 'message': 'Acesso negado. Registro não pertence ao seu escopo.'}), 403
         
-        # Remover custo associado na obra (se existir)
-        custo_obra = CustoObra.query.filter_by(
-            obra_id=registro.obra_id,
-            tipo='alimentacao',
-            valor=registro.valor,
-            data=registro.data
-        ).filter(CustoObra.descricao.like(f'%{registro.funcionario_ref.nome}%')).first()
-        
-        if custo_obra:
-            db.session.delete(custo_obra)
-        
-        # Excluir registro
+        # Dados para log antes da exclusão
         funcionario_nome = registro.funcionario_ref.nome
         tipo = registro.tipo
+        data = registro.data
+        valor = registro.valor
+        obra_nome = registro.obra_ref.nome if registro.obra_ref else 'N/A'
+        
+        print(f"🗑️ EXCLUINDO: {funcionario_nome} - {data} - {tipo} - R$ {valor} - Obra: {obra_nome}")
+        
+        # Remover custo associado na obra (se existir) - busca mais flexível
+        custos_obra = CustoObra.query.filter(
+            CustoObra.obra_id == registro.obra_id,
+            CustoObra.tipo == 'alimentacao',
+            CustoObra.data == registro.data,
+            CustoObra.valor == registro.valor
+        ).all()
+        
+        # Filtrar por nome do funcionário na descrição
+        custos_relacionados = [
+            custo for custo in custos_obra 
+            if custo.descricao and funcionario_nome.lower() in custo.descricao.lower()
+        ]
+        
+        if custos_relacionados:
+            print(f"🗑️ Removendo {len(custos_relacionados)} custo(s) associado(s) na obra")
+            for custo in custos_relacionados:
+                db.session.delete(custo)
+        else:
+            print(f"ℹ️ Nenhum custo associado encontrado na obra")
+        
+        # Excluir registro principal
         db.session.delete(registro)
         db.session.commit()
         
+        print(f"✅ EXCLUSÃO CONCLUÍDA: {funcionario_nome} - {tipo}")
+        
         return jsonify({
             'success': True, 
-            'message': f'Registro de {tipo} de {funcionario_nome} excluído com sucesso!'
+            'message': f'Registro de {tipo} de {funcionario_nome} ({data.strftime("%d/%m/%Y")}) excluído com sucesso!'
         })
         
     except Exception as e:
         db.session.rollback()
-        return jsonify({'success': False, 'message': f'Erro ao excluir: {str(e)}'}), 500
+        import traceback
+        error_details = traceback.format_exc()
+        print(f"❌ ERRO NA EXCLUSÃO: {error_details}")
+        
+        return jsonify({
+            'success': False, 
+            'message': f'Erro interno ao excluir registro: {str(e)}'
+        }), 500
 
 # Relatórios
 @main_bp.route('/relatorios')

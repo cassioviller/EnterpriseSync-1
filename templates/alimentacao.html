@@ -475,8 +475,11 @@ $(document).ready(function() {
         responsive: true
     });
     
-    // NÃO configurar data padrão - deixar usuário escolher
-    // CORREÇÃO: Removido valueAsDate = new Date() que forçava data atual
+    // CORREÇÃO CRÍTICA: Garantir que campos de data iniciem vazios
+    // Nunca forçar data atual - deixar usuário escolher completamente
+    document.getElementById('data').value = '';
+    document.getElementById('data_inicio').value = '';
+    document.getElementById('data_fim').value = '';
     
     // Configurar alternância entre data única e período
     setupPeriodoToggle();
@@ -622,7 +625,9 @@ document.addEventListener('DOMContentLoaded', function() {
     const form = document.getElementById('alimentacaoForm');
     if (form) {
         form.addEventListener('submit', function(e) {
-            console.log('🔍 DEBUG CRÍTICO: Formulário de alimentação sendo enviado');
+            e.preventDefault();
+            
+            console.log('🔍 VALIDAÇÃO PRÉ-ENVIO: Formulário de alimentação');
             
             // Identificar tipo de lançamento
             const isPeriodo = document.getElementById('lancamentoPeriodo').checked;
@@ -633,43 +638,85 @@ document.addEventListener('DOMContentLoaded', function() {
             const dataInicio = document.getElementById('data_inicio').value;
             const dataFim = document.getElementById('data_fim').value;
             
-            console.log('📅 Valores dos campos de data:');
-            console.log('   data única:', dataUnica);
-            console.log('   data início:', dataInicio);
-            console.log('   data fim:', dataFim);
+            // VALIDAÇÃO CRÍTICA: Impedir envio com datas incorretas
+            let dataValida = true;
+            let mensagemErro = '';
             
-            // CAPTURAR DADOS DO FORMDATA EXATAMENTE COMO SERÁ ENVIADO
-            const formData = new FormData(this);
-            console.log('📤 FormData que será enviado ao servidor:');
-            for (let [key, value] of formData.entries()) {
-                if (key.includes('data')) {
-                    console.log(`   ${key}: '${value}'`);
-                    
-                    // ALERTA ESPECÍFICO por tipo de lançamento
-                    if (key === 'data' && !isPeriodo && value && value.includes('2025-08')) {
-                        console.error('🚨 PROBLEMA INDIVIDUAL: Campo "data" em agosto!', value);
-                    }
-                    if ((key === 'data_inicio' || key === 'data_fim') && isPeriodo && value && value.includes('2025-08')) {
-                        console.error('🚨 PROBLEMA PERÍODO: Campo em agosto!', key, value);
-                    }
-                }
-            }
-            
-            // VERIFICAR SE HÁ DISCREPÂNCIA ENTRE DOM E FORMDATA
             if (!isPeriodo) {
-                console.log('🔍 VERIFICAÇÃO INDIVIDUAL:');
-                console.log('   DOM data.value:', dataUnica);
-                console.log('   FormData data:', formData.get('data'));
-                if (dataUnica !== formData.get('data')) {
-                    console.error('🚨 DISCREPÂNCIA: DOM diferente do FormData!');
+                if (!dataUnica) {
+                    dataValida = false;
+                    mensagemErro = 'Data é obrigatória para lançamento individual';
+                } else if (dataUnica.includes('2025-08') && !confirm('ATENÇÃO: Você selecionou uma data em AGOSTO. Isso está correto?')) {
+                    dataValida = false;
+                    mensagemErro = 'Data em agosto cancelada pelo usuário';
                 }
             } else {
-                console.log('🔍 VERIFICAÇÃO PERÍODO:');
-                console.log('   DOM data_inicio.value:', dataInicio);
-                console.log('   DOM data_fim.value:', dataFim);
-                console.log('   FormData data_inicio:', formData.get('data_inicio'));
-                console.log('   FormData data_fim:', formData.get('data_fim'));
+                if (!dataInicio || !dataFim) {
+                    dataValida = false;
+                    mensagemErro = 'Datas de início e fim são obrigatórias para lançamento por período';
+                } else if ((dataInicio.includes('2025-08') || dataFim.includes('2025-08')) && 
+                          !confirm('ATENÇÃO: Você selecionou datas em AGOSTO. Isso está correto?')) {
+                    dataValida = false;
+                    mensagemErro = 'Datas em agosto canceladas pelo usuário';
+                }
             }
+            
+            if (!dataValida) {
+                console.error('🚨 VALIDAÇÃO FALHOU:', mensagemErro);
+                showToast('Erro de validação: ' + mensagemErro, 'error');
+                return false;
+            }
+            
+            console.log('✅ Datas validadas - prosseguindo com envio');
+            
+            // Verificar funcionários selecionados
+            const funcionariosSelecionados = document.querySelectorAll('.funcionario-checkbox:checked').length;
+            if (funcionariosSelecionados === 0) {
+                showToast('Selecione pelo menos um funcionário', 'error');
+                return false;
+            }
+            
+            // Prosseguir com envio original
+            const formData = new FormData(this);
+            const btnSalvar = document.getElementById('btnSalvar');
+            
+            // Log final dos dados que serão enviados
+            console.log('📤 Enviando dados validados:', {
+                tipo: isPeriodo ? 'periodo' : 'individual',
+                dataUnica,
+                dataInicio,
+                dataFim,
+                funcionarios: funcionariosSelecionados
+            });
+            
+            // Desabilitar botão durante envio
+            btnSalvar.disabled = true;
+            btnSalvar.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Salvando...';
+            
+            fetch("{{ url_for('main.nova_alimentacao') }}", {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    showToast('Registros salvos com sucesso!', 'success');
+                    // Fechar modal e recarregar página
+                    $('#alimentacaoModal').modal('hide');
+                    setTimeout(() => location.reload(), 1000);
+                } else {
+                    showToast('Erro: ' + data.message, 'error');
+                }
+            })
+            .catch(error => {
+                console.error('Erro:', error);
+                showToast('Erro ao salvar registros: ' + error.message, 'error');
+            })
+            .finally(() => {
+                // Reabilitar botão
+                btnSalvar.disabled = false;
+                btnSalvar.innerHTML = '<i class="fas fa-save me-2"></i>Salvar Lançamentos';
+            });
         });
         
         // DEBUG: Monitorar mudanças nos campos de data
@@ -1022,25 +1069,59 @@ function obterBadgeTipo(tipo) {
 }
 
 function excluirRegistro(id) {
-    if (confirm('Tem certeza que deseja excluir este registro?')) {
+    // Melhorar confirmação com mais detalhes
+    const row = document.getElementById(`registro-${id}`);
+    const funcionario = row.querySelector('.funcionario-nome').textContent.trim().split('\n')[0];
+    const data = row.querySelector('.data-registro').textContent;
+    const tipo = row.querySelector('.tipo-refeicao .badge').textContent;
+    
+    if (confirm(`Confirma exclusão do registro?\n\nFuncionário: ${funcionario}\nData: ${data}\nTipo: ${tipo}\n\nEsta ação não pode ser desfeita!`)) {
+        // Mostrar feedback visual
+        const btnExcluir = row.querySelector('.btn-outline-danger');
+        const originalContent = btnExcluir.innerHTML;
+        btnExcluir.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+        btnExcluir.disabled = true;
+        
         fetch(`/alimentacao/excluir/${id}`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
             }
         })
-        .then(response => response.json())
+        .then(response => {
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+            }
+            return response.json();
+        })
         .then(data => {
             if (data.success) {
-                document.getElementById(`registro-${id}`).remove();
-                showToast('Registro excluído com sucesso!', 'success');
+                // Animação de saída suave
+                row.style.transition = 'opacity 0.3s ease-out';
+                row.style.opacity = '0';
+                
+                setTimeout(() => {
+                    row.remove();
+                    showToast('Registro excluído com sucesso!', 'success');
+                    
+                    // Atualizar DataTable se existir
+                    if ($.fn.DataTable && $.fn.DataTable.isDataTable('#alimentacaoTable')) {
+                        $('#alimentacaoTable').DataTable().row(row).remove().draw();
+                    }
+                }, 300);
             } else {
+                // Restaurar botão em caso de erro
+                btnExcluir.innerHTML = originalContent;
+                btnExcluir.disabled = false;
                 showToast('Erro ao excluir registro: ' + data.message, 'error');
             }
         })
         .catch(error => {
-            console.error('Erro:', error);
-            showToast('Erro de conexão', 'error');
+            console.error('Erro na exclusão:', error);
+            // Restaurar botão
+            btnExcluir.innerHTML = originalContent;
+            btnExcluir.disabled = false;
+            showToast('Erro de conexão: ' + error.message, 'error');
         });
     }
 }
@@ -1065,41 +1146,7 @@ function showToast(message, type = 'info') {
     }, 3000);
 }
 
-// Interceptar submit do formulário para enviar funcionários selecionados
-document.getElementById('alimentacaoForm').addEventListener('submit', function(e) {
-    e.preventDefault();
-    
-    const formData = new FormData(this);
-    const btnSalvar = document.getElementById('btnSalvar');
-    
-    // Desabilitar botão durante envio
-    btnSalvar.disabled = true;
-    btnSalvar.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Salvando...';
-    
-    fetch("{{ url_for('main.nova_alimentacao') }}", {
-        method: 'POST',
-        body: formData
-    })
-    .then(response => response.json())
-    .then(data => {
-        if (data.success) {
-            // Fechar modal e recarregar página
-            $('#alimentacaoModal').modal('hide');
-            location.reload();
-        } else {
-            alert('Erro: ' + data.message);
-        }
-    })
-    .catch(error => {
-        console.error('Erro:', error);
-        alert('Erro ao salvar registros');
-    })
-    .finally(() => {
-        // Reabilitar botão
-        btnSalvar.disabled = false;
-        btnSalvar.innerHTML = '<i class="fas fa-save me-2"></i>Salvar Lançamentos';
-    });
-});
+// REMOVIDO - Já tratado no event listener acima com validação completa
 
 // ================== EDIÇÃO INLINE ==================
 function editarRegistroInline(id) {
