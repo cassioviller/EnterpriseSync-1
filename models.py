@@ -55,28 +55,6 @@ class HorarioTrabalho(db.Model):
     def __repr__(self):
         return f'<HorarioTrabalho {self.nome}>'
 
-class HorarioPadrao(db.Model):
-    """Horário padrão de trabalho por funcionário"""
-    __tablename__ = 'horarios_padrao'
-    
-    id = db.Column(db.Integer, primary_key=True)
-    funcionario_id = db.Column(db.Integer, db.ForeignKey('funcionario.id'), nullable=False)
-    
-    # Horários padrão
-    entrada_padrao = db.Column(db.Time, nullable=False)        # Ex: 07:12
-    saida_almoco_padrao = db.Column(db.Time)                   # Ex: 12:00
-    retorno_almoco_padrao = db.Column(db.Time)                 # Ex: 13:00
-    saida_padrao = db.Column(db.Time, nullable=False)          # Ex: 17:00
-    
-    # Configurações
-    ativo = db.Column(db.Boolean, default=True)
-    data_inicio = db.Column(db.Date, nullable=False)
-    data_fim = db.Column(db.Date)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    
-    def __repr__(self):
-        return f'<HorarioPadrao Func:{self.funcionario_id} {self.entrada_padrao}-{self.saida_padrao}>'
-
 class Funcionario(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     codigo = db.Column(db.String(10), unique=True, nullable=False)  # F0001, F0002, etc.
@@ -95,21 +73,6 @@ class Funcionario(db.Model):
     funcao_id = db.Column(db.Integer, db.ForeignKey('funcao.id'))
     horario_trabalho_id = db.Column(db.Integer, db.ForeignKey('horario_trabalho.id'))
     admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=True)  # Para isolamento multi-tenant
-    
-    # Relacionamento com horário padrão
-    horarios_padrao = db.relationship('HorarioPadrao', backref='funcionario_ref', lazy=True)
-    
-    def get_horario_padrao_ativo(self, data_consulta=None):
-        """Retorna horário padrão ativo para uma data específica"""
-        if not data_consulta:
-            data_consulta = date.today()
-        
-        return HorarioPadrao.query.filter(
-            HorarioPadrao.funcionario_id == self.id,
-            HorarioPadrao.ativo == True,
-            HorarioPadrao.data_inicio <= data_consulta,
-            db.or_(HorarioPadrao.data_fim.is_(None), HorarioPadrao.data_fim >= data_consulta)
-        ).first()
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     
     # Relacionamentos
@@ -262,12 +225,6 @@ class RegistroPonto(db.Model):
     minutos_atraso_saida = db.Column(db.Integer, default=0)    # saída antes do horário
     total_atraso_minutos = db.Column(db.Integer, default=0)    # soma dos atrasos
     total_atraso_horas = db.Column(db.Float, default=0.0)      # atrasos em horas
-    
-    # Campos para horas extras detalhadas baseadas em horário padrão
-    minutos_extras_entrada = db.Column(db.Integer, default=0)  # Entrada antecipada
-    minutos_extras_saida = db.Column(db.Integer, default=0)    # Saída atrasada
-    total_minutos_extras = db.Column(db.Integer, default=0)    # Total em minutos
-    horas_extras_detalhadas = db.Column(db.Float, default=0.0) # Total em horas decimais
     
     # Campos adicionais
     meio_periodo = db.Column(db.Boolean, default=False)
