@@ -178,7 +178,7 @@ else:
 **Referências de Código**:
 - `kpis_engine.py` (linhas 573-614): Lógica principal de cálculo
 - `auto_deploy_producao.py`: Sistema de deploy automático
-- `CORRECAO_HORAS_EXTRAS_COMPLETAAC.py`: Correção consolidada aplicada
+- `CORRECAO_HORAS_EXTRAS_COMPLETA.py`: Correção consolidada aplicada
 
 **Data do Relatório**: 06 de Agosto de 2025  
 **Versão do Sistema**: SIGE v8.1
