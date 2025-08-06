@@ -1368,14 +1368,444 @@ document.addEventListener('DOMContentLoaded', function() {
                     break;
             }
 
-            document.getElementById('filtro_data_inicio').value = dataInicio;
-            document.getElementById('filtro_data_fim').value = dataFim;
+            document.getElementById('dataInicio').value = dataInicio;
+            document.getElementById('dataFim').value = dataFim;
             
-            // Highlight active button
+            // Marcar botão ativo
             document.querySelectorAll('.filtro-periodo').forEach(b => b.classList.remove('active'));
             this.classList.add('active');
-        });
+        
+function validarDataSelecionada() {
+    const dataInput = document.getElementById('data');
+    const dataInicioInput = document.getElementById('data_inicio');
+    const dataFimInput = document.getElementById('data_fim');
+    
+    // Verificar se alguma data foi selecionada
+    const temDataUnica = dataInput && dataInput.value;
+    const temPeriodo = dataInicioInput && dataInicioInput.value && dataFimInput && dataFimInput.value;
+    
+    if (!temDataUnica && !temPeriodo) {
+        alert('⚠️ Selecione uma data ou período antes de salvar!');
+        return false;
+    }
+    
+    // Log para debug
+    console.log('📅 Validação de data:', {
+        dataUnica: dataInput ? dataInput.value : null,
+        dataInicio: dataInicioInput ? dataInicioInput.value : null,
+        dataFim: dataFimInput ? dataFimInput.value : null
     });
+    
+    return true;
+}
+
+// Aplicar validação no submit do formulário
+document.getElementById('alimentacaoForm').addEventListener('submit', function(e) {
+    if (!validarDataSelecionada()) {
+        e.preventDefault();
+        return false;
+    }
+});
+});
+    
+function validarDataSelecionada() {
+    const dataInput = document.getElementById('data');
+    const dataInicioInput = document.getElementById('data_inicio');
+    const dataFimInput = document.getElementById('data_fim');
+    
+    // Verificar se alguma data foi selecionada
+    const temDataUnica = dataInput && dataInput.value;
+    const temPeriodo = dataInicioInput && dataInicioInput.value && dataFimInput && dataFimInput.value;
+    
+    if (!temDataUnica && !temPeriodo) {
+        alert('⚠️ Selecione uma data ou período antes de salvar!');
+        return false;
+    }
+    
+    // Log para debug
+    console.log('📅 Validação de data:', {
+        dataUnica: dataInput ? dataInput.value : null,
+        dataInicio: dataInicioInput ? dataInicioInput.value : null,
+        dataFim: dataFimInput ? dataFimInput.value : null
+    });
+    
+    return true;
+}
+
+// Aplicar validação no submit do formulário
+document.getElementById('alimentacaoForm').addEventListener('submit', function(e) {
+    if (!validarDataSelecionada()) {
+        e.preventDefault();
+        return false;
+    }
+});
+});
+
+function validarDataSelecionada() {
+    const dataInput = document.getElementById('data');
+    const dataInicioInput = document.getElementById('data_inicio');
+    const dataFimInput = document.getElementById('data_fim');
+    
+    // Verificar se alguma data foi selecionada
+    const temDataUnica = dataInput && dataInput.value;
+    const temPeriodo = dataInicioInput && dataInicioInput.value && dataFimInput && dataFimInput.value;
+    
+    if (!temDataUnica && !temPeriodo) {
+        alert('⚠️ Selecione uma data ou período antes de salvar!');
+        return false;
+    }
+    
+    // Log para debug
+    console.log('📅 Validação de data:', {
+        dataUnica: dataInput ? dataInput.value : null,
+        dataInicio: dataInicioInput ? dataInicioInput.value : null,
+        dataFim: dataFimInput ? dataFimInput.value : null
+    });
+    
+    return true;
+}
+
+// Aplicar validação no submit do formulário
+document.getElementById('alimentacaoForm').addEventListener('submit', function(e) {
+    if (!validarDataSelecionada()) {
+        e.preventDefault();
+        return false;
+    }
+});
+});
+
+// ================== EDIÇÃO INLINE ==================
+let registroEditandoId = null;
+let dadosOriginais = {};
+
+function editarRegistroInline(id) {
+    if (registroEditandoId && registroEditandoId !== id) {
+        cancelarEdicao(registroEditandoId);
+    }
+    
+    registroEditandoId = id;
+    const row = document.getElementById(`registro-${id}`);
+    
+    // Salvar dados originais
+    dadosOriginais[id] = {
+        data: row.querySelector('.data-registro').textContent,
+        tipo: row.querySelector('.tipo-refeicao .badge').textContent,
+        valor: row.querySelector('.valor-registro').textContent,
+        observacoes: row.querySelector('.observacoes-registro').textContent
+    };
+    
+    // Converter células em campos editáveis
+    converterParaEdicao(row, id);
+}
+
+function converterParaEdicao(row, id) {
+    // Data
+    const dataCell = row.querySelector('.data-registro');
+    const dataAtual = dataCell.textContent.split('/').reverse().join('-'); // DD/MM/YYYY -> YYYY-MM-DD
+    dataCell.innerHTML = `<input type="date" class="form-control form-control-sm" value="${dataAtual}" id="edit-data-${id}">`;
+    
+    // Tipo
+    const tipoCell = row.querySelector('.tipo-refeicao');
+    const tipoAtual = tipoCell.querySelector('.badge').textContent.toLowerCase();
+    let tipoValue = '';
+    if (tipoAtual.includes('café')) tipoValue = 'cafe';
+    else if (tipoAtual.includes('almoço')) tipoValue = 'almoco';
+    else if (tipoAtual.includes('jantar')) tipoValue = 'jantar';
+    else tipoValue = 'lanche';
+    
+    tipoCell.innerHTML = `
+        <select class="form-select form-select-sm" id="edit-tipo-${id}">
+            <option value="cafe" ${tipoValue === 'cafe' ? 'selected' : ''}>Café da Manhã</option>
+            <option value="almoco" ${tipoValue === 'almoco' ? 'selected' : ''}>Almoço</option>
+            <option value="lanche" ${tipoValue === 'lanche' ? 'selected' : ''}>Lanche</option>
+            <option value="jantar" ${tipoValue === 'jantar' ? 'selected' : ''}>Jantar</option>
+        </select>
+    `;
+    
+    // Valor
+    const valorCell = row.querySelector('.valor-registro');
+    const valorAtual = valorCell.textContent.replace('R$ ', '').replace(',', '.');
+    valorCell.innerHTML = `<input type="number" class="form-control form-control-sm" step="0.01" value="${valorAtual}" id="edit-valor-${id}">`;
+    
+    // Observações
+    const obsCell = row.querySelector('.observacoes-registro');
+    const obsAtual = obsCell.textContent === '-' ? '' : obsCell.textContent;
+    obsCell.innerHTML = `<input type="text" class="form-control form-control-sm" value="${obsAtual}" id="edit-obs-${id}" placeholder="Observações">`;
+    
+    // Botões de ação
+    const actionsCell = row.querySelector('td:last-child');
+    actionsCell.innerHTML = `
+        <div class="btn-group btn-group-sm">
+            <button class="btn btn-success" onclick="salvarEdicao(${id})">
+                <i class="fas fa-check"></i>
+            </button>
+            <button class="btn btn-secondary" onclick="cancelarEdicao(${id})">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+    `;
+}
+
+function salvarEdicao(id) {
+    const row = document.getElementById(`registro-${id}`);
+    
+    const dados = {
+        data: document.getElementById(`edit-data-${id}`).value,
+        tipo: document.getElementById(`edit-tipo-${id}`).value,
+        valor: document.getElementById(`edit-valor-${id}`).value,
+        observacoes: document.getElementById(`edit-obs-${id}`).value
+    };
+    
+    // Enviar para o servidor
+    fetch(`/alimentacao/editar/${id}`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(dados)
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            // Atualizar a linha com os novos dados
+            atualizarLinhaTabela(row, dados);
+            registroEditandoId = null;
+            delete dadosOriginais[id];
+            
+            // Mostrar mensagem de sucesso
+            showToast('Registro atualizado com sucesso!', 'success');
+        } else {
+            showToast('Erro ao atualizar registro: ' + data.message, 'error');
+        }
+    })
+    .catch(error => {
+        console.error('Erro:', error);
+        showToast('Erro de conexão', 'error');
+    });
+}
+
+function cancelarEdicao(id) {
+    if (!dadosOriginais[id]) return;
+    
+    const row = document.getElementById(`registro-${id}`);
+    atualizarLinhaTabela(row, dadosOriginais[id]);
+    
+    registroEditandoId = null;
+    delete dadosOriginais[id];
+}
+        return false;
+    }
+    
+    // Log para debug
+    console.log('📅 Validação de data:', {
+        dataUnica: dataInput ? dataInput.value : null,
+        dataInicio: dataInicioInput ? dataInicioInput.value : null,
+        dataFim: dataFimInput ? dataFimInput.value : null
+    });
+    
+    return true;
+}
+
+// Aplicar validação no submit do formulário
+document.getElementById('alimentacaoForm').addEventListener('submit', function(e) {
+    if (!validarDataSelecionada()) {
+        e.preventDefault();
+        return false;
+    }
+});
+});
+}
+
+function cancelarEdicao(id) {
+    const row = document.getElementById(`registro-${id}`);
+    const original = dadosOriginais[id];
+    
+    if (original) {
+        // Restaurar dados originais
+        row.querySelector('.data-registro').textContent = original.data;
+        row.querySelector('.tipo-refeicao').innerHTML = obterBadgeTipo(original.tipo);
+        row.querySelector('.valor-registro').textContent = original.valor;
+        row.querySelector('.observacoes-registro').textContent = original.observacoes;
+        
+        // Restaurar botões
+        row.querySelector('td:last-child').innerHTML = `
+            <div class="btn-group btn-group-sm">
+                <button class="btn btn-outline-primary btn-editar" onclick="editarRegistroInline(${id})">
+                    <i class="fas fa-edit"></i>
+                </button>
+                <button class="btn btn-outline-danger" onclick="excluirRegistro(${id})">
+                    <i class="fas fa-trash"></i>
+                </button>
+            </div>
+        `;
+    }
+    
+    registroEditandoId = null;
+    delete dadosOriginais[id];
+}
+
+function atualizarLinhaTabela(row, dados) {
+    // Data
+    const dataFormatada = new Date(dados.data).toLocaleDateString('pt-BR');
+    row.querySelector('.data-registro').textContent = dataFormatada;
+    
+    // Tipo
+    row.querySelector('.tipo-refeicao').innerHTML = obterBadgeTipo(dados.tipo);
+    
+    // Valor
+    const valorFormatado = parseFloat(dados.valor).toLocaleString('pt-BR', {
+        style: 'currency',
+        currency: 'BRL'
+    
+function validarDataSelecionada() {
+    const dataInput = document.getElementById('data');
+    const dataInicioInput = document.getElementById('data_inicio');
+    const dataFimInput = document.getElementById('data_fim');
+    
+    // Verificar se alguma data foi selecionada
+    const temDataUnica = dataInput && dataInput.value;
+    const temPeriodo = dataInicioInput && dataInicioInput.value && dataFimInput && dataFimInput.value;
+    
+    if (!temDataUnica && !temPeriodo) {
+        alert('⚠️ Selecione uma data ou período antes de salvar!');
+        return false;
+    }
+    
+    // Log para debug
+    console.log('📅 Validação de data:', {
+        dataUnica: dataInput ? dataInput.value : null,
+        dataInicio: dataInicioInput ? dataInicioInput.value : null,
+        dataFim: dataFimInput ? dataFimInput.value : null
+    });
+    
+    return true;
+}
+
+// Aplicar validação no submit do formulário
+document.getElementById('alimentacaoForm').addEventListener('submit', function(e) {
+    if (!validarDataSelecionada()) {
+        e.preventDefault();
+        return false;
+    }
+});
+});
+    row.querySelector('.valor-registro').textContent = valorFormatado;
+    
+    // Observações
+    row.querySelector('.observacoes-registro').textContent = dados.observacoes || '-';
+    
+    // Restaurar botões
+    row.querySelector('td:last-child').innerHTML = `
+        <div class="btn-group btn-group-sm">
+            <button class="btn btn-outline-primary btn-editar" onclick="editarRegistroInline(${row.dataset.registroId})">
+                <i class="fas fa-edit"></i>
+            </button>
+            <button class="btn btn-outline-danger" onclick="excluirRegistro(${row.dataset.registroId})">
+                <i class="fas fa-trash"></i>
+            </button>
+        </div>
+    `;
+}
+
+function obterBadgeTipo(tipo) {
+    if (typeof tipo === 'string') {
+        if (tipo.includes('Café')) return '<span class="badge bg-warning">Café da Manhã</span>';
+        if (tipo.includes('Almoço')) return '<span class="badge bg-success">Almoço</span>';
+        if (tipo.includes('Jantar')) return '<span class="badge bg-primary">Jantar</span>';
+        return '<span class="badge bg-secondary">Lanche</span>';
+    }
+    
+    const badges = {
+        'cafe': '<span class="badge bg-warning">Café da Manhã</span>',
+        'almoco': '<span class="badge bg-success">Almoço</span>',
+        'jantar': '<span class="badge bg-primary">Jantar</span>',
+        'lanche': '<span class="badge bg-secondary">Lanche</span>'
+    };
+    return badges[tipo] || '<span class="badge bg-secondary">Lanche</span>';
+}
+
+
+function excluirRegistro(id) {
+    if (confirm('Tem certeza que deseja excluir este registro?')) {
+        // Mostrar loading
+        const btn = event.target.closest('button');
+        const originalHtml = btn.innerHTML;
+        btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+        btn.disabled = true;
+        
+        fetch(`/alimentacao/${id}/excluir`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-Requested-With': 'XMLHttpRequest'
+            },
+            body: JSON.stringify({})
+        })
+        .then(response => {
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}`);
+            }
+            return response.json();
+        })
+        .then(data => {
+            if (data.success) {
+                // Remover a linha da tabela
+                const row = document.getElementById(`registro-${id}`);
+                if (row) {
+                    row.remove();
+                }
+                showToast('Registro excluído com sucesso!', 'success');
+                
+                // Atualizar contadores se existirem
+                setTimeout(() => {
+                    location.reload();
+                }, 1000);
+            } else {
+                showToast('Erro ao excluir: ' + (data.message || 'Erro desconhecido'), 'error');
+                // Restaurar botão
+                btn.innerHTML = originalHtml;
+                btn.disabled = false;
+            }
+        })
+        .catch(error => {
+            console.error('Erro na exclusão:', error);
+            showToast('Erro de conexão: ' + error.message, 'error');
+            // Restaurar botão
+            btn.innerHTML = originalHtml;
+            btn.disabled = false;
+        });
+    }
+}
+
+function validarDataSelecionada() {
+    const dataInput = document.getElementById('data');
+    const dataInicioInput = document.getElementById('data_inicio');
+    const dataFimInput = document.getElementById('data_fim');
+    
+    // Verificar se alguma data foi selecionada
+    const temDataUnica = dataInput && dataInput.value;
+    const temPeriodo = dataInicioInput && dataInicioInput.value && dataFimInput && dataFimInput.value;
+    
+    if (!temDataUnica && !temPeriodo) {
+        alert('⚠️ Selecione uma data ou período antes de salvar!');
+        return false;
+    }
+    
+    // Log para debug
+    console.log('📅 Validação de data:', {
+        dataUnica: dataInput ? dataInput.value : null,
+        dataInicio: dataInicioInput ? dataInicioInput.value : null,
+        dataFim: dataFimInput ? dataFimInput.value : null
+    });
+    
+    return true;
+}
+
+</script>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    console.log('🚀 Sistema de alimentação carregado');
     
     // =================== FILTROS ===================
     function aplicarFiltros() {
@@ -1409,6 +1839,7 @@ document.addEventListener('DOMContentLoaded', function() {
         window.location.href = '/alimentacao';
     }
     
+    // Tornar funções globais
     window.aplicarFiltros = aplicarFiltros;
     window.limparFiltros = limparFiltros;
     
@@ -1671,6 +2102,5 @@ document.addEventListener('DOMContentLoaded', function() {
     
     console.log('✅ JavaScript de alimentação carregado com sucesso');
 });
-
 </script>
 {% endblock %}
