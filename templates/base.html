@@ -1036,7 +1036,7 @@
                 img.src = svg;
                 img.onerror = null; // Evitar loop infinito
             } else {
-                img.src = '{{ url_for('static', filename='images/default-avatar.svg') }}';
+                img.src = '/static/images/default-avatar.svg';
             }
         }
         

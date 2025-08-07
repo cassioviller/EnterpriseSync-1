@@ -6322,10 +6322,8 @@ def recalcular_registro_automatico(registro):
         # Sem atrasos
         
     elif tipo == 'trabalhado':
-        # Trabalho normal: até 8h normais, resto extras (50%)
-        if horas > 8:
-            registro.horas_extras = horas - 8
-            registro.percentual_extras = 50.0
+        # Trabalho normal: calcular extras baseado no horário padrão
+        calcular_horas_extras_baseado_horario_padrao(registro)
         
         # Calcular atrasos apenas em dias normais
         calcular_atrasos_trabalho_normal(registro)
@@ -6368,6 +6366,49 @@ def calcular_atrasos_trabalho_normal(registro):
     
     # Converter total para horas
     registro.total_atraso_horas = registro.total_atraso_minutos / 60.0
+
+def calcular_horas_extras_baseado_horario_padrao(registro):
+    """Calcula horas extras baseado no horário padrão do funcionário"""
+    funcionario = Funcionario.query.get(registro.funcionario_id)
+    if not funcionario or not funcionario.horario_trabalho_id:
+        # Sem horário padrão, usar 8h como base
+        if registro.horas_trabalhadas > 8:
+            registro.horas_extras = registro.horas_trabalhadas - 8
+            registro.percentual_extras = 50.0
+        return
+    
+    horario_padrao = HorarioTrabalho.query.get(funcionario.horario_trabalho_id)
+    if not horario_padrao:
+        # Sem horário padrão, usar 8h como base
+        if registro.horas_trabalhadas > 8:
+            registro.horas_extras = registro.horas_trabalhadas - 8
+            registro.percentual_extras = 50.0
+        return
+    
+    # Calcular horas padrão baseado no horário
+    if horario_padrao.entrada and horario_padrao.saida:
+        entrada_padrao = datetime.combine(registro.data, horario_padrao.entrada)
+        saida_padrao = datetime.combine(registro.data, horario_padrao.saida)
+        
+        # Subtrair almoço padrão
+        minutos_padrao = (saida_padrao - entrada_padrao).total_seconds() / 60
+        if horario_padrao.saida_almoco and horario_padrao.retorno_almoco:
+            almoco_saida_padrao = datetime.combine(registro.data, horario_padrao.saida_almoco)
+            almoco_retorno_padrao = datetime.combine(registro.data, horario_padrao.retorno_almoco)
+            minutos_almoco = (almoco_retorno_padrao - almoco_saida_padrao).total_seconds() / 60
+            minutos_padrao -= minutos_almoco
+        
+        horas_padrao = minutos_padrao / 60.0
+        
+        # Calcular extras apenas se trabalhou mais que o padrão
+        if registro.horas_trabalhadas > horas_padrao:
+            registro.horas_extras = registro.horas_trabalhadas - horas_padrao
+            registro.percentual_extras = 50.0
+    else:
+        # Fallback para 8h se não conseguir calcular
+        if registro.horas_trabalhadas > 8:
+            registro.horas_extras = registro.horas_trabalhadas - 8
+            registro.percentual_extras = 50.0
 
 @main_bp.route('/ponto/registro/<int:registro_id>', methods=['GET'])
 @login_required  
