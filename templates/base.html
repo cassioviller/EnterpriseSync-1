@@ -1017,6 +1017,52 @@
             }
         }
 
+        // Função para corrigir imagens quebradas
+        function corrigirImagemQuebrada(img) {
+            if (img.dataset.nome) {
+                // Gerar avatar SVG baseado no nome
+                const nome = img.dataset.nome;
+                const iniciais = obterIniciais(nome).toUpperCase();
+                const cor = gerarCorPorNome(nome);
+                
+                const svg = `data:image/svg+xml;base64,${btoa(`
+                    <svg width="120" height="120" xmlns="http://www.w3.org/2000/svg">
+                        <circle cx="60" cy="60" r="60" fill="${cor}"/>
+                        <text x="60" y="68" font-family="Arial" font-size="40" 
+                              font-weight="bold" text-anchor="middle" fill="white">${iniciais}</text>
+                    </svg>
+                `)}`;
+                
+                img.src = svg;
+                img.onerror = null; // Evitar loop infinito
+            } else {
+                img.src = '{{ url_for('static', filename='images/default-avatar.svg') }}';
+            }
+        }
+        
+        function obterIniciais(nome) {
+            const palavras = nome.trim().split(' ');
+            if (palavras.length >= 2) {
+                return palavras[0][0] + palavras[palavras.length - 1][0];
+            }
+            return palavras[0].substring(0, 2);
+        }
+        
+        function gerarCorPorNome(nome) {
+            let hash = 0;
+            for (let i = 0; i < nome.length; i++) {
+                hash = nome.charCodeAt(i) + ((hash << 5) - hash);
+            }
+            
+            const cores = [
+                '#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd',
+                '#8c564b', '#e377c2', '#7f7f7f', '#bcbd22', '#17becf',
+                '#3498db', '#e74c3c', '#2ecc71', '#f39c12', '#9b59b6'
+            ];
+            
+            return cores[Math.abs(hash) % cores.length];
+        }
+
         // Initialize theme when DOM is ready
         document.addEventListener('DOMContentLoaded', () => {
             const theme = getPreferredTheme();

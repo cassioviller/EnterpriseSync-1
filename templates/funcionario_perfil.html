@@ -34,7 +34,8 @@
                          height="120" 
                          style="object-fit: cover;"
                          alt="Foto de {{ funcionario.nome }}"
-                         onerror="this.src='{{ url_for('static', filename='images/default-avatar.svg') }}'">
+                         onerror="corrigirImagemQuebrada(this)"
+                         data-nome="{{ funcionario.nome }}">
                 {% else %}
                     <img src="{{ url_for('static', filename='images/default-avatar.svg') }}" 
                          class="rounded-circle mb-3" 
