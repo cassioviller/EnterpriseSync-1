@@ -73,14 +73,11 @@ class Funcionario(db.Model):
     funcao_id = db.Column(db.Integer, db.ForeignKey('funcao.id'))
     horario_trabalho_id = db.Column(db.Integer, db.ForeignKey('horario_trabalho.id'))
     admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=True)  # Para isolamento multi-tenant
-    
-    # Relacionamento com horário de trabalho
-    horario_trabalho_ref = db.relationship('HorarioTrabalho')
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     
     # Relacionamentos
+    horario_trabalho = db.relationship('HorarioTrabalho', backref=db.backref('funcionarios', overlaps="horario_trabalho"), overlaps="funcionarios")
     registros_ponto = db.relationship('RegistroPonto', backref='funcionario_ref', lazy=True, overlaps="funcionario_ref")
-    horario_trabalho = db.relationship('HorarioTrabalho', backref='funcionarios', lazy=True, overlaps="funcionarios")
 
 class Obra(db.Model):
     id = db.Column(db.Integer, primary_key=True)

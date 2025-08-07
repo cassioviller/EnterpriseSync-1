@@ -45,7 +45,7 @@ class KPIUnificado:
         elif self.admin_id:
             # Filtrar por obras do admin
             obras_admin = db.session.query(Obra.id).filter(Obra.admin_id == self.admin_id).subquery()
-            query_alimentacao = query_alimentacao.filter(RegistroAlimentacao.obra_id.in_(obras_admin))
+            query_alimentacao = query_alimentacao.filter(RegistroAlimentacao.obra_id.in_(db.session.query(Obra.id).filter(Obra.admin_id == self.admin_id).subquery().select()))
         
         custos['alimentacao'] = query_alimentacao.scalar() or 0
         
