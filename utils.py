@@ -607,10 +607,16 @@ def calcular_kpis_funcionario_periodo(funcionario_id, data_inicio=None, data_fim
         'pontualidade': pontualidade
     }
 
-def calcular_kpis_funcionarios_geral(data_inicio=None, data_fim=None, admin_id=None):
+def calcular_kpis_funcionarios_geral(data_inicio=None, data_fim=None, admin_id=None, incluir_inativos=False):
     """
     Calcula KPIs gerais de todos os funcionários para um período
     Agora com suporte a filtro por admin_id para multi-tenant
+    
+    Args:
+        data_inicio: Data inicial do período
+        data_fim: Data final do período
+        admin_id: ID do admin para filtrar funcionários
+        incluir_inativos: Se True, inclui funcionários inativos (padrão: False)
     """
     from models import Funcionario
     from flask_login import current_user
@@ -619,11 +625,21 @@ def calcular_kpis_funcionarios_geral(data_inicio=None, data_fim=None, admin_id=N
     if admin_id is None and current_user and current_user.is_authenticated:
         admin_id = current_user.id
     
-    # Filtrar funcionários pelo admin (ordenados alfabeticamente)
+    # CORREÇÃO CRÍTICA: Filtrar funcionários SEMPRE por ativo=True, exceto se explicitamente solicitado
+    # Isso evita vazamento de dados de funcionários inativos
     if admin_id:
-        funcionarios_ativos = Funcionario.query.filter_by(ativo=True, admin_id=admin_id).order_by(Funcionario.nome).all()
+        if incluir_inativos:
+            funcionarios = Funcionario.query.filter_by(admin_id=admin_id).order_by(Funcionario.nome).all()
+        else:
+            funcionarios = Funcionario.query.filter_by(ativo=True, admin_id=admin_id).order_by(Funcionario.nome).all()
     else:
-        funcionarios_ativos = Funcionario.query.filter_by(ativo=True).order_by(Funcionario.nome).all()
+        if incluir_inativos:
+            funcionarios = Funcionario.query.order_by(Funcionario.nome).all()
+        else:
+            funcionarios = Funcionario.query.filter_by(ativo=True).order_by(Funcionario.nome).all()
+    
+    # Para compatibilidade, manter nome da variável
+    funcionarios_ativos = funcionarios
     
     total_funcionarios = len(funcionarios_ativos)
     total_custo_geral = 0
@@ -637,6 +653,10 @@ def calcular_kpis_funcionarios_geral(data_inicio=None, data_fim=None, admin_id=N
     funcionarios_kpis = []
     
     for funcionario in funcionarios_ativos:
+        # PROTEÇÃO ADICIONAL: Pular funcionários inativos mesmo se estiverem na lista
+        if not incluir_inativos and not funcionario.ativo:
+            continue
+            
         kpi = calcular_kpis_funcionario_periodo(funcionario.id, data_inicio, data_fim)
         if kpi:
             funcionarios_kpis.append(kpi)
@@ -650,11 +670,14 @@ def calcular_kpis_funcionarios_geral(data_inicio=None, data_fim=None, admin_id=N
     
     # Calcular taxa de absenteísmo geral (baseado no total de faltas)
     from models import RegistroPonto
+    
+    # CORREÇÃO: Filtrar registros apenas de funcionários ativos
+    funcionarios_para_calculo = [f for f in funcionarios_ativos if incluir_inativos or f.ativo]
     total_dias_com_registros = sum(len(RegistroPonto.query.filter(
         RegistroPonto.funcionario_id == f.id,
         RegistroPonto.data >= data_inicio,
         RegistroPonto.data <= data_fim
-    ).all()) for f in funcionarios_ativos)
+    ).all()) for f in funcionarios_para_calculo)
     
     total_faltas_todas = total_faltas_geral + total_faltas_justificadas_geral
     
