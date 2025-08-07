@@ -628,7 +628,10 @@ def calcular_kpis_funcionarios_geral(data_inicio=None, data_fim=None, admin_id=N
     total_custo_geral = 0
     total_horas_geral = 0
     total_faltas_geral = 0
+    total_faltas_justificadas_geral = 0
     total_custo_faltas_geral = 0
+    total_dias_uteis = 0
+    total_dias_trabalhados = 0
     
     funcionarios_kpis = []
     
@@ -638,15 +641,26 @@ def calcular_kpis_funcionarios_geral(data_inicio=None, data_fim=None, admin_id=N
             funcionarios_kpis.append(kpi)
             total_custo_geral += kpi['custo_total']
             total_horas_geral += kpi['horas_trabalhadas']
-            total_faltas_geral += kpi['dias_faltas_justificadas']
+            total_faltas_geral += kpi['faltas']  # Faltas normais
+            total_faltas_justificadas_geral += kpi['dias_faltas_justificadas']  # Faltas justificadas
             total_custo_faltas_geral += kpi['custo_faltas_justificadas']
+            total_dias_uteis += kpi['dias_uteis']
+            total_dias_trabalhados += kpi['dias_trabalhados']
+    
+    # Calcular taxa de absenteísmo geral
+    if total_dias_uteis > 0:
+        taxa_absenteismo_geral = ((total_dias_uteis - total_dias_trabalhados) / total_dias_uteis) * 100
+    else:
+        taxa_absenteismo_geral = 0.0
     
     return {
         'total_funcionarios': total_funcionarios,
         'total_custo_geral': total_custo_geral,
         'total_horas_geral': total_horas_geral,
-        'total_faltas_geral': total_faltas_geral,
+        'total_faltas_geral': total_faltas_geral,  # Faltas normais
+        'total_faltas_justificadas_geral': total_faltas_justificadas_geral,  # Faltas justificadas
         'total_custo_faltas_geral': total_custo_faltas_geral,
+        'taxa_absenteismo_geral': taxa_absenteismo_geral,  # Taxa de absenteísmo
         'funcionarios_kpis': funcionarios_kpis
     }
 

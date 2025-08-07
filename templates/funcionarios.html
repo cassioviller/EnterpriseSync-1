@@ -128,11 +128,84 @@
                     <div class="d-flex align-items-center">
                         <div class="flex-grow-1">
                             <h6 class="card-title mb-0">Faltas Justificadas</h6>
-                            <h4 class="mb-0">{{ kpis_geral.total_faltas_geral if kpis_geral else 0 }} dias</h4>
+                            <h4 class="mb-0">{{ kpis_geral.total_faltas_justificadas_geral if kpis_geral else 0 }} dias</h4>
                             <small>R$ {{ '{:,.2f}'.format(kpis_geral.total_custo_faltas_geral if kpis_geral else 0).replace(',', '.') }}</small>
                         </div>
                         <div class="ms-3">
                             <i class="fas fa-exclamation-triangle fa-2x opacity-75"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Segunda linha de KPIs -->
+    <div class="row mb-4">
+        <div class="col-md-3">
+            <div class="card bg-danger text-white">
+                <div class="card-body">
+                    <div class="d-flex align-items-center">
+                        <div class="flex-grow-1">
+                            <h6 class="card-title mb-0">Faltas Normais</h6>
+                            <h4 class="mb-0">{{ kpis_geral.total_faltas_geral if kpis_geral else 0 }} dias</h4>
+                            <small class="opacity-75">Faltas não justificadas</small>
+                        </div>
+                        <div class="ms-3">
+                            <i class="fas fa-user-times fa-2x opacity-75"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-3">
+            <div class="card bg-dark text-white">
+                <div class="card-body">
+                    <div class="d-flex align-items-center">
+                        <div class="flex-grow-1">
+                            <h6 class="card-title mb-0">Taxa de Absenteísmo</h6>
+                            <h4 class="mb-0">{{ '{:,.1f}'.format(kpis_geral.taxa_absenteismo_geral if kpis_geral else 0).replace(',', '.') }}%</h4>
+                            <small class="opacity-75">Ausências no período</small>
+                        </div>
+                        <div class="ms-3">
+                            <i class="fas fa-chart-line fa-2x opacity-75"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-3">
+            <div class="card bg-secondary text-white">
+                <div class="card-body">
+                    <div class="d-flex align-items-center">
+                        <div class="flex-grow-1">
+                            <h6 class="card-title mb-0">Total de Faltas</h6>
+                            <h4 class="mb-0">{{ (kpis_geral.total_faltas_geral + kpis_geral.total_faltas_justificadas_geral) if kpis_geral else 0 }} dias</h4>
+                            <small class="opacity-75">Normais + Justificadas</small>
+                        </div>
+                        <div class="ms-3">
+                            <i class="fas fa-calendar-times fa-2x opacity-75"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-3">
+            <div class="card bg-light text-dark">
+                <div class="card-body">
+                    <div class="d-flex align-items-center">
+                        <div class="flex-grow-1">
+                            <h6 class="card-title mb-0">Meta Absenteísmo</h6>
+                            <h4 class="mb-0 {% if kpis_geral and kpis_geral.taxa_absenteismo_geral <= 5 %}text-success{% elif kpis_geral and kpis_geral.taxa_absenteismo_geral <= 10 %}text-warning{% else %}text-danger{% endif %}">
+                                {% if kpis_geral and kpis_geral.taxa_absenteismo_geral <= 5 %}✓ Excelente{% elif kpis_geral and kpis_geral.taxa_absenteismo_geral <= 10 %}△ Aceitável{% else %}✗ Alto{% endif %}
+                            </h4>
+                            <small class="text-muted">Meta: ≤ 5%</small>
+                        </div>
+                        <div class="ms-3">
+                            <i class="fas fa-bullseye fa-2x opacity-75"></i>
                         </div>
                     </div>
                 </div>
