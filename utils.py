@@ -649,6 +649,7 @@ def calcular_kpis_funcionarios_geral(data_inicio=None, data_fim=None, admin_id=N
             total_dias_trabalhados += kpi['dias_trabalhados']
     
     # Calcular taxa de absenteísmo geral (baseado no total de faltas)
+    from models import RegistroPonto
     total_dias_com_registros = sum(len(RegistroPonto.query.filter(
         RegistroPonto.funcionario_id == f.id,
         RegistroPonto.data >= data_inicio,
