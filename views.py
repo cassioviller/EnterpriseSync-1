@@ -1638,13 +1638,17 @@ def criar_outro_custo(funcionario_id):
     try:
         data = datetime.strptime(request.form['data'], '%Y-%m-%d').date()
         
+        # Obter KPI associado ou usar padrão
+        kpi_associado = request.form.get('kpi_associado', 'outros_custos')
+        
         outro_custo = OutroCusto(
             funcionario_id=funcionario_id,
             data=data,
             tipo=request.form['tipo'],
             categoria=request.form['categoria'],
             valor=float(request.form['valor']),
-            descricao=request.form.get('descricao')
+            descricao=request.form.get('descricao'),
+            kpi_associado=kpi_associado  # NOVA FUNCIONALIDADE: Associação com KPI específico
         )
         
         db.session.add(outro_custo)
