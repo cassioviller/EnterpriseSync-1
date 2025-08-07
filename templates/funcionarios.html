@@ -313,10 +313,17 @@
                                 </a>
                             </div>
                             <div class="col-6">
-                                <button class="btn btn-outline-danger btn-sm w-100" 
-                                        onclick="excluirFuncionario({{ kpi.funcionario.id }}, '{{ kpi.funcionario.nome }}')">
-                                    <i class="fas fa-trash"></i> Excluir
-                                </button>
+                                {% if kpi.funcionario.ativo %}
+                                    <button class="btn btn-outline-danger btn-sm w-100" 
+                                            onclick="toggleStatusFuncionario({{ kpi.funcionario.id }}, '{{ kpi.funcionario.nome }}', false)">
+                                        <i class="fas fa-user-times"></i> Desativar
+                                    </button>
+                                {% else %}
+                                    <button class="btn btn-outline-success btn-sm w-100" 
+                                            onclick="toggleStatusFuncionario({{ kpi.funcionario.id }}, '{{ kpi.funcionario.nome }}', true)">
+                                        <i class="fas fa-user-check"></i> Reativar
+                                    </button>
+                                {% endif %}
                             </div>
                         </div>
                     </div>
@@ -1199,5 +1206,42 @@ $('#modalLancamentoMultiplo').on('show.bs.modal', function() {
     document.getElementById('periodo_inicio').value = primeiroDiaDoMes.toISOString().split('T')[0];
     document.getElementById('periodo_fim').value = hoje.toISOString().split('T')[0];
 });
+
+// Toggle status funcionário (ativar/desativar)
+function toggleStatusFuncionario(id, nome, ativar) {
+    const acao = ativar ? 'ativar' : 'desativar';
+    const mensagem = `Tem certeza que deseja ${acao} o funcionário ${nome}?`;
+    
+    if (confirm(mensagem)) {
+        fetch(`/funcionario/${id}/toggle-status`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': getCsrfToken()
+            },
+            body: JSON.stringify({
+                ativo: ativar
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                alert(data.message);
+                location.reload();
+            } else {
+                alert('Erro: ' + data.message);
+            }
+        })
+        .catch(error => {
+            console.error('Erro:', error);
+            alert('Erro interno do servidor');
+        });
+    }
+}
+
+// Function to get CSRF token
+function getCsrfToken() {
+    return document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
+}
 </script>
 {% endblock %}

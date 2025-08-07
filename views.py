@@ -228,15 +228,14 @@ def alterar_senha_funcionario(funcionario_id):
         db.session.rollback()
         return jsonify({'success': False, 'message': 'Erro interno do servidor'})
 
-@main_bp.route('/admin/funcionario-acesso/<int:funcionario_id>/toggle-status', methods=['POST'])
-@admin_required
+@main_bp.route('/funcionario/<int:funcionario_id>/toggle-status', methods=['POST'])
+@login_required
 def toggle_funcionario_status(funcionario_id):
     """Ativar/desativar funcionário"""
     try:
-        funcionario = Usuario.query.filter_by(
+        funcionario = Funcionario.query.filter_by(
             id=funcionario_id, 
-            admin_id=current_user.id, 
-            tipo_usuario=TipoUsuario.FUNCIONARIO
+            admin_id=current_user.id
         ).first_or_404()
         
         data = request.get_json()
@@ -772,8 +771,25 @@ def funcionarios():
         ativo=True
     ).order_by(Funcionario.nome).all()
     
+    # Buscar funcionários inativos também para exibir na lista
+    funcionarios_inativos = Funcionario.query.filter_by(
+        admin_id=current_user.id,
+        ativo=False
+    ).order_by(Funcionario.nome).all()
+    
+    # Calcular KPIs dos funcionários inativos (para exibir na interface)
+    funcionarios_inativos_kpis = []
+    for func in funcionarios_inativos:
+        from utils import calcular_kpis_funcionario_periodo
+        kpi = calcular_kpis_funcionario_periodo(func.id, data_inicio, data_fim)
+        if kpi:
+            funcionarios_inativos_kpis.append(kpi)
+    
+    # Combinar ativos e inativos para exibição
+    todos_funcionarios_kpis = kpis_geral['funcionarios_kpis'] + funcionarios_inativos_kpis
+    
     return render_template('funcionarios.html', 
-                         funcionarios_kpis=kpis_geral['funcionarios_kpis'],
+                         funcionarios_kpis=todos_funcionarios_kpis,
                          funcionarios=funcionarios,
                          kpis_geral=kpis_geral,
                          obras_ativas=obras_ativas,
