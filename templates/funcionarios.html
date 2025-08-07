@@ -645,14 +645,27 @@ function filtrarFuncionarios() {
     const funcionarioCards = document.querySelectorAll('.funcionario-card');
     let visibleCount = 0;
     
+    console.log('Filtro aplicado:', {
+        busca: searchTerm,
+        status: statusFilter,
+        totalCards: funcionarioCards.length
+    });
+    
     funcionarioCards.forEach(card => {
         const nome = card.dataset.nome || '';
-        const departamento = card.dataset.departamento || '';
+        const telefone = card.dataset.telefone || '';
         const funcao = card.dataset.funcao || '';
         const status = card.dataset.status || '';
         
+        console.log('Card:', {
+            nome,
+            status,
+            statusFilter,
+            matchesStatus: statusFilter === '' || status === statusFilter
+        });
+        
         const matchesSearch = nome.includes(searchTerm) || 
-                            departamento.includes(searchTerm) || 
+                            telefone.includes(searchTerm) || 
                             funcao.includes(searchTerm);
         
         const matchesStatus = statusFilter === '' || status === statusFilter;
@@ -665,12 +678,31 @@ function filtrarFuncionarios() {
         }
     });
     
+    console.log('Funcionários visíveis:', visibleCount);
+    
     // Mostrar/esconder mensagem "nenhum resultado"
-    const noResults = document.getElementById('noResultsMessage');
-    if (visibleCount === 0) {
-        noResults.style.display = 'block';
-    } else {
-        noResults.style.display = 'none';
+    let noResults = document.getElementById('noResultsMessage');
+    if (visibleCount === 0 && !noResults) {
+        // Criar mensagem se não existir
+        noResults = document.createElement('div');
+        noResults.id = 'noResultsMessage';
+        noResults.className = 'col-12 text-center py-5';
+        noResults.innerHTML = `
+            <div class="text-muted">
+                <i class="fas fa-search fa-3x mb-3"></i>
+                <h5>Nenhum funcionário encontrado</h5>
+                <p>Tente ajustar os filtros de pesquisa</p>
+            </div>
+        `;
+        document.getElementById('funcionariosGrid').appendChild(noResults);
+    }
+    
+    if (noResults) {
+        if (visibleCount === 0) {
+            noResults.style.display = 'block';
+        } else {
+            noResults.style.display = 'none';
+        }
     }
 }
 
