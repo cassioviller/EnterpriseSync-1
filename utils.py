@@ -495,12 +495,10 @@ def calcular_kpis_funcionario_periodo(funcionario_id, data_inicio=None, data_fim
         total_horas_trabalhadas += horas_trabalhadas
         total_horas_extras += horas_extras
         
-        # Contar faltas justificadas
-        if registro.observacoes and 'falta justificada' in registro.observacoes.lower():
-            dias_faltas_justificadas += 1
-            if funcionario.salario:
-                salario_hora = funcionario.salario / 220
-                custo_faltas_justificadas += salario_hora * 8  # 8 horas por dia
+        # Contar custo de faltas justificadas
+        if registro.tipo_registro == 'falta_justificada' and funcionario.salario:
+            salario_hora = funcionario.salario / 220
+            custo_faltas_justificadas += salario_hora * 8  # 8 horas por dia
     
     # Custo de mão de obra
     custo_mao_obra = 0
@@ -537,11 +535,14 @@ def calcular_kpis_funcionario_periodo(funcionario_id, data_inicio=None, data_fim
             dias_uteis += 1
         data_atual = data_atual + timedelta(days=1)
     
-    # Dias trabalhados (com registros de ponto)
-    dias_trabalhados = len(registros_ponto)
+    # Dias trabalhados (apenas registros de trabalho efetivo)
+    dias_trabalhados = len([r for r in registros_ponto if r.tipo_registro not in ['falta', 'falta_justificada']])
     
-    # Calcular faltas (apenas registros explícitos de falta no sistema)
-    faltas = len([r for r in registros_ponto if r.tipo_registro in ['falta', 'falta_justificada']])
+    # Calcular faltas normais (não justificadas)
+    faltas = len([r for r in registros_ponto if r.tipo_registro == 'falta'])
+    
+    # Calcular faltas justificadas (já contado no loop acima, mas vamos recalcular para garantir)
+    dias_faltas_justificadas = len([r for r in registros_ponto if r.tipo_registro == 'falta_justificada'])
     
     # Calcular atrasos (número de dias com atraso)
     atrasos = len([r for r in registros_ponto if (getattr(r, 'total_atraso_horas', 0) or 0) > 0])
@@ -647,9 +648,17 @@ def calcular_kpis_funcionarios_geral(data_inicio=None, data_fim=None, admin_id=N
             total_dias_uteis += kpi['dias_uteis']
             total_dias_trabalhados += kpi['dias_trabalhados']
     
-    # Calcular taxa de absenteísmo geral
-    if total_dias_uteis > 0:
-        taxa_absenteismo_geral = ((total_dias_uteis - total_dias_trabalhados) / total_dias_uteis) * 100
+    # Calcular taxa de absenteísmo geral (baseado no total de faltas)
+    total_dias_com_registros = sum(len(RegistroPonto.query.filter(
+        RegistroPonto.funcionario_id == f.id,
+        RegistroPonto.data >= data_inicio,
+        RegistroPonto.data <= data_fim
+    ).all()) for f in funcionarios_ativos)
+    
+    total_faltas_todas = total_faltas_geral + total_faltas_justificadas_geral
+    
+    if total_dias_com_registros > 0:
+        taxa_absenteismo_geral = (total_faltas_todas / total_dias_com_registros) * 100
     else:
         taxa_absenteismo_geral = 0.0
     
