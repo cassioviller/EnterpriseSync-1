@@ -1,0 +1,97 @@
+# Correção do Erro de Produção - SQLAlchemy
+
+## Análise do Problema
+
+Baseado no erro apresentado e no relatório fornecido, identifiquei uma discrepância entre o ambiente de desenvolvimento e produção:
+
+### Erro Identificado
+```
+sqlalchemy.exc.ProgrammingError: (psycopg2.errors.UndefinedColumn) column outro_custo.admin_id does not exist
+```
+
+### Causa Raiz
+O erro indica que a coluna `admin_id` não existe na tabela `outro_custo` no ambiente de produção, mesmo que o relatório indique que ela deveria existir. Isso sugere que:
+
+1. **Migração não aplicada**: A migração que adiciona a coluna `admin_id` não foi executada no banco de produção
+2. **Sincronização de schema**: O banco de produção está desatualizado em relação ao modelo SQLAlchemy
+3. **Deploy incompleto**: O Dockerfile pode não estar executando as migrações necessárias
+
+## Soluções Propostas
+
+### Solução 1: Verificação e Aplicação de Migração
+
+Primeiro, verifique se a coluna existe no banco de produção:
+
+```sql
+SELECT column_name 
+FROM information_schema.columns 
+WHERE table_name = 'outro_custo' 
+AND column_name = 'admin_id';
+```
+
+Se a coluna não existir, adicione-a:
+
+```sql
+ALTER TABLE outro_custo 
+ADD COLUMN admin_id INTEGER;
+```
+
+### Solução 2: Atualização do Dockerfile
+
+Certifique-se de que o Dockerfile execute as migrações:
+
+```dockerfile
+# Adicione antes do CMD
+RUN flask db upgrade
+```
+
+### Solução 3: Script de Migração Manual
+
+Crie um script que pode ser executado no container:
+
+```python
+from flask import Flask
+from flask_migrate import upgrade
+from app import app
+
+def deploy():
+    """Run deployment tasks."""
+    # migrate database to latest revision
+    upgrade()
+
+if __name__ == '__main__':
+    deploy()
+```
+
+### Solução 4: Verificação Condicional no Código
+
+Como solução temporária, adicione verificação condicional:
+
+```python
+# Verificar se a coluna existe antes de usar
+def column_exists(engine, table_name, column_name):
+    inspector = inspect(engine)
+    columns = [c['name'] for c in inspector.get_columns(table_name)]
+    return column_name in columns
+
+# Usar na query
+if column_exists(db.engine, 'outro_custo', 'admin_id'):
+    # Query com admin_id
+else:
+    # Query sem admin_id
+```
+
+## Recomendações Imediatas
+
+1. **Verificar o banco de produção** para confirmar se a coluna `admin_id` existe
+2. **Executar migração manual** se necessário
+3. **Atualizar o processo de deploy** para incluir migrações automáticas
+4. **Testar em ambiente de staging** antes de aplicar em produção
+
+## Prevenção Futura
+
+1. **Automatizar migrações** no processo de deploy
+2. **Implementar verificações de schema** antes do deploy
+3. **Criar testes de integração** que validem a estrutura do banco
+4. **Documentar processo de migração** para a equipe
+

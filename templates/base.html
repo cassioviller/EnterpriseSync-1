@@ -20,6 +20,57 @@
     <!-- Custom CSS -->
     <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
     
+    <!-- Função global para corrigir imagens quebradas - DEVE estar disponível imediatamente -->
+    <script>
+        window.corrigirImagemQuebrada = function(img) {
+            console.log('Corrigindo imagem quebrada para:', img.dataset.nome || 'imagem sem nome');
+            
+            if (img.dataset.nome) {
+                // Gerar avatar SVG baseado no nome
+                const nome = img.dataset.nome;
+                const iniciais = obterIniciais(nome).toUpperCase();
+                const cor = gerarCorPorNome(nome);
+                
+                const svg = `data:image/svg+xml;base64,${btoa(`
+                    <svg width="120" height="120" xmlns="http://www.w3.org/2000/svg">
+                        <circle cx="60" cy="60" r="60" fill="${cor}"/>
+                        <text x="60" y="68" font-family="Arial" font-size="40" 
+                              font-weight="bold" text-anchor="middle" fill="white">${iniciais}</text>
+                    </svg>
+                `)}`;
+                
+                img.src = svg;
+                img.onerror = null; // Evitar loop infinito
+            } else {
+                img.src = 'data:image/svg+xml;base64,' + btoa(`
+                    <svg width="120" height="120" xmlns="http://www.w3.org/2000/svg">
+                        <circle cx="60" cy="60" r="60" fill="#6c757d"/>
+                        <text x="60" y="68" font-family="Arial" font-size="40" 
+                              font-weight="bold" text-anchor="middle" fill="white">?</text>
+                    </svg>
+                `);
+                img.onerror = null;
+            }
+        }
+        
+        function obterIniciais(nome) {
+            const palavras = nome.trim().split(' ');
+            if (palavras.length >= 2) {
+                return palavras[0][0] + palavras[palavras.length - 1][0];
+            }
+            return palavras[0].substring(0, 2);
+        }
+        
+        function gerarCorPorNome(nome) {
+            let hash = 0;
+            for (let i = 0; i < nome.length; i++) {
+                hash = nome.charCodeAt(i) + ((hash << 5) - hash);
+            }
+            const cores = ['#3b82f6', '#ef4444', '#10b981', '#f59e0b', '#8b5cf6', '#f97316', '#06b6d4', '#84cc16'];
+            return cores[Math.abs(hash) % cores.length];
+        }
+    </script>
+    
     <!-- Global Theme Styling -->
     <style>
         /* ===== DARK MODE (Default) ===== */
@@ -1017,51 +1068,7 @@
             }
         }
 
-        // Função para corrigir imagens quebradas
-        function corrigirImagemQuebrada(img) {
-            if (img.dataset.nome) {
-                // Gerar avatar SVG baseado no nome
-                const nome = img.dataset.nome;
-                const iniciais = obterIniciais(nome).toUpperCase();
-                const cor = gerarCorPorNome(nome);
-                
-                const svg = `data:image/svg+xml;base64,${btoa(`
-                    <svg width="120" height="120" xmlns="http://www.w3.org/2000/svg">
-                        <circle cx="60" cy="60" r="60" fill="${cor}"/>
-                        <text x="60" y="68" font-family="Arial" font-size="40" 
-                              font-weight="bold" text-anchor="middle" fill="white">${iniciais}</text>
-                    </svg>
-                `)}`;
-                
-                img.src = svg;
-                img.onerror = null; // Evitar loop infinito
-            } else {
-                img.src = '/static/images/default-avatar.svg';
-            }
-        }
-        
-        function obterIniciais(nome) {
-            const palavras = nome.trim().split(' ');
-            if (palavras.length >= 2) {
-                return palavras[0][0] + palavras[palavras.length - 1][0];
-            }
-            return palavras[0].substring(0, 2);
-        }
-        
-        function gerarCorPorNome(nome) {
-            let hash = 0;
-            for (let i = 0; i < nome.length; i++) {
-                hash = nome.charCodeAt(i) + ((hash << 5) - hash);
-            }
-            
-            const cores = [
-                '#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd',
-                '#8c564b', '#e377c2', '#7f7f7f', '#bcbd22', '#17becf',
-                '#3498db', '#e74c3c', '#2ecc71', '#f39c12', '#9b59b6'
-            ];
-            
-            return cores[Math.abs(hash) % cores.length];
-        }
+        // Função duplicada removida - a função corrigirImagemQuebrada agora está no head do documento
 
         // Initialize theme when DOM is ready
         document.addEventListener('DOMContentLoaded', () => {
