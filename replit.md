@@ -36,7 +36,7 @@ Preferred communication style: Simple, everyday language.
 - **Visuals**: Font Awesome 6 for icons, SVG avatars for employees.
 
 ### Key Modules & Features
-- **Employee Management**: Comprehensive profiles, time tracking (Ponto), KPI dashboard (15 KPIs), food expense tracking (Alimentação), and other costs management. Includes custom work schedules, detailed labor cost calculations, and employee activation/deactivation system with proper filtering.
+- **Employee Management**: Comprehensive profiles, time tracking (Ponto), KPI dashboard (15 KPIs), food expense tracking (Alimentação), and other costs management with dual-field categorization system (tipo for cost nature, categoria for KPI association). Includes custom work schedules, detailed labor cost calculations, and employee activation/deactivation system with proper filtering.
 - **Project Management (Obras)**: Tracking construction projects, budget management, timeline, status, and integrated financial KPIs (e.g., Cost/m², Profit Margin, Budget Deviation). Includes Daily Work Report (RDO) system.
 - **Vehicle Management**: Fleet tracking, status, and maintenance.
 - **Financial Management**: Includes `CentroCusto`, `Receita`, `OrcamentoObra`, `FluxoCaixa` models, and a dedicated financial calculation engine with strategic KPIs.
