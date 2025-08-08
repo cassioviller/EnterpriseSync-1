@@ -581,6 +581,12 @@ def calcular_kpis_funcionario_periodo(funcionario_id, data_inicio=None, data_fim
     else:
         produtividade = 0
     
+    # Calcular atrasos em horas para compatibilidade com template
+    atrasos_horas = total_minutos_atraso / 60.0
+    
+    # Calcular outros custos que não sejam alimentação/transporte
+    outros_custos_valor = custo_total - custo_mao_obra - custo_alimentacao - custo_transporte
+    
     return {
         'funcionario': funcionario,
         'horas_trabalhadas': total_horas_trabalhadas,
@@ -588,10 +594,13 @@ def calcular_kpis_funcionario_periodo(funcionario_id, data_inicio=None, data_fim
         'h_extras': total_horas_extras,  # Alias para compatibilidade com template
         'faltas': faltas,
         'atrasos': atrasos,
+        'atrasos_horas': atrasos_horas,  # Atrasos em horas para o template
         'dias_faltas_justificadas': dias_faltas_justificadas,
+        'faltas_justificadas': dias_faltas_justificadas,  # Alias para template
         'custo_mao_obra': custo_mao_obra,
         'custo_alimentacao': custo_alimentacao,
         'custo_transporte': custo_transporte,
+        'outros_custos': outros_custos_valor,  # Outros custos calculados
         'custo_faltas_justificadas': custo_faltas_justificadas,
         'custo_total': custo_total,
         'absenteismo': absenteismo,
