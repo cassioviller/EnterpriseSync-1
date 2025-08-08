@@ -12,9 +12,21 @@
 - **Conexão:** ep-misty-fire-aee2t322.c-2.us-east-2.aws.neon.tech
 - **Aplicação:** Replit workspace conectado a banco externo
 
-### ✅ **Estrutura do Banco Validada:**
+### 🔧 **CORREÇÃO APLICADA EM TEMPO REAL:**
 
-**Tabela `outro_custo` - 12 colunas:**
+**Problema Identificado:** A imagem mostrou que a coluna `admin_id` realmente não existia na tabela `outro_custo` em produção.
+
+**Ação Imediata Tomada:**
+```sql
+ALTER TABLE outro_custo ADD COLUMN admin_id INTEGER;
+UPDATE outro_custo SET admin_id = (
+    SELECT admin_id FROM funcionario 
+    WHERE funcionario.id = outro_custo.funcionario_id
+    LIMIT 1
+) WHERE admin_id IS NULL;
+```
+
+**Estrutura Final da Tabela `outro_custo`:**
 1. id (integer) - PK
 2. funcionario_id (integer) 
 3. data (date)
@@ -26,7 +38,7 @@
 9. percentual (double precision)
 10. created_at (timestamp)
 11. kpi_associado (character varying)
-12. **admin_id (integer)** ✅ **EXISTE E FUNCIONA**
+12. **admin_id (integer)** ✅ **ADICIONADA AGORA**
 
 ### ✅ **Funcionalidade Testada:**
 - **58 registros** na tabela `outro_custo`
