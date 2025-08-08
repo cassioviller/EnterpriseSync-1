@@ -33,7 +33,18 @@ class KPIUnificado:
             'total': 0
         }
         
-        # 1. ALIMENTAÇÃO
+        # Obter lista de funcionários do admin
+        funcionarios_filter = []
+        if self.admin_id:
+            funcionarios_admin = db.session.query(Funcionario.id).filter(
+                Funcionario.admin_id == self.admin_id
+            ).all()
+            funcionarios_filter = [f[0] for f in funcionarios_admin]
+        
+        # 1. ALIMENTAÇÃO (RegistroAlimentacao + OutroCusto)
+        alimentacao_total = 0
+        
+        # 1a. Registros de alimentação tradicionais
         query_alimentacao = db.session.query(func.sum(RegistroAlimentacao.valor))
         query_alimentacao = query_alimentacao.filter(
             RegistroAlimentacao.data >= self.data_inicio,
@@ -47,31 +58,35 @@ class KPIUnificado:
             obras_admin = db.session.query(Obra.id).filter(Obra.admin_id == self.admin_id).subquery()
             query_alimentacao = query_alimentacao.filter(RegistroAlimentacao.obra_id.in_(db.session.query(Obra.id).filter(Obra.admin_id == self.admin_id).subquery().select()))
         
-        custos['alimentacao'] = query_alimentacao.scalar() or 0
+        alimentacao_total += query_alimentacao.scalar() or 0
         
-        # 2. TRANSPORTE (Veículos)
-        query_transporte = db.session.query(func.sum(CustoVeiculo.valor))
-        query_transporte = query_transporte.filter(
-            CustoVeiculo.data_custo >= self.data_inicio,
-            CustoVeiculo.data_custo <= self.data_fim
-        )
+        # 1b. Custos de alimentação da tabela OutroCusto (Vale Alimentação, etc)
+        if funcionarios_filter:
+            query_outro_alimentacao = db.session.query(func.sum(OutroCusto.valor))
+            query_outro_alimentacao = query_outro_alimentacao.filter(
+                OutroCusto.funcionario_id.in_(funcionarios_filter),
+                OutroCusto.data >= self.data_inicio,
+                OutroCusto.data <= self.data_fim,
+                OutroCusto.kpi_associado == 'custo_alimentacao'
+            )
+            alimentacao_total += query_outro_alimentacao.scalar() or 0
         
-        if obra_id:
-            query_transporte = query_transporte.filter(CustoVeiculo.obra_id == obra_id)
-        elif self.admin_id:
-            # Buscar veículos do admin (assumindo campo admin_id em Veiculo)
-            # Por enquanto, inclui todos os custos de veículos
-            pass
+        custos['alimentacao'] = alimentacao_total
         
-        custos['transporte'] = query_transporte.scalar() or 0
+        # 2. TRANSPORTE (apenas custos diretos de funcionários - Vale Transporte)
+        if funcionarios_filter:
+            query_transporte = db.session.query(func.sum(OutroCusto.valor))
+            query_transporte = query_transporte.filter(
+                OutroCusto.funcionario_id.in_(funcionarios_filter),
+                OutroCusto.data >= self.data_inicio,
+                OutroCusto.data <= self.data_fim,
+                OutroCusto.kpi_associado == 'custo_transporte'
+            )
+            custos['transporte'] = query_transporte.scalar() or 0
+        else:
+            custos['transporte'] = 0
         
         # 3. MÃO DE OBRA (baseado em registros de ponto)
-        funcionarios_filter = []
-        if self.admin_id:
-            funcionarios_admin = db.session.query(Funcionario.id).filter(
-                Funcionario.admin_id == self.admin_id
-            ).all()
-            funcionarios_filter = [f[0] for f in funcionarios_admin]
         
         if funcionarios_filter or obra_id:
             registros_ponto = db.session.query(RegistroPonto).filter(
@@ -114,13 +129,14 @@ class KPIUnificado:
             
             custos['mao_obra'] = mao_obra_total
         
-        # 4. OUTROS CUSTOS
+        # 4. OUTROS CUSTOS (apenas os que não são transporte nem alimentação)
         if funcionarios_filter:
             query_outros = db.session.query(func.sum(OutroCusto.valor))
             query_outros = query_outros.filter(
                 OutroCusto.funcionario_id.in_(funcionarios_filter),
                 OutroCusto.data >= self.data_inicio,
-                OutroCusto.data <= self.data_fim
+                OutroCusto.data <= self.data_fim,
+                OutroCusto.kpi_associado == 'outros_custos'
             )
             custos['outros'] = query_outros.scalar() or 0
         
