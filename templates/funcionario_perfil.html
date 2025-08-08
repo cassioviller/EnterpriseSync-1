@@ -2552,21 +2552,28 @@ document.addEventListener('DOMContentLoaded', function() {
                         <div class="col-md-6">
                             <div class="mb-3">
                                 <label for="tipo_outro_custo" class="form-label">Tipo</label>
-                                <input type="text" class="form-control" id="tipo_outro_custo" name="tipo" 
-                                       placeholder="Ex: Vale Transporte, Vale Alimentação, Desconto VT..." required>
+                                <select class="form-select" id="tipo_outro_custo" name="tipo" required>
+                                    <option value="">Selecione o tipo...</option>
+                                    <option value="bonus">Bônus</option>
+                                    <option value="desconto">Desconto</option>
+                                    <option value="adicional">Adicional</option>
+                                    <option value="outros" selected>Outros</option>
+                                </select>
+                                <small class="form-text text-muted">Se é bônus, desconto ou adicional</small>
                             </div>
                         </div>
                     </div>
                     <div class="row">
                         <div class="col-md-6">
                             <div class="mb-3">
-                                <label for="categoria_outro_custo" class="form-label">Categoria</label>
+                                <label for="categoria_outro_custo" class="form-label">Categoria para KPI</label>
                                 <select class="form-select" id="categoria_outro_custo" name="categoria" required>
                                     <option value="">Selecione...</option>
                                     <option value="outros_custos" selected>Outros Custos</option>
                                     <option value="alimentacao">Alimentação</option>
                                     <option value="transporte">Transporte</option>
                                 </select>
+                                <small class="form-text text-muted">Qual KPI será afetado</small>
                             </div>
                         </div>
                         <div class="col-md-6">
