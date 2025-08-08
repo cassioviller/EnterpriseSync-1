@@ -374,20 +374,45 @@ def calcular_custos_mes(admin_id, data_inicio, data_fim):
             horas_extras = registro.horas_extras or 0
             custo_mao_obra += (horas * salario_hora) + (horas_extras * salario_hora * 1.5)
     
-    # Outros custos
-    outros_custos = db.session.query(func.sum(OutroCusto.valor)).join(
+    # Outros custos por categoria
+    outros_custos_query = db.session.query(
+        OutroCusto.categoria,
+        func.sum(OutroCusto.valor).label('total')
+    ).join(
         OutroCusto.funcionario_ref
     ).filter(
         OutroCusto.funcionario_ref.has(admin_id=admin_id),
         OutroCusto.data.between(data_inicio, data_fim)
-    ).scalar() or 0
+    ).group_by(OutroCusto.categoria).all()
+    
+    # Separar custos por categoria
+    custo_outros_alimentacao = 0
+    custo_outros_transporte = 0
+    custo_outros_diversos = 0
+    
+    for categoria, valor in outros_custos_query:
+        if categoria == 'alimentacao':
+            custo_outros_alimentacao = float(valor or 0)
+        elif categoria == 'transporte':
+            custo_outros_transporte = float(valor or 0)
+        else:  # outros_custos ou qualquer outra categoria
+            custo_outros_diversos = float(valor or 0)
+    
+    # Somar aos custos principais
+    custo_alimentacao_total = custo_alimentacao + custo_outros_alimentacao
+    custo_transporte_total = custo_transporte + custo_outros_transporte
     
     return {
-        'alimentacao': float(custo_alimentacao),
-        'transporte': float(custo_transporte),
+        'alimentacao': float(custo_alimentacao_total),
+        'transporte': float(custo_transporte_total),
         'mao_obra': float(custo_mao_obra),
-        'outros': float(outros_custos),
-        'total': float(custo_alimentacao + custo_transporte + custo_mao_obra + outros_custos)
+        'outros': float(custo_outros_diversos),
+        'total': float(custo_alimentacao_total + custo_transporte_total + custo_mao_obra + custo_outros_diversos),
+        'detalhes_outros_custos': {
+            'alimentacao_adicional': float(custo_outros_alimentacao),
+            'transporte_adicional': float(custo_outros_transporte),
+            'outros_diversos': float(custo_outros_diversos)
+        }
     }
 
 def formatar_cpf(cpf):
@@ -581,6 +606,33 @@ def calcular_kpis_funcionario_periodo(funcionario_id, data_inicio=None, data_fim
     else:
         produtividade = 0
     
+    # Calcular outros custos por categoria para este funcionário
+    outros_custos_query = db.session.query(
+        OutroCusto.categoria,
+        func.sum(OutroCusto.valor).label('total')
+    ).filter(
+        OutroCusto.funcionario_id == funcionario.id,
+        OutroCusto.data.between(data_inicio, data_fim)
+    ).group_by(OutroCusto.categoria).all()
+    
+    # Separar custos por categoria
+    custo_outros_alimentacao = 0
+    custo_outros_transporte = 0
+    custo_outros_diversos = 0
+    
+    for categoria, valor in outros_custos_query:
+        if categoria == 'alimentacao':
+            custo_outros_alimentacao = float(valor or 0)
+        elif categoria == 'transporte':
+            custo_outros_transporte = float(valor or 0)
+        else:  # outros_custos ou qualquer outra categoria
+            custo_outros_diversos = float(valor or 0)
+    
+    # Somar aos custos principais
+    custo_alimentacao_total = custo_alimentacao + custo_outros_alimentacao
+    custo_transporte_total = custo_transporte + custo_outros_transporte
+    custo_total_atualizado = custo_mao_obra + custo_alimentacao_total + custo_transporte_total + custo_faltas_justificadas + custo_outros_diversos
+
     return {
         'funcionario': funcionario,
         'horas_trabalhadas': total_horas_trabalhadas,
@@ -590,10 +642,11 @@ def calcular_kpis_funcionario_periodo(funcionario_id, data_inicio=None, data_fim
         'atrasos': atrasos,
         'dias_faltas_justificadas': dias_faltas_justificadas,
         'custo_mao_obra': custo_mao_obra,
-        'custo_alimentacao': custo_alimentacao,
-        'custo_transporte': custo_transporte,
+        'custo_alimentacao': custo_alimentacao_total,  # Inclui outros custos de alimentação
+        'custo_transporte': custo_transporte_total,    # Inclui outros custos de transporte
+        'custo_outros': custo_outros_diversos,         # Outros custos diversos
         'custo_faltas_justificadas': custo_faltas_justificadas,
-        'custo_total': custo_total,
+        'custo_total': custo_total_atualizado,
         'absenteismo': absenteismo,
         'produtividade': produtividade,  # Novo KPI
         'dias_uteis': dias_uteis,
@@ -604,7 +657,15 @@ def calcular_kpis_funcionario_periodo(funcionario_id, data_inicio=None, data_fim
         'total_minutos_atraso': total_minutos_atraso,
         'horas_perdidas_total': horas_perdidas_total,
         'horas_esperadas': horas_esperadas,
-        'pontualidade': pontualidade
+        'pontualidade': pontualidade,
+        # Detalhes dos custos adicionais
+        'detalhes_outros_custos': {
+            'alimentacao_base': custo_alimentacao,
+            'alimentacao_adicional': custo_outros_alimentacao,
+            'transporte_base': custo_transporte,
+            'transporte_adicional': custo_outros_transporte,
+            'outros_diversos': custo_outros_diversos
+        }
     }
 
 def calcular_kpis_funcionarios_geral(data_inicio=None, data_fim=None, admin_id=None, incluir_inativos=False):
