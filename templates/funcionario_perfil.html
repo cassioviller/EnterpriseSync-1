@@ -536,7 +536,7 @@
                                 <th>Tipo</th>
                                 <th>Categoria</th>
                                 <th>Valor</th>
-
+                                <th>KPI Associado</th>
                                 <th>Descrição</th>
                                 <th>Ações</th>
                             </tr>
@@ -564,7 +564,19 @@
                                         <span class="text-danger">-R$ {{ '{:,.2f}'.format(custo.valor) }}</span>
                                     {% endif %}
                                 </td>
-
+                                <td>
+                                    {% if custo.kpi_associado %}
+                                        {% if custo.kpi_associado == 'custo_alimentacao' %}
+                                            <span class="badge bg-success">Custo Alimentação</span>
+                                        {% elif custo.kpi_associado == 'custo_transporte' %}
+                                            <span class="badge bg-info">Custo Transporte</span>
+                                        {% else %}
+                                            <span class="badge bg-secondary">Outros Custos</span>
+                                        {% endif %}
+                                    {% else %}
+                                        <span class="badge bg-secondary">Outros Custos</span>
+                                    {% endif %}
+                                </td>
                                 <td>{{ custo.descricao or '-' }}</td>
                                 <td>
                                     <div class="btn-group" role="group">
@@ -2552,31 +2564,39 @@ document.addEventListener('DOMContentLoaded', function() {
                         <div class="col-md-6">
                             <div class="mb-3">
                                 <label for="tipo_outro_custo" class="form-label">Tipo</label>
-                                <select class="form-select" id="tipo_outro_custo" name="tipo" required>
-                                    <option value="">Selecione o tipo...</option>
-                                    <option value="bonus">Bônus</option>
-                                    <option value="desconto">Desconto</option>
-                                    <option value="adicional">Adicional</option>
-                                    <option value="outros" selected>Outros</option>
-                                </select>
-                                <small class="form-text text-muted">Se é bônus, desconto ou adicional</small>
+                                <input type="text" class="form-control" id="tipo_outro_custo" name="tipo" 
+                                       placeholder="Ex: Vale Transporte, Vale Alimentação, Desconto VT..." required>
                             </div>
                         </div>
                     </div>
                     <div class="row">
-                        <div class="col-md-6">
+                        <div class="col-md-4">
                             <div class="mb-3">
-                                <label for="categoria_outro_custo" class="form-label">Categoria para KPI</label>
+                                <label for="categoria_outro_custo" class="form-label">Categoria</label>
                                 <select class="form-select" id="categoria_outro_custo" name="categoria" required>
                                     <option value="">Selecione...</option>
-                                    <option value="outros_custos" selected>Outros Custos</option>
-                                    <option value="alimentacao">Alimentação</option>
-                                    <option value="transporte">Transporte</option>
+                                    <option value="adicional">Adicional (+)</option>
+                                    <option value="desconto">Desconto (-)</option>
                                 </select>
-                                <small class="form-text text-muted">Qual KPI será afetado</small>
                             </div>
                         </div>
-                        <div class="col-md-6">
+                        <div class="col-md-4">
+                            <div class="mb-3">
+                                <label for="kpi_associado_outro_custo" class="form-label">KPI Associado</label>
+                                <select class="form-select" id="kpi_associado_outro_custo" name="kpi_associado" required>
+                                    <option value="custo_alimentacao">Custo Alimentação</option>
+                                    <option value="custo_transporte">Custo Transporte</option>
+                                    <option value="outros_custos" selected>Outros Custos</option>
+                                </select>
+                                <div class="form-text">
+                                    <small class="text-muted">
+                                        <i class="fas fa-info-circle"></i> 
+                                        Selecione qual KPI deve contabilizar este custo
+                                    </small>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
                             <div class="mb-3">
                                 <label for="valor_outro_custo" class="form-label">Valor (R$)</label>
                                 <input type="number" step="0.01" class="form-control" id="valor_outro_custo" name="valor" required>

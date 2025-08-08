@@ -1637,28 +1637,18 @@ def criar_outro_custo(funcionario_id):
     
     try:
         data = datetime.strptime(request.form['data'], '%Y-%m-%d').date()
-        tipo = request.form['tipo']
-        valor_original = float(request.form['valor'])
         
-        # CORREÇÃO: Aplicar lógica correta de sinal baseado no TIPO
-        # Bônus, Adicional, Outros devem ser POSITIVOS
-        # Desconto deve ser NEGATIVO
-        if tipo.lower() in ['bonus', 'bônus', 'adicional', 'outros']:
-            valor_final = abs(valor_original)  # Garantir que seja positivo
-        elif tipo.lower() in ['desconto']:
-            valor_final = -abs(valor_original)  # Garantir que seja negativo
-        else:
-            # Para outros tipos, manter valor original
-            valor_final = valor_original
+        # Obter KPI associado ou usar padrão
+        kpi_associado = request.form.get('kpi_associado', 'outros_custos')
         
         outro_custo = OutroCusto(
             funcionario_id=funcionario_id,
             data=data,
-            tipo=tipo,
-            categoria=request.form.get('categoria', 'outros_custos'),
-            valor=valor_final,  # Usar valor com sinal correto
+            tipo=request.form['tipo'],
+            categoria=request.form['categoria'],
+            valor=float(request.form['valor']),
             descricao=request.form.get('descricao'),
-            admin_id=current_user.id
+            kpi_associado=kpi_associado  # NOVA FUNCIONALIDADE: Associação com KPI específico
         )
         
         db.session.add(outro_custo)
@@ -6707,29 +6697,16 @@ def criar_outro_custo_crud():
         funcionario_id = request.form.get('funcionario_id')
         data = datetime.strptime(request.form.get('data'), '%Y-%m-%d').date()
         tipo = request.form.get('tipo')
-        valor_original = float(request.form.get('valor'))
+        valor = float(request.form.get('valor'))
         descricao = request.form.get('descricao')
-        
-        # CORREÇÃO: Aplicar lógica correta de sinal baseado no TIPO
-        # Bônus, Adicional, Outros devem ser POSITIVOS
-        # Desconto deve ser NEGATIVO
-        if tipo.lower() in ['bonus', 'bônus', 'adicional', 'outros']:
-            valor_final = abs(valor_original)  # Garantir que seja positivo
-        elif tipo.lower() in ['desconto']:
-            valor_final = -abs(valor_original)  # Garantir que seja negativo
-        else:
-            # Para outros tipos, manter valor original
-            valor_final = valor_original
         
         # Criar custo
         custo = OutroCusto(
             funcionario_id=funcionario_id,
             data=data,
             tipo=tipo,
-            categoria=request.form.get('categoria', 'outros_custos'),
-            valor=valor_final,  # Usar valor com sinal correto
-            descricao=descricao,
-            admin_id=current_user.id
+            valor=valor,
+            descricao=descricao
         )
         
         db.session.add(custo)
@@ -6763,24 +6740,10 @@ def atualizar_outro_custo_crud(custo_id):
     try:
         custo = OutroCusto.query.get_or_404(custo_id)
         
-        tipo = request.form.get('tipo')
-        valor_original = float(request.form.get('valor'))
-        
-        # CORREÇÃO: Aplicar lógica correta de sinal baseado no TIPO
-        # Bônus, Adicional, Outros devem ser POSITIVOS
-        # Desconto deve ser NEGATIVO
-        if tipo.lower() in ['bonus', 'bônus', 'adicional', 'outros']:
-            valor_final = abs(valor_original)  # Garantir que seja positivo
-        elif tipo.lower() in ['desconto']:
-            valor_final = -abs(valor_original)  # Garantir que seja negativo
-        else:
-            # Para outros tipos, manter valor original
-            valor_final = valor_original
-        
         custo.funcionario_id = request.form.get('funcionario_id')
         custo.data = datetime.strptime(request.form.get('data'), '%Y-%m-%d').date()
-        custo.tipo = tipo
-        custo.valor = valor_final  # Usar valor com sinal correto
+        custo.tipo = request.form.get('tipo')
+        custo.valor = float(request.form.get('valor'))
         custo.descricao = request.form.get('descricao')
         
         db.session.commit()
