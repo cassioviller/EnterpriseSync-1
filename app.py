@@ -75,3 +75,25 @@ with app.app_context():
             logging.warning("⚠️ Algumas fotos podem não ter sido corrigidas")
     except Exception as e:
         logging.warning(f"⚠️ Aviso: Não foi possível corrigir fotos automaticamente: {e}")
+    
+    # Verificar e adicionar coluna kpi_associado se necessário
+    try:
+        from sqlalchemy import text, inspect
+        
+        # Verificar se a coluna kpi_associado existe
+        inspector = inspect(db.engine)
+        columns = inspector.get_columns('outro_custo')
+        column_names = [col['name'] for col in columns]
+        
+        if 'kpi_associado' not in column_names:
+            logging.info("🔧 Adicionando coluna kpi_associado...")
+            db.session.execute(text("ALTER TABLE outro_custo ADD COLUMN kpi_associado VARCHAR(30) DEFAULT 'outros_custos'"))
+            db.session.execute(text("UPDATE outro_custo SET kpi_associado = 'outros_custos' WHERE kpi_associado IS NULL"))
+            db.session.commit()
+            logging.info("✅ Coluna kpi_associado adicionada com sucesso")
+        else:
+            logging.info("✅ Coluna kpi_associado já existe")
+            
+    except Exception as e:
+        logging.warning(f"⚠️ Aviso: Não foi possível verificar/adicionar coluna kpi_associado: {e}")
+        db.session.rollback()
