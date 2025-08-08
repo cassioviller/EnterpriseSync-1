@@ -64,7 +64,14 @@ def load_user(user_id):
 # Create tables if they don't exist
 with app.app_context():
     db.create_all()
+
     logging.info("Database tables created/verified")
+
+# Adicionar função para templates
+@app.context_processor
+def inject_foto_funcionario():
+    from utils import obter_foto_funcionario
+    return dict(obter_foto_funcionario=obter_foto_funcionario)
     
     # Corrigir fotos dos funcionários automaticamente no startup
     try:

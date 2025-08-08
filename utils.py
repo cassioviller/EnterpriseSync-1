@@ -226,27 +226,87 @@ def gerar_codigo_funcionario():
     return f"VV{novo_numero:03d}"
 
 def salvar_foto_funcionario(foto, codigo):
-    """Salva foto do funcionário e retorna o nome do arquivo"""
+    """Salva foto do funcionário como base64 e arquivo, retorna o nome do arquivo e base64"""
     if not foto:
-        return None
+        return None, None
     
-    # Criar diretório se não existe
-    upload_dir = os.path.join(current_app.static_folder, 'uploads', 'funcionarios')
-    os.makedirs(upload_dir, exist_ok=True)
+    import base64
+    import io
+    from PIL import Image
     
-    # Nome seguro do arquivo
-    filename = secure_filename(foto.filename)
-    extensao = filename.rsplit('.', 1)[1].lower() if '.' in filename else 'jpg'
+    try:
+        # Ler dados da foto
+        foto.seek(0)
+        foto_data = foto.read()
+        
+        # Criar diretório se não existe
+        upload_dir = os.path.join(current_app.static_folder, 'uploads', 'funcionarios')
+        os.makedirs(upload_dir, exist_ok=True)
+        
+        # Nome seguro do arquivo
+        filename = secure_filename(foto.filename)
+        extensao = filename.rsplit('.', 1)[1].lower() if '.' in filename else 'jpg'
+        
+        # Redimensionar imagem para economizar espaço
+        image = Image.open(io.BytesIO(foto_data))
+        image = image.convert('RGB')  # Converter para RGB se necessário
+        
+        # Redimensionar para máximo 200x200 pixels mantendo proporção
+        image.thumbnail((200, 200), Image.Resampling.LANCZOS)
+        
+        # Salvar como JPEG otimizado
+        img_buffer = io.BytesIO()
+        image.save(img_buffer, format='JPEG', quality=85, optimize=True)
+        img_buffer.seek(0)
+        foto_otimizada = img_buffer.getvalue()
+        
+        # Converter para base64
+        foto_base64 = base64.b64encode(foto_otimizada).decode('utf-8')
+        foto_base64_completo = f"data:image/jpeg;base64,{foto_base64}"
+        
+        # Nome final: codigo_funcionario.jpg (sempre JPG para consistência)
+        nome_arquivo = f"{codigo}.jpg"
+        caminho_completo = os.path.join(upload_dir, nome_arquivo)
+        
+        # Salvar arquivo físico (para fallback)
+        with open(caminho_completo, 'wb') as f:
+            f.write(foto_otimizada)
+        
+        # Retornar caminho relativo e base64
+        return f"uploads/funcionarios/{nome_arquivo}", foto_base64_completo
+        
+    except Exception as e:
+        print(f"Erro ao processar foto: {e}")
+        return None, None
+
+def obter_foto_funcionario(funcionario):
+    """Retorna a foto do funcionário: base64 primeiro, depois arquivo, ou avatar SVG gerado"""
+    if funcionario.foto_base64:
+        return funcionario.foto_base64
     
-    # Nome final: codigo_funcionario.extensao
-    nome_arquivo = f"{codigo}.{extensao}"
-    caminho_completo = os.path.join(upload_dir, nome_arquivo)
+    if funcionario.foto and os.path.exists(os.path.join('static', funcionario.foto)):
+        return url_for('static', filename=funcionario.foto)
     
-    # Salvar arquivo
-    foto.save(caminho_completo)
+    # Gerar avatar SVG como fallback
+    import hashlib
+    hash_nome = hashlib.md5(funcionario.nome.encode()).hexdigest()
+    cor_fundo = f"#{hash_nome[:6]}"
     
-    # Retornar caminho relativo para salvar no banco
-    return f"uploads/funcionarios/{nome_arquivo}"
+    palavras = funcionario.nome.split()
+    iniciais = ""
+    if len(palavras) >= 2:
+        iniciais = palavras[0][0] + palavras[-1][0]
+    else:
+        iniciais = palavras[0][:2] if palavras else "??"
+    
+    svg_content = f'''<svg width="120" height="120" viewBox="0 0 120 120" style="background-color: {cor_fundo}; border-radius: 50%;">
+  <text x="60" y="70" font-family="Arial, sans-serif" font-size="40" font-weight="bold" 
+        text-anchor="middle" fill="white">{iniciais.upper()}</text>
+</svg>'''
+    
+    import base64
+    svg_base64 = base64.b64encode(svg_content.encode('utf-8')).decode('utf-8')
+    return f"data:image/svg+xml;base64,{svg_base64}"
 
 def validar_cpf(cpf):
     """Valida CPF brasileiro"""

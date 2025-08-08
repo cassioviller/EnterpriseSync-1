@@ -852,9 +852,10 @@ def novo_funcionario():
             
             # Processar upload de foto
             if form.foto.data:
-                foto_path = salvar_foto_funcionario(form.foto.data, funcionario.codigo)
+                foto_path, foto_base64 = salvar_foto_funcionario(form.foto.data, funcionario.codigo)
                 if foto_path:
                     funcionario.foto = foto_path
+                    funcionario.foto_base64 = foto_base64
             
             db.session.commit()
             flash('Funcionário cadastrado com sucesso!', 'success')
@@ -916,9 +917,10 @@ def editar_funcionario(id):
                 foto = request.files['foto']
                 if foto and foto.filename:
                     from utils import salvar_foto_funcionario
-                    foto_path = salvar_foto_funcionario(foto, funcionario.codigo)
+                    foto_path, foto_base64 = salvar_foto_funcionario(foto, funcionario.codigo)
                     if foto_path:
                         funcionario.foto = foto_path
+                        funcionario.foto_base64 = foto_base64
             
             db.session.commit()
             flash('Funcionário atualizado com sucesso!', 'success')
@@ -1341,9 +1343,10 @@ def funcionario_modal():
         if 'foto' in request.files:
             foto = request.files['foto']
             if foto and foto.filename:
-                foto_path = salvar_foto_funcionario(foto, funcionario.codigo)
+                foto_path, foto_base64 = salvar_foto_funcionario(foto, funcionario.codigo)
                 if foto_path:
                     funcionario.foto = foto_path
+                    funcionario.foto_base64 = foto_base64
         
         db.session.commit()
         flash('Funcionário cadastrado com sucesso!', 'success')
