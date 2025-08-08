@@ -1572,9 +1572,9 @@ def funcionario_perfil(id):
             for key, value in data.items():
                 setattr(self, key, value)
     
-    # CORRIGIDO: Usar kpi_associado para categorizar custos corretamente
+    # CORRIGIDO: Usar kpi_associado e valores já têm sinais corretos
     total_outros_custos = sum(
-        c.valor if c.categoria == 'adicional' else -c.valor 
+        c.valor
         for c in outros_custos 
         if c.kpi_associado == 'outros_custos'
     )
