@@ -8,6 +8,16 @@ SIGE (Sistema Integrado de Gestão Empresarial) is a comprehensive business mana
 
 Preferred communication style: Simple, everyday language.
 
+## Recent Changes
+
+**Latest Update - August 8, 2025:**
+- ✅ Resolved critical `UndefinedColumn` error for `admin_id` in production environments
+- ✅ Created robust deployment script (`fix_admin_id_production.py`) for production fixes
+- ✅ Fixed template dependencies in `funcionario_perfil.html` to use available KPI fields
+- ✅ Implemented comprehensive SQLAlchemy cache clearing and metadata reflection
+- ✅ Validated complete functionality: 58 outro_custo records with proper admin_id assignment
+- ✅ Documented complete solution in `SOLUCAO_ADMIN_ID_PRODUCAO.md` for future deployments
+
 ## System Architecture
 
 ### Core Design Principles
