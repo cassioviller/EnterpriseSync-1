@@ -9,22 +9,22 @@ Na produção, a tabela `outro_custo` não possui a coluna `admin_id`, causando:
 
 ## 🔧 **SOLUÇÃO AUTOMATIZADA**
 
-### **Opção 1: Script de Deploy Direto**
+### **Opção 1: Script Simples (RECOMENDADO)**
 
-Execute no servidor de produção:
+Execute no servidor de produção após o deploy:
 
 ```bash
-# Fazer upload do script
-python deploy_admin_id_fix.py
+# Script simples e direto
+python fix_admin_id_simple.py
 ```
 
-### **Opção 2: Docker com Entrypoint Automatizado**
+### **Opção 2: Docker Automático (Já Configurado)**
 
-O Dockerfile foi atualizado para executar automaticamente:
+O docker-entrypoint.sh já foi atualizado para verificar e corrigir automaticamente:
 
-```dockerfile
-# Novo entrypoint que executa migrações
-ENTRYPOINT ["/app/entrypoint.sh"]
+```bash
+# No próximo deploy, será executado automaticamente
+docker run sige:latest
 ```
 
 ### **Opção 3: Execução Manual SQL**

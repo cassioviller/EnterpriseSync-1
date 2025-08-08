@@ -70,6 +70,45 @@ if os.path.exists('/app/views.py'):
 echo "🔧 Verificando e corrigindo schema de restaurantes..."
 python3 auto_fix_schema.py
 
+# CORREÇÃO ADMIN_ID - Adicionar coluna se não existir
+echo "🔧 Verificando coluna admin_id..."
+python3 -c "
+from app import app, db
+from sqlalchemy import text
+
+with app.app_context():
+    try:
+        # Verificar se admin_id existe
+        result = db.session.execute(text('''
+            SELECT column_name 
+            FROM information_schema.columns 
+            WHERE table_name = 'outro_custo' AND column_name = 'admin_id'
+        '''))
+        
+        if not result.fetchone():
+            print('⚡ Adicionando coluna admin_id...')
+            db.session.execute(text('ALTER TABLE outro_custo ADD COLUMN admin_id INTEGER'))
+            
+            # Atualizar registros existentes
+            updated = db.session.execute(text('''
+                UPDATE outro_custo 
+                SET admin_id = (
+                    SELECT admin_id 
+                    FROM funcionario 
+                    WHERE funcionario.id = outro_custo.funcionario_id
+                    LIMIT 1
+                )
+                WHERE admin_id IS NULL
+            ''')).rowcount
+            
+            db.session.commit()
+            print(f'✅ Coluna admin_id adicionada - {updated} registros atualizados')
+        else:
+            print('✅ Coluna admin_id já existe')
+    except Exception as e:
+        print(f'❌ Erro na correção admin_id: {e}')
+"
+
 # Criar usuário admin
 echo "Criando usuários..."
 python3 -c "

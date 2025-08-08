@@ -38,15 +38,13 @@ RUN pip install --no-cache-dir --upgrade pip setuptools wheel && \
 # Copiar código da aplicação
 COPY . .
 
-# Copiar scripts de deploy e migração
-COPY scripts/ /app/scripts/
-COPY migrations/ /app/migrations/
-COPY entrypoint.sh /app/entrypoint.sh
-
-# Criar diretórios necessários e tornar scripts executáveis
+# Criar diretórios necessários
 RUN mkdir -p /app/static/fotos /app/logs && \
-    chmod +x /app/entrypoint.sh && \
     chown -R sige:sige /app
+
+# Copiar script de entrada original
+COPY docker-entrypoint.sh /app/
+RUN chmod +x /app/docker-entrypoint.sh
 
 # Mudar para usuário não-root
 USER sige
@@ -60,5 +58,5 @@ ENV FLASK_ENV=production \
 # Expor porta
 EXPOSE 5000
 
-# Comando de entrada que executa migrações antes de iniciar
-ENTRYPOINT ["/app/entrypoint.sh"]
+# Comando de entrada
+ENTRYPOINT ["/app/docker-entrypoint.sh"]
