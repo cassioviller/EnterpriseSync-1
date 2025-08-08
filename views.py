@@ -1572,8 +1572,12 @@ def funcionario_perfil(id):
             for key, value in data.items():
                 setattr(self, key, value)
     
-    # Adicionar cálculo de outros custos
-    total_outros_custos = sum(c.valor if c.categoria == 'adicional' else -c.valor for c in outros_custos)
+    # CORRIGIDO: Usar kpi_associado para categorizar custos corretamente
+    total_outros_custos = sum(
+        c.valor if c.categoria == 'adicional' else -c.valor 
+        for c in outros_custos 
+        if c.kpi_associado == 'outros_custos'
+    )
     
     if kpis:
         # Corrigir horas perdidas: (faltas * 8) + atrasos
