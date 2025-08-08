@@ -575,10 +575,6 @@ class OutroCusto(db.Model):
     descricao = db.Column(db.Text)
     obra_id = db.Column(db.Integer, db.ForeignKey('obra.id'))
     percentual = db.Column(db.Float)  # Para descontos percentuais (ex: 6% do salário)
-    
-    # NOVA FUNCIONALIDADE: Associação com KPIs específicos
-    kpi_associado = db.Column(db.String(30), default='outros_custos')  # 'custo_alimentacao', 'custo_transporte', 'outros_custos'
-    
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     
     funcionario = db.relationship('Funcionario', backref='outros_custos')
