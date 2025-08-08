@@ -506,26 +506,43 @@ def calcular_kpis_funcionario_periodo(funcionario_id, data_inicio=None, data_fim
         salario_hora = funcionario.salario / 220
         custo_mao_obra = (total_horas_trabalhadas * salario_hora) + (total_horas_extras * salario_hora * 1.5)
     
-    # Custo de alimentação
-    custo_alimentacao = db.session.query(func.sum(RegistroAlimentacao.valor)).filter(
+    # CORRIGIDO: Usar nova lógica com kpi_associado
+    from models import OutroCusto
+    
+    # Custo de alimentação (RegistroAlimentacao + OutroCusto com kpi_associado='custo_alimentacao')
+    custo_alimentacao_registro = db.session.query(func.sum(RegistroAlimentacao.valor)).filter(
         RegistroAlimentacao.funcionario_id == funcionario_id,
         RegistroAlimentacao.data >= data_inicio,
         RegistroAlimentacao.data <= data_fim
     ).scalar() or 0
     
-    # Custo de transporte (baseado no uso de veículos)
-    custo_transporte = 0
-    usos_veiculo = UsoVeiculo.query.filter(
-        UsoVeiculo.funcionario_id == funcionario_id,
-        UsoVeiculo.data_uso >= data_inicio,
-        UsoVeiculo.data_uso <= data_fim
-    ).all()
+    custo_alimentacao_outro = db.session.query(func.sum(OutroCusto.valor)).filter(
+        OutroCusto.funcionario_id == funcionario_id,
+        OutroCusto.data >= data_inicio,
+        OutroCusto.data <= data_fim,
+        OutroCusto.kpi_associado == 'custo_alimentacao'
+    ).scalar() or 0
     
-    # Assumindo um custo médio por uso de veículo (pode ser refinado)
-    custo_transporte = len(usos_veiculo) * 50.0  # R$ 50 por uso estimado
+    custo_alimentacao = custo_alimentacao_registro + custo_alimentacao_outro
+    
+    # Custo de transporte (OutroCusto com kpi_associado='custo_transporte')
+    custo_transporte = db.session.query(func.sum(OutroCusto.valor)).filter(
+        OutroCusto.funcionario_id == funcionario_id,
+        OutroCusto.data >= data_inicio,
+        OutroCusto.data <= data_fim,
+        OutroCusto.kpi_associado == 'custo_transporte'
+    ).scalar() or 0
+    
+    # Outros custos (OutroCusto com kpi_associado='outros_custos')
+    outros_custos = db.session.query(func.sum(OutroCusto.valor)).filter(
+        OutroCusto.funcionario_id == funcionario_id,
+        OutroCusto.data >= data_inicio,
+        OutroCusto.data <= data_fim,
+        OutroCusto.kpi_associado == 'outros_custos'
+    ).scalar() or 0
     
     # Custo total do funcionário
-    custo_total = custo_mao_obra + custo_alimentacao + custo_transporte + custo_faltas_justificadas
+    custo_total = custo_mao_obra + custo_alimentacao + custo_transporte + outros_custos + custo_faltas_justificadas
     
     # Calcular dias úteis no período (segunda a sexta)
     dias_uteis = 0
@@ -592,6 +609,7 @@ def calcular_kpis_funcionario_periodo(funcionario_id, data_inicio=None, data_fim
         'custo_mao_obra': custo_mao_obra,
         'custo_alimentacao': custo_alimentacao,
         'custo_transporte': custo_transporte,
+        'outros_custos': outros_custos,
         'custo_faltas_justificadas': custo_faltas_justificadas,
         'custo_total': custo_total,
         'absenteismo': absenteismo,
