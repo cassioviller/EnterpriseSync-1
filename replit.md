@@ -11,15 +11,17 @@ Preferred communication style: Simple, everyday language.
 ## Recent Changes
 
 **Latest Update - August 8, 2025:**
-- ✅ Resolved critical `UndefinedColumn` error for `admin_id` in production environments
-- ✅ Created automated deployment scripts for production admin_id fix:
+- ✅ Resolved critical `UndefinedColumn` errors for database schema consistency
+- ✅ Fixed `outro_custo.admin_id` column issue in production environments
+- ✅ Fixed `outro_custo.kpi_associado` column metadata caching issue
+- ✅ Created automated deployment scripts for production fixes:
   - `deploy_admin_id_fix.py` - Direct execution script
   - `migrations/add_admin_id_to_outro_custo.py` - Automated migration
-  - `entrypoint.sh` - Docker container entry point with auto-migration
-- ✅ Updated Dockerfile for automated deployment with migration execution
+  - `docker-entrypoint.sh` - Enhanced with both `admin_id` and `kpi_associado` column verification
+- ✅ Updated Dockerfile for automated deployment with comprehensive migration execution
 - ✅ Fixed template dependencies in `funcionario_perfil.html` to use available KPI fields
 - ✅ Implemented comprehensive deployment verification and rollback protection
-- ✅ Complete production-ready solution with multiple deployment options
+- ✅ Complete production-ready solution with automated schema validation during deployment
 
 ## System Architecture
 

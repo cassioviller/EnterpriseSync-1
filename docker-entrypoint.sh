@@ -109,6 +109,40 @@ with app.app_context():
         print(f'❌ Erro na correção admin_id: {e}')
 "
 
+# CORREÇÃO KPI_ASSOCIADO - Adicionar coluna se não existir
+echo "🔧 Verificando coluna kpi_associado..."
+python3 -c "
+from app import app, db
+from sqlalchemy import text
+
+with app.app_context():
+    try:
+        # Verificar se kpi_associado existe
+        result = db.session.execute(text('''
+            SELECT column_name 
+            FROM information_schema.columns 
+            WHERE table_name = 'outro_custo' AND column_name = 'kpi_associado'
+        '''))
+        
+        if not result.fetchone():
+            print('⚡ Adicionando coluna kpi_associado...')
+            db.session.execute(text(\"ALTER TABLE outro_custo ADD COLUMN kpi_associado VARCHAR(30) DEFAULT 'outros_custos'\"))
+            
+            # Atualizar registros existentes
+            updated = db.session.execute(text('''
+                UPDATE outro_custo 
+                SET kpi_associado = 'outros_custos'
+                WHERE kpi_associado IS NULL
+            ''')).rowcount
+            
+            db.session.commit()
+            print(f'✅ Coluna kpi_associado adicionada - {updated} registros atualizados')
+        else:
+            print('✅ Coluna kpi_associado já existe')
+    except Exception as e:
+        print(f'❌ Erro na correção kpi_associado: {e}')
+"
+
 # Criar usuário admin
 echo "Criando usuários..."
 python3 -c "
