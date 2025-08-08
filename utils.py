@@ -379,9 +379,9 @@ def calcular_custos_mes(admin_id, data_inicio, data_fim):
         OutroCusto.categoria,
         func.sum(OutroCusto.valor).label('total')
     ).join(
-        OutroCusto.funcionario_ref
+        OutroCusto.funcionario
     ).filter(
-        OutroCusto.funcionario_ref.has(admin_id=admin_id),
+        OutroCusto.funcionario.has(admin_id=admin_id),
         OutroCusto.data.between(data_inicio, data_fim)
     ).group_by(OutroCusto.categoria).all()
     
