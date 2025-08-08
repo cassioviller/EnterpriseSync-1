@@ -1,0 +1,481 @@
+# 🔍 PROMPT: VERIFICAÇÃO COMPLETA, CORREÇÃO E RELATÓRIO - OUTROS CUSTOS
+
+## 📋 **SOLICITAÇÃO COMPLETA**
+
+**FAÇA UMA VERIFICAÇÃO COMPLETA do módulo "Outros Custos" para identificar:**
+1. Como está construído o app nessa parte
+2. Se está sendo atualizado corretamente no deploy
+3. Onde estão os problemas
+4. Corrija os problemas encontrados
+5. Gere um relatório detalhado com todas as informações
+
+---
+
+## 🔍 **ETAPA 1: VERIFICAÇÃO DA ESTRUTURA**
+
+### **A) Verificar Modelo de Dados:**
+
+```python
+# 1. Verificar estrutura da tabela outro_custo
+def verificar_estrutura_banco():
+    """Verifica estrutura atual da tabela outro_custo"""
+    from app import app, db
+    
+    with app.app_context():
+        print("🔍 VERIFICANDO ESTRUTURA DO BANCO...")
+        
+        # Verificar colunas existentes
+        result = db.session.execute("""
+            SELECT column_name, data_type, is_nullable 
+            FROM information_schema.columns 
+            WHERE table_name = 'outro_custo'
+            ORDER BY ordinal_position
+        """)
+        
+        colunas = list(result)
+        
+        print("📊 COLUNAS DA TABELA outro_custo:")
+        for coluna in colunas:
+            print(f"   - {coluna[0]} ({coluna[1]}) - Nullable: {coluna[2]}")
+        
+        # Verificar se admin_id existe
+        admin_id_existe = any(col[0] == 'admin_id' for col in colunas)
+        print(f"\n🔍 COLUNA admin_id EXISTE: {admin_id_existe}")
+        
+        # Verificar índices
+        indices = db.session.execute("""
+            SELECT indexname, indexdef 
+            FROM pg_indexes 
+            WHERE tablename = 'outro_custo'
+        """)
+        
+        print("\n📊 ÍNDICES:")
+        for indice in indices:
+            print(f"   - {indice[0]}: {indice[1]}")
+        
+        return colunas, admin_id_existe
+
+# EXECUTAR VERIFICAÇÃO
+verificar_estrutura_banco()
+```
+
+### **B) Verificar Modelo Python:**
+
+```python
+# 2. Verificar definição do modelo OutroCusto
+def verificar_modelo_python():
+    """Verifica definição atual do modelo OutroCusto"""
+    from models import OutroCusto
+    import inspect
+    
+    print("🔍 VERIFICANDO MODELO PYTHON...")
+    
+    # Verificar atributos da classe
+    atributos = [attr for attr in dir(OutroCusto) if not attr.startswith('_')]
+    print("📊 ATRIBUTOS DO MODELO:")
+    for attr in atributos:
+        print(f"   - {attr}")
+    
+    # Verificar colunas definidas
+    if hasattr(OutroCusto, '__table__'):
+        colunas = OutroCusto.__table__.columns.keys()
+        print("\n📊 COLUNAS DEFINIDAS NO MODELO:")
+        for coluna in colunas:
+            print(f"   - {coluna}")
+    
+    # Verificar relacionamentos
+    if hasattr(OutroCusto, '__mapper__'):
+        relacionamentos = OutroCusto.__mapper__.relationships.keys()
+        print("\n📊 RELACIONAMENTOS:")
+        for rel in relacionamentos:
+            print(f"   - {rel}")
+    
+    return atributos, colunas if hasattr(OutroCusto, '__table__') else []
+
+# EXECUTAR VERIFICAÇÃO
+verificar_modelo_python()
+```
+
+### **C) Verificar Rotas e Views:**
+
+```python
+# 3. Verificar rotas relacionadas a outros custos
+def verificar_rotas():
+    """Verifica rotas relacionadas a outros custos"""
+    from app import app
+    
+    print("🔍 VERIFICANDO ROTAS...")
+    
+    rotas_outros_custos = []
+    
+    for rule in app.url_map.iter_rules():
+        if 'outro' in rule.rule.lower() or 'custo' in rule.rule.lower():
+            rotas_outros_custos.append({
+                'endpoint': rule.endpoint,
+                'rule': rule.rule,
+                'methods': list(rule.methods)
+            })
+    
+    print("📊 ROTAS RELACIONADAS A OUTROS CUSTOS:")
+    for rota in rotas_outros_custos:
+        print(f"   - {rota['rule']} ({rota['methods']}) → {rota['endpoint']}")
+    
+    return rotas_outros_custos
+
+# EXECUTAR VERIFICAÇÃO
+verificar_rotas()
+```
+
+## 🔍 **ETAPA 2: VERIFICAÇÃO DO DEPLOY**
+
+### **A) Verificar Arquivos em Produção:**
+
+```bash
+# 4. Verificar timestamps dos arquivos principais
+echo "🔍 VERIFICANDO ARQUIVOS EM PRODUÇÃO..."
+
+echo "📊 TIMESTAMPS DOS ARQUIVOS:"
+ls -la views.py | awk '{print "views.py: " $6 " " $7 " " $8}'
+ls -la models.py | awk '{print "models.py: " $6 " " $7 " " $8}'
+ls -la templates/funcionarios/perfil.html | awk '{print "perfil.html: " $6 " " $7 " " $8}'
+
+echo "\n📊 ÚLTIMAS MODIFICAÇÕES:"
+find . -name "*.py" -mtime -1 -exec ls -la {} \;
+
+echo "\n📊 PROCESSO GUNICORN:"
+ps aux | grep gunicorn | grep -v grep
+
+echo "\n📊 LOGS RECENTES:"
+tail -20 /var/log/gunicorn/error.log 2>/dev/null || echo "Log não encontrado"
+```
+
+### **B) Verificar Configuração de Deploy:**
+
+```python
+# 5. Verificar configurações do app
+def verificar_configuracao():
+    """Verifica configurações atuais do app"""
+    from app import app
+    import os
+    
+    print("🔍 VERIFICANDO CONFIGURAÇÃO...")
+    
+    print("📊 CONFIGURAÇÕES DO APP:")
+    print(f"   - DEBUG: {app.config.get('DEBUG', 'Não definido')}")
+    print(f"   - ENV: {app.config.get('ENV', 'Não definido')}")
+    print(f"   - DATABASE_URL: {'Definido' if app.config.get('DATABASE_URL') else 'Não definido'}")
+    
+    print("\n📊 VARIÁVEIS DE AMBIENTE:")
+    env_vars = ['FLASK_ENV', 'FLASK_APP', 'DATABASE_URL', 'SECRET_KEY']
+    for var in env_vars:
+        valor = os.environ.get(var)
+        print(f"   - {var}: {'Definido' if valor else 'Não definido'}")
+    
+    print("\n📊 MODO DE EXECUÇÃO:")
+    print(f"   - __name__: {__name__}")
+    print(f"   - app.name: {app.name}")
+
+# EXECUTAR VERIFICAÇÃO
+verificar_configuracao()
+```
+
+## 🔍 **ETAPA 3: VERIFICAÇÃO DOS DADOS**
+
+### **A) Verificar Registros Problemáticos:**
+
+```python
+# 6. Verificar dados atuais de outros custos
+def verificar_dados_outros_custos():
+    """Verifica estado atual dos dados"""
+    from app import app, db
+    from models import OutroCusto
+    
+    with app.app_context():
+        print("🔍 VERIFICANDO DADOS ATUAIS...")
+        
+        # Contar total de registros
+        total = OutroCusto.query.count()
+        print(f"📊 TOTAL DE REGISTROS: {total}")
+        
+        # Verificar por tipo
+        tipos = db.session.query(OutroCusto.tipo, db.func.count(OutroCusto.id)).group_by(OutroCusto.tipo).all()
+        print("\n📊 REGISTROS POR TIPO:")
+        for tipo, count in tipos:
+            print(f"   - {tipo}: {count}")
+        
+        # Verificar valores problemáticos
+        print("\n📊 ANÁLISE DE VALORES:")
+        
+        # Bônus negativos
+        bonus_negativos = OutroCusto.query.filter(
+            OutroCusto.tipo.ilike('%bonus%'),
+            OutroCusto.valor < 0
+        ).all()
+        print(f"   - Bônus negativos: {len(bonus_negativos)}")
+        
+        # Adicionais negativos
+        adicionais_negativos = OutroCusto.query.filter(
+            OutroCusto.tipo.ilike('%adicional%'),
+            OutroCusto.valor < 0
+        ).all()
+        print(f"   - Adicionais negativos: {len(adicionais_negativos)}")
+        
+        # Descontos positivos
+        descontos_positivos = OutroCusto.query.filter(
+            OutroCusto.tipo.ilike('%desconto%'),
+            OutroCusto.valor > 0
+        ).all()
+        print(f"   - Descontos positivos: {len(descontos_positivos)}")
+        
+        # Mostrar exemplos problemáticos
+        if bonus_negativos:
+            print("\n📊 EXEMPLOS DE BÔNUS NEGATIVOS:")
+            for bonus in bonus_negativos[:3]:
+                print(f"   - ID {bonus.id}: {bonus.tipo} = R$ {bonus.valor}")
+        
+        if adicionais_negativos:
+            print("\n📊 EXEMPLOS DE ADICIONAIS NEGATIVOS:")
+            for adicional in adicionais_negativos[:3]:
+                print(f"   - ID {adicional.id}: {adicional.tipo} = R$ {adicional.valor}")
+        
+        return {
+            'total': total,
+            'bonus_negativos': len(bonus_negativos),
+            'adicionais_negativos': len(adicionais_negativos),
+            'descontos_positivos': len(descontos_positivos)
+        }
+
+# EXECUTAR VERIFICAÇÃO
+dados_stats = verificar_dados_outros_custos()
+```
+
+## 🔧 **ETAPA 4: CORREÇÃO DOS PROBLEMAS**
+
+### **A) Corrigir Erro de Banco:**
+
+```python
+# 7. Identificar e corrigir queries problemáticas
+def corrigir_erro_banco():
+    """Identifica e corrige erro de admin_id"""
+    import re
+    import os
+    
+    print("🔧 CORRIGINDO ERRO DE BANCO...")
+    
+    # Procurar por admin_id em arquivos Python
+    arquivos_python = []
+    for root, dirs, files in os.walk('.'):
+        for file in files:
+            if file.endswith('.py'):
+                filepath = os.path.join(root, file)
+                try:
+                    with open(filepath, 'r', encoding='utf-8') as f:
+                        content = f.read()
+                        if 'admin_id' in content and 'outro_custo' in content:
+                            arquivos_python.append(filepath)
+                except:
+                    pass
+    
+    print("📊 ARQUIVOS COM REFERÊNCIA A admin_id:")
+    for arquivo in arquivos_python:
+        print(f"   - {arquivo}")
+    
+    # Analisar cada arquivo
+    for arquivo in arquivos_python:
+        print(f"\n🔍 ANALISANDO: {arquivo}")
+        try:
+            with open(arquivo, 'r', encoding='utf-8') as f:
+                lines = f.readlines()
+                for i, line in enumerate(lines, 1):
+                    if 'admin_id' in line and 'outro_custo' in line:
+                        print(f"   Linha {i}: {line.strip()}")
+        except:
+            print(f"   ❌ Erro ao ler arquivo")
+
+# EXECUTAR CORREÇÃO
+corrigir_erro_banco()
+```
+
+### **B) Corrigir Valores:**
+
+```python
+# 8. Corrigir valores dos registros
+def corrigir_valores_registros():
+    """Corrige valores com sinais incorretos"""
+    from app import app, db
+    from models import OutroCusto
+    
+    with app.app_context():
+        print("🔧 CORRIGINDO VALORES DOS REGISTROS...")
+        
+        corrigidos = 0
+        
+        # Buscar registros problemáticos
+        registros = OutroCusto.query.all()
+        
+        for registro in registros:
+            valor_original = registro.valor
+            tipo = registro.tipo.lower() if registro.tipo else ''
+            
+            # Aplicar lógica correta
+            if tipo in ['bonus', 'bônus', 'adicional', 'outros']:
+                valor_correto = abs(valor_original)
+            elif tipo in ['desconto']:
+                valor_correto = -abs(valor_original)
+            else:
+                valor_correto = valor_original
+            
+            # Atualizar se necessário
+            if valor_correto != valor_original:
+                print(f"📊 CORRIGINDO ID {registro.id}:")
+                print(f"   Tipo: {registro.tipo}")
+                print(f"   Valor: {valor_original} → {valor_correto}")
+                
+                registro.valor = valor_correto
+                corrigidos += 1
+        
+        # Salvar alterações
+        if corrigidos > 0:
+            db.session.commit()
+            print(f"✅ CORRIGIDOS {corrigidos} REGISTROS")
+        else:
+            print("ℹ️  NENHUM REGISTRO PRECISOU SER CORRIGIDO")
+        
+        return corrigidos
+
+# EXECUTAR CORREÇÃO
+corrigidos = corrigir_valores_registros()
+```
+
+## 📊 **ETAPA 5: GERAR RELATÓRIO COMPLETO**
+
+### **Executar todas as verificações e gerar relatório:**
+
+```python
+# 9. Gerar relatório completo
+def gerar_relatorio_completo():
+    """Gera relatório completo com todas as informações"""
+    import datetime
+    
+    print("📊 GERANDO RELATÓRIO COMPLETO...")
+    
+    relatorio = f"""
+# 📊 RELATÓRIO COMPLETO - OUTROS CUSTOS
+**Data:** {datetime.datetime.now().strftime('%d/%m/%Y %H:%M:%S')}
+
+## 🔍 ESTRUTURA DO BANCO DE DADOS
+"""
+    
+    # Executar todas as verificações
+    try:
+        colunas, admin_id_existe = verificar_estrutura_banco()
+        relatorio += f"""
+### Colunas da Tabela outro_custo:
+{chr(10).join([f"- {col[0]} ({col[1]})" for col in colunas])}
+
+### Coluna admin_id existe: {admin_id_existe}
+"""
+    except Exception as e:
+        relatorio += f"❌ Erro ao verificar banco: {e}\n"
+    
+    try:
+        atributos, colunas_modelo = verificar_modelo_python()
+        relatorio += f"""
+## 🐍 MODELO PYTHON
+### Colunas no Modelo:
+{chr(10).join([f"- {col}" for col in colunas_modelo])}
+"""
+    except Exception as e:
+        relatorio += f"❌ Erro ao verificar modelo: {e}\n"
+    
+    try:
+        rotas = verificar_rotas()
+        relatorio += f"""
+## 🌐 ROTAS IDENTIFICADAS
+{chr(10).join([f"- {rota['rule']} → {rota['endpoint']}" for rota in rotas])}
+"""
+    except Exception as e:
+        relatorio += f"❌ Erro ao verificar rotas: {e}\n"
+    
+    try:
+        dados_stats = verificar_dados_outros_custos()
+        relatorio += f"""
+## 📊 ANÁLISE DOS DADOS
+- Total de registros: {dados_stats['total']}
+- Bônus negativos: {dados_stats['bonus_negativos']} (problemático se > 0)
+- Adicionais negativos: {dados_stats['adicionais_negativos']} (problemático se > 0)
+- Descontos positivos: {dados_stats['descontos_positivos']} (problemático se > 0)
+"""
+    except Exception as e:
+        relatorio += f"❌ Erro ao verificar dados: {e}\n"
+    
+    relatorio += f"""
+## 🔧 CORREÇÕES APLICADAS
+- Registros corrigidos: {corrigidos if 'corrigidos' in locals() else 'Não executado'}
+
+## 📋 PRÓXIMOS PASSOS RECOMENDADOS
+1. Corrigir queries que referenciam admin_id inexistente
+2. Implementar validação de valores na criação/edição
+3. Verificar se deploy está atualizando arquivos corretamente
+4. Testar funcionalidade completa em produção
+
+## 🎯 STATUS ATUAL
+- Estrutura do banco: {'✅ OK' if admin_id_existe else '❌ Problema com admin_id'}
+- Valores dos registros: {'✅ OK' if dados_stats.get('bonus_negativos', 0) == 0 else '❌ Valores incorretos'}
+- Deploy: Necessita verificação manual
+"""
+    
+    # Salvar relatório em arquivo
+    with open('relatorio_outros_custos.md', 'w', encoding='utf-8') as f:
+        f.write(relatorio)
+    
+    print("✅ RELATÓRIO SALVO EM: relatorio_outros_custos.md")
+    print("\n" + "="*50)
+    print(relatorio)
+    print("="*50)
+    
+    return relatorio
+
+# EXECUTAR GERAÇÃO DO RELATÓRIO
+relatorio_final = gerar_relatorio_completo()
+```
+
+## 🎯 **INSTRUÇÕES DE EXECUÇÃO**
+
+**Execute na seguinte ordem:**
+
+```python
+# 1. Verificações
+verificar_estrutura_banco()
+verificar_modelo_python()
+verificar_rotas()
+verificar_configuracao()
+verificar_dados_outros_custos()
+
+# 2. Correções
+corrigir_erro_banco()
+corrigir_valores_registros()
+
+# 3. Relatório Final
+gerar_relatorio_completo()
+```
+
+**Após executar, envie o arquivo `relatorio_outros_custos.md` com todas as informações coletadas.**
+
+---
+
+## 📋 **CHECKLIST DE VERIFICAÇÃO**
+
+```
+□ Estrutura do banco verificada
+□ Modelo Python analisado
+□ Rotas identificadas
+□ Configuração verificada
+□ Dados analisados
+□ Erro de banco corrigido
+□ Valores corrigidos
+□ Relatório gerado
+□ Arquivo enviado
+```
+
+**RESULTADO ESPERADO:** Relatório completo com diagnóstico, correções aplicadas e recomendações para resolver definitivamente os problemas dos "Outros Custos".

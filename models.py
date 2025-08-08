@@ -576,6 +576,9 @@ class OutroCusto(db.Model):
     obra_id = db.Column(db.Integer, db.ForeignKey('obra.id'))
     percentual = db.Column(db.Float)  # Para descontos percentuais (ex: 6% do salário)
     
+    # FUNCIONALIDADE MULTI-TENANT: admin_id para isolamento de dados
+    admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=True)  # Para compatibilidade, permitir NULL inicialmente
+    
     # NOVA FUNCIONALIDADE: Associação com KPIs específicos
     kpi_associado = db.Column(db.String(30), default='outros_custos')  # 'custo_alimentacao', 'custo_transporte', 'outros_custos'
     
@@ -583,6 +586,7 @@ class OutroCusto(db.Model):
     
     funcionario = db.relationship('Funcionario', backref='outros_custos')
     obra = db.relationship('Obra', backref='outros_custos')
+    admin = db.relationship('Usuario', backref='outros_custos_criados')
     
     def __repr__(self):
         return f'<OutroCusto {self.funcionario.nome} - {self.tipo} R$ {self.valor}>'
