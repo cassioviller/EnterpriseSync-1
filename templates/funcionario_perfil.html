@@ -266,21 +266,19 @@
                     </div>
                 </div>
                 
-                <!-- Informações do Horário de Trabalho -->
-                {% if kpis.horario_info %}
+                <!-- Informações do Período Analisado -->
                 <div class="alert alert-info">
                     <div class="row">
                         <div class="col-md-6">
-                            <strong>Horário:</strong> {{ kpis.horario_info.nome }}<br>
-                            <strong>Período:</strong> {{ kpis.periodo }}
+                            <strong>Período Analisado:</strong> {{ data_inicio.strftime('%d/%m/%Y') }} a {{ data_fim.strftime('%d/%m/%Y') }}<br>
+                            <strong>Dias Úteis:</strong> {{ kpis.dias_uteis if kpis.dias_uteis is defined else 0 }} dias
                         </div>
                         <div class="col-md-6">
-                            <strong>Jornada:</strong> {{ kpis.horario_info.horas_diarias }}h/dia<br>
-                            <strong>Valor/hora:</strong> R$ {{ '{:.2f}'.format(kpis.horario_info.valor_hora) }}
+                            <strong>Horas Esperadas:</strong> {{ kpis.horas_esperadas if kpis.horas_esperadas is defined else 0 }}h<br>
+                            <strong>Dias Trabalhados:</strong> {{ kpis.dias_trabalhados if kpis.dias_trabalhados is defined else 0 }} dias
                         </div>
                     </div>
                 </div>
-                {% endif %}
                 
 
                 
