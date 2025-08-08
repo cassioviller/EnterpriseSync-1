@@ -289,7 +289,7 @@
             <div class="d-flex align-items-center gap-3">
                 <div class="text-end">
                     <small class="text-muted d-block">Última atualização</small>
-                    <strong class="text-primary">{{ moment().format('DD/MM/YYYY HH:mm') }}</strong>
+                    <strong class="text-primary">{{ data_fim.strftime('%d/%m/%Y') if data_fim else 'Hoje' }}</strong>
                 </div>
             </div>
         </div>
