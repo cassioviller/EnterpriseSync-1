@@ -581,12 +581,6 @@ def calcular_kpis_funcionario_periodo(funcionario_id, data_inicio=None, data_fim
     else:
         produtividade = 0
     
-    # Calcular atrasos em horas para compatibilidade com template
-    atrasos_horas = total_minutos_atraso / 60.0
-    
-    # Calcular outros custos que não sejam alimentação/transporte
-    outros_custos_valor = custo_total - custo_mao_obra - custo_alimentacao - custo_transporte
-    
     return {
         'funcionario': funcionario,
         'horas_trabalhadas': total_horas_trabalhadas,
@@ -594,13 +588,10 @@ def calcular_kpis_funcionario_periodo(funcionario_id, data_inicio=None, data_fim
         'h_extras': total_horas_extras,  # Alias para compatibilidade com template
         'faltas': faltas,
         'atrasos': atrasos,
-        'atrasos_horas': atrasos_horas,  # Atrasos em horas para o template
         'dias_faltas_justificadas': dias_faltas_justificadas,
-        'faltas_justificadas': dias_faltas_justificadas,  # Alias para template
         'custo_mao_obra': custo_mao_obra,
         'custo_alimentacao': custo_alimentacao,
         'custo_transporte': custo_transporte,
-        'outros_custos': outros_custos_valor,  # Outros custos calculados
         'custo_faltas_justificadas': custo_faltas_justificadas,
         'custo_total': custo_total,
         'absenteismo': absenteismo,
@@ -634,54 +625,20 @@ def calcular_kpis_funcionarios_geral(data_inicio=None, data_fim=None, admin_id=N
     if admin_id is None and current_user and current_user.is_authenticated:
         admin_id = current_user.id
     
-    # NOVA LÓGICA: Incluir funcionários inativos que têm registros no período
-    # Funcionários ativos são sempre incluídos
-    # Funcionários inativos são incluídos apenas se tiverem registros no período filtrado
-    
-    from models import RegistroPonto
-    from app import db
-    from sqlalchemy import or_
-    
+    # CORREÇÃO CRÍTICA: Filtrar funcionários SEMPRE por ativo=True, exceto se explicitamente solicitado
+    # Isso evita vazamento de dados de funcionários inativos
     if admin_id:
-        # Buscar funcionários ativos
-        funcionarios_ativos = Funcionario.query.filter_by(ativo=True, admin_id=admin_id).all()
-        
-        # Se há filtro de período, incluir inativos com registros no período
-        if data_inicio and data_fim and not incluir_inativos:
-            # Buscar funcionários inativos que têm registros no período
-            funcionarios_com_registros = db.session.query(Funcionario).join(RegistroPonto).filter(
-                Funcionario.admin_id == admin_id,
-                Funcionario.ativo == False,
-                RegistroPonto.data >= data_inicio,
-                RegistroPonto.data <= data_fim
-            ).distinct().all()
-            
-            funcionarios = funcionarios_ativos + funcionarios_com_registros
-        elif incluir_inativos:
-            funcionarios = Funcionario.query.filter_by(admin_id=admin_id).all()
+        if incluir_inativos:
+            funcionarios = Funcionario.query.filter_by(admin_id=admin_id).order_by(Funcionario.nome).all()
         else:
-            funcionarios = funcionarios_ativos
+            funcionarios = Funcionario.query.filter_by(ativo=True, admin_id=admin_id).order_by(Funcionario.nome).all()
     else:
-        # Mesma lógica para super admin
-        funcionarios_ativos = Funcionario.query.filter_by(ativo=True).all()
-        
-        if data_inicio and data_fim and not incluir_inativos:
-            funcionarios_com_registros = db.session.query(Funcionario).join(RegistroPonto).filter(
-                Funcionario.ativo == False,
-                RegistroPonto.data >= data_inicio,
-                RegistroPonto.data <= data_fim
-            ).distinct().all()
-            
-            funcionarios = funcionarios_ativos + funcionarios_com_registros
-        elif incluir_inativos:
-            funcionarios = Funcionario.query.all()
+        if incluir_inativos:
+            funcionarios = Funcionario.query.order_by(Funcionario.nome).all()
         else:
-            funcionarios = funcionarios_ativos
+            funcionarios = Funcionario.query.filter_by(ativo=True).order_by(Funcionario.nome).all()
     
-    # Ordenar por nome
-    funcionarios = sorted(funcionarios, key=lambda f: f.nome)
-    
-    # Para compatibilidade, manter nome da variável  
+    # Para compatibilidade, manter nome da variável
     funcionarios_ativos = funcionarios
     
     total_funcionarios = len(funcionarios_ativos)
@@ -696,8 +653,9 @@ def calcular_kpis_funcionarios_geral(data_inicio=None, data_fim=None, admin_id=N
     funcionarios_kpis = []
     
     for funcionario in funcionarios_ativos:
-        # NOVA LÓGICA: Processar funcionários ativos + inativos com registros no período
-        # Não pular mais funcionários inativos que têm dados relevantes
+        # PROTEÇÃO ADICIONAL: Pular funcionários inativos mesmo se estiverem na lista
+        if not incluir_inativos and not funcionario.ativo:
+            continue
             
         kpi = calcular_kpis_funcionario_periodo(funcionario.id, data_inicio, data_fim)
         if kpi:
