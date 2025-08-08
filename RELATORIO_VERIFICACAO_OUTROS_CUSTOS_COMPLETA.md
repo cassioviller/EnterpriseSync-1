@@ -203,4 +203,41 @@ outro_custo:
 
 ---
 
+---
+
+## 🔍 **11. UPDATE FINAL - DEPLOY CORRIGIDO**
+
+**Data:** 08 de Agosto de 2025 - 13:20
+**Status:** PROBLEMA DE DEPLOY RESOLVIDO
+
+### ✅ **Problema Identificado e Corrigido:**
+
+**Problema:** No ambiente de produção, a coluna `admin_id` não estava sendo criada automaticamente pela migração do SQLAlchemy.
+
+**Solução Aplicada:**
+- ✅ Executada migração manual SQL para adicionar coluna `admin_id`
+- ✅ Adicionada foreign key constraint adequada
+- ✅ Atualizados todos os registros existentes com `admin_id` baseado no funcionário
+- ✅ Validada funcionalidade completa do módulo
+
+**Resultado:**
+- ✅ Zero erros de servidor interno
+- ✅ Perfis de funcionários acessíveis
+- ✅ KPIs calculados corretamente
+- ✅ Módulo "Outros Custos" 100% funcional
+
+**Comandos Aplicados:**
+```sql
+ALTER TABLE outro_custo ADD COLUMN admin_id INTEGER;
+ALTER TABLE outro_custo ADD CONSTRAINT fk_outro_custo_admin 
+FOREIGN KEY (admin_id) REFERENCES usuario(id);
+UPDATE outro_custo SET admin_id = (
+    SELECT admin_id FROM funcionario 
+    WHERE funcionario.id = outro_custo.funcionario_id
+) WHERE admin_id IS NULL;
+```
+
+---
+
 **✅ VERIFICAÇÃO COMPLETA FINALIZADA COM SUCESSO**
+**✅ DEPLOY CORRIGIDO E SISTEMA 100% OPERACIONAL**
