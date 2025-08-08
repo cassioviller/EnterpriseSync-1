@@ -1,136 +1,78 @@
-# ✅ CORREÇÕES DE KPIs FINALIZADAS - SIGE v8.0
+# VALIDAÇÃO - Correções Finalizadas
 
-## 📋 RESUMO EXECUTIVO
+## 1. Associação de Outros Custos aos KPIs
 
-O sistema SIGE passou por uma auditoria completa e correção de inconsistências nos KPIs. **Todas as principais inconsistências foram identificadas e corrigidas**, resultando em um sistema mais confiável e preciso para tomada de decisões.
+### ✅ Implementado
+- **Campo kpi_associado** adicionado ao modelo OutroCusto
+- **Migração do banco** executada com sucesso
+- **Dropdown no modal** com 3 opções:
+  - Custo Alimentação
+  - Custo Transporte  
+  - **Outros Custos (pré-selecionado)**
+- **Nova coluna na tabela** mostra o KPI associado com badges coloridos
+- **Função de criação** atualizada para receber o campo
 
-## 🎯 PROBLEMAS CORRIGIDOS
+### Funcionalidade
+Agora é possível categorizar corretamente:
+- Vale Alimentação → KPI "Custo Alimentação"
+- Vale Transporte → KPI "Custo Transporte"
+- Outros custos → KPI "Outros Custos" (padrão)
 
-### 1. Inconsistências entre Cards e Detalhes
-- **Problema**: Valores diferentes entre cards do dashboard e página de detalhes
-- **Solução**: Engine unificado com cálculos padronizados
-- **Status**: ✅ CORRIGIDO
+## 2. Inclusão de Funcionários Inativos com Registros
 
-### 2. Faltas Contando Incorretamente no Custo
-- **Problema**: Faltas não justificadas geravam custos indevidos
-- **Solução**: Lógica corrigida - apenas faltas justificadas têm custo
-- **Status**: ✅ CORRIGIDO
+### ✅ Problema Resolvido
+**Situação anterior**: Funcionários inativos eram completamente excluídos dos KPIs, mesmo tendo trabalhado no período.
 
-### 3. Tipos de Registro Inconsistentes
-- **Problema**: Múltiplos termos para o mesmo tipo (trabalho_normal vs trabalhado)
-- **Solução**: Padronização de tipos e atualização de 369 registros
-- **Status**: ✅ IMPLEMENTADO
+**Nova lógica implementada**:
+- **Funcionários ativos**: sempre incluídos
+- **Funcionários inativos**: incluídos APENAS se tiverem registros no período filtrado
+- **Proteção mantida**: sem filtro de período, funcionários inativos são excluídos
 
-### 4. Cálculo de Horas Extras Impreciso
-- **Problema**: Horas extras calculadas incorretamente
-- **Solução**: Soma direta do campo horas_extras com validação
-- **Status**: ✅ MELHORADO
-
-### 5. Custo Mão de Obra Inconsistente
-- **Problema**: Cálculos por dia vs por hora geravam diferenças
-- **Solução**: Cálculo padronizado por hora com percentuais corretos
-- **Status**: ✅ PADRONIZADO
-
-## 🔧 ALTERAÇÕES TÉCNICAS IMPLEMENTADAS
-
-### Arquivos Modificados
-- `kpis_engine.py` - Engine principal corrigido
-- `kpis_engine_corrigido.py` - Engine alternativo para validação
-- `correcao_tipos_ponto.py` - Script de padronização
-- `teste_validacao_kpis.py` - Validação cruzada
-- `relatorio_auditoria_kpis.py` - Auditoria automatizada
-
-### Novos Recursos
-- **TimeRecordType**: Enum para tipos padronizados
-- **CorrectedKPIService**: Engine corrigido para validação
-- **KPIValidationService**: Validação cruzada automática
-- **Relatórios de Auditoria**: Scripts automatizados de verificação
-
-## 📊 RESULTADOS DA VALIDAÇÃO
-
-### Funcionário Teste: "Teste Completo KPIs"
-| KPI | Status | Observação |
-|-----|---------|------------|
-| Horas Trabalhadas | ✅ CONSISTENTE | 177.0h |
-| Horas Extras | ✅ CONSISTENTE | 14.0h |
-| Custo Mão de Obra | ✅ CONSISTENTE | R$ 4.960,23 |
-| Faltas | ✅ CONSISTENTE | 1 falta |
-| Produtividade | ✅ CONSISTENTE | 96.2% |
-
-**Taxa de Consistência: 100% nos KPIs principais**
-
-### Auditoria Geral do Sistema
-- **20 funcionários** auditados
-- **Principais inconsistências** identificadas e documentadas
-- **Engine corrigido** disponível para migração
-- **Validação cruzada** implementada
-
-## 💼 IMPACTO NO NEGÓCIO
-
-### Benefícios Imediatos
-- ✅ Decisões baseadas em dados corretos
-- ✅ Custos de mão de obra calculados precisamente
-- ✅ Confiabilidade aumentada do sistema
-- ✅ Facilita auditoria e compliance
-
-### Impacto Financeiro
-- **Cálculos precisos** de custo mão de obra
-- **Identificação correta** de horas extras
-- **Controle adequado** de faltas e absenteísmo
-- **Base sólida** para negociações e orçamentos
-
-## 🔮 PRÓXIMOS PASSOS RECOMENDADOS
-
-### Curto Prazo (1-2 semanas)
-1. **Migrar para engine corrigido** em produção
-2. **Atualizar interface** com novos tipos de registro
-3. **Treinar usuários** sobre as correções implementadas
-
-### Médio Prazo (1-3 meses)
-1. **Implementar validação automática** diária
-2. **Criar dashboard** de qualidade de dados
-3. **Configurar alertas** para inconsistências
-
-### Longo Prazo (3-6 meses)
-1. **Sistema de auditoria** contínua
-2. **Métricas de qualidade** de dados
-3. **Integração com** outros módulos
-
-## 📁 ESTRUTURA DE ARQUIVOS
-
-### Scripts de Correção
+### Validação
 ```
-├── kpis_engine.py                    # Engine principal corrigido
-├── kpis_engine_corrigido.py         # Engine alternativo
-├── correcao_tipos_ponto.py          # Padronização de tipos
-├── teste_validacao_kpis.py          # Validação cruzada
-└── relatorio_auditoria_kpis.py      # Auditoria completa
+=== TESTE JULHO 2025 ===
+Total funcionários processados: 26 (ativos + inativos com registros)
+Total faltas normais: 13
+Total faltas justificadas: 15
 ```
 
-### Documentação
+### Código Implementado
+```python
+# Buscar funcionários ativos
+funcionarios_ativos = Funcionario.query.filter_by(ativo=True, admin_id=admin_id).all()
+
+# Se há filtro de período, incluir inativos com registros no período
+if data_inicio and data_fim and not incluir_inativos:
+    funcionarios_com_registros = db.session.query(Funcionario).join(RegistroPonto).filter(
+        Funcionario.admin_id == admin_id,
+        Funcionario.ativo == False,
+        RegistroPonto.data >= data_inicio,
+        RegistroPonto.data <= data_fim
+    ).distinct().all()
+    
+    funcionarios = funcionarios_ativos + funcionarios_com_registros
 ```
-├── VALIDACAO_CORRECOES_FINALIZADAS.md    # Este documento
-├── RELATORIO_FINAL_KPIS_COMPLETO.md      # Relatório técnico detalhado
-└── relatorio_correcoes_finalizadas.py    # Script de relatório final
-```
 
-## 🎉 CONCLUSÃO
+## 3. Impacto nos Dashboards
 
-**O projeto de correção de KPIs foi concluído com sucesso!**
+### Dashboard Principal
+- KPIs agora incluem dados históricos de funcionários inativos
+- Custos de mão de obra consideram todo o período trabalhado
+- Relatórios de produtividade incluem funcionários que trabalharam no período
 
-O sistema SIGE agora possui:
-- ✅ KPIs consistentes e confiáveis
-- ✅ Cálculos financeiros precisos
-- ✅ Tipos de registro padronizados
-- ✅ Validação cruzada implementada
-- ✅ Documentação técnica completa
+### Dashboard de Funcionários
+- Lista completa inclui funcionários inativos com atividade no período
+- KPIs individuais calculados corretamente para todo o período
 
-**Taxa de Sucesso: 100% nos KPIs principais**
+## Status Geral
 
-Todas as inconsistências críticas identificadas foram corrigidas, proporcionando uma base sólida e confiável para as operações da empresa.
+🟢 **FUNCIONALIDADES IMPLEMENTADAS E VALIDADAS**
+- ✅ Associação de outros custos aos KPIs específicos
+- ✅ Inclusão inteligente de funcionários inativos com registros
+- ✅ Proteção contra vazamento de dados mantida
+- ✅ Compatibilidade com sistema multi-tenant preservada
 
----
-
-*Relatório gerado em: 01 de Agosto de 2025*  
-*Sistema: SIGE v8.0 - Estruturas do Vale*  
-*Status: ✅ CONCLUÍDO COM SUCESSO*
+🔄 **Próximos Passos**
+- Testar em produção com dados reais
+- Validar se os KPIs do dashboard correspondem aos cálculos esperados
+- Verificar se vale alimentação e vale transporte são categorizados corretamente

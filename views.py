@@ -1468,8 +1468,9 @@ def funcionario_perfil(id):
     else:
         data_fim = datetime.strptime(data_fim, '%Y-%m-%d').date()
     
-    # Calcular KPIs individuais para o período (usando engine v3.1)
-    kpis = kpis_engine.calcular_kpis_funcionario(id, data_inicio, data_fim)
+    # Calcular KPIs individuais para o período (usando utils)
+    from utils import calcular_kpis_funcionario_periodo
+    kpis = calcular_kpis_funcionario_periodo(id, data_inicio, data_fim)
     
     # Buscar registros de ponto com filtros e identificação de faltas
     
