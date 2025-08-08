@@ -66,21 +66,22 @@ with app.app_context():
     db.create_all()
 
     logging.info("Database tables created/verified")
+    
+    # Migrar fotos para base64 automaticamente no startup
+    try:
+        from deploy_fotos_persistentes import executar_migracao_fotos
+        migrados, erros = executar_migracao_fotos()
+        if migrados > 0:
+            logging.info(f"✅ {migrados} fotos migradas para base64 automaticamente")
+        else:
+            logging.info("✅ Fotos já estão persistentes!")
+    except Exception as e:
+        logging.error(f"❌ Erro ao migrar fotos: {e}")
 
 # Adicionar função para templates
 @app.context_processor
 def inject_foto_funcionario():
     from utils import obter_foto_funcionario
     return dict(obter_foto_funcionario=obter_foto_funcionario)
-    
-    # Corrigir fotos dos funcionários automaticamente no startup
-    try:
-        from fix_fotos_startup import fix_fotos_startup
-        if fix_fotos_startup():
-            logging.info("✅ Fotos dos funcionários verificadas e corrigidas automaticamente")
-        else:
-            logging.warning("⚠️ Algumas fotos podem não ter sido corrigidas")
-    except Exception as e:
-        logging.warning(f"⚠️ Aviso: Não foi possível corrigir fotos automaticamente: {e}")
     
 

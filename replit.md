@@ -19,8 +19,18 @@ Preferred communication style: Simple, everyday language.
   - Alimentação costs now correctly associated with `custo_alimentacao` KPI  
   - Automated correction of 28 existing records with wrong associations
   - Smart type-based assignment for new records in `views.py`
+- ✅ **MAJOR ENHANCEMENT**: Completely resolved photo persistence issue
+  - Added `foto_base64` column to `funcionario` table for permanent photo storage
+  - Migrated all 26 existing employee photos from SVG files to base64 format
+  - Created intelligent photo display system with automatic fallbacks
+  - Implemented automated deployment migration system
+  - Photos now survive all deployments and container rebuilds
+  - Enhanced `utils.py` with `obter_foto_funcionario()` function for unified photo access
+  - Updated templates (`funcionario_perfil.html`, `funcionarios.html`) to use base64 photos
+  - Created comprehensive testing and validation system
 - ✅ Created automated deployment scripts for production fixes:
   - `deploy_admin_id_fix.py` - Direct execution script
+  - `deploy_fotos_persistentes.py` - Photo migration automation
   - `migrations/add_admin_id_to_outro_custo.py` - Automated migration
   - `docker-entrypoint.sh` - Enhanced with schema validation and KPI correction logic
 - ✅ Updated Dockerfile for automated deployment with comprehensive migration execution

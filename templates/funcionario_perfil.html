@@ -27,23 +27,13 @@
     <div class="col-md-3">
         <div class="card text-center">
             <div class="card-body">
-                {% if funcionario.foto %}
-                    <img src="{{ url_for('static', filename=funcionario.foto) }}" 
-                         class="rounded-circle mb-3" 
-                         width="120" 
-                         height="120" 
-                         style="object-fit: cover;"
-                         alt="Foto de {{ funcionario.nome }}"
-                         onerror="corrigirImagemQuebrada(this)"
-                         data-nome="{{ funcionario.nome }}">
-                {% else %}
-                    <img src="{{ url_for('static', filename='images/default-avatar.svg') }}" 
-                         class="rounded-circle mb-3" 
-                         width="120" 
-                         height="120" 
-                         style="object-fit: cover;"
-                         alt="Avatar padrão">
-                {% endif %}
+                <img src="{{ obter_foto_funcionario(funcionario) }}" 
+                     class="rounded-circle mb-3" 
+                     width="120" 
+                     height="120" 
+                     style="object-fit: cover;"
+                     alt="Foto de {{ funcionario.nome }}"
+                     data-nome="{{ funcionario.nome }}">
                 <h5 class="card-title mb-1">{{ funcionario.nome }}</h5>
                 <p class="text-muted mb-2">{{ funcionario.funcao_ref.nome if funcionario.funcao_ref else 'Sem função' }}</p>
                 {% if funcionario.ativo %}
