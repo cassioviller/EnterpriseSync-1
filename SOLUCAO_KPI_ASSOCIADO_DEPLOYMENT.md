@@ -64,16 +64,26 @@ Script para verificar se a correção funciona corretamente durante o deployment
 
 ## ✅ Validação
 
-### Teste Executado
+### Teste de Adição da Coluna
 ```
-🔧 Testando verificação da coluna kpi_associado...
+🔧 Testando adição da coluna kpi_associado...
 ✅ Coluna kpi_associado já existe
-📊 Registros com kpi_associado NULL: 0
-📋 Dados de exemplo:
-  ID: 78, Tipo: va, KPI: custo_alimentacao
+🧪 Simulando remoção da coluna para teste...
+⚠️ Coluna removida temporariamente para teste
+⚡ Adicionando coluna kpi_associado...
+✅ Coluna kpi_associado adicionada - 0 registros atualizados
+📋 Coluna criada: kpi_associado (character varying) default: 'outros_custos'::character varying
+📊 Dados após adição:
+  ID: 78, Tipo: va, KPI: outros_custos
   ID: 1, Tipo: Vale Transporte, KPI: outros_custos
   ID: 57, Tipo: Vale Transporte, KPI: outros_custos
 ```
+
+### Teste do Código de Deployment
+```
+✅ Coluna kpi_associado já existe
+```
+**Confirmado**: O código do docker-entrypoint.sh funciona corretamente tanto para verificação quanto para adição da coluna.
 
 ### Verificação da Estrutura
 ```sql

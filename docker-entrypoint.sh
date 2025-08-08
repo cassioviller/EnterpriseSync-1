@@ -126,7 +126,7 @@ with app.app_context():
         
         if not result.fetchone():
             print('⚡ Adicionando coluna kpi_associado...')
-            db.session.execute(text(\"ALTER TABLE outro_custo ADD COLUMN kpi_associado VARCHAR(30) DEFAULT 'outros_custos'\"))
+            db.session.execute(text('ALTER TABLE outro_custo ADD COLUMN kpi_associado VARCHAR(30) DEFAULT \\'outros_custos\\''))
             
             # Atualizar registros existentes
             updated = db.session.execute(text('''
