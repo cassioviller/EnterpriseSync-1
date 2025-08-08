@@ -2,598 +2,293 @@
 
 {% block title %}Dashboard - SIGE{% endblock %}
 
-{% block head %}
-<style>
-/* Dashboard Moderno - Design System */
-:root {
-    --primary-gradient: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-    --success-gradient: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
-    --warning-gradient: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
-    --info-gradient: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
-    --dark-gradient: linear-gradient(135deg, #2c3e50 0%, #34495e 100%);
-    
-    --glass-bg: rgba(255, 255, 255, 0.25);
-    --glass-border: rgba(255, 255, 255, 0.18);
-    --shadow-soft: 0 8px 32px 0 rgba(31, 38, 135, 0.37);
-    --shadow-card: 0 10px 25px rgba(0, 0, 0, 0.1);
-    --border-radius: 16px;
-    
-    --text-primary: #2d3748;
-    --text-secondary: #718096;
-    --bg-light: #f7fafc;
-}
-
-/* Glassmorphism Cards */
-.glass-card {
-    background: var(--glass-bg);
-    backdrop-filter: blur(10px);
-    -webkit-backdrop-filter: blur(10px);
-    border: 1px solid var(--glass-border);
-    border-radius: var(--border-radius);
-    box-shadow: var(--shadow-soft);
-    transition: all 0.3s ease;
-}
-
-.glass-card:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 15px 40px rgba(0, 0, 0, 0.15);
-}
-
-/* Gradient Cards */
-.gradient-card {
-    border-radius: var(--border-radius);
-    padding: 1.5rem;
-    color: white;
-    position: relative;
-    overflow: hidden;
-    transition: all 0.3s ease;
-    border: none;
-    box-shadow: var(--shadow-card);
-}
-
-.gradient-card::before {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background: rgba(255, 255, 255, 0.1);
-    opacity: 0;
-    transition: opacity 0.3s ease;
-}
-
-.gradient-card:hover::before {
-    opacity: 1;
-}
-
-.gradient-card:hover {
-    transform: translateY(-3px);
-    box-shadow: 0 20px 50px rgba(0, 0, 0, 0.2);
-}
-
-.gradient-primary { background: var(--primary-gradient); }
-.gradient-success { background: var(--success-gradient); }
-.gradient-warning { background: var(--warning-gradient); }
-.gradient-info { background: var(--info-gradient); }
-.gradient-dark { background: var(--dark-gradient); }
-
-/* Typography */
-.metric-value {
-    font-size: 2.5rem;
-    font-weight: 700;
-    line-height: 1;
-    margin: 0;
-}
-
-.metric-label {
-    font-size: 0.875rem;
-    font-weight: 500;
-    opacity: 0.9;
-    margin: 0;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-}
-
-.section-title {
-    font-size: 1.5rem;
-    font-weight: 600;
-    color: var(--text-primary);
-    margin-bottom: 1.5rem;
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-}
-
-/* Custom Components */
-.metric-icon {
-    width: 3rem;
-    height: 3rem;
-    border-radius: 12px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    background: rgba(255, 255, 255, 0.2);
-    font-size: 1.5rem;
-}
-
-.progress-ring {
-    width: 80px;
-    height: 80px;
-    position: relative;
-}
-
-.progress-ring svg {
-    transform: rotate(-90deg);
-}
-
-.progress-ring-circle {
-    stroke: rgba(255, 255, 255, 0.3);
-    fill: transparent;
-    stroke-width: 8;
-}
-
-.progress-ring-progress {
-    stroke: white;
-    fill: transparent;
-    stroke-width: 8;
-    stroke-linecap: round;
-    transition: stroke-dasharray 0.3s ease;
-}
-
-/* Filter Bar */
-.filter-bar {
-    background: white;
-    border-radius: var(--border-radius);
-    padding: 1.5rem;
-    box-shadow: var(--shadow-card);
-    margin-bottom: 2rem;
-}
-
-.quick-filter-btn {
-    border: 2px solid #e2e8f0;
-    background: white;
-    color: var(--text-secondary);
-    border-radius: 8px;
-    padding: 0.5rem 1rem;
-    font-size: 0.875rem;
-    font-weight: 500;
-    transition: all 0.2s ease;
-}
-
-.quick-filter-btn:hover, .quick-filter-btn.active {
-    border-color: #667eea;
-    background: #667eea;
-    color: white;
-    transform: translateY(-1px);
-}
-
-/* Charts Container */
-.chart-container {
-    background: white;
-    border-radius: var(--border-radius);
-    padding: 1.5rem;
-    box-shadow: var(--shadow-card);
-    height: 400px;
-}
-
-/* Data Table */
-.data-table {
-    background: white;
-    border-radius: var(--border-radius);
-    box-shadow: var(--shadow-card);
-    overflow: hidden;
-}
-
-.data-table .table {
-    margin: 0;
-}
-
-.data-table .table th {
-    background: #f8fafc;
-    border: none;
-    font-weight: 600;
-    color: var(--text-primary);
-    padding: 1rem;
-}
-
-.data-table .table td {
-    border: none;
-    padding: 1rem;
-    border-bottom: 1px solid #e2e8f0;
-}
-
-/* Responsive Design */
-@media (max-width: 768px) {
-    .metric-value { font-size: 2rem; }
-    .gradient-card { padding: 1rem; }
-    .chart-container { height: 300px; }
-}
-
-/* Animations */
-@keyframes fadeInUp {
-    from {
-        opacity: 0;
-        transform: translateY(20px);
-    }
-    to {
-        opacity: 1;
-        transform: translateY(0);
-    }
-}
-
-.fade-in-up {
-    animation: fadeInUp 0.6s ease-out;
-}
-
-/* Cost Breakdown Cards */
-.cost-item {
-    background: white;
-    border-radius: 12px;
-    padding: 1.25rem;
-    box-shadow: var(--shadow-card);
-    transition: all 0.3s ease;
-    border-left: 4px solid;
-}
-
-.cost-item:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 15px 35px rgba(0, 0, 0, 0.1);
-}
-
-.cost-alimentacao { border-left-color: #f59e0b; }
-.cost-transporte { border-left-color: #3b82f6; }
-.cost-mao-obra { border-left-color: #10b981; }
-.cost-outros { border-left-color: #8b5cf6; }
-.cost-total { border-left-color: #ef4444; }
-
-.cost-icon {
-    width: 2.5rem;
-    height: 2.5rem;
-    border-radius: 8px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 1.25rem;
-    margin-bottom: 0.75rem;
-}
-
-.cost-value {
-    font-size: 1.5rem;
-    font-weight: 700;
-    margin: 0;
-    color: var(--text-primary);
-}
-
-.cost-label {
-    font-size: 0.875rem;
-    font-weight: 500;
-    color: var(--text-secondary);
-    margin: 0;
-}
-</style>
-{% endblock %}
-
 {% block content %}
-<div class="container-fluid" style="background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%); min-height: 100vh; padding: 2rem 1rem;">
-    
-    <!-- Header -->
-    <div class="fade-in-up mb-4">
-        <div class="d-flex justify-content-between align-items-center mb-3">
-            <div>
-                <h1 class="h2 mb-1" style="color: var(--text-primary); font-weight: 700;">
-                    Dashboard Executivo
-                </h1>
-                <p class="text-muted mb-0">Visão geral do desempenho da empresa</p>
-            </div>
-            <div class="d-flex align-items-center gap-3">
-                <div class="text-end">
-                    <small class="text-muted d-block">Última atualização</small>
-                    <strong class="text-primary">{{ data_fim.strftime('%d/%m/%Y') if data_fim else 'Hoje' }}</strong>
-                </div>
-            </div>
-        </div>
+<div class="container-fluid">
+    <!-- Header da página -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1 class="h3 mb-0">
+            <i class="fas fa-tachometer-alt"></i> Dashboard
+        </h1>
     </div>
 
-    <!-- Filtros de Data -->
-    <div class="fade-in-up mb-4" style="animation-delay: 0.1s;">
-        <div class="filter-bar">
-            <form method="GET" class="row g-3 align-items-end">
+    <!-- Filtros de Data Globais -->
+    <div class="card mb-4">
+        <div class="card-header">
+            <h5 class="card-title mb-0">
+                <i class="fas fa-calendar"></i> Filtros de Data
+            </h5>
+        </div>
+        <div class="card-body">
+            <form method="GET" class="row g-3">
                 <div class="col-md-3">
-                    <label class="form-label fw-semibold">Data Inicial</label>
+                    <label class="form-label">Data Inicial</label>
                     <input type="date" name="data_inicio" class="form-control" 
-                           style="border-radius: 8px; border: 2px solid #e2e8f0;"
                            value="{{ data_inicio.strftime('%Y-%m-%d') if data_inicio else '' }}">
                 </div>
                 <div class="col-md-3">
-                    <label class="form-label fw-semibold">Data Final</label>
+                    <label class="form-label">Data Final</label>
                     <input type="date" name="data_fim" class="form-control" 
-                           style="border-radius: 8px; border: 2px solid #e2e8f0;"
                            value="{{ data_fim.strftime('%Y-%m-%d') if data_fim else '' }}">
                 </div>
-                <div class="col-md-3">
-                    <button type="submit" class="btn btn-primary me-2" style="border-radius: 8px; padding: 0.75rem 1.5rem;">
-                        <i class="fas fa-filter me-2"></i>Aplicar Filtro
+                <div class="col-md-3 d-flex align-items-end">
+                    <button type="submit" class="btn btn-primary me-2">
+                        <i class="fas fa-filter"></i> Aplicar Filtro
                     </button>
-                    <a href="{{ url_for('main.dashboard') }}" class="btn btn-outline-secondary" style="border-radius: 8px; padding: 0.75rem 1rem;">
-                        <i class="fas fa-times me-1"></i>Limpar
+                    <a href="{{ url_for('main.dashboard') }}" class="btn btn-secondary">
+                        <i class="fas fa-times"></i> Limpar
                     </a>
                 </div>
-                <div class="col-md-3">
-                    <div class="d-flex gap-2">
-                        <button type="button" class="quick-filter-btn" onclick="setDateRange('mes_atual')">Mês</button>
-                        <button type="button" class="quick-filter-btn" onclick="setDateRange('ultimo_mes')">Último</button>
-                        <button type="button" class="quick-filter-btn" onclick="setDateRange('ultimos_3_meses')">3 Meses</button>
-                        <button type="button" class="quick-filter-btn" onclick="setDateRange('ano_atual')">Ano</button>
+                <div class="col-md-3 d-flex align-items-end">
+                    <div class="btn-group" role="group">
+                        <button type="button" class="btn btn-outline-primary btn-sm" 
+                                onclick="setDateRange('mes_atual')">Mês Atual</button>
+                        <button type="button" class="btn btn-outline-primary btn-sm" 
+                                onclick="setDateRange('ultimo_mes')">Último Mês</button>
+                        <button type="button" class="btn btn-outline-primary btn-sm" 
+                                onclick="setDateRange('ultimos_3_meses')">3 Meses</button>
+                        <button type="button" class="btn btn-outline-primary btn-sm" 
+                                onclick="setDateRange('ano_atual')">Ano Atual</button>
                     </div>
                 </div>
             </form>
         </div>
     </div>
 
-    <!-- KPIs Principais -->
-    <div class="fade-in-up mb-4" style="animation-delay: 0.2s;">
-        <div class="row g-4">
-            <div class="col-lg-3 col-md-6">
-                <div class="gradient-card gradient-primary">
-                    <div class="d-flex justify-content-between align-items-start">
-                        <div>
-                            <p class="metric-label">Funcionários Ativos</p>
-                            <h2 class="metric-value">{{ total_funcionarios }}</h2>
-                            <small class="opacity-75">+2 este mês</small>
-                        </div>
-                        <div class="metric-icon">
-                            <i class="fas fa-users"></i>
-                        </div>
+    <!-- KPIs Cards -->
+<div class="row mb-4">
+    <div class="col-md-3">
+        <div class="card bg-primary text-white">
+            <div class="card-body">
+                <div class="d-flex align-items-center">
+                    <div class="flex-grow-1">
+                        <h5 class="card-title mb-0">Funcionários Ativos</h5>
+                        <h2 class="mb-0">{{ total_funcionarios }}</h2>
+                    </div>
+                    <div class="ms-3">
+                        <i class="fas fa-users fa-2x opacity-75"></i>
                     </div>
                 </div>
             </div>
-            
-            <div class="col-lg-3 col-md-6">
-                <div class="gradient-card gradient-success">
-                    <div class="d-flex justify-content-between align-items-start">
-                        <div>
-                            <p class="metric-label">Obras Ativas</p>
-                            <h2 class="metric-value">{{ total_obras }}</h2>
-                            <small class="opacity-75">{{ total_obras }} em andamento</small>
-                        </div>
-                        <div class="metric-icon">
-                            <i class="fas fa-hard-hat"></i>
-                        </div>
+        </div>
+    </div>
+    
+    <div class="col-md-3">
+        <div class="card bg-success text-white">
+            <div class="card-body">
+                <div class="d-flex align-items-center">
+                    <div class="flex-grow-1">
+                        <h5 class="card-title mb-0">Obras Ativas</h5>
+                        <h2 class="mb-0">{{ total_obras }}</h2>
+                    </div>
+                    <div class="ms-3">
+                        <i class="fas fa-hard-hat fa-2x opacity-75"></i>
                     </div>
                 </div>
             </div>
-            
-            <div class="col-lg-3 col-md-6">
-                <div class="gradient-card gradient-warning">
-                    <div class="d-flex justify-content-between align-items-start">
-                        <div>
-                            <p class="metric-label">Veículos</p>
-                            <h2 class="metric-value">{{ total_veiculos }}</h2>
-                            <small class="opacity-75">Frota ativa</small>
-                        </div>
-                        <div class="metric-icon">
-                            <i class="fas fa-truck"></i>
-                        </div>
+        </div>
+    </div>
+    
+    <div class="col-md-3">
+        <div class="card bg-warning text-white">
+            <div class="card-body">
+                <div class="d-flex align-items-center">
+                    <div class="flex-grow-1">
+                        <h5 class="card-title mb-0">Veículos</h5>
+                        <h2 class="mb-0">{{ total_veiculos }}</h2>
+                    </div>
+                    <div class="ms-3">
+                        <i class="fas fa-truck fa-2x opacity-75"></i>
                     </div>
                 </div>
             </div>
-            
-            <div class="col-lg-3 col-md-6">
-                <div class="gradient-card gradient-info">
-                    <div class="d-flex justify-content-between align-items-start">
-                        <div>
-                            <p class="metric-label">Custos Período</p>
-                            <h2 class="metric-value" style="font-size: 1.8rem;">R$ {{ '{:,.0f}'.format(custos_mes).replace(',', '.') }}</h2>
-                            <small class="opacity-75">{{ data_inicio.strftime('%d/%m') }} - {{ data_fim.strftime('%d/%m') }}</small>
+        </div>
+    </div>
+    
+    <div class="col-md-3">
+        <div class="card bg-info text-white">
+            <div class="card-body">
+                <div class="d-flex align-items-center">
+                    <div class="flex-grow-1">
+                        <h5 class="card-title mb-0">Custos do Período</h5>
+                        <h2 class="mb-0">R$ {{ '{:,.2f}'.format(custos_mes).replace(',', '.') }}</h2>
+                    </div>
+                    <div class="ms-3">
+                        <i class="fas fa-dollar-sign fa-2x opacity-75"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Custos Detalhados -->
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-chart-pie"></i> Custos Detalhados do Período
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-2">
+                        <div class="text-center">
+                            <i class="fas fa-utensils fa-2x text-warning mb-2"></i>
+                            <h6>Alimentação</h6>
+                            <h5 class="text-warning">R$ {{ '{:,.2f}'.format(custos_detalhados.alimentacao).replace(',', '.') }}</h5>
                         </div>
-                        <div class="metric-icon">
-                            <i class="fas fa-dollar-sign"></i>
+                    </div>
+                    <div class="col-md-2">
+                        <div class="text-center">
+                            <i class="fas fa-car fa-2x text-info mb-2"></i>
+                            <h6>Transporte</h6>
+                            <h5 class="text-info">R$ {{ '{:,.2f}'.format(custos_detalhados.transporte).replace(',', '.') }}</h5>
+                        </div>
+                    </div>
+                    <div class="col-md-2">
+                        <div class="text-center">
+                            <i class="fas fa-users fa-2x text-success mb-2"></i>
+                            <h6>Mão de Obra</h6>
+                            <h5 class="text-success">R$ {{ '{:,.2f}'.format(custos_detalhados.mao_obra).replace(',', '.') }}</h5>
+                        </div>
+                    </div>
+                    <div class="col-md-2">
+                        <div class="text-center">
+                            <i class="fas fa-exclamation-triangle fa-2x text-danger mb-2"></i>
+                            <h6>Faltas Justificadas</h6>
+                            <h5 class="text-danger">R$ {{ '{:,.2f}'.format(custos_detalhados.faltas_justificadas).replace(',', '.') }}</h5>
+                        </div>
+                    </div>
+                    <div class="col-md-2">
+                        <div class="text-center">
+                            <i class="fas fa-cogs fa-2x text-secondary mb-2"></i>
+                            <h6>Outros</h6>
+                            <h5 class="text-secondary">R$ {{ '{:,.2f}'.format(custos_detalhados.outros).replace(',', '.') }}</h5>
+                        </div>
+                    </div>
+                    <div class="col-md-2">
+                        <div class="text-center">
+                            <i class="fas fa-calculator fa-2x text-primary mb-2"></i>
+                            <h6>Total</h6>
+                            <h5 class="text-primary">R$ {{ '{:,.2f}'.format(custos_detalhados.total).replace(',', '.') }}</h5>
                         </div>
                     </div>
                 </div>
             </div>
         </div>
     </div>
+</div>
 
-    <!-- Breakdown de Custos -->
-    <div class="fade-in-up mb-4" style="animation-delay: 0.3s;">
-        <h2 class="section-title">
-            <i class="fas fa-chart-pie text-primary"></i>
-            Análise de Custos Detalhada
-        </h2>
-        <div class="row g-4">
-            <div class="col-lg-2 col-md-4 col-sm-6">
-                <div class="cost-item cost-alimentacao">
-                    <div class="cost-icon" style="background: rgba(245, 158, 11, 0.1); color: #f59e0b;">
-                        <i class="fas fa-utensils"></i>
-                    </div>
-                    <h3 class="cost-value">R$ {{ '{:,.0f}'.format(custos_detalhados.alimentacao).replace(',', '.') }}</h3>
-                    <p class="cost-label">Alimentação</p>
-                </div>
+<!-- Charts Row -->
+<div class="row mb-4">
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-chart-pie"></i> Funcionários por Departamento
+                </h5>
             </div>
-            <div class="col-lg-2 col-md-4 col-sm-6">
-                <div class="cost-item cost-transporte">
-                    <div class="cost-icon" style="background: rgba(59, 130, 246, 0.1); color: #3b82f6;">
-                        <i class="fas fa-car"></i>
-                    </div>
-                    <h3 class="cost-value">R$ {{ '{:,.0f}'.format(custos_detalhados.transporte).replace(',', '.') }}</h3>
-                    <p class="cost-label">Transporte</p>
-                </div>
-            </div>
-            <div class="col-lg-2 col-md-4 col-sm-6">
-                <div class="cost-item cost-mao-obra">
-                    <div class="cost-icon" style="background: rgba(16, 185, 129, 0.1); color: #10b981;">
-                        <i class="fas fa-users-cog"></i>
-                    </div>
-                    <h3 class="cost-value">R$ {{ '{:,.0f}'.format(custos_detalhados.mao_obra).replace(',', '.') }}</h3>
-                    <p class="cost-label">Mão de Obra</p>
-                </div>
-            </div>
-            <div class="col-lg-2 col-md-4 col-sm-6">
-                <div class="cost-item cost-outros">
-                    <div class="cost-icon" style="background: rgba(139, 92, 246, 0.1); color: #8b5cf6;">
-                        <i class="fas fa-cogs"></i>
-                    </div>
-                    <h3 class="cost-value">R$ {{ '{:,.0f}'.format(custos_detalhados.faltas_justificadas).replace(',', '.') }}</h3>
-                    <p class="cost-label">Faltas Justif.</p>
-                </div>
-            </div>
-            <div class="col-lg-2 col-md-4 col-sm-6">
-                <div class="cost-item cost-outros">
-                    <div class="cost-icon" style="background: rgba(139, 92, 246, 0.1); color: #8b5cf6;">
-                        <i class="fas fa-ellipsis-h"></i>
-                    </div>
-                    <h3 class="cost-value">R$ {{ '{:,.0f}'.format(custos_detalhados.outros).replace(',', '.') }}</h3>
-                    <p class="cost-label">Outros</p>
-                </div>
-            </div>
-            <div class="col-lg-2 col-md-4 col-sm-6">
-                <div class="cost-item cost-total">
-                    <div class="cost-icon" style="background: rgba(239, 68, 68, 0.1); color: #ef4444;">
-                        <i class="fas fa-calculator"></i>
-                    </div>
-                    <h3 class="cost-value">R$ {{ '{:,.0f}'.format(custos_detalhados.total).replace(',', '.') }}</h3>
-                    <p class="cost-label">Total Geral</p>
-                </div>
+            <div class="card-body">
+                <canvas id="funcionariosDeptChart" width="400" height="200"></canvas>
             </div>
         </div>
     </div>
-
-    <!-- Gráficos e Análises -->
-    <div class="fade-in-up mb-4" style="animation-delay: 0.4s;">
-        <div class="row g-4">
-            <div class="col-lg-8">
-                <div class="chart-container">
-                    <h3 class="section-title mb-3">
-                        <i class="fas fa-chart-line text-primary"></i>
-                        Tendência de Custos
-                    </h3>
-                    <canvas id="custosTimelineChart" width="400" height="200"></canvas>
-                </div>
+    
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-chart-bar"></i> Custos por Obra
+                </h5>
             </div>
-            <div class="col-lg-4">
-                <div class="chart-container">
-                    <h3 class="section-title mb-3">
-                        <i class="fas fa-chart-pie text-primary"></i>
-                        Distribuição por Depto.
-                    </h3>
-                    <canvas id="funcionariosDeptChart" width="400" height="200"></canvas>
-                </div>
+            <div class="card-body">
+                <canvas id="custosObraChart" width="400" height="200"></canvas>
             </div>
         </div>
     </div>
+</div>
 
-    <!-- Tabelas de Dados -->
-    <div class="fade-in-up" style="animation-delay: 0.5s;">
-        <div class="row g-4">
-            <div class="col-lg-6">
-                <div class="data-table">
-                    <div style="padding: 1.5rem; border-bottom: 1px solid #e2e8f0;">
-                        <h3 class="section-title mb-0">
-                            <i class="fas fa-hard-hat text-primary"></i>
-                            Obras em Andamento
-                        </h3>
-                    </div>
+<!-- Tables Row -->
+<div class="row">
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-hard-hat"></i> Obras em Andamento
+                </h5>
+            </div>
+            <div class="card-body">
+                {% if obras_andamento %}
                     <div class="table-responsive">
-                        {% if obras_andamento %}
-                            <table class="table">
-                                <thead>
-                                    <tr>
-                                        <th>Obra</th>
-                                        <th>Início</th>
-                                        <th>Orçamento</th>
-                                        <th>Status</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {% for obra in obras_andamento %}
-                                    <tr>
-                                        <td>
-                                            <div class="fw-semibold">{{ obra.nome }}</div>
-                                            <small class="text-muted">{{ obra.endereco[:30] }}...</small>
-                                        </td>
-                                        <td>{{ obra.data_inicio.strftime('%d/%m/%Y') if obra.data_inicio else '-' }}</td>
-                                        <td>
-                                            <span class="fw-semibold text-success">R$ {{ '{:,.0f}'.format(obra.orcamento).replace(',', '.') }}</span>
-                                        </td>
-                                        <td>
-                                            <span class="badge bg-success">{{ obra.status }}</span>
-                                        </td>
-                                    </tr>
-                                    {% endfor %}
-                                </tbody>
-                            </table>
-                        {% else %}
-                            <div class="text-center py-5">
-                                <i class="fas fa-hard-hat fa-3x text-muted mb-3"></i>
-                                <p class="text-muted">Nenhuma obra em andamento no momento.</p>
-                            </div>
-                        {% endif %}
+                        <table class="table table-sm">
+                            <thead>
+                                <tr>
+                                    <th>Obra</th>
+                                    <th>Início</th>
+                                    <th>Orçamento</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for obra in obras_andamento %}
+                                <tr>
+                                    <td>{{ obra.nome }}</td>
+                                    <td>{{ obra.data_inicio.strftime('%d/%m/%Y') if obra.data_inicio else '-' }}</td>
+                                    <td>R$ {{ '{:,.2f}'.format(obra.orcamento) }}</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
                     </div>
-                </div>
-            </div>
-            
-            <div class="col-lg-6">
-                <div class="data-table">
-                    <div style="padding: 1.5rem; border-bottom: 1px solid #e2e8f0;">
-                        <h3 class="section-title mb-0">
-                            <i class="fas fa-chart-bar text-primary"></i>
-                            Top Custos por Obra
-                        </h3>
-                    </div>
-                    <div class="table-responsive">
-                        {% if custos_recentes %}
-                            <table class="table">
-                                <thead>
-                                    <tr>
-                                        <th>Obra</th>
-                                        <th>Custo Total</th>
-                                        <th>Tendência</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {% for custo in custos_recentes %}
-                                    <tr>
-                                        <td>
-                                            <div class="fw-semibold">{{ custo.nome }}</div>
-                                            <small class="text-muted">Atualizado recentemente</small>
-                                        </td>
-                                        <td>
-                                            <span class="fw-semibold text-danger">R$ {{ '{:,.0f}'.format(custo.total_custo).replace(',', '.') }}</span>
-                                        </td>
-                                        <td>
-                                            <i class="fas fa-arrow-up text-danger"></i>
-                                            <small class="text-muted">+5%</small>
-                                        </td>
-                                    </tr>
-                                    {% endfor %}
-                                </tbody>
-                            </table>
-                        {% else %}
-                            <div class="text-center py-5">
-                                <i class="fas fa-chart-bar fa-3x text-muted mb-3"></i>
-                                <p class="text-muted">Nenhum custo registrado para o período.</p>
-                            </div>
-                        {% endif %}
-                    </div>
-                </div>
+                {% else %}
+                    <p class="text-muted mb-0">Nenhuma obra em andamento.</p>
+                {% endif %}
             </div>
         </div>
     </div>
-
+    
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-dollar-sign"></i> Custos Recentes
+                </h5>
+            </div>
+            <div class="card-body">
+                {% if custos_recentes %}
+                    <div class="table-responsive">
+                        <table class="table table-sm">
+                            <thead>
+                                <tr>
+                                    <th>Obra</th>
+                                    <th>Custo Total</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for custo in custos_recentes %}
+                                <tr>
+                                    <td>{{ custo.nome }}</td>
+                                    <td>R$ {{ '{:,.2f}'.format(custo.total_custo) }}</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                {% else %}
+                    <p class="text-muted mb-0">Nenhum custo registrado.</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
 </div>
 
 <script>
-// Funções de filtro de data
 function setDateRange(period) {
     const today = new Date();
     let startDate, endDate = today;
     
     switch(period) {
-        case 'mes_atual':
-            startDate = new Date(today.getFullYear(), today.getMonth(), 1);
-            break;
         case 'ultimo_mes':
             startDate = new Date(today.getFullYear(), today.getMonth() - 1, 1);
             endDate = new Date(today.getFullYear(), today.getMonth(), 0);
@@ -606,6 +301,7 @@ function setDateRange(period) {
             break;
     }
     
+    // Formatar datas para yyyy-mm-dd
     const formatDate = (date) => {
         return date.getFullYear() + '-' + 
                String(date.getMonth() + 1).padStart(2, '0') + '-' + 
@@ -616,109 +312,136 @@ function setDateRange(period) {
     document.querySelector('input[name="data_fim"]').value = formatDate(endDate);
 }
 
-// Inicialização dos gráficos
+// Gráficos
 document.addEventListener('DOMContentLoaded', function() {
-    // Configuração global do Chart.js
-    Chart.defaults.font.family = 'Inter, system-ui, sans-serif';
-    Chart.defaults.color = '#718096';
+    // Gráfico de funcionários por departamento
+    const ctxFuncionarios = document.getElementById('funcionariosDeptChart').getContext('2d');
+    new Chart(ctxFuncionarios, {
+        type: 'pie',
+        data: {
+            labels: [{% for dept in funcionarios_dept %}'{{ dept.nome }}'{% if not loop.last %},{% endif %}{% endfor %}],
+            datasets: [{
+                data: [{% for dept in funcionarios_dept %}{{ dept.total }}{% if not loop.last %},{% endif %}{% endfor %}],
+                backgroundColor: [
+                    '#0d6efd', '#198754', '#ffc107', '#dc3545', '#6610f2', '#fd7e14'
+                ]
+            }]
+        },
+        options: {
+            responsive: true,
+            plugins: {
+                legend: {
+                    position: 'bottom'
+                }
+            }
+        }
+    });
     
-    // Gráfico de timeline de custos
-    const timelineCtx = document.getElementById('custosTimelineChart');
-    if (timelineCtx) {
-        new Chart(timelineCtx, {
-            type: 'line',
-            data: {
-                labels: ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun'],
-                datasets: [{
-                    label: 'Custos Mensais',
-                    data: [65000, 72000, 69000, 78000, 75000, 82000],
-                    borderColor: '#667eea',
-                    backgroundColor: 'rgba(102, 126, 234, 0.1)',
-                    borderWidth: 3,
-                    fill: true,
-                    tension: 0.4,
-                    pointBackgroundColor: '#667eea',
-                    pointBorderColor: '#fff',
-                    pointBorderWidth: 2,
-                    pointRadius: 6
-                }]
+    // Gráfico de custos por obra
+    const ctxCustos = document.getElementById('custosObraChart').getContext('2d');
+    new Chart(ctxCustos, {
+        type: 'bar',
+        data: {
+            labels: [{% for custo in custos_recentes %}'{{ custo.nome }}'{% if not loop.last %},{% endif %}{% endfor %}],
+            datasets: [{
+                label: 'Custo Total (R$)',
+                data: [{% for custo in custos_recentes %}{{ custo.total_custo }}{% if not loop.last %},{% endif %}{% endfor %}],
+                backgroundColor: 'rgba(13, 110, 253, 0.8)',
+                borderColor: 'rgba(13, 110, 253, 1)',
+                borderWidth: 1
+            }]
+        },
+        options: {
+            responsive: true,
+            plugins: {
+                legend: {
+                    display: false
+                }
             },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: {
-                    legend: { display: false },
-                    tooltip: {
-                        backgroundColor: 'rgba(0, 0, 0, 0.8)',
-                        titleColor: '#fff',
-                        bodyColor: '#fff',
-                        borderColor: '#667eea',
-                        borderWidth: 1,
-                        cornerRadius: 8,
-                        callbacks: {
-                            label: function(context) {
-                                return 'R$ ' + context.parsed.y.toLocaleString('pt-BR');
-                            }
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    ticks: {
+                        callback: function(value) {
+                            return 'R$ ' + value.toLocaleString('pt-BR', {minimumFractionDigits: 2});
                         }
-                    }
-                },
-                scales: {
-                    y: {
-                        beginAtZero: true,
-                        grid: { color: '#e2e8f0' },
-                        ticks: {
-                            callback: function(value) {
-                                return 'R$ ' + (value/1000) + 'k';
-                            }
-                        }
-                    },
-                    x: {
-                        grid: { display: false }
                     }
                 }
             }
-        });
-    }
-    
-    // Gráfico de funcionários por departamento
-    const deptCtx = document.getElementById('funcionariosDeptChart');
-    if (deptCtx) {
-        new Chart(deptCtx, {
-            type: 'doughnut',
-            data: {
-                labels: [{% for dept in funcionarios_dept %}'{{ dept.nome }}'{% if not loop.last %},{% endif %}{% endfor %}],
-                datasets: [{
-                    data: [{% for dept in funcionarios_dept %}{{ dept.total }}{% if not loop.last %},{% endif %}{% endfor %}],
-                    backgroundColor: [
-                        '#667eea', '#764ba2', '#f093fb', '#f5576c',
-                        '#4facfe', '#00f2fe', '#43e97b', '#38f9d7'
-                    ],
-                    borderWidth: 0,
-                    hoverOffset: 10
-                }]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: {
-                    legend: {
-                        position: 'bottom',
-                        labels: {
-                            padding: 20,
-                            usePointStyle: true,
-                            pointStyle: 'circle'
-                        }
-                    },
-                    tooltip: {
-                        backgroundColor: 'rgba(0, 0, 0, 0.8)',
-                        titleColor: '#fff',
-                        bodyColor: '#fff',
-                        cornerRadius: 8
-                    }
-                },
-                cutout: '60%'
+        }
+    });
+});
+</script>
+{% endblock %}
+
+{% block scripts %}
+<script>
+// Dados dos gráficos
+const funcionariosDeptData = {
+    labels: [{% for item in funcionarios_dept %}'{{ item[0] }}'{% if not loop.last %},{% endif %}{% endfor %}],
+    datasets: [{
+        data: [{% for item in funcionarios_dept %}{{ item[1] }}{% if not loop.last %},{% endif %}{% endfor %}],
+        backgroundColor: [
+            'rgba(54, 162, 235, 0.8)',
+            'rgba(255, 99, 132, 0.8)',
+            'rgba(255, 205, 86, 0.8)',
+            'rgba(75, 192, 192, 0.8)',
+            'rgba(153, 102, 255, 0.8)',
+            'rgba(255, 159, 64, 0.8)'
+        ]
+    }]
+};
+
+const custosObraData = {
+    labels: [{% for item in custos_recentes %}'{{ item.nome }}'{% if not loop.last %},{% endif %}{% endfor %}],
+    datasets: [{
+        label: 'Custo (R$)',
+        data: [{% for item in custos_recentes %}{{ item.total_custo }}{% if not loop.last %},{% endif %}{% endfor %}],
+        backgroundColor: 'rgba(54, 162, 235, 0.8)',
+        borderColor: 'rgba(54, 162, 235, 1)',
+        borderWidth: 1
+    }]
+};
+
+// Gráfico de funcionários por departamento
+const funcionariosDeptCtx = document.getElementById('funcionariosDeptChart').getContext('2d');
+new Chart(funcionariosDeptCtx, {
+    type: 'pie',
+    data: funcionariosDeptData,
+    options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+            legend: {
+                position: 'bottom'
             }
-        });
+        }
+    }
+});
+
+// Gráfico de custos por obra
+const custosObraCtx = document.getElementById('custosObraChart').getContext('2d');
+new Chart(custosObraCtx, {
+    type: 'bar',
+    data: custosObraData,
+    options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+            legend: {
+                display: false
+            }
+        },
+        scales: {
+            y: {
+                beginAtZero: true,
+                ticks: {
+                    callback: function(value) {
+                        return 'R$ ' + value.toLocaleString('pt-BR');
+                    }
+                }
+            }
+        }
     }
 });
 </script>
