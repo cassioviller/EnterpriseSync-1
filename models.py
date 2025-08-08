@@ -569,16 +569,18 @@ class OutroCusto(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     funcionario_id = db.Column(db.Integer, db.ForeignKey('funcionario.id'), nullable=False)
     data = db.Column(db.Date, nullable=False)
-    tipo = db.Column(db.String(30), nullable=False)  # 'vale_transporte', 'vale_alimentacao', 'desconto_vt', 'desconto_outras'
-    categoria = db.Column(db.String(20), nullable=False)  # 'adicional' ou 'desconto'
+    tipo = db.Column(db.String(100), nullable=False)  # Descrição livre do tipo de custo
+    categoria = db.Column(db.String(20), nullable=False, default='outros_custos')  # 'outros_custos', 'alimentacao', 'transporte'
     valor = db.Column(db.Float, nullable=False)
     descricao = db.Column(db.Text)
     obra_id = db.Column(db.Integer, db.ForeignKey('obra.id'))
     percentual = db.Column(db.Float)  # Para descontos percentuais (ex: 6% do salário)
+    admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=True)  # Para isolamento multi-tenant
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     
     funcionario = db.relationship('Funcionario', backref='outros_custos')
     obra = db.relationship('Obra', backref='outros_custos')
+    admin = db.relationship('Usuario', backref='outros_custos')
     
     def __repr__(self):
         return f'<OutroCusto {self.funcionario.nome} - {self.tipo} R$ {self.valor}>'

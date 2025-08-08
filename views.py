@@ -1642,9 +1642,10 @@ def criar_outro_custo(funcionario_id):
             funcionario_id=funcionario_id,
             data=data,
             tipo=request.form['tipo'],
-            categoria=request.form['categoria'],
+            categoria=request.form.get('categoria', 'outros_custos'),
             valor=float(request.form['valor']),
-            descricao=request.form.get('descricao')
+            descricao=request.form.get('descricao'),
+            admin_id=current_user.id
         )
         
         db.session.add(outro_custo)
@@ -6701,8 +6702,10 @@ def criar_outro_custo_crud():
             funcionario_id=funcionario_id,
             data=data,
             tipo=tipo,
+            categoria=request.form.get('categoria', 'outros_custos'),
             valor=valor,
-            descricao=descricao
+            descricao=descricao,
+            admin_id=current_user.id
         )
         
         db.session.add(custo)
