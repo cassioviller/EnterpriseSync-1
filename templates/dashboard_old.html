@@ -1,0 +1,450 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard - SIGE{% endblock %}
+
+<!-- Backup do dashboard antigo - Substituído por versão moderna -->
+
+{% block content %}
+<div class="container-fluid">
+    <!-- Header da página -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1 class="h3 mb-0">
+            <i class="fas fa-tachometer-alt"></i> Dashboard
+        </h1>
+    </div>
+
+    <!-- Filtros de Data Globais -->
+    <div class="card mb-4">
+        <div class="card-header">
+            <h5 class="card-title mb-0">
+                <i class="fas fa-calendar"></i> Filtros de Data
+            </h5>
+        </div>
+        <div class="card-body">
+            <form method="GET" class="row g-3">
+                <div class="col-md-3">
+                    <label class="form-label">Data Inicial</label>
+                    <input type="date" name="data_inicio" class="form-control" 
+                           value="{{ data_inicio.strftime('%Y-%m-%d') if data_inicio else '' }}">
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">Data Final</label>
+                    <input type="date" name="data_fim" class="form-control" 
+                           value="{{ data_fim.strftime('%Y-%m-%d') if data_fim else '' }}">
+                </div>
+                <div class="col-md-3 d-flex align-items-end">
+                    <button type="submit" class="btn btn-primary me-2">
+                        <i class="fas fa-filter"></i> Aplicar Filtro
+                    </button>
+                    <a href="{{ url_for('main.dashboard') }}" class="btn btn-secondary">
+                        <i class="fas fa-times"></i> Limpar
+                    </a>
+                </div>
+                <div class="col-md-3 d-flex align-items-end">
+                    <div class="btn-group" role="group">
+                        <button type="button" class="btn btn-outline-primary btn-sm" 
+                                onclick="setDateRange('mes_atual')">Mês Atual</button>
+                        <button type="button" class="btn btn-outline-primary btn-sm" 
+                                onclick="setDateRange('ultimo_mes')">Último Mês</button>
+                        <button type="button" class="btn btn-outline-primary btn-sm" 
+                                onclick="setDateRange('ultimos_3_meses')">3 Meses</button>
+                        <button type="button" class="btn btn-outline-primary btn-sm" 
+                                onclick="setDateRange('ano_atual')">Ano Atual</button>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- KPIs Cards -->
+<div class="row mb-4">
+    <div class="col-md-3">
+        <div class="card bg-primary text-white">
+            <div class="card-body">
+                <div class="d-flex align-items-center">
+                    <div class="flex-grow-1">
+                        <h5 class="card-title mb-0">Funcionários Ativos</h5>
+                        <h2 class="mb-0">{{ total_funcionarios }}</h2>
+                    </div>
+                    <div class="ms-3">
+                        <i class="fas fa-users fa-2x opacity-75"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-3">
+        <div class="card bg-success text-white">
+            <div class="card-body">
+                <div class="d-flex align-items-center">
+                    <div class="flex-grow-1">
+                        <h5 class="card-title mb-0">Obras Ativas</h5>
+                        <h2 class="mb-0">{{ total_obras }}</h2>
+                    </div>
+                    <div class="ms-3">
+                        <i class="fas fa-hard-hat fa-2x opacity-75"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-3">
+        <div class="card bg-warning text-white">
+            <div class="card-body">
+                <div class="d-flex align-items-center">
+                    <div class="flex-grow-1">
+                        <h5 class="card-title mb-0">Veículos</h5>
+                        <h2 class="mb-0">{{ total_veiculos }}</h2>
+                    </div>
+                    <div class="ms-3">
+                        <i class="fas fa-truck fa-2x opacity-75"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-3">
+        <div class="card bg-info text-white">
+            <div class="card-body">
+                <div class="d-flex align-items-center">
+                    <div class="flex-grow-1">
+                        <h5 class="card-title mb-0">Custos do Período</h5>
+                        <h2 class="mb-0">R$ {{ '{:,.2f}'.format(custos_mes).replace(',', '.') }}</h2>
+                    </div>
+                    <div class="ms-3">
+                        <i class="fas fa-dollar-sign fa-2x opacity-75"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Custos Detalhados -->
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-chart-pie"></i> Custos Detalhados do Período
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-2">
+                        <div class="text-center">
+                            <i class="fas fa-utensils fa-2x text-warning mb-2"></i>
+                            <h6>Alimentação</h6>
+                            <h5 class="text-warning">R$ {{ '{:,.2f}'.format(custos_detalhados.alimentacao).replace(',', '.') }}</h5>
+                        </div>
+                    </div>
+                    <div class="col-md-2">
+                        <div class="text-center">
+                            <i class="fas fa-car fa-2x text-info mb-2"></i>
+                            <h6>Transporte</h6>
+                            <h5 class="text-info">R$ {{ '{:,.2f}'.format(custos_detalhados.transporte).replace(',', '.') }}</h5>
+                        </div>
+                    </div>
+                    <div class="col-md-2">
+                        <div class="text-center">
+                            <i class="fas fa-users fa-2x text-success mb-2"></i>
+                            <h6>Mão de Obra</h6>
+                            <h5 class="text-success">R$ {{ '{:,.2f}'.format(custos_detalhados.mao_obra).replace(',', '.') }}</h5>
+                        </div>
+                    </div>
+                    <div class="col-md-2">
+                        <div class="text-center">
+                            <i class="fas fa-exclamation-triangle fa-2x text-danger mb-2"></i>
+                            <h6>Faltas Justificadas</h6>
+                            <h5 class="text-danger">R$ {{ '{:,.2f}'.format(custos_detalhados.faltas_justificadas).replace(',', '.') }}</h5>
+                        </div>
+                    </div>
+                    <div class="col-md-2">
+                        <div class="text-center">
+                            <i class="fas fa-cogs fa-2x text-secondary mb-2"></i>
+                            <h6>Outros</h6>
+                            <h5 class="text-secondary">R$ {{ '{:,.2f}'.format(custos_detalhados.outros).replace(',', '.') }}</h5>
+                        </div>
+                    </div>
+                    <div class="col-md-2">
+                        <div class="text-center">
+                            <i class="fas fa-calculator fa-2x text-primary mb-2"></i>
+                            <h6>Total</h6>
+                            <h5 class="text-primary">R$ {{ '{:,.2f}'.format(custos_detalhados.total).replace(',', '.') }}</h5>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Charts Row -->
+<div class="row mb-4">
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-chart-pie"></i> Funcionários por Departamento
+                </h5>
+            </div>
+            <div class="card-body">
+                <canvas id="funcionariosDeptChart" width="400" height="200"></canvas>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-chart-bar"></i> Custos por Obra
+                </h5>
+            </div>
+            <div class="card-body">
+                <canvas id="custosObraChart" width="400" height="200"></canvas>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Tables Row -->
+<div class="row">
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-hard-hat"></i> Obras em Andamento
+                </h5>
+            </div>
+            <div class="card-body">
+                {% if obras_andamento %}
+                    <div class="table-responsive">
+                        <table class="table table-sm">
+                            <thead>
+                                <tr>
+                                    <th>Obra</th>
+                                    <th>Início</th>
+                                    <th>Orçamento</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for obra in obras_andamento %}
+                                <tr>
+                                    <td>{{ obra.nome }}</td>
+                                    <td>{{ obra.data_inicio.strftime('%d/%m/%Y') if obra.data_inicio else '-' }}</td>
+                                    <td>R$ {{ '{:,.2f}'.format(obra.orcamento) }}</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                {% else %}
+                    <p class="text-muted mb-0">Nenhuma obra em andamento.</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-dollar-sign"></i> Custos Recentes
+                </h5>
+            </div>
+            <div class="card-body">
+                {% if custos_recentes %}
+                    <div class="table-responsive">
+                        <table class="table table-sm">
+                            <thead>
+                                <tr>
+                                    <th>Obra</th>
+                                    <th>Custo Total</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for custo in custos_recentes %}
+                                <tr>
+                                    <td>{{ custo.nome }}</td>
+                                    <td>R$ {{ '{:,.2f}'.format(custo.total_custo) }}</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                {% else %}
+                    <p class="text-muted mb-0">Nenhum custo registrado.</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+</div>
+
+<script>
+function setDateRange(period) {
+    const today = new Date();
+    let startDate, endDate = today;
+    
+    switch(period) {
+        case 'ultimo_mes':
+            startDate = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+            endDate = new Date(today.getFullYear(), today.getMonth(), 0);
+            break;
+        case 'ultimos_3_meses':
+            startDate = new Date(today.getFullYear(), today.getMonth() - 3, 1);
+            break;
+        case 'ano_atual':
+            startDate = new Date(today.getFullYear(), 0, 1);
+            break;
+    }
+    
+    // Formatar datas para yyyy-mm-dd
+    const formatDate = (date) => {
+        return date.getFullYear() + '-' + 
+               String(date.getMonth() + 1).padStart(2, '0') + '-' + 
+               String(date.getDate()).padStart(2, '0');
+    };
+    
+    document.querySelector('input[name="data_inicio"]').value = formatDate(startDate);
+    document.querySelector('input[name="data_fim"]').value = formatDate(endDate);
+}
+
+// Gráficos
+document.addEventListener('DOMContentLoaded', function() {
+    // Gráfico de funcionários por departamento
+    const ctxFuncionarios = document.getElementById('funcionariosDeptChart').getContext('2d');
+    new Chart(ctxFuncionarios, {
+        type: 'pie',
+        data: {
+            labels: [{% for dept in funcionarios_dept %}'{{ dept.nome }}'{% if not loop.last %},{% endif %}{% endfor %}],
+            datasets: [{
+                data: [{% for dept in funcionarios_dept %}{{ dept.total }}{% if not loop.last %},{% endif %}{% endfor %}],
+                backgroundColor: [
+                    '#0d6efd', '#198754', '#ffc107', '#dc3545', '#6610f2', '#fd7e14'
+                ]
+            }]
+        },
+        options: {
+            responsive: true,
+            plugins: {
+                legend: {
+                    position: 'bottom'
+                }
+            }
+        }
+    });
+    
+    // Gráfico de custos por obra
+    const ctxCustos = document.getElementById('custosObraChart').getContext('2d');
+    new Chart(ctxCustos, {
+        type: 'bar',
+        data: {
+            labels: [{% for custo in custos_recentes %}'{{ custo.nome }}'{% if not loop.last %},{% endif %}{% endfor %}],
+            datasets: [{
+                label: 'Custo Total (R$)',
+                data: [{% for custo in custos_recentes %}{{ custo.total_custo }}{% if not loop.last %},{% endif %}{% endfor %}],
+                backgroundColor: 'rgba(13, 110, 253, 0.8)',
+                borderColor: 'rgba(13, 110, 253, 1)',
+                borderWidth: 1
+            }]
+        },
+        options: {
+            responsive: true,
+            plugins: {
+                legend: {
+                    display: false
+                }
+            },
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    ticks: {
+                        callback: function(value) {
+                            return 'R$ ' + value.toLocaleString('pt-BR', {minimumFractionDigits: 2});
+                        }
+                    }
+                }
+            }
+        }
+    });
+});
+</script>
+{% endblock %}
+
+{% block scripts %}
+<script>
+// Dados dos gráficos
+const funcionariosDeptData = {
+    labels: [{% for item in funcionarios_dept %}'{{ item[0] }}'{% if not loop.last %},{% endif %}{% endfor %}],
+    datasets: [{
+        data: [{% for item in funcionarios_dept %}{{ item[1] }}{% if not loop.last %},{% endif %}{% endfor %}],
+        backgroundColor: [
+            'rgba(54, 162, 235, 0.8)',
+            'rgba(255, 99, 132, 0.8)',
+            'rgba(255, 205, 86, 0.8)',
+            'rgba(75, 192, 192, 0.8)',
+            'rgba(153, 102, 255, 0.8)',
+            'rgba(255, 159, 64, 0.8)'
+        ]
+    }]
+};
+
+const custosObraData = {
+    labels: [{% for item in custos_recentes %}'{{ item.nome }}'{% if not loop.last %},{% endif %}{% endfor %}],
+    datasets: [{
+        label: 'Custo (R$)',
+        data: [{% for item in custos_recentes %}{{ item.total_custo }}{% if not loop.last %},{% endif %}{% endfor %}],
+        backgroundColor: 'rgba(54, 162, 235, 0.8)',
+        borderColor: 'rgba(54, 162, 235, 1)',
+        borderWidth: 1
+    }]
+};
+
+// Gráfico de funcionários por departamento
+const funcionariosDeptCtx = document.getElementById('funcionariosDeptChart').getContext('2d');
+new Chart(funcionariosDeptCtx, {
+    type: 'pie',
+    data: funcionariosDeptData,
+    options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+            legend: {
+                position: 'bottom'
+            }
+        }
+    }
+});
+
+// Gráfico de custos por obra
+const custosObraCtx = document.getElementById('custosObraChart').getContext('2d');
+new Chart(custosObraCtx, {
+    type: 'bar',
+    data: custosObraData,
+    options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+            legend: {
+                display: false
+            }
+        },
+        scales: {
+            y: {
+                beginAtZero: true,
+                ticks: {
+                    callback: function(value) {
+                        return 'R$ ' + value.toLocaleString('pt-BR');
+                    }
+                }
+            }
+        }
+    }
+});
+</script>
+{% endblock %}
