@@ -139,6 +139,31 @@ with app.app_context():
             print(f'✅ Coluna kpi_associado adicionada - {updated} registros atualizados')
         else:
             print('✅ Coluna kpi_associado já existe')
+            
+        # Corrigir associações incorretas de KPI baseadas no tipo
+        print('🔧 Corrigindo associações de KPI...')
+        updated_kpis = db.session.execute(text('''
+            UPDATE outro_custo 
+            SET kpi_associado = CASE 
+                WHEN LOWER(tipo) LIKE '%transporte%' OR LOWER(tipo) LIKE '%vale transporte%' OR LOWER(tipo) IN ('vt', 'vale_transporte') THEN 'custo_transporte'
+                WHEN LOWER(tipo) LIKE '%alimenta%' OR LOWER(tipo) LIKE '%vale alimenta%' OR LOWER(tipo) IN ('va', 'vale_alimentacao', 'refeicao') THEN 'custo_alimentacao'
+                WHEN LOWER(tipo) LIKE '%semana viagem%' OR LOWER(tipo) LIKE '%viagem%' THEN 'custo_alimentacao'
+                ELSE 'outros_custos'
+            END
+            WHERE CASE 
+                WHEN LOWER(tipo) LIKE '%transporte%' OR LOWER(tipo) LIKE '%vale transporte%' OR LOWER(tipo) IN ('vt', 'vale_transporte') THEN 'custo_transporte'
+                WHEN LOWER(tipo) LIKE '%alimenta%' OR LOWER(tipo) LIKE '%vale alimenta%' OR LOWER(tipo) IN ('va', 'vale_alimentacao', 'refeicao') THEN 'custo_alimentacao'
+                WHEN LOWER(tipo) LIKE '%semana viagem%' OR LOWER(tipo) LIKE '%viagem%' THEN 'custo_alimentacao'
+                ELSE 'outros_custos'
+            END != kpi_associado
+        ''')).rowcount
+        
+        if updated_kpis > 0:
+            db.session.commit()
+            print(f'✅ {updated_kpis} associações de KPI corrigidas')
+        else:
+            print('✅ Associações de KPI já estão corretas')
+            
     except Exception as e:
         print(f'❌ Erro na correção kpi_associado: {e}')
 "

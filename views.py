@@ -1639,8 +1639,22 @@ def criar_outro_custo(funcionario_id):
     try:
         data = datetime.strptime(request.form['data'], '%Y-%m-%d').date()
         
-        # Obter KPI associado ou usar padrão
-        kpi_associado = request.form.get('kpi_associado', 'outros_custos')
+        # Obter KPI associado ou determinar automaticamente baseado no tipo
+        kpi_associado = request.form.get('kpi_associado')
+        
+        # Se não foi especificado, determinar automaticamente baseado no tipo
+        if not kpi_associado or kpi_associado == 'outros_custos':
+            tipo = request.form['tipo'].lower()
+            
+            # Lógica inteligente de associação por tipo
+            if 'transporte' in tipo or 'vale transporte' in tipo or tipo in ['vt', 'vale_transporte']:
+                kpi_associado = 'custo_transporte'
+            elif 'alimenta' in tipo or 'vale alimenta' in tipo or tipo in ['va', 'vale_alimentacao', 'refeicao']:
+                kpi_associado = 'custo_alimentacao'
+            elif 'semana viagem' in tipo or 'viagem' in tipo:
+                kpi_associado = 'custo_alimentacao'  # Semana viagem geralmente é alimentação
+            else:
+                kpi_associado = 'outros_custos'
         
         outro_custo = OutroCusto(
             funcionario_id=funcionario_id,

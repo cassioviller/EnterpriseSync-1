@@ -14,10 +14,15 @@ Preferred communication style: Simple, everyday language.
 - ✅ Resolved critical `UndefinedColumn` errors for database schema consistency
 - ✅ Fixed `outro_custo.admin_id` column issue in production environments
 - ✅ Fixed `outro_custo.kpi_associado` column metadata caching issue
+- ✅ **CRITICAL FIX**: Implemented intelligent KPI association logic for cost categorization
+  - Transporte costs now correctly associated with `custo_transporte` KPI
+  - Alimentação costs now correctly associated with `custo_alimentacao` KPI  
+  - Automated correction of 28 existing records with wrong associations
+  - Smart type-based assignment for new records in `views.py`
 - ✅ Created automated deployment scripts for production fixes:
   - `deploy_admin_id_fix.py` - Direct execution script
   - `migrations/add_admin_id_to_outro_custo.py` - Automated migration
-  - `docker-entrypoint.sh` - Enhanced with both `admin_id` and `kpi_associado` column verification
+  - `docker-entrypoint.sh` - Enhanced with schema validation and KPI correction logic
 - ✅ Updated Dockerfile for automated deployment with comprehensive migration execution
 - ✅ Fixed template dependencies in `funcionario_perfil.html` to use available KPI fields
 - ✅ Implemented comprehensive deployment verification and rollback protection
