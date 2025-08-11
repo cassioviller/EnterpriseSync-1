@@ -1,0 +1,116 @@
+Boa! Vou direto ao ponto e deixo tudo “pronto pra colar” no teu sistema.
+
+# 1) Como o valor das faltas deve ser calculado (sem duplicar)
+
+* **Regra adotada (Brasil):** 1 falta injustificada ⇒ **perde 1 dia + 1 DSR** ⇒ **2 dias de desconto.**
+* **Fórmula canônica (folha):**
+
+  * `valor_dia = salario_mensal / 30`
+  * `valor_falta_unitario = 2 * valor_dia`
+  * `valor_faltas_total = faltas_injustificadas * valor_falta_unitario`
+* **Horas perdidas** (ex.: 16h no mês) **não entram** no desconto da folha quando você já está usando a regra “1 falta = 2 dias”. Use horas perdidas apenas como **KPI informativo** (tempo), não para financeiro — senão **duplica**.
+
+> Exemplo: salário R\$ 2.106,00 e 1 falta
+> `valor_dia = 2106/30 = 70,20` → `valor_falta_unitario = 140,40` → `valor_faltas_total = 140,40`.
+
+# 2) Resposta curta à sua pergunta
+
+> “A abordagem ficou correta agora, evitando duplicação?”
+> **Fica correta se:**
+
+* **Somente** o **card de Faltas** gera o **desconto financeiro** (Falta+DSR).
+* O card de **Horas Perdidas** mostra **apenas horas** (sem valor em R\$) **ou** mostra um **valor espelho** marcado como **informativo** que **não entra** no somatório da folha.
+  Recomendo **não exibir valor em R\$ no card de Horas Perdidas** para evitar confusão.
+
+# 3) Instruções para a LLM (explicar, mudar lógica, variáveis e contexto)
+
+## Contexto do app
+
+* **Aplicação:** SIGE (RH brasileiro), folha mensalista, Flask + PostgreSQL + Jinja2.
+* **Objetivo da tela:** No **card “Faltas”**, exibir **número de faltas** e **logo abaixo** o **valor do desconto** (Falta + DSR) conforme lei.
+* **Política adotada:** **1 falta injustificada = 2 dias** de desconto (CLT/Lei 605/49/Súmula 13).
+
+## Variáveis de entrada
+
+* `salario_mensal: number` (ex.: 2106.00)
+* `faltas_injustificadas: int` (contadas por `tipo_registro == 'falta'`)
+* `horas_ausentes_injustificadas: number` (opcional, só para KPI – não somar na folha se usar regra 2 dias/falta)
+* `horas_dia: number` (ex.: 8.8) — **somente para KPI de horas**, não para desconto financeiro no modo 2 dias/falta.
+
+## O que mudar na lógica
+
+1. **Remover** qualquer cálculo de valor das faltas baseado em **valor\_hora × horas\_dia** quando estiver ativado o modo “**duplo\_por\_falta**”.
+2. **Centralizar** o desconto financeiro de faltas em **um único ponto**:
+
+   ```
+   valor_dia = salario_mensal / 30
+   valor_falta_unitario = 2 * valor_dia
+   valor_faltas_total = faltas_injustificadas * valor_falta_unitario
+   ```
+3. **Não somar** “valor de horas perdidas” ao desconto de faltas. Horas perdidas ficam **apenas** como KPI (quantidade de horas).
+4. **Exibir na UI (card Faltas):**
+
+   * Linha 1 (grande): `{{ kpis.faltas_injustificadas }}`
+   * **Linha 2 (logo abaixo)**: `-R$ {{ kpis.valor_faltas_total }}`
+5. Se existir fracionamento por horas injustificadas e você **quiser** aplicar DSR proporcional por horas (opcional), faça **separadamente**:
+
+   ```
+   fracao_dia = horas_ausentes_injustificadas / horas_dia
+   desconto_horas = 2 * valor_dia * fracao_dia
+   ```
+
+   e **não** some “valor de horas perdidas” duas vezes. Escolha: ou usa **faltas inteiras**, ou **proporcional por horas**, ou **combinação**, mas sempre garantindo que **cada ausência seja valorizada uma única vez**.
+
+## Saídas esperadas (objeto para o template)
+
+```json
+{
+  "faltas_injustificadas": 0,
+  "valor_dia": 0,
+  "valor_falta_unitario": 0,
+  "valor_faltas_total": 0,
+  "horas_perdidas_kpi": 0
+}
+```
+
+* `valor_faltas_total` é o **único** campo que entra na folha como desconto por faltas+DSR.
+* `horas_perdidas_kpi` é apenas informativo.
+
+## Pseudocódigo (claro para LLM)
+
+```
+valor_dia = salario_mensal / 30
+valor_falta_unitario = 2 * valor_dia
+valor_faltas_total = faltas_injustificadas * valor_falta_unitario
+
+// KPI (informativo)
+horas_perdidas_kpi = faltas_injustificadas * horas_dia  // exibição apenas
+
+return {
+  faltas_injustificadas,
+  valor_dia: round2(valor_dia),
+  valor_falta_unitario: round2(valor_falta_unitario),
+  valor_faltas_total: round2(valor_faltas_total),
+  horas_perdidas_kpi: round2(horas_perdidas_kpi)
+}
+```
+
+## Exemplo de Jinja (card “Faltas”)
+
+```html
+<div class="card kpi">
+  <h4 class="m-0">{{ kpis.faltas_injustificadas }}</h4>
+  <div class="text-danger fw-bold">
+    -R$ {{ '{:,.2f}'.format(kpis.valor_faltas_total) }}
+  </div>
+  <small>Faltas (desconto Falta+DSR)</small>
+</div>
+```
+
+---
+
+Se quiser, eu te entrego esse cálculo em:
+
+* **Function do n8n** (JS puro, pronto pra colar), ou
+* **helper Python** pra tua camada de serviço.
+  Diz qual prefere que eu já te mando redondinho.

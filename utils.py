@@ -688,15 +688,14 @@ def calcular_kpis_funcionario_periodo(funcionario_id, data_inicio=None, data_fim
     # Calcular faltas normais (não justificadas)
     faltas = len([r for r in registros_ponto if r.tipo_registro == 'falta'])
     
-    # Calcular valor monetário das faltas (desconto no salário)
+    # Calcular valor monetário das faltas (regra CLT: 1 falta = 2 dias de desconto)
     valor_faltas = 0.0
+    valor_dia = 0.0
     if faltas > 0 and funcionario.salario:
-        # Falta = desconto de 8.8h por dia do salário
-        horas_diarias = 8.8
-        if funcionario.horario_trabalho and funcionario.horario_trabalho.horas_diarias:
-            horas_diarias = float(funcionario.horario_trabalho.horas_diarias)
-        
-        valor_faltas = faltas * valor_hora_base * horas_diarias
+        # Regra brasileira: 1 falta injustificada = perde 1 dia + 1 DSR = 2 dias
+        valor_dia = funcionario.salario / 30  # Valor do dia
+        valor_falta_unitario = 2 * valor_dia  # Falta + DSR
+        valor_faltas = faltas * valor_falta_unitario
     
     # Calcular faltas justificadas (já contado no loop acima, mas vamos recalcular para garantir)
     dias_faltas_justificadas = len([r for r in registros_ponto if r.tipo_registro == 'falta_justificada'])
@@ -747,7 +746,8 @@ def calcular_kpis_funcionario_periodo(funcionario_id, data_inicio=None, data_fim
         'valor_horas_extras': valor_horas_extras,  # Valor monetário das horas extras
         'valor_hora_atual': valor_hora_base,  # Valor hora atual do funcionário
         'faltas': faltas,
-        'valor_faltas': valor_faltas,  # NOVO: Valor monetário das faltas (desconto)
+        'valor_faltas': valor_faltas,  # Valor monetário das faltas (Falta + DSR conforme CLT)
+        'valor_dia': valor_dia,  # Valor do dia para transparência
         'atrasos': atrasos,
         'dias_faltas_justificadas': dias_faltas_justificadas,
         'custo_mao_obra': custo_mao_obra,
