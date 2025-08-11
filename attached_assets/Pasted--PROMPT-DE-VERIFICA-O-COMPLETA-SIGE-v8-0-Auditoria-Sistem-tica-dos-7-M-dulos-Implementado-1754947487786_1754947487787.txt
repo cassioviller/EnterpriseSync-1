@@ -1,0 +1,1111 @@
+# 🔍 PROMPT DE VERIFICAÇÃO COMPLETA - SIGE v8.0
+## Auditoria Sistemática dos 7 Módulos Implementados
+
+**MISSÃO CRÍTICA:** Você é o **Auditor Técnico Sênior** responsável por verificar se TODAS as funcionalidades dos 7 módulos do SIGE v8.0 foram implementadas corretamente conforme especificado nos prompts anteriores.
+
+**OBJETIVO:** Realizar uma auditoria técnica completa e sistemática, testando cada funcionalidade, integração e requisito técnico para garantir que o sistema está 100% funcional e conforme especificações.
+
+---
+
+## 🎯 **METODOLOGIA DE VERIFICAÇÃO**
+
+### **Abordagem Sistemática**
+
+Esta verificação seguirá uma metodologia rigorosa de auditoria técnica, testando cada módulo individualmente e suas integrações. Cada teste será documentado com resultado PASS/FAIL e observações detalhadas. Falhas serão categorizadas por criticidade e receberão recomendações específicas de correção.
+
+A auditoria será realizada em 4 fases distintas: verificação individual de módulos, teste de integrações, validação de performance e segurança, e verificação de conformidade. Cada fase possui critérios específicos de aprovação e deve ser concluída antes de avançar para a próxima.
+
+### **Critérios de Aprovação**
+
+Para que um módulo seja considerado aprovado, deve atender a 100% dos requisitos funcionais críticos, 95% dos requisitos funcionais secundários, e 90% dos requisitos de usabilidade. Integrações devem funcionar sem erros em 100% dos cenários testados. Performance deve atender aos SLAs definidos em 95% dos casos.
+
+Segurança deve passar em todos os testes de vulnerabilidade conhecidas, conformidade legal deve ser 100% para requisitos obrigatórios, e documentação deve estar completa e atualizada. Qualquer falha crítica resulta em reprovação automática do módulo.
+
+---
+
+## 📋 **FASE 1: VERIFICAÇÃO INDIVIDUAL DOS MÓDULOS**
+
+### **MÓDULO 1 - SISTEMA DE PROPOSTAS DIGITAIS**
+
+#### **Teste 1.1: Interface de Criação de Propostas**
+
+**VERIFICAR SE EXISTE:**
+- Formulário responsivo para criação de propostas
+- Campos obrigatórios: cliente, serviços, valores, prazos
+- Validação em tempo real de todos os campos
+- Cálculo automático de totais e subtotais
+- Sistema de templates para propostas recorrentes
+- Duplicação de itens e serviços
+- Upload de anexos (imagens, documentos)
+- Preview da proposta antes do envio
+
+**TESTE PRÁTICO:**
+1. Acesse a rota `/propostas/nova`
+2. Preencha uma proposta completa com múltiplos serviços
+3. Teste validações deixando campos obrigatórios vazios
+4. Verifique se cálculos são atualizados automaticamente
+5. Teste responsividade em dispositivo móvel
+6. Salve como rascunho e recupere posteriormente
+
+**CRITÉRIO DE APROVAÇÃO:** Todas as funcionalidades devem funcionar sem erros, interface deve ser intuitiva e responsiva.
+
+#### **Teste 1.2: Sistema de Aprovação Digital**
+
+**VERIFICAR SE EXISTE:**
+- Geração automática de link único para cliente
+- Token de segurança criptográfico
+- Interface do cliente sem necessidade de login
+- Visualização completa da proposta em PDF
+- Botões claros de aprovar/rejeitar
+- Campo para observações do cliente
+- Registro de timestamp de todas as ações
+- Notificação automática para empresa
+
+**TESTE PRÁTICO:**
+1. Crie uma proposta e envie para cliente
+2. Acesse o link gerado (simule ser o cliente)
+3. Teste aprovação e rejeição
+4. Verifique se notificações são enviadas
+5. Teste segurança tentando acessar com token inválido
+6. Verifique logs de auditoria
+
+**CRITÉRIO DE APROVAÇÃO:** Sistema deve ser seguro, intuitivo para cliente e registrar todas as ações.
+
+#### **Teste 1.3: Conversão Automática em Obra**
+
+**VERIFICAR SE EXISTE:**
+- Conversão automática quando proposta aprovada
+- Criação de registro na tabela `obras`
+- Transferência de todos os dados relevantes
+- Criação de centro de custo no módulo contábil
+- Ativação do portal do cliente (Módulo 2)
+- Disponibilização para alocação de equipe (Módulo 3)
+- Criação de lista de materiais (Módulo 4)
+
+**TESTE PRÁTICO:**
+1. Aprove uma proposta como cliente
+2. Verifique se obra foi criada automaticamente
+3. Confirme se centro de custo existe no módulo contábil
+4. Teste se portal do cliente está ativo
+5. Verifique se obra aparece para alocação de equipe
+6. Confirme se materiais estão disponíveis no almoxarifado
+
+**CRITÉRIO DE APROVAÇÃO:** Conversão deve ser 100% automática e todos os módulos devem ser atualizados.
+
+#### **Teste 1.4: Relatórios e Analytics**
+
+**VERIFICAR SE EXISTE:**
+- Dashboard com funil de vendas
+- Gráficos de conversão por período
+- Relatório de propostas por vendedor
+- Análise de tempo médio de aprovação
+- Relatório de motivos de rejeição
+- Exportação em múltiplos formatos
+
+**TESTE PRÁTICO:**
+1. Acesse dashboard de propostas
+2. Verifique se gráficos carregam corretamente
+3. Teste filtros por período e vendedor
+4. Exporte relatórios em PDF e Excel
+5. Verifique precisão dos dados apresentados
+
+**CRITÉRIO DE APROVAÇÃO:** Todos os relatórios devem ser precisos e exportação deve funcionar.
+
+### **MÓDULO 2 - PORTAL DO CLIENTE**
+
+#### **Teste 2.1: Dashboard do Cliente**
+
+**VERIFICAR SE EXISTE:**
+- Interface exclusiva para cada obra
+- Progresso visual da obra (barra de progresso)
+- Cronograma atualizado em tempo real
+- Próximas atividades planejadas
+- Informações de contato da equipe
+- Status atual da obra
+- Previsão de conclusão
+
+**TESTE PRÁTICO:**
+1. Acesse portal com token de obra ativa
+2. Verifique se progresso é exibido corretamente
+3. Confirme se cronograma está atualizado
+4. Teste responsividade em mobile
+5. Verifique se informações são específicas da obra
+
+**CRITÉRIO DE APROVAÇÃO:** Dashboard deve mostrar informações precisas e atualizadas em tempo real.
+
+#### **Teste 2.2: Galeria de Fotos**
+
+**VERIFICAR SE EXISTE:**
+- Fotos organizadas por data
+- Categorização por tipo de atividade
+- Visualização em alta resolução
+- Download de fotos individuais ou em lote
+- Comparação antes/depois
+- Geolocalização das fotos
+- Timestamps precisos
+
+**TESTE PRÁTICO:**
+1. Acesse galeria de fotos da obra
+2. Verifique organização cronológica
+3. Teste zoom e visualização em alta resolução
+4. Baixe fotos individuais e em lote
+5. Verifique se metadados estão corretos
+
+**CRITÉRIO DE APROVAÇÃO:** Galeria deve ser funcional, organizada e permitir downloads.
+
+#### **Teste 2.3: Sistema de Comunicação**
+
+**VERIFICAR SE EXISTE:**
+- Chat em tempo real com equipe
+- Histórico completo de conversas
+- Envio de imagens e documentos
+- Notificações de novas mensagens
+- Status de leitura das mensagens
+- Organização por tópicos
+
+**TESTE PRÁTICO:**
+1. Envie mensagem através do portal
+2. Verifique se equipe recebe notificação
+3. Teste envio de imagens e documentos
+4. Confirme se histórico é mantido
+5. Teste em dispositivo móvel
+
+**CRITÉRIO DE APROVAÇÃO:** Comunicação deve ser em tempo real e confiável.
+
+#### **Teste 2.4: Relatórios Personalizados**
+
+**VERIFICAR SE EXISTE:**
+- Relatórios de progresso por período
+- Relatório de materiais utilizados
+- Relatório de horas trabalhadas
+- Comparação orçado vs realizado
+- Exportação em PDF, Excel, PowerPoint
+- Agendamento de relatórios automáticos
+
+**TESTE PRÁTICO:**
+1. Gere relatório de progresso mensal
+2. Teste exportação em diferentes formatos
+3. Configure relatório automático semanal
+4. Verifique precisão dos dados
+5. Teste personalização de conteúdo
+
+**CRITÉRIO DE APROVAÇÃO:** Relatórios devem ser precisos, personalizáveis e exportáveis.
+
+### **MÓDULO 3 - GESTÃO DE EQUIPES**
+
+#### **Teste 3.1: Interface Kanban**
+
+**VERIFICAR SE EXISTE:**
+- Colunas por status de obra
+- Cards com informações da obra
+- Drag-and-drop para realocação
+- Informações da equipe alocada
+- Indicadores visuais de progresso
+- Filtros por funcionário, período, obra
+
+**TESTE PRÁTICO:**
+1. Acesse interface Kanban
+2. Teste drag-and-drop entre colunas
+3. Verifique se informações são atualizadas
+4. Teste filtros disponíveis
+5. Confirme responsividade mobile
+
+**CRITÉRIO DE APROVAÇÃO:** Interface deve ser intuitiva e funcional para gestão visual.
+
+#### **Teste 3.2: Calendário de Alocação**
+
+**VERIFICAR SE EXISTE:**
+- Visualização semanal/mensal
+- Alocação por drag-and-drop
+- Validação de conflitos
+- Indicação de sobrecarga
+- Diferentes tipos de alocação (campo/oficina)
+- Integração com feriados e folgas
+
+**TESTE PRÁTICO:**
+1. Aloque funcionário para obra específica
+2. Teste detecção de conflitos
+3. Verifique criação automática de RDO
+4. Teste diferentes visualizações
+5. Confirme validações de disponibilidade
+
+**CRITÉRIO DE APROVAÇÃO:** Calendário deve prevenir conflitos e criar RDOs automaticamente.
+
+#### **Teste 3.3: Criação Automática de RDO**
+
+**VERIFICAR SE EXISTE:**
+- RDO criado automaticamente na alocação
+- Pré-preenchimento com dados da alocação
+- Associação correta com obra e funcionário
+- Status inicial apropriado
+- Integração com sistema de ponto
+
+**TESTE PRÁTICO:**
+1. Aloque funcionário para obra em campo
+2. Verifique se RDO foi criado
+3. Confirme dados pré-preenchidos
+4. Teste associações com obra e funcionário
+5. Verifique integração com ponto
+
+**CRITÉRIO DE APROVAÇÃO:** RDO deve ser criado automaticamente com dados corretos.
+
+#### **Teste 3.4: Analytics de Produtividade**
+
+**VERIFICAR SE EXISTE:**
+- Relatórios de produtividade individual
+- Comparação entre funcionários
+- Análise de horas vs progresso
+- Identificação de gargalos
+- Sugestões de otimização
+- Dashboards visuais
+
+**TESTE PRÁTICO:**
+1. Acesse relatórios de produtividade
+2. Compare performance entre funcionários
+3. Analise correlação horas/progresso
+4. Verifique precisão dos cálculos
+5. Teste exportação de relatórios
+
+**CRITÉRIO DE APROVAÇÃO:** Analytics devem ser precisos e fornecer insights úteis.
+
+### **MÓDULO 4 - ALMOXARIFADO INTELIGENTE**
+
+#### **Teste 4.1: Sistema de Código de Barras**
+
+**VERIFICAR SE EXISTE:**
+- Leitura de códigos EAN-13/EAN-8
+- Interface para scanner ou câmera
+- Validação de códigos
+- Busca automática de produtos
+- Cadastro de novos códigos
+- Geração de etiquetas
+
+**TESTE PRÁTICO:**
+1. Teste leitura com scanner físico
+2. Teste leitura com câmera do celular
+3. Escaneie código inexistente
+4. Cadastre novo produto com código
+5. Gere etiqueta para produto sem código
+
+**CRITÉRIO DE APROVAÇÃO:** Sistema deve ler códigos corretamente e gerenciar produtos.
+
+#### **Teste 4.2: Processamento de XML de NF**
+
+**VERIFICAR SE EXISTE:**
+- Upload de arquivos XML
+- Extração automática de dados
+- Validação de estrutura XML
+- Identificação de produtos
+- Conciliação com pedidos
+- Tratamento de erros
+
+**TESTE PRÁTICO:**
+1. Faça upload de XML válido
+2. Verifique extração de dados
+3. Teste XML com erros
+4. Confirme criação de produtos
+5. Verifique conciliação com pedidos
+
+**CRITÉRIO DE APROVAÇÃO:** Processamento deve ser automático e robusto.
+
+#### **Teste 4.3: Integração com RDO**
+
+**VERIFICAR SE EXISTE:**
+- Aba "Materiais" no RDO
+- Dropdown com autocomplete
+- Lançamento automático no estoque
+- Associação com obra específica
+- Funcionalidade de devolução
+- Validação de disponibilidade
+
+**TESTE PRÁTICO:**
+1. Acesse RDO de obra ativa
+2. Registre consumo de materiais
+3. Verifique atualização do estoque
+4. Teste devolução de materiais
+5. Confirme associação com obra
+
+**CRITÉRIO DE APROVAÇÃO:** Integração deve ser transparente e automática.
+
+#### **Teste 4.4: Gestão Inteligente de Estoque**
+
+**VERIFICAR SE EXISTE:**
+- Cálculo automático de ponto de reposição
+- Alertas de estoque baixo
+- Previsão de demanda
+- Análise de giro de estoque
+- Sugestões de compra
+- Controle de validade
+
+**TESTE PRÁTICO:**
+1. Verifique cálculos de ponto de reposição
+2. Teste alertas de estoque baixo
+3. Analise previsões de demanda
+4. Verifique sugestões de compra
+5. Teste controle de validade
+
+**CRITÉRIO DE APROVAÇÃO:** Sistema deve ser inteligente e proativo.
+
+### **MÓDULO 5 - RECONHECIMENTO FACIAL**
+
+#### **Teste 5.1: Cadastro Biométrico**
+
+**VERIFICAR SE EXISTE:**
+- Interface para captura de fotos
+- Múltiplos ângulos por funcionário
+- Validação de qualidade da imagem
+- Processamento em tempo real
+- Armazenamento seguro
+- Conformidade LGPD
+
+**TESTE PRÁTICO:**
+1. Cadastre novo funcionário
+2. Capture múltiplas fotos
+3. Teste validação de qualidade
+4. Verifique processamento
+5. Confirme armazenamento seguro
+
+**CRITÉRIO DE APROVAÇÃO:** Cadastro deve ser seguro e conforme LGPD.
+
+#### **Teste 5.2: Reconhecimento em Tempo Real**
+
+**VERIFICAR SE EXISTE:**
+- Reconhecimento em menos de 2 segundos
+- Precisão superior a 99%
+- Anti-spoofing ativo
+- Registro automático de ponto
+- Logs de tentativas
+- Fallback para casos de falha
+
+**TESTE PRÁTICO:**
+1. Teste reconhecimento com funcionário cadastrado
+2. Meça tempo de resposta
+3. Teste com foto/vídeo (anti-spoofing)
+4. Verifique registro de ponto
+5. Teste com funcionário não cadastrado
+
+**CRITÉRIO DE APROVAÇÃO:** Reconhecimento deve ser rápido, preciso e seguro.
+
+#### **Teste 5.3: Integração com Sistema de Ponto**
+
+**VERIFICAR SE EXISTE:**
+- Registro automático na tabela de pontos
+- Associação com funcionário correto
+- Timestamp preciso
+- Validação de jornada
+- Cálculo de horas extras
+- Alertas de irregularidades
+
+**TESTE PRÁTICO:**
+1. Registre entrada de funcionário
+2. Verifique criação do ponto
+3. Registre saída e calcule horas
+4. Teste detecção de horas extras
+5. Verifique alertas de irregularidades
+
+**CRITÉRIO DE APROVAÇÃO:** Integração deve ser automática e precisa.
+
+#### **Teste 5.4: Conformidade LGPD**
+
+**VERIFICAR SE EXISTE:**
+- Consentimento explícito
+- Criptografia de dados biométricos
+- Funcionalidade de exclusão
+- Logs de acesso aos dados
+- Política de retenção
+- Relatórios de conformidade
+
+**TESTE PRÁTICO:**
+1. Verifique coleta de consentimento
+2. Confirme criptografia de dados
+3. Teste exclusão de dados
+4. Verifique logs de acesso
+5. Gere relatório de conformidade
+
+**CRITÉRIO DE APROVAÇÃO:** Deve estar 100% conforme LGPD.
+
+### **MÓDULO 6 - FOLHA DE PAGAMENTO**
+
+#### **Teste 6.1: Cálculos Automáticos**
+
+**VERIFICAR SE EXISTE:**
+- Cálculo de salário base
+- Horas extras com adicional correto
+- Adicional noturno
+- DSR sobre horas extras
+- Desconto de faltas
+- Cálculo de INSS e IRRF
+
+**TESTE PRÁTICO:**
+1. Processe folha de funcionário com horas extras
+2. Verifique cálculo de adicional noturno
+3. Teste desconto de faltas
+4. Confirme cálculos de INSS/IRRF
+5. Compare com cálculo manual
+
+**CRITÉRIO DE APROVAÇÃO:** Cálculos devem estar 100% corretos conforme CLT.
+
+#### **Teste 6.2: Integração com eSocial**
+
+**VERIFICAR SE EXISTE:**
+- Geração automática de eventos
+- Validação prévia de dados
+- Transmissão automática
+- Monitoramento de status
+- Correção de inconsistências
+- Relatórios de conformidade
+
+**TESTE PRÁTICO:**
+1. Admita novo funcionário
+2. Verifique geração de evento S-2200
+3. Teste transmissão para eSocial
+4. Monitore status de processamento
+5. Verifique relatórios de conformidade
+
+**CRITÉRIO DE APROVAÇÃO:** Integração deve ser automática e sem erros.
+
+#### **Teste 6.3: Portal do Funcionário**
+
+**VERIFICAR SE EXISTE:**
+- Acesso com login seguro
+- Visualização de holerites
+- Solicitação de férias
+- Atualização de dados pessoais
+- Download de declarações
+- Histórico de benefícios
+
+**TESTE PRÁTICO:**
+1. Acesse portal como funcionário
+2. Visualize holerite atual
+3. Solicite período de férias
+4. Atualize dados pessoais
+5. Baixe declaração para IR
+
+**CRITÉRIO DE APROVAÇÃO:** Portal deve ser funcional e seguro.
+
+#### **Teste 6.4: Integração Contábil**
+
+**VERIFICAR SE EXISTE:**
+- Lançamentos automáticos na contabilidade
+- Associação com centros de custo
+- Provisões automáticas
+- Conciliação com folha
+- Relatórios contábeis
+- Auditoria de lançamentos
+
+**TESTE PRÁTICO:**
+1. Processe folha de pagamento
+2. Verifique lançamentos contábeis
+3. Confirme associação com centros de custo
+4. Teste provisões automáticas
+5. Execute conciliação
+
+**CRITÉRIO DE APROVAÇÃO:** Integração deve ser automática e precisa.
+
+### **MÓDULO 7 - SISTEMA CONTÁBIL**
+
+#### **Teste 7.1: Plano de Contas**
+
+**VERIFICAR SE EXISTE:**
+- Plano de contas brasileiro completo
+- Estrutura hierárquica de 4 níveis
+- Contas patrimoniais e de resultado
+- Configuração de natureza das contas
+- Relacionamento com demonstrações
+- Possibilidade de customização
+
+**TESTE PRÁTICO:**
+1. Verifique estrutura do plano de contas
+2. Teste criação de nova conta
+3. Configure natureza e tipo
+4. Verifique hierarquia
+5. Teste relacionamentos
+
+**CRITÉRIO DE APROVAÇÃO:** Plano deve estar completo e configurável.
+
+#### **Teste 7.2: Lançamentos Automáticos**
+
+**VERIFICAR SE EXISTE:**
+- Lançamentos de todos os módulos
+- Partidas dobradas corretas
+- Associação com centros de custo
+- Validação de consistência
+- Histórico de lançamentos
+- Estorno automático quando necessário
+
+**TESTE PRÁTICO:**
+1. Execute operação em cada módulo
+2. Verifique lançamentos gerados
+3. Confirme partidas dobradas
+4. Teste associação com centros de custo
+5. Verifique consistência
+
+**CRITÉRIO DE APROVAÇÃO:** Lançamentos devem ser automáticos e corretos.
+
+#### **Teste 7.3: Demonstrações Financeiras**
+
+**VERIFICAR SE EXISTE:**
+- Balancete mensal automático
+- DRE por período
+- Balanço patrimonial
+- Demonstração de fluxo de caixa
+- Comparação entre períodos
+- Exportação em múltiplos formatos
+
+**TESTE PRÁTICO:**
+1. Gere balancete do mês atual
+2. Visualize DRE do período
+3. Exporte balanço patrimonial
+4. Compare com período anterior
+5. Teste diferentes formatos
+
+**CRITÉRIO DE APROVAÇÃO:** Demonstrações devem ser precisas e atualizadas.
+
+#### **Teste 7.4: SPED Contábil**
+
+**VERIFICAR SE EXISTE:**
+- Geração automática do arquivo
+- Validação conforme layout oficial
+- Identificação de pendências
+- Correção automática de problemas
+- Transmissão para Receita Federal
+- Logs de processamento
+
+**TESTE PRÁTICO:**
+1. Gere arquivo SPED do período
+2. Execute validações
+3. Corrija pendências identificadas
+4. Teste transmissão (ambiente homologação)
+5. Verifique logs
+
+**CRITÉRIO DE APROVAÇÃO:** SPED deve ser gerado corretamente e transmitido.
+
+---
+
+## 🔗 **FASE 2: VERIFICAÇÃO DE INTEGRAÇÕES**
+
+### **Teste de Integração 2.1: Proposta → Obra → Portal Cliente**
+
+**FLUXO COMPLETO:**
+1. Crie proposta no Módulo 1
+2. Aprove como cliente
+3. Verifique conversão automática em obra
+4. Confirme ativação do portal do cliente
+5. Teste acesso do cliente ao portal
+6. Verifique dados transferidos corretamente
+
+**CRITÉRIO DE APROVAÇÃO:** Fluxo deve ser 100% automático e sem perda de dados.
+
+### **Teste de Integração 2.2: Alocação → RDO → Progresso → Cliente**
+
+**FLUXO COMPLETO:**
+1. Aloque funcionário para obra (Módulo 3)
+2. Verifique criação automática de RDO
+3. Preencha progresso no RDO
+4. Confirme atualização no portal do cliente
+5. Verifique notificação automática
+6. Teste cálculos de progresso
+
+**CRITÉRIO DE APROVAÇÃO:** Atualizações devem ser em tempo real e precisas.
+
+### **Teste de Integração 2.3: Ponto → Folha → Contabilidade**
+
+**FLUXO COMPLETO:**
+1. Registre ponto via reconhecimento facial
+2. Processe folha de pagamento
+3. Verifique lançamentos contábeis automáticos
+4. Confirme associação com centros de custo
+5. Teste relatórios integrados
+6. Verifique consistência de dados
+
+**CRITÉRIO DE APROVAÇÃO:** Integração deve ser automática e consistente.
+
+### **Teste de Integração 2.4: Almoxarifado → RDO → Custos → Contabilidade**
+
+**FLUXO COMPLETO:**
+1. Registre consumo de material no RDO
+2. Verifique baixa automática no estoque
+3. Confirme lançamento de custo na obra
+4. Teste contabilização automática
+5. Verifique relatórios de custo por obra
+6. Confirme rastreabilidade completa
+
+**CRITÉRIO DE APROVAÇÃO:** Rastreabilidade deve ser completa e custos precisos.
+
+---
+
+## ⚡ **FASE 3: VERIFICAÇÃO DE PERFORMANCE**
+
+### **Teste de Performance 3.1: Tempo de Resposta**
+
+**MÉTRICAS OBRIGATÓRIAS:**
+- Páginas principais: < 3 segundos
+- Operações CRUD: < 2 segundos
+- Relatórios simples: < 5 segundos
+- Relatórios complexos: < 15 segundos
+- Reconhecimento facial: < 2 segundos
+- APIs internas: < 1 segundo
+
+**TESTE PRÁTICO:**
+1. Meça tempo de carregamento de cada módulo
+2. Teste operações CRUD em cada tabela
+3. Gere relatórios de diferentes complexidades
+4. Teste reconhecimento facial múltiplas vezes
+5. Meça tempo de resposta das APIs
+
+**CRITÉRIO DE APROVAÇÃO:** Todas as métricas devem ser atendidas em 95% dos casos.
+
+### **Teste de Performance 3.2: Carga Simultânea**
+
+**CENÁRIOS DE TESTE:**
+- 10 usuários simultâneos
+- 50 usuários simultâneos
+- 100 usuários simultâneos
+- Picos de 200 usuários
+- Operações concorrentes no mesmo registro
+
+**TESTE PRÁTICO:**
+1. Simule múltiplos usuários simultâneos
+2. Teste operações concorrentes
+3. Monitore uso de CPU e memória
+4. Verifique integridade de dados
+5. Teste recuperação após picos
+
+**CRITÉRIO DE APROVAÇÃO:** Sistema deve manter performance e integridade.
+
+### **Teste de Performance 3.3: Volume de Dados**
+
+**CENÁRIOS DE TESTE:**
+- 1.000 funcionários ativos
+- 10.000 RDOs históricos
+- 50.000 movimentações de estoque
+- 100.000 lançamentos contábeis
+- 1 milhão de registros de ponto
+
+**TESTE PRÁTICO:**
+1. Popule banco com volumes realistas
+2. Teste operações com grandes datasets
+3. Verifique performance de relatórios
+4. Teste backup e restore
+5. Monitore crescimento de índices
+
+**CRITÉRIO DE APROVAÇÃO:** Performance deve ser mantida com volumes reais.
+
+---
+
+## 🔒 **FASE 4: VERIFICAÇÃO DE SEGURANÇA**
+
+### **Teste de Segurança 4.1: Autenticação e Autorização**
+
+**VERIFICAÇÕES OBRIGATÓRIAS:**
+- Login seguro com hash de senhas
+- Sessões com timeout automático
+- Controle de acesso por módulo
+- Validação de permissões em cada ação
+- Prevenção de escalação de privilégios
+- Logs de tentativas de acesso
+
+**TESTE PRÁTICO:**
+1. Teste login com credenciais inválidas
+2. Tente acessar páginas sem permissão
+3. Verifique timeout de sessão
+4. Teste escalação de privilégios
+5. Monitore logs de segurança
+
+**CRITÉRIO DE APROVAÇÃO:** Todos os controles devem funcionar corretamente.
+
+### **Teste de Segurança 4.2: Proteção de Dados**
+
+**VERIFICAÇÕES OBRIGATÓRIAS:**
+- Criptografia de dados sensíveis
+- Proteção contra SQL injection
+- Validação de entrada de dados
+- Sanitização de outputs
+- Proteção contra XSS
+- CSRF tokens implementados
+
+**TESTE PRÁTICO:**
+1. Teste injeção SQL em formulários
+2. Tente ataques XSS
+3. Verifique proteção CSRF
+4. Teste upload de arquivos maliciosos
+5. Confirme criptografia de dados
+
+**CRITÉRIO DE APROVAÇÃO:** Sistema deve ser resistente a ataques comuns.
+
+### **Teste de Segurança 4.3: Conformidade LGPD**
+
+**VERIFICAÇÕES OBRIGATÓRIAS:**
+- Consentimento para coleta de dados
+- Funcionalidade de portabilidade
+- Exclusão de dados pessoais
+- Logs de acesso a dados sensíveis
+- Políticas de retenção
+- Relatórios de conformidade
+
+**TESTE PRÁTICO:**
+1. Teste coleta de consentimento
+2. Execute portabilidade de dados
+3. Teste exclusão completa
+4. Verifique logs de acesso
+5. Gere relatórios de conformidade
+
+**CRITÉRIO DE APROVAÇÃO:** Conformidade deve ser 100% para LGPD.
+
+---
+
+## 📱 **FASE 5: VERIFICAÇÃO MOBILE**
+
+### **Teste Mobile 5.1: Responsividade**
+
+**DISPOSITIVOS DE TESTE:**
+- Smartphone (320px - 480px)
+- Tablet (768px - 1024px)
+- Desktop (1200px+)
+- Orientação portrait e landscape
+
+**TESTE PRÁTICO:**
+1. Teste cada módulo em diferentes resoluções
+2. Verifique usabilidade touch
+3. Teste orientação portrait/landscape
+4. Confirme legibilidade de textos
+5. Verifique funcionamento de formulários
+
+**CRITÉRIO DE APROVAÇÃO:** Interface deve ser totalmente funcional em mobile.
+
+### **Teste Mobile 5.2: Performance Mobile**
+
+**MÉTRICAS ESPECÍFICAS:**
+- Carregamento inicial: < 5 segundos
+- Navegação entre páginas: < 2 segundos
+- Uso de dados: otimizado
+- Bateria: consumo eficiente
+- Offline: funcionalidades básicas
+
+**TESTE PRÁTICO:**
+1. Meça tempos de carregamento mobile
+2. Monitore uso de dados
+3. Teste funcionalidades offline
+4. Verifique consumo de bateria
+5. Teste em conexões lentas
+
+**CRITÉRIO DE APROVAÇÃO:** Performance mobile deve ser otimizada.
+
+---
+
+## 📊 **FASE 6: VERIFICAÇÃO DE RELATÓRIOS**
+
+### **Teste de Relatórios 6.1: Precisão de Dados**
+
+**RELATÓRIOS CRÍTICOS:**
+- Folha de pagamento vs contabilidade
+- Estoque vs movimentações
+- Progresso vs RDOs
+- Custos vs centros de custo
+- Receitas vs propostas aprovadas
+
+**TESTE PRÁTICO:**
+1. Compare dados entre módulos
+2. Execute conciliações manuais
+3. Verifique totalizadores
+4. Teste filtros e agrupamentos
+5. Confirme fórmulas de cálculo
+
+**CRITÉRIO DE APROVAÇÃO:** Dados devem ser 100% consistentes entre módulos.
+
+### **Teste de Relatórios 6.2: Exportação e Formatação**
+
+**FORMATOS OBRIGATÓRIOS:**
+- PDF com formatação profissional
+- Excel com fórmulas funcionais
+- CSV para importação
+- PowerPoint para apresentações
+
+**TESTE PRÁTICO:**
+1. Exporte relatórios em todos os formatos
+2. Verifique formatação e layout
+3. Teste abertura em softwares externos
+4. Confirme integridade de dados
+5. Teste relatórios grandes
+
+**CRITÉRIO DE APROVAÇÃO:** Exportação deve funcionar perfeitamente.
+
+---
+
+## 🎯 **CHECKLIST FINAL DE APROVAÇÃO**
+
+### **MÓDULO 1 - PROPOSTAS (25 ITENS)**
+- [ ] Interface de criação responsiva
+- [ ] Validações em tempo real
+- [ ] Cálculos automáticos corretos
+- [ ] Sistema de aprovação digital
+- [ ] Tokens de segurança funcionais
+- [ ] Conversão automática em obra
+- [ ] Integração com todos os módulos
+- [ ] Relatórios de funil de vendas
+- [ ] Dashboard com KPIs
+- [ ] Versionamento de propostas
+- [ ] Portal do cliente sem login
+- [ ] Assinatura eletrônica válida
+- [ ] Notificações automáticas
+- [ ] Logs de auditoria completos
+- [ ] Templates personalizáveis
+- [ ] Upload de anexos
+- [ ] Preview antes do envio
+- [ ] Duplicação de itens
+- [ ] Campos obrigatórios validados
+- [ ] Responsividade mobile
+- [ ] Performance adequada
+- [ ] Segurança implementada
+- [ ] Backup de dados
+- [ ] Recuperação de rascunhos
+- [ ] Integração com WhatsApp (se implementado)
+
+### **MÓDULO 2 - PORTAL CLIENTE (20 ITENS)**
+- [ ] Dashboard executivo funcional
+- [ ] Progresso em tempo real
+- [ ] Galeria de fotos organizada
+- [ ] Sistema de comunicação
+- [ ] Relatórios personalizados
+- [ ] Notificações automáticas
+- [ ] Interface responsiva
+- [ ] Integração com RDO
+- [ ] Previsão de conclusão
+- [ ] Aprovações online
+- [ ] Download de fotos
+- [ ] Histórico de conversas
+- [ ] Cronograma atualizado
+- [ ] Informações da equipe
+- [ ] Status da obra
+- [ ] Exportação de relatórios
+- [ ] Agendamento automático
+- [ ] Comparação orçado/realizado
+- [ ] Aplicativo mobile (se implementado)
+- [ ] Segurança de acesso
+
+### **MÓDULO 3 - GESTÃO EQUIPES (18 ITENS)**
+- [ ] Interface Kanban funcional
+- [ ] Calendário de alocação
+- [ ] Drag-and-drop operacional
+- [ ] Validação de conflitos
+- [ ] Criação automática de RDO
+- [ ] Sistema de competências
+- [ ] Analytics de produtividade
+- [ ] Relatórios gerenciais
+- [ ] Integração com ponto
+- [ ] Gestão de ausências
+- [ ] Filtros funcionais
+- [ ] Responsividade mobile
+- [ ] Indicadores visuais
+- [ ] Diferentes tipos de alocação
+- [ ] Integração com feriados
+- [ ] Validação de disponibilidade
+- [ ] Gamificação (se implementado)
+- [ ] Avaliação 360° (se implementado)
+
+### **MÓDULO 4 - ALMOXARIFADO (22 ITENS)**
+- [ ] Sistema de código de barras
+- [ ] Processamento de XML
+- [ ] Integração com RDO
+- [ ] Gestão inteligente de estoque
+- [ ] Rastreabilidade completa
+- [ ] Controle de validade
+- [ ] Gestão de fornecedores
+- [ ] Otimização de layout
+- [ ] Relatórios de giro
+- [ ] Alertas de estoque baixo
+- [ ] Previsão de demanda
+- [ ] Sugestões de compra
+- [ ] Leitura com scanner
+- [ ] Leitura com câmera
+- [ ] Cadastro de produtos
+- [ ] Geração de etiquetas
+- [ ] Validação de códigos
+- [ ] Conciliação com pedidos
+- [ ] Funcionalidade de devolução
+- [ ] Associação com obras
+- [ ] Controle de lotes
+- [ ] Interface mobile
+
+### **MÓDULO 5 - RECONHECIMENTO FACIAL (16 ITENS)**
+- [ ] Cadastro biométrico seguro
+- [ ] Reconhecimento < 2 segundos
+- [ ] Precisão > 99%
+- [ ] Anti-spoofing ativo
+- [ ] Integração com ponto
+- [ ] Conformidade LGPD
+- [ ] Múltiplos pontos de acesso
+- [ ] Logs de auditoria
+- [ ] Fallback para falhas
+- [ ] Controle de acesso
+- [ ] Analytics de presença
+- [ ] Criptografia de dados
+- [ ] Consentimento explícito
+- [ ] Exclusão de dados
+- [ ] Relatórios de conformidade
+- [ ] Interface mobile
+
+### **MÓDULO 6 - FOLHA PAGAMENTO (20 ITENS)**
+- [ ] Cálculos CLT corretos
+- [ ] Integração com ponto
+- [ ] Cálculo de encargos
+- [ ] Integração eSocial
+- [ ] Portal do funcionário
+- [ ] Gestão de benefícios
+- [ ] Relatórios gerenciais
+- [ ] Integração contábil
+- [ ] Provisões automáticas
+- [ ] Holerites digitais
+- [ ] Solicitação de férias
+- [ ] Atualização de dados
+- [ ] Download de declarações
+- [ ] Validação de jornada
+- [ ] Cálculo de horas extras
+- [ ] Adicional noturno
+- [ ] Desconto de faltas
+- [ ] INSS e IRRF corretos
+- [ ] Eventos eSocial automáticos
+- [ ] Conciliação com contabilidade
+
+### **MÓDULO 7 - CONTABILIDADE (18 ITENS)**
+- [ ] Plano de contas completo
+- [ ] Lançamentos automáticos
+- [ ] Centros de custo por obra
+- [ ] Demonstrações financeiras
+- [ ] SPED Contábil automático
+- [ ] Conciliação bancária
+- [ ] Business Intelligence
+- [ ] Auditoria e compliance
+- [ ] Integração fiscal
+- [ ] Dashboards executivos
+- [ ] Partidas dobradas corretas
+- [ ] Validação de consistência
+- [ ] Histórico de lançamentos
+- [ ] Balancete automático
+- [ ] DRE por período
+- [ ] Balanço patrimonial
+- [ ] Fluxo de caixa
+- [ ] Comparação entre períodos
+
+### **INTEGRAÇÕES (15 ITENS)**
+- [ ] Event-driven architecture
+- [ ] APIs RESTful internas
+- [ ] WebSockets tempo real
+- [ ] Cache distribuído
+- [ ] Sincronização entre módulos
+- [ ] Transações ACID
+- [ ] Logs de integração
+- [ ] Retry automático
+- [ ] Circuit breaker
+- [ ] Monitoramento de APIs
+- [ ] Proposta → Obra automática
+- [ ] Alocação → RDO automática
+- [ ] Ponto → Folha automática
+- [ ] Materiais → Custos automática
+- [ ] Folha → Contabilidade automática
+
+### **SEGURANÇA E CONFORMIDADE (12 ITENS)**
+- [ ] Autenticação multifator
+- [ ] Criptografia end-to-end
+- [ ] Controles de acesso
+- [ ] Auditoria completa
+- [ ] Conformidade LGPD 100%
+- [ ] Proteção contra SQL injection
+- [ ] Proteção contra XSS
+- [ ] CSRF tokens
+- [ ] Logs imutáveis
+- [ ] Backup e recovery
+- [ ] Monitoramento de segurança
+- [ ] Políticas de senha
+
+### **PERFORMANCE E QUALIDADE (10 ITENS)**
+- [ ] Páginas < 3 segundos
+- [ ] Operações < 2 segundos
+- [ ] Reconhecimento < 2 segundos
+- [ ] Suporte a 100+ usuários
+- [ ] Responsividade total
+- [ ] Performance mobile
+- [ ] Funcionalidades offline
+- [ ] Escalabilidade horizontal
+- [ ] Monitoramento APM
+- [ ] Otimização de banco
+
+---
+
+## 📋 **RELATÓRIO FINAL DE AUDITORIA**
+
+### **TEMPLATE DE RELATÓRIO**
+
+**RESUMO EXECUTIVO:**
+- Total de itens verificados: XXX
+- Itens aprovados: XXX
+- Itens reprovados: XXX
+- Taxa de conformidade: XX%
+- Criticidade das falhas: Alta/Média/Baixa
+
+**MÓDULOS APROVADOS:**
+- [ ] Módulo 1 - Propostas (XX/25 itens)
+- [ ] Módulo 2 - Portal Cliente (XX/20 itens)
+- [ ] Módulo 3 - Gestão Equipes (XX/18 itens)
+- [ ] Módulo 4 - Almoxarifado (XX/22 itens)
+- [ ] Módulo 5 - Reconhecimento Facial (XX/16 itens)
+- [ ] Módulo 6 - Folha Pagamento (XX/20 itens)
+- [ ] Módulo 7 - Contabilidade (XX/18 itens)
+
+**INTEGRAÇÕES APROVADAS:**
+- [ ] Integrações entre módulos (XX/15 itens)
+- [ ] Segurança e conformidade (XX/12 itens)
+- [ ] Performance e qualidade (XX/10 itens)
+
+**RECOMENDAÇÕES CRÍTICAS:**
+1. [Listar falhas críticas que impedem aprovação]
+2. [Priorizar correções por impacto]
+3. [Definir prazos para correções]
+
+**RECOMENDAÇÕES SECUNDÁRIAS:**
+1. [Melhorias de usabilidade]
+2. [Otimizações de performance]
+3. [Funcionalidades adicionais]
+
+**APROVAÇÃO FINAL:**
+- [ ] SISTEMA APROVADO - Pronto para produção
+- [ ] APROVAÇÃO CONDICIONAL - Correções menores necessárias
+- [ ] SISTEMA REPROVADO - Correções críticas necessárias
+
+**ASSINATURA DO AUDITOR:**
+Data: ___________
+Auditor: ___________
+Cargo: Auditor Técnico Sênior
+
+---
+
+## 🎯 **INSTRUÇÕES FINAIS**
+
+### **Como Executar Esta Auditoria**
+
+1. **Execute cada teste na ordem apresentada**
+2. **Documente TODOS os resultados (PASS/FAIL)**
+3. **Capture screenshots de evidências**
+4. **Registre tempos de resposta medidos**
+5. **Anote observações detalhadas**
+6. **Classifique falhas por criticidade**
+7. **Gere relatório final completo**
+
+### **Critérios de Aprovação Final**
+
+- **Módulos críticos (1,2,6,7): 100% dos itens obrigatórios**
+- **Módulos secundários (3,4,5): 95% dos itens obrigatórios**
+- **Integrações: 100% funcionais**
+- **Segurança: 100% conforme**
+- **Performance: 95% dentro dos SLAs**
+
+### **Ações Pós-Auditoria**
+
+1. **Correção de falhas críticas**
+2. **Re-teste de itens corrigidos**
+3. **Aprovação final documentada**
+4. **Preparação para produção**
+5. **Treinamento de usuários**
+
+**🔍 Esta auditoria garantirá que o SIGE v8.0 esteja 100% funcional e pronto para revolucionar a gestão empresarial brasileira!**
+

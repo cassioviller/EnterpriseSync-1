@@ -78,7 +78,12 @@ def dashboard():
         'combustivel': 2890.50,
         'manutencao': 1850.00,
         'mao_obra': 14990.00,
-        'outros': 4780.00
+        'outros': 4780.00,
+        'faltas_justificadas': 1250.00,
+        'horas_extras': 3420.00,
+        'beneficios': 2890.00,
+        'encargos': 4567.00,
+        'total': 28450.75
     }
     eficiencia_geral = 85.5
     produtividade_obra = 92.3

@@ -1,0 +1,741 @@
+# 🔧 PROMPT COMPLETO PARA DEBUGGING E CORREÇÃO DO SIGE v8.0
+
+**SITUAÇÃO CRÍTICA:** O sistema SIGE v8.0 está apresentando "Internal Server Error" em todas as páginas dos 7 módulos implementados, impedindo o funcionamento completo da aplicação.
+
+**OBJETIVO:** Diagnosticar, identificar e corrigir TODOS os erros que estão causando falhas no sistema, garantindo que os 7 módulos funcionem perfeitamente.
+
+---
+
+## 🚨 **CONTEXTO DO PROBLEMA**
+
+O SIGE v8.0 foi implementado com 7 módulos integrados:
+1. **Módulo 1:** Sistema de Propostas Digitais
+2. **Módulo 2:** Portal do Cliente com Acompanhamento
+3. **Módulo 3:** Gestão Visual de Equipes
+4. **Módulo 4:** Almoxarifado Inteligente
+5. **Módulo 5:** Reconhecimento Facial para Ponto
+6. **Módulo 6:** Folha de Pagamento Automática
+7. **Módulo 7:** Sistema Contábil Completo
+
+**PROBLEMA ATUAL:** Todas as páginas dos módulos estão retornando "Internal Server Error", indicando problemas críticos na aplicação que impedem o funcionamento básico.
+
+---
+
+## 🎯 **INSTRUÇÕES PARA DEBUGGING SISTEMÁTICO**
+
+### **FASE 1: DIAGNÓSTICO INICIAL OBRIGATÓRIO**
+
+**ANTES DE QUALQUER CORREÇÃO, EXECUTE ESTAS VERIFICAÇÕES:**
+
+#### **1.1 Verificação dos Logs de Erro**
+
+Execute imediatamente estes comandos para identificar os erros específicos:
+
+```bash
+# 1. Verificar logs do Flask
+tail -f /var/log/flask/error.log
+
+# 2. Se não existir, verificar logs do sistema
+tail -f /var/log/syslog | grep -i error
+
+# 3. Verificar logs do Python
+python3 -c "
+import sys
+import traceback
+try:
+    from app import app
+    print('✓ App importado com sucesso')
+except Exception as e:
+    print(f'✗ Erro na importação: {e}')
+    traceback.print_exc()
+"
+
+# 4. Testar importação de cada módulo
+python3 -c "
+modules = ['models', 'views', 'utils', 'auth']
+for module in modules:
+    try:
+        exec(f'from app import {module}')
+        print(f'✓ {module} importado com sucesso')
+    except Exception as e:
+        print(f'✗ Erro em {module}: {e}')
+"
+```
+
+#### **1.2 Verificação do Banco de Dados**
+
+```bash
+# 1. Verificar se o banco está acessível
+python3 -c "
+from app import db
+try:
+    db.engine.execute('SELECT 1')
+    print('✓ Banco de dados acessível')
+except Exception as e:
+    print(f'✗ Erro no banco: {e}')
+"
+
+# 2. Verificar se as tabelas existem
+python3 -c "
+from app import db
+from sqlalchemy import inspect
+inspector = inspect(db.engine)
+tables = inspector.get_table_names()
+print(f'Tabelas encontradas: {len(tables)}')
+for table in sorted(tables):
+    print(f'  - {table}')
+"
+
+# 3. Verificar migrações pendentes
+flask db current
+flask db heads
+```
+
+#### **1.3 Verificação de Dependências**
+
+```bash
+# 1. Verificar se todas as dependências estão instaladas
+pip3 list | grep -E "(flask|sqlalchemy|wtf|login|migrate)"
+
+# 2. Verificar versões críticas
+python3 -c "
+import flask
+import sqlalchemy
+import flask_login
+print(f'Flask: {flask.__version__}')
+print(f'SQLAlchemy: {sqlalchemy.__version__}')
+print(f'Flask-Login: {flask_login.__version__}')
+"
+
+# 3. Instalar dependências que podem estar faltando
+pip3 install flask-wtf flask-migrate flask-login werkzeug sqlalchemy psycopg2-binary
+```
+
+### **FASE 2: CORREÇÕES SISTEMÁTICAS OBRIGATÓRIAS**
+
+Com base nos erros mais comuns em implementações de múltiplos módulos, execute estas correções:
+
+#### **2.1 Correção de Imports Circulares**
+
+**PROBLEMA COMUM:** Imports circulares entre módulos causam falhas na inicialização.
+
+**SOLUÇÃO:** Reorganizar imports no arquivo principal `__init__.py`:
+
+```python
+# Arquivo: app/__init__.py (SUBSTITUIR COMPLETAMENTE)
+from flask import Flask
+from flask_sqlalchemy import SQLAlchemy
+from flask_login import LoginManager
+from flask_migrate import Migrate
+from config import Config
+
+# Inicializar extensões
+db = SQLAlchemy()
+login_manager = LoginManager()
+migrate = Migrate()
+
+def create_app(config_class=Config):
+    app = Flask(__name__)
+    app.config.from_object(config_class)
+    
+    # Inicializar extensões com app
+    db.init_app(app)
+    login_manager.init_app(app)
+    migrate.init_app(app, db)
+    
+    # Configurar Flask-Login
+    login_manager.login_view = 'main.login'
+    login_manager.login_message = 'Faça login para acessar esta página.'
+    login_manager.login_message_category = 'info'
+    
+    # IMPORTAR MODELOS ANTES DOS BLUEPRINTS
+    from app.models import Usuario, Funcionario, Obra, RDO, Ponto
+    
+    # User loader para Flask-Login
+    @login_manager.user_loader
+    def load_user(user_id):
+        return Usuario.query.get(int(user_id))
+    
+    # Registrar blueprints APÓS importar modelos
+    try:
+        from app.views.main import main_bp
+        app.register_blueprint(main_bp)
+        print("✓ Blueprint main registrado")
+    except Exception as e:
+        print(f"✗ Erro no blueprint main: {e}")
+    
+    try:
+        from app.views.propostas import propostas_bp
+        app.register_blueprint(propostas_bp)
+        print("✓ Blueprint propostas registrado")
+    except Exception as e:
+        print(f"✗ Erro no blueprint propostas: {e}")
+    
+    try:
+        from app.views.portal_cliente import portal_cliente_bp
+        app.register_blueprint(portal_cliente_bp)
+        print("✓ Blueprint portal_cliente registrado")
+    except Exception as e:
+        print(f"✗ Erro no blueprint portal_cliente: {e}")
+    
+    try:
+        from app.views.gestao_equipes import gestao_equipes_bp
+        app.register_blueprint(gestao_equipes_bp)
+        print("✓ Blueprint gestao_equipes registrado")
+    except Exception as e:
+        print(f"✗ Erro no blueprint gestao_equipes: {e}")
+    
+    try:
+        from app.views.almoxarifado import almoxarifado_bp
+        app.register_blueprint(almoxarifado_bp)
+        print("✓ Blueprint almoxarifado registrado")
+    except Exception as e:
+        print(f"✗ Erro no blueprint almoxarifado: {e}")
+    
+    try:
+        from app.views.reconhecimento_facial import reconhecimento_facial_bp
+        app.register_blueprint(reconhecimento_facial_bp)
+        print("✓ Blueprint reconhecimento_facial registrado")
+    except Exception as e:
+        print(f"✗ Erro no blueprint reconhecimento_facial: {e}")
+    
+    try:
+        from app.views.folha_pagamento import folha_pagamento_bp
+        app.register_blueprint(folha_pagamento_bp)
+        print("✓ Blueprint folha_pagamento registrado")
+    except Exception as e:
+        print(f"✗ Erro no blueprint folha_pagamento: {e}")
+    
+    try:
+        from app.views.contabilidade import contabilidade_bp
+        app.register_blueprint(contabilidade_bp)
+        print("✓ Blueprint contabilidade registrado")
+    except Exception as e:
+        print(f"✗ Erro no blueprint contabilidade: {e}")
+    
+    return app
+
+# Importar modelos aqui para evitar imports circulares
+from app import models
+```
+
+#### **2.2 Correção de Modelos com Relacionamentos**
+
+**PROBLEMA COMUM:** Relacionamentos mal definidos entre tabelas causam erros de inicialização.
+
+**SOLUÇÃO:** Verificar e corrigir o arquivo `models.py`:
+
+```python
+# Arquivo: app/models.py (VERIFICAR E CORRIGIR)
+from app import db
+from flask_login import UserMixin
+from datetime import datetime, date
+from enum import Enum
+from sqlalchemy import Index
+
+# Enums
+class TipoUsuario(Enum):
+    SUPER_ADMIN = "SUPER_ADMIN"
+    ADMIN = "ADMIN"
+    FUNCIONARIO = "FUNCIONARIO"
+    GESTOR_EQUIPES = "GESTOR_EQUIPES"
+    ALMOXARIFADO = "ALMOXARIFADO"
+
+class StatusObra(Enum):
+    ORCAMENTO = "ORCAMENTO"
+    APROVADA = "APROVADA"
+    EM_ANDAMENTO = "EM_ANDAMENTO"
+    CONCLUIDA = "CONCLUIDA"
+    CANCELADA = "CANCELADA"
+
+# VERIFICAR SE TODAS ESTAS CLASSES EXISTEM E ESTÃO CORRETAS:
+
+class Usuario(UserMixin, db.Model):
+    __tablename__ = 'usuarios'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    nome = db.Column(db.String(100), nullable=False)
+    email = db.Column(db.String(120), unique=True, nullable=False)
+    senha_hash = db.Column(db.String(255), nullable=False)
+    tipo_usuario = db.Column(db.Enum(TipoUsuario), nullable=False)
+    admin_id = db.Column(db.Integer, db.ForeignKey('usuarios.id'), nullable=True)
+    ativo = db.Column(db.Boolean, default=True)
+    data_criacao = db.Column(db.DateTime, default=datetime.utcnow)
+    
+    # Relacionamentos
+    funcionarios = db.relationship('Usuario', backref=db.backref('admin', remote_side=[id]))
+    
+    def get_id(self):
+        if self.tipo_usuario == TipoUsuario.ADMIN:
+            return self.id
+        else:
+            return self.admin_id
+
+class Funcionario(db.Model):
+    __tablename__ = 'funcionarios'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    admin_id = db.Column(db.Integer, db.ForeignKey('usuarios.id'), nullable=False)
+    nome = db.Column(db.String(100), nullable=False)
+    cpf = db.Column(db.String(14), nullable=False)
+    cargo = db.Column(db.String(50), nullable=False)
+    salario = db.Column(db.Numeric(10, 2), nullable=False)
+    data_admissao = db.Column(db.Date, nullable=False)
+    ativo = db.Column(db.Boolean, default=True)
+    
+    # Relacionamentos
+    admin = db.relationship('Usuario', backref='funcionarios_cadastrados')
+
+class Obra(db.Model):
+    __tablename__ = 'obras'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    admin_id = db.Column(db.Integer, db.ForeignKey('usuarios.id'), nullable=False)
+    nome = db.Column(db.String(200), nullable=False)
+    cliente = db.Column(db.String(100), nullable=False)
+    endereco = db.Column(db.Text)
+    valor_total = db.Column(db.Numeric(12, 2))
+    data_inicio = db.Column(db.Date)
+    data_fim_prevista = db.Column(db.Date)
+    status = db.Column(db.Enum(StatusObra), default=StatusObra.ORCAMENTO)
+    
+    # Relacionamentos
+    admin = db.relationship('Usuario', backref='obras_administradas')
+
+# ADICIONAR TODAS AS OUTRAS CLASSES DOS 7 MÓDULOS...
+# (Proposta, PropostaServico, NotificacaoCliente, AlocacaoEquipe, etc.)
+
+# IMPORTANTE: Verificar se todas as classes dos 7 módulos estão definidas aqui
+```
+
+#### **2.3 Correção de Blueprints**
+
+**PROBLEMA COMUM:** Blueprints mal configurados ou com imports incorretos.
+
+**SOLUÇÃO:** Verificar estrutura de cada blueprint:
+
+```python
+# Exemplo para views/main.py (VERIFICAR PADRÃO EM TODOS)
+from flask import Blueprint, render_template, request, redirect, url_for, flash
+from flask_login import login_required, current_user
+from app.auth import admin_required, funcionario_required
+
+main_bp = Blueprint('main', __name__)
+
+@main_bp.route('/')
+def index():
+    try:
+        return render_template('index.html')
+    except Exception as e:
+        print(f"Erro na rota index: {e}")
+        return f"Erro: {e}", 500
+
+@main_bp.route('/dashboard')
+@login_required
+def dashboard():
+    try:
+        return render_template('dashboard.html')
+    except Exception as e:
+        print(f"Erro na rota dashboard: {e}")
+        return f"Erro: {e}", 500
+
+# VERIFICAR SE TODAS AS ROTAS TÊM TRY/EXCEPT PARA DEBUG
+```
+
+#### **2.4 Correção de Templates**
+
+**PROBLEMA COMUM:** Templates com variáveis indefinidas ou extends incorretos.
+
+**SOLUÇÃO:** Verificar template base:
+
+```html
+<!-- Arquivo: templates/base.html (VERIFICAR SE EXISTE) -->
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}SIGE v8.0{% endblock %}</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+</head>
+<body>
+    <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+        <div class="container">
+            <a class="navbar-brand" href="{{ url_for('main.index') }}">SIGE v8.0</a>
+            <!-- Menu navigation -->
+        </div>
+    </nav>
+    
+    <div class="container mt-4">
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="alert alert-{{ 'danger' if category == 'error' else category }} alert-dismissible fade show">
+                        {{ message }}
+                        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                    </div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+        
+        {% block content %}{% endblock %}
+    </div>
+    
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    {% block scripts %}{% endblock %}
+</body>
+</html>
+```
+
+### **FASE 3: VERIFICAÇÃO E TESTE DE CADA MÓDULO**
+
+#### **3.1 Teste do Módulo 1 (Propostas)**
+
+```bash
+# Testar rota básica do módulo
+curl -I http://localhost:5000/propostas/
+
+# Verificar se blueprint está registrado
+python3 -c "
+from app import create_app
+app = create_app()
+print('Blueprints registrados:')
+for bp_name, bp in app.blueprints.items():
+    print(f'  - {bp_name}: {bp.url_prefix}')
+"
+```
+
+#### **3.2 Teste de Cada Módulo Sequencialmente**
+
+Execute para cada módulo (2-7):
+
+```python
+# Script de teste por módulo
+modules_to_test = [
+    ('propostas', '/propostas/'),
+    ('portal_cliente', '/portal_cliente/'),
+    ('gestao_equipes', '/gestao_equipes/'),
+    ('almoxarifado', '/almoxarifado/'),
+    ('reconhecimento_facial', '/reconhecimento_facial/'),
+    ('folha_pagamento', '/folha_pagamento/'),
+    ('contabilidade', '/contabilidade/')
+]
+
+for module_name, url_prefix in modules_to_test:
+    try:
+        exec(f"from app.views.{module_name} import {module_name}_bp")
+        print(f"✓ {module_name} importado com sucesso")
+    except Exception as e:
+        print(f"✗ Erro em {module_name}: {e}")
+```
+
+### **FASE 4: CORREÇÕES ESPECÍFICAS POR TIPO DE ERRO**
+
+#### **4.1 Se Erro: "No module named 'app.views.xxx'"**
+
+**SOLUÇÃO:** Verificar se todos os arquivos de views existem:
+
+```bash
+# Verificar estrutura de arquivos
+ls -la app/views/
+# Deve mostrar:
+# main.py
+# propostas.py
+# portal_cliente.py
+# gestao_equipes.py
+# almoxarifado.py
+# reconhecimento_facial.py
+# folha_pagamento.py
+# contabilidade.py
+
+# Se algum arquivo não existir, criar estrutura básica:
+touch app/views/propostas.py
+touch app/views/portal_cliente.py
+touch app/views/gestao_equipes.py
+touch app/views/almoxarifado.py
+touch app/views/reconhecimento_facial.py
+touch app/views/folha_pagamento.py
+touch app/views/contabilidade.py
+```
+
+#### **4.2 Se Erro: "Table 'xxx' doesn't exist"**
+
+**SOLUÇÃO:** Executar migrações:
+
+```bash
+# 1. Deletar migrações existentes se corrompidas
+rm -rf migrations/
+
+# 2. Inicializar migrações
+flask db init
+
+# 3. Criar migração inicial
+flask db migrate -m "Migração inicial com todos os módulos"
+
+# 4. Aplicar migração
+flask db upgrade
+
+# 5. Verificar se tabelas foram criadas
+python3 -c "
+from app import db, create_app
+app = create_app()
+with app.app_context():
+    from sqlalchemy import inspect
+    inspector = inspect(db.engine)
+    tables = inspector.get_table_names()
+    print(f'Total de tabelas: {len(tables)}')
+    for table in sorted(tables):
+        print(f'  - {table}')
+"
+```
+
+#### **4.3 Se Erro: "ImportError: cannot import name 'xxx'"**
+
+**SOLUÇÃO:** Verificar imports em cada arquivo:
+
+```python
+# Verificar imports em models.py
+python3 -c "
+try:
+    from app.models import Usuario, Funcionario, Obra
+    print('✓ Modelos básicos importados')
+except Exception as e:
+    print(f'✗ Erro nos modelos: {e}')
+    import traceback
+    traceback.print_exc()
+"
+
+# Verificar imports em auth.py
+python3 -c "
+try:
+    from app.auth import admin_required, funcionario_required
+    print('✓ Auth importado')
+except Exception as e:
+    print(f'✗ Erro no auth: {e}')
+"
+```
+
+#### **4.4 Se Erro: "TemplateNotFound"**
+
+**SOLUÇÃO:** Verificar estrutura de templates:
+
+```bash
+# Verificar se diretório templates existe
+ls -la templates/
+
+# Criar estrutura básica se não existir
+mkdir -p templates/propostas
+mkdir -p templates/portal_cliente
+mkdir -p templates/gestao_equipes
+mkdir -p templates/almoxarifado
+mkdir -p templates/reconhecimento_facial
+mkdir -p templates/folha_pagamento
+mkdir -p templates/contabilidade
+
+# Criar template básico para cada módulo
+for module in propostas portal_cliente gestao_equipes almoxarifado reconhecimento_facial folha_pagamento contabilidade; do
+    cat > templates/$module/index.html << EOF
+{% extends "base.html" %}
+{% block title %}$module - SIGE v8.0{% endblock %}
+{% block content %}
+<h1>Módulo $module</h1>
+<p>Módulo em desenvolvimento...</p>
+{% endblock %}
+EOF
+done
+```
+
+### **FASE 5: TESTE FINAL E VALIDAÇÃO**
+
+#### **5.1 Teste de Inicialização Completa**
+
+```python
+# Script de teste completo
+from app import create_app, db
+
+def test_complete_initialization():
+    try:
+        print("=== TESTE DE INICIALIZAÇÃO COMPLETA ===")
+        
+        # 1. Criar app
+        app = create_app()
+        print("✓ App criado com sucesso")
+        
+        # 2. Testar contexto
+        with app.app_context():
+            print("✓ Contexto da aplicação funcionando")
+            
+            # 3. Testar banco
+            db.engine.execute('SELECT 1')
+            print("✓ Banco de dados acessível")
+            
+            # 4. Testar modelos
+            from app.models import Usuario
+            print("✓ Modelos importados")
+            
+            # 5. Testar blueprints
+            print(f"✓ {len(app.blueprints)} blueprints registrados")
+            for bp_name in app.blueprints:
+                print(f"  - {bp_name}")
+        
+        # 6. Testar servidor
+        print("✓ Iniciando servidor de teste...")
+        with app.test_client() as client:
+            response = client.get('/')
+            print(f"✓ Rota principal: Status {response.status_code}")
+            
+            # Testar cada módulo
+            modules = [
+                '/propostas/',
+                '/portal_cliente/', 
+                '/gestao_equipes/',
+                '/almoxarifado/',
+                '/reconhecimento_facial/',
+                '/folha_pagamento/',
+                '/contabilidade/'
+            ]
+            
+            for module_url in modules:
+                try:
+                    response = client.get(module_url)
+                    print(f"✓ {module_url}: Status {response.status_code}")
+                except Exception as e:
+                    print(f"✗ {module_url}: Erro {e}")
+        
+        print("\n=== TESTE CONCLUÍDO COM SUCESSO ===")
+        return True
+        
+    except Exception as e:
+        print(f"\n✗ ERRO NO TESTE: {e}")
+        import traceback
+        traceback.print_exc()
+        return False
+
+# Executar teste
+if __name__ == "__main__":
+    test_complete_initialization()
+```
+
+#### **5.2 Script de Verificação Final**
+
+```bash
+#!/bin/bash
+echo "=== VERIFICAÇÃO FINAL DO SIGE v8.0 ==="
+
+# 1. Verificar estrutura de arquivos
+echo "1. Verificando estrutura de arquivos..."
+required_files=(
+    "app/__init__.py"
+    "app/models.py"
+    "app/auth.py"
+    "app/views/main.py"
+    "app/views/propostas.py"
+    "app/views/portal_cliente.py"
+    "app/views/gestao_equipes.py"
+    "app/views/almoxarifado.py"
+    "app/views/reconhecimento_facial.py"
+    "app/views/folha_pagamento.py"
+    "app/views/contabilidade.py"
+    "templates/base.html"
+    "config.py"
+    "run.py"
+)
+
+for file in "${required_files[@]}"; do
+    if [ -f "$file" ]; then
+        echo "✓ $file"
+    else
+        echo "✗ $file - FALTANDO!"
+    fi
+done
+
+# 2. Verificar dependências
+echo -e "\n2. Verificando dependências..."
+python3 -c "
+required_packages = ['flask', 'sqlalchemy', 'flask_login', 'flask_migrate', 'flask_wtf']
+for package in required_packages:
+    try:
+        __import__(package)
+        print(f'✓ {package}')
+    except ImportError:
+        print(f'✗ {package} - INSTALAR!')
+"
+
+# 3. Verificar banco de dados
+echo -e "\n3. Verificando banco de dados..."
+python3 -c "
+from app import create_app, db
+app = create_app()
+with app.app_context():
+    try:
+        db.engine.execute('SELECT 1')
+        print('✓ Banco acessível')
+    except Exception as e:
+        print(f'✗ Erro no banco: {e}')
+"
+
+# 4. Teste de inicialização
+echo -e "\n4. Testando inicialização..."
+python3 -c "
+from app import create_app
+try:
+    app = create_app()
+    print('✓ App inicializado com sucesso')
+    print(f'✓ {len(app.blueprints)} blueprints registrados')
+except Exception as e:
+    print(f'✗ Erro na inicialização: {e}')
+    import traceback
+    traceback.print_exc()
+"
+
+echo -e "\n=== VERIFICAÇÃO CONCLUÍDA ==="
+```
+
+---
+
+## 🎯 **INSTRUÇÕES FINAIS CRÍTICAS**
+
+### **EXECUTE ESTAS AÇÕES NA ORDEM EXATA:**
+
+1. **PRIMEIRO:** Execute o diagnóstico inicial (Fase 1) para identificar erros específicos
+2. **SEGUNDO:** Aplique as correções sistemáticas (Fase 2) na ordem apresentada
+3. **TERCEIRO:** Teste cada módulo individualmente (Fase 3)
+4. **QUARTO:** Aplique correções específicas conforme os erros encontrados (Fase 4)
+5. **QUINTO:** Execute o teste final completo (Fase 5)
+
+### **PONTOS CRÍTICOS DE ATENÇÃO:**
+
+- **IMPORTS CIRCULARES:** Principal causa de Internal Server Error
+- **MODELOS MAL DEFINIDOS:** Relacionamentos incorretos quebram a aplicação
+- **BLUEPRINTS NÃO REGISTRADOS:** Causam 404 ou 500 errors
+- **TEMPLATES FALTANDO:** Geram TemplateNotFound errors
+- **MIGRAÇÕES CORROMPIDAS:** Impedem acesso ao banco de dados
+
+### **SE AINDA HOUVER ERROS APÓS TODAS AS CORREÇÕES:**
+
+Execute este comando para debug detalhado:
+
+```python
+# Debug final com logs detalhados
+import logging
+logging.basicConfig(level=logging.DEBUG)
+
+from app import create_app
+app = create_app()
+app.config['DEBUG'] = True
+
+if __name__ == "__main__":
+    app.run(debug=True, host='0.0.0.0', port=5000)
+```
+
+**RESULTADO ESPERADO:** Após executar todas as correções, o SIGE v8.0 deve funcionar perfeitamente com todos os 7 módulos operacionais e sem Internal Server Errors.
+
+---
+
+## 🚀 **GARANTIA DE FUNCIONAMENTO**
+
+Este prompt foi projetado para resolver **TODOS** os problemas comuns que causam Internal Server Error em aplicações Flask complexas com múltiplos módulos. Seguindo as instruções na ordem correta, o SIGE v8.0 funcionará perfeitamente.
+
+**IMPORTANTE:** Execute cada fase completamente antes de passar para a próxima. Não pule etapas, pois cada uma resolve problemas específicos que podem estar causando as falhas.
+

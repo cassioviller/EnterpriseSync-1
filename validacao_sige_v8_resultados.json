@@ -1,0 +1,33 @@
+{
+  "endpoints": {
+    "/": true,
+    "/test": true,
+    "/login": true,
+    "/dashboard": true,
+    "/funcionarios": true,
+    "/obras": true,
+    "/veiculos": true
+  },
+  "conteudo": {
+    "SIGE": true,
+    "Dashboard": false,
+    "Funcionários": false,
+    "Obras": false,
+    "Custos": false,
+    "bootstrap": true,
+    "chart": false,
+    "card": true,
+    "navbar": false,
+    "R$": false
+  },
+  "performance": {
+    "/": 14.90163803100586,
+    "/test": 3.938913345336914,
+    "/login": 3.410816192626953,
+    "/dashboard": 7.474422454833984,
+    "/funcionarios": 7.84611701965332,
+    "/obras": 7.743358612060547,
+    "/veiculos": 7.668018341064453
+  },
+  "status_geral": "BOM"
+}
