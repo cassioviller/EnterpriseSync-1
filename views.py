@@ -158,3 +158,20 @@ def veiculos():
 @admin_required
 def financeiro():
     return render_template('financeiro.html')
+
+# ===== ROTAS COMERCIAIS =====
+@main_bp.route('/propostas')
+@admin_required
+def propostas():
+    return render_template('propostas/lista_propostas.html')
+
+@main_bp.route('/propostas/nova')
+@admin_required
+def nova_proposta():
+    return render_template('propostas/nova_proposta.html')
+
+# ===== GESTÃO DE EQUIPES =====
+@main_bp.route('/equipes')
+@admin_required
+def equipes():
+    return render_template('equipes/gestao_equipes.html')
