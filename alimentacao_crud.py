@@ -5,10 +5,10 @@ Implementa todas as operações necessárias para o controle de alimentação
 """
 
 from flask import Blueprint, render_template, request, flash, redirect, url_for, jsonify
+from models import RegistroAlimentacao, Funcionario, Obra, Restaurante
+from app import db
 from flask_login import login_required, current_user
 from datetime import datetime, date, timedelta
-from app import db
-from models import RegistroAlimentacao, Funcionario, Obra, Restaurante
 
 # Criar blueprint para alimentação
 alimentacao_bp = Blueprint('alimentacao', __name__)

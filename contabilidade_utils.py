@@ -2,14 +2,7 @@
 Utilitários para o Módulo 7 - Sistema Contábil Completo
 """
 import calendar
-from datetime import date, timedelta
-from decimal import Decimal
-from sqlalchemy import func, case
-from app import db
-from models import (PlanoContas, CentroCustoContabil, LancamentoContabil, PartidaContabil, 
-                    BalanceteMensal, DREMensal, BalancoPatrimonial, FluxoCaixaContabil, 
-                    ProvisaoMensal, SpedContabil, AuditoriaContabil, Proposta, 
-                    NotaFiscal, MovimentacaoEstoque, FolhaPagamento)
+from models import (PlanoContas, CentroCustoContabil, LancamentoContabil, PartidaContabil, BalanceteMensal, DREMensal, BalancoPatrimonial, FluxoCaixaContabil, ProvisaoMensal, SpedContabil, AuditoriaContabil, Proposta, NotaFiscal, MovimentacaoEstoque, FolhaPagamento)
 
 # ===============================================================
 # == MÓDULO 7: FUNÇÕES UTILITÁRIAS CONTÁBEIS

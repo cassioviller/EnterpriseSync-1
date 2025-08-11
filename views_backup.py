@@ -1,9 +1,8 @@
 from flask import Blueprint, render_template, request, redirect, url_for, flash, jsonify, session
+    from models import TipoUsuario
+from app import db
 from flask_login import login_required, current_user, login_user, logout_user
 from werkzeug.security import check_password_hash, generate_password_hash
-from app import db
-from models import *
-from models import PropostaComercial, ServicoPropostaComercial
 from forms import *
 from utils import calcular_horas_trabalhadas, calcular_custo_real_obra, calcular_custos_mes
 from kpis_engine import kpis_engine
@@ -1936,7 +1935,6 @@ def obras():
 @main_bp.route('/obras/novo', methods=['GET', 'POST'])
 @login_required
 def nova_obra():
-    from models import Servico, ServicoObra, CategoriaServico
     import json
     import logging
     
@@ -2053,7 +2051,6 @@ def nova_obra():
 @main_bp.route('/api/servicos')
 @login_required
 def api_servicos():
-    from models import Servico
     # Query específica para evitar erro categoria_id
     servicos_data = db.session.query(
         Servico.id,
@@ -2103,7 +2100,6 @@ def editar_obra(id):
 def detalhes_obra(id):
     from datetime import datetime, date, timedelta
     from sqlalchemy import func
-    from models import ServicoObra, Servico
     
     # Verificar se a obra pertence ao admin logado
     obra = Obra.query.filter_by(id=id, admin_id=current_user.id).first_or_404()
@@ -5728,7 +5724,6 @@ def lista_rdos():
 @login_required
 def novo_rdo():
     """Formulário para criar novo RDO"""
-    from models import ServicoObra
     
     # Dados para template
     obras = Obra.query.filter_by(ativo=True).all()
@@ -5827,7 +5822,6 @@ def criar_rdo():
                     observacoes = request.form.get(f'atividade_observacoes_{contador}', '')
                     
                     if descricao and percentual:
-                        from models import RDOAtividade
                         atividade = RDOAtividade(
                             rdo_id=rdo.id,
                             descricao_atividade=descricao,
@@ -6385,7 +6379,6 @@ def verificar_permissao_edicao_ponto(registro, usuario):
     print(f"🔍 Verificando permissão: usuário {usuario.email} ({usuario.tipo_usuario})")
     
     # Usar o enum corretamente
-    from models import TipoUsuario
     
     if usuario.tipo_usuario == TipoUsuario.SUPER_ADMIN:
         print("✅ Permissão concedida: SUPER_ADMIN")
@@ -6587,7 +6580,6 @@ def excluir_registros_periodo():
 
 def obter_obras_usuario(usuario):
     """Retorna obras disponíveis para o usuário"""
-    from models import TipoUsuario
     
     if usuario.tipo_usuario == TipoUsuario.SUPER_ADMIN:
         obras = Obra.query.filter_by(ativo=True).all()

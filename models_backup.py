@@ -3,10 +3,8 @@ from datetime import datetime, date
 from sqlalchemy import func
 from enum import Enum
 
-from flask_sqlalchemy import SQLAlchemy
-
-# Instância única do SQLAlchemy
-db = SQLAlchemy()
+# O db será importado do app para evitar instâncias múltiplas
+db = None
 
 class TipoUsuario(Enum):
     SUPER_ADMIN = "super_admin"

@@ -1,11 +1,11 @@
 # ===== PROCESSADOR XML NFE AVANÇADO - CONFORME REUNIÃO TÉCNICA =====
 
 import hashlib
+from models import NotaFiscal, Fornecedor, Produto, CategoriaProduto, MovimentacaoEstoque
+from app import db
 from datetime import datetime
 from decimal import Decimal
 import re
-from models import NotaFiscal, Fornecedor, Produto, CategoriaProduto, MovimentacaoEstoque
-from app import db
 
 # Import condicional para XML
 try:

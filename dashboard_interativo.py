@@ -5,10 +5,10 @@ Implementa funcionalidades avançadas de dashboard com drill-down e filtros
 """
 
 from datetime import datetime, date, timedelta
-from models import *
-from app import db
 from sqlalchemy import func, desc, and_, or_
 import json
+from models import *
+from app import db
 
 class DashboardAvancado:
     def __init__(self):

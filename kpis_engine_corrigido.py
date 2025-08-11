@@ -14,13 +14,13 @@ Data: 01 de Agosto de 2025
 """
 
 from datetime import date, datetime, time, timedelta
-from app import db
-from models import (
     Funcionario, RegistroPonto, RegistroAlimentacao, 
     Ocorrencia, TipoOcorrencia, CalendarioUtil, HorarioTrabalho
 )
 from sqlalchemy import func, extract, and_, or_
 import logging
+            from models import OutroCusto
+from app import db
 
 class TimeRecordType:
     """Tipos padronizados de lançamento de ponto"""
@@ -264,7 +264,6 @@ class CorrectedKPIService:
     def _calcular_outros_custos(self, funcionario_id, data_inicio, data_fim):
         """Calcula outros custos do funcionário"""
         try:
-            from models import OutroCusto
             resultado = db.session.query(func.coalesce(func.sum(OutroCusto.valor), 0)).filter(
                 OutroCusto.funcionario_id == funcionario_id,
                 OutroCusto.data >= data_inicio,

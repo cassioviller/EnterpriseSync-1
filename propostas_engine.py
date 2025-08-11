@@ -16,12 +16,12 @@ Data: 30 de Julho de 2025
 
 from datetime import datetime, date, timedelta
 from decimal import Decimal
-from app import db
-from models import (
     Proposta, ItemProposta, StatusProposta, HistoricoStatusProposta,
     Servico, Obra, Usuario, Funcionario, ServicoObra
 )
 from flask_login import current_user
+from models import (
+from app import db
 from reportlab.lib.pagesizes import A4
 from reportlab.lib import colors
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle

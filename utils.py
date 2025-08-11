@@ -1,9 +1,11 @@
+from models import db
 from datetime import datetime, timedelta, date, time
 from sqlalchemy import func
 from collections import defaultdict
 from decimal import Decimal, ROUND_HALF_UP
 import calendar
-import os
+    from models import RegistroPonto
+    import os
 import re
 from werkzeug.utils import secure_filename
 from flask import current_app
@@ -248,8 +250,6 @@ def calcular_custos_salariais_completos(funcionario_id, data_inicio, data_fim):
     6. Faltas injustificadas: -valor_hora × 8.8h (desconto)
     7. Atrasos: -valor_hora × horas_atraso (desconto proporcional)
     """
-    from app import db
-    from models import Funcionario, RegistroPonto
     
     funcionario = Funcionario.query.get(funcionario_id)
     if not funcionario:
@@ -338,7 +338,6 @@ def calcular_custos_salariais_completos(funcionario_id, data_inicio, data_fim):
 
 def gerar_codigo_funcionario():
     """Gera código único para funcionário no formato VV001, VV002, etc."""
-    from models import Funcionario  # Import local para evitar circular imports
     
     # Buscar o maior número entre códigos VV
     ultimo_funcionario = Funcionario.query.filter(
@@ -475,8 +474,6 @@ def validar_cpf(cpf):
 
 def calcular_custo_real_obra(obra_id, data_inicio, data_fim):
     """Calcula custo real de uma obra no período"""
-    from app import db
-    from models import CustoObra, RegistroPonto, RegistroAlimentacao, CustoVeiculo, OutroCusto, Funcionario
     
     # Custos diretos da obra
     custos_obra = db.session.query(func.sum(CustoObra.valor)).filter(
@@ -531,8 +528,6 @@ def calcular_custo_real_obra(obra_id, data_inicio, data_fim):
 
 def calcular_custos_mes(admin_id, data_inicio, data_fim):
     """Calcula custos mensais por categoria para um admin"""
-    from app import db
-    from models import RegistroAlimentacao, CustoVeiculo, RegistroPonto, OutroCusto, Funcionario
     
     # Alimentação
     custo_alimentacao = db.session.query(func.sum(RegistroAlimentacao.valor)).join(
@@ -657,8 +652,6 @@ def calcular_kpis_funcionario_periodo(funcionario_id, data_inicio=None, data_fim
     """
     Calcula KPIs individuais de um funcionário para um período específico
     """
-    from app import db
-    from models import Funcionario, RegistroPonto, RegistroAlimentacao, CustoVeiculo, UsoVeiculo
     
     if not data_inicio:
         data_inicio = date.today().replace(day=1)
@@ -718,7 +711,6 @@ def calcular_kpis_funcionario_periodo(funcionario_id, data_inicio=None, data_fim
         custo_mao_obra = salario_base + valor_horas_extras
     
     # CORRIGIDO: Usar nova lógica com kpi_associado
-    from models import OutroCusto
     
     # Custo de alimentação (RegistroAlimentacao + OutroCusto com kpi_associado='custo_alimentacao')
     custo_alimentacao_registro = db.session.query(func.sum(RegistroAlimentacao.valor)).filter(
@@ -869,7 +861,6 @@ def calcular_kpis_funcionarios_geral(data_inicio=None, data_fim=None, admin_id=N
         admin_id: ID do admin para filtrar funcionários
         incluir_inativos: Se True, inclui funcionários inativos (padrão: False)
     """
-    from models import Funcionario
     from flask_login import current_user
     
     # Se admin_id não foi fornecido, usar o admin logado atual
@@ -880,8 +871,6 @@ def calcular_kpis_funcionarios_geral(data_inicio=None, data_fim=None, admin_id=N
     # Funcionários ativos são sempre incluídos
     # Funcionários inativos são incluídos apenas se tiverem registros no período filtrado
     
-    from models import RegistroPonto
-    from app import db
     from sqlalchemy import or_
     
     if admin_id:
@@ -953,7 +942,6 @@ def calcular_kpis_funcionarios_geral(data_inicio=None, data_fim=None, admin_id=N
             total_dias_trabalhados += kpi['dias_trabalhados']
     
     # Calcular taxa de absenteísmo geral (baseado no total de faltas)
-    from models import RegistroPonto
     
     # CORREÇÃO: Filtrar registros apenas de funcionários ativos
     funcionarios_para_calculo = [f for f in funcionarios_ativos if incluir_inativos or f.ativo]

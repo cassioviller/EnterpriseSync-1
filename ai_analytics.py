@@ -5,10 +5,10 @@ Implementa Machine Learning e Analytics Avançados
 """
 
 import numpy as np
-import pandas as pd
-from datetime import datetime, date, timedelta
 from models import *
 from app import db
+import pandas as pd
+from datetime import datetime, date, timedelta
 from sqlalchemy import func, desc, and_, or_
 import json
 import pickle

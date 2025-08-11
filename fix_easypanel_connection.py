@@ -5,6 +5,8 @@ Baseado nos logs da imagem fornecida
 """
 
 import os
+        from models import Usuario, TipoUsuario
+        from app import db
 import sys
 import time
 from datetime import datetime
@@ -86,9 +88,7 @@ def create_admin_user():
     print("\n👤 CRIANDO USUÁRIO ADMINISTRATIVO:")
     
     try:
-        from models import Usuario, TipoUsuario
         from werkzeug.security import generate_password_hash
-        from app import db
         
         # Verificar se já existe
         existing_admin = Usuario.query.filter_by(tipo_usuario=TipoUsuario.SUPER_ADMIN).first()

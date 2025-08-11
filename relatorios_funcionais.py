@@ -1,12 +1,12 @@
+from models import db
 """
 Sistema de Relatórios Funcionais - SIGE v3.1
 Implementação completa dos relatórios com exportação PDF/Excel/CSV
 """
 
 from flask import Blueprint, request, jsonify, make_response
-from flask_login import login_required
-from app import db
 from models import *
+from flask_login import login_required
 from datetime import datetime, date
 from sqlalchemy import func
 from io import BytesIO

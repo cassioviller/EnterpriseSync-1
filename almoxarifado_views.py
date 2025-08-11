@@ -4,8 +4,7 @@ from flask import Blueprint, render_template, request, jsonify, flash, redirect,
 from flask_login import login_required, current_user
 from datetime import datetime, date, timedelta
 from auth import almoxarife_required, pode_gerenciar_almoxarifado, get_tenant_filter
-from models import (Produto, CategoriaProduto, Fornecedor, NotaFiscal, MovimentacaoEstoque, 
-                   RDO, Obra, db)
+from models import (Produto, CategoriaProduto, Fornecedor, NotaFiscal, MovimentacaoEstoque, RDO, Obra, db)
 from almoxarifado_utils import (
     atualizar_estoque_produto, calcular_estoque_minimo_inteligente,
     prever_ruptura_estoque, gerar_relatorio_estoque, calcular_kpis_almoxarifado,

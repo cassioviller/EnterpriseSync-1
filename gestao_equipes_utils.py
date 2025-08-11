@@ -1,3 +1,4 @@
+from models import db
 #!/usr/bin/env python3
 """
 MÓDULO 3: GESTÃO DE EQUIPES - Funções Utilitárias
@@ -6,7 +7,6 @@ Sistema de alocação com interface Kanban/Calendário
 
 from datetime import datetime, date, timedelta
 from flask_login import current_user
-from app import db
 from models import AlocacaoEquipe, Funcionario, Obra, RDO, RegistroPonto
 from sqlalchemy import func, and_, or_
 

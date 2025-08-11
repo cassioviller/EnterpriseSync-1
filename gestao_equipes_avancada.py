@@ -5,9 +5,9 @@ Implementação baseada na reunião técnica especializada
 Funcionalidades refinadas conforme especificações técnicas
 """
 
-from app import db
-from models import AlocacaoEquipe, RDO, Funcionario, Obra, Usuario
 from flask_login import current_user
+        from models import RegistroPonto
+from app import db
 from datetime import date, datetime, timedelta
 from collections import defaultdict
 import secrets
@@ -431,7 +431,6 @@ def sincronizar_alocacao_com_ponto_avancado(alocacao_id):
     Integração automática quando funcionário bate ponto.
     """
     try:
-        from models import RegistroPonto
         
         alocacao = AlocacaoEquipe.query.get(alocacao_id)
         if not alocacao:

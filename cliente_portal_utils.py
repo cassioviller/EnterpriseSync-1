@@ -1,3 +1,4 @@
+from models import db
 #!/usr/bin/env python3
 """
 MÓDULO 2: FUNÇÕES UTILITÁRIAS PARA PORTAL DO CLIENTE
@@ -6,10 +7,9 @@ Sistema SIGE v8.0 - Funções para cálculo de progresso e análise de obras
 
 from datetime import date, datetime, timedelta
 from sqlalchemy import func, and_
-from app import db
-from models import Obra, RDO, RDOAtividade, RDOFoto, NotificacaoCliente
 from collections import defaultdict
 import statistics
+    from models import Proposta
 
 def calcular_progresso_obra_cliente(obra_id):
     """
@@ -375,7 +375,6 @@ def criar_notificacao_cliente(obra_id, tipo, titulo, mensagem, rdo_id=None, ativ
 
 def criar_notificacao_automatica_rdo(rdo_id):
     """Criar notificação automática quando RDO for finalizado"""
-    from models import RDO
     
     rdo = RDO.query.get(rdo_id)
     if not rdo or rdo.status != 'Finalizado':
@@ -495,7 +494,6 @@ def gerar_token_cliente_obra(obra_id):
 
 def atualizar_dados_cliente_obra(obra_id, proposta_id):
     """Atualizar dados do cliente na obra baseado na proposta"""
-    from models import Proposta
     
     obra = Obra.query.get(obra_id)
     proposta = Proposta.query.get(proposta_id)

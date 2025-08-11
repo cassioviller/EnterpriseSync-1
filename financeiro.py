@@ -13,9 +13,9 @@ Data: 07 de Julho de 2025
 
 from datetime import datetime, date, timedelta
 from sqlalchemy import and_, func, text
-from app import db
-from models import *
 import calendar
+from models import *
+from app import db
 
 def gerar_numero_receita():
     """Gera próximo número de receita sequencial"""

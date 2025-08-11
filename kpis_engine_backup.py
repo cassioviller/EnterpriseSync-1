@@ -18,8 +18,6 @@ Data: 04 de Julho de 2025
 """
 
 from datetime import date, datetime, time, timedelta
-from app import db
-from models import (
     Funcionario, RegistroPonto, RegistroAlimentacao, 
     Ocorrencia, TipoOcorrencia, CalendarioUtil, HorarioTrabalho
 )
@@ -286,7 +284,6 @@ class KPIsEngine:
         """Calcular custo de transporte (vale transporte)"""
         if not hasattr(self, 'OutroCusto'):
             try:
-                from models import OutroCusto
                 self.OutroCusto = OutroCusto
             except ImportError:
                 return 0.0
@@ -304,7 +301,6 @@ class KPIsEngine:
         """Calcular outros custos (vale alimentação, EPIs, etc.)"""
         if not hasattr(self, 'OutroCusto'):
             try:
-                from models import OutroCusto
                 self.OutroCusto = OutroCusto
             except ImportError:
                 return 0.0

@@ -1,11 +1,12 @@
+from models import db
 """
 Views para o Módulo 7 - Sistema Contábil Completo
 """
 
 from flask import Blueprint, render_template, request, jsonify, redirect, url_for, flash
+    from models import SpedContabil
 from flask_login import login_required, current_user
 from datetime import datetime, date, timedelta
-from app import db
 import calendar
 
 contabilidade_bp = Blueprint('contabilidade', __name__)
@@ -28,7 +29,6 @@ def admin_required(f):
 @admin_required
 def dashboard_contabil():
     """Dashboard principal da contabilidade"""
-    from models import DREMensal, BalancoPatrimonial, LancamentoContabil
     from contabilidade_utils import calcular_saldo_conta
     
     hoje = date.today()
@@ -66,7 +66,6 @@ def dashboard_contabil():
 @admin_required
 def plano_de_contas():
     """Exibir plano de contas"""
-    from models import PlanoContas
     from contabilidade_utils import criar_plano_contas_padrao
     
     # Criar plano de contas se não existir
@@ -83,7 +82,6 @@ def plano_de_contas():
 @admin_required
 def lancamentos_contabeis():
     """Listar lançamentos contábeis"""
-    from models import LancamentoContabil
     
     page = request.args.get('page', 1, type=int)
     per_page = 20
@@ -100,7 +98,6 @@ def lancamentos_contabeis():
 @admin_required
 def balancete():
     """Visualizar balancete mensal"""
-    from models import BalanceteMensal
     from contabilidade_utils import gerar_balancete_mensal
     
     # Obter mês/ano dos parâmetros ou usar atual
@@ -135,7 +132,6 @@ def balancete():
 @admin_required
 def dre():
     """Demonstração do Resultado do Exercício"""
-    from models import DREMensal
     
     mes = request.args.get('mes', date.today().month, type=int)
     ano = request.args.get('ano', date.today().year, type=int)
@@ -165,7 +161,6 @@ def dre():
 @admin_required
 def balanco_patrimonial():
     """Balanço Patrimonial"""
-    from models import BalancoPatrimonial
     
     data_ref = request.args.get('data', date.today().isoformat())
     data_referencia = datetime.strptime(data_ref, '%Y-%m-%d').date()
@@ -193,7 +188,6 @@ def balanco_patrimonial():
 @admin_required
 def auditoria_contabil():
     """Sistema de auditoria contábil"""
-    from models import AuditoriaContabil
     from contabilidade_utils import executar_auditoria_automatica
     
     # Executar auditoria se solicitado
@@ -224,7 +218,6 @@ def relatorios():
 @admin_required
 def sped():
     """Geração de SPED Contábil"""
-    from models import SpedContabil
     
     speds = SpedContabil.query.filter_by(admin_id=current_user.id)\
                              .order_by(SpedContabil.data_geracao.desc()).all()

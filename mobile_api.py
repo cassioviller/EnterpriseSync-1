@@ -5,10 +5,10 @@ APIs específicas para aplicativo mobile React Native
 """
 
 from flask import Blueprint, request, jsonify, current_app
-from flask_login import login_required, current_user
-from datetime import datetime, date, timedelta
 from models import *
 from app import db
+from flask_login import login_required, current_user
+from datetime import datetime, date, timedelta
 from sqlalchemy import func, desc, and_, or_
 import base64
 import os

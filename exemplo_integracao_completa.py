@@ -4,11 +4,11 @@ Demonstra o fluxo end-to-end automatizado conforme especificação técnica
 """
 
 from datetime import datetime, date, timedelta
-from app import db
-from models import *
 from integracoes_automaticas import gerenciador_fluxo
 from fluxo_dados_automatico import TriggerAutomatico
 import logging
+from models import *
+from app import db
 
 # Configurar logging
 logging.basicConfig(level=logging.INFO)

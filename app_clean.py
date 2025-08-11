@@ -42,20 +42,13 @@ from models import *
 
 # Import views
 from views import main_bp
-try:
-    from relatorios_funcionais import relatorios_bp
-    app.register_blueprint(relatorios_bp, url_prefix='/relatorios')
-except ImportError:
-    logging.warning("Relatórios funcionais não disponível")
+from relatorios_funcionais import relatorios_bp
+from almoxarifado_views import almoxarifado_bp
 
-try:
-    from almoxarifado_views import almoxarifado_bp
-    app.register_blueprint(almoxarifado_bp, url_prefix='/almoxarifado')
-except ImportError:
-    logging.warning("Almoxarifado views não disponível")
-
-# Register main blueprint
+# Register blueprints
 app.register_blueprint(main_bp)
+app.register_blueprint(relatorios_bp, url_prefix='/relatorios')
+app.register_blueprint(almoxarifado_bp, url_prefix='/almoxarifado')
 
 @login_manager.user_loader
 def load_user(user_id):

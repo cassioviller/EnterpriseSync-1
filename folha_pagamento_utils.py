@@ -1,3 +1,4 @@
+from models import db
 """
 Utilitários para o Módulo 6 - Sistema de Folha de Pagamento Automática
 Funções para cálculo de horas, impostos e processamento da folha
@@ -5,9 +6,8 @@ Funções para cálculo de horas, impostos e processamento da folha
 
 from datetime import datetime, date, time, timedelta
 from decimal import Decimal
-from models import *
-from app import db
 from flask_login import current_user
+from models import *
 
 # ================================
 # CÁLCULOS DE HORAS TRABALHADAS

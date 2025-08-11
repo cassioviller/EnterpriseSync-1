@@ -6,8 +6,6 @@ Centraliza todos os cálculos para garantir consistência entre dashboard, cards
 
 from datetime import datetime, date, timedelta
 from sqlalchemy import func, and_, or_
-from app import db
-from models import (
     Obra, CustoObra, RegistroPonto, RegistroAlimentacao, 
     CustoVeiculo, OutroCusto, Funcionario, Usuario
 )
@@ -195,7 +193,6 @@ class KPIUnificado:
         ).count()
         
         # CORRIGIDO: Veículos filtrados por admin_id (multi-tenant)
-        from models import Veiculo
         veiculos_ativos = Veiculo.query.filter(
             Veiculo.ativo == True,
             Veiculo.admin_id == self.admin_id

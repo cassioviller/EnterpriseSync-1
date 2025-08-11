@@ -1,10 +1,12 @@
+from models import db
 """
 Views para o Módulo 6 - Sistema de Folha de Pagamento Automática
 Versão limpa e funcional
 """
 
 from flask import Blueprint, render_template, request, jsonify, redirect, url_for, flash
-from flask_login import login_required, current_user
+        from models import FolhaPagamento
+        from flask_login import login_required, current_user
 from datetime import datetime, date, timedelta
 import calendar
 
@@ -34,8 +36,6 @@ def dashboard():
     """Dashboard principal da folha de pagamento"""
     
     # Importar modelos e db dentro da função para evitar importação circular
-    from models import FolhaPagamento, Funcionario, ParametrosLegais
-    from app import db
     
     # Mês atual
     hoje = date.today()
@@ -111,8 +111,6 @@ def processar_folha_mes(ano, mes):
     """Processar folha de pagamento do mês"""
     
     try:
-        from models import FolhaPagamento
-        from app import db
         
         mes_referencia = date(ano, mes, 1)
         

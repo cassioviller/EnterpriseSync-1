@@ -1,3 +1,4 @@
+from models import db
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
@@ -18,8 +19,6 @@ Data: 04 de Julho de 2025
 """
 
 from datetime import date, datetime, time, timedelta
-from app import db
-from models import (
     Funcionario, RegistroPonto, RegistroAlimentacao, 
     Ocorrencia, TipoOcorrencia, CalendarioUtil, HorarioTrabalho
 )
@@ -326,6 +325,7 @@ class CalculadoraKPI:
     def _calcular_dias_uteis_mes(self, ano, mes):
         """Calcula dias úteis reais do mês (seg-sex, excluindo feriados)"""
         import calendar
+                from models import OutroCusto
         from datetime import timedelta
         
         primeiro_dia = date(ano, mes, 1)
@@ -424,7 +424,6 @@ class CalculadoraKPI:
         """Calcular custo de transporte (vale transporte)"""
         if not hasattr(self, 'OutroCusto'):
             try:
-                from models import OutroCusto
                 self.OutroCusto = OutroCusto
             except ImportError:
                 return 0.0
@@ -442,7 +441,6 @@ class CalculadoraKPI:
         """Calcular outros custos (vale alimentação, EPIs, etc.)"""
         if not hasattr(self, 'OutroCusto'):
             try:
-                from models import OutroCusto
                 self.OutroCusto = OutroCusto
             except ImportError:
                 return 0.0

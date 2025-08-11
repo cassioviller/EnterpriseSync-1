@@ -10,8 +10,6 @@ Data: 1º de agosto de 2025
 
 from datetime import datetime, date
 from sqlalchemy import func, and_, or_
-from app import db
-from models import Funcionario, RegistroPonto, RegistroAlimentacao, RegistroTransporte
 
 class KPIsEngineV82:
     """

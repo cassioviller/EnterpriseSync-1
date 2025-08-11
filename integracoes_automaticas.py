@@ -4,12 +4,12 @@ Implementa o fluxo end-to-end automatizado conforme especificação técnica
 """
 
 from datetime import datetime, date
-from app import db
-from models import (Proposta, Obra, Usuario, AlocacaoEquipe, RDO, MovimentacaoEstoque, 
                     RegistroPonto, FolhaPagamento, LancamentoContabil, NotificacaoCliente)
 from contabilidade_utils import (contabilizar_proposta_aprovada, contabilizar_entrada_material,
                                 contabilizar_folha_pagamento, criar_lancamento_automatico)
 import logging
+        from models import Produto
+from app import db
 
 # ===============================================================
 # == AUTOMAÇÃO DO FLUXO COMPLETO DE DADOS SIGE v8.0
@@ -176,7 +176,6 @@ class GerenciadorFluxoDados:
     
     def _criar_centro_custo_contabil(self, proposta):
         """Cria centro de custo automático para a obra"""
-        from models import CentroCustoContabil
         
         centro_custo = CentroCustoContabil(
             codigo=f"OBRA_{proposta.obra.id}",
@@ -300,7 +299,6 @@ class GerenciadorFluxoDados:
         
     def _verificar_estoque_minimo(self, produto_id):
         """Verifica e alerta sobre estoque mínimo"""
-        from models import Produto
         produto = Produto.query.get(produto_id)
         
         if produto and produto.quantidade_estoque <= produto.estoque_minimo:

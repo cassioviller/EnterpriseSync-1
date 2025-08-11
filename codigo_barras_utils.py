@@ -1,13 +1,13 @@
+from models import db
 # ===== SISTEMA DE CÓDIGO DE BARRAS AVANÇADO - CONFORME REUNIÃO TÉCNICA =====
 
 import re
+from models import Produto, CategoriaProduto
 import random
 import string
 from datetime import datetime
 import base64
 import io
-from models import Produto, CategoriaProduto
-from app import db
 
 # Imports opcionais para funcionalidades avançadas
 try:

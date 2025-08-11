@@ -5,9 +5,9 @@ Permite lançar registros para múltiplos funcionários simultaneamente
 """
 
 from flask import Blueprint, render_template, request, jsonify, redirect, url_for, flash
-from flask_login import login_required, current_user
-from app import db
 from models import *
+from app import db
+from flask_login import login_required, current_user
 from datetime import date, datetime, timedelta
 import logging
 

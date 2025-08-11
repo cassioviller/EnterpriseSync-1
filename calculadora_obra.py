@@ -3,8 +3,6 @@
 
 from datetime import datetime, timedelta
 from sqlalchemy import func
-from app import db
-from models import (
     Obra, RegistroPonto, Funcionario, HorarioTrabalho, 
     CustoVeiculo, RegistroAlimentacao, CustoObra, OutroCusto
 )

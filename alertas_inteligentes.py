@@ -5,10 +5,10 @@ Monitora métricas críticas e gera notificações automáticas
 """
 
 from datetime import datetime, date, timedelta
-from models import *
 from kpis_engine import calcular_kpis_funcionario
-from app import db
 import json
+from models import *
+from app import db
 
 class AlertaInteligente:
     def __init__(self):

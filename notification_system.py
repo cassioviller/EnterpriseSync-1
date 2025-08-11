@@ -5,10 +5,10 @@ Sistema completo de notificações multi-canal com IA
 """
 
 from datetime import datetime, date, timedelta
-from models import *
-from app import db
 from sqlalchemy import func, and_, or_
 import json
+from models import *
+from app import db
 import smtplib
 try:
     from email.mime.text import MimeText

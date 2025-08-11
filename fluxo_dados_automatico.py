@@ -5,8 +5,9 @@ Baseado no documento: FLUXO COMPLETO DE DADOS DO SIGE v8.0
 """
 
 from datetime import datetime, date
-from app import db
 import logging
+            from models import AlocacaoEquipe
+from app import db
 
 # Configuração do logger
 logging.basicConfig(level=logging.INFO)
@@ -174,7 +175,6 @@ class MonitoramentoFluxo:
         
         try:
             # Verificar propostas aprovadas sem obra criada
-            from models import Proposta
             propostas_orphans = Proposta.query.filter(
                 Proposta.status == 'APROVADA',
                 Proposta.obra_id.is_(None)
@@ -182,7 +182,6 @@ class MonitoramentoFluxo:
             verificacoes['propostas_sem_obra'] = propostas_orphans
             
             # Verificar alocações sem RDO gerado
-            from models import AlocacaoEquipe
             alocacoes_orphans = AlocacaoEquipe.query.filter(
                 AlocacaoEquipe.status == 'ATIVA',
                 AlocacaoEquipe.rdo_gerado == False
