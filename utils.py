@@ -688,14 +688,34 @@ def calcular_kpis_funcionario_periodo(funcionario_id, data_inicio=None, data_fim
     # Calcular faltas normais (não justificadas)
     faltas = len([r for r in registros_ponto if r.tipo_registro == 'falta'])
     
-    # Calcular valor monetário das faltas (regra CLT: 1 falta = 2 dias de desconto)
+    # Calcular valor monetário das faltas com DSR (Lei 605/49 + CLT)
     valor_faltas = 0.0
     valor_dia = 0.0
+    valor_faltas_estrito = 0.0
+    semanas_com_falta = 0
+    
     if faltas > 0 and funcionario.salario:
-        # Regra brasileira: 1 falta injustificada = perde 1 dia + 1 DSR = 2 dias
         valor_dia = funcionario.salario / 30  # Valor do dia
-        valor_falta_unitario = 2 * valor_dia  # Falta + DSR
+        
+        # MÉTODO SIMPLIFICADO (prática comum)
+        # 1 falta injustificada = 2 dias de desconto (falta + DSR)
+        valor_falta_unitario = 2 * valor_dia
         valor_faltas = faltas * valor_falta_unitario
+        
+        # MÉTODO ESTRITO (Lei 605/49)
+        # Calcular semanas com falta para DSR preciso
+        registros_faltas = [r for r in registros_ponto if r.tipo_registro == 'falta']
+        semanas_identificadas = set()
+        
+        for registro in registros_faltas:
+            # Calcular número da semana (domingo = início)
+            dias_desde_domingo = (registro.data.weekday() + 1) % 7
+            inicio_semana = registro.data - timedelta(days=dias_desde_domingo)
+            semanas_identificadas.add(inicio_semana)
+        
+        semanas_com_falta = len(semanas_identificadas)
+        # Cálculo estrito: faltas + DSRs perdidos por semana
+        valor_faltas_estrito = (faltas * valor_dia) + (semanas_com_falta * valor_dia)
     
     # Calcular faltas justificadas (já contado no loop acima, mas vamos recalcular para garantir)
     dias_faltas_justificadas = len([r for r in registros_ponto if r.tipo_registro == 'falta_justificada'])
@@ -746,8 +766,10 @@ def calcular_kpis_funcionario_periodo(funcionario_id, data_inicio=None, data_fim
         'valor_horas_extras': valor_horas_extras,  # Valor monetário das horas extras
         'valor_hora_atual': valor_hora_base,  # Valor hora atual do funcionário
         'faltas': faltas,
-        'valor_faltas': valor_faltas,  # Valor monetário das faltas (Falta + DSR conforme CLT)
+        'valor_faltas': valor_faltas,  # Método simplificado (2 dias/falta)
+        'valor_faltas_estrito': valor_faltas_estrito,  # Método estrito (Lei 605/49)
         'valor_dia': valor_dia,  # Valor do dia para transparência
+        'semanas_com_falta': semanas_com_falta,  # Semanas que perderam DSR
         'atrasos': atrasos,
         'dias_faltas_justificadas': dias_faltas_justificadas,
         'custo_mao_obra': custo_mao_obra,

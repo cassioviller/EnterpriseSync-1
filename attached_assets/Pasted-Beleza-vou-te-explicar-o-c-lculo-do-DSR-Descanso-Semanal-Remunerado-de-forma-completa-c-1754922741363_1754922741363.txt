@@ -1,0 +1,157 @@
+Beleza — vou te explicar o **cálculo do DSR (Descanso Semanal Remunerado)** de forma **completa**, considerando tanto a **base legal** quanto a **prática em folha de pagamento**, e cobrindo os cenários mais comuns.
+
+---
+
+# 📚 1. O que é o DSR
+
+**DSR** significa **Descanso Semanal Remunerado**.
+É um direito garantido pela **Constituição Federal (art. 7º, XV)** e regulamentado pela **Lei 605/49** e pela **CLT**.
+Basicamente, o trabalhador **tem direito a receber o pagamento de um dia de descanso na semana** (geralmente domingo) **desde que tenha cumprido integralmente sua jornada semanal**.
+
+Se houver **falta injustificada** ou **atrasos não justificados**, o DSR **pode ser descontado** proporcionalmente.
+
+---
+
+# ⚖️ 2. Base legal
+
+* **Lei 605/49 – art. 6º:** O empregado perde a remuneração do DSR quando não cumpre integralmente a jornada da semana, salvo justificativa legal.
+* **CLT – art. 64:** Quando há perda de dias de salário, o desconto é proporcional.
+* **Súmula 13 do TST:** O sábado é considerado dia útil para efeito de cálculo do DSR (não é dia de descanso).
+
+---
+
+# 🔍 3. Quando o DSR é perdido
+
+O empregado **perde o DSR** de uma semana se:
+
+1. Tiver **1 ou mais faltas injustificadas** nessa semana.
+2. Tiver **atrasos/saídas antecipadas não justificadas** que somem tempo equivalente a **um dia inteiro de trabalho**.
+
+> A contagem é **semanal** — não por mês. Uma única falta injustificada numa semana já tira **todo o DSR dessa semana**.
+
+---
+
+# 🧮 4. Fórmulas de cálculo
+
+Existem **dois cenários principais**:
+
+---
+
+## **4.1. Cálculo simplificado (regra prática adotada por muitas empresas)**
+
+Usado quando a empresa **não apura semana a semana** e opta por um método fixo:
+
+* **1 falta injustificada = desconto de 2 dias de salário**
+
+  * 1 dia da falta
+  * * 1 dia de DSR perdido
+      **Fórmula:**
+
+```
+valor_dia = salario_mensal / 30
+desconto_total = faltas_injustificadas * (2 * valor_dia)
+```
+
+> Essa é a fórmula que você mencionou no exemplo do salário R\$ 2.106,00:
+> 2106 ÷ 30 = 70,20 por dia → × 2 = 140,40 por falta.
+
+Vantagens:
+
+* Simples de implementar no sistema.
+* Já embute o impacto do DSR junto com a falta.
+
+Desvantagens:
+
+* Não diferencia semanas com mais de 1 falta (o desconto do DSR não é “duplicado” na lei, mas será no cálculo).
+
+---
+
+## **4.2. Cálculo estrito (conforme legislação, semana a semana)**
+
+Mais fiel à Lei 605/49:
+
+1. Divida o mês em **semanas** (domingo a sábado, ou conforme escala).
+2. Para cada semana:
+
+   * Se houve 1 ou mais faltas injustificadas → perde o DSR daquela semana.
+   * Caso contrário → mantém o DSR.
+3. Desconto total:
+
+```
+valor_dia = salario_mensal / 30
+desconto_total = (faltas_injustificadas * valor_dia) + (semanas_com_falta * valor_dia)
+```
+
+* Primeiro termo = valor dos dias de trabalho não feitos.
+* Segundo termo = valor dos DSRs perdidos.
+
+Vantagens:
+
+* Reflete a lei ao pé da letra.
+* Evita desconto de DSR duplicado por múltiplas faltas na mesma semana.
+
+Desvantagens:
+
+* Mais complexo (precisa do calendário e saber quais faltas ocorreram em cada semana).
+
+---
+
+# 📊 5. Exemplo prático
+
+### Cenário:
+
+* Salário: **R\$ 2.100,00**
+* Jornada: 8,8h/dia
+* Mês com 4 semanas
+* Faltas injustificadas:
+
+  * 1ª semana: 1 falta
+  * 2ª semana: 2 faltas
+  * 3ª semana: nenhuma
+  * 4ª semana: 1 falta
+
+### **Simplificado (2 dias por falta)**
+
+```
+valor_dia = 2100 / 30 = 70,00
+faltas = 4
+desconto_total = 4 * (2 * 70,00) = R$ 560,00
+```
+
+### **Estrito (por semana)**
+
+* Faltas: 4 × 70,00 = 280,00
+* Semanas com falta: 3 × 70,00 = 210,00
+* Desconto total = 280,00 + 210,00 = **R\$ 490,00**
+
+---
+
+# ⚙️ 6. Como implementar no sistema
+
+### Variáveis mínimas:
+
+* `salario_mensal`
+* `faltas_injustificadas`
+* `calendario_faltas` (para método estrito)
+* `horas_dia` (para proporcionalidade, se quiser descontar frações de falta)
+
+### Lógica recomendada para KPI e folha:
+
+* Se objetivo é **facilidade**: usar **simplificado** (2 dias/falta).
+* Se objetivo é **precisão legal**: usar **estrito** (analisar por semana).
+
+---
+
+# 💡 7. Dica importante
+
+⚠️ Muitas empresas **adotam o simplificado** por questão de custo-benefício na gestão de folha, mas para **auditoria trabalhista** ou contestação judicial, o método estrito é o que vale.
+
+---
+
+Se você quiser, posso já te entregar **um trecho de código Python** que:
+
+* Recebe lista de faltas por data
+* Calcula **tanto** pelo método simplificado quanto pelo estrito
+* Retorna os dois valores para o gestor comparar
+
+Quer que eu já gere esse código para o seu SIGE?
