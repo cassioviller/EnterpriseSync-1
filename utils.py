@@ -113,6 +113,48 @@ def calcular_valor_hora_corrigido(funcionario):
     
     return round(valor_hora, 2)
 
+def calcular_valor_hora_periodo(funcionario, data_inicio, data_fim):
+    """
+    Calcula o valor/hora baseado no período específico (mês dos dados)
+    
+    CORREÇÃO: Em vez de usar mês atual (agosto), usa o mês do período analisado
+    """
+    if not funcionario or not funcionario.salario:
+        return 0.0
+    
+    from calendar import monthrange
+    
+    # Usar o mês do período analisado (não o mês atual!)
+    data_ref = data_inicio if data_inicio else datetime.now().date()
+    ano = data_ref.year
+    mes = data_ref.month
+    
+    # Calcular dias úteis do mês do período
+    dias_uteis = 0
+    primeiro_dia, ultimo_dia = monthrange(ano, mes)
+    
+    for dia in range(1, ultimo_dia + 1):
+        data_check = data_ref.replace(day=dia)
+        if data_check.weekday() < 5:  # Segunda a sexta
+            dias_uteis += 1
+    
+    # Determinar horas diárias
+    if funcionario.horario_trabalho and funcionario.horario_trabalho.horas_diarias:
+        horas_diarias = float(funcionario.horario_trabalho.horas_diarias)
+    else:
+        horas_diarias = 8.8
+    
+    # Horas mensais do período específico
+    horas_mensais_reais = dias_uteis * horas_diarias
+    
+    # Valor/hora baseado no período
+    if horas_mensais_reais > 0:
+        valor_hora = float(funcionario.salario) / horas_mensais_reais
+    else:
+        valor_hora = 0.0
+    
+    return round(valor_hora, 2)
+
 def calcular_custos_salariais_completos(funcionario_id, data_inicio, data_fim):
     """
     Calcula todos os custos salariais baseado na lógica correta:
@@ -573,8 +615,8 @@ def calcular_kpis_funcionario_periodo(funcionario_id, data_inicio=None, data_fim
     # Calcular valor das horas extras com percentual correto da CLT
     valor_horas_extras = 0.0
     if funcionario.salario:
-        # Usar função corrigida que calcula baseado em dias úteis reais
-        valor_hora_base = calcular_valor_hora_corrigido(funcionario)
+        # Usar função corrigida que calcula baseado no período específico
+        valor_hora_base = calcular_valor_hora_periodo(funcionario, data_inicio, data_fim)
         
         # Calcular valor total das horas extras por tipo de registro  
         for registro in registros_ponto:
