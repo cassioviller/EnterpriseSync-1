@@ -560,11 +560,29 @@ def calcular_kpis_funcionario_periodo(funcionario_id, data_inicio=None, data_fim
             salario_hora = funcionario.salario / 220
             custo_faltas_justificadas += salario_hora * 8  # 8 horas por dia
     
+    # Calcular valor das horas extras com percentual correto da CLT
+    valor_horas_extras = 0.0
+    if funcionario.salario:
+        # Usar função corrigida que calcula baseado em dias úteis reais
+        valor_hora_base = calcular_valor_hora_corrigido(funcionario)
+        
+        # Calcular valor total das horas extras por tipo de registro  
+        for registro in registros_ponto:
+            if registro.horas_extras and registro.horas_extras > 0:
+                # Multiplicador conforme legislação brasileira (CLT)
+                if registro.tipo_registro in ['domingo_trabalhado', 'domingo_horas_extras', 'feriado_trabalhado']:
+                    multiplicador = 2.0  # 100% adicional
+                else:
+                    multiplicador = 1.5  # 50% adicional padrão
+                
+                valor_extras_registro = registro.horas_extras * valor_hora_base * multiplicador
+                valor_horas_extras += valor_extras_registro
+    
     # Custo de mão de obra
     custo_mao_obra = 0
     if funcionario.salario:
-        salario_hora = funcionario.salario / 220
-        custo_mao_obra = (total_horas_trabalhadas * salario_hora) + (total_horas_extras * salario_hora * 1.5)
+        salario_base = funcionario.salario
+        custo_mao_obra = salario_base + valor_horas_extras
     
     # CORRIGIDO: Usar nova lógica com kpi_associado
     from models import OutroCusto
@@ -663,6 +681,7 @@ def calcular_kpis_funcionario_periodo(funcionario_id, data_inicio=None, data_fim
         'horas_trabalhadas': total_horas_trabalhadas,
         'horas_extras': total_horas_extras,
         'h_extras': total_horas_extras,  # Alias para compatibilidade com template
+        'valor_horas_extras': valor_horas_extras,  # NOVO: Valor monetário das horas extras
         'faltas': faltas,
         'atrasos': atrasos,
         'dias_faltas_justificadas': dias_faltas_justificadas,
