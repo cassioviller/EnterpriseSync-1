@@ -12,7 +12,7 @@
                     <i class="fas fa-users"></i> Funcionários
                 </h1>
                 <div class="btn-group">
-                    <a href="{{ url_for('main.novo_funcionario') }}" class="btn btn-primary">
+                    <a href="{{ url_for('main.funcionarios') }}" class="btn btn-primary">
                         <i class="fas fa-plus"></i> Novo Funcionário
                     </a>
                     <button type="button" class="btn btn-outline-primary" data-bs-toggle="modal" data-bs-target="#funcionarioModal" onclick="abrirModalNovoFuncionario()">
@@ -338,7 +338,7 @@
                     <i class="fas fa-users fa-4x text-muted mb-3"></i>
                     <h5 class="text-muted">Nenhum funcionário encontrado</h5>
                     <p class="text-muted">Não há funcionários ativos no período selecionado.</p>
-                    <a href="{{ url_for('main.novo_funcionario') }}" class="btn btn-primary">
+                    <a href="{{ url_for('main.funcionarios') }}" class="btn btn-primary">
                         <i class="fas fa-plus"></i> Adicionar Primeiro Funcionário
                     </a>
                 </div>
@@ -366,7 +366,7 @@
                 </h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
-            <form method="POST" id="funcionarioForm" enctype="multipart/form-data" action="{{ url_for('main.funcionario_modal') }}">
+            <form method="POST" id="funcionarioForm" enctype="multipart/form-data" action="{{ url_for('main.funcionarios') }}">
                 <div class="modal-body">
                     <div class="row">
                         <div class="col-md-8">
@@ -513,7 +513,7 @@ function abrirModalNovoFuncionario() {
     // Limpar formulário
     document.getElementById('funcionarioForm').reset();
     document.getElementById('modalTitle').textContent = 'Novo Funcionário';
-    document.getElementById('funcionarioForm').action = "{{ url_for('main.funcionario_modal') }}";
+    document.getElementById('funcionarioForm').action = "{{ url_for('main.funcionarios') }}";
     
     // Esconder preview da foto
     const fotoPreview = document.getElementById('foto-preview');

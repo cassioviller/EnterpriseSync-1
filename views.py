@@ -22,7 +22,7 @@ def login():
             Usuario.ativo == True
         ).first()
         
-        if user and check_password_hash(user.password_hash, password):
+        if user and password and check_password_hash(user.password_hash, password):
             login_user(user)
             
             if user.tipo_usuario == TipoUsuario.SUPER_ADMIN:
