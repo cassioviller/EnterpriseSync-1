@@ -6063,9 +6063,13 @@ def controle_ponto():
                 horas_mensais = horas_diarias * dias_uteis
                 valor_hora_normal = funcionario.salario / horas_mensais
                 
-                # Valor direto das horas extras (sem multiplicador adicional)
-                # O valor R$ 10,41 já considera o custo real da hora de trabalho
-                valor_extras_registro = registro.horas_extras * valor_hora_normal
+                # Multiplicador conforme legislação brasileira (CLT)
+                if registro.tipo_registro in ['domingo_trabalhado', 'domingo_horas_extras', 'feriado_trabalhado']:
+                    multiplicador = 2.0  # 100% adicional
+                else:
+                    multiplicador = 1.5  # 50% adicional padrão
+                
+                valor_extras_registro = registro.horas_extras * valor_hora_normal * multiplicador
                 total_valor_extras += valor_extras_registro
     
     return render_template('controle_ponto.html',

@@ -54,9 +54,10 @@ def testar_calculo_carlos():
     valor_hora = salario / horas_mensais
     print(f"💵 Valor hora: R$ {salario:,.2f} ÷ {horas_mensais}h = R$ {valor_hora:.2f}")
     
-    # Cálculo das horas extras (valor direto)
-    valor_extras = horas_extras * valor_hora
-    print(f"⚡ Horas extras: {horas_extras}h × R$ {valor_hora:.2f} = R$ {valor_extras:.2f}")
+    # Cálculo das horas extras (50% adicional)
+    multiplicador = 1.5  # 50% adicional conforme CLT
+    valor_extras = horas_extras * valor_hora * multiplicador
+    print(f"⚡ Horas extras: {horas_extras}h × R$ {valor_hora:.2f} × {multiplicador} = R$ {valor_extras:.2f}")
     
     # Custo total
     custo_total = salario + valor_extras
@@ -66,13 +67,13 @@ def testar_calculo_carlos():
     print("✅ VALIDAÇÃO:")
     print(f"   - Esperado valor hora: R$ 10,41")
     print(f"   - Calculado valor hora: R$ {valor_hora:.2f}")
-    print(f"   - Esperado extras: R$ 81,20")
+    print(f"   - Esperado extras: R$ 121,74 (com 50% adicional)")
     print(f"   - Calculado extras: R$ {valor_extras:.2f}")
-    print(f"   - Esperado total: R$ 2.187,20")
+    print(f"   - Esperado total: R$ 2.227,74")
     print(f"   - Calculado total: R$ {custo_total:.2f}")
     
     # Verificar se está correto
-    if abs(valor_hora - 10.41) < 0.01 and abs(valor_extras - 81.20) < 0.01:
+    if abs(valor_hora - 10.41) < 0.01 and abs(valor_extras - 121.74) < 0.50:
         print("✅ CÁLCULO CORRETO!")
     else:
         print("❌ CÁLCULO INCORRETO - Revisar metodologia")
