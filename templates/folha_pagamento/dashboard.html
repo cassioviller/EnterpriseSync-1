@@ -1,0 +1,277 @@
+{% extends "base.html" %}
+
+{% block title %}Folha de Pagamento - Dashboard{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- Header -->
+    <div class="row">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <div>
+                    <h1 class="h3 mb-0">
+                        <i class="fas fa-money-check-alt text-success me-2"></i>
+                        Folha de Pagamento
+                    </h1>
+                    <p class="text-muted small mb-0">Módulo 6 - Sistema de Folha Automática</p>
+                </div>
+                <div>
+                    {% if not parametros_configurados %}
+                    <a href="{{ url_for('folha.parametros_legais') }}" class="btn btn-warning me-2">
+                        <i class="fas fa-cog me-1"></i>
+                        Configurar Parâmetros
+                    </a>
+                    {% endif %}
+                    <div class="btn-group">
+                        <button type="button" class="btn btn-primary dropdown-toggle" data-bs-toggle="dropdown">
+                            <i class="fas fa-calculator me-1"></i>
+                            Processar Folha
+                        </button>
+                        <ul class="dropdown-menu">
+                            <li><a class="dropdown-item" href="#" onclick="processarFolha({{ mes_referencia.year }}, {{ mes_referencia.month }})">
+                                <i class="fas fa-play me-1"></i>
+                                Processar {{ mes_referencia.strftime('%B/%Y') }}
+                            </a></li>
+                            <li><hr class="dropdown-divider"></li>
+                            <li><a class="dropdown-item" href="#" onclick="processarFolha({{ mes_referencia.year }}, {{ mes_referencia.month }}, true)">
+                                <i class="fas fa-redo me-1"></i>
+                                Reprocessar {{ mes_referencia.strftime('%B/%Y') }}
+                            </a></li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Métricas Principais -->
+    <div class="row g-3 mb-4">
+        <div class="col-xl-3 col-md-6">
+            <div class="card border-0 shadow-sm">
+                <div class="card-body">
+                    <div class="row align-items-center">
+                        <div class="col">
+                            <p class="text-muted mb-1 small">Total Folha Bruta</p>
+                            <h4 class="mb-0 text-primary">R$ {{ "{:,.2f}".format(total_folha or 0) }}</h4>
+                            {% if variacao %}
+                            <small class="text-{{ 'success' if variacao > 0 else 'danger' }}">
+                                <i class="fas fa-arrow-{{ 'up' if variacao > 0 else 'down' }} me-1"></i>
+                                {{ "{:+.1f}".format(variacao) }}% vs mês anterior
+                            </small>
+                            {% endif %}
+                        </div>
+                        <div class="col-auto">
+                            <div class="avatar-sm bg-primary bg-soft rounded">
+                                <i class="fas fa-coins text-primary"></i>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-xl-3 col-md-6">
+            <div class="card border-0 shadow-sm">
+                <div class="card-body">
+                    <div class="row align-items-center">
+                        <div class="col">
+                            <p class="text-muted mb-1 small">Total Líquido</p>
+                            <h4 class="mb-0 text-success">R$ {{ "{:,.2f}".format(total_liquido or 0) }}</h4>
+                            <small class="text-muted">
+                                {{ "{:.1f}".format((total_liquido / total_folha * 100) if total_folha > 0 else 0) }}% do bruto
+                            </small>
+                        </div>
+                        <div class="col-auto">
+                            <div class="avatar-sm bg-success bg-soft rounded">
+                                <i class="fas fa-hand-holding-usd text-success"></i>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-xl-3 col-md-6">
+            <div class="card border-0 shadow-sm">
+                <div class="card-body">
+                    <div class="row align-items-center">
+                        <div class="col">
+                            <p class="text-muted mb-1 small">Encargos (INSS+FGTS)</p>
+                            <h4 class="mb-0 text-warning">R$ {{ "{:,.2f}".format(total_encargos or 0) }}</h4>
+                            <small class="text-muted">
+                                {{ "{:.1f}".format((total_encargos / total_folha * 100) if total_folha > 0 else 0) }}% do bruto
+                            </small>
+                        </div>
+                        <div class="col-auto">
+                            <div class="avatar-sm bg-warning bg-soft rounded">
+                                <i class="fas fa-percentage text-warning"></i>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-xl-3 col-md-6">
+            <div class="card border-0 shadow-sm">
+                <div class="card-body">
+                    <div class="row align-items-center">
+                        <div class="col">
+                            <p class="text-muted mb-1 small">Processamento</p>
+                            <h4 class="mb-0">{{ folhas_processadas }}/{{ funcionarios_ativos }}</h4>
+                            <div class="progress mt-2" style="height: 4px;">
+                                <div class="progress-bar bg-info" role="progressbar" 
+                                     style="width: {{ percentual_processado }}%" 
+                                     aria-valuenow="{{ percentual_processado }}" 
+                                     aria-valuemin="0" aria-valuemax="100"></div>
+                            </div>
+                            <small class="text-muted">{{ "{:.1f}".format(percentual_processado) }}% concluído</small>
+                        </div>
+                        <div class="col-auto">
+                            <div class="avatar-sm bg-info bg-soft rounded">
+                                <i class="fas fa-users text-info"></i>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Ações Rápidas -->
+    <div class="row g-3 mb-4">
+        <div class="col-md-3">
+            <a href="{{ url_for('folha.listar_configuracoes') }}" class="card text-decoration-none">
+                <div class="card-body text-center">
+                    <i class="fas fa-user-cog fa-2x text-primary mb-2"></i>
+                    <h6 class="card-title">Configurações Salariais</h6>
+                    <p class="card-text small text-muted">Gerenciar salários e benefícios</p>
+                </div>
+            </a>
+        </div>
+        <div class="col-md-3">
+            <a href="{{ url_for('folha.listar_beneficios') }}" class="card text-decoration-none">
+                <div class="card-body text-center">
+                    <i class="fas fa-gift fa-2x text-success mb-2"></i>
+                    <h6 class="card-title">Benefícios</h6>
+                    <p class="card-text small text-muted">VR, VT, plano de saúde</p>
+                </div>
+            </a>
+        </div>
+        <div class="col-md-3">
+            <a href="{{ url_for('folha.listar_adiantamentos') }}" class="card text-decoration-none">
+                <div class="card-body text-center">
+                    <i class="fas fa-hand-holding-usd fa-2x text-warning mb-2"></i>
+                    <h6 class="card-title">Adiantamentos</h6>
+                    <p class="card-text small text-muted">Gerenciar adiantamentos</p>
+                </div>
+            </a>
+        </div>
+        <div class="col-md-3">
+            <a href="{{ url_for('folha.relatorios') }}" class="card text-decoration-none">
+                <div class="card-body text-center">
+                    <i class="fas fa-chart-line fa-2x text-info mb-2"></i>
+                    <h6 class="card-title">Relatórios</h6>
+                    <p class="card-text small text-muted">Análises e holerites</p>
+                </div>
+            </a>
+        </div>
+    </div>
+
+    <!-- Top Funcionários -->
+    <div class="row g-3">
+        {% if top_salarios %}
+        <div class="col-md-6">
+            <div class="card border-0 shadow-sm">
+                <div class="card-header bg-transparent border-0">
+                    <h6 class="card-title mb-0">
+                        <i class="fas fa-trophy text-warning me-2"></i>
+                        Maiores Salários
+                    </h6>
+                </div>
+                <div class="card-body">
+                    {% for folha in top_salarios %}
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <div>
+                            <h6 class="mb-0">{{ folha.funcionario.nome }}</h6>
+                            <small class="text-muted">{{ folha.funcionario.cargo or 'Sem cargo' }}</small>
+                        </div>
+                        <div class="text-end">
+                            <span class="fw-bold">R$ {{ "{:,.2f}".format(folha.total_proventos) }}</span>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+        {% endif %}
+
+        {% if top_extras %}
+        <div class="col-md-6">
+            <div class="card border-0 shadow-sm">
+                <div class="card-header bg-transparent border-0">
+                    <h6 class="card-title mb-0">
+                        <i class="fas fa-clock text-primary me-2"></i>
+                        Mais Horas Extras
+                    </h6>
+                </div>
+                <div class="card-body">
+                    {% for folha in top_extras %}
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <div>
+                            <h6 class="mb-0">{{ folha.funcionario.nome }}</h6>
+                            <small class="text-muted">{{ folha.funcionario.cargo or 'Sem cargo' }}</small>
+                        </div>
+                        <div class="text-end">
+                            <span class="fw-bold text-primary">R$ {{ "{:,.2f}".format(folha.horas_extras) }}</span>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Modal de Processamento -->
+<div class="modal fade" id="processarModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Processar Folha de Pagamento</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form id="formProcessar" method="POST">
+                <div class="modal-body">
+                    <div class="alert alert-info">
+                        <i class="fas fa-info-circle me-2"></i>
+                        O processamento da folha calculará automaticamente salários, horas extras, impostos e benefícios baseado nos pontos registrados.
+                    </div>
+                    <input type="hidden" name="reprocessar" id="reprocessar" value="false">
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-calculator me-1"></i>
+                        Processar
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+function processarFolha(ano, mes, reprocessar = false) {
+    const modal = new bootstrap.Modal(document.getElementById('processarModal'));
+    const form = document.getElementById('formProcessar');
+    const reprocessarInput = document.getElementById('reprocessar');
+    
+    form.action = `/folha-pagamento/processar/${ano}/${mes}`;
+    reprocessarInput.value = reprocessar ? 'true' : 'false';
+    
+    modal.show();
+}
+</script>
+{% endblock %}

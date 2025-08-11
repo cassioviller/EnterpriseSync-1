@@ -52,12 +52,14 @@ from models import *
 from views import main_bp
 from relatorios_funcionais import relatorios_bp
 from almoxarifado_views import almoxarifado_bp
+from folha_pagamento_views import folha_bp
 
 # Register blueprints
 # app.register_blueprint(auth_bp, url_prefix='/auth')  # Removido temporariamente
 app.register_blueprint(main_bp)
 app.register_blueprint(relatorios_bp, url_prefix='/relatorios')
 app.register_blueprint(almoxarifado_bp, url_prefix='/almoxarifado')
+app.register_blueprint(folha_bp, url_prefix='/folha-pagamento')
 
 @login_manager.user_loader
 def load_user(user_id):

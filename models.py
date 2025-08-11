@@ -1117,10 +1117,332 @@ class MovimentacaoEstoque(db.Model):
             'observacoes': self.observacoes
         }
     
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    
     # Relacionamentos
     produto_rel = db.relationship('Produto', foreign_keys=[produto_id], overlaps="movimentacoes")
+
+
+# ================================
+# MÓDULO 6: FOLHA DE PAGAMENTO AUTOMÁTICA
+# ================================
+
+class ConfiguracaoSalarial(db.Model):
+    """Configuração salarial por funcionário"""
+    __tablename__ = 'configuracao_salarial'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    funcionario_id = db.Column(db.Integer, db.ForeignKey('funcionario.id'), nullable=False)
+    salario_base = db.Column(db.Numeric(10, 2), nullable=False)  # Salário base
+    tipo_salario = db.Column(db.String(20), nullable=False)  # MENSAL, HORISTA, COMISSIONADO
+    valor_hora = db.Column(db.Numeric(10, 2))  # Para horistas
+    percentual_comissao = db.Column(db.Numeric(5, 2))  # Para comissionados
+    carga_horaria_mensal = db.Column(db.Integer, default=220)  # Horas/mês padrão
+    dependentes = db.Column(db.Integer, default=0)  # Para IRRF
+    data_inicio = db.Column(db.Date, nullable=False)
+    data_fim = db.Column(db.Date)  # NULL = vigente
+    ativo = db.Column(db.Boolean, default=True)
+    admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    # Relacionamentos
+    funcionario = db.relationship('Funcionario', backref='configuracoes_salariais')
+    admin = db.relationship('Usuario', foreign_keys=[admin_id])
+    
+    # Índices para performance
+    __table_args__ = (
+        db.Index('idx_config_salarial_funcionario_ativo', 'funcionario_id', 'ativo'),
+        db.Index('idx_config_salarial_admin_id', 'admin_id'),
+        db.Index('idx_config_salarial_vigencia', 'data_inicio', 'data_fim'),
+    )
+
+class BeneficioFuncionario(db.Model):
+    """Benefícios por funcionário"""
+    __tablename__ = 'beneficio_funcionario'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    funcionario_id = db.Column(db.Integer, db.ForeignKey('funcionario.id'), nullable=False)
+    tipo_beneficio = db.Column(db.String(50), nullable=False)  # VR, VT, PLANO_SAUDE, SEGURO_VIDA, etc.
+    valor = db.Column(db.Numeric(10, 2), nullable=False)  # Valor do benefício
+    percentual_desconto = db.Column(db.Numeric(5, 2), default=0)  # % descontado do funcionário
+    dias_por_mes = db.Column(db.Integer, default=22)  # Para VR/VT
+    ativo = db.Column(db.Boolean, default=True)
+    data_inicio = db.Column(db.Date, nullable=False)
+    data_fim = db.Column(db.Date)  # NULL = vigente
+    observacoes = db.Column(db.Text)
+    admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    # Relacionamentos
+    funcionario = db.relationship('Funcionario', backref='beneficios')
+    admin = db.relationship('Usuario', foreign_keys=[admin_id])
+    
+    # Índices
+    __table_args__ = (
+        db.Index('idx_beneficio_funcionario_tipo', 'funcionario_id', 'tipo_beneficio', 'ativo'),
+        db.Index('idx_beneficio_admin_id', 'admin_id'),
+    )
+
+class CalculoHorasMensal(db.Model):
+    """Cálculo de horas mensal baseado nos pontos"""
+    __tablename__ = 'calculo_horas_mensal'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    funcionario_id = db.Column(db.Integer, db.ForeignKey('funcionario.id'), nullable=False)
+    mes_referencia = db.Column(db.Date, nullable=False)  # Primeiro dia do mês
+    
+    # Horas trabalhadas
+    horas_normais = db.Column(db.Numeric(8, 2), default=0)
+    horas_extras_50 = db.Column(db.Numeric(8, 2), default=0)  # Extras 50%
+    horas_extras_100 = db.Column(db.Numeric(8, 2), default=0)  # Extras 100%
+    horas_noturnas = db.Column(db.Numeric(8, 2), default=0)  # Adicional noturno
+    horas_dsr = db.Column(db.Numeric(8, 2), default=0)  # Descanso semanal
+    
+    # Faltas e atrasos
+    faltas_horas = db.Column(db.Numeric(8, 2), default=0)
+    atrasos_horas = db.Column(db.Numeric(8, 2), default=0)
+    
+    # Controle de dias
+    dias_trabalhados = db.Column(db.Integer, default=0)
+    dias_faltas = db.Column(db.Integer, default=0)
+    dias_uteis_mes = db.Column(db.Integer, default=22)
+    
+    # Controle de processamento
+    processado_em = db.Column(db.DateTime, default=datetime.utcnow)
+    reprocessado = db.Column(db.Boolean, default=False)
+    admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False)
+    
+    # Relacionamentos
+    funcionario = db.relationship('Funcionario', backref='calculos_horas')
+    admin = db.relationship('Usuario', foreign_keys=[admin_id])
+    
+    # Índices
+    __table_args__ = (
+        db.Index('idx_calculo_horas_funcionario_mes', 'funcionario_id', 'mes_referencia'),
+        db.Index('idx_calculo_horas_admin_id', 'admin_id'),
+        db.UniqueConstraint('funcionario_id', 'mes_referencia', name='uk_calculo_horas_funcionario_mes'),
+    )
+
+class FolhaPagamento(db.Model):
+    """Folha de pagamento mensal por funcionário"""
+    __tablename__ = 'folha_pagamento'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    funcionario_id = db.Column(db.Integer, db.ForeignKey('funcionario.id'), nullable=False)
+    mes_referencia = db.Column(db.Date, nullable=False)  # Primeiro dia do mês
+    
+    # PROVENTOS
+    salario_base = db.Column(db.Numeric(10, 2), default=0)
+    horas_extras = db.Column(db.Numeric(10, 2), default=0)
+    adicional_noturno = db.Column(db.Numeric(10, 2), default=0)
+    dsr = db.Column(db.Numeric(10, 2), default=0)  # Descanso semanal remunerado
+    comissoes = db.Column(db.Numeric(10, 2), default=0)
+    bonus = db.Column(db.Numeric(10, 2), default=0)
+    outros_proventos = db.Column(db.Numeric(10, 2), default=0)
+    total_proventos = db.Column(db.Numeric(10, 2), default=0)
+    
+    # DESCONTOS OBRIGATÓRIOS
+    inss = db.Column(db.Numeric(10, 2), default=0)
+    irrf = db.Column(db.Numeric(10, 2), default=0)
+    fgts = db.Column(db.Numeric(10, 2), default=0)  # Não é desconto, mas é calculado
+    
+    # DESCONTOS DE BENEFÍCIOS
+    vale_refeicao = db.Column(db.Numeric(10, 2), default=0)
+    vale_transporte = db.Column(db.Numeric(10, 2), default=0)
+    plano_saude = db.Column(db.Numeric(10, 2), default=0)
+    seguro_vida = db.Column(db.Numeric(10, 2), default=0)
+    
+    # DESCONTOS POR FALTAS/ATRASOS
+    faltas = db.Column(db.Numeric(10, 2), default=0)
+    atrasos = db.Column(db.Numeric(10, 2), default=0)
+    
+    # OUTROS DESCONTOS
+    adiantamentos = db.Column(db.Numeric(10, 2), default=0)
+    emprestimos = db.Column(db.Numeric(10, 2), default=0)
+    outros_descontos = db.Column(db.Numeric(10, 2), default=0)
+    total_descontos = db.Column(db.Numeric(10, 2), default=0)
+    
+    # LÍQUIDO
+    salario_liquido = db.Column(db.Numeric(10, 2), default=0)
+    
+    # CONTROLE
+    status = db.Column(db.String(20), default='CALCULADO')  # CALCULADO, APROVADO, PAGO
+    calculado_em = db.Column(db.DateTime, default=datetime.utcnow)
+    aprovado_em = db.Column(db.DateTime)
+    aprovado_por = db.Column(db.Integer, db.ForeignKey('usuario.id'))
+    pago_em = db.Column(db.DateTime)
+    observacoes = db.Column(db.Text)
+    admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False)
+    
+    # Relacionamentos
+    funcionario = db.relationship('Funcionario', backref='folhas_pagamento')
+    aprovador = db.relationship('Usuario', foreign_keys=[aprovado_por])
+    admin = db.relationship('Usuario', foreign_keys=[admin_id])
+    
+    # Índices
+    __table_args__ = (
+        db.Index('idx_folha_funcionario_mes', 'funcionario_id', 'mes_referencia'),
+        db.Index('idx_folha_admin_status', 'admin_id', 'status'),
+        db.Index('idx_folha_mes_referencia', 'mes_referencia'),
+        db.UniqueConstraint('funcionario_id', 'mes_referencia', name='uk_folha_funcionario_mes'),
+    )
+
+class LancamentoRecorrente(db.Model):
+    """Lançamentos recorrentes mensais"""
+    __tablename__ = 'lancamento_recorrente'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    funcionario_id = db.Column(db.Integer, db.ForeignKey('funcionario.id'), nullable=False)
+    tipo = db.Column(db.String(20), nullable=False)  # PROVENTO, DESCONTO
+    descricao = db.Column(db.String(100), nullable=False)
+    valor = db.Column(db.Numeric(10, 2))  # Valor fixo
+    percentual = db.Column(db.Numeric(5, 2))  # Percentual do salário
+    dia_vencimento = db.Column(db.Integer, default=1)  # Dia do mês para processar
+    ativo = db.Column(db.Boolean, default=True)
+    data_inicio = db.Column(db.Date, nullable=False)
+    data_fim = db.Column(db.Date)  # NULL = sem fim
+    observacoes = db.Column(db.Text)
+    admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    # Relacionamentos
+    funcionario = db.relationship('Funcionario', backref='lancamentos_recorrentes')
+    admin = db.relationship('Usuario', foreign_keys=[admin_id])
+    
+    # Índices
+    __table_args__ = (
+        db.Index('idx_lancamento_funcionario_ativo', 'funcionario_id', 'ativo'),
+        db.Index('idx_lancamento_admin_id', 'admin_id'),
+    )
+
+class Adiantamento(db.Model):
+    """Adiantamentos salariais"""
+    __tablename__ = 'adiantamento'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    funcionario_id = db.Column(db.Integer, db.ForeignKey('funcionario.id'), nullable=False)
+    valor_total = db.Column(db.Numeric(10, 2), nullable=False)
+    data_solicitacao = db.Column(db.Date, nullable=False)
+    data_aprovacao = db.Column(db.Date)
+    aprovado_por = db.Column(db.Integer, db.ForeignKey('usuario.id'))
+    
+    # Parcelamento
+    parcelas = db.Column(db.Integer, default=1)
+    valor_parcela = db.Column(db.Numeric(10, 2))
+    parcelas_pagas = db.Column(db.Integer, default=0)
+    
+    # Controle
+    status = db.Column(db.String(20), default='SOLICITADO')  # SOLICITADO, APROVADO, QUITADO, CANCELADO
+    motivo = db.Column(db.String(200))
+    observacoes = db.Column(db.Text)
+    admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    # Relacionamentos
+    funcionario = db.relationship('Funcionario', backref='adiantamentos')
+    aprovador = db.relationship('Usuario', foreign_keys=[aprovado_por])
+    admin = db.relationship('Usuario', foreign_keys=[admin_id])
+    
+    # Índices
+    __table_args__ = (
+        db.Index('idx_adiantamento_funcionario_status', 'funcionario_id', 'status'),
+        db.Index('idx_adiantamento_admin_id', 'admin_id'),
+    )
+
+class FeriasDecimo(db.Model):
+    """Controle de férias e 13º salário"""
+    __tablename__ = 'ferias_decimo'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    funcionario_id = db.Column(db.Integer, db.ForeignKey('funcionario.id'), nullable=False)
+    tipo = db.Column(db.String(20), nullable=False)  # FERIAS, DECIMO_TERCEIRO
+    ano_referencia = db.Column(db.Integer, nullable=False)
+    
+    # Período
+    periodo_inicio = db.Column(db.Date, nullable=False)
+    periodo_fim = db.Column(db.Date, nullable=False)
+    
+    # Cálculos
+    dias_direito = db.Column(db.Integer, default=30)  # Dias de férias ou meses de 13º
+    dias_gozados = db.Column(db.Integer, default=0)
+    valor_calculado = db.Column(db.Numeric(10, 2), default=0)
+    terco_constitucional = db.Column(db.Numeric(10, 2), default=0)  # 1/3 das férias
+    
+    # Controle
+    status = db.Column(db.String(20), default='CALCULADO')  # CALCULADO, PAGO
+    data_pagamento = db.Column(db.Date)
+    observacoes = db.Column(db.Text)
+    admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    # Relacionamentos
+    funcionario = db.relationship('Funcionario', backref='ferias_decimos')
+    admin = db.relationship('Usuario', foreign_keys=[admin_id])
+    
+    # Índices
+    __table_args__ = (
+        db.Index('idx_ferias_decimo_funcionario_tipo_ano', 'funcionario_id', 'tipo', 'ano_referencia'),
+        db.Index('idx_ferias_decimo_admin_id', 'admin_id'),
+    )
+
+class ParametrosLegais(db.Model):
+    """Parâmetros legais por ano (INSS, IRRF, etc.)"""
+    __tablename__ = 'parametros_legais'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False)
+    ano_vigencia = db.Column(db.Integer, nullable=False)
+    
+    # INSS - Tabela progressiva
+    inss_faixa1_limite = db.Column(db.Numeric(10, 2), default=1320.00)  # 2024
+    inss_faixa1_percentual = db.Column(db.Numeric(5, 2), default=7.5)
+    inss_faixa2_limite = db.Column(db.Numeric(10, 2), default=2571.29)
+    inss_faixa2_percentual = db.Column(db.Numeric(5, 2), default=9.0)
+    inss_faixa3_limite = db.Column(db.Numeric(10, 2), default=3856.94)
+    inss_faixa3_percentual = db.Column(db.Numeric(5, 2), default=12.0)
+    inss_faixa4_limite = db.Column(db.Numeric(10, 2), default=7507.49)
+    inss_faixa4_percentual = db.Column(db.Numeric(5, 2), default=14.0)
+    inss_teto = db.Column(db.Numeric(10, 2), default=877.24)  # Valor máximo
+    
+    # IRRF - Tabela progressiva
+    irrf_isencao = db.Column(db.Numeric(10, 2), default=2112.00)
+    irrf_faixa1_limite = db.Column(db.Numeric(10, 2), default=2826.65)
+    irrf_faixa1_percentual = db.Column(db.Numeric(5, 2), default=7.5)
+    irrf_faixa1_deducao = db.Column(db.Numeric(10, 2), default=158.40)
+    irrf_faixa2_limite = db.Column(db.Numeric(10, 2), default=3751.05)
+    irrf_faixa2_percentual = db.Column(db.Numeric(5, 2), default=15.0)
+    irrf_faixa2_deducao = db.Column(db.Numeric(10, 2), default=370.40)
+    irrf_faixa3_limite = db.Column(db.Numeric(10, 2), default=4664.68)
+    irrf_faixa3_percentual = db.Column(db.Numeric(5, 2), default=22.5)
+    irrf_faixa3_deducao = db.Column(db.Numeric(10, 2), default=651.73)
+    irrf_faixa4_percentual = db.Column(db.Numeric(5, 2), default=27.5)
+    irrf_faixa4_deducao = db.Column(db.Numeric(10, 2), default=884.96)
+    irrf_dependente_valor = db.Column(db.Numeric(10, 2), default=189.59)
+    
+    # OUTROS PARÂMETROS
+    fgts_percentual = db.Column(db.Numeric(5, 2), default=8.0)
+    salario_minimo = db.Column(db.Numeric(10, 2), default=1412.00)  # 2024
+    vale_transporte_percentual = db.Column(db.Numeric(5, 2), default=6.0)
+    adicional_noturno_percentual = db.Column(db.Numeric(5, 2), default=20.0)
+    hora_extra_50_percentual = db.Column(db.Numeric(5, 2), default=50.0)
+    hora_extra_100_percentual = db.Column(db.Numeric(5, 2), default=100.0)
+    
+    # Controle
+    ativo = db.Column(db.Boolean, default=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    # Relacionamentos
+    admin = db.relationship('Usuario', foreign_keys=[admin_id])
+    
+    # Índices
+    __table_args__ = (
+        db.Index('idx_parametros_admin_ano', 'admin_id', 'ano_vigencia'),
+        db.UniqueConstraint('admin_id', 'ano_vigencia', name='uk_parametros_admin_ano'),
+    )
 
 
 # ================================
