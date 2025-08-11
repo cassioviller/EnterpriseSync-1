@@ -709,9 +709,10 @@ def calcular_kpis_funcionario_periodo(funcionario_id, data_inicio=None, data_fim
     else:
         absenteismo = 0
     
-    # Calcular média de horas diárias
-    if dias_trabalhados > 0:
-        media_horas_diarias = total_horas_trabalhadas / dias_trabalhados
+    # Calcular média de horas diárias baseada em dias úteis
+    # Se não faltou nem atrasou, deve dar próximo de 8.8h
+    if dias_uteis > 0:
+        media_horas_diarias = total_horas_trabalhadas / dias_uteis
     else:
         media_horas_diarias = 0
     
