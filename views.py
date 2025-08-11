@@ -1123,10 +1123,21 @@ def lancamento_multiplo_ponto():
                 hora_almoco_inicio = datetime.strptime(data.get('hora_almoco_inicio', '12:00'), '%H:%M').time()
                 hora_almoco_fim = datetime.strptime(data.get('hora_almoco_fim', '13:00'), '%H:%M').time()
         
-        elif tipo_lancamento in ['sabado_horas_extras', 'domingo_horas_extras']:
+        elif tipo_lancamento in ['sabado_horas_extras', 'domingo_horas_extras', 'sabado_trabalhado', 'domingo_trabalhado']:
+            # Para fins de semana, usar horários específicos
             hora_entrada = datetime.strptime(data.get('hora_entrada', '07:00'), '%H:%M').time()
-            hora_saida = datetime.strptime(data.get('hora_saida', '11:00'), '%H:%M').time()
-            percentual_extras = int(data.get('percentual_extras', 50 if tipo_lancamento == 'sabado_horas_extras' else 100))
+            hora_saida = datetime.strptime(data.get('hora_saida', '17:00'), '%H:%M').time()
+            
+            # Intervalos de almoço para fins de semana também
+            if not data.get('sem_intervalo', False):
+                hora_almoco_inicio = datetime.strptime(data.get('hora_almoco_inicio', '12:00'), '%H:%M').time()
+                hora_almoco_fim = datetime.strptime(data.get('hora_almoco_fim', '13:00'), '%H:%M').time()
+            
+            # Configurar percentual baseado no tipo
+            if 'sabado' in tipo_lancamento:
+                percentual_extras = int(data.get('percentual_extras', 50))
+            else:  # domingo
+                percentual_extras = int(data.get('percentual_extras', 100))
         
         elif tipo_lancamento == 'feriado_trabalhado':
             hora_entrada = datetime.strptime(data.get('hora_entrada', '07:12'), '%H:%M').time()
@@ -1185,7 +1196,7 @@ def lancamento_multiplo_ponto():
                     deve_trabalhar_hoje = dia_semana_br <= 5  # Segunda a sexta
                 
                 # Para tipos especiais (sábado/domingo extras), forçar criação independente do horário
-                if tipo_lancamento in ['sabado_horas_extras', 'domingo_horas_extras', 'feriado_trabalhado']:
+                if tipo_lancamento in ['sabado_horas_extras', 'domingo_horas_extras', 'sabado_trabalhado', 'domingo_trabalhado', 'feriado_trabalhado']:
                     deve_trabalhar_hoje = True
                 
                 # Pular este dia se o funcionário não deve trabalhar
