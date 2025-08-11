@@ -701,13 +701,18 @@ class AlocacaoEquipe(db.Model):
     tipo_local = db.Column(db.String(20), nullable=False)  # 'oficina', 'campo'
     turno = db.Column(db.String(20), default='matutino')  # 'matutino', 'vespertino', 'noturno'
     
-    # Controle e auditoria
+    # Controle e auditoria avançado (conforme reunião técnica)
     criado_por_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False)
     rdo_gerado_id = db.Column(db.Integer, db.ForeignKey('rdo.id'))  # NULL se for oficina
     rdo_gerado = db.Column(db.Boolean, default=False)  # Flag para compatibilidade
     
     # Status da alocação
     status = db.Column(db.String(20), default='Planejado')  # 'Planejado', 'Executado', 'Cancelado'
+    prioridade = db.Column(db.String(20), default='Normal')  # 'Alta', 'Normal', 'Baixa'
+    
+    # Validações e controle de conflitos
+    validacao_conflito = db.Column(db.Boolean, default=False)  # Se foi validado contra conflitos
+    motivo_cancelamento = db.Column(db.Text)  # Motivo se cancelado
     
     # Observações
     observacoes = db.Column(db.Text)
@@ -753,11 +758,45 @@ class AlocacaoEquipe(db.Model):
             'tipo_local': self.tipo_local,
             'turno': self.turno,
             'status': self.status,
+            'prioridade': self.prioridade,
             'rdo_gerado': self.rdo_gerado,
             'rdo_gerado_id': self.rdo_gerado_id,
+            'rdo_numero': self.rdo_gerado_rel.numero_rdo if self.rdo_gerado_rel else None,
+            'validacao_conflito': self.validacao_conflito,
             'observacoes': self.observacoes,
+            'motivo_cancelamento': self.motivo_cancelamento,
             'created_at': self.created_at.isoformat() if self.created_at else None
         }
+    
+    def pode_ser_cancelada(self):
+        """Verifica se a alocação pode ser cancelada"""
+        from datetime import date
+        return self.status == 'Planejado' and self.data_alocacao >= date.today()
+    
+    def gerar_numero_rdo_automatico(self):
+        """Gera número de RDO conforme especificação da reunião técnica"""
+        if not self.obra:
+            return None
+        
+        data_str = self.data_alocacao.strftime('%Y%m%d')
+        codigo_obra = self.obra.codigo or f'OBR{self.obra.id:03d}'
+        
+        # Buscar último RDO do dia para esta obra
+        ultimo_rdo = RDO.query.filter(
+            RDO.obra_id == self.obra_id,
+            RDO.numero_rdo.like(f'RDO-{codigo_obra}-{data_str}%')
+        ).order_by(RDO.numero_rdo.desc()).first()
+        
+        if ultimo_rdo:
+            try:
+                ultimo_numero = int(ultimo_rdo.numero_rdo.split('-')[-1])
+                novo_numero = ultimo_numero + 1
+            except:
+                novo_numero = 1
+        else:
+            novo_numero = 1
+        
+        return f"RDO-{codigo_obra}-{data_str}-{novo_numero:03d}"
 
 
 # ================================

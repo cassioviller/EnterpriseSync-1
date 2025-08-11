@@ -5440,27 +5440,35 @@ def cliente_aprovar_proposta_v2(token):
 @login_required
 @admin_required
 def gestao_equipes():
-    """Dashboard principal de gestão de equipes"""
-    from gestao_equipes_utils import obter_alocacoes_periodo, obter_funcionarios_disponiveis
-    from datetime import date, timedelta
+    """Dashboard principal de gestão de equipes conforme reunião técnica"""
+    from gestao_equipes_avancada import obter_dashboard_gestor_equipes
+    from datetime import date
     
-    # Período padrão: próximos 30 dias
-    hoje = date.today()
-    fim_periodo = hoje + timedelta(days=30)
+    # Data de referência (hoje por padrão)
+    data_ref_str = request.args.get('data', date.today().isoformat())
+    try:
+        from datetime import datetime
+        data_referencia = datetime.strptime(data_ref_str, '%Y-%m-%d').date()
+    except:
+        data_referencia = date.today()
     
-    alocacoes = obter_alocacoes_periodo(hoje, fim_periodo)
-    funcionarios_disponiveis = obter_funcionarios_disponiveis(hoje)
+    # Obter dados do dashboard
+    dashboard_data = obter_dashboard_gestor_equipes(current_user.id, data_referencia)
+    
+    if not dashboard_data:
+        flash('Erro ao carregar dados do dashboard', 'danger')
+        return redirect(url_for('main.dashboard'))
     
     # Obras ativas para dropdown
     obras_ativas = Obra.query.filter_by(
-        admin_id=current_user.id
-    ).filter(Obra.status.in_(['Planejamento', 'Em Andamento'])).all()
+        admin_id=current_user.id,
+        ativo=True
+    ).filter(Obra.status.in_(['Em andamento', 'Planejamento'])).all()
     
-    return render_template('equipes/dashboard.html',
-                         alocacoes=alocacoes,
-                         funcionarios_disponiveis=funcionarios_disponiveis,
+    return render_template('equipes/dashboard_avancado.html',
+                         dashboard=dashboard_data,
                          obras_ativas=obras_ativas,
-                         hoje=hoje)
+                         data_referencia=data_referencia)
 
 @main_bp.route('/equipes/api/alocacoes')
 @login_required
@@ -5509,8 +5517,8 @@ def api_alocacoes():
 @login_required
 @admin_required
 def criar_alocacao():
-    """Criar nova alocação de equipe"""
-    from gestao_equipes_utils import criar_alocacao_equipe
+    """Criar nova alocação de equipe com validações avançadas"""
+    from gestao_equipes_avancada import criar_alocacao_equipe_avancada, verificar_conflitos_alocacao
     
     data = request.get_json()
     
@@ -5519,6 +5527,7 @@ def criar_alocacao():
     data_alocacao = data.get('data_alocacao')
     tipo_local = data.get('tipo_local', 'campo')
     turno = data.get('turno', 'matutino')
+    prioridade = data.get('prioridade', 'Normal')
     observacoes = data.get('observacoes')
     
     if not all([funcionario_id, obra_id, data_alocacao]):
@@ -5531,16 +5540,41 @@ def criar_alocacao():
         from datetime import datetime
         data_obj = datetime.strptime(data_alocacao, '%Y-%m-%d').date()
         
-        sucesso, resultado = criar_alocacao_equipe(
+        # Verificar conflitos primeiro (conforme reunião técnica)
+        conflito = verificar_conflitos_alocacao(funcionario_id, data_obj, current_user.id)
+        if conflito['tem_conflito']:
+            return jsonify({
+                'success': False,
+                'message': f"Conflito detectado: {conflito['conflito_detalhes']['obra_nome']}",
+                'conflito_detalhes': conflito['conflito_detalhes']
+            }), 409
+        
+        sucesso, resultado = criar_alocacao_equipe_avancada(
             funcionario_id, obra_id, data_obj, 
-            tipo_local, turno, observacoes
+            tipo_local, turno, prioridade, observacoes
         )
         
         if sucesso:
+            # Integração com Módulo 2 (Portal do Cliente) se for campo
+            if tipo_local == 'campo' and resultado.rdo_gerado:
+                try:
+                    from cliente_portal_utils import criar_notificacao_cliente
+                    criar_notificacao_cliente(
+                        obra_id=obra_id,
+                        tipo='equipe_alocada',
+                        titulo='Equipe Alocada',
+                        mensagem=f'Funcionário {resultado.funcionario.nome} foi alocado para sua obra.',
+                        prioridade='normal'
+                    )
+                except Exception as e:
+                    # Não falhar a alocação se notificação falhar
+                    logging.warning(f"Falha ao criar notificação cliente: {str(e)}")
+            
             return jsonify({
                 'success': True,
                 'message': 'Alocação criada com sucesso',
-                'alocacao': resultado.to_dict()
+                'alocacao': resultado.to_dict(),
+                'rdo_gerado': resultado.rdo_gerado
             })
         else:
             return jsonify({
@@ -5606,21 +5640,45 @@ def gerar_rdo_alocacao(alocacao_id):
 @login_required
 @admin_required
 def funcionarios_disponiveis():
-    """API para obter funcionários disponíveis em uma data"""
-    from gestao_equipes_utils import obter_funcionarios_disponiveis
-    
-    data_str = request.args.get('data')
-    if not data_str:
-        return jsonify({'error': 'Parâmetro data é obrigatório'}), 400
+    """API para obter funcionários disponíveis conforme especificação da reunião técnica"""
+    data_str = request.args.get('data', date.today().isoformat())
     
     try:
         from datetime import datetime
         data_obj = datetime.strptime(data_str, '%Y-%m-%d').date()
-        funcionarios = obter_funcionarios_disponiveis(data_obj)
+        
+        # Funcionários ativos
+        funcionarios = Funcionario.query.filter_by(
+            admin_id=current_user.id,
+            ativo=True
+        ).all()
+        
+        resultado = []
+        for funcionario in funcionarios:
+            # Verificar se já está alocado nesta data
+            alocacao = AlocacaoEquipe.query.filter_by(
+                funcionario_id=funcionario.id,
+                data_alocacao=data_obj,
+                admin_id=current_user.id
+            ).filter(AlocacaoEquipe.status != 'Cancelado').first()
+            
+            resultado.append({
+                'id': funcionario.id,
+                'nome': funcionario.nome,
+                'cargo': funcionario.cargo,
+                'alocado': alocacao is not None,
+                'alocacao': {
+                    'obra_nome': alocacao.obra.nome if alocacao and alocacao.obra else None,
+                    'tipo_local': alocacao.tipo_local if alocacao else None,
+                    'status': alocacao.status if alocacao else None,
+                    'prioridade': alocacao.prioridade if alocacao else None
+                } if alocacao else None
+            })
         
         return jsonify({
             'success': True,
-            'funcionarios': funcionarios
+            'data_consulta': data_str,
+            'funcionarios': resultado
         })
         
     except Exception as e:
@@ -5654,8 +5712,8 @@ def equipe_obra(obra_id):
 @login_required
 @admin_required
 def relatorio_equipes():
-    """Relatório de alocações de equipes"""
-    from gestao_equipes_utils import relatorio_alocacoes_periodo
+    """Relatório avançado de alocações conforme reunião técnica"""
+    from gestao_equipes_avancada import gerar_relatorio_produtividade_avancado
     
     data_inicio_str = request.args.get('inicio')
     data_fim_str = request.args.get('fim')
@@ -5673,12 +5731,18 @@ def relatorio_equipes():
         except:
             return jsonify({'error': 'Formato de data inválido'}), 400
     
-    relatorio = relatorio_alocacoes_periodo(data_inicio, data_fim)
+    relatorio = gerar_relatorio_produtividade_avancado(data_inicio, data_fim, current_user.id)
+    
+    if not relatorio:
+        return jsonify({'error': 'Erro ao gerar relatório'}), 500
     
     if request.args.get('format') == 'json':
         return jsonify(relatorio)
     
-    return render_template('equipes/relatorio.html', relatorio=relatorio)
+    return render_template('equipes/relatorio_avancado.html', 
+                         relatorio=relatorio,
+                         data_inicio=data_inicio,
+                         data_fim=data_fim)
 
 # ================================
 # MÓDULO 4: ALMOXARIFADO - FUNCIONALIDADES BÁSICAS
