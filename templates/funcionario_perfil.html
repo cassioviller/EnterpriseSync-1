@@ -239,6 +239,9 @@
                     <div class="col-md-3">
                         <div class="text-center p-3 border rounded">
                             <h4 class="text-danger mb-1">{{ '{:.1f}h'.format(kpis.horas_perdidas_total if kpis.horas_perdidas_total is defined else 0) }}</h4>
+                            {% if kpis.valor_faltas is defined and kpis.valor_faltas > 0 %}
+                            <div class="text-danger fw-bold">-R$ {{ '{:,.2f}'.format(kpis.valor_faltas) }}</div>
+                            {% endif %}
                             <small class="text-muted">Horas Perdidas</small>
                         </div>
                     </div>
