@@ -25,4 +25,7 @@ dependencies = [
     "scikit-learn>=1.7.1",
     "requests>=2.32.4",
     "flask-migrate>=4.0.7",
+    "qrcode>=8.2",
+    "pillow>=11.3.0",
+    "lxml>=6.0.0",
 ]

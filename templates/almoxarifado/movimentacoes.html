@@ -1,0 +1,277 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- Cabeçalho -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1 class="h3 mb-0 text-gray-800">
+            <i class="fas fa-exchange-alt"></i> Movimentações de Estoque
+        </h1>
+        <div>
+            {% if pode_gerenciar %}
+            <a href="{{ url_for('almoxarifado.scanner_codigo_barras') }}" class="btn btn-primary">
+                <i class="fas fa-barcode"></i> Scanner
+            </a>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Filtros -->
+    <div class="card shadow mb-4">
+        <div class="card-header">
+            <h6 class="m-0 font-weight-bold text-primary">
+                <i class="fas fa-filter"></i> Filtros de Busca
+            </h6>
+        </div>
+        <div class="card-body">
+            <form method="GET" action="{{ url_for('almoxarifado.listar_movimentacoes_estoque') }}">
+                <div class="row">
+                    <div class="col-md-3">
+                        <label for="data_inicio" class="form-label">Data Início</label>
+                        <input type="date" class="form-control" id="data_inicio" name="data_inicio" 
+                               value="{{ filtros.data_inicio or '' }}">
+                    </div>
+                    <div class="col-md-3">
+                        <label for="data_fim" class="form-label">Data Fim</label>
+                        <input type="date" class="form-control" id="data_fim" name="data_fim" 
+                               value="{{ filtros.data_fim or '' }}">
+                    </div>
+                    <div class="col-md-3">
+                        <label for="tipo_movimentacao" class="form-label">Tipo</label>
+                        <select class="form-select" id="tipo_movimentacao" name="tipo_movimentacao">
+                            <option value="">Todos</option>
+                            <option value="ENTRADA" {% if filtros.tipo_movimentacao == 'ENTRADA' %}selected{% endif %}>Entrada</option>
+                            <option value="SAIDA" {% if filtros.tipo_movimentacao == 'SAIDA' %}selected{% endif %}>Saída</option>
+                            <option value="DEVOLUCAO" {% if filtros.tipo_movimentacao == 'DEVOLUCAO' %}selected{% endif %}>Devolução</option>
+                            <option value="AJUSTE" {% if filtros.tipo_movimentacao == 'AJUSTE' %}selected{% endif %}>Ajuste</option>
+                        </select>
+                    </div>
+                    <div class="col-md-3">
+                        <label for="produto_id" class="form-label">Produto</label>
+                        <select class="form-select" id="produto_id" name="produto_id">
+                            <option value="">Todos</option>
+                            {% for produto in produtos %}
+                            <option value="{{ produto.id }}" {% if filtros.produto_id == produto.id %}selected{% endif %}>
+                                {{ produto.nome }}
+                            </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </div>
+                <div class="row mt-3">
+                    <div class="col-md-4">
+                        <label for="obra_id" class="form-label">Obra</label>
+                        <select class="form-select" id="obra_id" name="obra_id">
+                            <option value="">Todas</option>
+                            {% for obra in obras %}
+                            <option value="{{ obra.id }}" {% if filtros.obra_id == obra.id %}selected{% endif %}>
+                                {{ obra.nome }}
+                            </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-md-4">
+                        <label for="funcionario_id" class="form-label">Funcionário</label>
+                        <select class="form-select" id="funcionario_id" name="funcionario_id">
+                            <option value="">Todos</option>
+                            {% for funcionario in funcionarios %}
+                            <option value="{{ funcionario.id }}" {% if filtros.funcionario_id == funcionario.id %}selected{% endif %}>
+                                {{ funcionario.nome }}
+                            </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-md-4 d-flex align-items-end">
+                        <button type="submit" class="btn btn-primary me-2">
+                            <i class="fas fa-search"></i> Filtrar
+                        </button>
+                        <a href="{{ url_for('almoxarifado.listar_movimentacoes_estoque') }}" class="btn btn-secondary">
+                            <i class="fas fa-times"></i> Limpar
+                        </a>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Lista de Movimentações -->
+    <div class="card shadow mb-4">
+        <div class="card-header py-3">
+            <h6 class="m-0 font-weight-bold text-primary">
+                Movimentações Encontradas 
+                {% if movimentacoes.items %}
+                    ({{ movimentacoes.total }} registros)
+                {% endif %}
+            </h6>
+        </div>
+        <div class="card-body">
+            {% if movimentacoes.items %}
+                <div class="table-responsive">
+                    <table class="table table-bordered" width="100%" cellspacing="0">
+                        <thead>
+                            <tr>
+                                <th>Data/Hora</th>
+                                <th>Produto</th>
+                                <th>Tipo</th>
+                                <th>Quantidade</th>
+                                <th>Valor Unit.</th>
+                                <th>Valor Total</th>
+                                <th>Origem</th>
+                                <th>Usuário</th>
+                                <th>Observações</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for mov in movimentacoes.items %}
+                            <tr>
+                                <td>
+                                    <small>{{ mov.data_movimentacao.strftime('%d/%m/%Y') }}</small><br>
+                                    <small class="text-muted">{{ mov.data_movimentacao.strftime('%H:%M') }}</small>
+                                </td>
+                                <td>
+                                    <strong>{{ mov.produto_rel.nome if mov.produto_rel else 'N/A' }}</strong>
+                                    {% if mov.produto_rel %}
+                                    <br><small class="text-muted">{{ mov.produto_rel.codigo_interno }}</small>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if mov.tipo_movimentacao == 'ENTRADA' %}
+                                        <span class="badge badge-success">{{ mov.tipo_movimentacao }}</span>
+                                    {% elif mov.tipo_movimentacao == 'SAIDA' %}
+                                        <span class="badge badge-danger">{{ mov.tipo_movimentacao }}</span>
+                                    {% elif mov.tipo_movimentacao == 'DEVOLUCAO' %}
+                                        <span class="badge badge-warning">{{ mov.tipo_movimentacao }}</span>
+                                    {% elif mov.tipo_movimentacao == 'AJUSTE' %}
+                                        <span class="badge badge-info">{{ mov.tipo_movimentacao }}</span>
+                                    {% else %}
+                                        <span class="badge badge-secondary">{{ mov.tipo_movimentacao }}</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if mov.tipo_movimentacao == 'SAIDA' %}
+                                        <span class="text-danger">-{{ mov.quantidade }}</span>
+                                    {% else %}
+                                        <span class="text-success">+{{ mov.quantidade }}</span>
+                                    {% endif %}
+                                    {% if mov.produto_rel %}{{ mov.produto_rel.unidade_medida }}{% endif %}
+                                </td>
+                                <td>
+                                    {% if mov.valor_unitario %}
+                                        R$ {{ "%.2f"|format(mov.valor_unitario) }}
+                                    {% else %}
+                                        <span class="text-muted">-</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if mov.valor_total %}
+                                        R$ {{ "%.2f"|format(mov.valor_total) }}
+                                    {% else %}
+                                        <span class="text-muted">-</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if mov.rdo %}
+                                        <i class="fas fa-clipboard-list text-primary"></i> 
+                                        <a href="/rdo/{{ mov.rdo.id }}">{{ mov.rdo.numero_rdo }}</a>
+                                    {% elif mov.nota_fiscal %}
+                                        <i class="fas fa-file-invoice text-success"></i> 
+                                        NFe {{ mov.nota_fiscal.numero }}/{{ mov.nota_fiscal.serie }}
+                                    {% elif mov.obra %}
+                                        <i class="fas fa-building text-info"></i> 
+                                        {{ mov.obra.nome }}
+                                    {% elif mov.funcionario %}
+                                        <i class="fas fa-user text-warning"></i> 
+                                        {{ mov.funcionario.nome }}
+                                    {% else %}
+                                        <span class="text-muted">Manual</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <small>{{ mov.usuario.nome if mov.usuario else 'N/A' }}</small>
+                                </td>
+                                <td>
+                                    {% if mov.observacoes %}
+                                        <small>{{ mov.observacoes[:50] }}{% if mov.observacoes|length > 50 %}...{% endif %}</small>
+                                    {% else %}
+                                        <span class="text-muted">-</span>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- Paginação -->
+                {% if movimentacoes.pages > 1 %}
+                <nav aria-label="Paginação de movimentações">
+                    <ul class="pagination justify-content-center">
+                        {% if movimentacoes.has_prev %}
+                        <li class="page-item">
+                            <a class="page-link" href="{{ url_for('almoxarifado.listar_movimentacoes_estoque', page=movimentacoes.prev_num, **filtros) }}">
+                                Anterior
+                            </a>
+                        </li>
+                        {% endif %}
+                        
+                        {% for page_num in movimentacoes.iter_pages() %}
+                            {% if page_num %}
+                                {% if page_num != movimentacoes.page %}
+                                <li class="page-item">
+                                    <a class="page-link" href="{{ url_for('almoxarifado.listar_movimentacoes_estoque', page=page_num, **filtros) }}">
+                                        {{ page_num }}
+                                    </a>
+                                </li>
+                                {% else %}
+                                <li class="page-item active">
+                                    <span class="page-link">{{ page_num }}</span>
+                                </li>
+                                {% endif %}
+                            {% else %}
+                            <li class="page-item disabled">
+                                <span class="page-link">…</span>
+                            </li>
+                            {% endif %}
+                        {% endfor %}
+                        
+                        {% if movimentacoes.has_next %}
+                        <li class="page-item">
+                            <a class="page-link" href="{{ url_for('almoxarifado.listar_movimentacoes_estoque', page=movimentacoes.next_num, **filtros) }}">
+                                Próxima
+                            </a>
+                        </li>
+                        {% endif %}
+                    </ul>
+                </nav>
+                {% endif %}
+
+            {% else %}
+                <div class="text-center py-4">
+                    <i class="fas fa-exchange-alt fa-3x text-muted mb-3"></i>
+                    <h5 class="text-muted">Nenhuma movimentação encontrada</h5>
+                    <p class="text-muted">
+                        {% if filtros.data_inicio or filtros.data_fim or filtros.tipo_movimentacao or filtros.produto_id %}
+                            Tente ajustar os filtros para encontrar movimentações.
+                        {% else %}
+                            Ainda não há movimentações registradas no sistema.
+                        {% endif %}
+                    </p>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<script>
+// Melhorar seletores com Select2 ou similar (opcional)
+$(document).ready(function() {
+    // Melhorar UX dos selects se necessário
+    $('#produto_id, #obra_id, #funcionario_id').each(function() {
+        if ($(this).find('option').length > 20) {
+            // Aplicar select2 ou similar para muitas opções
+            // $(this).select2();
+        }
+    });
+});
+</script>
+{% endblock %}

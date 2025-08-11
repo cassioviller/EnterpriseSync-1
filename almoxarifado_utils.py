@@ -1,15 +1,18 @@
-# ===== MÓDULO 4: FUNÇÕES PARA ALMOXARIFADO INTELIGENTE =====
+# ===== MÓDULO 4: ALMOXARIFADO INTELIGENTE - BASEADO NA REUNIÃO TÉCNICA =====
 
 import hashlib
 import xml.etree.ElementTree as ET
 from decimal import Decimal
 import re
-import requests
+import base64
+import io
+from PIL import Image
+import numpy as np
 from datetime import date, datetime, timedelta
 from collections import defaultdict
-from models import (Produto, CategoriaProduto, Fornecedor, NotaFiscal, 
-                   MovimentacaoEstoque, RDO, Funcionario, Obra, AlocacaoEquipe)
 from app import db
+from models import (Produto, CategoriaProduto, Fornecedor, NotaFiscal, 
+                   MovimentacaoEstoque, RDO, Funcionario, Obra, AlocacaoEquipe, Usuario)
 
 # ===== FUNÇÕES DE CÓDIGO DE BARRAS =====
 

@@ -1,0 +1,2785 @@
+# 🎯 PROMPT ULTRA-ESPECÍFICO: MÓDULO 6 - SISTEMA DE FOLHA DE PAGAMENTO AUTOMÁTICA
+
+**Contexto:** Implementação do sexto módulo do SIGE v8.0 - Sistema Integrado de Gestão de Empresas  
+**Status:** Módulos 1, 2, 3, 4 e 5 já implementados e funcionando perfeitamente  
+**Objetivo:** Implementar sistema de folha de pagamento 100% automática com conformidade CLT total  
+
+---
+
+## 📋 CONTEXTO CRÍTICO DO SISTEMA ATUAL
+
+### **Sistema SIGE v8.0 - Estado Atual:**
+
+O sistema SIGE já possui uma base sólida com **332 arquivos** e **25+ tabelas** funcionando perfeitamente:
+
+**Módulos Implementados:**
+- ✅ **Módulo 1:** Sistema de Propostas com portal do cliente
+- ✅ **Módulo 2:** Portal do Cliente com acompanhamento de obras
+- ✅ **Módulo 3:** Gestão de Equipes com interface Kanban
+- ✅ **Módulo 4:** Almoxarifado Inteligente com código de barras
+- ✅ **Módulo 5:** Reconhecimento Facial para ponto automático (99.38% precisão)
+
+**Sistema de Ponto Atual (FUNDAMENTAL para este módulo):**
+```python
+# CLASSE EXISTENTE que será INTEGRADA (NÃO MODIFICAR)
+class Ponto(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    funcionario_id = db.Column(db.Integer, db.ForeignKey('funcionario.id'))
+    data_ponto = db.Column(db.Date, nullable=False)
+    hora_entrada = db.Column(db.Time)
+    hora_saida = db.Column(db.Time)
+    obra_id = db.Column(db.Integer, db.ForeignKey('obra.id'))  # Módulo 3
+    admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'))
+    metodo_registro = db.Column(db.String(20), default='MANUAL')  # Módulo 5
+    confianca_facial = db.Column(db.Float)  # Módulo 5
+    
+    # Relacionamentos existentes
+    funcionario = db.relationship('Funcionario', backref='pontos')
+    obra = db.relationship('Obra', backref='pontos')
+```
+
+**Sistema Multi-tenant Existente:**
+- **admin_id** em todas as tabelas para isolamento de dados
+- **Decorators** de autenticação já implementados
+- **Sistema de permissões** funcionando
+
+---
+
+## 🎯 OBJETIVO DO MÓDULO 6
+
+Implementar um **Sistema de Folha de Pagamento 100% Automática** que:
+
+1. **Calcule automaticamente** toda a folha baseada nos pontos do Módulo 5
+2. **Implemente todas as regras da CLT** (horas extras, adicional noturno, DSR, etc.)
+3. **Calcule INSS, IRRF e FGTS** com precisão legal
+4. **Gerencie benefícios** automaticamente (VR, VT, plano de saúde)
+5. **Processe férias e 13º** automaticamente
+6. **Gere holerites em PDF** automaticamente
+7. **Exporte para eSocial/SEFIP** automaticamente
+8. **Mantenha conformidade CLT** total com auditoria automática
+
+---
+
+## 🏗️ ARQUITETURA TÉCNICA DETALHADA
+
+### **8 NOVAS CLASSES SQL (Implementar exatamente assim):**
+
+```python
+# 1. CONFIGURAÇÃO SALARIAL POR FUNCIONÁRIO
+class ConfiguracaoSalarial(db.Model):
+    __tablename__ = 'configuracao_salarial'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    funcionario_id = db.Column(db.Integer, db.ForeignKey('funcionario.id'), nullable=False)
+    salario_base = db.Column(db.Numeric(10, 2), nullable=False)  # Salário base
+    tipo_salario = db.Column(db.String(20), nullable=False)  # MENSAL, HORISTA, COMISSIONADO
+    valor_hora = db.Column(db.Numeric(10, 2))  # Para horistas
+    percentual_comissao = db.Column(db.Numeric(5, 2))  # Para comissionados
+    carga_horaria_mensal = db.Column(db.Integer, default=220)  # Horas/mês padrão
+    dependentes = db.Column(db.Integer, default=0)  # Para IRRF
+    data_inicio = db.Column(db.Date, nullable=False)
+    data_fim = db.Column(db.Date)  # NULL = vigente
+    ativo = db.Column(db.Boolean, default=True)
+    admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    # Relacionamentos
+    funcionario = db.relationship('Funcionario', backref='configuracoes_salariais')
+    
+    # Índices para performance
+    __table_args__ = (
+        db.Index('idx_config_salarial_funcionario_ativo', 'funcionario_id', 'ativo'),
+        db.Index('idx_config_salarial_admin_id', 'admin_id'),
+        db.Index('idx_config_salarial_vigencia', 'data_inicio', 'data_fim'),
+    )
+
+# 2. BENEFÍCIOS POR FUNCIONÁRIO
+class BeneficioFuncionario(db.Model):
+    __tablename__ = 'beneficio_funcionario'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    funcionario_id = db.Column(db.Integer, db.ForeignKey('funcionario.id'), nullable=False)
+    tipo_beneficio = db.Column(db.String(50), nullable=False)  # VR, VT, PLANO_SAUDE, SEGURO_VIDA, etc.
+    valor = db.Column(db.Numeric(10, 2), nullable=False)  # Valor do benefício
+    percentual_desconto = db.Column(db.Numeric(5, 2), default=0)  # % descontado do funcionário
+    dias_por_mes = db.Column(db.Integer, default=22)  # Para VR/VT
+    ativo = db.Column(db.Boolean, default=True)
+    data_inicio = db.Column(db.Date, nullable=False)
+    data_fim = db.Column(db.Date)  # NULL = vigente
+    observacoes = db.Column(db.Text)
+    admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    # Relacionamentos
+    funcionario = db.relationship('Funcionario', backref='beneficios')
+    
+    # Índices
+    __table_args__ = (
+        db.Index('idx_beneficio_funcionario_tipo', 'funcionario_id', 'tipo_beneficio', 'ativo'),
+        db.Index('idx_beneficio_admin_id', 'admin_id'),
+    )
+
+# 3. CÁLCULO DE HORAS MENSAL
+class CalculoHorasMensal(db.Model):
+    __tablename__ = 'calculo_horas_mensal'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    funcionario_id = db.Column(db.Integer, db.ForeignKey('funcionario.id'), nullable=False)
+    mes_referencia = db.Column(db.Date, nullable=False)  # Primeiro dia do mês
+    
+    # Horas trabalhadas
+    horas_normais = db.Column(db.Numeric(8, 2), default=0)
+    horas_extras_50 = db.Column(db.Numeric(8, 2), default=0)  # Extras 50%
+    horas_extras_100 = db.Column(db.Numeric(8, 2), default=0)  # Extras 100%
+    horas_noturnas = db.Column(db.Numeric(8, 2), default=0)  # Adicional noturno
+    horas_dsr = db.Column(db.Numeric(8, 2), default=0)  # Descanso semanal
+    
+    # Faltas e atrasos
+    faltas_horas = db.Column(db.Numeric(8, 2), default=0)
+    atrasos_horas = db.Column(db.Numeric(8, 2), default=0)
+    
+    # Controle de dias
+    dias_trabalhados = db.Column(db.Integer, default=0)
+    dias_faltas = db.Column(db.Integer, default=0)
+    dias_uteis_mes = db.Column(db.Integer, default=22)
+    
+    # Controle de processamento
+    processado_em = db.Column(db.DateTime, default=datetime.utcnow)
+    reprocessado = db.Column(db.Boolean, default=False)
+    admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False)
+    
+    # Relacionamentos
+    funcionario = db.relationship('Funcionario', backref='calculos_horas')
+    
+    # Índices
+    __table_args__ = (
+        db.Index('idx_calculo_horas_funcionario_mes', 'funcionario_id', 'mes_referencia'),
+        db.Index('idx_calculo_horas_admin_id', 'admin_id'),
+        db.UniqueConstraint('funcionario_id', 'mes_referencia', name='uk_calculo_horas_funcionario_mes'),
+    )
+
+# 4. FOLHA DE PAGAMENTO MENSAL
+class FolhaPagamento(db.Model):
+    __tablename__ = 'folha_pagamento'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    funcionario_id = db.Column(db.Integer, db.ForeignKey('funcionario.id'), nullable=False)
+    mes_referencia = db.Column(db.Date, nullable=False)  # Primeiro dia do mês
+    
+    # PROVENTOS
+    salario_base = db.Column(db.Numeric(10, 2), default=0)
+    horas_extras = db.Column(db.Numeric(10, 2), default=0)
+    adicional_noturno = db.Column(db.Numeric(10, 2), default=0)
+    dsr = db.Column(db.Numeric(10, 2), default=0)  # Descanso semanal remunerado
+    comissoes = db.Column(db.Numeric(10, 2), default=0)
+    bonus = db.Column(db.Numeric(10, 2), default=0)
+    outros_proventos = db.Column(db.Numeric(10, 2), default=0)
+    total_proventos = db.Column(db.Numeric(10, 2), default=0)
+    
+    # DESCONTOS OBRIGATÓRIOS
+    inss = db.Column(db.Numeric(10, 2), default=0)
+    irrf = db.Column(db.Numeric(10, 2), default=0)
+    fgts = db.Column(db.Numeric(10, 2), default=0)  # Não é desconto, mas é calculado
+    
+    # DESCONTOS DE BENEFÍCIOS
+    vale_refeicao = db.Column(db.Numeric(10, 2), default=0)
+    vale_transporte = db.Column(db.Numeric(10, 2), default=0)
+    plano_saude = db.Column(db.Numeric(10, 2), default=0)
+    seguro_vida = db.Column(db.Numeric(10, 2), default=0)
+    
+    # DESCONTOS POR FALTAS/ATRASOS
+    faltas = db.Column(db.Numeric(10, 2), default=0)
+    atrasos = db.Column(db.Numeric(10, 2), default=0)
+    
+    # OUTROS DESCONTOS
+    adiantamentos = db.Column(db.Numeric(10, 2), default=0)
+    emprestimos = db.Column(db.Numeric(10, 2), default=0)
+    outros_descontos = db.Column(db.Numeric(10, 2), default=0)
+    total_descontos = db.Column(db.Numeric(10, 2), default=0)
+    
+    # LÍQUIDO
+    salario_liquido = db.Column(db.Numeric(10, 2), default=0)
+    
+    # CONTROLE
+    status = db.Column(db.String(20), default='CALCULADO')  # CALCULADO, APROVADO, PAGO
+    calculado_em = db.Column(db.DateTime, default=datetime.utcnow)
+    aprovado_em = db.Column(db.DateTime)
+    aprovado_por = db.Column(db.Integer, db.ForeignKey('usuario.id'))
+    pago_em = db.Column(db.DateTime)
+    observacoes = db.Column(db.Text)
+    admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False)
+    
+    # Relacionamentos
+    funcionario = db.relationship('Funcionario', backref='folhas_pagamento')
+    aprovador = db.relationship('Usuario', foreign_keys=[aprovado_por])
+    
+    # Índices
+    __table_args__ = (
+        db.Index('idx_folha_funcionario_mes', 'funcionario_id', 'mes_referencia'),
+        db.Index('idx_folha_admin_status', 'admin_id', 'status'),
+        db.Index('idx_folha_mes_referencia', 'mes_referencia'),
+        db.UniqueConstraint('funcionario_id', 'mes_referencia', name='uk_folha_funcionario_mes'),
+    )
+
+# 5. LANÇAMENTOS RECORRENTES
+class LancamentoRecorrente(db.Model):
+    __tablename__ = 'lancamento_recorrente'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    funcionario_id = db.Column(db.Integer, db.ForeignKey('funcionario.id'), nullable=False)
+    tipo = db.Column(db.String(20), nullable=False)  # PROVENTO, DESCONTO
+    descricao = db.Column(db.String(100), nullable=False)
+    valor = db.Column(db.Numeric(10, 2))  # Valor fixo
+    percentual = db.Column(db.Numeric(5, 2))  # Percentual do salário
+    dia_vencimento = db.Column(db.Integer, default=1)  # Dia do mês para processar
+    ativo = db.Column(db.Boolean, default=True)
+    data_inicio = db.Column(db.Date, nullable=False)
+    data_fim = db.Column(db.Date)  # NULL = sem fim
+    observacoes = db.Column(db.Text)
+    admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    # Relacionamentos
+    funcionario = db.relationship('Funcionario', backref='lancamentos_recorrentes')
+    
+    # Índices
+    __table_args__ = (
+        db.Index('idx_lancamento_funcionario_ativo', 'funcionario_id', 'ativo'),
+        db.Index('idx_lancamento_admin_id', 'admin_id'),
+    )
+
+# 6. ADIANTAMENTOS
+class Adiantamento(db.Model):
+    __tablename__ = 'adiantamento'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    funcionario_id = db.Column(db.Integer, db.ForeignKey('funcionario.id'), nullable=False)
+    valor_total = db.Column(db.Numeric(10, 2), nullable=False)
+    data_solicitacao = db.Column(db.Date, nullable=False)
+    data_aprovacao = db.Column(db.Date)
+    aprovado_por = db.Column(db.Integer, db.ForeignKey('usuario.id'))
+    
+    # Parcelamento
+    parcelas = db.Column(db.Integer, default=1)
+    valor_parcela = db.Column(db.Numeric(10, 2))
+    parcelas_pagas = db.Column(db.Integer, default=0)
+    
+    # Controle
+    status = db.Column(db.String(20), default='SOLICITADO')  # SOLICITADO, APROVADO, QUITADO, CANCELADO
+    motivo = db.Column(db.String(200))
+    observacoes = db.Column(db.Text)
+    admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    # Relacionamentos
+    funcionario = db.relationship('Funcionario', backref='adiantamentos')
+    aprovador = db.relationship('Usuario', foreign_keys=[aprovado_por])
+    
+    # Índices
+    __table_args__ = (
+        db.Index('idx_adiantamento_funcionario_status', 'funcionario_id', 'status'),
+        db.Index('idx_adiantamento_admin_id', 'admin_id'),
+    )
+
+# 7. FÉRIAS E 13º SALÁRIO
+class FeriasDecimo(db.Model):
+    __tablename__ = 'ferias_decimo'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    funcionario_id = db.Column(db.Integer, db.ForeignKey('funcionario.id'), nullable=False)
+    tipo = db.Column(db.String(20), nullable=False)  # FERIAS, DECIMO_TERCEIRO
+    ano_referencia = db.Column(db.Integer, nullable=False)
+    
+    # Período
+    periodo_inicio = db.Column(db.Date, nullable=False)
+    periodo_fim = db.Column(db.Date, nullable=False)
+    
+    # Cálculos
+    dias_direito = db.Column(db.Integer, default=30)  # Dias de férias ou meses de 13º
+    dias_gozados = db.Column(db.Integer, default=0)
+    valor_calculado = db.Column(db.Numeric(10, 2), default=0)
+    terco_constitucional = db.Column(db.Numeric(10, 2), default=0)  # 1/3 das férias
+    
+    # Controle
+    status = db.Column(db.String(20), default='CALCULADO')  # CALCULADO, PAGO
+    data_pagamento = db.Column(db.Date)
+    observacoes = db.Column(db.Text)
+    admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    # Relacionamentos
+    funcionario = db.relationship('Funcionario', backref='ferias_decimos')
+    
+    # Índices
+    __table_args__ = (
+        db.Index('idx_ferias_decimo_funcionario_tipo_ano', 'funcionario_id', 'tipo', 'ano_referencia'),
+        db.Index('idx_ferias_decimo_admin_id', 'admin_id'),
+    )
+
+# 8. PARÂMETROS LEGAIS POR ANO
+class ParametrosLegais(db.Model):
+    __tablename__ = 'parametros_legais'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False)
+    ano_vigencia = db.Column(db.Integer, nullable=False)
+    
+    # INSS - Tabela progressiva
+    inss_faixa1_limite = db.Column(db.Numeric(10, 2), default=1320.00)  # 2024
+    inss_faixa1_percentual = db.Column(db.Numeric(5, 2), default=7.5)
+    inss_faixa2_limite = db.Column(db.Numeric(10, 2), default=2571.29)
+    inss_faixa2_percentual = db.Column(db.Numeric(5, 2), default=9.0)
+    inss_faixa3_limite = db.Column(db.Numeric(10, 2), default=3856.94)
+    inss_faixa3_percentual = db.Column(db.Numeric(5, 2), default=12.0)
+    inss_faixa4_limite = db.Column(db.Numeric(10, 2), default=7507.49)
+    inss_faixa4_percentual = db.Column(db.Numeric(5, 2), default=14.0)
+    inss_teto = db.Column(db.Numeric(10, 2), default=877.24)  # Valor máximo
+    
+    # IRRF - Tabela progressiva
+    irrf_isencao = db.Column(db.Numeric(10, 2), default=2112.00)
+    irrf_faixa1_limite = db.Column(db.Numeric(10, 2), default=2826.65)
+    irrf_faixa1_percentual = db.Column(db.Numeric(5, 2), default=7.5)
+    irrf_faixa1_deducao = db.Column(db.Numeric(10, 2), default=158.40)
+    irrf_faixa2_limite = db.Column(db.Numeric(10, 2), default=3751.05)
+    irrf_faixa2_percentual = db.Column(db.Numeric(5, 2), default=15.0)
+    irrf_faixa2_deducao = db.Column(db.Numeric(10, 2), default=370.40)
+    irrf_faixa3_limite = db.Column(db.Numeric(10, 2), default=4664.68)
+    irrf_faixa3_percentual = db.Column(db.Numeric(5, 2), default=22.5)
+    irrf_faixa3_deducao = db.Column(db.Numeric(10, 2), default=651.73)
+    irrf_faixa4_percentual = db.Column(db.Numeric(5, 2), default=27.5)
+    irrf_faixa4_deducao = db.Column(db.Numeric(10, 2), default=884.96)
+    irrf_dependente_valor = db.Column(db.Numeric(10, 2), default=189.59)
+    
+    # OUTROS PARÂMETROS
+    fgts_percentual = db.Column(db.Numeric(5, 2), default=8.0)
+    salario_minimo = db.Column(db.Numeric(10, 2), default=1412.00)  # 2024
+    vale_transporte_percentual = db.Column(db.Numeric(5, 2), default=6.0)
+    adicional_noturno_percentual = db.Column(db.Numeric(5, 2), default=20.0)
+    hora_extra_50_percentual = db.Column(db.Numeric(5, 2), default=50.0)
+    hora_extra_100_percentual = db.Column(db.Numeric(5, 2), default=100.0)
+    
+    # Controle
+    ativo = db.Column(db.Boolean, default=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    # Índices
+    __table_args__ = (
+        db.Index('idx_parametros_admin_ano', 'admin_id', 'ano_vigencia'),
+        db.UniqueConstraint('admin_id', 'ano_vigencia', name='uk_parametros_admin_ano'),
+    )
+```
+
+---
+
+## 🔧 FUNÇÕES UTILITÁRIAS CRÍTICAS
+
+### **Implementar exatamente estas funções em utils.py:**
+
+```python
+# CÁLCULOS DE HORAS TRABALHADAS
+def calcular_horas_mensal(funcionario_id, mes_referencia):
+    """Calcular horas trabalhadas no mês baseado nos pontos"""
+    
+    inicio_mes = mes_referencia.replace(day=1)
+    fim_mes = (inicio_mes + timedelta(days=32)).replace(day=1) - timedelta(days=1)
+    
+    # Obter pontos do mês
+    pontos = Ponto.query.filter(
+        Ponto.funcionario_id == funcionario_id,
+        Ponto.data_ponto.between(inicio_mes, fim_mes)
+    ).all()
+    
+    horas_normais = 0
+    horas_extras_50 = 0
+    horas_extras_100 = 0
+    horas_noturnas = 0
+    faltas_horas = 0
+    atrasos_horas = 0
+    dias_trabalhados = 0
+    dias_faltas = 0
+    
+    # Contar dias úteis do mês
+    dias_uteis = 0
+    data_atual = inicio_mes
+    while data_atual <= fim_mes:
+        if data_atual.weekday() < 5:  # Segunda a sexta
+            dias_uteis += 1
+        data_atual += timedelta(days=1)
+    
+    # Processar cada ponto
+    for ponto in pontos:
+        if ponto.hora_entrada and ponto.hora_saida:
+            # Calcular horas trabalhadas
+            entrada = datetime.combine(ponto.data_ponto, ponto.hora_entrada)
+            saida = datetime.combine(ponto.data_ponto, ponto.hora_saida)
+            
+            # Se saída for no dia seguinte
+            if ponto.hora_saida < ponto.hora_entrada:
+                saida += timedelta(days=1)
+            
+            horas_trabalhadas = (saida - entrada).total_seconds() / 3600
+            
+            # Descontar intervalo (1h para jornada > 6h)
+            if horas_trabalhadas > 6:
+                horas_trabalhadas -= 1
+            
+            # Classificar horas
+            if ponto.data_ponto.weekday() == 6:  # Domingo
+                # Todo trabalho no domingo é 100%
+                horas_extras_100 += horas_trabalhadas
+            else:  # Dias úteis
+                if horas_trabalhadas <= 8:
+                    horas_normais += horas_trabalhadas
+                else:
+                    horas_normais += 8
+                    extras = horas_trabalhadas - 8
+                    
+                    # Primeiras 2h extras = 50%, depois 100%
+                    if extras <= 2:
+                        horas_extras_50 += extras
+                    else:
+                        horas_extras_50 += 2
+                        horas_extras_100 += extras - 2
+            
+            # Calcular adicional noturno (22h às 5h)
+            horas_noturnas += calcular_horas_noturnas(ponto.hora_entrada, ponto.hora_saida)
+            
+            dias_trabalhados += 1
+            
+        elif ponto.data_ponto.weekday() < 5:  # Falta em dia útil
+            dias_faltas += 1
+            faltas_horas += 8  # 8 horas por dia de falta
+    
+    # Calcular DSR
+    horas_dsr = calcular_dsr_horas(horas_extras_50, horas_extras_100, horas_noturnas, dias_uteis)
+    
+    # Salvar ou atualizar cálculo
+    calculo = CalculoHorasMensal.query.filter_by(
+        funcionario_id=funcionario_id,
+        mes_referencia=inicio_mes
+    ).first()
+    
+    if not calculo:
+        calculo = CalculoHorasMensal(
+            funcionario_id=funcionario_id,
+            mes_referencia=inicio_mes,
+            admin_id=get_current_admin_id()
+        )
+        db.session.add(calculo)
+    
+    # Atualizar valores
+    calculo.horas_normais = horas_normais
+    calculo.horas_extras_50 = horas_extras_50
+    calculo.horas_extras_100 = horas_extras_100
+    calculo.horas_noturnas = horas_noturnas
+    calculo.horas_dsr = horas_dsr
+    calculo.faltas_horas = faltas_horas
+    calculo.atrasos_horas = atrasos_horas
+    calculo.dias_trabalhados = dias_trabalhados
+    calculo.dias_faltas = dias_faltas
+    calculo.dias_uteis_mes = dias_uteis
+    calculo.processado_em = datetime.utcnow()
+    
+    db.session.commit()
+    
+    return calculo
+
+def calcular_horas_noturnas(hora_entrada, hora_saida):
+    """Calcular horas noturnas (22h às 5h) com adicional de 20%"""
+    
+    if not hora_entrada or not hora_saida:
+        return 0
+    
+    # Período noturno: 22h às 5h
+    inicio_noturno = time(22, 0)
+    fim_noturno = time(5, 0)
+    
+    horas_noturnas = 0
+    
+    # Converter para datetime para facilitar cálculos
+    entrada = datetime.combine(date.today(), hora_entrada)
+    saida = datetime.combine(date.today(), hora_saida)
+    
+    # Se saída for no dia seguinte
+    if hora_saida < hora_entrada:
+        saida += timedelta(days=1)
+    
+    # Verificar interseção com período noturno
+    inicio_noturno_dt = datetime.combine(date.today(), inicio_noturno)
+    fim_noturno_dt = datetime.combine(date.today() + timedelta(days=1), fim_noturno)
+    
+    # Calcular interseção
+    inicio_intersecao = max(entrada, inicio_noturno_dt)
+    fim_intersecao = min(saida, fim_noturno_dt)
+    
+    if inicio_intersecao < fim_intersecao:
+        horas_noturnas = (fim_intersecao - inicio_intersecao).total_seconds() / 3600
+    
+    return horas_noturnas
+
+def calcular_dsr_horas(horas_extras_50, horas_extras_100, horas_noturnas, dias_uteis):
+    """Calcular DSR baseado em horas extras e adicional noturno"""
+    
+    if dias_uteis == 0:
+        return 0
+    
+    # DSR = (Horas extras + Adicional noturno) / Dias úteis * Domingos e feriados
+    # Simplificado: assumir 4 domingos por mês
+    domingos_mes = 4
+    
+    base_dsr = horas_extras_50 + horas_extras_100 + horas_noturnas
+    dsr_horas = (base_dsr / dias_uteis) * domingos_mes if dias_uteis > 0 else 0
+    
+    return dsr_horas
+
+# CÁLCULOS DE IMPOSTOS
+def calcular_inss(salario_bruto, parametros_legais):
+    """Calcular INSS com tabela progressiva 2024"""
+    
+    if salario_bruto <= parametros_legais.inss_faixa1_limite:
+        return salario_bruto * (parametros_legais.inss_faixa1_percentual / 100)
+    
+    elif salario_bruto <= parametros_legais.inss_faixa2_limite:
+        inss = parametros_legais.inss_faixa1_limite * (parametros_legais.inss_faixa1_percentual / 100)
+        inss += (salario_bruto - parametros_legais.inss_faixa1_limite) * (parametros_legais.inss_faixa2_percentual / 100)
+        return inss
+    
+    elif salario_bruto <= parametros_legais.inss_faixa3_limite:
+        inss = parametros_legais.inss_faixa1_limite * (parametros_legais.inss_faixa1_percentual / 100)
+        inss += (parametros_legais.inss_faixa2_limite - parametros_legais.inss_faixa1_limite) * (parametros_legais.inss_faixa2_percentual / 100)
+        inss += (salario_bruto - parametros_legais.inss_faixa2_limite) * (parametros_legais.inss_faixa3_percentual / 100)
+        return inss
+    
+    elif salario_bruto <= parametros_legais.inss_faixa4_limite:
+        inss = parametros_legais.inss_faixa1_limite * (parametros_legais.inss_faixa1_percentual / 100)
+        inss += (parametros_legais.inss_faixa2_limite - parametros_legais.inss_faixa1_limite) * (parametros_legais.inss_faixa2_percentual / 100)
+        inss += (parametros_legais.inss_faixa3_limite - parametros_legais.inss_faixa2_limite) * (parametros_legais.inss_faixa3_percentual / 100)
+        inss += (salario_bruto - parametros_legais.inss_faixa3_limite) * (parametros_legais.inss_faixa4_percentual / 100)
+        return inss
+    
+    else:
+        # Teto do INSS
+        return parametros_legais.inss_teto
+
+def calcular_irrf(salario_bruto, inss, dependentes, parametros_legais):
+    """Calcular IRRF com tabela progressiva 2024"""
+    
+    # Base de cálculo = Salário bruto - INSS - (Dependentes * valor por dependente)
+    base_calculo = salario_bruto - inss - (dependentes * parametros_legais.irrf_dependente_valor)
+    
+    if base_calculo <= parametros_legais.irrf_isencao:
+        return 0
+    
+    elif base_calculo <= parametros_legais.irrf_faixa1_limite:
+        irrf = base_calculo * (parametros_legais.irrf_faixa1_percentual / 100)
+        return max(0, irrf - parametros_legais.irrf_faixa1_deducao)
+    
+    elif base_calculo <= parametros_legais.irrf_faixa2_limite:
+        irrf = base_calculo * (parametros_legais.irrf_faixa2_percentual / 100)
+        return max(0, irrf - parametros_legais.irrf_faixa2_deducao)
+    
+    elif base_calculo <= parametros_legais.irrf_faixa3_limite:
+        irrf = base_calculo * (parametros_legais.irrf_faixa3_percentual / 100)
+        return max(0, irrf - parametros_legais.irrf_faixa3_deducao)
+    
+    else:
+        irrf = base_calculo * (parametros_legais.irrf_faixa4_percentual / 100)
+        return max(0, irrf - parametros_legais.irrf_faixa4_deducao)
+
+def calcular_fgts(salario_bruto, parametros_legais):
+    """Calcular FGTS (8% sobre salário bruto)"""
+    return salario_bruto * (parametros_legais.fgts_percentual / 100)
+
+# PROCESSAMENTO DA FOLHA
+def processar_folha_mensal(admin_id, mes_referencia):
+    """Processar folha de pagamento completa do mês"""
+    
+    inicio_mes = mes_referencia.replace(day=1)
+    fim_mes = (inicio_mes + timedelta(days=32)).replace(day=1) - timedelta(days=1)
+    
+    # Obter funcionários ativos
+    funcionarios = Funcionario.query.filter_by(
+        admin_id=admin_id,
+        ativo=True
+    ).all()
+    
+    # Obter parâmetros legais
+    parametros = ParametrosLegais.query.filter_by(
+        admin_id=admin_id,
+        ano_vigencia=mes_referencia.year,
+        ativo=True
+    ).first()
+    
+    if not parametros:
+        raise Exception(f"Parâmetros legais não configurados para {mes_referencia.year}")
+    
+    resultados = []
+    
+    for funcionario in funcionarios:
+        try:
+            # 1. Calcular horas do mês
+            calculo_horas = calcular_horas_mensal(funcionario.id, inicio_mes)
+            
+            # 2. Obter configuração salarial
+            config_salarial = obter_configuracao_salarial_vigente(funcionario.id, mes_referencia)
+            if not config_salarial:
+                continue
+            
+            # 3. Calcular proventos
+            proventos = calcular_proventos_funcionario(funcionario, config_salarial, calculo_horas, parametros)
+            
+            # 4. Calcular descontos obrigatórios
+            descontos_obrigatorios = calcular_descontos_obrigatorios(proventos, config_salarial.dependentes, parametros)
+            
+            # 5. Calcular benefícios
+            beneficios = calcular_beneficios_funcionario(funcionario.id, mes_referencia)
+            
+            # 6. Calcular lançamentos recorrentes
+            recorrentes = calcular_lancamentos_recorrentes(funcionario.id, mes_referencia, proventos['salario_base'])
+            
+            # 7. Calcular adiantamentos
+            adiantamentos_valor = calcular_adiantamentos_mes(funcionario.id, mes_referencia)
+            
+            # 8. Calcular totais
+            total_proventos = (
+                proventos['salario_base'] +
+                proventos['horas_extras'] +
+                proventos['adicional_noturno'] +
+                proventos['dsr'] +
+                proventos['comissoes'] +
+                recorrentes['proventos']
+            )
+            
+            total_descontos = (
+                descontos_obrigatorios['inss'] +
+                descontos_obrigatorios['irrf'] +
+                beneficios['total_descontos'] +
+                recorrentes['descontos'] +
+                adiantamentos_valor +
+                proventos['faltas'] +
+                proventos['atrasos']
+            )
+            
+            salario_liquido = total_proventos - total_descontos
+            
+            # 9. Salvar folha de pagamento
+            folha = FolhaPagamento.query.filter_by(
+                funcionario_id=funcionario.id,
+                mes_referencia=inicio_mes
+            ).first()
+            
+            if not folha:
+                folha = FolhaPagamento(
+                    funcionario_id=funcionario.id,
+                    mes_referencia=inicio_mes,
+                    admin_id=admin_id
+                )
+                db.session.add(folha)
+            
+            # Atualizar valores
+            folha.salario_base = proventos['salario_base']
+            folha.horas_extras = proventos['horas_extras']
+            folha.adicional_noturno = proventos['adicional_noturno']
+            folha.dsr = proventos['dsr']
+            folha.comissoes = proventos['comissoes']
+            folha.outros_proventos = recorrentes['proventos']
+            folha.total_proventos = total_proventos
+            
+            folha.inss = descontos_obrigatorios['inss']
+            folha.irrf = descontos_obrigatorios['irrf']
+            folha.fgts = descontos_obrigatorios['fgts']
+            folha.vale_refeicao = beneficios['vale_refeicao']
+            folha.vale_transporte = beneficios['vale_transporte']
+            folha.plano_saude = beneficios['plano_saude']
+            folha.seguro_vida = beneficios['seguro_vida']
+            folha.faltas = proventos['faltas']
+            folha.atrasos = proventos['atrasos']
+            folha.adiantamentos = adiantamentos_valor
+            folha.outros_descontos = recorrentes['descontos']
+            folha.total_descontos = total_descontos
+            
+            folha.salario_liquido = salario_liquido
+            folha.calculado_em = datetime.utcnow()
+            
+            resultados.append({
+                'funcionario': funcionario,
+                'folha': folha,
+                'sucesso': True
+            })
+            
+        except Exception as e:
+            resultados.append({
+                'funcionario': funcionario,
+                'erro': str(e),
+                'sucesso': False
+            })
+    
+    db.session.commit()
+    
+    return resultados
+```
+
+
+
+## 🌐 ROTAS FLASK ESPECÍFICAS
+
+### **Implementar exatamente estas rotas em views.py:**
+
+```python
+# DASHBOARD PRINCIPAL DA FOLHA
+@app.route('/folha-pagamento')
+@admin_required
+def dashboard_folha():
+    """Dashboard principal da folha de pagamento"""
+    
+    # Mês atual
+    hoje = date.today()
+    mes_atual = hoje.replace(day=1)
+    
+    # Obter folhas do mês atual
+    folhas_mes = FolhaPagamento.query.filter_by(
+        admin_id=current_user.id,
+        mes_referencia=mes_atual
+    ).all()
+    
+    # Calcular métricas
+    total_folha = sum(f.total_proventos for f in folhas_mes)
+    total_liquido = sum(f.salario_liquido for f in folhas_mes)
+    total_encargos = sum(f.inss + f.fgts for f in folhas_mes)
+    
+    # Mês anterior para comparação
+    mes_anterior = (mes_atual - timedelta(days=1)).replace(day=1)
+    folhas_anterior = FolhaPagamento.query.filter_by(
+        admin_id=current_user.id,
+        mes_referencia=mes_anterior
+    ).all()
+    
+    total_anterior = sum(f.total_proventos for f in folhas_anterior)
+    variacao = ((total_folha - total_anterior) / total_anterior * 100) if total_anterior > 0 else 0
+    
+    # Status do processamento
+    funcionarios_ativos = Funcionario.query.filter_by(
+        admin_id=current_user.id,
+        ativo=True
+    ).count()
+    
+    folhas_processadas = len(folhas_mes)
+    percentual_processado = (folhas_processadas / funcionarios_ativos * 100) if funcionarios_ativos > 0 else 0
+    
+    # Top 5 maiores salários
+    top_salarios = sorted(folhas_mes, key=lambda x: x.total_proventos, reverse=True)[:5]
+    
+    # Funcionários com mais horas extras
+    top_extras = sorted(folhas_mes, key=lambda x: x.horas_extras, reverse=True)[:5]
+    
+    return render_template('folha_pagamento/dashboard.html',
+                         total_folha=total_folha,
+                         total_liquido=total_liquido,
+                         total_encargos=total_encargos,
+                         variacao=variacao,
+                         funcionarios_ativos=funcionarios_ativos,
+                         folhas_processadas=folhas_processadas,
+                         percentual_processado=percentual_processado,
+                         top_salarios=top_salarios,
+                         top_extras=top_extras,
+                         mes_referencia=mes_atual)
+
+# PROCESSAR FOLHA DO MÊS
+@app.route('/folha-pagamento/processar/<int:ano>/<int:mes>', methods=['POST'])
+@admin_required
+def processar_folha_mes(ano, mes):
+    """Processar folha de pagamento do mês"""
+    
+    try:
+        mes_referencia = date(ano, mes, 1)
+        
+        # Verificar se já foi processada
+        folhas_existentes = FolhaPagamento.query.filter_by(
+            admin_id=current_user.id,
+            mes_referencia=mes_referencia
+        ).count()
+        
+        if folhas_existentes > 0:
+            reprocessar = request.form.get('reprocessar') == 'true'
+            if not reprocessar:
+                flash('Folha já processada para este mês. Use a opção "Reprocessar" se necessário.', 'warning')
+                return redirect(url_for('dashboard_folha'))
+        
+        # Processar folha
+        resultados = processar_folha_mensal(current_user.id, mes_referencia)
+        
+        sucessos = [r for r in resultados if r['sucesso']]
+        erros = [r for r in resultados if not r['sucesso']]
+        
+        if erros:
+            flash(f'Folha processada com {len(sucessos)} sucessos e {len(erros)} erros.', 'warning')
+            for erro in erros[:5]:  # Mostrar apenas os primeiros 5 erros
+                flash(f"Erro em {erro['funcionario'].nome}: {erro['erro']}", 'danger')
+        else:
+            flash(f'Folha processada com sucesso! {len(sucessos)} funcionários processados.', 'success')
+        
+        return redirect(url_for('dashboard_folha'))
+        
+    except Exception as e:
+        flash(f'Erro ao processar folha: {str(e)}', 'danger')
+        return redirect(url_for('dashboard_folha'))
+
+# LISTA DE FOLHAS POR MÊS
+@app.route('/folha-pagamento/mes/<int:ano>/<int:mes>')
+@admin_required
+def folhas_mes(ano, mes):
+    """Listar folhas de pagamento do mês"""
+    
+    mes_referencia = date(ano, mes, 1)
+    
+    folhas = FolhaPagamento.query.filter_by(
+        admin_id=current_user.id,
+        mes_referencia=mes_referencia
+    ).join(Funcionario).order_by(Funcionario.nome).all()
+    
+    # Calcular totais
+    total_proventos = sum(f.total_proventos for f in folhas)
+    total_descontos = sum(f.total_descontos for f in folhas)
+    total_liquido = sum(f.salario_liquido for f in folhas)
+    total_inss = sum(f.inss for f in folhas)
+    total_irrf = sum(f.irrf for f in folhas)
+    total_fgts = sum(f.fgts for f in folhas)
+    
+    return render_template('folha_pagamento/lista_mes.html',
+                         folhas=folhas,
+                         mes_referencia=mes_referencia,
+                         total_proventos=total_proventos,
+                         total_descontos=total_descontos,
+                         total_liquido=total_liquido,
+                         total_inss=total_inss,
+                         total_irrf=total_irrf,
+                         total_fgts=total_fgts)
+
+# HOLERITE INDIVIDUAL
+@app.route('/folha-pagamento/holerite/<int:funcionario_id>/<int:ano>/<int:mes>')
+@admin_required
+def holerite_funcionario(funcionario_id, ano, mes):
+    """Exibir holerite do funcionário"""
+    
+    mes_referencia = date(ano, mes, 1)
+    
+    folha = FolhaPagamento.query.filter_by(
+        funcionario_id=funcionario_id,
+        mes_referencia=mes_referencia,
+        admin_id=current_user.id
+    ).first()
+    
+    if not folha:
+        flash('Holerite não encontrado.', 'danger')
+        return redirect(url_for('dashboard_folha'))
+    
+    # Obter detalhes adicionais
+    calculo_horas = CalculoHorasMensal.query.filter_by(
+        funcionario_id=funcionario_id,
+        mes_referencia=mes_referencia
+    ).first()
+    
+    config_salarial = obter_configuracao_salarial_vigente(funcionario_id, mes_referencia)
+    
+    return render_template('folha_pagamento/holerite.html',
+                         folha=folha,
+                         calculo_horas=calculo_horas,
+                         config_salarial=config_salarial)
+
+# GERAR HOLERITE PDF
+@app.route('/folha-pagamento/holerite-pdf/<int:funcionario_id>/<int:ano>/<int:mes>')
+@admin_required
+def gerar_holerite_pdf(funcionario_id, ano, mes):
+    """Gerar holerite em PDF"""
+    
+    mes_referencia = date(ano, mes, 1)
+    
+    try:
+        filepath = gerar_holerite_pdf_funcionario(funcionario_id, mes_referencia)
+        
+        if filepath and os.path.exists(filepath):
+            return send_file(filepath, as_attachment=True, 
+                           download_name=f"holerite_{funcionario_id}_{ano}_{mes:02d}.pdf")
+        else:
+            flash('Erro ao gerar holerite PDF.', 'danger')
+            return redirect(url_for('holerite_funcionario', 
+                                  funcionario_id=funcionario_id, ano=ano, mes=mes))
+            
+    except Exception as e:
+        flash(f'Erro ao gerar PDF: {str(e)}', 'danger')
+        return redirect(url_for('holerite_funcionario', 
+                              funcionario_id=funcionario_id, ano=ano, mes=mes))
+
+# CONFIGURAÇÕES SALARIAIS
+@app.route('/folha-pagamento/configuracoes-salariais')
+@admin_required
+def configuracoes_salariais():
+    """Listar configurações salariais dos funcionários"""
+    
+    funcionarios = db.session.query(Funcionario).outerjoin(ConfiguracaoSalarial).filter(
+        Funcionario.admin_id == current_user.id,
+        Funcionario.ativo == True
+    ).all()
+    
+    # Separar funcionários com e sem configuração
+    com_config = []
+    sem_config = []
+    
+    for funcionario in funcionarios:
+        config_atual = obter_configuracao_salarial_vigente(funcionario.id, date.today())
+        if config_atual:
+            com_config.append({
+                'funcionario': funcionario,
+                'config': config_atual
+            })
+        else:
+            sem_config.append(funcionario)
+    
+    return render_template('folha_pagamento/configuracoes_salariais.html',
+                         com_config=com_config,
+                         sem_config=sem_config)
+
+# NOVA CONFIGURAÇÃO SALARIAL
+@app.route('/folha-pagamento/configuracao-salarial/nova/<int:funcionario_id>', methods=['GET', 'POST'])
+@admin_required
+def nova_configuracao_salarial(funcionario_id):
+    """Criar nova configuração salarial"""
+    
+    funcionario = Funcionario.query.filter_by(
+        id=funcionario_id,
+        admin_id=current_user.id
+    ).first()
+    
+    if not funcionario:
+        flash('Funcionário não encontrado.', 'danger')
+        return redirect(url_for('configuracoes_salariais'))
+    
+    if request.method == 'POST':
+        try:
+            # Finalizar configuração anterior se existir
+            config_anterior = ConfiguracaoSalarial.query.filter_by(
+                funcionario_id=funcionario_id,
+                ativo=True
+            ).first()
+            
+            if config_anterior:
+                config_anterior.ativo = False
+                config_anterior.data_fim = date.today() - timedelta(days=1)
+            
+            # Criar nova configuração
+            config = ConfiguracaoSalarial(
+                funcionario_id=funcionario_id,
+                salario_base=float(request.form['salario_base']),
+                tipo_salario=request.form['tipo_salario'],
+                valor_hora=float(request.form['valor_hora']) if request.form.get('valor_hora') else None,
+                percentual_comissao=float(request.form['percentual_comissao']) if request.form.get('percentual_comissao') else None,
+                carga_horaria_mensal=int(request.form['carga_horaria_mensal']),
+                dependentes=int(request.form['dependentes']),
+                data_inicio=datetime.strptime(request.form['data_inicio'], '%Y-%m-%d').date(),
+                admin_id=current_user.id
+            )
+            
+            db.session.add(config)
+            db.session.commit()
+            
+            flash('Configuração salarial criada com sucesso!', 'success')
+            return redirect(url_for('configuracoes_salariais'))
+            
+        except Exception as e:
+            flash(f'Erro ao criar configuração: {str(e)}', 'danger')
+    
+    return render_template('folha_pagamento/nova_configuracao_salarial.html',
+                         funcionario=funcionario)
+
+# BENEFÍCIOS DOS FUNCIONÁRIOS
+@app.route('/folha-pagamento/beneficios')
+@admin_required
+def beneficios_funcionarios():
+    """Gerenciar benefícios dos funcionários"""
+    
+    beneficios = BeneficioFuncionario.query.filter_by(
+        admin_id=current_user.id,
+        ativo=True
+    ).join(Funcionario).order_by(Funcionario.nome, BeneficioFuncionario.tipo_beneficio).all()
+    
+    # Agrupar por funcionário
+    beneficios_por_funcionario = {}
+    for beneficio in beneficios:
+        funcionario_id = beneficio.funcionario_id
+        if funcionario_id not in beneficios_por_funcionario:
+            beneficios_por_funcionario[funcionario_id] = {
+                'funcionario': beneficio.funcionario,
+                'beneficios': []
+            }
+        beneficios_por_funcionario[funcionario_id]['beneficios'].append(beneficio)
+    
+    # Funcionários sem benefícios
+    funcionarios_com_beneficios = set(beneficios_por_funcionario.keys())
+    todos_funcionarios = Funcionario.query.filter_by(
+        admin_id=current_user.id,
+        ativo=True
+    ).all()
+    
+    funcionarios_sem_beneficios = [f for f in todos_funcionarios if f.id not in funcionarios_com_beneficios]
+    
+    return render_template('folha_pagamento/beneficios.html',
+                         beneficios_por_funcionario=beneficios_por_funcionario,
+                         funcionarios_sem_beneficios=funcionarios_sem_beneficios)
+
+# NOVO BENEFÍCIO
+@app.route('/folha-pagamento/beneficio/novo/<int:funcionario_id>', methods=['GET', 'POST'])
+@admin_required
+def novo_beneficio(funcionario_id):
+    """Criar novo benefício para funcionário"""
+    
+    funcionario = Funcionario.query.filter_by(
+        id=funcionario_id,
+        admin_id=current_user.id
+    ).first()
+    
+    if not funcionario:
+        flash('Funcionário não encontrado.', 'danger')
+        return redirect(url_for('beneficios_funcionarios'))
+    
+    if request.method == 'POST':
+        try:
+            beneficio = BeneficioFuncionario(
+                funcionario_id=funcionario_id,
+                tipo_beneficio=request.form['tipo_beneficio'],
+                valor=float(request.form['valor']),
+                percentual_desconto=float(request.form['percentual_desconto']),
+                dias_por_mes=int(request.form['dias_por_mes']) if request.form.get('dias_por_mes') else 22,
+                data_inicio=datetime.strptime(request.form['data_inicio'], '%Y-%m-%d').date(),
+                observacoes=request.form.get('observacoes'),
+                admin_id=current_user.id
+            )
+            
+            db.session.add(beneficio)
+            db.session.commit()
+            
+            flash('Benefício criado com sucesso!', 'success')
+            return redirect(url_for('beneficios_funcionarios'))
+            
+        except Exception as e:
+            flash(f'Erro ao criar benefício: {str(e)}', 'danger')
+    
+    # Tipos de benefícios disponíveis
+    tipos_beneficios = [
+        ('VALE_REFEICAO', 'Vale Refeição'),
+        ('VALE_TRANSPORTE', 'Vale Transporte'),
+        ('PLANO_SAUDE', 'Plano de Saúde'),
+        ('SEGURO_VIDA', 'Seguro de Vida'),
+        ('AUXILIO_CRECHE', 'Auxílio Creche'),
+        ('OUTROS', 'Outros')
+    ]
+    
+    return render_template('folha_pagamento/novo_beneficio.html',
+                         funcionario=funcionario,
+                         tipos_beneficios=tipos_beneficios)
+
+# PARÂMETROS LEGAIS
+@app.route('/folha-pagamento/parametros-legais')
+@admin_required
+def parametros_legais():
+    """Gerenciar parâmetros legais por ano"""
+    
+    ano_atual = date.today().year
+    
+    parametros = ParametrosLegais.query.filter_by(
+        admin_id=current_user.id
+    ).order_by(ParametrosLegais.ano_vigencia.desc()).all()
+    
+    # Verificar se existe para o ano atual
+    parametros_ano_atual = next((p for p in parametros if p.ano_vigencia == ano_atual), None)
+    
+    return render_template('folha_pagamento/parametros_legais.html',
+                         parametros=parametros,
+                         parametros_ano_atual=parametros_ano_atual,
+                         ano_atual=ano_atual)
+
+# EDITAR PARÂMETROS LEGAIS
+@app.route('/folha-pagamento/parametros-legais/<int:ano>', methods=['GET', 'POST'])
+@admin_required
+def editar_parametros_legais(ano):
+    """Editar parâmetros legais do ano"""
+    
+    parametros = ParametrosLegais.query.filter_by(
+        admin_id=current_user.id,
+        ano_vigencia=ano
+    ).first()
+    
+    if request.method == 'POST':
+        try:
+            if not parametros:
+                parametros = ParametrosLegais(
+                    admin_id=current_user.id,
+                    ano_vigencia=ano
+                )
+                db.session.add(parametros)
+            
+            # Atualizar INSS
+            parametros.inss_faixa1_limite = float(request.form['inss_faixa1_limite'])
+            parametros.inss_faixa1_percentual = float(request.form['inss_faixa1_percentual'])
+            parametros.inss_faixa2_limite = float(request.form['inss_faixa2_limite'])
+            parametros.inss_faixa2_percentual = float(request.form['inss_faixa2_percentual'])
+            parametros.inss_faixa3_limite = float(request.form['inss_faixa3_limite'])
+            parametros.inss_faixa3_percentual = float(request.form['inss_faixa3_percentual'])
+            parametros.inss_faixa4_limite = float(request.form['inss_faixa4_limite'])
+            parametros.inss_faixa4_percentual = float(request.form['inss_faixa4_percentual'])
+            parametros.inss_teto = float(request.form['inss_teto'])
+            
+            # Atualizar IRRF
+            parametros.irrf_isencao = float(request.form['irrf_isencao'])
+            parametros.irrf_faixa1_limite = float(request.form['irrf_faixa1_limite'])
+            parametros.irrf_faixa1_percentual = float(request.form['irrf_faixa1_percentual'])
+            parametros.irrf_faixa1_deducao = float(request.form['irrf_faixa1_deducao'])
+            parametros.irrf_faixa2_limite = float(request.form['irrf_faixa2_limite'])
+            parametros.irrf_faixa2_percentual = float(request.form['irrf_faixa2_percentual'])
+            parametros.irrf_faixa2_deducao = float(request.form['irrf_faixa2_deducao'])
+            parametros.irrf_faixa3_limite = float(request.form['irrf_faixa3_limite'])
+            parametros.irrf_faixa3_percentual = float(request.form['irrf_faixa3_percentual'])
+            parametros.irrf_faixa3_deducao = float(request.form['irrf_faixa3_deducao'])
+            parametros.irrf_faixa4_percentual = float(request.form['irrf_faixa4_percentual'])
+            parametros.irrf_faixa4_deducao = float(request.form['irrf_faixa4_deducao'])
+            parametros.irrf_dependente_valor = float(request.form['irrf_dependente_valor'])
+            
+            # Atualizar outros
+            parametros.fgts_percentual = float(request.form['fgts_percentual'])
+            parametros.salario_minimo = float(request.form['salario_minimo'])
+            parametros.vale_transporte_percentual = float(request.form['vale_transporte_percentual'])
+            parametros.adicional_noturno_percentual = float(request.form['adicional_noturno_percentual'])
+            parametros.hora_extra_50_percentual = float(request.form['hora_extra_50_percentual'])
+            parametros.hora_extra_100_percentual = float(request.form['hora_extra_100_percentual'])
+            
+            db.session.commit()
+            
+            flash('Parâmetros legais atualizados com sucesso!', 'success')
+            return redirect(url_for('parametros_legais'))
+            
+        except Exception as e:
+            flash(f'Erro ao atualizar parâmetros: {str(e)}', 'danger')
+    
+    # Se não existe, criar com valores padrão 2024
+    if not parametros:
+        parametros = ParametrosLegais(
+            ano_vigencia=ano,
+            # Valores padrão INSS 2024
+            inss_faixa1_limite=1320.00,
+            inss_faixa1_percentual=7.5,
+            inss_faixa2_limite=2571.29,
+            inss_faixa2_percentual=9.0,
+            inss_faixa3_limite=3856.94,
+            inss_faixa3_percentual=12.0,
+            inss_faixa4_limite=7507.49,
+            inss_faixa4_percentual=14.0,
+            inss_teto=877.24,
+            # Valores padrão IRRF 2024
+            irrf_isencao=2112.00,
+            irrf_faixa1_limite=2826.65,
+            irrf_faixa1_percentual=7.5,
+            irrf_faixa1_deducao=158.40,
+            irrf_faixa2_limite=3751.05,
+            irrf_faixa2_percentual=15.0,
+            irrf_faixa2_deducao=370.40,
+            irrf_faixa3_limite=4664.68,
+            irrf_faixa3_percentual=22.5,
+            irrf_faixa3_deducao=651.73,
+            irrf_faixa4_percentual=27.5,
+            irrf_faixa4_deducao=884.96,
+            irrf_dependente_valor=189.59,
+            # Outros valores padrão
+            fgts_percentual=8.0,
+            salario_minimo=1412.00,
+            vale_transporte_percentual=6.0,
+            adicional_noturno_percentual=20.0,
+            hora_extra_50_percentual=50.0,
+            hora_extra_100_percentual=100.0
+        )
+    
+    return render_template('folha_pagamento/editar_parametros_legais.html',
+                         parametros=parametros,
+                         ano=ano)
+
+# RELATÓRIOS
+@app.route('/folha-pagamento/relatorios')
+@admin_required
+def relatorios_folha():
+    """Página de relatórios da folha de pagamento"""
+    
+    # Últimos 12 meses para seleção
+    hoje = date.today()
+    meses_disponiveis = []
+    
+    for i in range(12):
+        mes = (hoje.replace(day=1) - timedelta(days=i*30)).replace(day=1)
+        meses_disponiveis.append(mes)
+    
+    return render_template('folha_pagamento/relatorios.html',
+                         meses_disponiveis=meses_disponiveis)
+
+# RELATÓRIO RESUMO MENSAL
+@app.route('/folha-pagamento/relatorio-resumo/<int:ano>/<int:mes>')
+@admin_required
+def relatorio_resumo_mensal(ano, mes):
+    """Relatório resumo da folha mensal"""
+    
+    mes_referencia = date(ano, mes, 1)
+    
+    folhas = FolhaPagamento.query.filter_by(
+        admin_id=current_user.id,
+        mes_referencia=mes_referencia
+    ).join(Funcionario).order_by(Funcionario.nome).all()
+    
+    if not folhas:
+        flash('Nenhuma folha encontrada para este mês.', 'warning')
+        return redirect(url_for('relatorios_folha'))
+    
+    # Calcular totais e estatísticas
+    total_funcionarios = len(folhas)
+    total_proventos = sum(f.total_proventos for f in folhas)
+    total_descontos = sum(f.total_descontos for f in folhas)
+    total_liquido = sum(f.salario_liquido for f in folhas)
+    
+    # Detalhamento de descontos
+    total_inss = sum(f.inss for f in folhas)
+    total_irrf = sum(f.irrf for f in folhas)
+    total_fgts = sum(f.fgts for f in folhas)
+    total_vale_refeicao = sum(f.vale_refeicao for f in folhas)
+    total_vale_transporte = sum(f.vale_transporte for f in folhas)
+    total_plano_saude = sum(f.plano_saude for f in folhas)
+    
+    # Estatísticas
+    media_salarial = total_proventos / total_funcionarios if total_funcionarios > 0 else 0
+    maior_salario = max(f.total_proventos for f in folhas) if folhas else 0
+    menor_salario = min(f.total_proventos for f in folhas) if folhas else 0
+    
+    return render_template('folha_pagamento/relatorio_resumo.html',
+                         folhas=folhas,
+                         mes_referencia=mes_referencia,
+                         total_funcionarios=total_funcionarios,
+                         total_proventos=total_proventos,
+                         total_descontos=total_descontos,
+                         total_liquido=total_liquido,
+                         total_inss=total_inss,
+                         total_irrf=total_irrf,
+                         total_fgts=total_fgts,
+                         total_vale_refeicao=total_vale_refeicao,
+                         total_vale_transporte=total_vale_transporte,
+                         total_plano_saude=total_plano_saude,
+                         media_salarial=media_salarial,
+                         maior_salario=maior_salario,
+                         menor_salario=menor_salario)
+
+# EXPORTAR PARA ESOCIAL
+@app.route('/folha-pagamento/exportar-esocial/<int:ano>/<int:mes>')
+@admin_required
+def exportar_esocial(ano, mes):
+    """Exportar folha para eSocial"""
+    
+    try:
+        mes_referencia = date(ano, mes, 1)
+        filepath = gerar_arquivo_esocial(current_user.id, mes_referencia)
+        
+        if filepath and os.path.exists(filepath):
+            return send_file(filepath, as_attachment=True,
+                           download_name=f"esocial_{current_user.id}_{ano}_{mes:02d}.xml")
+        else:
+            flash('Erro ao gerar arquivo eSocial.', 'danger')
+            return redirect(url_for('relatorios_folha'))
+            
+    except Exception as e:
+        flash(f'Erro ao exportar eSocial: {str(e)}', 'danger')
+        return redirect(url_for('relatorios_folha'))
+
+# EXPORTAR PARA SEFIP
+@app.route('/folha-pagamento/exportar-sefip/<int:ano>/<int:mes>')
+@admin_required
+def exportar_sefip(ano, mes):
+    """Exportar folha para SEFIP"""
+    
+    try:
+        mes_referencia = date(ano, mes, 1)
+        filepath = gerar_arquivo_sefip(current_user.id, mes_referencia)
+        
+        if filepath and os.path.exists(filepath):
+            return send_file(filepath, as_attachment=True,
+                           download_name=f"sefip_{current_user.id}_{ano}_{mes:02d}.txt")
+        else:
+            flash('Erro ao gerar arquivo SEFIP.', 'danger')
+            return redirect(url_for('relatorios_folha'))
+            
+    except Exception as e:
+        flash(f'Erro ao exportar SEFIP: {str(e)}', 'danger')
+        return redirect(url_for('relatorios_folha'))
+```
+
+---
+
+## 🎨 TEMPLATES HTML RESPONSIVOS
+
+### **Template Principal: folha_pagamento/dashboard.html**
+
+```html
+{% extends "base.html" %}
+
+{% block title %}Folha de Pagamento - Dashboard{% endblock %}
+
+{% block extra_css %}
+<style>
+.metric-card {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    border-radius: 15px;
+    padding: 25px;
+    margin-bottom: 20px;
+    box-shadow: 0 8px 25px rgba(0,0,0,0.15);
+    transition: transform 0.3s ease;
+}
+
+.metric-card:hover {
+    transform: translateY(-5px);
+}
+
+.metric-value {
+    font-size: 2.8rem;
+    font-weight: bold;
+    margin-bottom: 8px;
+}
+
+.metric-label {
+    font-size: 1rem;
+    opacity: 0.9;
+    margin-bottom: 5px;
+}
+
+.metric-change {
+    font-size: 0.9rem;
+    opacity: 0.8;
+}
+
+.metric-change.positive {
+    color: #90EE90;
+}
+
+.metric-change.negative {
+    color: #FFB6C1;
+}
+
+.progress-card {
+    background: white;
+    border-radius: 15px;
+    padding: 25px;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+    margin-bottom: 20px;
+}
+
+.progress-circle {
+    width: 120px;
+    height: 120px;
+    border-radius: 50%;
+    background: conic-gradient(#28a745 0deg, #28a745 var(--progress-deg), #e9ecef var(--progress-deg), #e9ecef 360deg);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0 auto 20px;
+    position: relative;
+}
+
+.progress-circle::before {
+    content: '';
+    width: 90px;
+    height: 90px;
+    border-radius: 50%;
+    background: white;
+    position: absolute;
+}
+
+.progress-text {
+    position: relative;
+    z-index: 1;
+    font-size: 1.5rem;
+    font-weight: bold;
+    color: #333;
+}
+
+.table-hover tbody tr:hover {
+    background-color: rgba(0,123,255,0.1);
+}
+
+.btn-action {
+    padding: 5px 10px;
+    margin: 2px;
+    border-radius: 20px;
+    font-size: 0.8rem;
+}
+
+.status-badge {
+    padding: 5px 12px;
+    border-radius: 20px;
+    font-size: 0.8rem;
+    font-weight: bold;
+}
+
+.status-calculado {
+    background-color: #fff3cd;
+    color: #856404;
+}
+
+.status-aprovado {
+    background-color: #d1ecf1;
+    color: #0c5460;
+}
+
+.status-pago {
+    background-color: #d4edda;
+    color: #155724;
+}
+
+.chart-container {
+    background: white;
+    border-radius: 15px;
+    padding: 25px;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+    margin-bottom: 20px;
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h1><i class="fas fa-money-check-alt"></i> Folha de Pagamento</h1>
+                <div>
+                    <button class="btn btn-success" data-bs-toggle="modal" data-bs-target="#modalProcessarFolha">
+                        <i class="fas fa-play"></i> Processar Folha
+                    </button>
+                    <a href="{{ url_for('configuracoes_salariais') }}" class="btn btn-outline-primary">
+                        <i class="fas fa-cog"></i> Configurações
+                    </a>
+                    <a href="{{ url_for('relatorios_folha') }}" class="btn btn-outline-info">
+                        <i class="fas fa-chart-bar"></i> Relatórios
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Métricas Principais -->
+    <div class="row">
+        <div class="col-md-3">
+            <div class="metric-card">
+                <div class="metric-value">R$ {{ "{:,.2f}".format(total_folha) }}</div>
+                <div class="metric-label">Total da Folha</div>
+                <div class="metric-change {{ 'positive' if variacao >= 0 else 'negative' }}">
+                    <i class="fas fa-{{ 'arrow-up' if variacao >= 0 else 'arrow-down' }}"></i>
+                    {{ "{:+.1f}".format(variacao) }}% vs mês anterior
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="metric-card">
+                <div class="metric-value">R$ {{ "{:,.2f}".format(total_liquido) }}</div>
+                <div class="metric-label">Total Líquido</div>
+                <div class="metric-change">
+                    {{ "{:.1f}".format((total_liquido/total_folha*100) if total_folha > 0 else 0) }}% da folha bruta
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="metric-card">
+                <div class="metric-value">R$ {{ "{:,.2f}".format(total_encargos) }}</div>
+                <div class="metric-label">Total Encargos</div>
+                <div class="metric-change">
+                    INSS + FGTS
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="metric-card">
+                <div class="metric-value">{{ folhas_processadas }}</div>
+                <div class="metric-label">Funcionários Processados</div>
+                <div class="metric-change">
+                    de {{ funcionarios_ativos }} funcionários ativos
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Progresso do Processamento -->
+    <div class="row">
+        <div class="col-md-4">
+            <div class="progress-card text-center">
+                <h5>Progresso do Processamento</h5>
+                <div class="progress-circle" style="--progress-deg: {{ percentual_processado * 3.6 }}deg;">
+                    <div class="progress-text">{{ "{:.0f}".format(percentual_processado) }}%</div>
+                </div>
+                <p class="text-muted">{{ folhas_processadas }} de {{ funcionarios_ativos }} funcionários</p>
+                {% if percentual_processado < 100 %}
+                <button class="btn btn-warning btn-sm" data-bs-toggle="modal" data-bs-target="#modalProcessarFolha">
+                    <i class="fas fa-play"></i> Continuar Processamento
+                </button>
+                {% else %}
+                <span class="badge bg-success">Processamento Completo</span>
+                {% endif %}
+            </div>
+        </div>
+        
+        <!-- Gráfico de Distribuição -->
+        <div class="col-md-8">
+            <div class="chart-container">
+                <h5>Distribuição da Folha - {{ mes_referencia.strftime('%B/%Y') }}</h5>
+                <canvas id="chartDistribuicao" width="400" height="200"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <!-- Top Salários e Horas Extras -->
+    <div class="row">
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header">
+                    <h5><i class="fas fa-trophy text-warning"></i> Top 5 Maiores Salários</h5>
+                </div>
+                <div class="card-body">
+                    {% if top_salarios %}
+                    <div class="table-responsive">
+                        <table class="table table-sm table-hover">
+                            <thead>
+                                <tr>
+                                    <th>Funcionário</th>
+                                    <th>Cargo</th>
+                                    <th class="text-end">Salário Bruto</th>
+                                    <th class="text-end">Líquido</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for folha in top_salarios %}
+                                <tr>
+                                    <td>
+                                        <strong>{{ folha.funcionario.nome }}</strong><br>
+                                        <small class="text-muted">{{ folha.funcionario.matricula }}</small>
+                                    </td>
+                                    <td>{{ folha.funcionario.cargo or '-' }}</td>
+                                    <td class="text-end">
+                                        <strong>R$ {{ "{:,.2f}".format(folha.total_proventos) }}</strong>
+                                    </td>
+                                    <td class="text-end">
+                                        <span class="text-success">R$ {{ "{:,.2f}".format(folha.salario_liquido) }}</span>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    {% else %}
+                    <p class="text-muted">Nenhuma folha processada ainda.</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header">
+                    <h5><i class="fas fa-clock text-info"></i> Top 5 Horas Extras</h5>
+                </div>
+                <div class="card-body">
+                    {% if top_extras %}
+                    <div class="table-responsive">
+                        <table class="table table-sm table-hover">
+                            <thead>
+                                <tr>
+                                    <th>Funcionário</th>
+                                    <th class="text-end">Horas Extras</th>
+                                    <th class="text-end">Valor</th>
+                                    <th class="text-center">Ações</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for folha in top_extras %}
+                                <tr>
+                                    <td>
+                                        <strong>{{ folha.funcionario.nome }}</strong><br>
+                                        <small class="text-muted">{{ folha.funcionario.matricula }}</small>
+                                    </td>
+                                    <td class="text-end">
+                                        {% set calculo_horas = folha.funcionario.calculos_horas | selectattr('mes_referencia', 'equalto', mes_referencia) | first %}
+                                        {% if calculo_horas %}
+                                        {{ "{:.1f}".format(calculo_horas.horas_extras_50 + calculo_horas.horas_extras_100) }}h
+                                        {% else %}
+                                        -
+                                        {% endif %}
+                                    </td>
+                                    <td class="text-end">
+                                        <strong class="text-warning">R$ {{ "{:,.2f}".format(folha.horas_extras) }}</strong>
+                                    </td>
+                                    <td class="text-center">
+                                        <a href="{{ url_for('holerite_funcionario', funcionario_id=folha.funcionario_id, ano=mes_referencia.year, mes=mes_referencia.month) }}" 
+                                           class="btn btn-outline-primary btn-action" title="Ver Holerite">
+                                            <i class="fas fa-eye"></i>
+                                        </a>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    {% else %}
+                    <p class="text-muted">Nenhuma hora extra registrada.</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Ações Rápidas -->
+    <div class="row mt-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5><i class="fas fa-bolt"></i> Ações Rápidas</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-3">
+                            <a href="{{ url_for('folhas_mes', ano=mes_referencia.year, mes=mes_referencia.month) }}" 
+                               class="btn btn-outline-primary btn-lg w-100 mb-3">
+                                <i class="fas fa-list"></i><br>
+                                <small>Ver Folhas do Mês</small>
+                            </a>
+                        </div>
+                        <div class="col-md-3">
+                            <a href="{{ url_for('configuracoes_salariais') }}" 
+                               class="btn btn-outline-secondary btn-lg w-100 mb-3">
+                                <i class="fas fa-users-cog"></i><br>
+                                <small>Configurar Salários</small>
+                            </a>
+                        </div>
+                        <div class="col-md-3">
+                            <a href="{{ url_for('beneficios_funcionarios') }}" 
+                               class="btn btn-outline-info btn-lg w-100 mb-3">
+                                <i class="fas fa-gift"></i><br>
+                                <small>Gerenciar Benefícios</small>
+                            </a>
+                        </div>
+                        <div class="col-md-3">
+                            <a href="{{ url_for('parametros_legais') }}" 
+                               class="btn btn-outline-warning btn-lg w-100 mb-3">
+                                <i class="fas fa-balance-scale"></i><br>
+                                <small>Parâmetros Legais</small>
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Processar Folha -->
+<div class="modal fade" id="modalProcessarFolha" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Processar Folha de Pagamento</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="POST" action="{{ url_for('processar_folha_mes', ano=mes_referencia.year, mes=mes_referencia.month) }}">
+                <div class="modal-body">
+                    <div class="alert alert-info">
+                        <i class="fas fa-info-circle"></i>
+                        <strong>Processamento da Folha de {{ mes_referencia.strftime('%B/%Y') }}</strong><br>
+                        Esta ação irá calcular automaticamente a folha de pagamento de todos os funcionários ativos baseada nos pontos registrados.
+                    </div>
+                    
+                    {% if folhas_processadas > 0 %}
+                    <div class="alert alert-warning">
+                        <i class="fas fa-exclamation-triangle"></i>
+                        Já existem {{ folhas_processadas }} folhas processadas para este mês.
+                    </div>
+                    
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" name="reprocessar" value="true" id="reprocessar">
+                        <label class="form-check-label" for="reprocessar">
+                            <strong>Reprocessar folhas existentes</strong><br>
+                            <small class="text-muted">Marque esta opção para recalcular as folhas já processadas</small>
+                        </label>
+                    </div>
+                    {% endif %}
+                    
+                    <div class="mt-3">
+                        <h6>O que será processado:</h6>
+                        <ul class="list-unstyled">
+                            <li><i class="fas fa-check text-success"></i> Cálculo de horas trabalhadas</li>
+                            <li><i class="fas fa-check text-success"></i> Horas extras (50% e 100%)</li>
+                            <li><i class="fas fa-check text-success"></i> Adicional noturno (20%)</li>
+                            <li><i class="fas fa-check text-success"></i> DSR (Descanso Semanal Remunerado)</li>
+                            <li><i class="fas fa-check text-success"></i> INSS, IRRF e FGTS</li>
+                            <li><i class="fas fa-check text-success"></i> Benefícios (VR, VT, Plano de Saúde)</li>
+                            <li><i class="fas fa-check text-success"></i> Lançamentos recorrentes</li>
+                            <li><i class="fas fa-check text-success"></i> Adiantamentos</li>
+                        </ul>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-success">
+                        <i class="fas fa-play"></i> Processar Folha
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+// Gráfico de distribuição da folha
+const ctx = document.getElementById('chartDistribuicao').getContext('2d');
+const chartDistribuicao = new Chart(ctx, {
+    type: 'doughnut',
+    data: {
+        labels: ['Salário Líquido', 'INSS', 'IRRF', 'Benefícios', 'Outros'],
+        datasets: [{
+            data: [
+                {{ total_liquido }},
+                {{ folhas_mes | sum(attribute='inss') }},
+                {{ folhas_mes | sum(attribute='irrf') }},
+                {{ folhas_mes | sum(attribute='vale_refeicao') + folhas_mes | sum(attribute='vale_transporte') + folhas_mes | sum(attribute='plano_saude') }},
+                {{ folhas_mes | sum(attribute='outros_descontos') }}
+            ],
+            backgroundColor: [
+                '#28a745',
+                '#dc3545',
+                '#ffc107',
+                '#17a2b8',
+                '#6c757d'
+            ],
+            borderWidth: 2,
+            borderColor: '#fff'
+        }]
+    },
+    options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+            legend: {
+                position: 'bottom'
+            },
+            tooltip: {
+                callbacks: {
+                    label: function(context) {
+                        const value = context.parsed;
+                        const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                        const percentage = ((value / total) * 100).toFixed(1);
+                        return context.label + ': R$ ' + value.toLocaleString('pt-BR', {minimumFractionDigits: 2}) + ' (' + percentage + '%)';
+                    }
+                }
+            }
+        }
+    }
+});
+
+// Atualizar dashboard a cada 30 segundos
+setInterval(function() {
+    // Apenas recarregar se não houver modais abertos
+    if (!document.querySelector('.modal.show')) {
+        location.reload();
+    }
+}, 30000);
+</script>
+{% endblock %}
+```
+
+---
+
+## 🔧 FUNÇÕES UTILITÁRIAS ADICIONAIS
+
+### **Implementar estas funções auxiliares em utils.py:**
+
+```python
+# FUNÇÕES AUXILIARES PARA CONFIGURAÇÕES E BENEFÍCIOS
+def obter_configuracao_salarial_vigente(funcionario_id, data_referencia):
+    """Obter configuração salarial vigente na data"""
+    
+    return ConfiguracaoSalarial.query.filter(
+        ConfiguracaoSalarial.funcionario_id == funcionario_id,
+        ConfiguracaoSalarial.ativo == True,
+        ConfiguracaoSalarial.data_inicio <= data_referencia,
+        or_(ConfiguracaoSalarial.data_fim.is_(None), 
+            ConfiguracaoSalarial.data_fim >= data_referencia)
+    ).first()
+
+def calcular_proventos_funcionario(funcionario, config_salarial, calculo_horas, parametros):
+    """Calcular todos os proventos do funcionário"""
+    
+    # Calcular valor hora
+    if config_salarial.tipo_salario == 'HORISTA':
+        valor_hora = config_salarial.valor_hora
+        salario_base = calculo_horas.horas_normais * valor_hora
+    else:
+        valor_hora = config_salarial.salario_base / config_salarial.carga_horaria_mensal
+        # Salário mensal proporcional aos dias trabalhados
+        salario_base = config_salarial.salario_base * (calculo_horas.dias_trabalhados / calculo_horas.dias_uteis_mes)
+    
+    # Horas extras
+    horas_extras = (
+        (calculo_horas.horas_extras_50 * valor_hora * (parametros.hora_extra_50_percentual / 100 + 1)) +
+        (calculo_horas.horas_extras_100 * valor_hora * (parametros.hora_extra_100_percentual / 100 + 1))
+    )
+    
+    # Adicional noturno
+    adicional_noturno = calculo_horas.horas_noturnas * valor_hora * (parametros.adicional_noturno_percentual / 100)
+    
+    # DSR
+    dsr = calculo_horas.horas_dsr * valor_hora
+    
+    # Comissões (se aplicável)
+    comissoes = 0
+    if config_salarial.tipo_salario == 'COMISSIONADO' and config_salarial.percentual_comissao:
+        # Calcular comissões baseado nas vendas/obras do mês
+        comissoes = calcular_comissoes_funcionario(funcionario.id, calculo_horas.mes_referencia, config_salarial.percentual_comissao)
+    
+    # Descontos por faltas e atrasos
+    faltas = calculo_horas.faltas_horas * valor_hora
+    atrasos = calculo_horas.atrasos_horas * valor_hora
+    
+    return {
+        'salario_base': salario_base,
+        'horas_extras': horas_extras,
+        'adicional_noturno': adicional_noturno,
+        'dsr': dsr,
+        'comissoes': comissoes,
+        'faltas': faltas,
+        'atrasos': atrasos
+    }
+
+def calcular_descontos_obrigatorios(proventos, dependentes, parametros):
+    """Calcular INSS, IRRF e FGTS"""
+    
+    salario_bruto = (
+        proventos['salario_base'] +
+        proventos['horas_extras'] +
+        proventos['adicional_noturno'] +
+        proventos['dsr'] +
+        proventos['comissoes']
+    )
+    
+    # INSS
+    inss = calcular_inss(salario_bruto, parametros)
+    
+    # IRRF
+    irrf = calcular_irrf(salario_bruto, inss, dependentes or 0, parametros)
+    
+    # FGTS
+    fgts = calcular_fgts(salario_bruto, parametros)
+    
+    return {
+        'inss': inss,
+        'irrf': irrf,
+        'fgts': fgts
+    }
+
+def calcular_beneficios_funcionario(funcionario_id, mes_referencia):
+    """Calcular benefícios do funcionário no mês"""
+    
+    beneficios = BeneficioFuncionario.query.filter(
+        BeneficioFuncionario.funcionario_id == funcionario_id,
+        BeneficioFuncionario.ativo == True,
+        BeneficioFuncionario.data_inicio <= mes_referencia,
+        or_(BeneficioFuncionario.data_fim.is_(None), 
+            BeneficioFuncionario.data_fim >= mes_referencia)
+    ).all()
+    
+    resultado = {
+        'vale_refeicao': 0,
+        'vale_transporte': 0,
+        'plano_saude': 0,
+        'seguro_vida': 0,
+        'total_descontos': 0
+    }
+    
+    # Contar dias trabalhados no mês
+    dias_trabalhados = contar_dias_trabalhados_mes(funcionario_id, mes_referencia)
+    
+    for beneficio in beneficios:
+        if beneficio.tipo_beneficio == 'VALE_REFEICAO':
+            valor_total = beneficio.valor * dias_trabalhados
+            desconto = valor_total * (beneficio.percentual_desconto / 100)
+            resultado['vale_refeicao'] = desconto
+            
+        elif beneficio.tipo_beneficio == 'VALE_TRANSPORTE':
+            # Vale transporte com limite de 6% do salário
+            config_salarial = obter_configuracao_salarial_vigente(funcionario_id, mes_referencia)
+            limite_vt = config_salarial.salario_base * 0.06 if config_salarial else 0
+            
+            valor_total = beneficio.valor * dias_trabalhados * 2  # Ida e volta
+            desconto = min(valor_total * (beneficio.percentual_desconto / 100), limite_vt)
+            resultado['vale_transporte'] = desconto
+            
+        elif beneficio.tipo_beneficio == 'PLANO_SAUDE':
+            resultado['plano_saude'] = beneficio.valor * (beneficio.percentual_desconto / 100)
+            
+        elif beneficio.tipo_beneficio == 'SEGURO_VIDA':
+            resultado['seguro_vida'] = beneficio.valor * (beneficio.percentual_desconto / 100)
+    
+    resultado['total_descontos'] = sum([
+        resultado['vale_refeicao'],
+        resultado['vale_transporte'],
+        resultado['plano_saude'],
+        resultado['seguro_vida']
+    ])
+    
+    return resultado
+
+def calcular_lancamentos_recorrentes(funcionario_id, mes_referencia, salario_base):
+    """Calcular lançamentos recorrentes do funcionário"""
+    
+    lancamentos = LancamentoRecorrente.query.filter(
+        LancamentoRecorrente.funcionario_id == funcionario_id,
+        LancamentoRecorrente.ativo == True,
+        LancamentoRecorrente.data_inicio <= mes_referencia,
+        or_(LancamentoRecorrente.data_fim.is_(None), 
+            LancamentoRecorrente.data_fim >= mes_referencia)
+    ).all()
+    
+    total_proventos = 0
+    total_descontos = 0
+    
+    for lancamento in lancamentos:
+        if lancamento.percentual:
+            valor = salario_base * (lancamento.percentual / 100)
+        else:
+            valor = lancamento.valor
+        
+        if lancamento.tipo == 'PROVENTO':
+            total_proventos += valor
+        else:
+            total_descontos += valor
+    
+    return {
+        'proventos': total_proventos,
+        'descontos': total_descontos
+    }
+
+def calcular_adiantamentos_mes(funcionario_id, mes_referencia):
+    """Calcular valor de adiantamentos a descontar no mês"""
+    
+    adiantamentos = Adiantamento.query.filter(
+        Adiantamento.funcionario_id == funcionario_id,
+        Adiantamento.status == 'APROVADO',
+        Adiantamento.parcelas_pagas < Adiantamento.parcelas
+    ).all()
+    
+    total_desconto = 0
+    
+    for adiantamento in adiantamentos:
+        # Descontar uma parcela por mês
+        if adiantamento.parcelas_pagas < adiantamento.parcelas:
+            total_desconto += adiantamento.valor_parcela
+            
+            # Atualizar parcelas pagas
+            adiantamento.parcelas_pagas += 1
+            if adiantamento.parcelas_pagas >= adiantamento.parcelas:
+                adiantamento.status = 'QUITADO'
+    
+    return total_desconto
+
+def contar_dias_trabalhados_mes(funcionario_id, mes_referencia):
+    """Contar dias efetivamente trabalhados no mês"""
+    
+    inicio_mes = mes_referencia.replace(day=1)
+    fim_mes = (inicio_mes + timedelta(days=32)).replace(day=1) - timedelta(days=1)
+    
+    pontos = Ponto.query.filter(
+        Ponto.funcionario_id == funcionario_id,
+        Ponto.data_ponto.between(inicio_mes, fim_mes),
+        Ponto.hora_entrada.isnot(None),
+        Ponto.hora_saida.isnot(None)
+    ).count()
+    
+    return pontos
+
+def calcular_comissoes_funcionario(funcionario_id, mes_referencia, percentual_comissao):
+    """Calcular comissões baseado nas vendas/obras do funcionário"""
+    
+    # Integração com Módulo 1 (Propostas)
+    # Buscar propostas aprovadas no mês onde o funcionário foi responsável
+    
+    inicio_mes = mes_referencia.replace(day=1)
+    fim_mes = (inicio_mes + timedelta(days=32)).replace(day=1) - timedelta(days=1)
+    
+    # Assumindo que existe uma relação entre funcionário e propostas
+    # Esta implementação pode ser ajustada conforme a estrutura real
+    
+    try:
+        from models import Proposta  # Módulo 1
+        
+        propostas_aprovadas = Proposta.query.filter(
+            Proposta.responsavel_id == funcionario_id,  # Se existir este campo
+            Proposta.status == 'APROVADA',
+            Proposta.data_aprovacao.between(inicio_mes, fim_mes)
+        ).all()
+        
+        total_vendas = sum(p.valor_total for p in propostas_aprovadas)
+        comissao = total_vendas * (percentual_comissao / 100)
+        
+        return comissao
+        
+    except ImportError:
+        # Se Módulo 1 não estiver disponível, retornar 0
+        return 0
+
+# GERAÇÃO DE HOLERITE PDF
+def gerar_holerite_pdf_funcionario(funcionario_id, mes_referencia):
+    """Gerar holerite em PDF usando reportlab"""
+    
+    folha = FolhaPagamento.query.filter_by(
+        funcionario_id=funcionario_id,
+        mes_referencia=mes_referencia
+    ).first()
+    
+    if not folha:
+        return None
+    
+    try:
+        from reportlab.pdfgen import canvas
+        from reportlab.lib.pagesizes import A4
+        from reportlab.lib.units import mm
+        from reportlab.pdfbase import pdfutils
+        
+        # Criar diretório se não existir
+        os.makedirs('static/holerites', exist_ok=True)
+        
+        filename = f"holerite_{funcionario_id}_{mes_referencia.strftime('%Y_%m')}.pdf"
+        filepath = os.path.join('static/holerites', filename)
+        
+        # Criar PDF
+        c = canvas.Canvas(filepath, pagesize=A4)
+        width, height = A4
+        
+        # Cabeçalho
+        c.setFont("Helvetica-Bold", 16)
+        c.drawString(50, height - 50, "DEMONSTRATIVO DE PAGAMENTO")
+        
+        # Dados da empresa
+        empresa = folha.funcionario.admin
+        c.setFont("Helvetica", 10)
+        c.drawString(50, height - 80, f"Empresa: {empresa.nome}")
+        c.drawString(50, height - 95, f"CNPJ: {empresa.cnpj}")
+        
+        # Dados do funcionário
+        funcionario = folha.funcionario
+        c.drawString(50, height - 120, f"Funcionário: {funcionario.nome}")
+        c.drawString(50, height - 135, f"Matrícula: {funcionario.matricula}")
+        c.drawString(50, height - 150, f"Cargo: {funcionario.cargo or '-'}")
+        c.drawString(50, height - 165, f"Período: {mes_referencia.strftime('%m/%Y')}")
+        
+        # Linha separadora
+        c.line(50, height - 180, width - 50, height - 180)
+        
+        # Cabeçalho da tabela
+        y_pos = height - 200
+        c.setFont("Helvetica-Bold", 10)
+        c.drawString(50, y_pos, "DESCRIÇÃO")
+        c.drawString(300, y_pos, "PROVENTOS")
+        c.drawString(400, y_pos, "DESCONTOS")
+        
+        # Linha do cabeçalho
+        c.line(50, y_pos - 5, width - 50, y_pos - 5)
+        y_pos -= 20
+        
+        # Proventos
+        c.setFont("Helvetica", 9)
+        
+        if folha.salario_base > 0:
+            c.drawString(50, y_pos, "Salário Base")
+            c.drawString(300, y_pos, f"R$ {folha.salario_base:.2f}")
+            y_pos -= 15
+        
+        if folha.horas_extras > 0:
+            c.drawString(50, y_pos, "Horas Extras")
+            c.drawString(300, y_pos, f"R$ {folha.horas_extras:.2f}")
+            y_pos -= 15
+        
+        if folha.adicional_noturno > 0:
+            c.drawString(50, y_pos, "Adicional Noturno")
+            c.drawString(300, y_pos, f"R$ {folha.adicional_noturno:.2f}")
+            y_pos -= 15
+        
+        if folha.dsr > 0:
+            c.drawString(50, y_pos, "DSR")
+            c.drawString(300, y_pos, f"R$ {folha.dsr:.2f}")
+            y_pos -= 15
+        
+        if folha.comissoes > 0:
+            c.drawString(50, y_pos, "Comissões")
+            c.drawString(300, y_pos, f"R$ {folha.comissoes:.2f}")
+            y_pos -= 15
+        
+        # Descontos
+        y_pos = height - 220  # Resetar posição para descontos
+        
+        if folha.inss > 0:
+            c.drawString(50, y_pos, "INSS")
+            c.drawString(400, y_pos, f"R$ {folha.inss:.2f}")
+            y_pos -= 15
+        
+        if folha.irrf > 0:
+            c.drawString(50, y_pos, "IRRF")
+            c.drawString(400, y_pos, f"R$ {folha.irrf:.2f}")
+            y_pos -= 15
+        
+        if folha.vale_refeicao > 0:
+            c.drawString(50, y_pos, "Vale Refeição")
+            c.drawString(400, y_pos, f"R$ {folha.vale_refeicao:.2f}")
+            y_pos -= 15
+        
+        if folha.vale_transporte > 0:
+            c.drawString(50, y_pos, "Vale Transporte")
+            c.drawString(400, y_pos, f"R$ {folha.vale_transporte:.2f}")
+            y_pos -= 15
+        
+        if folha.plano_saude > 0:
+            c.drawString(50, y_pos, "Plano de Saúde")
+            c.drawString(400, y_pos, f"R$ {folha.plano_saude:.2f}")
+            y_pos -= 15
+        
+        if folha.adiantamentos > 0:
+            c.drawString(50, y_pos, "Adiantamentos")
+            c.drawString(400, y_pos, f"R$ {folha.adiantamentos:.2f}")
+            y_pos -= 15
+        
+        # Totais
+        y_pos = height - 400
+        c.line(50, y_pos, width - 50, y_pos)
+        y_pos -= 20
+        
+        c.setFont("Helvetica-Bold", 10)
+        c.drawString(50, y_pos, "TOTAL PROVENTOS")
+        c.drawString(300, y_pos, f"R$ {folha.total_proventos:.2f}")
+        c.drawString(50, y_pos - 15, "TOTAL DESCONTOS")
+        c.drawString(400, y_pos - 15, f"R$ {folha.total_descontos:.2f}")
+        
+        # Linha final
+        c.line(50, y_pos - 30, width - 50, y_pos - 30)
+        
+        # Salário líquido
+        c.setFont("Helvetica-Bold", 12)
+        c.drawString(50, y_pos - 50, "SALÁRIO LÍQUIDO")
+        c.drawString(350, y_pos - 50, f"R$ {folha.salario_liquido:.2f}")
+        
+        # Informações adicionais
+        c.setFont("Helvetica", 8)
+        c.drawString(50, y_pos - 80, f"FGTS: R$ {folha.fgts:.2f} (depositado em conta vinculada)")
+        c.drawString(50, y_pos - 95, f"Processado em: {folha.calculado_em.strftime('%d/%m/%Y %H:%M')}")
+        
+        # Rodapé
+        c.drawString(50, 50, "Este documento foi gerado automaticamente pelo sistema SIGE.")
+        
+        c.save()
+        
+        return filepath
+        
+    except Exception as e:
+        print(f"Erro ao gerar PDF: {str(e)}")
+        return None
+
+# EXPORTAÇÃO PARA ESOCIAL
+def gerar_arquivo_esocial(admin_id, mes_referencia):
+    """Gerar arquivo XML para eSocial"""
+    
+    folhas = FolhaPagamento.query.filter_by(
+        admin_id=admin_id,
+        mes_referencia=mes_referencia
+    ).join(Funcionario).all()
+    
+    if not folhas:
+        return None
+    
+    try:
+        import xml.etree.ElementTree as ET
+        
+        # Criar estrutura XML do eSocial
+        root = ET.Element("eSocial")
+        root.set("xmlns", "http://www.esocial.gov.br/schema/evt/evtRemun/v_S_01_02_00")
+        
+        # Evento de remuneração
+        evt_remun = ET.SubElement(root, "evtRemun")
+        evt_remun.set("Id", f"ID1{admin_id}{mes_referencia.strftime('%Y%m')}00001")
+        
+        # Identificação do evento
+        ide_evento = ET.SubElement(evt_remun, "ideEvento")
+        ET.SubElement(ide_evento, "indRetif").text = "1"
+        ET.SubElement(ide_evento, "nrRecibo").text = ""
+        ET.SubElement(ide_evento, "perApur").text = mes_referencia.strftime("%Y-%m")
+        ET.SubElement(ide_evento, "tpAmb").text = "2"  # Produção
+        ET.SubElement(ide_evento, "procEmi").text = "1"
+        ET.SubElement(ide_evento, "verProc").text = "SIGE_1.0"
+        
+        # Identificação do empregador
+        empresa = Usuario.query.get(admin_id)
+        ide_empregador = ET.SubElement(evt_remun, "ideEmpregador")
+        ET.SubElement(ide_empregador, "tpInsc").text = "1"
+        ET.SubElement(ide_empregador, "nrInsc").text = empresa.cnpj.replace('.', '').replace('/', '').replace('-', '')
+        
+        # Dados dos trabalhadores
+        for folha in folhas:
+            funcionario = folha.funcionario
+            
+            ide_trabalhador = ET.SubElement(evt_remun, "ideTrabalhador")
+            ET.SubElement(ide_trabalhador, "cpfTrab").text = funcionario.cpf.replace('.', '').replace('-', '')
+            ET.SubElement(ide_trabalhador, "nisTrab").text = funcionario.pis.replace('.', '').replace('-', '')
+            
+            # Remuneração do período
+            dmDev = ET.SubElement(ide_trabalhador, "dmDev")
+            ET.SubElement(dmDev, "ideDmDev").text = "1"
+            
+            # Informações de remuneração
+            infoPerApur = ET.SubElement(dmDev, "infoPerApur")
+            
+            # Itens de remuneração
+            if folha.salario_base > 0:
+                detVerbas = ET.SubElement(infoPerApur, "detVerbas")
+                ET.SubElement(detVerbas, "codRubr").text = "1000"
+                ET.SubElement(detVerbas, "ideTabRubr").text = "SALARIO_BASE"
+                ET.SubElement(detVerbas, "qtdRubr").text = "1"
+                ET.SubElement(detVerbas, "fatorRubr").text = "1"
+                ET.SubElement(detVerbas, "vrUnit").text = f"{folha.salario_base:.2f}"
+                ET.SubElement(detVerbas, "vrRubr").text = f"{folha.salario_base:.2f}"
+            
+            if folha.horas_extras > 0:
+                detVerbas = ET.SubElement(infoPerApur, "detVerbas")
+                ET.SubElement(detVerbas, "codRubr").text = "1010"
+                ET.SubElement(detVerbas, "ideTabRubr").text = "HORAS_EXTRAS"
+                ET.SubElement(detVerbas, "qtdRubr").text = "1"
+                ET.SubElement(detVerbas, "fatorRubr").text = "1"
+                ET.SubElement(detVerbas, "vrUnit").text = f"{folha.horas_extras:.2f}"
+                ET.SubElement(detVerbas, "vrRubr").text = f"{folha.horas_extras:.2f}"
+        
+        # Salvar arquivo
+        os.makedirs('static/esocial', exist_ok=True)
+        filename = f"esocial_{admin_id}_{mes_referencia.strftime('%Y_%m')}.xml"
+        filepath = os.path.join('static/esocial', filename)
+        
+        tree = ET.ElementTree(root)
+        tree.write(filepath, encoding='utf-8', xml_declaration=True)
+        
+        return filepath
+        
+    except Exception as e:
+        print(f"Erro ao gerar eSocial: {str(e)}")
+        return None
+
+# EXPORTAÇÃO PARA SEFIP
+def gerar_arquivo_sefip(admin_id, mes_referencia):
+    """Gerar arquivo texto para SEFIP"""
+    
+    folhas = FolhaPagamento.query.filter_by(
+        admin_id=admin_id,
+        mes_referencia=mes_referencia
+    ).join(Funcionario).all()
+    
+    if not folhas:
+        return None
+    
+    try:
+        # Criar arquivo SEFIP (formato texto fixo)
+        linhas = []
+        
+        # Cabeçalho
+        empresa = Usuario.query.get(admin_id)
+        cnpj_limpo = empresa.cnpj.replace('.', '').replace('/', '').replace('-', '')
+        
+        linha_cabecalho = (
+            f"00"  # Tipo de registro
+            f"{cnpj_limpo:<14}"  # CNPJ
+            f"{empresa.nome[:40]:<40}"  # Nome da empresa
+            f"{mes_referencia.strftime('%m%Y')}"  # Competência
+        )
+        linhas.append(linha_cabecalho)
+        
+        # Dados dos funcionários
+        for folha in folhas:
+            funcionario = folha.funcionario
+            pis_limpo = funcionario.pis.replace('.', '').replace('-', '') if funcionario.pis else '00000000000'
+            
+            linha_funcionario = (
+                f"10"  # Tipo de registro
+                f"{pis_limpo:<11}"  # PIS
+                f"{funcionario.nome[:40]:<40}"  # Nome
+                f"{int(folha.salario_base * 100):>10}"  # Salário base (centavos)
+                f"{int(folha.total_proventos * 100):>10}"  # Total proventos (centavos)
+                f"{int(folha.inss * 100):>8}"  # INSS (centavos)
+                f"{int(folha.fgts * 100):>8}"  # FGTS (centavos)
+            )
+            linhas.append(linha_funcionario)
+        
+        # Rodapé
+        total_funcionarios = len(folhas)
+        total_salarios = sum(f.total_proventos for f in folhas)
+        total_inss = sum(f.inss for f in folhas)
+        total_fgts = sum(f.fgts for f in folhas)
+        
+        linha_rodape = (
+            f"99"  # Tipo de registro
+            f"{total_funcionarios:>6}"  # Total funcionários
+            f"{int(total_salarios * 100):>12}"  # Total salários (centavos)
+            f"{int(total_inss * 100):>10}"  # Total INSS (centavos)
+            f"{int(total_fgts * 100):>10}"  # Total FGTS (centavos)
+        )
+        linhas.append(linha_rodape)
+        
+        # Salvar arquivo
+        os.makedirs('static/sefip', exist_ok=True)
+        filename = f"sefip_{admin_id}_{mes_referencia.strftime('%Y_%m')}.txt"
+        filepath = os.path.join('static/sefip', filename)
+        
+        with open(filepath, 'w', encoding='latin-1') as f:
+            for linha in linhas:
+                f.write(linha + '\n')
+        
+        return filepath
+        
+    except Exception as e:
+        print(f"Erro ao gerar SEFIP: {str(e)}")
+        return None
+
+# FUNÇÃO PARA OBTER ADMIN_ID ATUAL
+def get_current_admin_id():
+    """Obter admin_id do usuário atual"""
+    from flask_login import current_user
+    
+    if current_user.is_authenticated:
+        if current_user.tipo_usuario == TipoUsuario.SUPER_ADMIN:
+            # Para super admin, pode ser necessário especificar qual empresa
+            return current_user.id  # ou lógica específica
+        elif current_user.tipo_usuario == TipoUsuario.ADMIN:
+            return current_user.id
+        else:  # FUNCIONARIO
+            return current_user.admin_id
+    
+    return None
+```
+
+
+---
+
+## 📋 INSTRUÇÕES DE IMPLEMENTAÇÃO
+
+### **PASSO 1: Preparação do Banco de Dados**
+
+```python
+# Executar no terminal Python do Flask
+from app import app, db
+with app.app_context():
+    # Criar novas tabelas
+    db.create_all()
+    print("Tabelas do Módulo 6 criadas com sucesso!")
+    
+    # Verificar se tabelas foram criadas
+    from sqlalchemy import inspect
+    inspector = inspect(db.engine)
+    tabelas = inspector.get_table_names()
+    
+    tabelas_modulo6 = [
+        'configuracao_salarial',
+        'beneficio_funcionario', 
+        'calculo_horas_mensal',
+        'folha_pagamento',
+        'lancamento_recorrente',
+        'adiantamento',
+        'ferias_decimo',
+        'parametros_legais'
+    ]
+    
+    for tabela in tabelas_modulo6:
+        if tabela in tabelas:
+            print(f"✓ Tabela {tabela} criada")
+        else:
+            print(f"✗ Erro: Tabela {tabela} não foi criada")
+```
+
+### **PASSO 2: Configuração Inicial dos Parâmetros Legais**
+
+```python
+# Criar parâmetros legais para 2024
+def criar_parametros_legais_2024(admin_id):
+    """Criar parâmetros legais padrão para 2024"""
+    
+    parametros = ParametrosLegais(
+        admin_id=admin_id,
+        ano_vigencia=2024,
+        
+        # INSS 2024
+        inss_faixa1_limite=1320.00,
+        inss_faixa1_percentual=7.5,
+        inss_faixa2_limite=2571.29,
+        inss_faixa2_percentual=9.0,
+        inss_faixa3_limite=3856.94,
+        inss_faixa3_percentual=12.0,
+        inss_faixa4_limite=7507.49,
+        inss_faixa4_percentual=14.0,
+        inss_teto=877.24,
+        
+        # IRRF 2024
+        irrf_isencao=2112.00,
+        irrf_faixa1_limite=2826.65,
+        irrf_faixa1_percentual=7.5,
+        irrf_faixa1_deducao=158.40,
+        irrf_faixa2_limite=3751.05,
+        irrf_faixa2_percentual=15.0,
+        irrf_faixa2_deducao=370.40,
+        irrf_faixa3_limite=4664.68,
+        irrf_faixa3_percentual=22.5,
+        irrf_faixa3_deducao=651.73,
+        irrf_faixa4_percentual=27.5,
+        irrf_faixa4_deducao=884.96,
+        irrf_dependente_valor=189.59,
+        
+        # Outros
+        fgts_percentual=8.0,
+        salario_minimo=1412.00,
+        vale_transporte_percentual=6.0,
+        adicional_noturno_percentual=20.0,
+        hora_extra_50_percentual=50.0,
+        hora_extra_100_percentual=100.0
+    )
+    
+    db.session.add(parametros)
+    db.session.commit()
+    
+    return parametros
+
+# Executar para cada admin
+with app.app_context():
+    admins = Usuario.query.filter_by(tipo_usuario=TipoUsuario.ADMIN).all()
+    for admin in admins:
+        if not ParametrosLegais.query.filter_by(admin_id=admin.id, ano_vigencia=2024).first():
+            criar_parametros_legais_2024(admin.id)
+            print(f"Parâmetros legais criados para {admin.nome}")
+```
+
+### **PASSO 3: Instalação de Dependências**
+
+```bash
+# Instalar bibliotecas necessárias
+pip install reportlab==4.0.4  # Para geração de PDF
+pip install lxml==4.9.3       # Para processamento XML
+pip install python-dateutil==2.8.2  # Para cálculos de data
+```
+
+### **PASSO 4: Configuração de Diretórios**
+
+```python
+# Criar diretórios necessários
+import os
+
+diretorios = [
+    'static/holerites',
+    'static/esocial',
+    'static/sefip',
+    'templates/folha_pagamento'
+]
+
+for diretorio in diretorios:
+    os.makedirs(diretorio, exist_ok=True)
+    print(f"Diretório {diretorio} criado")
+```
+
+### **PASSO 5: Atualização do Menu Principal**
+
+```html
+<!-- Adicionar ao menu principal em base.html -->
+<li class="nav-item dropdown">
+    <a class="nav-link dropdown-toggle" href="#" id="navbarFolha" role="button" data-bs-toggle="dropdown">
+        <i class="fas fa-money-check-alt"></i> Folha de Pagamento
+    </a>
+    <ul class="dropdown-menu">
+        <li><a class="dropdown-item" href="{{ url_for('dashboard_folha') }}">
+            <i class="fas fa-tachometer-alt"></i> Dashboard
+        </a></li>
+        <li><hr class="dropdown-divider"></li>
+        <li><a class="dropdown-item" href="{{ url_for('configuracoes_salariais') }}">
+            <i class="fas fa-users-cog"></i> Configurações Salariais
+        </a></li>
+        <li><a class="dropdown-item" href="{{ url_for('beneficios_funcionarios') }}">
+            <i class="fas fa-gift"></i> Benefícios
+        </a></li>
+        <li><a class="dropdown-item" href="{{ url_for('parametros_legais') }}">
+            <i class="fas fa-balance-scale"></i> Parâmetros Legais
+        </a></li>
+        <li><hr class="dropdown-divider"></li>
+        <li><a class="dropdown-item" href="{{ url_for('relatorios_folha') }}">
+            <i class="fas fa-chart-bar"></i> Relatórios
+        </a></li>
+    </ul>
+</li>
+```
+
+### **PASSO 6: Teste de Funcionamento**
+
+```python
+# Script de teste completo
+def testar_modulo_folha_pagamento():
+    """Testar funcionamento do módulo de folha de pagamento"""
+    
+    print("=== TESTE DO MÓDULO 6 - FOLHA DE PAGAMENTO ===")
+    
+    # 1. Testar criação de configuração salarial
+    try:
+        funcionario = Funcionario.query.first()
+        if funcionario:
+            config = ConfiguracaoSalarial(
+                funcionario_id=funcionario.id,
+                salario_base=3000.00,
+                tipo_salario='MENSAL',
+                carga_horaria_mensal=220,
+                dependentes=0,
+                data_inicio=date.today(),
+                admin_id=funcionario.admin_id
+            )
+            db.session.add(config)
+            db.session.commit()
+            print("✓ Configuração salarial criada")
+        else:
+            print("✗ Nenhum funcionário encontrado para teste")
+    except Exception as e:
+        print(f"✗ Erro na configuração salarial: {e}")
+    
+    # 2. Testar cálculo de horas
+    try:
+        if funcionario:
+            calculo = calcular_horas_mensal(funcionario.id, date.today().replace(day=1))
+            print(f"✓ Cálculo de horas: {calculo.horas_normais}h normais")
+    except Exception as e:
+        print(f"✗ Erro no cálculo de horas: {e}")
+    
+    # 3. Testar cálculos de impostos
+    try:
+        parametros = ParametrosLegais.query.first()
+        if parametros:
+            inss = calcular_inss(3000.00, parametros)
+            irrf = calcular_irrf(3000.00, inss, 0, parametros)
+            fgts = calcular_fgts(3000.00, parametros)
+            print(f"✓ Impostos calculados: INSS={inss:.2f}, IRRF={irrf:.2f}, FGTS={fgts:.2f}")
+        else:
+            print("✗ Parâmetros legais não encontrados")
+    except Exception as e:
+        print(f"✗ Erro no cálculo de impostos: {e}")
+    
+    # 4. Testar processamento da folha
+    try:
+        if funcionario:
+            resultados = processar_folha_mensal(funcionario.admin_id, date.today().replace(day=1))
+            sucessos = [r for r in resultados if r['sucesso']]
+            print(f"✓ Folha processada: {len(sucessos)} funcionários")
+    except Exception as e:
+        print(f"✗ Erro no processamento da folha: {e}")
+    
+    # 5. Testar geração de holerite
+    try:
+        if funcionario:
+            filepath = gerar_holerite_pdf_funcionario(funcionario.id, date.today().replace(day=1))
+            if filepath and os.path.exists(filepath):
+                print("✓ Holerite PDF gerado")
+            else:
+                print("✗ Erro na geração do holerite")
+    except Exception as e:
+        print(f"✗ Erro na geração do holerite: {e}")
+    
+    print("\n🎉 TESTE CONCLUÍDO!")
+
+# Executar teste
+if __name__ == "__main__":
+    with app.app_context():
+        testar_modulo_folha_pagamento()
+```
+
+---
+
+## 🔗 INTEGRAÇÃO COM MÓDULOS ANTERIORES
+
+### **Com Módulo 1 (Propostas):**
+- **Comissões automáticas:** Quando proposta é aprovada, gera comissão para o responsável
+- **Metas de vendas:** Bonificações baseadas em propostas fechadas
+- **Custos de mão de obra:** Cliente vê estimativa de custos com equipe
+
+### **Com Módulo 2 (Portal Cliente):**
+- **Transparência total:** Cliente pode ver custos de mão de obra em tempo real
+- **Relatórios:** Comparativo de investimento em materiais vs mão de obra
+- **Eficiência:** Métricas de produtividade da equipe por obra
+
+### **Com Módulo 3 (Gestão Equipes):**
+- **Alocação inteligente:** Sistema considera custo/hora de cada funcionário
+- **Produtividade:** Métricas de eficiência por funcionário e obra
+- **Otimização:** Sugestões de alocação baseadas em custo-benefício
+
+### **Com Módulo 4 (Almoxarifado):**
+- **Análise de custos:** Comparativo entre custos de materiais e mão de obra
+- **Eficiência:** Correlação entre consumo de materiais e produtividade
+- **Relatórios integrados:** Custo total da obra (materiais + mão de obra)
+
+### **Com Módulo 5 (Reconhecimento Facial):**
+- **Automação total:** Pontos automáticos alimentam folha sem intervenção
+- **Precisão absoluta:** Zero erro humano no controle de horas
+- **Auditoria:** Rastreabilidade completa de presença vs pagamento
+
+### **Preparação para Módulo 7 (Contabilidade):**
+- **Lançamentos automáticos:** Folha gera lançamentos contábeis automaticamente
+- **Provisões:** Cálculo automático de 13º, férias e encargos
+- **DRE:** Custos de pessoal detalhados por centro de custo
+- **Balancete:** Contas de salários, encargos e provisões atualizadas
+
+---
+
+## ⚠️ REGRAS CRÍTICAS DE IMPLEMENTAÇÃO
+
+### **1. COMPATIBILIDADE TOTAL:**
+- **NUNCA** modificar classes existentes além do especificado
+- **SEMPRE** usar `admin_id` para multi-tenant
+- **MANTER** todas as funcionalidades atuais funcionando
+- **INTEGRAR** perfeitamente com sistema de ponto existente
+
+### **2. CONFORMIDADE LEGAL OBRIGATÓRIA:**
+- **IMPLEMENTAR** todas as regras da CLT sem exceção
+- **CALCULAR** INSS, IRRF e FGTS com precisão legal
+- **MANTER** conformidade com eSocial e SEFIP
+- **AUDITAR** todos os cálculos automaticamente
+
+### **3. PRECISÃO DOS CÁLCULOS:**
+- **USAR** Decimal para valores monetários (nunca float)
+- **VALIDAR** todos os cálculos com regras de negócio
+- **IMPLEMENTAR** arredondamentos conforme legislação
+- **TESTAR** com casos extremos e limites legais
+
+### **4. PERFORMANCE OTIMIZADA:**
+- **USAR** cache para parâmetros legais
+- **IMPLEMENTAR** índices apropriados no banco
+- **OTIMIZAR** queries com joins eficientes
+- **PROCESSAR** folha em lotes para grandes volumes
+
+### **5. SEGURANÇA E AUDITORIA:**
+- **REGISTRAR** todos os cálculos e alterações
+- **IMPLEMENTAR** logs de auditoria completos
+- **VALIDAR** permissões de acesso rigorosamente
+- **CRIPTOGRAFAR** dados sensíveis quando necessário
+
+### **6. EXPERIÊNCIA DO USUÁRIO:**
+- **FORNECER** feedback visual em tempo real
+- **IMPLEMENTAR** validações client-side
+- **CRIAR** interfaces responsivas para mobile
+- **GERAR** relatórios claros e profissionais
+
+---
+
+## 🎯 RESULTADO ESPERADO
+
+Após implementação completa, o sistema terá:
+
+✅ **Folha de pagamento 100% automática** baseada nos pontos do Módulo 5  
+✅ **Cálculos precisos** de INSS, IRRF, FGTS conforme legislação  
+✅ **Horas extras e adicional noturno** calculados automaticamente  
+✅ **DSR (Descanso Semanal Remunerado)** calculado corretamente  
+✅ **Benefícios automáticos** (VR, VT, plano de saúde)  
+✅ **Lançamentos recorrentes** processados automaticamente  
+✅ **Adiantamentos** controlados com parcelamento  
+✅ **Férias e 13º salário** calculados automaticamente  
+✅ **Holerites em PDF** gerados automaticamente  
+✅ **Dashboard completo** com métricas em tempo real  
+✅ **Relatórios avançados** para gestão e contabilidade  
+✅ **Exportação eSocial/SEFIP** automática  
+✅ **Auditoria completa** de conformidade CLT  
+✅ **Integração perfeita** com todos os módulos anteriores  
+
+---
+
+## 📊 MÉTRICAS DE SUCESSO
+
+### **Automação:**
+- **100%** dos cálculos automáticos (zero intervenção manual)
+- **< 5 segundos** para processar folha de até 100 funcionários
+- **Zero erros** de cálculo em auditoria
+
+### **Conformidade:**
+- **100%** de conformidade com CLT
+- **Aprovação** em auditoria trabalhista
+- **Compatibilidade total** com eSocial/SEFIP
+
+### **Produtividade:**
+- **90% redução** no tempo de processamento da folha
+- **Zero retrabalho** por erros de cálculo
+- **Relatórios instantâneos** para tomada de decisão
+
+### **Integração:**
+- **Funcionamento perfeito** com todos os 5 módulos anteriores
+- **Dados consistentes** entre todos os sistemas
+- **Fluxo end-to-end** sem quebras
+
+---
+
+## 🚀 PRÓXIMOS PASSOS
+
+### **Após Implementação:**
+1. **Testar** com dados reais de funcionários
+2. **Validar** cálculos com contador
+3. **Treinar** usuários no novo sistema
+4. **Monitorar** performance e ajustar se necessário
+
+### **Preparação para Módulo 7:**
+- **Mapear** contas contábeis para lançamentos automáticos
+- **Definir** centros de custo por obra/departamento
+- **Configurar** plano de contas integrado
+- **Preparar** relatórios contábeis automáticos
+
+---
+
+## 📞 SUPORTE E MANUTENÇÃO
+
+### **Monitoramento Contínuo:**
+- **Auditoria mensal** de cálculos
+- **Atualização** de parâmetros legais
+- **Backup** automático de dados
+- **Performance** do sistema
+
+### **Atualizações Legais:**
+- **Tabelas INSS/IRRF** atualizadas automaticamente
+- **Salário mínimo** atualizado anualmente
+- **Novas regras CLT** implementadas rapidamente
+- **Compatibilidade** com mudanças do eSocial
+
+### **Suporte aos Usuários:**
+- **Treinamento** contínuo da equipe
+- **Documentação** atualizada
+- **Suporte técnico** especializado
+- **Melhorias** baseadas no feedback
+
+**Status:** Módulo 6 especificado e pronto para implementação imediata! 🎯
+
+---
+
+## 🎉 CONCLUSÃO
+
+O **Módulo 6 - Sistema de Folha de Pagamento Automática** representa a **evolução definitiva** do SIGE, transformando-o na plataforma mais completa e avançada de gestão empresarial do mercado brasileiro.
+
+Com este módulo implementado, o SIGE oferecerá:
+- **Jornada completa** do cliente (Módulos 1-2)
+- **Gestão visual** de equipes (Módulo 3)
+- **Almoxarifado inteligente** (Módulo 4)
+- **Ponto biométrico** automático (Módulo 5)
+- **Folha de pagamento** 100% automática (Módulo 6)
+
+E estará **perfeitamente preparado** para o Módulo 7 (Sistema Contábil Completo), que fechará o ciclo com contabilidade totalmente integrada e automática.
+
+**🚀 O futuro da gestão empresarial está aqui!**
+

@@ -1,0 +1,378 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- Cabeçalho -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1 class="h3 mb-0 text-gray-800">
+            <i class="fas fa-upload"></i> Importar XML de Nota Fiscal
+        </h1>
+        <div>
+            <a href="{{ url_for('almoxarifado.listar_notas_fiscais') }}" class="btn btn-outline-secondary">
+                <i class="fas fa-list"></i> Ver Notas Fiscais
+            </a>
+        </div>
+    </div>
+
+    <!-- Instruções -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card border-info">
+                <div class="card-header bg-info text-white">
+                    <h6 class="m-0"><i class="fas fa-info-circle"></i> Como funciona a importação</h6>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-3 text-center">
+                            <i class="fas fa-upload fa-3x text-primary mb-2"></i>
+                            <h6>1. Upload do XML</h6>
+                            <p class="text-muted">Selecione o arquivo XML da NFe</p>
+                        </div>
+                        <div class="col-md-3 text-center">
+                            <i class="fas fa-search fa-3x text-success mb-2"></i>
+                            <h6>2. Validação</h6>
+                            <p class="text-muted">Sistema valida estrutura e dados</p>
+                        </div>
+                        <div class="col-md-3 text-center">
+                            <i class="fas fa-cogs fa-3x text-warning mb-2"></i>
+                            <h6>3. Processamento</h6>
+                            <p class="text-muted">Extrai fornecedor e produtos</p>
+                        </div>
+                        <div class="col-md-3 text-center">
+                            <i class="fas fa-check fa-3x text-info mb-2"></i>
+                            <h6>4. Finalização</h6>
+                            <p class="text-muted">Atualiza estoque automaticamente</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Área de Upload -->
+    <div class="row">
+        <div class="col-lg-8 mx-auto">
+            <div class="card shadow">
+                <div class="card-header">
+                    <h6 class="m-0 font-weight-bold text-primary">
+                        <i class="fas fa-file-upload"></i> Selecionar Arquivo XML
+                    </h6>
+                </div>
+                <div class="card-body">
+                    <!-- Área de Drag & Drop -->
+                    <div id="dropzone" class="border-dashed border-2 border-primary p-5 text-center rounded mb-4">
+                        <i class="fas fa-cloud-upload-alt fa-4x text-primary mb-3"></i>
+                        <h5>Arraste o arquivo XML aqui</h5>
+                        <p class="text-muted">ou clique no botão abaixo para selecionar</p>
+                        <input type="file" id="arquivo-xml" accept=".xml" style="display: none;">
+                        <button type="button" class="btn btn-primary" onclick="document.getElementById('arquivo-xml').click()">
+                            <i class="fas fa-folder-open"></i> Selecionar Arquivo
+                        </button>
+                    </div>
+                    
+                    <!-- Informações do Arquivo -->
+                    <div id="info-arquivo" style="display: none;">
+                        <div class="alert alert-info">
+                            <div class="row align-items-center">
+                                <div class="col-md-8">
+                                    <h6><i class="fas fa-file-alt"></i> <span id="nome-arquivo"></span></h6>
+                                    <p class="mb-0">Tamanho: <span id="tamanho-arquivo"></span></p>
+                                </div>
+                                <div class="col-md-4 text-end">
+                                    <button type="button" class="btn btn-success" onclick="processarXML()">
+                                        <i class="fas fa-play"></i> Processar XML
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Progresso -->
+                    <div id="progresso-upload" style="display: none;">
+                        <div class="mb-2">
+                            <strong>Processando XML...</strong>
+                        </div>
+                        <div class="progress">
+                            <div class="progress-bar progress-bar-animated" role="progressbar" style="width: 0%"></div>
+                        </div>
+                    </div>
+                    
+                    <!-- Resultado -->
+                    <div id="resultado-processamento" style="display: none;"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Histórico Recente -->
+    <div class="row mt-4">
+        <div class="col-12">
+            <div class="card shadow">
+                <div class="card-header">
+                    <h6 class="m-0 font-weight-bold text-primary">
+                        <i class="fas fa-history"></i> Últimas Importações
+                    </h6>
+                </div>
+                <div class="card-body">
+                    <div id="historico-importacoes">
+                        <p class="text-muted text-center">Nenhuma importação recente</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+.border-dashed {
+    border-style: dashed !important;
+}
+
+.border-2 {
+    border-width: 2px !important;
+}
+
+#dropzone {
+    transition: all 0.3s ease;
+    cursor: pointer;
+}
+
+#dropzone:hover, #dropzone.dragover {
+    background-color: rgba(13, 110, 253, 0.1);
+    border-color: #0d6efd;
+}
+
+.progress-bar-animated {
+    animation: progress-bar-stripes 1s linear infinite;
+}
+</style>
+
+<script>
+let arquivoSelecionado = null;
+
+// Configurar drag & drop
+const dropzone = document.getElementById('dropzone');
+const inputArquivo = document.getElementById('arquivo-xml');
+
+// Eventos de drag & drop
+dropzone.addEventListener('dragover', function(e) {
+    e.preventDefault();
+    dropzone.classList.add('dragover');
+});
+
+dropzone.addEventListener('dragleave', function(e) {
+    e.preventDefault();
+    dropzone.classList.remove('dragover');
+});
+
+dropzone.addEventListener('drop', function(e) {
+    e.preventDefault();
+    dropzone.classList.remove('dragover');
+    
+    const files = e.dataTransfer.files;
+    if (files.length > 0) {
+        handleFileSelect(files[0]);
+    }
+});
+
+// Evento de seleção de arquivo
+inputArquivo.addEventListener('change', function(e) {
+    if (e.target.files.length > 0) {
+        handleFileSelect(e.target.files[0]);
+    }
+});
+
+// Click no dropzone abre seletor
+dropzone.addEventListener('click', function() {
+    inputArquivo.click();
+});
+
+function handleFileSelect(file) {
+    // Validar tipo de arquivo
+    if (!file.name.toLowerCase().endsWith('.xml')) {
+        alert('Por favor, selecione um arquivo XML válido');
+        return;
+    }
+    
+    // Validar tamanho (máximo 5MB)
+    if (file.size > 5 * 1024 * 1024) {
+        alert('Arquivo muito grande. Máximo permitido: 5MB');
+        return;
+    }
+    
+    arquivoSelecionado = file;
+    
+    // Mostrar informações do arquivo
+    document.getElementById('nome-arquivo').textContent = file.name;
+    document.getElementById('tamanho-arquivo').textContent = formatarTamanho(file.size);
+    document.getElementById('info-arquivo').style.display = 'block';
+    
+    // Esconder outros elementos
+    document.getElementById('resultado-processamento').style.display = 'none';
+}
+
+function formatarTamanho(bytes) {
+    if (bytes === 0) return '0 Bytes';
+    
+    const k = 1024;
+    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+}
+
+async function processarXML() {
+    if (!arquivoSelecionado) {
+        alert('Nenhum arquivo selecionado');
+        return;
+    }
+    
+    // Mostrar progresso
+    document.getElementById('progresso-upload').style.display = 'block';
+    document.getElementById('resultado-processamento').style.display = 'none';
+    
+    const progressBar = document.querySelector('.progress-bar');
+    progressBar.style.width = '20%';
+    
+    try {
+        // Criar FormData
+        const formData = new FormData();
+        formData.append('arquivo_xml', arquivoSelecionado);
+        
+        progressBar.style.width = '50%';
+        
+        // Enviar arquivo
+        const response = await fetch('/almoxarifado/api/upload-xml', {
+            method: 'POST',
+            body: formData
+        });
+        
+        progressBar.style.width = '80%';
+        
+        const data = await response.json();
+        
+        progressBar.style.width = '100%';
+        
+        // Esconder progresso
+        setTimeout(() => {
+            document.getElementById('progresso-upload').style.display = 'none';
+            progressBar.style.width = '0%';
+            
+            if (response.ok) {
+                mostrarSucesso(data);
+            } else {
+                mostrarErro(data.erro);
+            }
+        }, 500);
+        
+    } catch (error) {
+        document.getElementById('progresso-upload').style.display = 'none';
+        console.error('Erro no upload:', error);
+        mostrarErro('Erro de conexão. Tente novamente.');
+    }
+}
+
+function mostrarSucesso(data) {
+    const html = `
+        <div class="alert alert-success">
+            <h5><i class="fas fa-check-circle"></i> XML processado com sucesso!</h5>
+            <div class="row">
+                <div class="col-md-6">
+                    <strong>Nota Fiscal:</strong> ${data.resumo.numero_nf}<br>
+                    <strong>Valor Total:</strong> R$ ${data.valor_total.toFixed(2)}<br>
+                    <strong>Data:</strong> ${data.resumo.data_emissao}
+                </div>
+                <div class="col-md-6">
+                    <strong>Produtos Criados:</strong> ${data.produtos_criados}<br>
+                    <strong>Produtos Atualizados:</strong> ${data.produtos_atualizados}<br>
+                    <strong>Total de Produtos:</strong> ${data.resumo.total_produtos}
+                </div>
+            </div>
+            <div class="mt-3">
+                <a href="/almoxarifado/notas-fiscais" class="btn btn-primary">
+                    <i class="fas fa-list"></i> Ver Notas Fiscais
+                </a>
+                <a href="/almoxarifado/produtos" class="btn btn-success">
+                    <i class="fas fa-boxes"></i> Ver Produtos
+                </a>
+                <button type="button" class="btn btn-outline-primary" onclick="limparFormulario()">
+                    <i class="fas fa-plus"></i> Importar Outra NFe
+                </button>
+            </div>
+        </div>
+    `;
+    
+    document.getElementById('resultado-processamento').innerHTML = html;
+    document.getElementById('resultado-processamento').style.display = 'block';
+    
+    // Adicionar ao histórico
+    adicionarAoHistorico(data);
+}
+
+function mostrarErro(mensagem) {
+    const html = `
+        <div class="alert alert-danger">
+            <h5><i class="fas fa-exclamation-triangle"></i> Erro no processamento</h5>
+            <p>${mensagem}</p>
+            <button type="button" class="btn btn-outline-danger" onclick="limparFormulario()">
+                <i class="fas fa-redo"></i> Tentar Novamente
+            </button>
+        </div>
+    `;
+    
+    document.getElementById('resultado-processamento').innerHTML = html;
+    document.getElementById('resultado-processamento').style.display = 'block';
+}
+
+function limparFormulario() {
+    arquivoSelecionado = null;
+    document.getElementById('info-arquivo').style.display = 'none';
+    document.getElementById('resultado-processamento').style.display = 'none';
+    document.getElementById('progresso-upload').style.display = 'none';
+    document.getElementById('arquivo-xml').value = '';
+}
+
+function adicionarAoHistorico(data) {
+    const historico = document.getElementById('historico-importacoes');
+    
+    const item = document.createElement('div');
+    item.className = 'border-bottom pb-2 mb-2';
+    item.innerHTML = `
+        <div class="d-flex justify-content-between align-items-center">
+            <div>
+                <strong>${data.resumo.numero_nf}</strong>
+                <small class="text-muted">- Agora mesmo</small><br>
+                <small>${data.produtos_criados} criados, ${data.produtos_atualizados} atualizados</small>
+            </div>
+            <span class="badge badge-success">Sucesso</span>
+        </div>
+    `;
+    
+    // Adicionar no topo
+    if (historico.querySelector('p')) {
+        historico.innerHTML = '';
+    }
+    historico.insertBefore(item, historico.firstChild);
+    
+    // Manter apenas os últimos 5 itens
+    while (historico.children.length > 5) {
+        historico.removeChild(historico.lastChild);
+    }
+}
+
+// Atalhos de teclado
+document.addEventListener('keydown', function(event) {
+    // Ctrl+U para abrir seletor de arquivo
+    if (event.ctrlKey && event.key === 'u') {
+        event.preventDefault();
+        inputArquivo.click();
+    }
+    
+    // Enter para processar se arquivo estiver selecionado
+    if (event.key === 'Enter' && arquivoSelecionado) {
+        event.preventDefault();
+        processarXML();
+    }
+});
+</script>
+{% endblock %}

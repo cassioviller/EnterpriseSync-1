@@ -8,10 +8,14 @@ from models import (Produto, CategoriaProduto, Fornecedor, NotaFiscal, Movimenta
                    RDO, Obra, db)
 from almoxarifado_utils import (
     atualizar_estoque_produto, calcular_estoque_minimo_inteligente,
-    prever_ruptura_estoque, gerar_codigo_interno, processar_xml_nfe,
-    obter_materiais_rdo, lancar_material_rdo, gerar_relatorio_estoque,
-    calcular_kpis_almoxarifado
+    prever_ruptura_estoque, gerar_relatorio_estoque, calcular_kpis_almoxarifado,
+    obter_materiais_rdo, lancar_material_rdo
 )
+from codigo_barras_utils import (
+    gerar_codigo_interno, validar_codigo_barras, buscar_produto_por_codigo,
+    sugerir_produtos_similares, gerar_qr_code_produto
+)
+from xml_nfe_processor import ProcessadorXMLNFe, validar_xml_nfe_rapido, extrair_resumo_xml
 
 almoxarifado_bp = Blueprint('almoxarifado', __name__, url_prefix='/almoxarifado')
 
@@ -468,3 +472,286 @@ def api_estoque_produto(id):
         'valor_medio': float(produto.valor_medio),
         'unidade_medida': produto.unidade_medida
     })
+
+# ===== APIS AVANÇADAS BASEADAS NA REUNIÃO TÉCNICA =====
+
+@almoxarifado_bp.route('/scanner')
+@login_required
+@almoxarife_required
+def scanner_codigo_barras():
+    """Interface de scanner de código de barras mobile-first"""
+    admin_id = get_tenant_filter()
+    
+    # Últimos códigos escaneados (simulado por enquanto)
+    codigos_recentes = []
+    
+    # Produtos com estoque baixo
+    produtos_baixo = Produto.query.filter(
+        Produto.admin_id == admin_id,
+        Produto.ativo == True,
+        Produto.estoque_atual <= Produto.estoque_minimo
+    ).limit(5).all()
+    
+    return render_template('almoxarifado/scanner.html',
+                         codigos_recentes=codigos_recentes,
+                         produtos_baixo=produtos_baixo,
+                         pode_gerenciar=pode_gerenciar_almoxarifado())
+
+@almoxarifado_bp.route('/api/buscar-codigo', methods=['POST'])
+@login_required
+@almoxarife_required
+def api_buscar_codigo():
+    """API para buscar produto por código de barras"""
+    admin_id = get_tenant_filter()
+    data = request.get_json()
+    
+    codigo = data.get('codigo', '').strip()
+    if not codigo:
+        return jsonify({'erro': 'Código não fornecido'}), 400
+    
+    # Validar código
+    validacao = validar_codigo_barras(codigo)
+    if not validacao['valido']:
+        return jsonify({'erro': validacao['erro']}), 400
+    
+    # Buscar produto
+    resultado = buscar_produto_por_codigo(codigo, admin_id)
+    
+    if resultado['encontrado']:
+        produto = resultado['produto']
+        return jsonify({
+            'encontrado': True,
+            'produto': {
+                'id': produto.id,
+                'nome': produto.nome,
+                'codigo_interno': produto.codigo_interno,
+                'estoque_atual': float(produto.estoque_atual),
+                'estoque_minimo': float(produto.estoque_minimo),
+                'status_estoque': produto.status_estoque,
+                'unidade_medida': produto.unidade_medida,
+                'valor_medio': float(produto.valor_medio),
+                'categoria': produto.categoria.nome if produto.categoria else None
+            },
+            'tipo_busca': resultado['tipo_busca']
+        })
+    
+    # Se não encontrou, retornar sugestões
+    sugestoes = []
+    if resultado.get('sugestoes'):
+        for sugestao in resultado['sugestoes']:
+            sugestoes.append({
+                'id': sugestao.id,
+                'nome': sugestao.nome,
+                'codigo_interno': sugestao.codigo_interno,
+                'estoque_atual': float(sugestao.estoque_atual)
+            })
+    
+    return jsonify({
+        'encontrado': False,
+        'codigo_buscado': codigo,
+        'sugestoes': sugestoes
+    })
+
+@almoxarifado_bp.route('/api/gerar-qr/<int:produto_id>')
+@login_required
+@almoxarife_required
+def api_gerar_qr_code(produto_id):
+    """API para gerar QR Code de produto"""
+    admin_id = get_tenant_filter()
+    produto = Produto.query.filter_by(id=produto_id, admin_id=admin_id).first_or_404()
+    
+    qr_code_base64 = gerar_qr_code_produto(produto_id)
+    
+    return jsonify({
+        'qr_code': qr_code_base64,
+        'produto_nome': produto.nome,
+        'codigo_interno': produto.codigo_interno
+    })
+
+@almoxarifado_bp.route('/importar-xml')
+@login_required
+@almoxarife_required
+def importar_xml():
+    """Página de importação de XML NFe"""
+    return render_template('almoxarifado/importar_xml.html',
+                         pode_gerenciar=pode_gerenciar_almoxarifado())
+
+@almoxarifado_bp.route('/api/upload-xml', methods=['POST'])
+@login_required
+@almoxarife_required
+def api_upload_xml():
+    """API para upload e processamento de XML NFe"""
+    admin_id = get_tenant_filter()
+    
+    if 'arquivo_xml' not in request.files:
+        return jsonify({'erro': 'Nenhum arquivo enviado'}), 400
+    
+    arquivo = request.files['arquivo_xml']
+    if arquivo.filename == '':
+        return jsonify({'erro': 'Nenhum arquivo selecionado'}), 400
+    
+    if not arquivo.filename.lower().endswith('.xml'):
+        return jsonify({'erro': 'Arquivo deve ser XML'}), 400
+    
+    try:
+        # Ler conteúdo do arquivo
+        xml_content = arquivo.read().decode('utf-8')
+        
+        # Validação rápida
+        validacao = validar_xml_nfe_rapido(xml_content)
+        if not validacao['valido']:
+            return jsonify({'erro': validacao['erro']}), 400
+        
+        # Extrair resumo para pré-visualização
+        resumo = extrair_resumo_xml(xml_content)
+        if not resumo['valido']:
+            return jsonify({'erro': resumo['erro']}), 400
+        
+        # Processar XML completo
+        processador = ProcessadorXMLNFe(admin_id)
+        resultado = processador.processar_xml(xml_content, current_user.id)
+        
+        if 'erro' in resultado:
+            return jsonify({'erro': resultado['erro']}), 400
+        
+        return jsonify({
+            'sucesso': True,
+            'resumo': resultado['resumo'],
+            'nota_fiscal_id': resultado['nota_fiscal_id'],
+            'produtos_criados': resultado['produtos_criados'],
+            'produtos_atualizados': resultado['produtos_atualizados'],
+            'valor_total': resultado['valor_total_importado']
+        })
+        
+    except Exception as e:
+        return jsonify({'erro': f'Erro ao processar arquivo: {str(e)}'}), 500
+
+@almoxarifado_bp.route('/api/estoque-minimo-ia/<int:produto_id>')
+@login_required
+@almoxarife_required
+def api_estoque_minimo_ia(produto_id):
+    """API para calcular estoque mínimo usando IA"""
+    admin_id = get_tenant_filter()
+    produto = Produto.query.filter_by(id=produto_id, admin_id=admin_id).first_or_404()
+    
+    # Calcular estoque mínimo inteligente
+    estoque_ia = calcular_estoque_minimo_inteligente(produto_id)
+    
+    # Previsão de ruptura
+    previsao = prever_ruptura_estoque(produto_id)
+    
+    return jsonify({
+        'produto_id': produto_id,
+        'produto_nome': produto.nome,
+        'estoque_atual': float(produto.estoque_atual),
+        'estoque_minimo_atual': float(produto.estoque_minimo),
+        'estoque_minimo_sugerido': float(estoque_ia),
+        'diferenca': float(estoque_ia - produto.estoque_minimo),
+        'previsao_ruptura': previsao,
+        'recomendacao': 'Ajustar estoque mínimo' if abs(estoque_ia - produto.estoque_minimo) > 5 else 'Manter configuração atual'
+    })
+
+@almoxarifado_bp.route('/api/atualizar-estoque-minimo', methods=['POST'])
+@login_required
+@almoxarife_required
+def api_atualizar_estoque_minimo():
+    """API para atualizar estoque mínimo"""
+    admin_id = get_tenant_filter()
+    data = request.get_json()
+    
+    produto_id = data.get('produto_id')
+    novo_estoque_minimo = data.get('estoque_minimo')
+    
+    if not produto_id or novo_estoque_minimo is None:
+        return jsonify({'erro': 'Dados incompletos'}), 400
+    
+    produto = Produto.query.filter_by(id=produto_id, admin_id=admin_id).first_or_404()
+    
+    try:
+        produto.estoque_minimo = float(novo_estoque_minimo)
+        db.session.commit()
+        
+        return jsonify({
+            'sucesso': True,
+            'produto_nome': produto.nome,
+            'novo_estoque_minimo': float(produto.estoque_minimo)
+        })
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'erro': str(e)}), 500
+
+@almoxarifado_bp.route('/movimentacoes-estoque')
+@login_required
+@almoxarife_required
+def listar_movimentacoes_estoque():
+    """Listar movimentações de estoque com filtros avançados"""
+    admin_id = get_tenant_filter()
+    
+    # Filtros
+    data_inicio = request.args.get('data_inicio')
+    data_fim = request.args.get('data_fim')
+    tipo_movimentacao = request.args.get('tipo_movimentacao')
+    produto_id = request.args.get('produto_id', type=int)
+    obra_id = request.args.get('obra_id', type=int)
+    funcionario_id = request.args.get('funcionario_id', type=int)
+    
+    # Query base
+    query = MovimentacaoEstoque.query.filter_by(admin_id=admin_id)
+    
+    # Aplicar filtros
+    if data_inicio:
+        try:
+            data_inicio_dt = datetime.strptime(data_inicio, '%Y-%m-%d')
+            query = query.filter(MovimentacaoEstoque.data_movimentacao >= data_inicio_dt)
+        except:
+            flash('Data de início inválida', 'warning')
+    
+    if data_fim:
+        try:
+            data_fim_dt = datetime.strptime(data_fim, '%Y-%m-%d')
+            # Incluir todo o dia
+            data_fim_dt = data_fim_dt.replace(hour=23, minute=59, second=59)
+            query = query.filter(MovimentacaoEstoque.data_movimentacao <= data_fim_dt)
+        except:
+            flash('Data de fim inválida', 'warning')
+    
+    if tipo_movimentacao:
+        query = query.filter_by(tipo_movimentacao=tipo_movimentacao)
+    
+    if produto_id:
+        query = query.filter_by(produto_id=produto_id)
+    
+    if obra_id:
+        query = query.filter_by(obra_id=obra_id)
+    
+    if funcionario_id:
+        query = query.filter_by(funcionario_id=funcionario_id)
+    
+    # Paginação
+    page = request.args.get('page', 1, type=int)
+    movimentacoes = query.order_by(
+        MovimentacaoEstoque.data_movimentacao.desc()
+    ).paginate(
+        page=page, per_page=50, error_out=False
+    )
+    
+    # Dados para filtros
+    produtos = Produto.query.filter_by(admin_id=admin_id, ativo=True).order_by(Produto.nome).all()
+    obras = Obra.query.filter_by(admin_id=admin_id, ativo=True).order_by(Obra.nome).all()
+    funcionarios = Funcionario.query.filter_by(admin_id=admin_id, ativo=True).order_by(Funcionario.nome).all()
+    
+    return render_template('almoxarifado/movimentacoes.html',
+                         movimentacoes=movimentacoes,
+                         produtos=produtos,
+                         obras=obras,
+                         funcionarios=funcionarios,
+                         filtros={
+                             'data_inicio': data_inicio,
+                             'data_fim': data_fim,
+                             'tipo_movimentacao': tipo_movimentacao,
+                             'produto_id': produto_id,
+                             'obra_id': obra_id,
+                             'funcionario_id': funcionario_id
+                         },
+                         pode_gerenciar=pode_gerenciar_almoxarifado())

@@ -825,7 +825,7 @@ class CategoriaProduto(db.Model):
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     
     # Relacionamentos
-    produtos = db.relationship('Produto', backref='categoria', lazy='dynamic')
+    produtos = db.relationship('Produto', backref='categoria_produto', lazy='dynamic')
     admin = db.relationship('Usuario', backref='categorias_administradas')
     
     # Índices
@@ -928,8 +928,9 @@ class Produto(db.Model):
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     
     # Relacionamentos
-    movimentacoes = db.relationship('MovimentacaoEstoque', backref='produto', lazy='dynamic')
-    admin = db.relationship('Usuario', backref='produtos_administrados')
+    movimentacoes = db.relationship('MovimentacaoEstoque', foreign_keys='MovimentacaoEstoque.produto_id', lazy='dynamic')
+    categoria = db.relationship('CategoriaProduto', foreign_keys=[categoria_id])
+    admin = db.relationship('Usuario', foreign_keys=[admin_id], backref='produtos_administrados')
     
     # Índices
     __table_args__ = (
@@ -1098,13 +1099,13 @@ class MovimentacaoEstoque(db.Model):
     )
     
     def __repr__(self):
-        return f'<MovimentacaoEstoque {self.tipo_movimentacao} - {self.produto.nome if self.produto else "N/A"}>'
+        return f'<MovimentacaoEstoque {self.tipo_movimentacao} - {self.produto_rel.nome if self.produto_rel else "N/A"}>'
     
     def to_dict(self):
         """Converter para dicionário para APIs"""
         return {
             'id': self.id,
-            'produto_nome': self.produto.nome if self.produto else None,
+            'produto_nome': self.produto_rel.nome if self.produto_rel else None,
             'tipo_movimentacao': self.tipo_movimentacao,
             'quantidade': float(self.quantidade),
             'valor_unitario': float(self.valor_unitario) if self.valor_unitario else None,
@@ -1120,9 +1121,7 @@ class MovimentacaoEstoque(db.Model):
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     
     # Relacionamentos
-    rdo = db.relationship('RDO', backref='materiais_rdo')
-    material = db.relationship('Material', backref='utilizacoes_rdo')
-    admin = db.relationship('Usuario', backref='rdo_materiais_administrados')
+    produto_rel = db.relationship('Produto', foreign_keys=[produto_id])
     
     def __repr__(self):
         return f'<RDOMaterial RDO:{self.rdo_id} - {self.material.descricao}>'

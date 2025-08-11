@@ -1,0 +1,424 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- Cabeçalho Mobile-First -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1 class="h3 mb-0 text-gray-800">
+            <i class="fas fa-barcode"></i> Scanner de Códigos
+        </h1>
+        <div>
+            <button type="button" class="btn btn-outline-secondary" onclick="alternarCamera()">
+                <i class="fas fa-camera" id="icon-camera"></i>
+            </button>
+        </div>
+    </div>
+
+    <!-- Interface de Scanner -->
+    <div class="row">
+        <!-- Scanner Principal -->
+        <div class="col-lg-8 mb-4">
+            <div class="card shadow">
+                <div class="card-header">
+                    <h6 class="m-0 font-weight-bold text-primary">
+                        <i class="fas fa-qrcode"></i> Leitor de Código
+                    </h6>
+                </div>
+                <div class="card-body text-center">
+                    <!-- Área de Câmera/Scanner -->
+                    <div id="scanner-container" class="mb-3" style="display: none;">
+                        <video id="scanner-video" class="border rounded" style="max-width: 100%; max-height: 300px;"></video>
+                        <div id="scanner-overlay" class="position-relative">
+                            <div class="scanner-line"></div>
+                        </div>
+                    </div>
+                    
+                    <!-- Botões de Ação -->
+                    <div class="mb-3">
+                        <button type="button" class="btn btn-primary btn-lg me-2" onclick="iniciarCamera()">
+                            <i class="fas fa-camera"></i> Escanear Código
+                        </button>
+                        <button type="button" class="btn btn-outline-primary" data-bs-toggle="modal" data-bs-target="#modalDigitarCodigo">
+                            <i class="fas fa-keyboard"></i> Digitar Código
+                        </button>
+                    </div>
+                    
+                    <!-- Resultado da Busca -->
+                    <div id="resultado-busca" style="display: none;">
+                        <div class="alert alert-success">
+                            <h5 id="produto-nome"></h5>
+                            <div class="row text-start">
+                                <div class="col-md-6">
+                                    <strong>Código:</strong> <span id="produto-codigo"></span><br>
+                                    <strong>Estoque:</strong> <span id="produto-estoque"></span><br>
+                                    <strong>Status:</strong> <span id="produto-status"></span>
+                                </div>
+                                <div class="col-md-6">
+                                    <strong>Categoria:</strong> <span id="produto-categoria"></span><br>
+                                    <strong>Valor Médio:</strong> R$ <span id="produto-valor"></span><br>
+                                    <strong>Unidade:</strong> <span id="produto-unidade"></span>
+                                </div>
+                            </div>
+                            <div class="mt-3">
+                                <button type="button" class="btn btn-success" onclick="abrirMovimentacao()">
+                                    <i class="fas fa-exchange-alt"></i> Movimentar Estoque
+                                </button>
+                                <button type="button" class="btn btn-info" onclick="verDetalhes()">
+                                    <i class="fas fa-eye"></i> Ver Detalhes
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Sugestões -->
+                    <div id="sugestoes-produtos" style="display: none;">
+                        <div class="alert alert-warning">
+                            <h6>Produto não encontrado. Sugestões:</h6>
+                            <div id="lista-sugestoes"></div>
+                        </div>
+                    </div>
+                    
+                    <!-- Erro -->
+                    <div id="erro-busca" class="alert alert-danger" style="display: none;">
+                        <strong>Erro:</strong> <span id="mensagem-erro"></span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Painel Lateral -->
+        <div class="col-lg-4">
+            <!-- Códigos Recentes -->
+            <div class="card shadow mb-4">
+                <div class="card-header">
+                    <h6 class="m-0 font-weight-bold text-primary">
+                        <i class="fas fa-history"></i> Últimos Escaneados
+                    </h6>
+                </div>
+                <div class="card-body">
+                    {% if codigos_recentes %}
+                        <div id="lista-recentes">
+                            {% for item in codigos_recentes %}
+                            <div class="d-flex justify-content-between align-items-center mb-2">
+                                <div>
+                                    <strong>{{ item.produto_nome }}</strong><br>
+                                    <small class="text-muted">{{ item.timestamp.strftime('%H:%M') }}</small>
+                                </div>
+                                <button class="btn btn-sm btn-outline-primary" onclick="buscarCodigo('{{ item.codigo }}')">
+                                    <i class="fas fa-redo"></i>
+                                </button>
+                            </div>
+                            <hr>
+                            {% endfor %}
+                        </div>
+                    {% else %}
+                        <p class="text-muted text-center">
+                            <i class="fas fa-barcode fa-2x mb-2"></i><br>
+                            Nenhum código escaneado ainda
+                        </p>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Produtos com Estoque Baixo -->
+            {% if produtos_baixo %}
+            <div class="card shadow">
+                <div class="card-header">
+                    <h6 class="m-0 font-weight-bold text-warning">
+                        <i class="fas fa-exclamation-triangle"></i> Estoque Baixo
+                    </h6>
+                </div>
+                <div class="card-body">
+                    {% for produto in produtos_baixo %}
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <div>
+                            <strong>{{ produto.nome[:20] }}...</strong><br>
+                            <small class="text-danger">{{ produto.estoque_atual }} {{ produto.unidade_medida }}</small>
+                        </div>
+                        <a href="{{ url_for('almoxarifado.ver_produto', id=produto.id) }}" class="btn btn-sm btn-warning">
+                            <i class="fas fa-eye"></i>
+                        </a>
+                    </div>
+                    {% if not loop.last %}<hr>{% endif %}
+                    {% endfor %}
+                </div>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<!-- Modal Digitar Código -->
+<div class="modal fade" id="modalDigitarCodigo" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Digitar Código</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <label for="codigo-manual" class="form-label">Código de Barras</label>
+                    <input type="text" class="form-control" id="codigo-manual" 
+                           placeholder="Digite ou cole o código aqui" autofocus>
+                    <div class="form-text">
+                        Aceita códigos EAN-13, EAN-8, Code-128 ou códigos internos
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-primary" onclick="buscarCodigoManual()">
+                    <i class="fas fa-search"></i> Buscar
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+/* Estilo para o scanner */
+#scanner-container {
+    position: relative;
+    display: inline-block;
+}
+
+.scanner-line {
+    position: absolute;
+    top: 50%;
+    left: 10%;
+    right: 10%;
+    height: 2px;
+    background: linear-gradient(90deg, transparent, #ff0000, transparent);
+    animation: scanner-animation 2s linear infinite;
+}
+
+@keyframes scanner-animation {
+    0% { transform: translateY(-100px); opacity: 0; }
+    50% { opacity: 1; }
+    100% { transform: translateY(100px); opacity: 0; }
+}
+
+/* Responsividade */
+@media (max-width: 768px) {
+    .btn-lg {
+        width: 100%;
+        margin-bottom: 10px;
+    }
+    
+    #scanner-video {
+        width: 100%;
+        height: auto;
+    }
+}
+</style>
+
+<script>
+let videoStream = null;
+let produtoAtual = null;
+
+// Inicializar câmera
+async function iniciarCamera() {
+    try {
+        const constraints = {
+            video: {
+                facingMode: 'environment', // Câmera traseira preferencialmente
+                width: { ideal: 640 },
+                height: { ideal: 480 }
+            }
+        };
+        
+        videoStream = await navigator.mediaDevices.getUserMedia(constraints);
+        const video = document.getElementById('scanner-video');
+        video.srcObject = videoStream;
+        video.play();
+        
+        document.getElementById('scanner-container').style.display = 'block';
+        
+        // Iniciar detecção (simulada por enquanto)
+        setTimeout(() => {
+            alert('Scanner de código de barras em desenvolvimento. Use "Digitar Código" para testar.');
+            pararCamera();
+        }, 3000);
+        
+    } catch (error) {
+        console.error('Erro ao acessar câmera:', error);
+        alert('Erro ao acessar câmera. Use "Digitar Código" como alternativa.');
+    }
+}
+
+function pararCamera() {
+    if (videoStream) {
+        videoStream.getTracks().forEach(track => track.stop());
+        videoStream = null;
+    }
+    document.getElementById('scanner-container').style.display = 'none';
+}
+
+function alternarCamera() {
+    if (videoStream) {
+        pararCamera();
+    } else {
+        iniciarCamera();
+    }
+}
+
+// Buscar código digitado manualmente
+function buscarCodigoManual() {
+    const codigo = document.getElementById('codigo-manual').value.trim();
+    if (!codigo) {
+        alert('Digite um código válido');
+        return;
+    }
+    
+    buscarCodigo(codigo);
+    bootstrap.Modal.getInstance(document.getElementById('modalDigitarCodigo')).hide();
+    document.getElementById('codigo-manual').value = '';
+}
+
+// Buscar produto por código
+async function buscarCodigo(codigo) {
+    try {
+        // Limpar resultados anteriores
+        document.getElementById('resultado-busca').style.display = 'none';
+        document.getElementById('sugestoes-produtos').style.display = 'none';
+        document.getElementById('erro-busca').style.display = 'none';
+        
+        // Fazer requisição
+        const response = await fetch('/almoxarifado/api/buscar-codigo', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ codigo: codigo })
+        });
+        
+        const data = await response.json();
+        
+        if (response.ok) {
+            if (data.encontrado) {
+                mostrarProdutoEncontrado(data.produto);
+                produtoAtual = data.produto;
+            } else {
+                mostrarSugestoes(data.sugestoes, data.codigo_buscado);
+            }
+        } else {
+            mostrarErro(data.erro);
+        }
+        
+    } catch (error) {
+        console.error('Erro na busca:', error);
+        mostrarErro('Erro de conexão. Tente novamente.');
+    }
+}
+
+function mostrarProdutoEncontrado(produto) {
+    document.getElementById('produto-nome').textContent = produto.nome;
+    document.getElementById('produto-codigo').textContent = produto.codigo_interno;
+    document.getElementById('produto-estoque').textContent = `${produto.estoque_atual} ${produto.unidade_medida}`;
+    document.getElementById('produto-status').innerHTML = getStatusBadge(produto.status_estoque);
+    document.getElementById('produto-categoria').textContent = produto.categoria || 'N/A';
+    document.getElementById('produto-valor').textContent = produto.valor_medio.toFixed(2);
+    document.getElementById('produto-unidade').textContent = produto.unidade_medida;
+    
+    document.getElementById('resultado-busca').style.display = 'block';
+}
+
+function mostrarSugestoes(sugestoes, codigoBuscado) {
+    if (sugestoes.length === 0) {
+        mostrarErro(`Produto não encontrado para o código: ${codigoBuscado}`);
+        return;
+    }
+    
+    let html = '';
+    sugestoes.forEach(sugestao => {
+        html += `
+            <div class="d-flex justify-content-between align-items-center mb-2">
+                <div>
+                    <strong>${sugestao.nome}</strong><br>
+                    <small>Código: ${sugestao.codigo_interno} | Estoque: ${sugestao.estoque_atual}</small>
+                </div>
+                <button class="btn btn-sm btn-primary" onclick="selecionarSugestao(${sugestao.id})">
+                    Selecionar
+                </button>
+            </div>
+        `;
+    });
+    
+    document.getElementById('lista-sugestoes').innerHTML = html;
+    document.getElementById('sugestoes-produtos').style.display = 'block';
+}
+
+function mostrarErro(mensagem) {
+    document.getElementById('mensagem-erro').textContent = mensagem;
+    document.getElementById('erro-busca').style.display = 'block';
+}
+
+function getStatusBadge(status) {
+    const badges = {
+        'OK': '<span class="badge badge-success">OK</span>',
+        'BAIXO': '<span class="badge badge-warning">Baixo</span>',
+        'CRITICO': '<span class="badge badge-danger">Crítico</span>',
+        'ZERADO': '<span class="badge badge-dark">Zerado</span>'
+    };
+    return badges[status] || '<span class="badge badge-secondary">N/A</span>';
+}
+
+function selecionarSugestao(produtoId) {
+    // Buscar dados completos do produto
+    fetch(`/almoxarifado/api/produto/${produtoId}/estoque`)
+        .then(response => response.json())
+        .then(data => {
+            mostrarProdutoEncontrado(data);
+            produtoAtual = data;
+            document.getElementById('sugestoes-produtos').style.display = 'none';
+        })
+        .catch(error => {
+            console.error('Erro:', error);
+            mostrarErro('Erro ao carregar produto');
+        });
+}
+
+function abrirMovimentacao() {
+    if (!produtoAtual) {
+        alert('Nenhum produto selecionado');
+        return;
+    }
+    
+    // Aqui você pode abrir um modal de movimentação ou redirecionar
+    // Por enquanto, redirecionar para a página de produtos
+    window.location.href = `/almoxarifado/produtos/${produtoAtual.id}`;
+}
+
+function verDetalhes() {
+    if (!produtoAtual) {
+        alert('Nenhum produto selecionado');
+        return;
+    }
+    
+    window.location.href = `/almoxarifado/produtos/${produtoAtual.id}`;
+}
+
+// Atalho de teclado para focar no campo de código
+document.addEventListener('keydown', function(event) {
+    // Ctrl+F ou F3 para abrir modal de digitar código
+    if ((event.ctrlKey && event.key === 'f') || event.key === 'F3') {
+        event.preventDefault();
+        new bootstrap.Modal(document.getElementById('modalDigitarCodigo')).show();
+    }
+});
+
+// Auto-focus no campo de código quando modal abrir
+document.getElementById('modalDigitarCodigo').addEventListener('shown.bs.modal', function() {
+    document.getElementById('codigo-manual').focus();
+});
+
+// Buscar ao pressionar Enter no campo de código
+document.getElementById('codigo-manual').addEventListener('keypress', function(event) {
+    if (event.key === 'Enter') {
+        event.preventDefault();
+        buscarCodigoManual();
+    }
+});
+</script>
+{% endblock %}
