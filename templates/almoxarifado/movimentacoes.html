@@ -129,7 +129,7 @@
                                     <small class="text-muted">{{ mov.data_movimentacao.strftime('%H:%M') }}</small>
                                 </td>
                                 <td>
-                                    <strong>{{ mov.produto_rel.nome if mov.produto_rel else 'N/A' }}</strong>
+                                    <strong>{{ mov.produto_rel.nome if mov.produto_rel else 'Produto ID: ' + mov.produto_id|string }}</strong>
                                     {% if mov.produto_rel %}
                                     <br><small class="text-muted">{{ mov.produto_rel.codigo_interno }}</small>
                                     {% endif %}

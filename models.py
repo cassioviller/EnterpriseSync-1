@@ -928,8 +928,7 @@ class Produto(db.Model):
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     
     # Relacionamentos
-    movimentacoes = db.relationship('MovimentacaoEstoque', foreign_keys='MovimentacaoEstoque.produto_id', lazy='dynamic')
-    categoria = db.relationship('CategoriaProduto', foreign_keys=[categoria_id])
+    categoria = db.relationship('CategoriaProduto', foreign_keys=[categoria_id], overlaps="categoria_produto,produtos")
     admin = db.relationship('Usuario', foreign_keys=[admin_id], backref='produtos_administrados')
     
     # Índices
@@ -1099,13 +1098,13 @@ class MovimentacaoEstoque(db.Model):
     )
     
     def __repr__(self):
-        return f'<MovimentacaoEstoque {self.tipo_movimentacao} - {self.produto_rel.nome if self.produto_rel else "N/A"}>'
+        return f'<MovimentacaoEstoque {self.tipo_movimentacao} - Produto:{self.produto_id}>'
     
     def to_dict(self):
         """Converter para dicionário para APIs"""
         return {
             'id': self.id,
-            'produto_nome': self.produto_rel.nome if self.produto_rel else None,
+            'produto_nome': self.produto_rel.nome if hasattr(self, 'produto_rel') and self.produto_rel else None,
             'tipo_movimentacao': self.tipo_movimentacao,
             'quantidade': float(self.quantidade),
             'valor_unitario': float(self.valor_unitario) if self.valor_unitario else None,
@@ -1121,10 +1120,7 @@ class MovimentacaoEstoque(db.Model):
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     
     # Relacionamentos
-    produto_rel = db.relationship('Produto', foreign_keys=[produto_id])
-    
-    def __repr__(self):
-        return f'<RDOMaterial RDO:{self.rdo_id} - {self.material.descricao}>'
+    produto_rel = db.relationship('Produto', foreign_keys=[produto_id], overlaps="movimentacoes")
 
 
 # ================================
