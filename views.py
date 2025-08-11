@@ -6012,12 +6012,24 @@ def controle_ponto():
 @main_bp.route('/ponto/registro', methods=['POST'])
 @login_required
 def criar_registro_ponto():
-    """Criar novo registro de ponto"""
+    """Criar novo registro de ponto com suporte completo a fins de semana"""
     try:
         funcionario_id = request.form.get('funcionario_id')
         data = datetime.strptime(request.form.get('data'), '%Y-%m-%d').date()
         tipo_registro = request.form.get('tipo_registro', 'trabalho_normal')
         obra_id = request.form.get('obra_id') or None
+        
+        # ✅ PERMITIR LANÇAMENTOS EM QUALQUER DIA DA SEMANA
+        # Verificar se já existe registro para esta data e funcionário
+        registro_existente = RegistroPonto.query.filter_by(
+            funcionario_id=funcionario_id,
+            data=data
+        ).first()
+        
+        if registro_existente:
+            return jsonify({'error': 'Já existe um registro de ponto para esta data.'}), 400
+        
+        print(f"🎯 Criando registro para {data.strftime('%d/%m/%Y')} - Tipo: {tipo_registro}")
         
         # Criar registro
         registro = RegistroPonto(
@@ -6044,9 +6056,9 @@ def criar_registro_ponto():
                 registro.hora_saida = datetime.strptime(saida, '%H:%M').time()
         
         # Percentual de extras baseado no tipo
-        if tipo_registro == 'sabado_horas_extras':
+        if tipo_registro in ['sabado_trabalhado', 'sabado_horas_extras']:
             registro.percentual_extras = 50.0
-        elif tipo_registro in ['domingo_horas_extras', 'feriado_trabalhado']:
+        elif tipo_registro in ['domingo_trabalhado', 'domingo_horas_extras', 'feriado_trabalhado']:
             registro.percentual_extras = 100.0
         else:
             percentual_extras = request.form.get('percentual_extras')
@@ -6055,10 +6067,35 @@ def criar_registro_ponto():
         # Observações
         registro.observacoes = request.form.get('observacoes')
         
+        # ✅ APLICAR LÓGICA ESPECIAL PARA FINS DE SEMANA
+        dia_semana = data.weekday()  # 0=segunda, 5=sábado, 6=domingo
+        
+        if dia_semana == 5 and tipo_registro in ['trabalho_normal', 'sabado_trabalhado']:
+            # Sábado trabalhado
+            print("✅ CONFIGURANDO SÁBADO TRABALHADO")
+            registro.tipo_registro = 'sabado_trabalhado'
+            registro.percentual_extras = 50.0
+            registro.total_atraso_horas = 0.0
+            registro.total_atraso_minutos = 0
+            
+        elif dia_semana == 6 and tipo_registro in ['trabalho_normal', 'domingo_trabalhado']:
+            # Domingo trabalhado
+            print("✅ CONFIGURANDO DOMINGO TRABALHADO")
+            registro.tipo_registro = 'domingo_trabalhado'
+            registro.percentual_extras = 100.0
+            registro.total_atraso_horas = 0.0
+            registro.total_atraso_minutos = 0
+        
         db.session.add(registro)
         db.session.commit()
         
-        return jsonify({'success': True})
+        print(f"✅ Registro criado com sucesso: {registro.id} - {tipo_registro}")
+        
+        return jsonify({
+            'success': True,
+            'message': f'Registro de ponto criado para {data.strftime("%d/%m/%Y")}',
+            'registro_id': registro.id
+        })
         
     except Exception as e:
         db.session.rollback()
