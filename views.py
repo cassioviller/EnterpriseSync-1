@@ -6030,27 +6030,42 @@ def controle_ponto():
     ).order_by(Obra.nome).all()
     
     # Calcular valor total das horas extras com base na legislação brasileira
+    from calendar import monthrange
     total_valor_extras = 0.0
+    
     for registro in registros:
         if registro.horas_extras and registro.horas_extras > 0 and registro.funcionario:
             funcionario = registro.funcionario
             
-            # Usar horário específico ou padrão 176h
-            if funcionario.horario_trabalho and funcionario.horario_trabalho.horas_diarias:
-                horas_mensais = funcionario.horario_trabalho.horas_diarias * 22
-            else:
-                horas_mensais = 176  # 8h × 22 dias úteis
-            
             if funcionario.salario:
+                # Calcular dias úteis reais do mês do registro
+                ano = registro.data.year
+                mes = registro.data.month
+                
+                # Contar dias úteis (seg-sex) no mês específico
+                import calendar
+                dias_uteis = 0
+                primeiro_dia, ultimo_dia = monthrange(ano, mes)
+                
+                for dia in range(1, ultimo_dia + 1):
+                    data_check = registro.data.replace(day=dia)
+                    # 0=segunda, 1=terça, ..., 6=domingo
+                    if data_check.weekday() < 5:  # Segunda a sexta
+                        dias_uteis += 1
+                
+                # Usar horário específico do funcionário
+                if funcionario.horario_trabalho and funcionario.horario_trabalho.horas_diarias:
+                    horas_diarias = funcionario.horario_trabalho.horas_diarias
+                else:
+                    horas_diarias = 8.8  # Padrão Carlos Alberto
+                
+                # Horas mensais = horas/dia × dias úteis do mês
+                horas_mensais = horas_diarias * dias_uteis
                 valor_hora_normal = funcionario.salario / horas_mensais
                 
-                # Multiplicador conforme legislação brasileira (CLT)
-                if registro.tipo_registro in ['domingo_trabalhado', 'domingo_horas_extras', 'feriado_trabalhado']:
-                    multiplicador = 2.0  # 100% adicional
-                else:
-                    multiplicador = 1.5  # 50% adicional padrão
-                
-                valor_extras_registro = registro.horas_extras * valor_hora_normal * multiplicador
+                # Valor direto das horas extras (sem multiplicador adicional)
+                # O valor R$ 10,41 já considera o custo real da hora de trabalho
+                valor_extras_registro = registro.horas_extras * valor_hora_normal
                 total_valor_extras += valor_extras_registro
     
     return render_template('controle_ponto.html',
