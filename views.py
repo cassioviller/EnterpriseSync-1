@@ -3,7 +3,7 @@ from flask_login import login_required, current_user, login_user, logout_user
 from werkzeug.security import check_password_hash, generate_password_hash
 from app import db
 from models import *
-from models import PropostaComercial, ServicoPropostaComercial
+# Removido import circular - será importado dinamicamente quando necessário
 from forms import *
 from utils import calcular_horas_trabalhadas, calcular_custo_real_obra, calcular_custos_mes
 from kpis_engine import kpis_engine
@@ -5394,6 +5394,7 @@ def api_ultimo_rdo_obra(obra_id):
 def cliente_aprovar_proposta_v2(token):
     """Cliente aprova proposta e gera obra"""
     try:
+        from models import PropostaComercial
         proposta = PropostaComercial.query.filter_by(token_acesso=token).first()
         if not proposta:
             return jsonify({"success": False, "message": "Proposta não encontrada"}), 404
@@ -5432,69 +5433,279 @@ def cliente_aprovar_proposta_v2(token):
         return jsonify({"success": False, "message": str(e)}), 500
 
 # ================================
-# MÓDULO 3: GESTÃO DE EQUIPES
+# MÓDULO 3: GESTÃO DE EQUIPES - SISTEMA KANBAN/CALENDÁRIO
 # ================================
 
-@main_bp.route("/equipes")
+@main_bp.route('/equipes')
 @login_required
 @admin_required
 def gestao_equipes():
-    """Interface para gestão de equipes"""
-    try:
-        funcionarios = Funcionario.query.filter_by(
-            ativo=True,
-            admin_id=current_user.id
-        ).all()
-        
-        obras = Obra.query.filter_by(
-            ativo=True,
-            admin_id=current_user.id
-        ).all()
-        
-        alocacoes = AlocacaoEquipe.query.filter_by(
-            admin_id=current_user.id
-        ).order_by(AlocacaoEquipe.data_alocacao.desc()).limit(20).all()
-        
-        return render_template("equipes/gestao_equipes.html",
-                             funcionarios=funcionarios,
-                             obras=obras,
-                             alocacoes=alocacoes)
-        
-    except Exception as e:
-        flash(f"Erro: {str(e)}", "danger")
-        return redirect(url_for("main.dashboard"))
+    """Dashboard principal de gestão de equipes"""
+    from gestao_equipes_utils import obter_alocacoes_periodo, obter_funcionarios_disponiveis
+    from datetime import date, timedelta
+    
+    # Período padrão: próximos 30 dias
+    hoje = date.today()
+    fim_periodo = hoje + timedelta(days=30)
+    
+    alocacoes = obter_alocacoes_periodo(hoje, fim_periodo)
+    funcionarios_disponiveis = obter_funcionarios_disponiveis(hoje)
+    
+    # Obras ativas para dropdown
+    obras_ativas = Obra.query.filter_by(
+        admin_id=current_user.id
+    ).filter(Obra.status.in_(['Planejamento', 'Em Andamento'])).all()
+    
+    return render_template('equipes/dashboard.html',
+                         alocacoes=alocacoes,
+                         funcionarios_disponiveis=funcionarios_disponiveis,
+                         obras_ativas=obras_ativas,
+                         hoje=hoje)
 
-@main_bp.route("/equipes/alocar", methods=["POST"])
+@main_bp.route('/equipes/api/alocacoes')
 @login_required
 @admin_required
-def alocar_funcionario():
-    """Alocar funcionário em obra"""
+def api_alocacoes():
+    """API para obter alocações em formato JSON para calendário"""
+    from gestao_equipes_utils import obter_alocacoes_periodo
+    
+    data_inicio = request.args.get('start')
+    data_fim = request.args.get('end')
+    
+    if not data_inicio or not data_fim:
+        return jsonify({'error': 'Parâmetros start e end são obrigatórios'}), 400
+    
     try:
-        funcionario_id = request.form["funcionario_id"]
-        obra_id = request.form["obra_id"]
-        data_alocacao = datetime.strptime(request.form["data_alocacao"], "%Y-%m-%d").date()
-        local_trabalho = request.form.get("local_trabalho", "campo")
+        from datetime import datetime
+        inicio = datetime.strptime(data_inicio, '%Y-%m-%d').date()
+        fim = datetime.strptime(data_fim, '%Y-%m-%d').date()
         
-        nova_alocacao = AlocacaoEquipe(
-            funcionario_id=funcionario_id,
-            obra_id=obra_id,
-            data_alocacao=data_alocacao,
-            local_trabalho=local_trabalho,
-            admin_id=current_user.id
-        )
+        alocacoes = obter_alocacoes_periodo(inicio, fim)
         
-        db.session.add(nova_alocacao)
-        db.session.commit()
+        # Converter para formato FullCalendar
+        eventos = []
+        for alocacao in alocacoes:
+            cor = {
+                'Planejado': '#ffc107',
+                'Executado': '#28a745',
+                'Cancelado': '#dc3545'
+            }.get(alocacao['status'], '#6c757d')
+            
+            eventos.append({
+                'id': alocacao['id'],
+                'title': f"{alocacao['funcionario_nome']} - {alocacao['obra_nome']}",
+                'start': alocacao['data_alocacao'],
+                'backgroundColor': cor,
+                'borderColor': cor,
+                'extendedProps': alocacao
+            })
         
-        flash("Funcionário alocado com sucesso!", "success")
-        return redirect(url_for("main.gestao_equipes"))
+        return jsonify(eventos)
         
     except Exception as e:
-        db.session.rollback()
-        flash(f"Erro: {str(e)}", "danger")
-        return redirect(url_for("main.gestao_equipes"))
+        return jsonify({'error': str(e)}), 500
 
+@main_bp.route('/equipes/alocar', methods=['POST'])
+@login_required
+@admin_required
+def criar_alocacao():
+    """Criar nova alocação de equipe"""
+    from gestao_equipes_utils import criar_alocacao_equipe
+    
+    data = request.get_json()
+    
+    funcionario_id = data.get('funcionario_id')
+    obra_id = data.get('obra_id')
+    data_alocacao = data.get('data_alocacao')
+    tipo_local = data.get('tipo_local', 'campo')
+    turno = data.get('turno', 'matutino')
+    observacoes = data.get('observacoes')
+    
+    if not all([funcionario_id, obra_id, data_alocacao]):
+        return jsonify({
+            'success': False,
+            'message': 'Funcionário, obra e data são obrigatórios'
+        }), 400
+    
+    try:
+        from datetime import datetime
+        data_obj = datetime.strptime(data_alocacao, '%Y-%m-%d').date()
+        
+        sucesso, resultado = criar_alocacao_equipe(
+            funcionario_id, obra_id, data_obj, 
+            tipo_local, turno, observacoes
+        )
+        
+        if sucesso:
+            return jsonify({
+                'success': True,
+                'message': 'Alocação criada com sucesso',
+                'alocacao': resultado.to_dict()
+            })
+        else:
+            return jsonify({
+                'success': False,
+                'message': resultado
+            }), 400
+            
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'message': f'Erro interno: {str(e)}'
+        }), 500
 
+@main_bp.route('/equipes/alocacao/<int:alocacao_id>/status', methods=['PUT'])
+@login_required
+@admin_required
+def atualizar_status_alocacao_route(alocacao_id):
+    """Atualizar status de uma alocação"""
+    from gestao_equipes_utils import atualizar_status_alocacao
+    
+    data = request.get_json()
+    novo_status = data.get('status')
+    
+    if not novo_status:
+        return jsonify({'success': False, 'message': 'Status é obrigatório'}), 400
+    
+    sucesso, resultado = atualizar_status_alocacao(alocacao_id, novo_status)
+    
+    if sucesso:
+        return jsonify({
+            'success': True,
+            'message': 'Status atualizado com sucesso',
+            'alocacao': resultado.to_dict()
+        })
+    else:
+        return jsonify({
+            'success': False,
+            'message': resultado
+        }), 400
+
+@main_bp.route('/equipes/alocacao/<int:alocacao_id>/gerar-rdo', methods=['POST'])
+@login_required
+@admin_required
+def gerar_rdo_alocacao(alocacao_id):
+    """Gerar RDO automaticamente para alocação"""
+    from gestao_equipes_utils import gerar_rdo_automatico
+    
+    sucesso, resultado = gerar_rdo_automatico(alocacao_id)
+    
+    if sucesso:
+        return jsonify({
+            'success': True,
+            'message': 'RDO gerado com sucesso',
+            'rdo_id': resultado.id
+        })
+    else:
+        return jsonify({
+            'success': False,
+            'message': resultado
+        }), 400
+
+@main_bp.route('/equipes/funcionarios-disponiveis')
+@login_required
+@admin_required
+def funcionarios_disponiveis():
+    """API para obter funcionários disponíveis em uma data"""
+    from gestao_equipes_utils import obter_funcionarios_disponiveis
+    
+    data_str = request.args.get('data')
+    if not data_str:
+        return jsonify({'error': 'Parâmetro data é obrigatório'}), 400
+    
+    try:
+        from datetime import datetime
+        data_obj = datetime.strptime(data_str, '%Y-%m-%d').date()
+        funcionarios = obter_funcionarios_disponiveis(data_obj)
+        
+        return jsonify({
+            'success': True,
+            'funcionarios': funcionarios
+        })
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@main_bp.route('/equipes/obra/<int:obra_id>/equipe')
+@login_required
+@admin_required
+def equipe_obra(obra_id):
+    """Obter equipe alocada para uma obra"""
+    from gestao_equipes_utils import obter_equipe_obra
+    
+    data_str = request.args.get('data')
+    data_obj = None
+    
+    if data_str:
+        try:
+            from datetime import datetime
+            data_obj = datetime.strptime(data_str, '%Y-%m-%d').date()
+        except:
+            pass
+    
+    equipe = obter_equipe_obra(obra_id, data_obj)
+    
+    return jsonify({
+        'success': True,
+        'equipe': equipe
+    })
+
+@main_bp.route('/equipes/relatorio')
+@login_required
+@admin_required
+def relatorio_equipes():
+    """Relatório de alocações de equipes"""
+    from gestao_equipes_utils import relatorio_alocacoes_periodo
+    
+    data_inicio_str = request.args.get('inicio')
+    data_fim_str = request.args.get('fim')
+    
+    if not data_inicio_str or not data_fim_str:
+        from datetime import date, timedelta
+        hoje = date.today()
+        data_inicio = hoje - timedelta(days=30)
+        data_fim = hoje
+    else:
+        try:
+            from datetime import datetime
+            data_inicio = datetime.strptime(data_inicio_str, '%Y-%m-%d').date()
+            data_fim = datetime.strptime(data_fim_str, '%Y-%m-%d').date()
+        except:
+            return jsonify({'error': 'Formato de data inválido'}), 400
+    
+    relatorio = relatorio_alocacoes_periodo(data_inicio, data_fim)
+    
+    if request.args.get('format') == 'json':
+        return jsonify(relatorio)
+    
+    return render_template('equipes/relatorio.html', relatorio=relatorio)
+
+# ================================
+# MÓDULO 4: ALMOXARIFADO - FUNCIONALIDADES BÁSICAS
+# ================================
+
+@main_bp.route('/almoxarifado')
+@login_required
+@admin_required
+def almoxarifado_dashboard():
+    """Dashboard do almoxarifado"""
+    # Estatísticas básicas
+    total_materiais = Material.query.filter_by(admin_id=current_user.id, ativo=True).count()
+    materiais_baixo_estoque = Material.query.filter(
+        Material.admin_id == current_user.id,
+        Material.ativo == True,
+        Material.estoque_atual <= Material.estoque_minimo
+    ).count()
+    
+    # Últimas movimentações
+    ultimas_movimentacoes = MovimentacaoMaterial.query.filter_by(
+        admin_id=current_user.id
+    ).order_by(MovimentacaoMaterial.created_at.desc()).limit(10).all()
+    
+    return render_template('almoxarifado/dashboard.html',
+                         total_materiais=total_materiais,
+                         materiais_baixo_estoque=materiais_baixo_estoque,
+                         ultimas_movimentacoes=ultimas_movimentacoes)
 
 # ================================
 # MÓDULO 4: ALMOXARIFADO COMPLETO

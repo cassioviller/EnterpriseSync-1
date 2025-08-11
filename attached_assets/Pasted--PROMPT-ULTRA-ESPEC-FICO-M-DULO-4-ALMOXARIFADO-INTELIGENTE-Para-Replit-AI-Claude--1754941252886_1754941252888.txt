@@ -1,0 +1,2896 @@
+# 🎯 PROMPT ULTRA-ESPECÍFICO: MÓDULO 4 - ALMOXARIFADO INTELIGENTE
+
+**Para:** Replit AI / Claude / ChatGPT  
+**Sistema:** SIGE v8.0 - Sistema Integrado de Gestão Empresarial  
+**Módulo:** 4 de 7 - Almoxarifado Inteligente com Código de Barras e XML  
+**Status:** Módulos 1, 2 e 3 já implementados e funcionando - Continuidade da evolução
+
+---
+
+## ⚠️ CONTEXTO CRÍTICO - MÓDULOS 1, 2 E 3 JÁ FUNCIONANDO
+
+Você está implementando **APENAS O MÓDULO 4** de uma evolução em andamento. Os **Módulos 1, 2 e 3 já estão funcionando** perfeitamente:
+
+### **Infraestrutura Existente dos Módulos Anteriores:**
+- ✅ **Módulo 1:** Sistema de propostas com conversão automática para obras
+- ✅ **Módulo 2:** Portal do cliente com acompanhamento em tempo real
+- ✅ **Módulo 3:** Gestão de equipes com interface Kanban e criação automática de RDO
+- ✅ **Sistema RDO:** Funcionando perfeitamente com progresso automático
+- ✅ **Sistema de Alocação:** Funcionários sendo alocados para obras automaticamente
+
+### **Sistema Base Atual (NÃO MODIFICAR):**
+```
+├── app.py                    # Flask app principal
+├── models.py                 # Classes existentes + Proposta + NotificacaoCliente + AlocacaoEquipe
+├── views.py                  # Blueprint main_bp + rotas dos Módulos 1, 2 e 3
+├── auth.py                   # Decorators funcionando + gestor_equipes_required
+├── utils.py                  # Funções dos Módulos 1, 2 e 3
+└── templates/                # Templates dos Módulos 1, 2 e 3 funcionando
+    ├── propostas/            # ✅ Módulo 1 implementado
+    ├── cliente/              # ✅ Módulo 2 implementado
+    └── gestao_equipes/       # ✅ Módulo 3 implementado
+```
+
+### **Classes Principais Existentes (USAR COMO BASE):**
+```python
+# ✅ SISTEMA DE USUÁRIOS ATUAL
+class TipoUsuario(enum.Enum):
+    SUPER_ADMIN = "super_admin"
+    ADMIN = "admin"
+    GESTOR_EQUIPES = "gestor_equipes"
+    FUNCIONARIO = "funcionario"
+    # SERÁ ADICIONADO: ALMOXARIFE
+
+# ✅ SISTEMA RDO EXISTENTE (SERÁ INTEGRADO)
+class RDO(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    numero_rdo = db.Column(db.String(20), unique=True, nullable=False)
+    obra_id = db.Column(db.Integer, db.ForeignKey('obra.id'), nullable=False)
+    data_relatorio = db.Column(db.Date, nullable=False)
+    status = db.Column(db.String(20), default='Rascunho')  # Rascunho, Finalizado
+    admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False)
+
+# ✅ SISTEMA DE FUNCIONÁRIOS EXISTENTE
+class Funcionario(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    nome = db.Column(db.String(100), nullable=False)
+    cargo = db.Column(db.String(50))
+    admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False)
+    ativo = db.Column(db.Boolean, default=True)
+
+# ✅ OBRAS EXISTENTES (MÓDULOS 1, 2 E 3)
+class Obra(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    nome = db.Column(db.String(100), nullable=False)
+    codigo = db.Column(db.String(20), unique=True)
+    endereco = db.Column(db.Text)
+    status = db.Column(db.String(20), default='Planejamento')  # Planejamento, Em Andamento, Concluída
+    admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False)
+    # + campos dos Módulos 1 e 2 (token_cliente, etc.)
+
+# ✅ ALOCAÇÃO DE EQUIPES (MÓDULO 3)
+class AlocacaoEquipe(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    funcionario_id = db.Column(db.Integer, db.ForeignKey('funcionario.id'), nullable=False)
+    obra_id = db.Column(db.Integer, db.ForeignKey('obra.id'), nullable=False)
+    data_alocacao = db.Column(db.Date, nullable=False)
+    tipo_local = db.Column(db.String(20), nullable=False)  # 'oficina', 'campo'
+    rdo_gerado_id = db.Column(db.Integer, db.ForeignKey('rdo.id'))
+    admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False)
+```
+
+---
+
+## 🎯 MÓDULO 4: ALMOXARIFADO INTELIGENTE - ESPECIFICAÇÃO COMPLETA
+
+### **OBJETIVO DO MÓDULO:**
+Criar sistema completo de almoxarifado que permite:
+1. **Leitura de código de barras** com câmera web em tempo real
+2. **Importação automática** de XML de notas fiscais (NFe)
+3. **Controle total** de entrada/saída/devolução de materiais
+4. **Integração com RDO** - aba específica para materiais
+5. **Rastreabilidade completa** por funcionário, obra e data
+6. **Relatórios avançados** com IA e analytics
+
+---
+
+## 📊 IMPLEMENTAÇÃO TÉCNICA DETALHADA
+
+### **PASSO 1: Atualizar Enum TipoUsuario (MODIFICAR EM models.py)**
+
+```python
+# ===== MÓDULO 4: ATUALIZAR ENUM EXISTENTE =====
+# LOCALIZAR o enum TipoUsuario em models.py e MODIFICAR:
+
+class TipoUsuario(enum.Enum):
+    SUPER_ADMIN = "super_admin"
+    ADMIN = "admin"
+    GESTOR_EQUIPES = "gestor_equipes"
+    ALMOXARIFE = "almoxarife"  # ADICIONAR ESTA LINHA
+    FUNCIONARIO = "funcionario"
+```
+
+### **PASSO 2: Novas Classes do Almoxarifado (ADICIONAR EM models.py)**
+
+```python
+# ===== MÓDULO 4: 5 NOVAS CLASSES PARA ALMOXARIFADO =====
+# ADICIONAR estas classes NO FINAL do arquivo models.py
+
+from decimal import Decimal
+import xml.etree.ElementTree as ET
+
+# 1. CATEGORIAS DE PRODUTOS
+class CategoriaProduto(db.Model):
+    __tablename__ = 'categoria_produto'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    nome = db.Column(db.String(100), nullable=False)
+    descricao = db.Column(db.Text)
+    codigo = db.Column(db.String(10), nullable=False)  # CIM, ELE, HID, etc.
+    cor_hex = db.Column(db.String(7), default='#007bff')  # Para interface visual
+    
+    # Multi-tenant (OBRIGATÓRIO)
+    admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False)
+    
+    # Controle de tempo
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    # Relacionamentos
+    produtos = db.relationship('Produto', backref='categoria', lazy='dynamic')
+    
+    # Índices
+    __table_args__ = (
+        db.Index('idx_categoria_admin_codigo', 'admin_id', 'codigo'),
+    )
+    
+    def __repr__(self):
+        return f'<CategoriaProduto {self.nome}>'
+
+# 2. FORNECEDORES
+class Fornecedor(db.Model):
+    __tablename__ = 'fornecedor'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    razao_social = db.Column(db.String(200), nullable=False)
+    nome_fantasia = db.Column(db.String(200))
+    cnpj = db.Column(db.String(18), nullable=False)
+    inscricao_estadual = db.Column(db.String(20))
+    
+    # Endereço
+    endereco = db.Column(db.Text)
+    cidade = db.Column(db.String(100))
+    estado = db.Column(db.String(2))
+    cep = db.Column(db.String(10))
+    
+    # Contato
+    telefone = db.Column(db.String(20))
+    email = db.Column(db.String(100))
+    contato_responsavel = db.Column(db.String(100))
+    
+    # Status
+    ativo = db.Column(db.Boolean, default=True)
+    
+    # Multi-tenant (OBRIGATÓRIO)
+    admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False)
+    
+    # Controle de tempo
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    # Relacionamentos
+    notas_fiscais = db.relationship('NotaFiscal', backref='fornecedor', lazy='dynamic')
+    
+    # Índices
+    __table_args__ = (
+        db.UniqueConstraint('cnpj', 'admin_id', name='uk_fornecedor_cnpj_admin'),
+        db.Index('idx_fornecedor_admin_ativo', 'admin_id', 'ativo'),
+    )
+    
+    def __repr__(self):
+        return f'<Fornecedor {self.razao_social}>'
+    
+    @property
+    def cnpj_formatado(self):
+        """Retorna CNPJ formatado"""
+        if len(self.cnpj) == 14:
+            return f"{self.cnpj[:2]}.{self.cnpj[2:5]}.{self.cnpj[5:8]}/{self.cnpj[8:12]}-{self.cnpj[12:]}"
+        return self.cnpj
+
+# 3. PRODUTOS/MATERIAIS
+class Produto(db.Model):
+    __tablename__ = 'produto'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    codigo_interno = db.Column(db.String(20), nullable=False)
+    codigo_barras = db.Column(db.String(50))
+    nome = db.Column(db.String(200), nullable=False)
+    descricao = db.Column(db.Text)
+    
+    # Classificação
+    categoria_id = db.Column(db.Integer, db.ForeignKey('categoria_produto.id'), nullable=False)
+    
+    # Unidades e medidas
+    unidade_medida = db.Column(db.String(10), nullable=False)  # UN, KG, M, L, M2, M3, etc.
+    peso_unitario = db.Column(db.Numeric(10,3))  # Para cálculos de frete
+    dimensoes = db.Column(db.String(50))  # Ex: "10x20x30 cm"
+    
+    # Controle de estoque
+    estoque_minimo = db.Column(db.Numeric(10,3), default=0)
+    estoque_maximo = db.Column(db.Numeric(10,3))
+    estoque_atual = db.Column(db.Numeric(10,3), default=0)
+    estoque_reservado = db.Column(db.Numeric(10,3), default=0)  # Para futuras funcionalidades
+    
+    # Valores
+    valor_medio = db.Column(db.Numeric(10,2), default=0)  # Calculado automaticamente
+    ultimo_valor_compra = db.Column(db.Numeric(10,2))
+    
+    # Status e controle
+    ativo = db.Column(db.Boolean, default=True)
+    critico = db.Column(db.Boolean, default=False)  # Material crítico para obras
+    
+    # Multi-tenant (OBRIGATÓRIO)
+    admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False)
+    
+    # Controle de tempo
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    # Relacionamentos
+    movimentacoes = db.relationship('MovimentacaoEstoque', backref='produto', lazy='dynamic')
+    
+    # Índices
+    __table_args__ = (
+        db.UniqueConstraint('codigo_interno', 'admin_id', name='uk_produto_codigo_admin'),
+        db.Index('idx_produto_codigo_barras', 'codigo_barras'),
+        db.Index('idx_produto_admin_ativo', 'admin_id', 'ativo'),
+        db.Index('idx_produto_categoria', 'categoria_id'),
+        db.Index('idx_produto_estoque_baixo', 'admin_id', 'estoque_atual', 'estoque_minimo'),
+    )
+    
+    def __repr__(self):
+        return f'<Produto {self.nome}>'
+    
+    @property
+    def estoque_disponivel(self):
+        """Estoque disponível (atual - reservado)"""
+        return self.estoque_atual - self.estoque_reservado
+    
+    @property
+    def status_estoque(self):
+        """Status do estoque: OK, BAIXO, CRITICO, ZERADO"""
+        if self.estoque_atual <= 0:
+            return 'ZERADO'
+        elif self.estoque_atual <= (self.estoque_minimo * 0.5):
+            return 'CRITICO'
+        elif self.estoque_atual <= self.estoque_minimo:
+            return 'BAIXO'
+        else:
+            return 'OK'
+    
+    @property
+    def valor_estoque_atual(self):
+        """Valor total do estoque atual"""
+        return self.estoque_atual * self.valor_medio
+    
+    def to_dict(self):
+        """Converter para dicionário para APIs"""
+        return {
+            'id': self.id,
+            'codigo_interno': self.codigo_interno,
+            'codigo_barras': self.codigo_barras,
+            'nome': self.nome,
+            'descricao': self.descricao,
+            'categoria': self.categoria.nome if self.categoria else None,
+            'unidade_medida': self.unidade_medida,
+            'estoque_atual': float(self.estoque_atual),
+            'estoque_minimo': float(self.estoque_minimo),
+            'valor_medio': float(self.valor_medio),
+            'status_estoque': self.status_estoque,
+            'ativo': self.ativo
+        }
+
+# 4. NOTAS FISCAIS
+class NotaFiscal(db.Model):
+    __tablename__ = 'nota_fiscal'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    numero = db.Column(db.String(20), nullable=False)
+    serie = db.Column(db.String(5), nullable=False)
+    chave_acesso = db.Column(db.String(44), unique=True, nullable=False)
+    
+    # Fornecedor
+    fornecedor_id = db.Column(db.Integer, db.ForeignKey('fornecedor.id'), nullable=False)
+    
+    # Datas
+    data_emissao = db.Column(db.Date, nullable=False)
+    data_entrada = db.Column(db.Date)  # Data de entrada no estoque
+    
+    # Valores
+    valor_produtos = db.Column(db.Numeric(10,2), nullable=False)
+    valor_frete = db.Column(db.Numeric(10,2), default=0)
+    valor_desconto = db.Column(db.Numeric(10,2), default=0)
+    valor_total = db.Column(db.Numeric(10,2), nullable=False)
+    
+    # XML e processamento
+    xml_content = db.Column(db.Text)  # Armazenar XML completo
+    xml_hash = db.Column(db.String(64))  # Hash para detectar duplicatas
+    
+    # Status
+    status = db.Column(db.String(20), default='Pendente')  # Pendente, Processada, Erro
+    observacoes = db.Column(db.Text)
+    
+    # Controle
+    processada_por_id = db.Column(db.Integer, db.ForeignKey('usuario.id'))
+    data_processamento = db.Column(db.DateTime)
+    
+    # Multi-tenant (OBRIGATÓRIO)
+    admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False)
+    
+    # Controle de tempo
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    # Relacionamentos
+    movimentacoes = db.relationship('MovimentacaoEstoque', backref='nota_fiscal', lazy='dynamic')
+    processada_por = db.relationship('Usuario', foreign_keys=[processada_por_id])
+    
+    # Índices
+    __table_args__ = (
+        db.Index('idx_nf_admin_status', 'admin_id', 'status'),
+        db.Index('idx_nf_fornecedor_data', 'fornecedor_id', 'data_emissao'),
+        db.Index('idx_nf_chave_acesso', 'chave_acesso'),
+    )
+    
+    def __repr__(self):
+        return f'<NotaFiscal {self.numero}/{self.serie}>'
+    
+    @property
+    def numero_formatado(self):
+        """Número da NF formatado"""
+        return f"{self.numero}/{self.serie}"
+    
+    def processar_xml(self):
+        """Processar XML da nota fiscal e extrair produtos"""
+        if not self.xml_content:
+            return False
+        
+        try:
+            root = ET.fromstring(self.xml_content)
+            # Implementar parsing do XML NFe
+            # Extrair produtos e criar movimentações
+            return True
+        except Exception as e:
+            self.observacoes = f"Erro ao processar XML: {str(e)}"
+            return False
+
+# 5. MOVIMENTAÇÕES DE ESTOQUE
+class MovimentacaoEstoque(db.Model):
+    __tablename__ = 'movimentacao_estoque'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    
+    # Produto
+    produto_id = db.Column(db.Integer, db.ForeignKey('produto.id'), nullable=False)
+    
+    # Tipo de movimentação
+    tipo_movimentacao = db.Column(db.String(20), nullable=False)  # ENTRADA, SAIDA, DEVOLUCAO, AJUSTE
+    
+    # Quantidades
+    quantidade = db.Column(db.Numeric(10,3), nullable=False)
+    quantidade_anterior = db.Column(db.Numeric(10,3))  # Para auditoria
+    quantidade_posterior = db.Column(db.Numeric(10,3))  # Para auditoria
+    
+    # Valores
+    valor_unitario = db.Column(db.Numeric(10,2))
+    valor_total = db.Column(db.Numeric(10,2))
+    
+    # Data e hora
+    data_movimentacao = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    
+    # Origem da movimentação (relacionamentos opcionais)
+    nota_fiscal_id = db.Column(db.Integer, db.ForeignKey('nota_fiscal.id'))
+    rdo_id = db.Column(db.Integer, db.ForeignKey('rdo.id'))
+    funcionario_id = db.Column(db.Integer, db.ForeignKey('funcionario.id'))
+    obra_id = db.Column(db.Integer, db.ForeignKey('obra.id'))
+    
+    # Controle e auditoria
+    usuario_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False)
+    observacoes = db.Column(db.Text)
+    ip_address = db.Column(db.String(45))
+    
+    # Multi-tenant (OBRIGATÓRIO)
+    admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False)
+    
+    # Relacionamentos
+    usuario = db.relationship('Usuario', backref='movimentacoes_estoque')
+    funcionario = db.relationship('Funcionario', backref='movimentacoes_materiais')
+    obra = db.relationship('Obra', backref='movimentacoes_materiais')
+    rdo = db.relationship('RDO', backref='movimentacoes_materiais')
+    
+    # Índices
+    __table_args__ = (
+        db.Index('idx_mov_produto_data', 'produto_id', 'data_movimentacao'),
+        db.Index('idx_mov_admin_tipo', 'admin_id', 'tipo_movimentacao'),
+        db.Index('idx_mov_obra_data', 'obra_id', 'data_movimentacao'),
+        db.Index('idx_mov_funcionario_data', 'funcionario_id', 'data_movimentacao'),
+        db.Index('idx_mov_rdo', 'rdo_id'),
+        db.Index('idx_mov_nf', 'nota_fiscal_id'),
+    )
+    
+    def __repr__(self):
+        return f'<MovimentacaoEstoque {self.tipo_movimentacao} - {self.produto.nome if self.produto else "N/A"}>'
+    
+    def to_dict(self):
+        """Converter para dicionário para APIs"""
+        return {
+            'id': self.id,
+            'produto_nome': self.produto.nome if self.produto else None,
+            'tipo_movimentacao': self.tipo_movimentacao,
+            'quantidade': float(self.quantidade),
+            'valor_unitario': float(self.valor_unitario) if self.valor_unitario else None,
+            'valor_total': float(self.valor_total) if self.valor_total else None,
+            'data_movimentacao': self.data_movimentacao.isoformat(),
+            'funcionario_nome': self.funcionario.nome if self.funcionario else None,
+            'obra_nome': self.obra.nome if self.obra else None,
+            'rdo_numero': self.rdo.numero_rdo if self.rdo else None,
+            'usuario_nome': self.usuario.nome if self.usuario else None,
+            'observacoes': self.observacoes
+        }
+```
+
+
+### **PASSO 3: Novo Decorator de Permissão (ADICIONAR EM auth.py)**
+
+```python
+# ===== MÓDULO 4: NOVO DECORATOR PARA ALMOXARIFE =====
+# ADICIONAR esta função NO FINAL do arquivo auth.py
+
+def almoxarife_required(f):
+    """Decorator para rotas que requerem acesso de almoxarife ou superior"""
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if not current_user.is_authenticated:
+            flash('Acesso negado. Faça login primeiro.', 'danger')
+            return redirect(url_for('main.login'))
+        
+        if current_user.tipo_usuario not in [TipoUsuario.SUPER_ADMIN, TipoUsuario.ADMIN, TipoUsuario.ALMOXARIFE]:
+            flash('Acesso negado. Apenas almoxarifes podem acessar esta página.', 'danger')
+            return redirect(url_for('main.dashboard'))
+        
+        return f(*args, **kwargs)
+    return decorated_function
+
+def pode_gerenciar_almoxarifado():
+    """Verificar se o usuário atual pode gerenciar almoxarifado"""
+    if not current_user.is_authenticated:
+        return False
+    
+    return current_user.tipo_usuario in [TipoUsuario.SUPER_ADMIN, TipoUsuario.ADMIN, TipoUsuario.ALMOXARIFE]
+
+def pode_lancar_materiais():
+    """Verificar se o usuário atual pode lançar materiais"""
+    if not current_user.is_authenticated:
+        return False
+    
+    # Almoxarife pode lançar em qualquer RDO
+    # Admin e Super Admin também podem
+    return current_user.tipo_usuario in [TipoUsuario.SUPER_ADMIN, TipoUsuario.ADMIN, TipoUsuario.ALMOXARIFE]
+```
+
+### **PASSO 4: Funções Utilitárias do Almoxarifado (ADICIONAR EM utils.py)**
+
+```python
+# ===== MÓDULO 4: FUNÇÕES PARA ALMOXARIFADO INTELIGENTE =====
+# ADICIONAR estas funções NO FINAL do arquivo utils.py
+
+import hashlib
+import xml.etree.ElementTree as ET
+from decimal import Decimal
+import re
+import requests
+from datetime import date, datetime, timedelta
+from collections import defaultdict
+from models import (Produto, CategoriaProduto, Fornecedor, NotaFiscal, 
+                   MovimentacaoEstoque, RDO, Funcionario, Obra)
+
+# ===== FUNÇÕES DE CÓDIGO DE BARRAS =====
+
+def validar_codigo_barras(codigo):
+    """Validar código de barras (EAN-13, EAN-8, Code-128)"""
+    if not codigo:
+        return False
+    
+    # Remover espaços e caracteres especiais
+    codigo = re.sub(r'[^0-9]', '', codigo)
+    
+    # EAN-13 (13 dígitos)
+    if len(codigo) == 13:
+        return validar_ean13(codigo)
+    
+    # EAN-8 (8 dígitos)
+    elif len(codigo) == 8:
+        return validar_ean8(codigo)
+    
+    # Code-128 ou outros formatos (aceitar se tiver entre 4 e 50 caracteres)
+    elif 4 <= len(codigo) <= 50:
+        return True
+    
+    return False
+
+def validar_ean13(codigo):
+    """Validar código EAN-13 com dígito verificador"""
+    if len(codigo) != 13:
+        return False
+    
+    try:
+        # Calcular dígito verificador
+        soma = 0
+        for i, digito in enumerate(codigo[:-1]):
+            peso = 1 if i % 2 == 0 else 3
+            soma += int(digito) * peso
+        
+        digito_verificador = (10 - (soma % 10)) % 10
+        return int(codigo[-1]) == digito_verificador
+    except:
+        return False
+
+def validar_ean8(codigo):
+    """Validar código EAN-8 com dígito verificador"""
+    if len(codigo) != 8:
+        return False
+    
+    try:
+        # Calcular dígito verificador
+        soma = 0
+        for i, digito in enumerate(codigo[:-1]):
+            peso = 3 if i % 2 == 0 else 1
+            soma += int(digito) * peso
+        
+        digito_verificador = (10 - (soma % 10)) % 10
+        return int(codigo[-1]) == digito_verificador
+    except:
+        return False
+
+def gerar_codigo_interno(admin_id, categoria_codigo=None):
+    """Gerar código interno único para produto"""
+    # Formato: CAT001, CAT002, etc.
+    if not categoria_codigo:
+        categoria_codigo = "PRD"
+    
+    # Buscar último código da categoria
+    ultimo_produto = Produto.query.filter(
+        Produto.admin_id == admin_id,
+        Produto.codigo_interno.like(f'{categoria_codigo}%')
+    ).order_by(Produto.codigo_interno.desc()).first()
+    
+    if ultimo_produto:
+        try:
+            ultimo_numero = int(ultimo_produto.codigo_interno[3:])
+            novo_numero = ultimo_numero + 1
+        except:
+            novo_numero = 1
+    else:
+        novo_numero = 1
+    
+    return f"{categoria_codigo}{novo_numero:03d}"
+
+# ===== FUNÇÕES DE ESTOQUE =====
+
+def atualizar_estoque_produto(produto_id, quantidade, tipo_movimentacao, **kwargs):
+    """Atualizar estoque do produto e criar movimentação"""
+    produto = Produto.query.get(produto_id)
+    if not produto:
+        raise ValueError("Produto não encontrado")
+    
+    # Validar quantidade
+    if quantidade <= 0:
+        raise ValueError("Quantidade deve ser positiva")
+    
+    # Validar tipo de movimentação
+    tipos_validos = ['ENTRADA', 'SAIDA', 'DEVOLUCAO', 'AJUSTE']
+    if tipo_movimentacao not in tipos_validos:
+        raise ValueError(f"Tipo de movimentação inválido. Use: {', '.join(tipos_validos)}")
+    
+    # Calcular nova quantidade
+    quantidade_anterior = produto.estoque_atual
+    
+    if tipo_movimentacao == 'ENTRADA':
+        nova_quantidade = quantidade_anterior + quantidade
+    elif tipo_movimentacao == 'SAIDA':
+        if quantidade_anterior < quantidade:
+            raise ValueError(f"Estoque insuficiente. Disponível: {quantidade_anterior}")
+        nova_quantidade = quantidade_anterior - quantidade
+    elif tipo_movimentacao == 'DEVOLUCAO':
+        nova_quantidade = quantidade_anterior + quantidade
+    elif tipo_movimentacao == 'AJUSTE':
+        # Para ajuste, a quantidade é o valor final desejado
+        nova_quantidade = quantidade
+        quantidade = nova_quantidade - quantidade_anterior  # Diferença para movimentação
+    
+    # Atualizar estoque
+    produto.estoque_atual = nova_quantidade
+    
+    # Atualizar valor médio se for entrada com valor
+    valor_unitario = kwargs.get('valor_unitario')
+    if tipo_movimentacao == 'ENTRADA' and valor_unitario:
+        valor_total_anterior = quantidade_anterior * produto.valor_medio
+        valor_total_entrada = quantidade * valor_unitario
+        valor_total_novo = valor_total_anterior + valor_total_entrada
+        
+        if nova_quantidade > 0:
+            produto.valor_medio = valor_total_novo / nova_quantidade
+        
+        produto.ultimo_valor_compra = valor_unitario
+    
+    # Criar movimentação
+    movimentacao = MovimentacaoEstoque(
+        produto_id=produto_id,
+        tipo_movimentacao=tipo_movimentacao,
+        quantidade=abs(quantidade),
+        quantidade_anterior=quantidade_anterior,
+        quantidade_posterior=nova_quantidade,
+        valor_unitario=valor_unitario,
+        valor_total=abs(quantidade) * valor_unitario if valor_unitario else None,
+        data_movimentacao=kwargs.get('data_movimentacao', datetime.utcnow()),
+        nota_fiscal_id=kwargs.get('nota_fiscal_id'),
+        rdo_id=kwargs.get('rdo_id'),
+        funcionario_id=kwargs.get('funcionario_id'),
+        obra_id=kwargs.get('obra_id'),
+        usuario_id=kwargs.get('usuario_id'),
+        observacoes=kwargs.get('observacoes'),
+        ip_address=kwargs.get('ip_address'),
+        admin_id=produto.admin_id
+    )
+    
+    db.session.add(movimentacao)
+    db.session.commit()
+    
+    return movimentacao
+
+def calcular_estoque_minimo_inteligente(produto_id, dias_historico=90):
+    """Calcular estoque mínimo baseado em IA"""
+    produto = Produto.query.get(produto_id)
+    if not produto:
+        return 0
+    
+    # Buscar movimentações de saída dos últimos X dias
+    data_inicio = datetime.utcnow() - timedelta(days=dias_historico)
+    
+    movimentacoes = MovimentacaoEstoque.query.filter(
+        MovimentacaoEstoque.produto_id == produto_id,
+        MovimentacaoEstoque.tipo_movimentacao == 'SAIDA',
+        MovimentacaoEstoque.data_movimentacao >= data_inicio
+    ).all()
+    
+    if not movimentacoes:
+        return produto.estoque_minimo or 10  # Valor padrão
+    
+    # Calcular consumo médio diário
+    total_consumido = sum(mov.quantidade for mov in movimentacoes)
+    consumo_medio_diario = total_consumido / dias_historico
+    
+    # Aplicar margem de segurança (30 dias de consumo)
+    estoque_minimo_sugerido = consumo_medio_diario * 30
+    
+    # Considerar sazonalidade (picos de consumo)
+    consumos_diarios = defaultdict(float)
+    for mov in movimentacoes:
+        data_mov = mov.data_movimentacao.date()
+        consumos_diarios[data_mov] += mov.quantidade
+    
+    if consumos_diarios:
+        consumos = list(consumos_diarios.values())
+        consumo_maximo = max(consumos)
+        
+        # Se o pico for muito maior que a média, aumentar margem
+        if consumo_maximo > (consumo_medio_diario * 2):
+            estoque_minimo_sugerido *= 1.5
+    
+    return max(estoque_minimo_sugerido, 1)  # Mínimo de 1 unidade
+
+def prever_ruptura_estoque(produto_id, dias_futuros=30):
+    """Prever quando o estoque pode acabar"""
+    produto = Produto.query.get(produto_id)
+    if not produto:
+        return None
+    
+    # Calcular consumo médio dos últimos 30 dias
+    data_inicio = datetime.utcnow() - timedelta(days=30)
+    
+    movimentacoes_saida = MovimentacaoEstoque.query.filter(
+        MovimentacaoEstoque.produto_id == produto_id,
+        MovimentacaoEstoque.tipo_movimentacao == 'SAIDA',
+        MovimentacaoEstoque.data_movimentacao >= data_inicio
+    ).all()
+    
+    if not movimentacoes_saida:
+        return None  # Sem histórico de consumo
+    
+    total_consumido = sum(mov.quantidade for mov in movimentacoes_saida)
+    consumo_medio_diario = total_consumido / 30
+    
+    if consumo_medio_diario <= 0:
+        return None
+    
+    # Calcular dias restantes
+    dias_restantes = produto.estoque_atual / consumo_medio_diario
+    
+    if dias_restantes <= dias_futuros:
+        data_ruptura = date.today() + timedelta(days=int(dias_restantes))
+        return {
+            'dias_restantes': int(dias_restantes),
+            'data_ruptura': data_ruptura,
+            'consumo_medio_diario': float(consumo_medio_diario),
+            'confianca': 'alta' if len(movimentacoes_saida) >= 10 else 'baixa'
+        }
+    
+    return None
+
+# ===== FUNÇÕES DE XML/NFe =====
+
+def processar_xml_nfe(xml_content, admin_id, usuario_id):
+    """Processar XML de nota fiscal eletrônica"""
+    try:
+        # Calcular hash do XML para evitar duplicatas
+        xml_hash = hashlib.sha256(xml_content.encode()).hexdigest()
+        
+        # Verificar se já foi processado
+        nf_existente = NotaFiscal.query.filter_by(
+            xml_hash=xml_hash,
+            admin_id=admin_id
+        ).first()
+        
+        if nf_existente:
+            return {'erro': 'XML já foi processado anteriormente', 'nota_fiscal_id': nf_existente.id}
+        
+        # Fazer parsing do XML
+        root = ET.fromstring(xml_content)
+        
+        # Namespace NFe
+        ns = {'nfe': 'http://www.portalfiscal.inf.br/nfe'}
+        
+        # Extrair dados da nota fiscal
+        inf_nfe = root.find('.//nfe:infNFe', ns)
+        if inf_nfe is None:
+            return {'erro': 'XML inválido: não é uma NFe válida'}
+        
+        chave_acesso = inf_nfe.get('Id', '').replace('NFe', '')
+        
+        # Dados do emitente (fornecedor)
+        emit = inf_nfe.find('nfe:emit', ns)
+        if emit is None:
+            return {'erro': 'XML inválido: dados do emitente não encontrados'}
+        
+        cnpj_fornecedor = emit.find('nfe:CNPJ', ns)
+        if cnpj_fornecedor is None:
+            return {'erro': 'XML inválido: CNPJ do fornecedor não encontrado'}
+        
+        cnpj = cnpj_fornecedor.text
+        
+        # Buscar ou criar fornecedor
+        fornecedor = Fornecedor.query.filter_by(
+            cnpj=cnpj,
+            admin_id=admin_id
+        ).first()
+        
+        if not fornecedor:
+            razao_social = emit.find('nfe:xNome', ns)
+            nome_fantasia = emit.find('nfe:xFant', ns)
+            
+            fornecedor = Fornecedor(
+                razao_social=razao_social.text if razao_social is not None else 'Não informado',
+                nome_fantasia=nome_fantasia.text if nome_fantasia is not None else None,
+                cnpj=cnpj,
+                admin_id=admin_id
+            )
+            db.session.add(fornecedor)
+            db.session.flush()
+        
+        # Dados da nota fiscal
+        ide = inf_nfe.find('nfe:ide', ns)
+        numero_nf = ide.find('nfe:nNF', ns).text
+        serie_nf = ide.find('nfe:serie', ns).text
+        data_emissao = datetime.strptime(ide.find('nfe:dhEmi', ns).text[:10], '%Y-%m-%d').date()
+        
+        # Valores totais
+        total = inf_nfe.find('nfe:total/nfe:ICMSTot', ns)
+        valor_produtos = Decimal(total.find('nfe:vProd', ns).text)
+        valor_frete = Decimal(total.find('nfe:vFrete', ns).text or '0')
+        valor_desconto = Decimal(total.find('nfe:vDesc', ns).text or '0')
+        valor_total = Decimal(total.find('nfe:vNF', ns).text)
+        
+        # Criar nota fiscal
+        nota_fiscal = NotaFiscal(
+            numero=numero_nf,
+            serie=serie_nf,
+            chave_acesso=chave_acesso,
+            fornecedor_id=fornecedor.id,
+            data_emissao=data_emissao,
+            valor_produtos=valor_produtos,
+            valor_frete=valor_frete,
+            valor_desconto=valor_desconto,
+            valor_total=valor_total,
+            xml_content=xml_content,
+            xml_hash=xml_hash,
+            status='Pendente',
+            admin_id=admin_id
+        )
+        
+        db.session.add(nota_fiscal)
+        db.session.flush()
+        
+        # Extrair produtos
+        produtos_xml = []
+        detalhes = inf_nfe.findall('nfe:det', ns)
+        
+        for det in detalhes:
+            prod = det.find('nfe:prod', ns)
+            
+            codigo_produto = prod.find('nfe:cProd', ns).text
+            codigo_barras = prod.find('nfe:cEAN', ns)
+            nome_produto = prod.find('nfe:xProd', ns).text
+            unidade = prod.find('nfe:uCom', ns).text
+            quantidade = Decimal(prod.find('nfe:qCom', ns).text)
+            valor_unitario = Decimal(prod.find('nfe:vUnCom', ns).text)
+            
+            produtos_xml.append({
+                'codigo_produto': codigo_produto,
+                'codigo_barras': codigo_barras.text if codigo_barras is not None else None,
+                'nome': nome_produto,
+                'unidade': unidade,
+                'quantidade': quantidade,
+                'valor_unitario': valor_unitario,
+                'valor_total': quantidade * valor_unitario
+            })
+        
+        db.session.commit()
+        
+        return {
+            'sucesso': True,
+            'nota_fiscal_id': nota_fiscal.id,
+            'fornecedor': {
+                'id': fornecedor.id,
+                'razao_social': fornecedor.razao_social,
+                'cnpj': fornecedor.cnpj
+            },
+            'produtos': produtos_xml,
+            'resumo': {
+                'numero': numero_nf,
+                'serie': serie_nf,
+                'data_emissao': data_emissao.isoformat(),
+                'valor_total': float(valor_total),
+                'quantidade_produtos': len(produtos_xml)
+            }
+        }
+        
+    except ET.ParseError:
+        return {'erro': 'XML inválido: erro de formatação'}
+    except Exception as e:
+        return {'erro': f'Erro ao processar XML: {str(e)}'}
+
+def processar_produtos_nfe(nota_fiscal_id, produtos_mapeamento, admin_id, usuario_id):
+    """Processar produtos da NFe e criar movimentações de entrada"""
+    nota_fiscal = NotaFiscal.query.get(nota_fiscal_id)
+    if not nota_fiscal:
+        return {'erro': 'Nota fiscal não encontrada'}
+    
+    if nota_fiscal.status == 'Processada':
+        return {'erro': 'Nota fiscal já foi processada'}
+    
+    try:
+        movimentacoes_criadas = []
+        
+        for item in produtos_mapeamento:
+            produto_id = item.get('produto_id')
+            quantidade = Decimal(str(item.get('quantidade', 0)))
+            valor_unitario = Decimal(str(item.get('valor_unitario', 0)))
+            criar_produto = item.get('criar_produto', False)
+            
+            # Se deve criar produto novo
+            if criar_produto:
+                categoria_id = item.get('categoria_id')
+                if not categoria_id:
+                    return {'erro': 'Categoria é obrigatória para criar novo produto'}
+                
+                categoria = CategoriaProduto.query.get(categoria_id)
+                if not categoria:
+                    return {'erro': 'Categoria não encontrada'}
+                
+                # Criar novo produto
+                codigo_interno = gerar_codigo_interno(admin_id, categoria.codigo)
+                
+                produto = Produto(
+                    codigo_interno=codigo_interno,
+                    codigo_barras=item.get('codigo_barras'),
+                    nome=item.get('nome'),
+                    descricao=item.get('descricao', ''),
+                    categoria_id=categoria_id,
+                    unidade_medida=item.get('unidade_medida', 'UN'),
+                    estoque_minimo=Decimal(str(item.get('estoque_minimo', 10))),
+                    valor_medio=valor_unitario,
+                    ultimo_valor_compra=valor_unitario,
+                    admin_id=admin_id
+                )
+                
+                db.session.add(produto)
+                db.session.flush()
+                produto_id = produto.id
+            
+            # Criar movimentação de entrada
+            if produto_id and quantidade > 0:
+                movimentacao = atualizar_estoque_produto(
+                    produto_id=produto_id,
+                    quantidade=quantidade,
+                    tipo_movimentacao='ENTRADA',
+                    valor_unitario=valor_unitario,
+                    nota_fiscal_id=nota_fiscal_id,
+                    usuario_id=usuario_id,
+                    observacoes=f'Entrada via NFe {nota_fiscal.numero_formatado}'
+                )
+                
+                movimentacoes_criadas.append(movimentacao)
+        
+        # Marcar nota fiscal como processada
+        nota_fiscal.status = 'Processada'
+        nota_fiscal.processada_por_id = usuario_id
+        nota_fiscal.data_processamento = datetime.utcnow()
+        nota_fiscal.data_entrada = date.today()
+        
+        db.session.commit()
+        
+        return {
+            'sucesso': True,
+            'movimentacoes_criadas': len(movimentacoes_criadas),
+            'nota_fiscal_id': nota_fiscal_id
+        }
+        
+    except Exception as e:
+        db.session.rollback()
+        return {'erro': f'Erro ao processar produtos: {str(e)}'}
+
+# ===== FUNÇÕES DE RELATÓRIOS =====
+
+def gerar_relatorio_estoque(admin_id, filtros=None):
+    """Gerar relatório completo de estoque"""
+    query = Produto.query.filter_by(admin_id=admin_id, ativo=True)
+    
+    # Aplicar filtros
+    if filtros:
+        if filtros.get('categoria_id'):
+            query = query.filter_by(categoria_id=filtros['categoria_id'])
+        
+        if filtros.get('status_estoque'):
+            status = filtros['status_estoque']
+            if status == 'BAIXO':
+                query = query.filter(Produto.estoque_atual <= Produto.estoque_minimo)
+            elif status == 'CRITICO':
+                query = query.filter(Produto.estoque_atual <= (Produto.estoque_minimo * 0.5))
+            elif status == 'ZERADO':
+                query = query.filter(Produto.estoque_atual <= 0)
+    
+    produtos = query.order_by(Produto.nome).all()
+    
+    relatorio = {
+        'produtos': [],
+        'resumo': {
+            'total_produtos': len(produtos),
+            'valor_total_estoque': 0,
+            'produtos_baixo_estoque': 0,
+            'produtos_criticos': 0,
+            'produtos_zerados': 0
+        }
+    }
+    
+    for produto in produtos:
+        item = {
+            'id': produto.id,
+            'codigo_interno': produto.codigo_interno,
+            'nome': produto.nome,
+            'categoria': produto.categoria.nome,
+            'unidade_medida': produto.unidade_medida,
+            'estoque_atual': float(produto.estoque_atual),
+            'estoque_minimo': float(produto.estoque_minimo),
+            'valor_medio': float(produto.valor_medio),
+            'valor_estoque': float(produto.valor_estoque_atual),
+            'status_estoque': produto.status_estoque
+        }
+        
+        relatorio['produtos'].append(item)
+        relatorio['resumo']['valor_total_estoque'] += item['valor_estoque']
+        
+        if produto.status_estoque == 'BAIXO':
+            relatorio['resumo']['produtos_baixo_estoque'] += 1
+        elif produto.status_estoque == 'CRITICO':
+            relatorio['resumo']['produtos_criticos'] += 1
+        elif produto.status_estoque == 'ZERADO':
+            relatorio['resumo']['produtos_zerados'] += 1
+    
+    return relatorio
+
+def gerar_relatorio_movimentacoes(admin_id, data_inicio, data_fim, filtros=None):
+    """Gerar relatório de movimentações por período"""
+    query = MovimentacaoEstoque.query.filter(
+        MovimentacaoEstoque.admin_id == admin_id,
+        MovimentacaoEstoque.data_movimentacao.between(data_inicio, data_fim)
+    )
+    
+    # Aplicar filtros
+    if filtros:
+        if filtros.get('produto_id'):
+            query = query.filter_by(produto_id=filtros['produto_id'])
+        
+        if filtros.get('tipo_movimentacao'):
+            query = query.filter_by(tipo_movimentacao=filtros['tipo_movimentacao'])
+        
+        if filtros.get('obra_id'):
+            query = query.filter_by(obra_id=filtros['obra_id'])
+        
+        if filtros.get('funcionario_id'):
+            query = query.filter_by(funcionario_id=filtros['funcionario_id'])
+    
+    movimentacoes = query.order_by(MovimentacaoEstoque.data_movimentacao.desc()).all()
+    
+    relatorio = {
+        'movimentacoes': [mov.to_dict() for mov in movimentacoes],
+        'resumo': {
+            'total_movimentacoes': len(movimentacoes),
+            'entradas': 0,
+            'saidas': 0,
+            'devolucoes': 0,
+            'valor_total_entradas': 0,
+            'valor_total_saidas': 0
+        }
+    }
+    
+    for mov in movimentacoes:
+        if mov.tipo_movimentacao == 'ENTRADA':
+            relatorio['resumo']['entradas'] += 1
+            if mov.valor_total:
+                relatorio['resumo']['valor_total_entradas'] += float(mov.valor_total)
+        elif mov.tipo_movimentacao == 'SAIDA':
+            relatorio['resumo']['saidas'] += 1
+            if mov.valor_total:
+                relatorio['resumo']['valor_total_saidas'] += float(mov.valor_total)
+        elif mov.tipo_movimentacao == 'DEVOLUCAO':
+            relatorio['resumo']['devolucoes'] += 1
+    
+    return relatorio
+
+def gerar_relatorio_consumo_obra(obra_id, data_inicio=None, data_fim=None):
+    """Gerar relatório de consumo de materiais por obra"""
+    query = MovimentacaoEstoque.query.filter(
+        MovimentacaoEstoque.obra_id == obra_id,
+        MovimentacaoEstoque.tipo_movimentacao == 'SAIDA'
+    )
+    
+    if data_inicio and data_fim:
+        query = query.filter(MovimentacaoEstoque.data_movimentacao.between(data_inicio, data_fim))
+    
+    movimentacoes = query.all()
+    
+    # Agrupar por produto
+    consumo_por_produto = defaultdict(lambda: {
+        'quantidade_total': 0,
+        'valor_total': 0,
+        'movimentacoes': []
+    })
+    
+    for mov in movimentacoes:
+        produto_nome = mov.produto.nome
+        consumo_por_produto[produto_nome]['quantidade_total'] += mov.quantidade
+        if mov.valor_total:
+            consumo_por_produto[produto_nome]['valor_total'] += mov.valor_total
+        consumo_por_produto[produto_nome]['movimentacoes'].append(mov.to_dict())
+    
+    obra = Obra.query.get(obra_id)
+    
+    return {
+        'obra': {
+            'id': obra.id,
+            'nome': obra.nome,
+            'codigo': obra.codigo
+        },
+        'periodo': {
+            'data_inicio': data_inicio.isoformat() if data_inicio else None,
+            'data_fim': data_fim.isoformat() if data_fim else None
+        },
+        'consumo_por_produto': dict(consumo_por_produto),
+        'resumo': {
+            'produtos_utilizados': len(consumo_por_produto),
+            'valor_total_consumido': sum(item['valor_total'] for item in consumo_por_produto.values()),
+            'total_movimentacoes': len(movimentacoes)
+        }
+    }
+
+# ===== FUNÇÕES DE INTEGRAÇÃO COM RDO =====
+
+def obter_materiais_rdo(rdo_id):
+    """Obter materiais lançados em um RDO específico"""
+    movimentacoes = MovimentacaoEstoque.query.filter_by(
+        rdo_id=rdo_id,
+        tipo_movimentacao='SAIDA'
+    ).all()
+    
+    materiais = []
+    for mov in movimentacoes:
+        materiais.append({
+            'id': mov.id,
+            'produto_id': mov.produto_id,
+            'produto_nome': mov.produto.nome,
+            'produto_unidade': mov.produto.unidade_medida,
+            'quantidade': float(mov.quantidade),
+            'valor_unitario': float(mov.valor_unitario) if mov.valor_unitario else None,
+            'valor_total': float(mov.valor_total) if mov.valor_total else None,
+            'data_lancamento': mov.data_movimentacao.isoformat(),
+            'usuario_nome': mov.usuario.nome if mov.usuario else None,
+            'observacoes': mov.observacoes
+        })
+    
+    return materiais
+
+def lancar_material_rdo(rdo_id, produto_id, quantidade, usuario_id, observacoes=None):
+    """Lançar material em um RDO específico"""
+    # Validar RDO
+    rdo = RDO.query.get(rdo_id)
+    if not rdo:
+        raise ValueError("RDO não encontrado")
+    
+    # Validar produto
+    produto = Produto.query.get(produto_id)
+    if not produto:
+        raise ValueError("Produto não encontrado")
+    
+    # Obter dados da obra e funcionário através da alocação
+    alocacao = AlocacaoEquipe.query.filter_by(rdo_gerado_id=rdo_id).first()
+    funcionario_id = alocacao.funcionario_id if alocacao else None
+    obra_id = rdo.obra_id
+    
+    # Criar movimentação de saída
+    movimentacao = atualizar_estoque_produto(
+        produto_id=produto_id,
+        quantidade=quantidade,
+        tipo_movimentacao='SAIDA',
+        rdo_id=rdo_id,
+        funcionario_id=funcionario_id,
+        obra_id=obra_id,
+        usuario_id=usuario_id,
+        observacoes=observacoes or f'Material usado no RDO {rdo.numero_rdo}'
+    )
+    
+    return movimentacao
+
+def processar_devolucao_rdo(rdo_id, devolucoes, usuario_id):
+    """Processar devolução de materiais de um RDO"""
+    movimentacoes_devolucao = []
+    
+    for item in devolucoes:
+        produto_id = item.get('produto_id')
+        quantidade_devolvida = item.get('quantidade')
+        observacoes = item.get('observacoes', '')
+        
+        if quantidade_devolvida > 0:
+            # Obter dados da obra
+            rdo = RDO.query.get(rdo_id)
+            alocacao = AlocacaoEquipe.query.filter_by(rdo_gerado_id=rdo_id).first()
+            funcionario_id = alocacao.funcionario_id if alocacao else None
+            
+            movimentacao = atualizar_estoque_produto(
+                produto_id=produto_id,
+                quantidade=quantidade_devolvida,
+                tipo_movimentacao='DEVOLUCAO',
+                rdo_id=rdo_id,
+                funcionario_id=funcionario_id,
+                obra_id=rdo.obra_id,
+                usuario_id=usuario_id,
+                observacoes=f'Devolução do RDO {rdo.numero_rdo}. {observacoes}'.strip()
+            )
+            
+            movimentacoes_devolucao.append(movimentacao)
+    
+    return movimentacoes_devolucao
+```
+
+
+### **PASSO 5: Rotas Principais do Almoxarifado (ADICIONAR EM views.py)**
+
+```python
+# ===== MÓDULO 4: ALMOXARIFADO INTELIGENTE - ROTAS PRINCIPAIS =====
+# ADICIONAR estas rotas no Blueprint main_bp existente
+
+from datetime import date, datetime, timedelta
+from flask import jsonify, request, render_template, flash, redirect, url_for
+from werkzeug.utils import secure_filename
+from auth import almoxarife_required, pode_gerenciar_almoxarifado, pode_lancar_materiais
+import os
+import json
+
+@main_bp.route('/almoxarifado')
+@almoxarife_required
+def almoxarifado_dashboard():
+    """Dashboard principal do almoxarifado"""
+    admin_id = get_tenant_filter()
+    
+    # Estatísticas principais
+    total_produtos = Produto.query.filter_by(admin_id=admin_id, ativo=True).count()
+    
+    produtos_baixo_estoque = Produto.query.filter(
+        Produto.admin_id == admin_id,
+        Produto.ativo == True,
+        Produto.estoque_atual <= Produto.estoque_minimo
+    ).count()
+    
+    produtos_criticos = Produto.query.filter(
+        Produto.admin_id == admin_id,
+        Produto.ativo == True,
+        Produto.estoque_atual <= (Produto.estoque_minimo * 0.5)
+    ).count()
+    
+    # Valor total do estoque
+    produtos = Produto.query.filter_by(admin_id=admin_id, ativo=True).all()
+    valor_total_estoque = sum(p.valor_estoque_atual for p in produtos)
+    
+    # Movimentações do dia
+    hoje = date.today()
+    movimentacoes_hoje = MovimentacaoEstoque.query.filter(
+        MovimentacaoEstoque.admin_id == admin_id,
+        MovimentacaoEstoque.data_movimentacao >= datetime.combine(hoje, datetime.min.time())
+    ).count()
+    
+    # Notas fiscais pendentes
+    nfs_pendentes = NotaFiscal.query.filter_by(
+        admin_id=admin_id,
+        status='Pendente'
+    ).count()
+    
+    # Produtos com maior movimentação (últimos 30 dias)
+    data_inicio = datetime.utcnow() - timedelta(days=30)
+    produtos_mais_movimentados = db.session.query(
+        Produto.nome,
+        db.func.sum(MovimentacaoEstoque.quantidade).label('total_movimentado')
+    ).join(MovimentacaoEstoque).filter(
+        MovimentacaoEstoque.admin_id == admin_id,
+        MovimentacaoEstoque.data_movimentacao >= data_inicio,
+        MovimentacaoEstoque.tipo_movimentacao == 'SAIDA'
+    ).group_by(Produto.id, Produto.nome).order_by(
+        db.func.sum(MovimentacaoEstoque.quantidade).desc()
+    ).limit(10).all()
+    
+    # Alertas de estoque
+    alertas = []
+    
+    # Produtos com estoque zerado
+    produtos_zerados = Produto.query.filter(
+        Produto.admin_id == admin_id,
+        Produto.ativo == True,
+        Produto.estoque_atual <= 0
+    ).limit(5).all()
+    
+    for produto in produtos_zerados:
+        alertas.append({
+            'tipo': 'danger',
+            'titulo': 'Estoque Zerado',
+            'mensagem': f'{produto.nome} está sem estoque',
+            'produto_id': produto.id
+        })
+    
+    # Produtos com estoque baixo
+    produtos_baixo = Produto.query.filter(
+        Produto.admin_id == admin_id,
+        Produto.ativo == True,
+        Produto.estoque_atual > 0,
+        Produto.estoque_atual <= Produto.estoque_minimo
+    ).limit(5).all()
+    
+    for produto in produtos_baixo:
+        alertas.append({
+            'tipo': 'warning',
+            'titulo': 'Estoque Baixo',
+            'mensagem': f'{produto.nome} está com estoque baixo ({produto.estoque_atual} {produto.unidade_medida})',
+            'produto_id': produto.id
+        })
+    
+    return render_template('almoxarifado/dashboard.html',
+                         total_produtos=total_produtos,
+                         produtos_baixo_estoque=produtos_baixo_estoque,
+                         produtos_criticos=produtos_criticos,
+                         valor_total_estoque=valor_total_estoque,
+                         movimentacoes_hoje=movimentacoes_hoje,
+                         nfs_pendentes=nfs_pendentes,
+                         produtos_mais_movimentados=produtos_mais_movimentados,
+                         alertas=alertas)
+
+@main_bp.route('/almoxarifado/produtos')
+@almoxarife_required
+def almoxarifado_produtos():
+    """Lista de produtos do almoxarifado"""
+    admin_id = get_tenant_filter()
+    
+    # Filtros
+    categoria_id = request.args.get('categoria_id', type=int)
+    status_estoque = request.args.get('status_estoque')
+    busca = request.args.get('busca', '').strip()
+    
+    # Query base
+    query = Produto.query.filter_by(admin_id=admin_id, ativo=True)
+    
+    # Aplicar filtros
+    if categoria_id:
+        query = query.filter_by(categoria_id=categoria_id)
+    
+    if status_estoque:
+        if status_estoque == 'BAIXO':
+            query = query.filter(Produto.estoque_atual <= Produto.estoque_minimo)
+        elif status_estoque == 'CRITICO':
+            query = query.filter(Produto.estoque_atual <= (Produto.estoque_minimo * 0.5))
+        elif status_estoque == 'ZERADO':
+            query = query.filter(Produto.estoque_atual <= 0)
+    
+    if busca:
+        query = query.filter(
+            db.or_(
+                Produto.nome.ilike(f'%{busca}%'),
+                Produto.codigo_interno.ilike(f'%{busca}%'),
+                Produto.codigo_barras.ilike(f'%{busca}%')
+            )
+        )
+    
+    produtos = query.order_by(Produto.nome).all()
+    
+    # Categorias para filtro
+    categorias = CategoriaProduto.query.filter_by(admin_id=admin_id).order_by(CategoriaProduto.nome).all()
+    
+    return render_template('almoxarifado/produtos.html',
+                         produtos=produtos,
+                         categorias=categorias,
+                         filtros={
+                             'categoria_id': categoria_id,
+                             'status_estoque': status_estoque,
+                             'busca': busca
+                         })
+
+@main_bp.route('/almoxarifado/produto/novo', methods=['GET', 'POST'])
+@almoxarife_required
+def almoxarifado_produto_novo():
+    """Criar novo produto"""
+    admin_id = get_tenant_filter()
+    
+    if request.method == 'POST':
+        try:
+            # Dados do formulário
+            nome = request.form.get('nome', '').strip()
+            descricao = request.form.get('descricao', '').strip()
+            categoria_id = request.form.get('categoria_id', type=int)
+            codigo_barras = request.form.get('codigo_barras', '').strip()
+            unidade_medida = request.form.get('unidade_medida', '').strip()
+            estoque_minimo = request.form.get('estoque_minimo', type=float, default=0)
+            estoque_inicial = request.form.get('estoque_inicial', type=float, default=0)
+            valor_unitario = request.form.get('valor_unitario', type=float, default=0)
+            
+            # Validações
+            if not nome:
+                flash('Nome do produto é obrigatório', 'danger')
+                raise ValueError('Nome obrigatório')
+            
+            if not categoria_id:
+                flash('Categoria é obrigatória', 'danger')
+                raise ValueError('Categoria obrigatória')
+            
+            categoria = CategoriaProduto.query.filter_by(id=categoria_id, admin_id=admin_id).first()
+            if not categoria:
+                flash('Categoria não encontrada', 'danger')
+                raise ValueError('Categoria inválida')
+            
+            # Validar código de barras se fornecido
+            if codigo_barras and not validar_codigo_barras(codigo_barras):
+                flash('Código de barras inválido', 'danger')
+                raise ValueError('Código de barras inválido')
+            
+            # Verificar se código de barras já existe
+            if codigo_barras:
+                produto_existente = Produto.query.filter_by(
+                    codigo_barras=codigo_barras,
+                    admin_id=admin_id
+                ).first()
+                if produto_existente:
+                    flash('Código de barras já cadastrado', 'danger')
+                    raise ValueError('Código de barras duplicado')
+            
+            # Gerar código interno
+            codigo_interno = gerar_codigo_interno(admin_id, categoria.codigo)
+            
+            # Criar produto
+            produto = Produto(
+                codigo_interno=codigo_interno,
+                codigo_barras=codigo_barras or None,
+                nome=nome,
+                descricao=descricao,
+                categoria_id=categoria_id,
+                unidade_medida=unidade_medida,
+                estoque_minimo=estoque_minimo,
+                estoque_atual=estoque_inicial,
+                valor_medio=valor_unitario,
+                ultimo_valor_compra=valor_unitario if valor_unitario > 0 else None,
+                admin_id=admin_id
+            )
+            
+            db.session.add(produto)
+            db.session.flush()
+            
+            # Se tem estoque inicial, criar movimentação de entrada
+            if estoque_inicial > 0:
+                atualizar_estoque_produto(
+                    produto_id=produto.id,
+                    quantidade=estoque_inicial,
+                    tipo_movimentacao='ENTRADA',
+                    valor_unitario=valor_unitario if valor_unitario > 0 else None,
+                    usuario_id=current_user.id,
+                    observacoes='Estoque inicial do produto'
+                )
+            
+            db.session.commit()
+            
+            flash(f'Produto "{nome}" criado com sucesso!', 'success')
+            return redirect(url_for('main.almoxarifado_produtos'))
+            
+        except Exception as e:
+            db.session.rollback()
+            if 'flash' not in str(e):  # Se não foi um erro já tratado com flash
+                flash(f'Erro ao criar produto: {str(e)}', 'danger')
+    
+    # GET - mostrar formulário
+    categorias = CategoriaProduto.query.filter_by(admin_id=admin_id).order_by(CategoriaProduto.nome).all()
+    
+    return render_template('almoxarifado/produto_form.html',
+                         categorias=categorias,
+                         produto=None)
+
+@main_bp.route('/almoxarifado/movimentacoes')
+@almoxarife_required
+def almoxarifado_movimentacoes():
+    """Lista de movimentações do estoque"""
+    admin_id = get_tenant_filter()
+    
+    # Filtros
+    data_inicio = request.args.get('data_inicio')
+    data_fim = request.args.get('data_fim')
+    produto_id = request.args.get('produto_id', type=int)
+    tipo_movimentacao = request.args.get('tipo_movimentacao')
+    obra_id = request.args.get('obra_id', type=int)
+    
+    # Datas padrão (últimos 30 dias)
+    if not data_inicio:
+        data_inicio = (date.today() - timedelta(days=30)).isoformat()
+    if not data_fim:
+        data_fim = date.today().isoformat()
+    
+    # Converter para datetime
+    try:
+        dt_inicio = datetime.strptime(data_inicio, '%Y-%m-%d')
+        dt_fim = datetime.strptime(data_fim, '%Y-%m-%d') + timedelta(days=1)
+    except:
+        dt_inicio = datetime.utcnow() - timedelta(days=30)
+        dt_fim = datetime.utcnow()
+    
+    # Query base
+    query = MovimentacaoEstoque.query.filter(
+        MovimentacaoEstoque.admin_id == admin_id,
+        MovimentacaoEstoque.data_movimentacao.between(dt_inicio, dt_fim)
+    )
+    
+    # Aplicar filtros
+    if produto_id:
+        query = query.filter_by(produto_id=produto_id)
+    
+    if tipo_movimentacao:
+        query = query.filter_by(tipo_movimentacao=tipo_movimentacao)
+    
+    if obra_id:
+        query = query.filter_by(obra_id=obra_id)
+    
+    movimentacoes = query.order_by(MovimentacaoEstoque.data_movimentacao.desc()).limit(500).all()
+    
+    # Dados para filtros
+    produtos = Produto.query.filter_by(admin_id=admin_id, ativo=True).order_by(Produto.nome).all()
+    obras = Obra.query.filter_by(admin_id=admin_id).order_by(Obra.nome).all()
+    
+    return render_template('almoxarifado/movimentacoes.html',
+                         movimentacoes=movimentacoes,
+                         produtos=produtos,
+                         obras=obras,
+                         filtros={
+                             'data_inicio': data_inicio,
+                             'data_fim': data_fim,
+                             'produto_id': produto_id,
+                             'tipo_movimentacao': tipo_movimentacao,
+                             'obra_id': obra_id
+                         })
+
+@main_bp.route('/almoxarifado/entrada-manual', methods=['GET', 'POST'])
+@almoxarife_required
+def almoxarifado_entrada_manual():
+    """Lançamento manual de entrada de material"""
+    admin_id = get_tenant_filter()
+    
+    if request.method == 'POST':
+        try:
+            produto_id = request.form.get('produto_id', type=int)
+            quantidade = request.form.get('quantidade', type=float)
+            valor_unitario = request.form.get('valor_unitario', type=float)
+            observacoes = request.form.get('observacoes', '').strip()
+            
+            # Validações
+            if not produto_id:
+                flash('Produto é obrigatório', 'danger')
+                raise ValueError('Produto obrigatório')
+            
+            if not quantidade or quantidade <= 0:
+                flash('Quantidade deve ser maior que zero', 'danger')
+                raise ValueError('Quantidade inválida')
+            
+            produto = Produto.query.filter_by(id=produto_id, admin_id=admin_id).first()
+            if not produto:
+                flash('Produto não encontrado', 'danger')
+                raise ValueError('Produto não encontrado')
+            
+            # Criar movimentação
+            movimentacao = atualizar_estoque_produto(
+                produto_id=produto_id,
+                quantidade=quantidade,
+                tipo_movimentacao='ENTRADA',
+                valor_unitario=valor_unitario if valor_unitario and valor_unitario > 0 else None,
+                usuario_id=current_user.id,
+                observacoes=observacoes or 'Entrada manual',
+                ip_address=request.remote_addr
+            )
+            
+            flash(f'Entrada registrada com sucesso! Novo estoque: {produto.estoque_atual} {produto.unidade_medida}', 'success')
+            return redirect(url_for('main.almoxarifado_entrada_manual'))
+            
+        except Exception as e:
+            db.session.rollback()
+            if 'flash' not in str(e):
+                flash(f'Erro ao registrar entrada: {str(e)}', 'danger')
+    
+    # GET - mostrar formulário
+    produtos = Produto.query.filter_by(admin_id=admin_id, ativo=True).order_by(Produto.nome).all()
+    
+    return render_template('almoxarifado/entrada_manual.html',
+                         produtos=produtos)
+
+@main_bp.route('/almoxarifado/saida-manual', methods=['GET', 'POST'])
+@almoxarife_required
+def almoxarifado_saida_manual():
+    """Lançamento manual de saída de material"""
+    admin_id = get_tenant_filter()
+    
+    if request.method == 'POST':
+        try:
+            produto_id = request.form.get('produto_id', type=int)
+            quantidade = request.form.get('quantidade', type=float)
+            funcionario_id = request.form.get('funcionario_id', type=int)
+            obra_id = request.form.get('obra_id', type=int)
+            observacoes = request.form.get('observacoes', '').strip()
+            
+            # Validações
+            if not produto_id:
+                flash('Produto é obrigatório', 'danger')
+                raise ValueError('Produto obrigatório')
+            
+            if not quantidade or quantidade <= 0:
+                flash('Quantidade deve ser maior que zero', 'danger')
+                raise ValueError('Quantidade inválida')
+            
+            produto = Produto.query.filter_by(id=produto_id, admin_id=admin_id).first()
+            if not produto:
+                flash('Produto não encontrado', 'danger')
+                raise ValueError('Produto não encontrado')
+            
+            # Validar estoque disponível
+            if produto.estoque_atual < quantidade:
+                flash(f'Estoque insuficiente. Disponível: {produto.estoque_atual} {produto.unidade_medida}', 'danger')
+                raise ValueError('Estoque insuficiente')
+            
+            # Criar movimentação
+            movimentacao = atualizar_estoque_produto(
+                produto_id=produto_id,
+                quantidade=quantidade,
+                tipo_movimentacao='SAIDA',
+                funcionario_id=funcionario_id if funcionario_id else None,
+                obra_id=obra_id if obra_id else None,
+                usuario_id=current_user.id,
+                observacoes=observacoes or 'Saída manual',
+                ip_address=request.remote_addr
+            )
+            
+            flash(f'Saída registrada com sucesso! Novo estoque: {produto.estoque_atual} {produto.unidade_medida}', 'success')
+            return redirect(url_for('main.almoxarifado_saida_manual'))
+            
+        except Exception as e:
+            db.session.rollback()
+            if 'flash' not in str(e):
+                flash(f'Erro ao registrar saída: {str(e)}', 'danger')
+    
+    # GET - mostrar formulário
+    produtos = Produto.query.filter_by(admin_id=admin_id, ativo=True).order_by(Produto.nome).all()
+    funcionarios = Funcionario.query.filter_by(admin_id=admin_id, ativo=True).order_by(Funcionario.nome).all()
+    obras = Obra.query.filter_by(admin_id=admin_id, status='Em Andamento').order_by(Obra.nome).all()
+    
+    return render_template('almoxarifado/saida_manual.html',
+                         produtos=produtos,
+                         funcionarios=funcionarios,
+                         obras=obras)
+
+@main_bp.route('/almoxarifado/importar-xml', methods=['GET', 'POST'])
+@almoxarife_required
+def almoxarifado_importar_xml():
+    """Importar XML de nota fiscal"""
+    admin_id = get_tenant_filter()
+    
+    if request.method == 'POST':
+        try:
+            # Verificar se arquivo foi enviado
+            if 'arquivo_xml' not in request.files:
+                flash('Nenhum arquivo selecionado', 'danger')
+                raise ValueError('Arquivo não enviado')
+            
+            arquivo = request.files['arquivo_xml']
+            if arquivo.filename == '':
+                flash('Nenhum arquivo selecionado', 'danger')
+                raise ValueError('Arquivo vazio')
+            
+            # Validar extensão
+            if not arquivo.filename.lower().endswith('.xml'):
+                flash('Apenas arquivos XML são permitidos', 'danger')
+                raise ValueError('Extensão inválida')
+            
+            # Ler conteúdo do XML
+            xml_content = arquivo.read().decode('utf-8')
+            
+            # Processar XML
+            resultado = processar_xml_nfe(xml_content, admin_id, current_user.id)
+            
+            if 'erro' in resultado:
+                flash(f'Erro ao processar XML: {resultado["erro"]}', 'danger')
+                raise ValueError('Erro no processamento')
+            
+            # Sucesso - redirecionar para mapeamento de produtos
+            flash('XML processado com sucesso! Agora mapeie os produtos.', 'success')
+            return redirect(url_for('main.almoxarifado_mapear_produtos', nf_id=resultado['nota_fiscal_id']))
+            
+        except Exception as e:
+            if 'flash' not in str(e):
+                flash(f'Erro ao importar XML: {str(e)}', 'danger')
+    
+    # GET - mostrar formulário
+    return render_template('almoxarifado/importar_xml.html')
+
+@main_bp.route('/almoxarifado/mapear-produtos/<int:nf_id>')
+@almoxarife_required
+def almoxarifado_mapear_produtos(nf_id):
+    """Mapear produtos da nota fiscal"""
+    admin_id = get_tenant_filter()
+    
+    # Buscar nota fiscal
+    nota_fiscal = NotaFiscal.query.filter_by(id=nf_id, admin_id=admin_id).first()
+    if not nota_fiscal:
+        flash('Nota fiscal não encontrada', 'danger')
+        return redirect(url_for('main.almoxarifado_importar_xml'))
+    
+    if nota_fiscal.status == 'Processada':
+        flash('Nota fiscal já foi processada', 'warning')
+        return redirect(url_for('main.almoxarifado_notas_fiscais'))
+    
+    # Reprocessar XML para obter produtos
+    resultado = processar_xml_nfe(nota_fiscal.xml_content, admin_id, current_user.id)
+    
+    if 'erro' in resultado:
+        flash(f'Erro ao reprocessar XML: {resultado["erro"]}', 'danger')
+        return redirect(url_for('main.almoxarifado_importar_xml'))
+    
+    produtos_xml = resultado['produtos']
+    
+    # Para cada produto do XML, tentar encontrar correspondência
+    produtos_mapeados = []
+    for produto_xml in produtos_xml:
+        produto_encontrado = None
+        
+        # Buscar por código de barras
+        if produto_xml['codigo_barras']:
+            produto_encontrado = Produto.query.filter_by(
+                codigo_barras=produto_xml['codigo_barras'],
+                admin_id=admin_id
+            ).first()
+        
+        # Se não encontrou, buscar por nome similar
+        if not produto_encontrado:
+            produtos_similares = Produto.query.filter(
+                Produto.admin_id == admin_id,
+                Produto.nome.ilike(f'%{produto_xml["nome"][:20]}%')
+            ).limit(3).all()
+        else:
+            produtos_similares = []
+        
+        produtos_mapeados.append({
+            'xml': produto_xml,
+            'produto_encontrado': produto_encontrado,
+            'produtos_similares': produtos_similares
+        })
+    
+    # Categorias para criar novos produtos
+    categorias = CategoriaProduto.query.filter_by(admin_id=admin_id).order_by(CategoriaProduto.nome).all()
+    
+    return render_template('almoxarifado/mapear_produtos.html',
+                         nota_fiscal=nota_fiscal,
+                         produtos_mapeados=produtos_mapeados,
+                         categorias=categorias)
+
+# ===== APIs PARA INTERFACE DINÂMICA =====
+
+@main_bp.route('/api/almoxarifado/buscar-produto')
+@almoxarife_required
+def api_buscar_produto():
+    """API para buscar produto por código de barras ou nome"""
+    admin_id = get_tenant_filter()
+    termo = request.args.get('termo', '').strip()
+    
+    if not termo:
+        return jsonify([])
+    
+    # Buscar por código de barras primeiro
+    produto = Produto.query.filter_by(
+        codigo_barras=termo,
+        admin_id=admin_id,
+        ativo=True
+    ).first()
+    
+    if produto:
+        return jsonify([produto.to_dict()])
+    
+    # Buscar por código interno
+    produto = Produto.query.filter_by(
+        codigo_interno=termo,
+        admin_id=admin_id,
+        ativo=True
+    ).first()
+    
+    if produto:
+        return jsonify([produto.to_dict()])
+    
+    # Buscar por nome (máximo 10 resultados)
+    produtos = Produto.query.filter(
+        Produto.admin_id == admin_id,
+        Produto.ativo == True,
+        Produto.nome.ilike(f'%{termo}%')
+    ).order_by(Produto.nome).limit(10).all()
+    
+    return jsonify([p.to_dict() for p in produtos])
+
+@main_bp.route('/api/almoxarifado/produto/<int:produto_id>')
+@almoxarife_required
+def api_produto_detalhes(produto_id):
+    """API para obter detalhes de um produto"""
+    admin_id = get_tenant_filter()
+    
+    produto = Produto.query.filter_by(
+        id=produto_id,
+        admin_id=admin_id
+    ).first()
+    
+    if not produto:
+        return jsonify({'erro': 'Produto não encontrado'}), 404
+    
+    # Últimas movimentações
+    ultimas_movimentacoes = MovimentacaoEstoque.query.filter_by(
+        produto_id=produto_id
+    ).order_by(MovimentacaoEstoque.data_movimentacao.desc()).limit(10).all()
+    
+    # Previsão de ruptura
+    previsao_ruptura = prever_ruptura_estoque(produto_id)
+    
+    return jsonify({
+        'produto': produto.to_dict(),
+        'ultimas_movimentacoes': [mov.to_dict() for mov in ultimas_movimentacoes],
+        'previsao_ruptura': previsao_ruptura,
+        'estoque_minimo_sugerido': float(calcular_estoque_minimo_inteligente(produto_id))
+    })
+
+@main_bp.route('/api/almoxarifado/validar-codigo-barras')
+@almoxarife_required
+def api_validar_codigo_barras():
+    """API para validar código de barras"""
+    codigo = request.args.get('codigo', '').strip()
+    
+    if not codigo:
+        return jsonify({'valido': False, 'erro': 'Código não fornecido'})
+    
+    valido = validar_codigo_barras(codigo)
+    
+    if valido:
+        # Verificar se já existe no sistema
+        admin_id = get_tenant_filter()
+        produto_existente = Produto.query.filter_by(
+            codigo_barras=codigo,
+            admin_id=admin_id
+        ).first()
+        
+        return jsonify({
+            'valido': True,
+            'existe': produto_existente is not None,
+            'produto': produto_existente.to_dict() if produto_existente else None
+        })
+    else:
+        return jsonify({'valido': False, 'erro': 'Código de barras inválido'})
+
+@main_bp.route('/api/almoxarifado/processar-produtos-nfe', methods=['POST'])
+@almoxarife_required
+def api_processar_produtos_nfe():
+    """API para processar produtos mapeados da NFe"""
+    try:
+        data = request.get_json()
+        nf_id = data.get('nota_fiscal_id')
+        produtos_mapeamento = data.get('produtos', [])
+        
+        admin_id = get_tenant_filter()
+        
+        resultado = processar_produtos_nfe(nf_id, produtos_mapeamento, admin_id, current_user.id)
+        
+        if 'erro' in resultado:
+            return jsonify(resultado), 400
+        
+        return jsonify(resultado)
+        
+    except Exception as e:
+        return jsonify({'erro': f'Erro interno: {str(e)}'}), 500
+
+# ===== INTEGRAÇÃO COM RDO =====
+
+@main_bp.route('/rdo/<int:rdo_id>/materiais')
+@almoxarife_required
+def rdo_materiais(rdo_id):
+    """Aba de materiais do RDO (integração com Módulo 3)"""
+    admin_id = get_tenant_filter()
+    
+    # Verificar se RDO existe e pertence ao admin
+    rdo = RDO.query.filter_by(id=rdo_id, admin_id=admin_id).first()
+    if not rdo:
+        flash('RDO não encontrado', 'danger')
+        return redirect(url_for('main.gestao_equipes_dashboard'))
+    
+    # Obter materiais já lançados
+    materiais_lancados = obter_materiais_rdo(rdo_id)
+    
+    # Produtos disponíveis para lançamento
+    produtos = Produto.query.filter_by(admin_id=admin_id, ativo=True).order_by(Produto.nome).all()
+    
+    return render_template('almoxarifado/rdo_materiais.html',
+                         rdo=rdo,
+                         materiais_lancados=materiais_lancados,
+                         produtos=produtos)
+
+@main_bp.route('/api/rdo/<int:rdo_id>/lancar-material', methods=['POST'])
+@almoxarife_required
+def api_rdo_lancar_material(rdo_id):
+    """API para lançar material em RDO"""
+    try:
+        data = request.get_json()
+        produto_id = data.get('produto_id')
+        quantidade = data.get('quantidade')
+        observacoes = data.get('observacoes', '')
+        
+        # Validações
+        if not produto_id or not quantidade:
+            return jsonify({'erro': 'Produto e quantidade são obrigatórios'}), 400
+        
+        if quantidade <= 0:
+            return jsonify({'erro': 'Quantidade deve ser maior que zero'}), 400
+        
+        # Lançar material
+        movimentacao = lancar_material_rdo(
+            rdo_id=rdo_id,
+            produto_id=produto_id,
+            quantidade=quantidade,
+            usuario_id=current_user.id,
+            observacoes=observacoes
+        )
+        
+        return jsonify({
+            'sucesso': True,
+            'movimentacao': movimentacao.to_dict(),
+            'message': 'Material lançado com sucesso!'
+        })
+        
+    except ValueError as e:
+        return jsonify({'erro': str(e)}), 400
+    except Exception as e:
+        return jsonify({'erro': f'Erro interno: {str(e)}'}), 500
+
+@main_bp.route('/api/rdo/<int:rdo_id>/processar-devolucao', methods=['POST'])
+@almoxarife_required
+def api_rdo_processar_devolucao(rdo_id):
+    """API para processar devolução de materiais do RDO"""
+    try:
+        data = request.get_json()
+        devolucoes = data.get('devolucoes', [])
+        
+        if not devolucoes:
+            return jsonify({'erro': 'Nenhuma devolução informada'}), 400
+        
+        movimentacoes = processar_devolucao_rdo(rdo_id, devolucoes, current_user.id)
+        
+        return jsonify({
+            'sucesso': True,
+            'movimentacoes_criadas': len(movimentacoes),
+            'message': f'{len(movimentacoes)} devolução(ões) processada(s) com sucesso!'
+        })
+        
+    except Exception as e:
+        return jsonify({'erro': f'Erro interno: {str(e)}'}), 500
+
+@main_bp.route('/api/almoxarifado/materiais-rdo/<int:rdo_id>')
+@almoxarife_required
+def api_materiais_rdo(rdo_id):
+    """API para obter materiais de um RDO"""
+    materiais = obter_materiais_rdo(rdo_id)
+    return jsonify(materiais)
+```
+
+
+### **PASSO 6: Templates da Interface (CRIAR EM templates/almoxarifado/)**
+
+#### **Template Principal - Dashboard**
+```html
+<!-- templates/almoxarifado/dashboard.html -->
+{% extends "base.html" %}
+{% block title %}Almoxarifado{% endblock %}
+
+{% block extra_css %}
+<style>
+    .card-stat { transition: transform 0.2s; }
+    .card-stat:hover { transform: translateY(-2px); }
+    .alerta-item { border-left: 4px solid; }
+    .alerta-danger { border-left-color: #dc3545; }
+    .alerta-warning { border-left-color: #ffc107; }
+    .scanner-button { 
+        background: linear-gradient(135deg, #28a745, #20c997);
+        border: none;
+        color: white;
+        padding: 15px 30px;
+        border-radius: 10px;
+        font-size: 1.1em;
+        transition: all 0.3s;
+    }
+    .scanner-button:hover {
+        transform: scale(1.05);
+        box-shadow: 0 5px 15px rgba(40, 167, 69, 0.3);
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- Header -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <h3><i class="fas fa-warehouse"></i> Almoxarifado Inteligente</h3>
+                    <p class="text-muted mb-0">Controle total de estoque com código de barras e IA</p>
+                </div>
+                <div>
+                    <button class="scanner-button mr-2" onclick="abrirScanner()">
+                        <i class="fas fa-qrcode"></i> Escanear Código
+                    </button>
+                    <div class="btn-group">
+                        <a href="{{ url_for('main.almoxarifado_entrada_manual') }}" class="btn btn-success">
+                            <i class="fas fa-plus"></i> Entrada
+                        </a>
+                        <a href="{{ url_for('main.almoxarifado_saida_manual') }}" class="btn btn-warning">
+                            <i class="fas fa-minus"></i> Saída
+                        </a>
+                        <a href="{{ url_for('main.almoxarifado_importar_xml') }}" class="btn btn-info">
+                            <i class="fas fa-file-upload"></i> Importar XML
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Cards de Estatísticas -->
+    <div class="row mb-4">
+        <div class="col-md-3 mb-3">
+            <div class="card card-stat bg-primary text-white h-100">
+                <div class="card-body">
+                    <div class="d-flex align-items-center">
+                        <div class="flex-grow-1">
+                            <h4 class="mb-0">{{ total_produtos }}</h4>
+                            <small>Produtos Cadastrados</small>
+                        </div>
+                        <div class="ml-3">
+                            <i class="fas fa-boxes fa-2x opacity-75"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-3 mb-3">
+            <div class="card card-stat bg-warning text-white h-100">
+                <div class="card-body">
+                    <div class="d-flex align-items-center">
+                        <div class="flex-grow-1">
+                            <h4 class="mb-0">{{ produtos_baixo_estoque }}</h4>
+                            <small>Estoque Baixo</small>
+                        </div>
+                        <div class="ml-3">
+                            <i class="fas fa-exclamation-triangle fa-2x opacity-75"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-3 mb-3">
+            <div class="card card-stat bg-danger text-white h-100">
+                <div class="card-body">
+                    <div class="d-flex align-items-center">
+                        <div class="flex-grow-1">
+                            <h4 class="mb-0">{{ produtos_criticos }}</h4>
+                            <small>Estoque Crítico</small>
+                        </div>
+                        <div class="ml-3">
+                            <i class="fas fa-times-circle fa-2x opacity-75"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-3 mb-3">
+            <div class="card card-stat bg-success text-white h-100">
+                <div class="card-body">
+                    <div class="d-flex align-items-center">
+                        <div class="flex-grow-1">
+                            <h4 class="mb-0">R$ {{ "%.2f"|format(valor_total_estoque) }}</h4>
+                            <small>Valor Total Estoque</small>
+                        </div>
+                        <div class="ml-3">
+                            <i class="fas fa-dollar-sign fa-2x opacity-75"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <!-- Ações Rápidas -->
+        <div class="col-md-4 mb-4">
+            <div class="card h-100">
+                <div class="card-header">
+                    <h5 class="mb-0">
+                        <i class="fas fa-bolt"></i> Ações Rápidas
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="list-group list-group-flush">
+                        <a href="#" onclick="abrirScanner()" class="list-group-item list-group-item-action">
+                            <i class="fas fa-qrcode text-primary"></i>
+                            <strong>Escanear Código de Barras</strong>
+                            <small class="d-block text-muted">Buscar produto por código</small>
+                        </a>
+                        
+                        <a href="{{ url_for('main.almoxarifado_entrada_manual') }}" class="list-group-item list-group-item-action">
+                            <i class="fas fa-plus text-success"></i>
+                            <strong>Lançar Entrada</strong>
+                            <small class="d-block text-muted">Registrar entrada de material</small>
+                        </a>
+                        
+                        <a href="{{ url_for('main.almoxarifado_saida_manual') }}" class="list-group-item list-group-item-action">
+                            <i class="fas fa-minus text-warning"></i>
+                            <strong>Lançar Saída</strong>
+                            <small class="d-block text-muted">Registrar saída de material</small>
+                        </a>
+                        
+                        <a href="{{ url_for('main.almoxarifado_importar_xml') }}" class="list-group-item list-group-item-action">
+                            <i class="fas fa-file-upload text-info"></i>
+                            <strong>Importar XML NFe</strong>
+                            <small class="d-block text-muted">Processar nota fiscal</small>
+                        </a>
+                        
+                        <a href="{{ url_for('main.almoxarifado_produtos') }}" class="list-group-item list-group-item-action">
+                            <i class="fas fa-list text-secondary"></i>
+                            <strong>Ver Produtos</strong>
+                            <small class="d-block text-muted">Listar todos os produtos</small>
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Alertas de Estoque -->
+        <div class="col-md-4 mb-4">
+            <div class="card h-100">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">
+                        <i class="fas fa-bell"></i> Alertas de Estoque
+                    </h5>
+                    <span class="badge badge-danger">{{ alertas|length }}</span>
+                </div>
+                <div class="card-body p-0" style="max-height: 400px; overflow-y: auto;">
+                    {% if alertas %}
+                        {% for alerta in alertas %}
+                        <div class="alerta-item alerta-{{ alerta.tipo }} p-3 border-bottom">
+                            <div class="d-flex align-items-start">
+                                <div class="flex-grow-1">
+                                    <h6 class="mb-1">{{ alerta.titulo }}</h6>
+                                    <p class="mb-0 text-muted small">{{ alerta.mensagem }}</p>
+                                </div>
+                                <div class="ml-2">
+                                    <a href="{{ url_for('main.almoxarifado_produtos') }}?produto_id={{ alerta.produto_id }}" 
+                                       class="btn btn-sm btn-outline-primary">
+                                        <i class="fas fa-eye"></i>
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    {% else %}
+                    <div class="p-4 text-center text-muted">
+                        <i class="fas fa-check-circle fa-3x mb-3"></i>
+                        <p class="mb-0">Nenhum alerta no momento</p>
+                        <small>Todos os produtos estão com estoque adequado</small>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Produtos Mais Movimentados -->
+        <div class="col-md-4 mb-4">
+            <div class="card h-100">
+                <div class="card-header">
+                    <h5 class="mb-0">
+                        <i class="fas fa-chart-bar"></i> Mais Movimentados (30 dias)
+                    </h5>
+                </div>
+                <div class="card-body p-0" style="max-height: 400px; overflow-y: auto;">
+                    {% if produtos_mais_movimentados %}
+                        {% for produto in produtos_mais_movimentados %}
+                        <div class="d-flex align-items-center p-3 border-bottom">
+                            <div class="flex-grow-1">
+                                <h6 class="mb-1">{{ produto[0] }}</h6>
+                                <div class="progress" style="height: 6px;">
+                                    <div class="progress-bar bg-primary" 
+                                         style="width: {{ (produto[1] / produtos_mais_movimentados[0][1] * 100) if produtos_mais_movimentados else 0 }}%"></div>
+                                </div>
+                            </div>
+                            <div class="ml-3 text-right">
+                                <strong>{{ produto[1] }}</strong>
+                                <small class="d-block text-muted">unidades</small>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    {% else %}
+                    <div class="p-4 text-center text-muted">
+                        <i class="fas fa-chart-bar fa-3x mb-3"></i>
+                        <p class="mb-0">Sem movimentações</p>
+                        <small>Nenhuma movimentação nos últimos 30 dias</small>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Resumo de Atividades -->
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">
+                        <i class="fas fa-clock"></i> Atividades de Hoje
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="row text-center">
+                        <div class="col-md-3">
+                            <h4 class="text-primary">{{ movimentacoes_hoje }}</h4>
+                            <small class="text-muted">Movimentações</small>
+                        </div>
+                        <div class="col-md-3">
+                            <h4 class="text-warning">{{ nfs_pendentes }}</h4>
+                            <small class="text-muted">NFes Pendentes</small>
+                        </div>
+                        <div class="col-md-3">
+                            <h4 class="text-success">0</h4>
+                            <small class="text-muted">Entradas</small>
+                        </div>
+                        <div class="col-md-3">
+                            <h4 class="text-danger">0</h4>
+                            <small class="text-muted">Saídas</small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Scanner -->
+<div class="modal fade" id="modalScanner" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Scanner de Código de Barras</h5>
+                <button type="button" class="close" data-dismiss="modal">
+                    <span>&times;</span>
+                </button>
+            </div>
+            <div class="modal-body">
+                <div class="row">
+                    <div class="col-md-6">
+                        <div id="scanner-container" style="width: 100%; height: 300px; background: #f8f9fa; border: 2px dashed #dee2e6; display: flex; align-items: center; justify-content: center;">
+                            <div class="text-center">
+                                <i class="fas fa-camera fa-3x text-muted mb-3"></i>
+                                <p class="text-muted">Clique para ativar câmera</p>
+                                <button class="btn btn-primary" onclick="iniciarCamera()">
+                                    <i class="fas fa-video"></i> Ativar Câmera
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="form-group">
+                            <label for="codigoManual">Ou digite o código:</label>
+                            <input type="text" id="codigoManual" class="form-control" 
+                                   placeholder="Digite ou escaneie o código de barras"
+                                   onkeypress="if(event.key==='Enter') buscarProduto()">
+                        </div>
+                        
+                        <button class="btn btn-success btn-block" onclick="buscarProduto()">
+                            <i class="fas fa-search"></i> Buscar Produto
+                        </button>
+                        
+                        <div id="resultado-busca" class="mt-3"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function abrirScanner() {
+    $('#modalScanner').modal('show');
+}
+
+function iniciarCamera() {
+    // Implementar integração com câmera
+    // Por simplicidade, mostrar apenas input manual
+    $('#scanner-container').html(`
+        <video id="video" width="100%" height="300" autoplay style="border-radius: 8px;"></video>
+    `);
+    
+    // Tentar acessar câmera
+    if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+        navigator.mediaDevices.getUserMedia({ video: true })
+            .then(function(stream) {
+                const video = document.getElementById('video');
+                video.srcObject = stream;
+                video.play();
+            })
+            .catch(function(err) {
+                console.error('Erro ao acessar câmera:', err);
+                alert('Erro ao acessar câmera. Use o campo manual.');
+            });
+    } else {
+        alert('Câmera não suportada neste navegador. Use o campo manual.');
+    }
+}
+
+function buscarProduto() {
+    const codigo = $('#codigoManual').val().trim();
+    if (!codigo) {
+        alert('Digite um código para buscar');
+        return;
+    }
+    
+    $.get('/api/almoxarifado/buscar-produto', { termo: codigo })
+        .done(function(produtos) {
+            if (produtos.length > 0) {
+                const produto = produtos[0];
+                $('#resultado-busca').html(`
+                    <div class="card">
+                        <div class="card-body">
+                            <h6 class="card-title">${produto.nome}</h6>
+                            <p class="card-text">
+                                <strong>Código:</strong> ${produto.codigo_interno}<br>
+                                <strong>Estoque:</strong> ${produto.estoque_atual} ${produto.unidade_medida}<br>
+                                <strong>Status:</strong> <span class="badge badge-${produto.status_estoque === 'OK' ? 'success' : 'warning'}">${produto.status_estoque}</span>
+                            </p>
+                            <div class="btn-group btn-group-sm">
+                                <a href="/almoxarifado/entrada-manual?produto_id=${produto.id}" class="btn btn-success">
+                                    <i class="fas fa-plus"></i> Entrada
+                                </a>
+                                <a href="/almoxarifado/saida-manual?produto_id=${produto.id}" class="btn btn-warning">
+                                    <i class="fas fa-minus"></i> Saída
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                `);
+            } else {
+                $('#resultado-busca').html(`
+                    <div class="alert alert-warning">
+                        <i class="fas fa-exclamation-triangle"></i>
+                        Produto não encontrado. 
+                        <a href="/almoxarifado/produto/novo?codigo_barras=${codigo}" class="alert-link">Cadastrar novo produto</a>
+                    </div>
+                `);
+            }
+        })
+        .fail(function() {
+            alert('Erro ao buscar produto');
+        });
+}
+
+// Atualizar estatísticas a cada 5 minutos
+setInterval(function() {
+    location.reload();
+}, 300000);
+</script>
+{% endblock %}
+```
+
+#### **Template de Integração com RDO**
+```html
+<!-- templates/almoxarifado/rdo_materiais.html -->
+{% extends "base.html" %}
+{% block title %}Materiais - {{ rdo.numero_rdo }}{% endblock %}
+
+{% block extra_css %}
+<style>
+    .material-item { 
+        border-left: 4px solid #007bff; 
+        transition: all 0.2s;
+    }
+    .material-item:hover { 
+        background-color: #f8f9fa; 
+        transform: translateX(5px);
+    }
+    .scanner-input {
+        border: 2px solid #28a745;
+        border-radius: 8px;
+        font-size: 1.1em;
+        padding: 12px;
+    }
+    .scanner-input:focus {
+        border-color: #20c997;
+        box-shadow: 0 0 0 0.2rem rgba(40, 167, 69, 0.25);
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- Header -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <h4><i class="fas fa-boxes"></i> Materiais - {{ rdo.numero_rdo }}</h4>
+                    <p class="text-muted mb-0">
+                        <strong>Obra:</strong> {{ rdo.obra.nome }} | 
+                        <strong>Data:</strong> {{ rdo.data_relatorio.strftime('%d/%m/%Y') }}
+                    </p>
+                </div>
+                <div>
+                    <a href="{{ url_for('main.gestao_equipes_dashboard') }}" class="btn btn-outline-secondary">
+                        <i class="fas fa-arrow-left"></i> Voltar para RDOs
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <!-- Lançar Novo Material -->
+        <div class="col-md-6 mb-4">
+            <div class="card">
+                <div class="card-header bg-success text-white">
+                    <h5 class="mb-0">
+                        <i class="fas fa-plus"></i> Lançar Material
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <form id="formLancarMaterial">
+                        <div class="form-group">
+                            <label for="codigoScanner">Código de Barras</label>
+                            <div class="input-group">
+                                <input type="text" id="codigoScanner" class="form-control scanner-input" 
+                                       placeholder="Escaneie ou digite o código de barras"
+                                       onkeypress="if(event.key==='Enter') buscarProdutoRDO()"
+                                       autofocus>
+                                <div class="input-group-append">
+                                    <button class="btn btn-success" type="button" onclick="buscarProdutoRDO()">
+                                        <i class="fas fa-search"></i>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div id="produto-selecionado" style="display: none;">
+                            <div class="form-group">
+                                <label>Produto Selecionado</label>
+                                <div id="info-produto" class="alert alert-info"></div>
+                            </div>
+                            
+                            <div class="form-group">
+                                <label for="quantidade">Quantidade *</label>
+                                <div class="input-group">
+                                    <input type="number" id="quantidade" class="form-control" 
+                                           step="0.001" min="0.001" required>
+                                    <div class="input-group-append">
+                                        <span id="unidade-medida" class="input-group-text">UN</span>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="form-group">
+                                <label for="observacoes">Observações</label>
+                                <textarea id="observacoes" class="form-control" rows="2" 
+                                          placeholder="Observações sobre o uso do material..."></textarea>
+                            </div>
+                            
+                            <button type="button" class="btn btn-success btn-block" onclick="confirmarLancamento()">
+                                <i class="fas fa-check"></i> Confirmar Lançamento
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <!-- Materiais Lançados -->
+        <div class="col-md-6 mb-4">
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">
+                        <i class="fas fa-list"></i> Materiais Lançados
+                    </h5>
+                    <span class="badge badge-primary">{{ materiais_lancados|length }}</span>
+                </div>
+                <div class="card-body p-0" style="max-height: 500px; overflow-y: auto;">
+                    <div id="lista-materiais">
+                        {% if materiais_lancados %}
+                            {% for material in materiais_lancados %}
+                            <div class="material-item p-3 border-bottom">
+                                <div class="d-flex justify-content-between align-items-start">
+                                    <div class="flex-grow-1">
+                                        <h6 class="mb-1">{{ material.produto_nome }}</h6>
+                                        <p class="mb-1">
+                                            <strong>Quantidade:</strong> {{ material.quantidade }} {{ material.produto_unidade }}
+                                            {% if material.valor_total %}
+                                            <br><strong>Valor:</strong> R$ {{ "%.2f"|format(material.valor_total) }}
+                                            {% endif %}
+                                        </p>
+                                        <small class="text-muted">
+                                            {{ material.data_lancamento }} por {{ material.usuario_nome }}
+                                        </small>
+                                        {% if material.observacoes %}
+                                        <br><small class="text-muted">{{ material.observacoes }}</small>
+                                        {% endif %}
+                                    </div>
+                                    <div class="ml-2">
+                                        <button class="btn btn-sm btn-outline-warning" 
+                                                onclick="marcarParaDevolucao({{ material.id }}, '{{ material.produto_nome }}', {{ material.quantidade }})">
+                                            <i class="fas fa-undo"></i>
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                            {% endfor %}
+                        {% else %}
+                        <div class="p-4 text-center text-muted">
+                            <i class="fas fa-boxes fa-3x mb-3"></i>
+                            <p class="mb-0">Nenhum material lançado</p>
+                            <small>Use o scanner para lançar materiais</small>
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+                
+                {% if materiais_lancados %}
+                <div class="card-footer">
+                    <button class="btn btn-warning btn-block" onclick="abrirModalDevolucao()">
+                        <i class="fas fa-undo"></i> Processar Devoluções
+                    </button>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal de Devolução -->
+<div class="modal fade" id="modalDevolucao" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Processar Devoluções</h5>
+                <button type="button" class="close" data-dismiss="modal">
+                    <span>&times;</span>
+                </button>
+            </div>
+            <div class="modal-body">
+                <p class="text-muted">Informe as quantidades devolvidas de cada material:</p>
+                <div id="lista-devolucoes"></div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-warning" onclick="confirmarDevolucoes()">
+                    <i class="fas fa-check"></i> Confirmar Devoluções
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+let produtoSelecionado = null;
+let devolucoesPendentes = [];
+
+function buscarProdutoRDO() {
+    const codigo = $('#codigoScanner').val().trim();
+    if (!codigo) {
+        alert('Digite um código para buscar');
+        return;
+    }
+    
+    $.get('/api/almoxarifado/buscar-produto', { termo: codigo })
+        .done(function(produtos) {
+            if (produtos.length > 0) {
+                produtoSelecionado = produtos[0];
+                mostrarProdutoSelecionado(produtoSelecionado);
+            } else {
+                alert('Produto não encontrado');
+                $('#produto-selecionado').hide();
+            }
+        })
+        .fail(function() {
+            alert('Erro ao buscar produto');
+        });
+}
+
+function mostrarProdutoSelecionado(produto) {
+    $('#info-produto').html(`
+        <strong>${produto.nome}</strong><br>
+        <small>Código: ${produto.codigo_interno} | Estoque: ${produto.estoque_atual} ${produto.unidade_medida}</small>
+    `);
+    
+    $('#unidade-medida').text(produto.unidade_medida);
+    $('#produto-selecionado').show();
+    $('#quantidade').focus();
+}
+
+function confirmarLancamento() {
+    if (!produtoSelecionado) {
+        alert('Selecione um produto primeiro');
+        return;
+    }
+    
+    const quantidade = parseFloat($('#quantidade').val());
+    const observacoes = $('#observacoes').val().trim();
+    
+    if (!quantidade || quantidade <= 0) {
+        alert('Informe uma quantidade válida');
+        return;
+    }
+    
+    // Verificar estoque disponível
+    if (quantidade > produtoSelecionado.estoque_atual) {
+        if (!confirm(`Estoque insuficiente! Disponível: ${produtoSelecionado.estoque_atual} ${produtoSelecionado.unidade_medida}. Continuar mesmo assim?`)) {
+            return;
+        }
+    }
+    
+    $.ajax({
+        url: '/api/rdo/{{ rdo.id }}/lancar-material',
+        method: 'POST',
+        contentType: 'application/json',
+        data: JSON.stringify({
+            produto_id: produtoSelecionado.id,
+            quantidade: quantidade,
+            observacoes: observacoes
+        }),
+        success: function(response) {
+            if (response.sucesso) {
+                alert(response.message);
+                location.reload(); // Recarregar para atualizar lista
+            } else {
+                alert('Erro: ' + response.erro);
+            }
+        },
+        error: function(xhr) {
+            const response = JSON.parse(xhr.responseText);
+            alert('Erro: ' + response.erro);
+        }
+    });
+}
+
+function marcarParaDevolucao(materialId, produtoNome, quantidadeMaxima) {
+    const quantidade = prompt(`Quantidade a devolver de "${produtoNome}" (máximo: ${quantidadeMaxima}):`);
+    
+    if (quantidade !== null) {
+        const qtd = parseFloat(quantidade);
+        if (qtd > 0 && qtd <= quantidadeMaxima) {
+            devolucoesPendentes.push({
+                material_id: materialId,
+                produto_nome: produtoNome,
+                quantidade: qtd,
+                quantidade_maxima: quantidadeMaxima
+            });
+            
+            alert(`${qtd} unidades de "${produtoNome}" marcadas para devolução`);
+        } else {
+            alert('Quantidade inválida');
+        }
+    }
+}
+
+function abrirModalDevolucao() {
+    if (devolucoesPendentes.length === 0) {
+        alert('Marque alguns materiais para devolução primeiro');
+        return;
+    }
+    
+    let html = '';
+    devolucoesPendentes.forEach((item, index) => {
+        html += `
+            <div class="form-group">
+                <label>${item.produto_nome}</label>
+                <div class="input-group">
+                    <input type="number" class="form-control" 
+                           value="${item.quantidade}" 
+                           max="${item.quantidade_maxima}"
+                           min="0" step="0.001"
+                           onchange="devolucoesPendentes[${index}].quantidade = parseFloat(this.value)">
+                    <div class="input-group-append">
+                        <button class="btn btn-outline-danger" onclick="removerDevolucao(${index})">
+                            <i class="fas fa-times"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        `;
+    });
+    
+    $('#lista-devolucoes').html(html);
+    $('#modalDevolucao').modal('show');
+}
+
+function removerDevolucao(index) {
+    devolucoesPendentes.splice(index, 1);
+    abrirModalDevolucao();
+}
+
+function confirmarDevolucoes() {
+    if (devolucoesPendentes.length === 0) {
+        alert('Nenhuma devolução para processar');
+        return;
+    }
+    
+    $.ajax({
+        url: '/api/rdo/{{ rdo.id }}/processar-devolucao',
+        method: 'POST',
+        contentType: 'application/json',
+        data: JSON.stringify({
+            devolucoes: devolucoesPendentes.map(item => ({
+                produto_id: item.material_id,
+                quantidade: item.quantidade,
+                observacoes: `Devolução de ${item.quantidade} unidades`
+            }))
+        }),
+        success: function(response) {
+            if (response.sucesso) {
+                alert(response.message);
+                devolucoesPendentes = [];
+                $('#modalDevolucao').modal('hide');
+                location.reload();
+            } else {
+                alert('Erro: ' + response.erro);
+            }
+        },
+        error: function(xhr) {
+            const response = JSON.parse(xhr.responseText);
+            alert('Erro: ' + response.erro);
+        }
+    });
+}
+
+// Auto-focus no campo de código quando a página carregar
+$(document).ready(function() {
+    $('#codigoScanner').focus();
+});
+</script>
+{% endblock %}
+```
+
+### **PASSO 7: Atualização do app.py**
+
+```python
+# ===== MÓDULO 4: ATUALIZAÇÕES NO APP.PY =====
+# ADICIONAR no final de app.py, antes de create_all()
+
+with app.app_context():
+    db.create_all()
+    
+    # Criar índices para performance do Módulo 4
+    try:
+        # Índices para produtos
+        db.engine.execute('CREATE INDEX IF NOT EXISTS idx_produto_codigo_barras ON produto(codigo_barras)')
+        db.engine.execute('CREATE INDEX IF NOT EXISTS idx_produto_admin_ativo ON produto(admin_id, ativo)')
+        db.engine.execute('CREATE INDEX IF NOT EXISTS idx_produto_categoria ON produto(categoria_id)')
+        db.engine.execute('CREATE INDEX IF NOT EXISTS idx_produto_estoque_baixo ON produto(admin_id, estoque_atual, estoque_minimo)')
+        
+        # Índices para movimentações
+        db.engine.execute('CREATE INDEX IF NOT EXISTS idx_mov_produto_data ON movimentacao_estoque(produto_id, data_movimentacao)')
+        db.engine.execute('CREATE INDEX IF NOT EXISTS idx_mov_admin_tipo ON movimentacao_estoque(admin_id, tipo_movimentacao)')
+        db.engine.execute('CREATE INDEX IF NOT EXISTS idx_mov_obra_data ON movimentacao_estoque(obra_id, data_movimentacao)')
+        db.engine.execute('CREATE INDEX IF NOT EXISTS idx_mov_funcionario_data ON movimentacao_estoque(funcionario_id, data_movimentacao)')
+        db.engine.execute('CREATE INDEX IF NOT EXISTS idx_mov_rdo ON movimentacao_estoque(rdo_id)')
+        db.engine.execute('CREATE INDEX IF NOT EXISTS idx_mov_nf ON movimentacao_estoque(nota_fiscal_id)')
+        
+        # Índices para notas fiscais
+        db.engine.execute('CREATE INDEX IF NOT EXISTS idx_nf_admin_status ON nota_fiscal(admin_id, status)')
+        db.engine.execute('CREATE INDEX IF NOT EXISTS idx_nf_fornecedor_data ON nota_fiscal(fornecedor_id, data_emissao)')
+        db.engine.execute('CREATE INDEX IF NOT EXISTS idx_nf_chave_acesso ON nota_fiscal(chave_acesso)')
+        
+        # Índices para fornecedores
+        db.engine.execute('CREATE INDEX IF NOT EXISTS idx_fornecedor_admin_ativo ON fornecedor(admin_id, ativo)')
+        
+        # Índices para categorias
+        db.engine.execute('CREATE INDEX IF NOT EXISTS idx_categoria_admin_codigo ON categoria_produto(admin_id, codigo)')
+        
+    except Exception as e:
+        logging.warning(f"Erro ao criar índices do Módulo 4: {e}")
+
+# ADICIONAR dependências no requirements.txt (se não existir, criar):
+# lxml>=4.6.0
+# pyzbar>=0.1.8
+# python-barcode>=0.13.1
+# Pillow>=8.0.0
+```
+
+### **PASSO 8: Integração com Módulo 3 (RDO)**
+
+```python
+# ===== MODIFICAR TEMPLATE DO RDO PARA INCLUIR ABA DE MATERIAIS =====
+# LOCALIZAR o template do RDO (provavelmente em templates/rdo/) e ADICIONAR:
+
+# No template principal do RDO, ADICIONAR esta aba:
+<li class="nav-item">
+    <a class="nav-link" href="{{ url_for('main.rdo_materiais', rdo_id=rdo.id) }}">
+        <i class="fas fa-boxes"></i> Materiais
+        {% set materiais_count = rdo.movimentacoes_materiais|length %}
+        {% if materiais_count > 0 %}
+        <span class="badge badge-primary ml-1">{{ materiais_count }}</span>
+        {% endif %}
+    </a>
+</li>
+
+# OU criar um botão de acesso rápido:
+<a href="{{ url_for('main.rdo_materiais', rdo_id=rdo.id) }}" class="btn btn-outline-primary btn-sm">
+    <i class="fas fa-boxes"></i> Gerenciar Materiais
+</a>
+```
+
+---
+
+## 🔧 INSTRUÇÕES FINAIS DE IMPLEMENTAÇÃO
+
+### **PASSO 9: Testar o Módulo Completo**
+
+**Cenários de Teste:**
+
+1. **Cadastro de Produtos:**
+   - Criar categorias de produtos
+   - Cadastrar produtos com código de barras
+   - Testar validação de códigos
+
+2. **Leitura de Código de Barras:**
+   - Testar busca por código de barras
+   - Validar códigos EAN-13 e EAN-8
+   - Testar busca por nome
+
+3. **Importação de XML:**
+   - Importar XML de nota fiscal
+   - Mapear produtos automaticamente
+   - Processar entrada no estoque
+
+4. **Movimentações:**
+   - Lançar entrada manual
+   - Lançar saída manual
+   - Testar validações de estoque
+
+5. **Integração com RDO:**
+   - Acessar aba materiais do RDO
+   - Lançar materiais via RDO
+   - Processar devoluções
+
+6. **Relatórios e Analytics:**
+   - Gerar relatórios de estoque
+   - Testar previsão de ruptura
+   - Validar cálculos de IA
+
+### **PASSO 10: Validações Críticas**
+
+- ✅ **Integração Perfeita:** Funciona com sistema RDO existente (Módulo 3)
+- ✅ **Código de Barras:** Leitura e validação funcionando
+- ✅ **XML NFe:** Importação automática de notas fiscais
+- ✅ **Rastreabilidade:** Por funcionário, obra e RDO
+- ✅ **IA:** Cálculos inteligentes de estoque mínimo
+- ✅ **Performance:** Queries otimizadas com índices
+- ✅ **Compatibilidade:** Zero quebra do sistema existente
+
+---
+
+## ⚠️ REGRAS CRÍTICAS FINAIS
+
+### **COMPATIBILIDADE ABSOLUTA:**
+- **NUNCA** modificar classes RDO, Funcionario ou Obra existentes
+- **APENAS ADICIONAR** relacionamentos onde especificado
+- **MANTER** todas as funcionalidades existentes funcionando
+- **USAR** sistema de autenticação atual
+
+### **INTEGRAÇÃO PERFEITA:**
+- **INTEGRAR** totalmente com sistema RDO (Módulo 3)
+- **NOTIFICAR** cliente quando materiais forem usados (Módulo 2)
+- **RASTREAR** por funcionário e obra automaticamente
+- **MANTER** sistema multi-tenant funcionando
+
+### **RESULTADO ESPERADO:**
+Módulo 4 funcionando perfeitamente com:
+- ✅ **Leitura de código de barras** com câmera web
+- ✅ **Importação automática** de XML de notas fiscais
+- ✅ **Controle completo** de entrada/saída/devolução
+- ✅ **Integração com RDO** - aba específica para materiais
+- ✅ **Rastreabilidade total** por funcionário, obra e data
+- ✅ **Relatórios avançados** com IA e analytics
+- ✅ **Interface mobile** para uso em campo
+
+**🎯 MÓDULO 4 PRONTO PARA IMPLEMENTAÇÃO IMEDIATA NO REPLIT!**
+
+---
+
+## 📊 RESUMO TÉCNICO
+
+### **Arquitetura:**
+- **5 novas classes:** Produto, CategoriaProduto, Fornecedor, NotaFiscal, MovimentacaoEstoque
+- **1 novo tipo de usuário:** `ALMOXARIFE`
+- **Integração total** com sistema RDO existente (Módulo 3)
+- **Aba específica** nos RDOs para materiais
+
+### **Funcionalidades:**
+- **Leitura de código de barras** com validação EAN-13/EAN-8
+- **Importação automática** de XML NFe
+- **Controle completo** de estoque
+- **Integração** com RDO para lançamentos
+- **IA** para cálculos de estoque mínimo
+
+### **Performance:**
+- **15+ novos índices** para otimização
+- **APIs otimizadas** para busca de produtos
+- **Cache** de códigos lidos
+- **Queries eficientes**
+
+### **Integração:**
+- **100% compatível** com Módulos 1, 2 e 3
+- **Zero modificações** em classes críticas
+- **Aproveitamento total** do sistema RDO
+- **Base sólida** para próximos módulos
+
+**Status:** Módulo 4 especificado e pronto para implementação! 🚀
+

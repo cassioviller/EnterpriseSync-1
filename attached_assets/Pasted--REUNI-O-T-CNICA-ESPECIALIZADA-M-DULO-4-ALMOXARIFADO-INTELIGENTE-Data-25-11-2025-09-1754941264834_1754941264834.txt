@@ -1,0 +1,568 @@
+# 🎯 REUNIÃO TÉCNICA ESPECIALIZADA - MÓDULO 4: ALMOXARIFADO INTELIGENTE
+
+**Data:** 25/11/2025 - 09:00h  
+**Duração:** 3,5 horas  
+**Contexto:** Implementação do quarto módulo - Módulos 1, 2 e 3 já funcionando perfeitamente  
+**Status:** Continuidade da evolução SIGE v8.0
+
+---
+
+## 👥 PARTICIPANTES DA REUNIÃO
+
+**Marina Santos** - Product Manager (Moderadora)  
+**Carlos Rodriguez** - Tech Lead  
+**Ana Silva** - Backend Developer  
+**Lucia Ferreira** - Frontend/UX  
+**Rafael Costa** - AI/ML Engineer  
+**João Mendes** - DevOps Engineer  
+**Patricia Lima** - Especialista em RH  
+**Roberto Almeida** - Especialista em Logística (novo participante)  
+
+---
+
+## 📋 AGENDA DA REUNIÃO
+
+### **09:00 - Abertura e Status dos Módulos Anteriores**
+
+**Marina:** Bom dia, pessoal! Excelente trabalho nos três primeiros módulos. O sistema está funcionando de forma excepcional:
+- **Módulo 1:** Propostas sendo aprovadas e convertidas automaticamente
+- **Módulo 2:** Clientes acompanhando obras em tempo real com 98% de satisfação
+- **Módulo 3:** Gestores alocando equipes visualmente com criação automática de RDO
+
+Agora vamos implementar o **Módulo 4 - Almoxarifado Inteligente**. Este é um módulo crítico porque vai **AUTOMATIZAR** todo o controle de estoque e **INTEGRAR** com os RDOs do Módulo 3. Roberto, bem-vindo à equipe!
+
+**Roberto:** Obrigado, Marina! Analisei o sistema atual e vejo que temos uma base sólida. O desafio é criar um almoxarifado que funcione tanto de forma **independente** quanto **integrado com RDOs**. Precisamos de leitura de código de barras, importação de XML de notas fiscais, e controle total de entrada/saída/devolução.
+
+### **09:10 - Análise Profunda do Sistema Atual**
+
+**Carlos:** Vamos revisar o que já temos funcionando e como o almoxarifado se integrará:
+
+```python
+# Sistema existente que será INTEGRADO
+class RDO(db.Model):
+    # ... campos existentes ...
+    # SERÁ INTEGRADO: materiais usados no RDO
+
+class AlocacaoEquipe(db.Model):  # Módulo 3
+    # ... campos existentes ...
+    # SERÁ INTEGRADO: funcionário que requisita materiais
+
+class Obra(db.Model):
+    # ... campos existentes ...
+    # SERÁ INTEGRADO: materiais alocados por obra
+```
+
+**Ana:** O ponto crucial é que o almoxarifado terá **duas formas de operação**:
+
+1. **Operação Independente:** Almoxarife faz lançamentos diretos
+2. **Operação via RDO:** Almoxarife lança materiais dentro do RDO
+
+**Roberto:** Exato! E precisamos de **rastreabilidade total**:
+- **Por funcionário:** Quem pegou o material
+- **Por obra:** Onde foi usado
+- **Por data:** Quando foi usado
+- **Por RDO:** Em qual relatório foi registrado
+
+### **09:25 - Especificação do Sistema de Código de Barras**
+
+**Rafael:** Para o código de barras, sugiro usar a biblioteca **pyzbar** para leitura e **python-barcode** para geração:
+
+**Funcionalidades:**
+- **Leitura** de códigos EAN-13, Code-128, QR Code
+- **Geração automática** de códigos para produtos sem código
+- **Integração** com câmera web para leitura em tempo real
+- **Validação** de códigos existentes no sistema
+
+**João:** Do ponto de vista técnico, vou implementar:
+- **API de leitura** via JavaScript + WebRTC
+- **Fallback** para input manual
+- **Cache** de códigos lidos recentemente
+- **Validação** em tempo real
+
+### **09:40 - Sistema de Importação XML**
+
+**Ana:** Para importação de XML de notas fiscais, vou usar **lxml** e seguir o padrão NFe:
+
+**Estrutura do XML NFe:**
+```xml
+<nfeProc>
+  <NFe>
+    <infNFe>
+      <det nItem="1">
+        <prod>
+          <cProd>001</cProd>
+          <cEAN>7891234567890</cEAN>
+          <xProd>Cimento CP-II 50kg</xProd>
+          <uCom>SC</uCom>
+          <qCom>100.0000</qCom>
+          <vUnCom>25.5000</vUnCom>
+        </prod>
+      </det>
+    </infNFe>
+  </NFe>
+</nfeProc>
+```
+
+**Funcionalidades de Importação:**
+- **Upload** de arquivo XML
+- **Parsing automático** dos produtos
+- **Validação** de estrutura NFe
+- **Criação automática** de produtos não cadastrados
+- **Lançamento automático** de entrada no estoque
+
+**Roberto:** E vou implementar **validações críticas**:
+- **CNPJ do fornecedor** deve estar cadastrado
+- **Produtos** devem ter código de barras válido
+- **Quantidades** devem ser positivas
+- **Valores** devem ser consistentes
+
+### **09:55 - Nova Arquitetura: 5 Classes Principais**
+
+**Carlos:** Vou criar 5 novas classes para o almoxarifado:
+
+```python
+# 1. PRODUTOS/MATERIAIS
+class Produto(db.Model):
+    codigo_interno = db.Column(db.String(20), unique=True)
+    codigo_barras = db.Column(db.String(50))
+    nome = db.Column(db.String(200))
+    descricao = db.Column(db.Text)
+    unidade_medida = db.Column(db.String(10))  # UN, KG, M, L, etc.
+    categoria_id = db.Column(db.Integer, db.ForeignKey('categoria_produto.id'))
+    estoque_minimo = db.Column(db.Numeric(10,3), default=0)
+    estoque_atual = db.Column(db.Numeric(10,3), default=0)
+    valor_medio = db.Column(db.Numeric(10,2), default=0)
+    ativo = db.Column(db.Boolean, default=True)
+
+# 2. CATEGORIAS DE PRODUTOS
+class CategoriaProduto(db.Model):
+    nome = db.Column(db.String(100))
+    descricao = db.Column(db.Text)
+    codigo = db.Column(db.String(10))  # CIM, ELE, HID, etc.
+
+# 3. FORNECEDORES
+class Fornecedor(db.Model):
+    razao_social = db.Column(db.String(200))
+    nome_fantasia = db.Column(db.String(200))
+    cnpj = db.Column(db.String(18), unique=True)
+    endereco = db.Column(db.Text)
+    telefone = db.Column(db.String(20))
+    email = db.Column(db.String(100))
+
+# 4. MOVIMENTAÇÕES DE ESTOQUE
+class MovimentacaoEstoque(db.Model):
+    produto_id = db.Column(db.Integer, db.ForeignKey('produto.id'))
+    tipo_movimentacao = db.Column(db.String(20))  # ENTRADA, SAIDA, DEVOLUCAO
+    quantidade = db.Column(db.Numeric(10,3))
+    valor_unitario = db.Column(db.Numeric(10,2))
+    data_movimentacao = db.Column(db.DateTime, default=datetime.utcnow)
+    
+    # Origem da movimentação
+    nota_fiscal_id = db.Column(db.Integer, db.ForeignKey('nota_fiscal.id'))
+    rdo_id = db.Column(db.Integer, db.ForeignKey('rdo.id'))
+    funcionario_id = db.Column(db.Integer, db.ForeignKey('funcionario.id'))
+    obra_id = db.Column(db.Integer, db.ForeignKey('obra.id'))
+    
+    # Controle
+    usuario_id = db.Column(db.Integer, db.ForeignKey('usuario.id'))
+    observacoes = db.Column(db.Text)
+
+# 5. NOTAS FISCAIS
+class NotaFiscal(db.Model):
+    numero = db.Column(db.String(20))
+    serie = db.Column(db.String(5))
+    chave_acesso = db.Column(db.String(44), unique=True)
+    fornecedor_id = db.Column(db.Integer, db.ForeignKey('fornecedor.id'))
+    data_emissao = db.Column(db.Date)
+    valor_total = db.Column(db.Numeric(10,2))
+    xml_content = db.Column(db.Text)  # Armazenar XML completo
+    status = db.Column(db.String(20), default='Pendente')  # Pendente, Processada
+```
+
+**Ana:** Perfeito! E vou adicionar **relacionamentos inteligentes**:
+- **Produto** ↔ **MovimentacaoEstoque** (histórico completo)
+- **NotaFiscal** ↔ **MovimentacaoEstoque** (rastreabilidade)
+- **RDO** ↔ **MovimentacaoEstoque** (integração Módulo 3)
+- **Funcionario** ↔ **MovimentacaoEstoque** (quem pegou)
+
+### **10:15 - Integração com RDO (Módulo 3)**
+
+**Patricia:** A integração com RDO é fundamental. O fluxo será:
+
+**Cenário 1: Almoxarife trabalha via RDO**
+1. **Almoxarife** acessa RDO criado pelo gestor (Módulo 3)
+2. **Dentro do RDO** tem aba "Materiais"
+3. **Almoxarife** escaneia código de barras ou digita
+4. **Sistema** faz lançamento automático de SAÍDA
+5. **No final do dia** almoxarife pode registrar DEVOLUÇÃO
+
+**Cenário 2: Almoxarife trabalha independente**
+1. **Almoxarife** acessa módulo de almoxarifado
+2. **Faz lançamentos** diretos de entrada/saída/devolução
+3. **Pode vincular** à obra e funcionário manualmente
+
+**Carlos:** Vou criar **abas específicas no RDO**:
+
+```python
+# MODIFICAR template do RDO para incluir aba de materiais
+# RDO existente terá nova aba: "Materiais"
+# Só almoxarife pode editar esta aba
+# Funcionários veem apenas para consulta
+```
+
+**Roberto:** E vou implementar **controle de permissões**:
+- **Almoxarife:** Pode lançar materiais em qualquer RDO
+- **Gestor:** Pode ver relatórios de consumo
+- **Funcionário:** Pode ver materiais do seu RDO (somente leitura)
+
+### **10:30 - Interface de Leitura de Código de Barras**
+
+**Lucia:** Vou criar uma interface **mobile-first** para leitura:
+
+**Tela Principal:**
+```
++----------------------------------+
+|  📷 [Escanear Código]           |
+|                                  |
+|  📝 [Digitar Código]            |
+|                                  |
+|  📋 [Últimos Escaneados]        |
+|  - Cimento CP-II (10 min atrás) |
+|  - Ferro 8mm (15 min atrás)     |
+|                                  |
+|  📊 [Estoque Baixo] (3 itens)   |
++----------------------------------+
+```
+
+**Funcionalidades:**
+- **Câmera em tempo real** com overlay de mira
+- **Feedback sonoro** quando ler código
+- **Histórico** dos últimos códigos lidos
+- **Sugestões** de produtos similares
+- **Modo offline** para locais sem internet
+
+**Rafael:** Vou implementar **IA para reconhecimento**:
+- **OCR** para códigos danificados
+- **Sugestão automática** baseada em histórico
+- **Detecção** de produtos similares
+- **Aprendizado** de padrões de uso
+
+### **10:45 - Sistema de Importação XML Avançado**
+
+**Ana:** Para importação de XML, vou criar um **wizard inteligente**:
+
+**Passo 1: Upload do XML**
+- **Drag & drop** ou seleção de arquivo
+- **Validação** de estrutura NFe
+- **Extração** automática de dados
+
+**Passo 2: Validação de Fornecedor**
+- **Busca automática** por CNPJ
+- **Criação** de fornecedor se não existir
+- **Validação** de dados obrigatórios
+
+**Passo 3: Mapeamento de Produtos**
+- **Lista** todos os produtos do XML
+- **Busca automática** por código de barras
+- **Sugestão** de produtos similares
+- **Criação** de novos produtos
+
+**Passo 4: Confirmação e Processamento**
+- **Resumo** da importação
+- **Valores** calculados automaticamente
+- **Lançamento** automático no estoque
+
+**Roberto:** E vou adicionar **validações críticas**:
+```python
+def validar_xml_nfe(xml_content):
+    # Validar estrutura XML
+    # Validar CNPJ do fornecedor
+    # Validar códigos de produtos
+    # Validar quantidades e valores
+    # Detectar duplicatas
+    return {
+        'valido': True/False,
+        'erros': [],
+        'avisos': [],
+        'produtos': []
+    }
+```
+
+### **11:00 - Controle de Estoque Inteligente**
+
+**Rafael:** Vou implementar **algoritmos inteligentes** para controle:
+
+**Cálculo de Estoque Mínimo:**
+```python
+def calcular_estoque_minimo(produto_id, dias_historico=90):
+    # Analisar consumo dos últimos 90 dias
+    # Calcular média móvel
+    # Considerar sazonalidade
+    # Aplicar margem de segurança
+    return estoque_minimo_sugerido
+```
+
+**Previsão de Consumo:**
+```python
+def prever_consumo(produto_id, dias_futuros=30):
+    # Usar regressão linear
+    # Considerar obras em andamento
+    # Analisar padrões históricos
+    # Retornar previsão com confiança
+    return {
+        'consumo_previsto': quantidade,
+        'confianca': percentual,
+        'data_ruptura': data_estimada
+    }
+```
+
+**Alertas Automáticos:**
+- **Estoque baixo** (abaixo do mínimo)
+- **Ruptura iminente** (previsão de acabar)
+- **Produtos parados** (sem movimentação há 60 dias)
+- **Divergências** de estoque
+
+### **11:15 - Relatórios Avançados**
+
+**João:** Vou criar **relatórios específicos** para gestão:
+
+**Relatório de Consumo por Obra:**
+- **Materiais** mais usados por obra
+- **Custo** de materiais por obra
+- **Comparativo** entre obras similares
+- **Eficiência** de uso de materiais
+
+**Relatório de Produtividade:**
+- **Consumo** por funcionário
+- **Padrões** de uso por cargo
+- **Desperdício** identificado
+- **Sugestões** de otimização
+
+**Relatório Financeiro:**
+- **Valor** do estoque atual
+- **Giro** de estoque por categoria
+- **Fornecedores** mais utilizados
+- **Análise** de custos
+
+**Relatório de Auditoria:**
+- **Todas** as movimentações
+- **Usuário** responsável por cada lançamento
+- **Histórico** de alterações
+- **Rastreabilidade** completa
+
+### **11:30 - Integração com Módulos Anteriores**
+
+**Marina:** Como este módulo se integra com os anteriores?
+
+**Carlos:** Integração perfeita e inteligente:
+
+**Com Módulo 1 (Propostas):**
+- **Proposta** pode incluir lista de materiais estimados
+- **Conversão** para obra transfere materiais para orçamento
+- **Cliente** pode ver custo estimado de materiais
+
+**Com Módulo 2 (Portal Cliente):**
+- **Cliente** vê progresso de materiais utilizados
+- **Transparência** total sobre custos
+- **Fotos** dos materiais sendo utilizados
+
+**Com Módulo 3 (Gestão Equipes):**
+- **RDO criado** automaticamente tem aba de materiais
+- **Funcionário alocado** pode requisitar materiais
+- **Almoxarife** lança materiais no RDO específico
+
+**Ana:** E prepara o terreno para os próximos:
+
+**Módulo 5 (Biometria):**
+- **Reconhecimento facial** para liberar materiais
+- **Controle** de quem pegou cada material
+- **Segurança** no almoxarifado
+
+**Módulo 6 (Folha Pagamento):**
+- **Custo** de materiais por funcionário
+- **Produtividade** baseada em materiais utilizados
+
+### **11:45 - Dashboard do Almoxarifado**
+
+**Lucia:** O dashboard terá **visão completa** do almoxarifado:
+
+**Seção 1: Indicadores Principais**
+- **Valor total** do estoque
+- **Produtos** em estoque baixo
+- **Movimentações** do dia
+- **Notas fiscais** pendentes
+
+**Seção 2: Gráficos Visuais**
+- **Consumo** por categoria (pizza)
+- **Movimentações** no tempo (linha)
+- **Top 10** produtos mais usados (barras)
+- **Estoque** por obra (barras empilhadas)
+
+**Seção 3: Ações Rápidas**
+- **Escanear** código de barras
+- **Importar** XML de nota fiscal
+- **Lançar** saída manual
+- **Ver** relatórios
+
+**Seção 4: Alertas**
+- **Produtos** com estoque baixo
+- **Notas fiscais** não processadas
+- **Divergências** detectadas
+- **Materiais** sem movimentação
+
+### **12:00 - Permissões e Segurança**
+
+**Patricia:** Vou definir **permissões específicas** para almoxarifado:
+
+**Almoxarife (novo tipo de usuário):**
+- **Pode:** Fazer todos os lançamentos
+- **Pode:** Importar XML de notas fiscais
+- **Pode:** Escanear códigos de barras
+- **Pode:** Acessar todos os RDOs para lançar materiais
+- **NÃO pode:** Alterar dados de funcionários ou obras
+
+**Gestor de Obras:**
+- **Pode:** Ver relatórios de consumo por obra
+- **Pode:** Ver materiais utilizados nos RDOs
+- **NÃO pode:** Fazer lançamentos no estoque
+
+**Funcionário:**
+- **Pode:** Ver materiais do seu RDO (somente leitura)
+- **NÃO pode:** Fazer lançamentos
+
+**Ana:** Vou criar **logs de auditoria** completos:
+```python
+class LogAlmoxarifado(db.Model):
+    usuario_id = db.Column(db.Integer, db.ForeignKey('usuario.id'))
+    acao = db.Column(db.String(50))  # ENTRADA, SAIDA, DEVOLUCAO, IMPORTACAO_XML
+    produto_id = db.Column(db.Integer, db.ForeignKey('produto.id'))
+    quantidade_anterior = db.Column(db.Numeric(10,3))
+    quantidade_nova = db.Column(db.Numeric(10,3))
+    observacoes = db.Column(db.Text)
+    ip_address = db.Column(db.String(45))
+    timestamp = db.Column(db.DateTime, default=datetime.utcnow)
+```
+
+### **12:15 - Interface Mobile para Campo**
+
+**João:** Vou criar **app mobile** para uso em campo:
+
+**Funcionalidades Mobile:**
+- **Câmera** para escanear códigos
+- **Modo offline** para locais sem internet
+- **Sincronização** automática quando conectar
+- **Interface** otimizada para touch
+- **Notificações** push para alertas
+
+**PWA (Progressive Web App):**
+- **Instalável** como app nativo
+- **Funciona offline** com Service Workers
+- **Sincronização** em background
+- **Notificações** push
+
+### **12:30 - Cronograma de Implementação**
+
+**Marina:** Qual o cronograma para este módulo?
+
+**Carlos:** Baseado na complexidade:
+
+**Semana 1:**
+- Criar 5 novas classes do almoxarifado
+- Implementar leitura de código de barras
+- Interface básica de lançamentos
+
+**Semana 2:**
+- Sistema de importação XML
+- Integração com RDO (aba materiais)
+- Relatórios básicos
+
+**Semana 3:**
+- Dashboard completo
+- Algoritmos de IA para estoque
+- Interface mobile/PWA
+
+**Semana 4:**
+- Testes e otimizações
+- Integração com módulos anteriores
+- Treinamento dos usuários
+
+**Roberto:** Posso ajudar com os testes de usabilidade e treinamento dos almoxarifes.
+
+### **12:45 - Considerações Técnicas Avançadas**
+
+**Rafael:** Algumas preocupações técnicas importantes:
+
+**Performance:**
+- **Índices** otimizados para consultas de estoque
+- **Cache** de produtos mais acessados
+- **Lazy loading** para listas grandes
+- **Paginação** inteligente
+
+**Segurança:**
+- **Validação** rigorosa de códigos de barras
+- **Sanitização** de XML importado
+- **Rate limiting** para APIs
+- **Criptografia** de dados sensíveis
+
+**Usabilidade:**
+- **Feedback** visual imediato
+- **Undo** para lançamentos recentes
+- **Confirmações** para ações críticas
+- **Atalhos** de teclado para power users
+
+**Lucia:** E vou implementar:
+- **Tooltips** explicativos
+- **Onboarding** para novos almoxarifes
+- **Modo** de treinamento
+- **Help** contextual
+
+### **13:00 - Próximos Passos**
+
+**Marina:** Resumindo as responsabilidades:
+
+1. **Ana** - 5 novas classes e lógica de movimentação
+2. **Lucia** - Interface de código de barras e dashboard
+3. **João** - Sistema de importação XML e PWA
+4. **Rafael** - Algoritmos de IA e analytics
+5. **Roberto** - Testes e validação de fluxos
+6. **Carlos** - Integração com RDO e revisão técnica
+
+**Próxima reunião:** Sexta-feira para review do Módulo 4 completo.
+
+---
+
+## 📝 DECISÕES TÉCNICAS FINAIS
+
+### **Arquitetura:**
+- **5 novas classes:** Produto, CategoriaProduto, Fornecedor, MovimentacaoEstoque, NotaFiscal
+- **Novo tipo de usuário:** `ALMOXARIFE`
+- **Integração total** com sistema RDO existente (Módulo 3)
+- **Aba específica** nos RDOs para materiais
+
+### **Funcionalidades:**
+- **Leitura de código de barras** com câmera web
+- **Importação automática** de XML de notas fiscais
+- **Controle completo** de entrada/saída/devolução
+- **Integração** com RDO para lançamentos
+- **Relatórios avançados** com IA
+
+### **Interface:**
+- **Dashboard** com indicadores em tempo real
+- **Mobile-first** para uso em campo
+- **PWA** para funcionar offline
+- **Integração** com câmera para códigos
+
+### **Integrações:**
+- **Módulo 1:** Materiais estimados nas propostas
+- **Módulo 2:** Cliente vê progresso de materiais
+- **Módulo 3:** Aba materiais nos RDOs
+- **Sistema existente:** Rastreabilidade por funcionário/obra
+
+### **Segurança:**
+- **Permissões específicas** para almoxarife
+- **Logs de auditoria** completos
+- **Validações** rigorosas de XML
+- **Rastreabilidade** total de movimentações
+
+**Status:** Módulo 4 especificado e pronto para implementação! 🚀
+

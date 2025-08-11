@@ -6,7 +6,8 @@ from enum import Enum
 
 class TipoUsuario(Enum):
     SUPER_ADMIN = "super_admin"
-    ADMIN = "admin" 
+    ADMIN = "admin"
+    GESTOR_EQUIPES = "gestor_equipes"
     FUNCIONARIO = "funcionario"
 
 class Usuario(UserMixin, db.Model):
@@ -98,7 +99,7 @@ class Obra(db.Model):
     cliente_nome = db.Column(db.String(100))
     cliente_email = db.Column(db.String(120))
     cliente_telefone = db.Column(db.String(20))
-    proposta_origem_id = db.Column(db.Integer, db.ForeignKey('proposta.id'))
+    proposta_origem_id = db.Column(db.Integer, db.ForeignKey('proposta_comercial.id'))
     
     # Configurações do Portal
     portal_ativo = db.Column(db.Boolean, default=True)
@@ -112,8 +113,7 @@ class Obra(db.Model):
     custos = db.relationship('CustoObra', backref='obra_ref', lazy=True, overlaps="obra_ref")
     
     # MÓDULO 2: Relacionamentos do Portal do Cliente
-    proposta_origem = db.relationship('Proposta', backref='obra_gerada')
-    notificacoes_cliente = db.relationship('NotificacaoCliente', backref='obra_ref', cascade='all, delete-orphan')
+    proposta_origem = db.relationship('PropostaComercial', backref='obra_gerada')
     servicos_obra = db.relationship('ServicoObra', backref='obra', cascade='all, delete-orphan', lazy=True)
 
 class ServicoObra(db.Model):
@@ -228,12 +228,15 @@ class HistoricoProdutividadeServico(db.Model):
 class RegistroPonto(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     funcionario_id = db.Column(db.Integer, db.ForeignKey('funcionario.id'), nullable=False)
-    obra_id = db.Column(db.Integer, db.ForeignKey('obra.id'))
+    obra_id = db.Column(db.Integer, db.ForeignKey('obra.id'))  # MÓDULO 3: Campo para obras
     data = db.Column(db.Date, nullable=False)
     hora_entrada = db.Column(db.Time)
     hora_saida = db.Column(db.Time)
     hora_almoco_saida = db.Column(db.Time)
     hora_almoco_retorno = db.Column(db.Time)
+    
+    # MÓDULO 3: Campo tipo_local para integração com gestão de equipes
+    tipo_local = db.Column(db.String(20), default='oficina')  # 'oficina', 'campo'
     
     # Cálculos automáticos conforme especificação
     horas_trabalhadas = db.Column(db.Float, default=0.0)
@@ -281,6 +284,8 @@ class Ocorrencia(db.Model):
     funcionario = db.relationship('Funcionario', backref='ocorrencias', lazy=True, overlaps="ocorrencias")
     tipo_ocorrencia = db.relationship('TipoOcorrencia', backref='ocorrencias', lazy=True, overlaps="ocorrencias")
     aprovador = db.relationship('Usuario', backref='ocorrencias_aprovadas', lazy=True, overlaps="ocorrencias_aprovadas")
+
+# ===== MÓDULO 3: GESTÃO DE EQUIPES - SISTEMAS KANBAN/CALENDÁRIO =====
 
 class CalendarioUtil(db.Model):
     data = db.Column(db.Date, primary_key=True)
@@ -682,37 +687,77 @@ class ServicoPropostaComercial(db.Model):
 # ================================
 
 class AlocacaoEquipe(db.Model):
-    """Alocação de funcionários em obras com geração automática de RDO"""
+    """Sistema completo de alocação de equipes - MÓDULO 3 v8.0"""
     __tablename__ = 'alocacao_equipe'
     
     id = db.Column(db.Integer, primary_key=True)
+    
+    # Relacionamentos principais
     funcionario_id = db.Column(db.Integer, db.ForeignKey('funcionario.id'), nullable=False)
     obra_id = db.Column(db.Integer, db.ForeignKey('obra.id'), nullable=False)
+    
+    # Dados da alocação
     data_alocacao = db.Column(db.Date, nullable=False)
-    local_trabalho = db.Column(db.String(20), nullable=False)  # 'oficina', 'campo'
-    turno = db.Column(db.String(20), default='matutino')  # matutino, vespertino, noturno
-    status = db.Column(db.String(20), default='ativo')  # ativo, concluido, cancelado
-    rdo_gerado = db.Column(db.Boolean, default=False)
+    tipo_local = db.Column(db.String(20), nullable=False)  # 'oficina', 'campo'
+    turno = db.Column(db.String(20), default='matutino')  # 'matutino', 'vespertino', 'noturno'
+    
+    # Controle e auditoria
+    criado_por_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False)
+    rdo_gerado_id = db.Column(db.Integer, db.ForeignKey('rdo.id'))  # NULL se for oficina
+    rdo_gerado = db.Column(db.Boolean, default=False)  # Flag para compatibilidade
+    
+    # Status da alocação
+    status = db.Column(db.String(20), default='Planejado')  # 'Planejado', 'Executado', 'Cancelado'
+    
+    # Observações
     observacoes = db.Column(db.Text)
     
-    # Multi-tenant
+    # Multi-tenant (OBRIGATÓRIO)
     admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False)
     
+    # Controle de tempo
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     
     # Relacionamentos
     funcionario = db.relationship('Funcionario', backref='alocacoes_equipe')
     obra = db.relationship('Obra', backref='alocacoes_equipe')
-    admin = db.relationship('Usuario', backref='alocacoes_administradas')
+    criado_por = db.relationship('Usuario', foreign_keys=[criado_por_id], backref='alocacoes_criadas')
+    admin = db.relationship('Usuario', foreign_keys=[admin_id], backref='alocacoes_administradas')
+    rdo_gerado_rel = db.relationship('RDO', backref='alocacao_origem')
     
-    # Constraint para evitar duplicatas
+    # Índices para performance e unicidade
     __table_args__ = (
-        db.UniqueConstraint('funcionario_id', 'obra_id', 'data_alocacao', name='_func_obra_data_uc'),
+        db.UniqueConstraint('funcionario_id', 'data_alocacao', name='uk_funcionario_data_alocacao'),
+        db.Index('idx_alocacao_data_admin', 'data_alocacao', 'admin_id'),
+        db.Index('idx_alocacao_obra_data', 'obra_id', 'data_alocacao'),
+        db.Index('idx_alocacao_funcionario_status', 'funcionario_id', 'status'),
     )
     
     def __repr__(self):
-        return f'<AlocacaoEquipe {self.funcionario.nome} - {self.obra.nome} - {self.data_alocacao}>'
+        func_nome = self.funcionario.nome if self.funcionario else f"ID:{self.funcionario_id}"
+        obra_nome = self.obra.nome if self.obra else f"ID:{self.obra_id}"
+        return f'<AlocacaoEquipe {func_nome} -> {obra_nome} ({self.data_alocacao})>'
+    
+    def to_dict(self):
+        """Converter para dicionário para APIs do sistema Kanban/Calendário"""
+        return {
+            'id': self.id,
+            'funcionario_id': self.funcionario_id,
+            'funcionario_nome': self.funcionario.nome if self.funcionario else None,
+            'funcionario_cargo': self.funcionario.cargo if self.funcionario else None,
+            'obra_id': self.obra_id,
+            'obra_nome': self.obra.nome if self.obra else None,
+            'obra_codigo': self.obra.codigo if self.obra else None,
+            'data_alocacao': self.data_alocacao.isoformat(),
+            'tipo_local': self.tipo_local,
+            'turno': self.turno,
+            'status': self.status,
+            'rdo_gerado': self.rdo_gerado,
+            'rdo_gerado_id': self.rdo_gerado_id,
+            'observacoes': self.observacoes,
+            'created_at': self.created_at.isoformat() if self.created_at else None
+        }
 
 
 # ================================
@@ -780,143 +825,40 @@ class MovimentacaoMaterial(db.Model):
     admin = db.relationship('Usuario', backref='movimentacoes_administradas')
     
     def __repr__(self):
-        return f'<MovimentacaoMaterial {self.material_ref.descricao} - {self.tipo_movimento} - {self.quantidade}>'
+        return f'<MovimentacaoMaterial {self.material_ref.descricao} - {self.tipo_movimento}>'
 
 class RDOMaterial(db.Model):
-    """Materiais utilizados em RDO específico"""
+    """Integração de materiais com RDO"""
     __tablename__ = 'rdo_material'
     
     id = db.Column(db.Integer, primary_key=True)
     rdo_id = db.Column(db.Integer, db.ForeignKey('rdo.id'), nullable=False)
     material_id = db.Column(db.Integer, db.ForeignKey('material.id'), nullable=False)
-    quantidade_requisitada = db.Column(db.Float, nullable=False)
-    quantidade_utilizada = db.Column(db.Float, default=0.0)
-    quantidade_devolvida = db.Column(db.Float, default=0.0)
+    quantidade_utilizada = db.Column(db.Float, nullable=False)
+    valor_unitario = db.Column(db.Float, nullable=False)
+    valor_total = db.Column(db.Float, nullable=False)
     observacoes = db.Column(db.Text)
+    
+    # Multi-tenant
+    admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False)
     
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     
     # Relacionamentos
     rdo = db.relationship('RDO', backref='materiais_rdo')
-    material = db.relationship('Material', backref='rdos_utilizacao')
-    
-    # Constraint para evitar duplicatas
-    __table_args__ = (
-        db.UniqueConstraint('rdo_id', 'material_id', name='_rdo_material_uc'),
-    )
+    material = db.relationship('Material', backref='utilizacoes_rdo')
+    admin = db.relationship('Usuario', backref='rdo_materiais_administrados')
     
     def __repr__(self):
-        return f'<RDOMaterial RDO-{self.rdo_id} - {self.material.descricao}>'
+        return f'<RDOMaterial RDO:{self.rdo_id} - {self.material.descricao}>'
 
 
-# ===== MÓDULO 1: SISTEMA DE PROPOSTAS =====
-
-class Proposta(db.Model):
-    __tablename__ = 'proposta'
-    
-    id = db.Column(db.Integer, primary_key=True)
-    numero_proposta = db.Column(db.String(20), unique=True, nullable=False)  # PROP-2025-001
-    
-    # Dados do Cliente
-    cliente_nome = db.Column(db.String(100), nullable=False)
-    cliente_email = db.Column(db.String(120), nullable=False)
-    cliente_telefone = db.Column(db.String(20))
-    cliente_cpf_cnpj = db.Column(db.String(18))
-    
-    # Dados da Obra
-    endereco_obra = db.Column(db.Text, nullable=False)
-    descricao_obra = db.Column(db.Text, nullable=False)
-    area_total_m2 = db.Column(db.Float)
-    
-    # Valores
-    valor_proposta = db.Column(db.Float, nullable=False)
-    prazo_execucao = db.Column(db.Integer)  # dias
-    
-    # Status e Controle
-    status = db.Column(db.String(20), default='Rascunho')  # Rascunho, Enviada, Aprovada, Rejeitada, Expirada
-    data_criacao = db.Column(db.DateTime, default=datetime.utcnow)
-    data_envio = db.Column(db.DateTime)
-    data_resposta = db.Column(db.DateTime)
-    data_expiracao = db.Column(db.DateTime)  # 30 dias após envio
-    
-    # Acesso do Cliente
-    login_cliente = db.Column(db.String(50), unique=True)
-    senha_cliente = db.Column(db.String(255))  # Hash bcrypt
-    token_acesso = db.Column(db.String(255), unique=True)
-    
-    # Resposta do Cliente
-    observacoes_cliente = db.Column(db.Text)
-    ip_assinatura = db.Column(db.String(45))
-    user_agent_assinatura = db.Column(db.Text)
-    
-    # Multi-tenant (OBRIGATÓRIO)
-    admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False)
-    criado_por_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False)
-    
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
-    
-    # Relacionamentos
-    servicos = db.relationship('PropostaServico', backref='proposta_ref', lazy=True, cascade='all, delete-orphan')
-    logs = db.relationship('PropostaLog', backref='proposta_ref', lazy=True, cascade='all, delete-orphan')
-    criado_por = db.relationship('Usuario', foreign_keys=[criado_por_id])
-    
-    def __repr__(self):
-        return f'<Proposta {self.numero_proposta}>'
-
-class PropostaServico(db.Model):
-    __tablename__ = 'proposta_servico'
-    
-    id = db.Column(db.Integer, primary_key=True)
-    proposta_id = db.Column(db.Integer, db.ForeignKey('proposta.id'), nullable=False)
-    
-    # Dados do Serviço
-    descricao_servico = db.Column(db.String(200), nullable=False)
-    quantidade = db.Column(db.Float, nullable=False)
-    unidade = db.Column(db.String(10), nullable=False)  # m², m³, un, kg, etc.
-    valor_unitario = db.Column(db.Float, nullable=False)
-    valor_total = db.Column(db.Float, nullable=False)
-    
-    # Detalhes
-    observacoes = db.Column(db.Text)
-    ordem = db.Column(db.Integer, default=1)
-    
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    
-    def __repr__(self):
-        return f'<PropostaServico {self.descricao_servico}>'
-
-class PropostaLog(db.Model):
-    __tablename__ = 'proposta_log'
-    
-    id = db.Column(db.Integer, primary_key=True)
-    proposta_id = db.Column(db.Integer, db.ForeignKey('proposta.id'), nullable=False)
-    
-    # Ação realizada
-    acao = db.Column(db.String(50), nullable=False)  # criada, enviada, visualizada, aprovada, rejeitada
-    
-    # Usuário (NULL para ações do cliente)
-    usuario_id = db.Column(db.Integer, db.ForeignKey('usuario.id'))
-    
-    # Dados da sessão
-    ip_address = db.Column(db.String(45))
-    user_agent = db.Column(db.Text)
-    
-    # Detalhes
-    observacoes = db.Column(db.Text)
-    
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    
-    # Relacionamentos
-    usuario = db.relationship('Usuario', backref='logs_proposta')
-    
-    def __repr__(self):
-        return f'<PropostaLog {self.acao}>'
-
-# ===== MÓDULO 2: NOVA CLASSE PARA NOTIFICAÇÕES DO CLIENTE =====
+# ================================
+# NOTIFICAÇÕES CLIENTE - MÓDULO 2
+# ================================
 
 class NotificacaoCliente(db.Model):
-    """Notificações para clientes no Portal do Cliente"""
+    """Notificações automáticas para clientes via portal"""
     __tablename__ = 'notificacao_cliente'
     
     id = db.Column(db.Integer, primary_key=True)
@@ -942,8 +884,13 @@ class NotificacaoCliente(db.Model):
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     
     # Relacionamentos
+    obra = db.relationship('Obra', backref='notificacoes_obra')
     rdo = db.relationship('RDO', backref='notificacoes')
     atividade = db.relationship('RDOAtividade', backref='notificacoes')
     
     def __repr__(self):
         return f'<NotificacaoCliente {self.titulo}>'
+
+
+
+
