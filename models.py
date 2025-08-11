@@ -1659,7 +1659,51 @@ class AuditoriaContabil(db.Model):
     corrigido = db.Column(db.Boolean, default=False)
     admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False)
 
+# MÓDULO 1 - SISTEMA DE PROPOSTAS
+class Cliente(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    nome = db.Column(db.String(200), nullable=False)
+    email = db.Column(db.String(120))
+    telefone = db.Column(db.String(20))
+    endereco = db.Column(db.Text)
+    cnpj = db.Column(db.String(18))
+    admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    
+    admin = db.relationship('Usuario', backref='clientes_administrados')
+
+class Proposta(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    numero = db.Column(db.String(50), unique=True, nullable=False)
+    cliente_id = db.Column(db.Integer, db.ForeignKey('cliente.id'), nullable=False)
+    titulo = db.Column(db.String(200), nullable=False)
+    descricao = db.Column(db.Text)
+    valor_total = db.Column(db.Float, default=0.0)
+    status = db.Column(db.String(20), default='rascunho')  # rascunho, enviada, aprovada, rejeitada
+    data_vencimento = db.Column(db.Date)
+    data_envio = db.Column(db.DateTime)
+    data_aprovacao = db.Column(db.DateTime)
+    link_visualizacao = db.Column(db.String(255))
+    admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    
+    # Relacionamentos
+    cliente = db.relationship('Cliente', backref='propostas')
+    admin = db.relationship('Usuario', backref='propostas_administradas')
+
+class PropostaHistorico(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    proposta_id = db.Column(db.Integer, db.ForeignKey('proposta.id'), nullable=False)
+    acao = db.Column(db.String(50), nullable=False)
+    descricao = db.Column(db.Text)
+    usuario_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    
+    # Relacionamentos
+    proposta = db.relationship('Proposta', backref='historico')
+    usuario = db.relationship('Usuario', backref='acoes_propostas')
+
 # Atualização de timestamp para verificar se o modelo é alterado
 # Essa linha força o gunicorn a recarregar quando há mudanças
-# Última modificação: 2025-08-11 20:30:00 - Módulo 7 Contábil implementado
+# Última modificação: 2025-08-11 21:05:00 - Módulo 1 Propostas adicionado
 

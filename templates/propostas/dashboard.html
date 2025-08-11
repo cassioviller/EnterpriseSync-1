@@ -1,0 +1,295 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard de Propostas{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- Header do Dashboard -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <h1 class="h3 mb-0">🎯 Dashboard de Propostas</h1>
+                    <p class="text-muted mb-0">Gestão comercial avançada com métricas em tempo real</p>
+                </div>
+                <div class="d-flex gap-2">
+                    <button class="btn btn-primary" onclick="location.href='{{ url_for('propostas.nova_proposta') }}'">
+                        <i class="fas fa-plus me-2"></i>Nova Proposta
+                    </button>
+                    <button class="btn btn-outline-secondary" onclick="atualizarDashboard()">
+                        <i class="fas fa-sync me-2"></i>Atualizar
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Cards de Métricas Principais -->
+    <div class="row mb-4">
+        <div class="col-lg-3 col-md-6 mb-3">
+            <div class="card border-0 shadow-sm h-100">
+                <div class="card-body">
+                    <div class="d-flex align-items-center">
+                        <div class="flex-shrink-0">
+                            <div class="bg-primary bg-opacity-10 rounded-circle p-3">
+                                <i class="fas fa-file-contract text-primary fa-lg"></i>
+                            </div>
+                        </div>
+                        <div class="flex-grow-1 ms-3">
+                            <div class="fw-bold text-dark">{{ total_propostas }}</div>
+                            <div class="text-muted small">Total de Propostas</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-3 col-md-6 mb-3">
+            <div class="card border-0 shadow-sm h-100">
+                <div class="card-body">
+                    <div class="d-flex align-items-center">
+                        <div class="flex-shrink-0">
+                            <div class="bg-warning bg-opacity-10 rounded-circle p-3">
+                                <i class="fas fa-clock text-warning fa-lg"></i>
+                            </div>
+                        </div>
+                        <div class="flex-grow-1 ms-3">
+                            <div class="fw-bold text-dark">{{ propostas_pendentes }}</div>
+                            <div class="text-muted small">Pendentes</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-3 col-md-6 mb-3">
+            <div class="card border-0 shadow-sm h-100">
+                <div class="card-body">
+                    <div class="d-flex align-items-center">
+                        <div class="flex-shrink-0">
+                            <div class="bg-success bg-opacity-10 rounded-circle p-3">
+                                <i class="fas fa-check-circle text-success fa-lg"></i>
+                            </div>
+                        </div>
+                        <div class="flex-grow-1 ms-3">
+                            <div class="fw-bold text-dark">{{ propostas_aprovadas }}</div>
+                            <div class="text-muted small">Aprovadas</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-3 col-md-6 mb-3">
+            <div class="card border-0 shadow-sm h-100">
+                <div class="card-body">
+                    <div class="d-flex align-items-center">
+                        <div class="flex-shrink-0">
+                            <div class="bg-info bg-opacity-10 rounded-circle p-3">
+                                <i class="fas fa-percentage text-info fa-lg"></i>
+                            </div>
+                        </div>
+                        <div class="flex-grow-1 ms-3">
+                            <div class="fw-bold text-dark">{{ "%.1f"|format(taxa_conversao) }}%</div>
+                            <div class="text-muted small">Taxa de Conversão</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Gráficos e Análises -->
+    <div class="row mb-4">
+        <div class="col-lg-8 mb-3">
+            <div class="card border-0 shadow-sm h-100">
+                <div class="card-header bg-transparent border-0 pb-0">
+                    <h5 class="card-title mb-0">📊 Funil de Vendas</h5>
+                </div>
+                <div class="card-body">
+                    <canvas id="funilVendasChart" height="100"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-4 mb-3">
+            <div class="card border-0 shadow-sm h-100">
+                <div class="card-header bg-transparent border-0 pb-0">
+                    <h5 class="card-title mb-0">💰 Valores Financeiros</h5>
+                </div>
+                <div class="card-body">
+                    <div class="mb-3">
+                        <div class="d-flex justify-content-between">
+                            <span class="text-muted">Valor Total</span>
+                            <span class="fw-bold">R$ {{ "{:,.2f}"|format(valor_total) }}</span>
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <div class="d-flex justify-content-between">
+                            <span class="text-muted">Valor Aprovado</span>
+                            <span class="fw-bold text-success">R$ {{ "{:,.2f}"|format(valor_aprovado) }}</span>
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <div class="d-flex justify-content-between">
+                            <span class="text-muted">Valor Pendente</span>
+                            <span class="fw-bold text-warning">R$ {{ "{:,.2f}"|format(valor_total - valor_aprovado) }}</span>
+                        </div>
+                    </div>
+                    <div class="progress mt-3" style="height: 10px;">
+                        <div class="progress-bar bg-success" style="width: {{ (valor_aprovado / valor_total * 100) if valor_total > 0 else 0 }}%"></div>
+                    </div>
+                    <small class="text-muted">{{ "%.1f"|format((valor_aprovado / valor_total * 100) if valor_total > 0 else 0) }}% do valor total aprovado</small>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Alertas e Propostas Vencendo -->
+    {% if propostas_vencendo %}
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card border-0 shadow-sm border-start border-warning border-4">
+                <div class="card-header bg-warning bg-opacity-10 border-0">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-exclamation-triangle text-warning me-2"></i>
+                        Propostas Próximas ao Vencimento
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        {% for proposta in propostas_vencendo %}
+                        <div class="col-lg-4 col-md-6 mb-3">
+                            <div class="card bg-light">
+                                <div class="card-body">
+                                    <h6 class="card-title">{{ proposta.titulo }}</h6>
+                                    <p class="card-text small">
+                                        <strong>Cliente:</strong> {{ proposta.cliente.nome }}<br>
+                                        <strong>Valor:</strong> R$ {{ "{:,.2f}"|format(proposta.valor_total) }}<br>
+                                        <strong>Vence em:</strong> {{ (proposta.data_vencimento - moment().date()).days }} dias
+                                    </p>
+                                    <a href="{{ url_for('propostas.visualizar', id=proposta.id) }}" class="btn btn-sm btn-warning">
+                                        <i class="fas fa-eye me-1"></i>Visualizar
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Propostas Recentes -->
+    <div class="row">
+        <div class="col-12">
+            <div class="card border-0 shadow-sm">
+                <div class="card-header bg-transparent border-0 pb-0">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <h5 class="card-title mb-0">📄 Propostas Recentes</h5>
+                        <a href="{{ url_for('propostas.listar_propostas') }}" class="btn btn-sm btn-outline-primary">
+                            Ver Todas
+                        </a>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Número</th>
+                                    <th>Cliente</th>
+                                    <th>Título</th>
+                                    <th>Valor</th>
+                                    <th>Status</th>
+                                    <th>Data</th>
+                                    <th>Ações</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for proposta in propostas_recentes %}
+                                <tr>
+                                    <td>
+                                        <code>{{ proposta.numero }}</code>
+                                    </td>
+                                    <td>{{ proposta.cliente.nome }}</td>
+                                    <td>{{ proposta.titulo }}</td>
+                                    <td>
+                                        <span class="fw-bold">R$ {{ "{:,.2f}"|format(proposta.valor_total) }}</span>
+                                    </td>
+                                    <td>
+                                        {% if proposta.status == 'rascunho' %}
+                                            <span class="badge bg-secondary">Rascunho</span>
+                                        {% elif proposta.status == 'enviada' %}
+                                            <span class="badge bg-primary">Enviada</span>
+                                        {% elif proposta.status == 'aprovada' %}
+                                            <span class="badge bg-success">Aprovada</span>
+                                        {% elif proposta.status == 'rejeitada' %}
+                                            <span class="badge bg-danger">Rejeitada</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>{{ proposta.created_at.strftime('%d/%m/%Y') }}</td>
+                                    <td>
+                                        <div class="btn-group btn-group-sm">
+                                            <a href="{{ url_for('propostas.visualizar', id=proposta.id) }}" 
+                                               class="btn btn-outline-primary btn-sm">
+                                                <i class="fas fa-eye"></i>
+                                            </a>
+                                            {% if proposta.status in ['rascunho', 'enviada'] %}
+                                            <a href="{{ url_for('propostas.editar_proposta', id=proposta.id) }}" 
+                                               class="btn btn-outline-warning btn-sm">
+                                                <i class="fas fa-edit"></i>
+                                            </a>
+                                            {% endif %}
+                                        </div>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+// Gráfico do Funil de Vendas
+const ctx = document.getElementById('funilVendasChart').getContext('2d');
+const funilChart = new Chart(ctx, {
+    type: 'doughnut',
+    data: {
+        labels: ['Pendentes', 'Aprovadas', 'Rejeitadas'],
+        datasets: [{
+            data: [{{ propostas_pendentes }}, {{ propostas_aprovadas }}, {{ propostas_rejeitadas }}],
+            backgroundColor: [
+                '#ffc107',
+                '#198754', 
+                '#dc3545'
+            ],
+            borderWidth: 0
+        }]
+    },
+    options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+            legend: {
+                position: 'bottom'
+            }
+        }
+    }
+});
+
+function atualizarDashboard() {
+    window.location.reload();
+}
+
+// Atualização automática a cada 5 minutos
+setInterval(atualizarDashboard, 300000);
+</script>
+{% endblock %}
