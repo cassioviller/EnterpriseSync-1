@@ -7,6 +7,7 @@ from models import PropostaComercial, ServicoPropostaComercial
 from forms import *
 from utils import calcular_horas_trabalhadas, calcular_custo_real_obra, calcular_custos_mes
 from kpis_engine import kpis_engine
+from cliente_portal_utils import *
 from auth import super_admin_required, admin_required, funcionario_required, get_tenant_filter, can_access_data
 from datetime import datetime, date, timedelta
 from sqlalchemy import func, desc, or_, and_
@@ -5387,25 +5388,7 @@ def api_ultimo_rdo_obra(obra_id):
 # MÓDULO 2: PORTAL DO CLIENTE
 # ================================
 
-@main_bp.route("/cliente/obra/<token>")
-def cliente_obra_dashboard(token):
-    """Portal do cliente para acompanhar progresso da obra"""
-    try:
-        obra = Obra.query.filter_by(token_cliente=token).first()
-        if not obra:
-            return "Token inválido", 404
-        
-        rdos = RDO.query.filter_by(obra_id=obra.id).count()
-        progresso = min(100, (rdos * 10))
-        
-        return f"""
-        <h1>Obra: {obra.nome}</h1>
-        <p>Endereço: {obra.endereco}</p>
-        <p>Progresso: {progresso}%</p>
-        <p>RDOs executados: {rdos}</p>
-        """
-    except Exception as e:
-        return f"Erro: {str(e)}", 500
+# Função removida - Portal do Cliente será implementado no Módulo 2
 
 @main_bp.route("/cliente/proposta/<token>/aprovar", methods=["POST"])
 def cliente_aprovar_proposta_v2(token):
@@ -5920,3 +5903,42 @@ def cliente_rejeitar_proposta(token):
         db.session.rollback()
         flash(f"Erro ao rejeitar proposta: {str(e)}", "danger")
         return redirect(url_for("main.cliente_proposta", token=token))
+
+# ===== MÓDULO 2: PORTAL DO CLIENTE - ACOMPANHAMENTO DE OBRAS =====
+
+@main_bp.route('/cliente/obra/<token>')
+def cliente_obra_dashboard(token):
+    """Dashboard principal do cliente para acompanhar obra"""
+    obra = Obra.query.filter_by(token_cliente=token).first_or_404()
+    
+    # Verificar se portal está ativo
+    if not obra.portal_ativo:
+        return render_template('cliente/portal_inativo.html', obra=obra)
+    
+    # Atualizar última visualização
+    obra.ultima_visualizacao_cliente = datetime.utcnow()
+    db.session.commit()
+    
+    # Calcular dados do dashboard
+    progresso = calcular_progresso_obra_cliente(obra.id)
+    fotos_recentes = obter_fotos_obra_recentes(obra.id, limite=6)
+    timeline_recente = obter_timeline_obra(obra.id, limite=5)
+    previsao = calcular_previsao_conclusao(obra.id)
+    notificacoes_nao_lidas = obter_notificacoes_nao_lidas(obra.id)
+    
+    # Estatísticas adicionais
+    total_rdos = RDO.query.filter_by(obra_id=obra.id, status='Finalizado').count()
+    total_fotos = db.session.query(func.count(RDOFoto.id)).join(RDO).filter(
+        RDO.obra_id == obra.id,
+        RDO.status == 'Finalizado'
+    ).scalar() or 0
+    
+    return render_template('cliente/obra_dashboard.html',
+                         obra=obra,
+                         progresso=progresso,
+                         fotos_recentes=fotos_recentes,
+                         timeline_recente=timeline_recente,
+                         previsao=previsao,
+                         notificacoes_nao_lidas=notificacoes_nao_lidas,
+                         total_rdos=total_rdos,
+                         total_fotos=total_fotos)

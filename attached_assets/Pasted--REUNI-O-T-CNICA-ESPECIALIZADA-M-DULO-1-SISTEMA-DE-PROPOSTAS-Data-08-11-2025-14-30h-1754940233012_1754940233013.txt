@@ -1,0 +1,315 @@
+# 🎯 REUNIÃO TÉCNICA ESPECIALIZADA - MÓDULO 1: SISTEMA DE PROPOSTAS
+
+**Data:** 08/11/2025 - 14:30h  
+**Duração:** 2 horas  
+**Contexto:** Implementação do primeiro módulo da evolução SIGE v8.0  
+**Status:** Meio da implementação - foco exclusivo no Módulo 1
+
+---
+
+## 👥 PARTICIPANTES DA REUNIÃO
+
+**Marina Santos** - Product Manager (Moderadora)  
+**Carlos Rodriguez** - Tech Lead  
+**Ana Silva** - Backend Developer  
+**Lucia Ferreira** - Frontend/UX  
+**Pedro Oliveira** - Especialista Contábil  
+
+---
+
+## 📋 AGENDA DA REUNIÃO
+
+### **14:30 - Abertura e Contexto**
+
+**Marina:** Pessoal, estamos aqui para detalhar profundamente o Módulo 1 - Sistema de Propostas. Já analisamos o código atual do SIGE e sabemos exatamente como integrar sem quebrar nada. Carlos, pode nos relembrar a arquitetura atual?
+
+**Carlos:** Claro, Marina. O SIGE atual tem uma estrutura sólida:
+- Flask com SQLAlchemy
+- Sistema multi-tenant com `admin_id` em todas as tabelas
+- Autenticação via decorators em `auth.py`
+- Blueprint `main_bp` em `views.py` com 50+ rotas
+- Classes principais: `Usuario`, `Funcionario`, `Obra`, `RDO`
+
+O ponto crítico é que NÃO podemos modificar nenhuma classe existente. Tudo deve ser aditivo.
+
+### **14:35 - Análise Detalhada do Fluxo de Propostas**
+
+**Marina:** Perfeito. Agora vamos mergulhar no fluxo completo. Ana, baseado no código atual, como você vê a integração?
+
+**Ana:** Analisei o `models.py` e o `views.py`. O sistema atual tem uma estrutura muito bem definida. Para o módulo de propostas, precisamos de 3 novas tabelas que se integrem perfeitamente:
+
+1. **Proposta** - Tabela principal
+2. **PropostaServico** - Itens da proposta  
+3. **PropostaLog** - Auditoria completa
+
+O mais importante é que quando o cliente aprovar, precisamos converter automaticamente para uma `Obra` usando a classe existente.
+
+**Carlos:** Exato! E olhando o sistema de autenticação atual, vejo que temos decorators perfeitos:
+- `@admin_required` para criação de propostas
+- Portal do cliente SEM Flask-Login (acesso via token)
+- Integração com `get_tenant_filter()` para multi-tenant
+
+### **14:45 - Especificação Técnica Detalhada**
+
+**Marina:** Lucia, do ponto de vista UX, como você vê o fluxo do cliente?
+
+**Lucia:** Analisei o padrão atual dos templates. O SIGE usa Bootstrap 4 e DataTables. Para o portal do cliente, sugiro:
+
+1. **Interface limpa** sem menu lateral (diferente do admin)
+2. **Design responsivo** para mobile
+3. **Assinatura digital** simples com confirmação
+4. **Feedback visual** claro do status
+
+O mais crítico é a experiência de aprovação. O cliente precisa entender exatamente o que está assinando.
+
+**Ana:** Concordo. E tecnicamente, vou usar `secrets.token_urlsafe(32)` para gerar tokens seguros. O acesso será via URL única, sem necessidade de login tradicional.
+
+### **14:55 - Integração com Sistema Existente**
+
+**Carlos:** Vamos detalhar a integração. Ana, como você vai converter proposta em obra?
+
+**Ana:** Ótima pergunta! Analisei a classe `Obra` atual e ela tem todos os campos necessários:
+- `nome` - vem do cliente
+- `endereco` - vem da proposta  
+- `valor_contrato` - vem do valor da proposta
+- `admin_id` - mantém o multi-tenant
+
+O código seria algo assim:
+```python
+obra = Obra(
+    nome=f"Obra - {proposta.cliente_nome}",
+    codigo=f"OB-{proposta.numero_proposta}",
+    endereco=proposta.endereco_obra,
+    valor_contrato=proposta.valor_proposta,
+    admin_id=proposta.admin_id
+)
+```
+
+**Pedro:** Perfeito! E do ponto de vista contábil, quando a proposta vira obra, já podemos começar a rastrear custos. Isso vai integrar perfeitamente com o módulo contábil que vem depois.
+
+### **15:05 - Detalhamento das Classes SQL**
+
+**Marina:** Ana, vamos detalhar cada campo das novas tabelas?
+
+**Ana:** Claro! Baseado no padrão atual do SIGE:
+
+**Tabela Proposta:**
+```sql
+CREATE TABLE proposta (
+    id INTEGER PRIMARY KEY,
+    numero_proposta VARCHAR(20) UNIQUE NOT NULL,  -- PROP-2025-001
+    
+    -- Dados do Cliente (campos essenciais)
+    cliente_nome VARCHAR(100) NOT NULL,
+    cliente_email VARCHAR(120) NOT NULL,
+    cliente_telefone VARCHAR(20),
+    cliente_cpf_cnpj VARCHAR(18),
+    
+    -- Dados da Obra
+    endereco_obra TEXT NOT NULL,
+    descricao_obra TEXT NOT NULL,
+    area_total_m2 FLOAT,
+    
+    -- Valores
+    valor_proposta FLOAT NOT NULL,
+    prazo_execucao INTEGER,  -- dias
+    
+    -- Status e Controle
+    status VARCHAR(20) DEFAULT 'Rascunho',  -- Rascunho, Enviada, Aprovada, Rejeitada, Expirada
+    data_criacao DATETIME DEFAULT CURRENT_TIMESTAMP,
+    data_envio DATETIME,
+    data_resposta DATETIME,
+    data_expiracao DATETIME,  -- 30 dias após envio
+    
+    -- Acesso do Cliente
+    login_cliente VARCHAR(50) UNIQUE,
+    senha_cliente VARCHAR(255),  -- Hash bcrypt
+    token_acesso VARCHAR(255) UNIQUE,
+    
+    -- Resposta do Cliente
+    observacoes_cliente TEXT,
+    ip_assinatura VARCHAR(45),
+    user_agent_assinatura TEXT,
+    
+    -- Multi-tenant (OBRIGATÓRIO no SIGE)
+    admin_id INTEGER NOT NULL REFERENCES usuario(id),
+    criado_por_id INTEGER NOT NULL REFERENCES usuario(id),
+    
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+```
+
+**Carlos:** Excelente! Vejo que você manteve o padrão de nomenclatura. E a auditoria?
+
+**Ana:** Sim! A tabela `PropostaLog` vai registrar cada ação:
+```sql
+CREATE TABLE proposta_log (
+    id INTEGER PRIMARY KEY,
+    proposta_id INTEGER NOT NULL REFERENCES proposta(id),
+    acao VARCHAR(50) NOT NULL,  -- criada, enviada, visualizada, aprovada, rejeitada
+    usuario_id INTEGER REFERENCES usuario(id),  -- NULL para ações do cliente
+    ip_address VARCHAR(45),
+    user_agent TEXT,
+    observacoes TEXT,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+```
+
+### **15:15 - Rotas e Segurança**
+
+**Marina:** Carlos, como ficam as rotas no `views.py`?
+
+**Carlos:** Vou adicionar no `main_bp` existente, seguindo o padrão atual:
+
+**Rotas Admin (com autenticação):**
+- `GET /propostas` - Lista propostas
+- `GET /propostas/nova` - Formulário nova proposta
+- `POST /propostas/nova` - Criar proposta
+- `POST /propostas/<id>/enviar` - Enviar para cliente
+- `GET /propostas/<id>/detalhes` - Ver detalhes
+
+**Rotas Cliente (sem autenticação Flask-Login):**
+- `GET /cliente/proposta/<token>` - Portal do cliente
+- `POST /cliente/proposta/<token>/aprovar` - Aprovar proposta
+- `POST /cliente/proposta/<token>/rejeitar` - Rejeitar proposta
+
+**Ana:** E para segurança, vou usar:
+- Tokens criptograficamente seguros
+- Rate limiting nas rotas do cliente
+- Validação de IP para assinatura
+- Hash das senhas com bcrypt
+
+### **15:25 - Templates e Interface**
+
+**Lucia:** Para os templates, vou seguir a estrutura atual:
+
+**Admin Templates:**
+- `templates/propostas/lista_propostas.html` - DataTable com filtros
+- `templates/propostas/nova_proposta.html` - Formulário com JavaScript
+- `templates/propostas/detalhes_proposta.html` - Visualização completa
+
+**Cliente Templates:**
+- `templates/cliente/proposta_detalhes.html` - Portal limpo
+- Layout próprio, sem herdar do `base.html` admin
+
+**Marina:** E a experiência mobile?
+
+**Lucia:** Totalmente responsiva! O cliente pode aprovar pelo celular. Vou usar:
+- Bootstrap 4 (mesmo do sistema atual)
+- Cards responsivos
+- Botões grandes para mobile
+- Confirmação clara antes da assinatura
+
+### **15:35 - Integração com Email**
+
+**Pedro:** E o envio de emails para o cliente?
+
+**Ana:** Vou criar uma função `enviar_email_proposta()` que pode ser integrada depois. Por enquanto, vou mostrar as credenciais na tela para o admin copiar e enviar manualmente.
+
+**Carlos:** Perfeito! Isso mantém o módulo independente e funcional.
+
+### **15:40 - Validações e Regras de Negócio**
+
+**Marina:** Quais validações críticas precisamos?
+
+**Ana:** Baseado no sistema atual:
+
+1. **Validação de Email:** Formato válido
+2. **Valor Proposta:** Maior que zero
+3. **Prazo:** Entre 1 e 365 dias
+4. **Expiração:** 30 dias automático
+5. **Status:** Transições válidas apenas
+6. **Multi-tenant:** Sempre validar `admin_id`
+
+**Carlos:** E para performance, vou adicionar índices:
+```sql
+CREATE INDEX idx_proposta_admin_id ON proposta(admin_id);
+CREATE INDEX idx_proposta_token ON proposta(token_acesso);
+CREATE INDEX idx_proposta_status ON proposta(status);
+```
+
+### **15:50 - Testes e Validação**
+
+**Marina:** Como vamos testar?
+
+**Ana:** Cenários de teste:
+1. **Admin cria proposta** → Sucesso
+2. **Admin envia proposta** → Gera credenciais
+3. **Cliente acessa portal** → Visualiza proposta
+4. **Cliente aprova** → Cria obra automaticamente
+5. **Cliente rejeita** → Registra motivo
+6. **Proposta expira** → Status automático
+
+**Lucia:** E vou testar em:
+- Desktop (Chrome, Firefox)
+- Mobile (iOS Safari, Android Chrome)
+- Tablet (iPad)
+
+### **15:55 - Cronograma de Implementação**
+
+**Marina:** Qual o cronograma para este módulo?
+
+**Carlos:** Baseado na complexidade:
+
+**Semana 1:**
+- Criar classes SQL
+- Implementar rotas admin
+- Templates básicos
+
+**Semana 2:**
+- Portal do cliente
+- Integração com Obra
+- Testes completos
+
+**Ana:** Posso começar hoje mesmo com as classes SQL!
+
+### **16:00 - Considerações Finais**
+
+**Marina:** Alguma preocupação técnica?
+
+**Carlos:** Apenas uma: precisamos garantir que a conversão proposta→obra não quebre nenhum relacionamento existente da classe `Obra`.
+
+**Ana:** Já verifiquei. A classe `Obra` atual tem relacionamentos com `RDO`, `ServicoObra`, etc. Todos são opcionais, então criar uma obra nova não vai quebrar nada.
+
+**Pedro:** E contabilmente, quando a proposta vira obra, já podemos começar a rastrear custos reais vs orçados.
+
+**Lucia:** A UX está bem definida. O cliente vai ter uma experiência muito clara e profissional.
+
+### **16:05 - Próximos Passos**
+
+**Marina:** Perfeito! Resumindo:
+
+1. **Ana** implementa as classes SQL e rotas
+2. **Lucia** cria os templates
+3. **Carlos** revisa a integração
+4. **Pedro** valida o fluxo contábil
+
+**Próxima reunião:** Sexta-feira para review do Módulo 1 completo.
+
+---
+
+## 📝 DECISÕES TÉCNICAS FINAIS
+
+### **Arquitetura:**
+- 3 novas tabelas: `Proposta`, `PropostaServico`, `PropostaLog`
+- Integração total com sistema multi-tenant atual
+- Conversão automática proposta→obra
+
+### **Segurança:**
+- Tokens seguros para acesso do cliente
+- Auditoria completa de ações
+- Validação de IP na assinatura
+
+### **UX:**
+- Portal cliente responsivo
+- Interface admin integrada
+- Fluxo claro de aprovação
+
+### **Performance:**
+- Índices otimizados
+- Queries eficientes
+- Cache de tokens
+
+**Status:** Módulo 1 especificado e pronto para implementação! 🚀
+

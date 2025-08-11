@@ -1,0 +1,583 @@
+# 🎯 REUNIÃO TÉCNICA ESPECIALIZADA - MÓDULO 3: GESTÃO DE EQUIPES
+
+**Data:** 22/11/2025 - 14:00h  
+**Duração:** 3 horas  
+**Contexto:** Implementação do terceiro módulo - Módulos 1 e 2 já funcionando perfeitamente  
+**Status:** Continuidade da evolução SIGE v8.0
+
+---
+
+## 👥 PARTICIPANTES DA REUNIÃO
+
+**Marina Santos** - Product Manager (Moderadora)  
+**Carlos Rodriguez** - Tech Lead  
+**Ana Silva** - Backend Developer  
+**Lucia Ferreira** - Frontend/UX  
+**Rafael Costa** - AI/ML Engineer  
+**João Mendes** - DevOps Engineer  
+**Patricia Lima** - Especialista em RH (nova participante)  
+
+---
+
+## 📋 AGENDA DA REUNIÃO
+
+### **14:00 - Abertura e Status dos Módulos Anteriores**
+
+**Marina:** Boa tarde, pessoal! Excelente trabalho nos Módulos 1 e 2. O sistema está funcionando perfeitamente:
+- **Módulo 1:** Propostas sendo aprovadas e convertidas em obras automaticamente
+- **Módulo 2:** Clientes acompanhando obras em tempo real com 95% de satisfação
+
+Agora vamos focar no **Módulo 3 - Gestão de Equipes**. Este é um módulo crítico porque vai **AUTOMATIZAR** a criação de RDOs e **INTEGRAR** com o sistema de ponto existente. Patricia, bem-vinda à equipe!
+
+**Patricia:** Obrigada, Marina! Analisei o sistema atual e vejo que já temos uma base sólida com `Funcionario`, `Ponto` e `RDO`. O desafio é criar uma interface visual para o gestor alocar pessoas e automatizar a criação de RDOs.
+
+### **14:10 - Análise Profunda do Sistema Atual**
+
+**Carlos:** Vamos revisar o que já temos funcionando:
+
+```python
+# Sistema existente que será INTEGRADO
+class Funcionario(db.Model):
+    nome = db.Column(db.String(100))
+    cargo = db.Column(db.String(50))
+    admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'))
+    ativo = db.Column(db.Boolean, default=True)
+
+class Ponto(db.Model):
+    funcionario_id = db.Column(db.Integer, db.ForeignKey('funcionario.id'))
+    data_ponto = db.Column(db.Date)
+    hora_entrada = db.Column(db.Time)
+    hora_saida = db.Column(db.Time)
+    tipo_local = db.Column(db.String(20))  # 'oficina', 'campo'
+
+class RDO(db.Model):
+    obra_id = db.Column(db.Integer, db.ForeignKey('obra.id'))
+    data_relatorio = db.Column(db.Date)
+    status = db.Column(db.String(20))  # 'Rascunho', 'Finalizado'
+```
+
+**Ana:** Perfeito! O ponto crucial é que o **gestor de equipes** vai poder:
+1. **Alocar funcionários** para obras em datas específicas
+2. **Definir se é oficina ou campo** na alocação
+3. **Criar RDO automaticamente** quando alocar para campo
+4. **Integrar com sistema de ponto** existente
+
+### **14:20 - Especificação da Interface Kanban/Calendário**
+
+**Lucia:** Analisei várias opções e sugiro uma **interface híbrida**:
+
+**Visão Kanban (Principal):**
+- **Colunas:** Funcionários disponíveis
+- **Cards:** Obras em andamento
+- **Drag & Drop:** Arrastar obra para funcionário = alocação
+- **Cores:** Verde (oficina), Azul (campo), Cinza (não alocado)
+
+**Visão Calendário (Alternativa):**
+- **Semana:** 7 dias visíveis
+- **Linhas:** Funcionários
+- **Células:** Alocações do dia
+- **Click:** Editar alocação
+
+**Rafael:** Do ponto de vista de dados, posso implementar:
+- **Algoritmo de sugestão** de alocação baseado em histórico
+- **Detecção de conflitos** (funcionário em 2 lugares)
+- **Otimização** de equipes por proximidade geográfica
+
+### **14:35 - Nova Classe: AlocacaoEquipe**
+
+**Ana:** Vou criar uma nova classe para gerenciar alocações:
+
+```python
+class AlocacaoEquipe(db.Model):
+    funcionario_id = db.Column(db.Integer, db.ForeignKey('funcionario.id'))
+    obra_id = db.Column(db.Integer, db.ForeignKey('obra.id'))
+    data_alocacao = db.Column(db.Date)
+    tipo_local = db.Column(db.String(20))  # 'oficina', 'campo'
+    
+    # Controle
+    criado_por_id = db.Column(db.Integer, db.ForeignKey('usuario.id'))
+    rdo_gerado_id = db.Column(db.Integer, db.ForeignKey('rdo.id'))
+    
+    # Status
+    status = db.Column(db.String(20), default='Planejado')  # Planejado, Executado, Cancelado
+    
+    # Multi-tenant
+    admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'))
+```
+
+**Carlos:** Excelente! E quando o gestor alocar alguém para **campo**, vamos automaticamente:
+1. **Criar RDO** para aquela obra e data
+2. **Vincular** a alocação ao RDO
+3. **Notificar** o funcionário (futuro)
+
+### **14:45 - Permissões e Segurança**
+
+**Patricia:** Precisamos definir quem pode fazer o quê:
+
+**Gestor de Equipes (novo tipo de usuário):**
+- Pode alocar TODOS os funcionários
+- Pode criar RDOs automaticamente
+- Pode ver todas as obras em andamento
+- NÃO pode editar dados de funcionários
+
+**Admin:**
+- Pode fazer tudo que o gestor faz
+- Pode definir quem é gestor de equipes
+- Pode editar dados de funcionários
+
+**Funcionário:**
+- Pode VER suas próprias alocações
+- NÃO pode alterar alocações
+
+**Ana:** Vou criar um novo enum para tipos de usuário:
+
+```python
+class TipoUsuario(enum.Enum):
+    SUPER_ADMIN = "super_admin"
+    ADMIN = "admin"
+    GESTOR_EQUIPES = "gestor_equipes"  # NOVO
+    FUNCIONARIO = "funcionario"
+```
+
+### **15:00 - Interface Kanban Detalhada**
+
+**Lucia:** Vou detalhar a interface Kanban:
+
+**Layout Principal:**
+```
++------------------+------------------+------------------+
+| Funcionários     | Obras Pendentes  | Alocações Hoje   |
+| Disponíveis      |                  |                  |
++------------------+------------------+------------------+
+| João Silva       | Obra A - Casa    | João → Obra A    |
+| [Pedreiro]       | Obra B - Prédio  | Maria → Obra B   |
+| [Disponível]     | Obra C - Reforma | Pedro → Oficina  |
+|                  |                  |                  |
+| Maria Santos     |                  |                  |
+| [Eletricista]    |                  |                  |
+| [Obra B]         |                  |                  |
++------------------+------------------+------------------+
+```
+
+**Funcionalidades:**
+- **Drag & Drop:** Arrastar obra para funcionário
+- **Modal de Alocação:** Escolher data, tipo (oficina/campo)
+- **Cores visuais:** Verde (oficina), Azul (campo)
+- **Filtros:** Por data, por obra, por funcionário
+
+**João:** Para performance, vou implementar:
+- **WebSockets** para atualizações em tempo real
+- **Cache Redis** para dados de alocação
+- **Lazy loading** para funcionários inativos
+
+### **15:15 - Criação Automática de RDO**
+
+**Carlos:** Este é o ponto mais crítico. Quando o gestor alocar alguém para **campo**:
+
+```python
+def criar_rdo_automatico(alocacao_id):
+    alocacao = AlocacaoEquipe.query.get(alocacao_id)
+    
+    if alocacao.tipo_local != 'campo':
+        return None  # Só cria RDO para campo
+    
+    # Verificar se já existe RDO para esta obra/data
+    rdo_existente = RDO.query.filter_by(
+        obra_id=alocacao.obra_id,
+        data_relatorio=alocacao.data_alocacao
+    ).first()
+    
+    if rdo_existente:
+        # Vincular alocação ao RDO existente
+        alocacao.rdo_gerado_id = rdo_existente.id
+    else:
+        # Criar novo RDO
+        numero_rdo = gerar_numero_rdo(alocacao.obra_id, alocacao.data_alocacao)
+        
+        rdo = RDO(
+            numero_rdo=numero_rdo,
+            obra_id=alocacao.obra_id,
+            data_relatorio=alocacao.data_alocacao,
+            status='Rascunho',
+            admin_id=alocacao.admin_id
+        )
+        
+        db.session.add(rdo)
+        db.session.flush()
+        
+        alocacao.rdo_gerado_id = rdo.id
+    
+    db.session.commit()
+    return rdo
+```
+
+**Ana:** E vou criar uma função para gerar números de RDO automáticos:
+
+```python
+def gerar_numero_rdo(obra_id, data_relatorio):
+    obra = Obra.query.get(obra_id)
+    data_str = data_relatorio.strftime('%Y%m%d')
+    
+    # Formato: RDO-OBRA001-20251122-001
+    ultimo_rdo = RDO.query.filter(
+        RDO.obra_id == obra_id,
+        RDO.numero_rdo.like(f'RDO-{obra.codigo}-%{data_str}%')
+    ).order_by(RDO.numero_rdo.desc()).first()
+    
+    if ultimo_rdo:
+        ultimo_numero = int(ultimo_rdo.numero_rdo.split('-')[-1])
+        novo_numero = ultimo_numero + 1
+    else:
+        novo_numero = 1
+    
+    return f"RDO-{obra.codigo}-{data_str}-{novo_numero:03d}"
+```
+
+### **15:30 - Integração com Sistema de Ponto**
+
+**Patricia:** A integração com o ponto é fundamental:
+
+**Fluxo Completo:**
+1. **Gestor aloca** funcionário para obra (campo) no dia X
+2. **Sistema cria** RDO automaticamente
+3. **Funcionário bate ponto** no dia X
+4. **Sistema detecta** que ele está alocado para campo
+5. **Ponto é vinculado** à obra automaticamente
+
+```python
+def processar_ponto_com_alocacao(ponto_id):
+    ponto = Ponto.query.get(ponto_id)
+    
+    # Buscar alocação do funcionário para esta data
+    alocacao = AlocacaoEquipe.query.filter_by(
+        funcionario_id=ponto.funcionario_id,
+        data_alocacao=ponto.data_ponto,
+        status='Planejado'
+    ).first()
+    
+    if alocacao:
+        # Atualizar tipo_local do ponto baseado na alocação
+        ponto.tipo_local = alocacao.tipo_local
+        
+        # Se for campo, vincular à obra
+        if alocacao.tipo_local == 'campo':
+            ponto.obra_id = alocacao.obra_id  # NOVO CAMPO
+        
+        # Marcar alocação como executada
+        alocacao.status = 'Executado'
+        
+        db.session.commit()
+```
+
+### **15:45 - Dashboard do Gestor de Equipes**
+
+**Lucia:** O dashboard do gestor terá várias visões:
+
+**Visão Diária (Principal):**
+- **Kanban** com funcionários e obras
+- **Estatísticas** do dia (X funcionários alocados)
+- **Alertas** (conflitos, funcionários sem alocação)
+
+**Visão Semanal:**
+- **Calendário** 7 dias
+- **Planejamento** antecipado
+- **Histórico** de alocações
+
+**Visão Mensal:**
+- **Relatórios** de produtividade
+- **Gráficos** de utilização de equipe
+- **Análises** de eficiência
+
+**Rafael:** Vou implementar analytics:
+- **Taxa de utilização** por funcionário
+- **Obras com mais alocações**
+- **Funcionários mais produtivos**
+- **Previsão de demanda** de equipe
+
+### **16:00 - APIs para Interface Dinâmica**
+
+**João:** Vou criar APIs específicas para o Kanban:
+
+```python
+@main_bp.route('/api/gestao-equipes/funcionarios-disponiveis')
+@gestor_equipes_required
+def api_funcionarios_disponiveis():
+    data = request.args.get('data', date.today().isoformat())
+    data_obj = datetime.strptime(data, '%Y-%m-%d').date()
+    
+    # Funcionários ativos
+    funcionarios = Funcionario.query.filter_by(
+        admin_id=get_tenant_filter(),
+        ativo=True
+    ).all()
+    
+    resultado = []
+    for funcionario in funcionarios:
+        # Verificar se já está alocado nesta data
+        alocacao = AlocacaoEquipe.query.filter_by(
+            funcionario_id=funcionario.id,
+            data_alocacao=data_obj
+        ).first()
+        
+        resultado.append({
+            'id': funcionario.id,
+            'nome': funcionario.nome,
+            'cargo': funcionario.cargo,
+            'alocado': alocacao is not None,
+            'alocacao': {
+                'obra_nome': alocacao.obra.nome if alocacao else None,
+                'tipo_local': alocacao.tipo_local if alocacao else None
+            } if alocacao else None
+        })
+    
+    return jsonify(resultado)
+
+@main_bp.route('/api/gestao-equipes/obras-ativas')
+@gestor_equipes_required
+def api_obras_ativas():
+    obras = Obra.query.filter_by(
+        admin_id=get_tenant_filter(),
+        status='Em Andamento'
+    ).all()
+    
+    return jsonify([{
+        'id': obra.id,
+        'nome': obra.nome,
+        'codigo': obra.codigo,
+        'endereco': obra.endereco,
+        'progresso': calcular_progresso_obra_cliente(obra.id)['percentual_geral']
+    } for obra in obras])
+
+@main_bp.route('/api/gestao-equipes/alocar', methods=['POST'])
+@gestor_equipes_required
+def api_alocar_funcionario():
+    data = request.get_json()
+    
+    # Validar dados
+    funcionario_id = data.get('funcionario_id')
+    obra_id = data.get('obra_id')
+    data_alocacao = datetime.strptime(data.get('data'), '%Y-%m-%d').date()
+    tipo_local = data.get('tipo_local')  # 'oficina' ou 'campo'
+    
+    # Verificar conflitos
+    conflito = AlocacaoEquipe.query.filter_by(
+        funcionario_id=funcionario_id,
+        data_alocacao=data_alocacao
+    ).first()
+    
+    if conflito:
+        return jsonify({'error': 'Funcionário já alocado nesta data'}), 400
+    
+    # Criar alocação
+    alocacao = AlocacaoEquipe(
+        funcionario_id=funcionario_id,
+        obra_id=obra_id,
+        data_alocacao=data_alocacao,
+        tipo_local=tipo_local,
+        criado_por_id=current_user.id,
+        admin_id=get_tenant_filter()
+    )
+    
+    db.session.add(alocacao)
+    db.session.flush()
+    
+    # Se for campo, criar RDO automaticamente
+    if tipo_local == 'campo':
+        rdo = criar_rdo_automatico(alocacao.id)
+        
+        # Notificar cliente (integração com Módulo 2)
+        if rdo:
+            criar_notificacao_cliente(
+                obra_id=obra_id,
+                tipo='equipe_alocada',
+                titulo='Equipe Alocada',
+                mensagem=f'Funcionário {alocacao.funcionario.nome} foi alocado para sua obra.',
+                prioridade='normal'
+            )
+    
+    db.session.commit()
+    
+    return jsonify({'success': True, 'alocacao_id': alocacao.id})
+```
+
+### **16:15 - Interface Responsiva**
+
+**Lucia:** A interface será **mobile-first**:
+
+**Desktop:**
+- **3 colunas** (funcionários, obras, alocações)
+- **Drag & drop** completo
+- **Modais** para detalhes
+
+**Tablet:**
+- **2 colunas** (funcionários + obras, alocações)
+- **Touch** otimizado
+- **Swipe** para navegação
+
+**Mobile:**
+- **1 coluna** com abas
+- **Lista** em vez de Kanban
+- **Botões grandes** para alocação
+
+**João:** Vou usar:
+- **Progressive Web App** (PWA)
+- **Service Workers** para offline
+- **Push notifications** (futuro)
+
+### **16:30 - Relatórios e Analytics**
+
+**Rafael:** Vou implementar relatórios avançados:
+
+**Relatório de Produtividade:**
+```python
+def gerar_relatorio_produtividade(data_inicio, data_fim):
+    alocacoes = AlocacaoEquipe.query.filter(
+        AlocacaoEquipe.data_alocacao.between(data_inicio, data_fim),
+        AlocacaoEquipe.admin_id == get_tenant_filter()
+    ).all()
+    
+    dados = defaultdict(lambda: {
+        'dias_trabalhados': 0,
+        'dias_oficina': 0,
+        'dias_campo': 0,
+        'obras_atendidas': set()
+    })
+    
+    for alocacao in alocacoes:
+        funcionario_nome = alocacao.funcionario.nome
+        dados[funcionario_nome]['dias_trabalhados'] += 1
+        
+        if alocacao.tipo_local == 'oficina':
+            dados[funcionario_nome]['dias_oficina'] += 1
+        else:
+            dados[funcionario_nome]['dias_campo'] += 1
+            dados[funcionario_nome]['obras_atendidas'].add(alocacao.obra_id)
+    
+    # Converter sets para contadores
+    for funcionario in dados:
+        dados[funcionario]['obras_atendidas'] = len(dados[funcionario]['obras_atendidas'])
+    
+    return dict(dados)
+```
+
+**Gráficos Visuais:**
+- **Pizza:** Distribuição oficina vs campo
+- **Barras:** Produtividade por funcionário
+- **Linha:** Evolução de alocações no tempo
+- **Heatmap:** Funcionários x Obras
+
+### **16:45 - Integração com Módulos Anteriores**
+
+**Marina:** Como este módulo se integra com os anteriores?
+
+**Carlos:** Integração perfeita:
+
+**Com Módulo 1 (Propostas):**
+- Proposta aprovada → Obra criada → Disponível para alocação
+
+**Com Módulo 2 (Portal Cliente):**
+- Funcionário alocado → Cliente vê equipe trabalhando
+- RDO criado → Progresso atualizado automaticamente
+- Notificação enviada → Cliente informado
+
+**Ana:** E prepara o terreno para os próximos:
+
+**Módulo 4 (Almoxarifado):**
+- RDO criado → Materiais podem ser alocados
+- Funcionário em campo → Pode requisitar materiais
+
+**Módulo 5 (Biometria):**
+- Alocação criada → Funcionário deve bater ponto
+- Reconhecimento facial → Confirma presença na obra
+
+### **17:00 - Cronograma de Implementação**
+
+**Marina:** Qual o cronograma para este módulo?
+
+**Carlos:** Baseado na complexidade:
+
+**Semana 1:**
+- Criar classe `AlocacaoEquipe`
+- Implementar permissões de gestor
+- Interface Kanban básica
+
+**Semana 2:**
+- APIs para drag & drop
+- Criação automática de RDO
+- Integração com sistema de ponto
+
+**Semana 3:**
+- Dashboard completo
+- Relatórios e analytics
+- Testes e otimizações
+
+**Patricia:** Posso ajudar com os testes de usabilidade e treinamento dos gestores.
+
+### **17:10 - Considerações Finais**
+
+**João:** Algumas preocupações técnicas:
+
+**Performance:**
+- **Cache** de alocações do dia atual
+- **Índices** otimizados para consultas
+- **Lazy loading** de dados históricos
+
+**Segurança:**
+- **Validação** de permissões em todas as APIs
+- **Rate limiting** para evitar spam
+- **Logs** de todas as alocações
+
+**Usabilidade:**
+- **Feedback visual** imediato
+- **Confirmações** para ações críticas
+- **Undo** para alocações recentes
+
+**Lucia:** E vou implementar:
+- **Tooltips** explicativos
+- **Onboarding** para novos gestores
+- **Atalhos de teclado** para power users
+
+### **17:15 - Próximos Passos**
+
+**Marina:** Resumindo as responsabilidades:
+
+1. **Ana** - Classe `AlocacaoEquipe` e lógica de RDO automático
+2. **Lucia** - Interface Kanban e UX responsiva
+3. **João** - APIs e performance
+4. **Rafael** - Analytics e relatórios
+5. **Patricia** - Testes e validação de fluxos
+6. **Carlos** - Integração e revisão técnica
+
+**Próxima reunião:** Sexta-feira para review do Módulo 3 completo.
+
+---
+
+## 📝 DECISÕES TÉCNICAS FINAIS
+
+### **Arquitetura:**
+- **1 nova classe:** `AlocacaoEquipe`
+- **Novo tipo de usuário:** `GESTOR_EQUIPES`
+- **Integração total** com sistema RDO existente
+- **Criação automática** de RDO para alocações de campo
+
+### **Interface:**
+- **Kanban principal** com drag & drop
+- **Calendário alternativo** para visão semanal
+- **Dashboard** com analytics em tempo real
+- **Mobile-first** e PWA
+
+### **Funcionalidades:**
+- **Alocação visual** de funcionários para obras
+- **Criação automática** de RDO quando alocar para campo
+- **Integração** com sistema de ponto existente
+- **Notificações** para cliente (Módulo 2)
+- **Relatórios** de produtividade
+
+### **Segurança:**
+- **Permissões específicas** para gestor de equipes
+- **Validação** de conflitos de alocação
+- **Logs** de auditoria completos
+- **Rate limiting** nas APIs
+
+**Status:** Módulo 3 especificado e pronto para implementação! 🚀
+

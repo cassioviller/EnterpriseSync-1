@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Portal Inativo - {{ obra.nome }} | SIGE</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <style>
+        body {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .inactive-card {
+            background: white;
+            border-radius: 20px;
+            padding: 40px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+            text-align: center;
+            max-width: 500px;
+        }
+        
+        .inactive-icon {
+            font-size: 4rem;
+            color: #e74c3c;
+            margin-bottom: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="inactive-card">
+        <i class="fas fa-exclamation-triangle inactive-icon"></i>
+        <h1 class="mb-3">Portal Temporariamente Inativo</h1>
+        <p class="text-muted mb-4">
+            O portal de acompanhamento para a obra <strong>{{ obra.nome }}</strong> 
+            está temporariamente inativo.
+        </p>
+        <p class="text-muted">
+            Entre em contato com a empresa para mais informações.
+        </p>
+        <div class="mt-4">
+            <small class="text-muted">
+                <i class="fas fa-calendar me-2"></i>
+                Obra iniciada em {{ obra.data_inicio.strftime('%d/%m/%Y') }}
+            </small>
+        </div>
+    </div>
+</body>
+</html>

@@ -1,0 +1,458 @@
+# 🎯 REUNIÃO TÉCNICA ESPECIALIZADA - MÓDULO 2: PORTAL DO CLIENTE
+
+**Data:** 15/11/2025 - 09:00h  
+**Duração:** 2,5 horas  
+**Contexto:** Implementação do segundo módulo - Módulo 1 (Propostas) já implementado  
+**Status:** Continuidade da evolução SIGE v8.0
+
+---
+
+## 👥 PARTICIPANTES DA REUNIÃO
+
+**Marina Santos** - Product Manager (Moderadora)  
+**Carlos Rodriguez** - Tech Lead  
+**Ana Silva** - Backend Developer  
+**Lucia Ferreira** - Frontend/UX  
+**Rafael Costa** - AI/ML Engineer (novo participante)  
+**João Mendes** - DevOps Engineer  
+
+---
+
+## 📋 AGENDA DA REUNIÃO
+
+### **09:00 - Abertura e Status do Módulo 1**
+
+**Marina:** Bom dia, pessoal! Excelente trabalho no Módulo 1. O sistema de propostas está funcionando perfeitamente. Agora vamos focar no Módulo 2 - Portal do Cliente para acompanhamento de obras. Carlos, pode nos atualizar sobre a integração?
+
+**Carlos:** Claro, Marina. O Módulo 1 criou uma base sólida. Agora temos:
+- Propostas aprovadas convertendo automaticamente em `Obra`
+- Sistema de tokens funcionando perfeitamente
+- Cliente já tem acesso via token
+
+O Módulo 2 vai **REUTILIZAR** essa infraestrutura e **INTEGRAR** com o sistema RDO existente. O ponto crucial é que já temos todas as classes necessárias: `RDO`, `RDOAtividade`, `RDOFoto`, `RDOMaoObra`.
+
+### **09:10 - Análise Profunda do Sistema RDO Existente**
+
+**Ana:** Analisei profundamente o sistema RDO atual. É muito robusto:
+
+```python
+class RDO(db.Model):
+    numero_rdo = db.Column(db.String(20))
+    obra_id = db.Column(db.Integer, db.ForeignKey('obra.id'))
+    data_relatorio = db.Column(db.Date)
+    status = db.Column(db.String(20))  # Rascunho, Finalizado
+    
+class RDOAtividade(db.Model):
+    rdo_id = db.Column(db.Integer, db.ForeignKey('rdo.id'))
+    descricao_atividade = db.Column(db.String(200))
+    percentual_conclusao = db.Column(db.Float)  # 0-100
+    
+class RDOFoto(db.Model):
+    rdo_id = db.Column(db.Integer, db.ForeignKey('rdo.id'))
+    caminho_foto = db.Column(db.String(255))
+    descricao = db.Column(db.String(200))
+```
+
+**Carlos:** Perfeito! Isso significa que NÃO precisamos criar novas tabelas. Vamos apenas **ESTENDER** a classe `Obra` e criar **FUNÇÕES** para calcular progresso baseado nos RDOs existentes.
+
+### **09:20 - Especificação do Portal do Cliente**
+
+**Marina:** Lucia, como você vê a experiência do cliente?
+
+**Lucia:** Baseado no sucesso do portal de propostas, vou manter o mesmo padrão visual, mas com funcionalidades específicas para acompanhamento:
+
+**Dashboard Principal:**
+- **Progresso geral** da obra (barra de progresso)
+- **Últimas fotos** (galeria com 6 fotos mais recentes)
+- **Atividades recentes** (timeline das últimas atividades)
+- **Informações da obra** (dados básicos)
+
+**Páginas Específicas:**
+- `/cliente/obra/<token>/progresso` - Progresso detalhado por atividade
+- `/cliente/obra/<token>/fotos` - Galeria completa de fotos
+- `/cliente/obra/<token>/timeline` - Timeline completa da obra
+
+**Rafael:** Do ponto de vista de dados, posso implementar algoritmos para:
+- Calcular progresso ponderado baseado nas atividades
+- Detectar tendências de progresso
+- Prever data de conclusão baseado no ritmo atual
+
+### **09:35 - Integração com Sistema Existente**
+
+**Ana:** A integração será perfeita. Vou **ESTENDER** a classe `Obra` existente:
+
+```python
+# ADICIONAR estes campos na classe Obra existente
+class Obra(db.Model):
+    # ... campos existentes ...
+    
+    # NOVOS CAMPOS para portal do cliente
+    token_cliente = db.Column(db.String(255), unique=True)
+    cliente_nome = db.Column(db.String(100))
+    cliente_email = db.Column(db.String(120))
+    proposta_origem_id = db.Column(db.Integer, db.ForeignKey('proposta.id'))
+    
+    # Relacionamento com proposta
+    proposta_origem = db.relationship('Proposta', backref='obra_gerada')
+```
+
+**Carlos:** Excelente! E quando a proposta for aprovada no Módulo 1, vamos automaticamente gerar o token do cliente para a obra:
+
+```python
+# No Módulo 1, quando aprovar proposta:
+obra.token_cliente = secrets.token_urlsafe(32)
+obra.cliente_nome = proposta.cliente_nome
+obra.cliente_email = proposta.cliente_email
+obra.proposta_origem_id = proposta.id
+```
+
+### **09:45 - Cálculo de Progresso Inteligente**
+
+**Rafael:** Vou criar um algoritmo sofisticado para calcular o progresso:
+
+**Método 1 - Progresso por Atividades:**
+```python
+def calcular_progresso_obra_cliente(obra_id):
+    # Obter todas as atividades dos RDOs
+    atividades = db.session.query(RDOAtividade, RDO).join(RDO).filter(
+        RDO.obra_id == obra_id,
+        RDO.status == 'Finalizado'  # Só RDOs finalizados
+    ).all()
+    
+    if not atividades:
+        return {'percentual_geral': 0, 'atividades_concluidas': 0}
+    
+    # Calcular média ponderada
+    total_percentual = sum(atividade.percentual_conclusao for atividade, rdo in atividades)
+    percentual_geral = total_percentual / len(atividades)
+    
+    return {
+        'percentual_geral': round(percentual_geral, 1),
+        'atividades_concluidas': len([a for a, r in atividades if a.percentual_conclusao >= 100]),
+        'atividades_total': len(atividades),
+        'ultima_atualizacao': max(rdo.data_relatorio for atividade, rdo in atividades)
+    }
+```
+
+**Ana:** Perfeito! E vou criar funções auxiliares para fotos e timeline:
+
+```python
+def obter_fotos_obra_recentes(obra_id, limite=6):
+    fotos = db.session.query(RDOFoto, RDO).join(RDO).filter(
+        RDO.obra_id == obra_id
+    ).order_by(RDO.data_relatorio.desc()).limit(limite).all()
+    
+    return [{'foto': foto, 'rdo': rdo, 'data': rdo.data_relatorio} for foto, rdo in fotos]
+
+def obter_timeline_obra(obra_id, limite=20):
+    timeline = []
+    
+    # RDOs como marcos
+    rdos = RDO.query.filter_by(obra_id=obra_id, status='Finalizado').order_by(RDO.data_relatorio.desc()).limit(limite).all()
+    
+    for rdo in rdos:
+        timeline.append({
+            'tipo': 'rdo',
+            'data': rdo.data_relatorio,
+            'titulo': f'Relatório {rdo.numero_rdo}',
+            'descricao': f'{len(rdo.atividades)} atividades registradas',
+            'icone': 'fas fa-clipboard-list'
+        })
+    
+    return sorted(timeline, key=lambda x: x['data'], reverse=True)
+```
+
+### **10:00 - Interface e Experiência do Usuário**
+
+**Lucia:** Vou criar uma interface moderna e intuitiva:
+
+**Dashboard Principal:**
+- **Header com progresso** - Barra de progresso grande e visível
+- **Cards informativos** - Dados da obra organizados
+- **Galeria de fotos** - Grid responsivo com lightbox
+- **Timeline** - Lista cronológica das atividades
+
+**Recursos Visuais:**
+- **Gráfico de progresso** - Chart.js para visualização
+- **Mapa de calor** - Atividades por período
+- **Comparativo** - Progresso planejado vs real
+
+**João:** Para performance, vou implementar:
+- **Cache Redis** para dados de progresso
+- **CDN** para fotos dos RDOs
+- **Lazy loading** para galeria de fotos
+- **API endpoints** para atualizações em tempo real
+
+### **10:15 - Segurança e Privacidade**
+
+**Carlos:** Segurança é crítica. Cada cliente só pode ver SUA obra:
+
+```python
+@main_bp.route('/cliente/obra/<token>')
+def cliente_obra_dashboard(token):
+    obra = Obra.query.filter_by(token_cliente=token).first_or_404()
+    
+    # Log de acesso
+    log_acesso_cliente(obra.id, request.remote_addr)
+    
+    # Verificar se obra está ativa
+    if obra.status == 'Cancelada':
+        return render_template('cliente/obra_cancelada.html')
+```
+
+**Ana:** E vou implementar rate limiting específico para o portal do cliente:
+
+```python
+from flask_limiter import Limiter
+
+# 100 requests por hora por IP para portal do cliente
+@limiter.limit("100 per hour")
+@main_bp.route('/cliente/obra/<token>')
+def cliente_obra_dashboard(token):
+    # ...
+```
+
+### **10:30 - API em Tempo Real**
+
+**Rafael:** Vou criar APIs para atualizações dinâmicas:
+
+```python
+@main_bp.route('/api/cliente/obra/<token>/progresso')
+def api_cliente_progresso(token):
+    obra = Obra.query.filter_by(token_cliente=token).first_or_404()
+    progresso = calcular_progresso_obra_cliente(obra.id)
+    
+    return jsonify({
+        'progresso_geral': progresso['percentual_geral'],
+        'atividades_concluidas': progresso['atividades_concluidas'],
+        'atividades_total': progresso['atividades_total'],
+        'ultima_atualizacao': progresso['ultima_atualizacao'].isoformat()
+    })
+
+@main_bp.route('/api/cliente/obra/<token>/fotos-recentes')
+def api_cliente_fotos_recentes(token):
+    obra = Obra.query.filter_by(token_cliente=token).first_or_404()
+    fotos = obter_fotos_obra_recentes(obra.id, 3)
+    
+    return jsonify([{
+        'url': foto['foto'].caminho_foto,
+        'descricao': foto['foto'].descricao,
+        'data': foto['data'].isoformat()
+    } for foto in fotos])
+```
+
+### **10:45 - Notificações e Comunicação**
+
+**Marina:** Como vamos notificar o cliente sobre atualizações?
+
+**João:** Vou implementar um sistema de notificações:
+
+**Email Automático:**
+- Novo RDO finalizado → Email com resumo
+- Marco importante atingido → Email de celebração
+- Atraso detectado → Email explicativo
+
+**Notificações no Portal:**
+- Badge com número de atualizações não vistas
+- Timeline destacando novidades
+- Pop-up discreto para atualizações importantes
+
+**Ana:** E vou criar uma tabela de notificações:
+
+```python
+class NotificacaoCliente(db.Model):
+    obra_id = db.Column(db.Integer, db.ForeignKey('obra.id'))
+    tipo = db.Column(db.String(30))  # 'novo_rdo', 'marco_atingido', 'atraso'
+    titulo = db.Column(db.String(100))
+    mensagem = db.Column(db.Text)
+    visualizada = db.Column(db.Boolean, default=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+```
+
+### **11:00 - Análise de Dados e Insights**
+
+**Rafael:** Vou implementar analytics avançados:
+
+**Métricas de Progresso:**
+- Velocidade média de conclusão
+- Previsão de data de entrega
+- Comparação com obras similares
+- Identificação de gargalos
+
+**Visualizações:**
+- Gráfico de Gantt simplificado
+- Heatmap de atividades por semana
+- Comparativo planejado vs executado
+
+```python
+def calcular_previsao_conclusao(obra_id):
+    # Análise de tendência baseada nos últimos 30 dias
+    progresso_historico = obter_progresso_historico(obra_id, 30)
+    
+    if len(progresso_historico) < 7:  # Mínimo 7 dias de dados
+        return None
+    
+    # Regressão linear simples
+    velocidade_media = calcular_velocidade_media(progresso_historico)
+    progresso_atual = calcular_progresso_obra_cliente(obra_id)['percentual_geral']
+    
+    dias_restantes = (100 - progresso_atual) / velocidade_media
+    data_previsao = date.today() + timedelta(days=dias_restantes)
+    
+    return {
+        'data_previsao': data_previsao,
+        'confianca': calcular_confianca_previsao(progresso_historico),
+        'velocidade_media': velocidade_media
+    }
+```
+
+### **11:15 - Integração com Módulos Futuros**
+
+**Carlos:** Como este módulo vai se integrar com os próximos?
+
+**Ana:** Excelente pergunta! O Módulo 2 será a **BASE** para os próximos:
+
+**Módulo 3 (Gestão de Equipes):**
+- Quando funcionário for alocado → Cliente vê equipe trabalhando
+- RDO criado → Progresso atualizado automaticamente
+
+**Módulo 4 (Almoxarifado):**
+- Material usado → Cliente vê consumo de materiais
+- Integração com custos da obra
+
+**Módulo 5 (Biometria):**
+- Ponto registrado → Cliente vê funcionários presentes
+- Timeline com horários de trabalho
+
+**Marina:** Perfeito! Isso garante que o cliente tenha visibilidade total da obra.
+
+### **11:30 - Responsividade e Mobile**
+
+**Lucia:** O portal será **MOBILE FIRST**:
+
+**Design Responsivo:**
+- Cards empilháveis em mobile
+- Galeria de fotos otimizada para touch
+- Timeline vertical em mobile
+- Gráficos adaptáveis
+
+**Performance Mobile:**
+- Imagens otimizadas (WebP)
+- Lazy loading agressivo
+- Cache local (localStorage)
+- Offline básico para dados já carregados
+
+**PWA Features:**
+- Instalável como app
+- Notificações push (futuro)
+- Ícone na home screen
+
+### **11:45 - Testes e Validação**
+
+**João:** Estratégia de testes:
+
+**Testes Automatizados:**
+- Cálculo de progresso com diferentes cenários
+- APIs de dados em tempo real
+- Segurança de acesso por token
+
+**Testes de Usuário:**
+- Cliente real testando o portal
+- Feedback sobre usabilidade
+- Teste em diferentes dispositivos
+
+**Testes de Performance:**
+- Load testing nas APIs
+- Otimização de queries
+- Cache effectiveness
+
+### **12:00 - Cronograma de Implementação**
+
+**Marina:** Qual o cronograma para este módulo?
+
+**Carlos:** Baseado na complexidade e reutilização do sistema existente:
+
+**Semana 1:**
+- Estender classe `Obra` com novos campos
+- Implementar funções de cálculo de progresso
+- Criar rotas básicas do portal
+
+**Semana 2:**
+- Desenvolver templates responsivos
+- Implementar APIs em tempo real
+- Sistema de notificações
+
+**Semana 3:**
+- Analytics e previsões
+- Otimizações de performance
+- Testes completos
+
+**Ana:** Posso começar hoje mesmo com a extensão da classe `Obra`!
+
+### **12:10 - Considerações Técnicas Finais**
+
+**Rafael:** Algumas considerações importantes:
+
+**Cache Strategy:**
+- Progresso da obra: Cache de 15 minutos
+- Fotos recentes: Cache de 1 hora
+- Timeline: Cache de 30 minutos
+
+**Otimizações:**
+- Queries otimizadas com JOINs eficientes
+- Índices específicos para performance
+- Paginação para listas grandes
+
+**Monitoramento:**
+- Logs de acesso do cliente
+- Métricas de engagement
+- Performance das APIs
+
+**João:** E vou configurar:
+- CDN para assets estáticos
+- Compressão gzip
+- HTTP/2 para múltiplas requisições
+
+### **12:15 - Próximos Passos**
+
+**Marina:** Resumindo as responsabilidades:
+
+1. **Ana** - Extensão da classe `Obra` e funções de cálculo
+2. **Lucia** - Templates responsivos e UX
+3. **Rafael** - Analytics e APIs em tempo real
+4. **João** - Performance e infraestrutura
+5. **Carlos** - Integração e revisão técnica
+
+**Próxima reunião:** Sexta-feira para review do Módulo 2 completo.
+
+---
+
+## 📝 DECISÕES TÉCNICAS FINAIS
+
+### **Arquitetura:**
+- **Extensão** da classe `Obra` existente (não criar nova tabela)
+- **Reutilização total** do sistema RDO atual
+- **APIs RESTful** para dados em tempo real
+- **Cache inteligente** para performance
+
+### **Funcionalidades:**
+- **Dashboard** com progresso visual
+- **Galeria de fotos** dos RDOs
+- **Timeline** de atividades
+- **Previsão** de conclusão com IA
+- **Notificações** automáticas
+
+### **Segurança:**
+- **Token único** por obra
+- **Rate limiting** específico
+- **Logs de acesso** completos
+- **Validação** de permissões
+
+### **Performance:**
+- **Cache Redis** para dados frequentes
+- **CDN** para imagens
+- **Lazy loading** para galeria
+- **Queries otimizadas**
+
+**Status:** Módulo 2 especificado e pronto para implementação! 🚀
+

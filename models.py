@@ -93,10 +93,16 @@ class Obra(db.Model):
     status = db.Column(db.String(20), default='Em andamento')
     responsavel_id = db.Column(db.Integer, db.ForeignKey('funcionario.id'))
     
-    # MÓDULO 2: Portal do Cliente - Novos campos
+    # MÓDULO 2: Portal do Cliente - Campos Completos
     token_cliente = db.Column(db.String(255), unique=True)
     cliente_nome = db.Column(db.String(100))
-    proposta_origem_id = db.Column(db.Integer, db.ForeignKey('proposta_comercial.id'))
+    cliente_email = db.Column(db.String(120))
+    cliente_telefone = db.Column(db.String(20))
+    proposta_origem_id = db.Column(db.Integer, db.ForeignKey('proposta.id'))
+    
+    # Configurações do Portal
+    portal_ativo = db.Column(db.Boolean, default=True)
+    ultima_visualizacao_cliente = db.Column(db.DateTime)
     
     ativo = db.Column(db.Boolean, default=True)  # Campo para controle de obras ativas
     admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=True)  # Para isolamento multi-tenant
@@ -104,6 +110,10 @@ class Obra(db.Model):
     
     registros_ponto = db.relationship('RegistroPonto', backref='obra_ref', lazy=True, overlaps="obra_ref")
     custos = db.relationship('CustoObra', backref='obra_ref', lazy=True, overlaps="obra_ref")
+    
+    # MÓDULO 2: Relacionamentos do Portal do Cliente
+    proposta_origem = db.relationship('Proposta', backref='obra_gerada')
+    notificacoes_cliente = db.relationship('NotificacaoCliente', backref='obra_ref', cascade='all, delete-orphan')
     servicos_obra = db.relationship('ServicoObra', backref='obra', cascade='all, delete-orphan', lazy=True)
 
 class ServicoObra(db.Model):
@@ -902,3 +912,38 @@ class PropostaLog(db.Model):
     
     def __repr__(self):
         return f'<PropostaLog {self.acao}>'
+
+# ===== MÓDULO 2: NOVA CLASSE PARA NOTIFICAÇÕES DO CLIENTE =====
+
+class NotificacaoCliente(db.Model):
+    """Notificações para clientes no Portal do Cliente"""
+    __tablename__ = 'notificacao_cliente'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    obra_id = db.Column(db.Integer, db.ForeignKey('obra.id'), nullable=False)
+    
+    # Tipo e conteúdo
+    tipo = db.Column(db.String(30), nullable=False)  # 'novo_rdo', 'marco_atingido', 'atraso', 'conclusao_atividade'
+    titulo = db.Column(db.String(100), nullable=False)
+    mensagem = db.Column(db.Text, nullable=False)
+    
+    # Dados relacionados
+    rdo_id = db.Column(db.Integer, db.ForeignKey('rdo.id'))
+    atividade_id = db.Column(db.Integer, db.ForeignKey('rdo_atividade.id'))
+    
+    # Status
+    visualizada = db.Column(db.Boolean, default=False)
+    data_visualizacao = db.Column(db.DateTime)
+    
+    # Prioridade
+    prioridade = db.Column(db.String(10), default='normal')  # 'baixa', 'normal', 'alta', 'urgente'
+    
+    # Controle
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    
+    # Relacionamentos
+    rdo = db.relationship('RDO', backref='notificacoes')
+    atividade = db.relationship('RDOAtividade', backref='notificacoes')
+    
+    def __repr__(self):
+        return f'<NotificacaoCliente {self.titulo}>'
