@@ -688,6 +688,16 @@ def calcular_kpis_funcionario_periodo(funcionario_id, data_inicio=None, data_fim
     # Calcular faltas normais (não justificadas)
     faltas = len([r for r in registros_ponto if r.tipo_registro == 'falta'])
     
+    # Calcular valor monetário das faltas (desconto no salário)
+    valor_faltas = 0.0
+    if faltas > 0 and funcionario.salario:
+        # Falta = desconto de 8.8h por dia do salário
+        horas_diarias = 8.8
+        if funcionario.horario_trabalho and funcionario.horario_trabalho.horas_diarias:
+            horas_diarias = float(funcionario.horario_trabalho.horas_diarias)
+        
+        valor_faltas = faltas * valor_hora_base * horas_diarias
+    
     # Calcular faltas justificadas (já contado no loop acima, mas vamos recalcular para garantir)
     dias_faltas_justificadas = len([r for r in registros_ponto if r.tipo_registro == 'falta_justificada'])
     
@@ -735,8 +745,9 @@ def calcular_kpis_funcionario_periodo(funcionario_id, data_inicio=None, data_fim
         'horas_extras': total_horas_extras,
         'h_extras': total_horas_extras,  # Alias para compatibilidade com template
         'valor_horas_extras': valor_horas_extras,  # Valor monetário das horas extras
-        'valor_hora_atual': valor_hora_base,  # NOVO: Valor hora atual do funcionário
+        'valor_hora_atual': valor_hora_base,  # Valor hora atual do funcionário
         'faltas': faltas,
+        'valor_faltas': valor_faltas,  # NOVO: Valor monetário das faltas (desconto)
         'atrasos': atrasos,
         'dias_faltas_justificadas': dias_faltas_justificadas,
         'custo_mao_obra': custo_mao_obra,
