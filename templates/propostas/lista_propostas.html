@@ -1,97 +1,98 @@
 {% extends "base.html" %}
-{% block title %}Propostas{% endblock %}
+{% block title %}Propostas - SIGE{% endblock %}
+
 {% block content %}
 <div class="container-fluid">
-    <div class="row">
-        <div class="col-12">
-            <div class="card">
-                <div class="card-header d-flex justify-content-between align-items-center">
-                    <h5 class="mb-0">
-                        <i class="fas fa-file-contract"></i> Propostas Comerciais
-                    </h5>
-                    <a href="{{ url_for('main.nova_proposta') }}" class="btn btn-primary">
-                        <i class="fas fa-plus"></i> Nova Proposta
-                    </a>
-                </div>
-                <div class="card-body">
-                    <div class="table-responsive">
-                        <table class="table table-striped table-hover" id="tabelaPropostas">
-                            <thead>
-                                <tr>
-                                    <th>Número</th>
-                                    <th>Cliente</th>
-                                    <th>Valor</th>
-                                    <th>Status</th>
-                                    <th>Data Criação</th>
-                                    <th>Data Envio</th>
-                                    <th>Ações</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {% for proposta in propostas %}
-                                <tr>
-                                    <td>
-                                        <strong>{{ proposta.numero_proposta }}</strong>
-                                    </td>
-                                    <td>
-                                        <div>
-                                            <strong>{{ proposta.cliente_nome }}</strong><br>
-                                            <small class="text-muted">{{ proposta.cliente_email }}</small>
-                                        </div>
-                                    </td>
-                                    <td>
-                                        <span class="h6 text-success">
-                                            R$ {{ "{:,.2f}".format(proposta.valor_proposta) }}
-                                        </span>
-                                    </td>
-                                    <td>
-                                        <span class="badge 
-                                            {% if proposta.status == 'Aprovada' %}badge-success
-                                            {% elif proposta.status == 'Rejeitada' %}badge-danger
-                                            {% elif proposta.status == 'Expirada' %}badge-secondary
-                                            {% else %}badge-warning{% endif %}">
-                                            {{ proposta.status }}
-                                        </span>
-                                    </td>
-                                    <td>{{ proposta.created_at.strftime('%d/%m/%Y') }}</td>
-                                    <td>
-                                        {% if proposta.data_envio %}
-                                            {{ proposta.data_envio.strftime('%d/%m/%Y') }}
-                                        {% else %}
-                                            <span class="text-muted">Não enviada</span>
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2><i class="fas fa-file-contract me-2"></i> Propostas Comerciais</h2>
+        <a href="{{ url_for('main.nova_proposta') }}" class="btn btn-primary">
+            <i class="fas fa-plus me-1"></i> Nova Proposta
+        </a>
+    </div>
+
+    <div class="card">
+        <div class="card-body">
+            {% if propostas %}
+                <div class="table-responsive">
+                    <table class="table table-hover" id="tabelaPropostas">
+                        <thead>
+                            <tr>
+                                <th>Número</th>
+                                <th>Cliente</th>
+                                <th>Valor</th>
+                                <th>Status</th>
+                                <th>Data Criação</th>
+                                <th>Data Envio</th>
+                                <th>Ações</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for proposta in propostas %}
+                            <tr>
+                                <td><strong>{{ proposta.numero_proposta }}</strong></td>
+                                <td>
+                                    <div>
+                                        <strong>{{ proposta.cliente_nome }}</strong><br>
+                                        <small class="text-muted">{{ proposta.cliente_email }}</small>
+                                    </div>
+                                </td>
+                                <td><strong>R$ {{ "%.2f"|format(proposta.valor_proposta) }}</strong></td>
+                                <td>
+                                    {% set status_class = {
+                                        'Rascunho': 'secondary',
+                                        'Enviada': 'warning',
+                                        'Aprovada': 'success',
+                                        'Rejeitada': 'danger',
+                                        'Expirada': 'dark',
+                                        'Cancelada': 'secondary'
+                                    } %}
+                                    <span class="badge bg-{{ status_class.get(proposta.status, 'secondary') }}">
+                                        {{ proposta.status }}
+                                    </span>
+                                </td>
+                                <td>{{ proposta.created_at.strftime('%d/%m/%Y %H:%M') }}</td>
+                                <td>
+                                    {% if proposta.data_envio %}
+                                        {{ proposta.data_envio.strftime('%d/%m/%Y %H:%M') }}
+                                    {% else %}
+                                        <span class="text-muted">-</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <div class="btn-group" role="group">
+                                        <a href="{{ url_for('main.detalhes_proposta', id=proposta.id) }}" 
+                                           class="btn btn-sm btn-outline-primary" title="Ver Detalhes">
+                                            <i class="fas fa-eye"></i>
+                                        </a>
+                                        
+                                        {% if proposta.status == 'Rascunho' %}
+                                        <form method="POST" action="{{ url_for('main.enviar_proposta', id=proposta.id) }}" 
+                                              style="display: inline;" onsubmit="return confirm('Enviar proposta para o cliente?')">
+                                            <button type="submit" class="btn btn-sm btn-success" title="Enviar para Cliente">
+                                                <i class="fas fa-paper-plane"></i>
+                                            </button>
+                                        </form>
                                         {% endif %}
-                                    </td>
-                                    <td>
-                                        <div class="btn-group" role="group">
-                                            <a href="{{ url_for('main.detalhes_proposta', id=proposta.id) }}" 
-                                               class="btn btn-sm btn-outline-primary">
-                                                <i class="fas fa-eye"></i>
-                                            </a>
-                                            
-                                            {% if proposta.status == 'Enviada' and not proposta.data_envio %}
-                                            <form method="POST" action="{{ url_for('main.enviar_proposta', id=proposta.id) }}" 
-                                                  style="display: inline;" onsubmit="return confirm('Enviar proposta para o cliente?')">
-                                                <button type="submit" class="btn btn-sm btn-success">
-                                                    <i class="fas fa-paper-plane"></i>
-                                                </button>
-                                            </form>
-                                            {% endif %}
-                                            
-                                            {% if proposta.token_acesso %}
-                                            <a href="{{ url_for('main.cliente_proposta', token=proposta.token_acesso) }}" 
-                                               class="btn btn-sm btn-info" target="_blank" title="Portal do Cliente">
-                                                <i class="fas fa-external-link-alt"></i>
-                                            </a>
-                                            {% endif %}
-                                        </div>
-                                    </td>
-                                </tr>
-                                {% endfor %}
-                            </tbody>
-                        </table>
-                    </div>
+                                        
+                                        {% if proposta.token_acesso %}
+                                        <a href="{{ url_for('main.cliente_proposta', token=proposta.token_acesso) }}" 
+                                           class="btn btn-sm btn-info" target="_blank" title="Ver Portal do Cliente">
+                                            <i class="fas fa-external-link-alt"></i>
+                                        </a>
+                                        {% endif %}
+                                    </div>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
                 </div>
-            </div>
+            {% else %}
+                <div class="text-center py-4">
+                    <i class="fas fa-file-contract fa-3x text-muted mb-3"></i>
+                    <p class="text-muted">Nenhuma proposta encontrada</p>
+                </div>
+            {% endif %}
         </div>
     </div>
 </div>
@@ -102,9 +103,11 @@ $(document).ready(function() {
         language: {
             url: '//cdn.datatables.net/plug-ins/1.13.7/i18n/pt-BR.json'
         },
-        order: [[4, 'desc']],  // Ordenar por data de criação
+        order: [[4, 'desc']],
+        pageLength: 25,
+        responsive: true,
         columnDefs: [
-            { orderable: false, targets: [6] }  // Desabilitar ordenação na coluna de ações
+            { targets: [6], orderable: false }
         ]
     });
 });

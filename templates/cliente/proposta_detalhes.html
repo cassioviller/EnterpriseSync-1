@@ -3,235 +3,254 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Proposta {{ proposta.numero_proposta }}</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <title>Proposta {{ proposta.numero_proposta }} - Portal do Cliente</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <style>
-        body { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); }
-        .main-card { box-shadow: 0 10px 30px rgba(0,0,0,0.3); }
-        .badge-lg { font-size: 0.9em; padding: 0.5em 1em; }
-        .servicos-table th { background-color: #f8f9fa; }
-        .valor-total { background: linear-gradient(45deg, #28a745, #20c997); }
+        .header-gradient {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+        .status-badge {
+            font-size: 1.1rem;
+            padding: 0.5rem 1rem;
+        }
+        .service-row:hover {
+            background-color: #f8f9fa;
+        }
+        .cliente-container {
+            max-width: 1000px;
+            margin: 0 auto;
+        }
+        .valor-destaque {
+            font-size: 1.5rem;
+            font-weight: bold;
+            color: #28a745;
+        }
     </style>
 </head>
-<body>
-    <div class="container my-5">
-        <div class="row justify-content-center">
-            <div class="col-lg-10">
-                <div class="card main-card">
-                    <div class="card-header bg-primary text-white">
-                        <div class="row align-items-center">
-                            <div class="col">
-                                <h4 class="mb-0">
-                                    <i class="fas fa-file-contract"></i>
-                                    Proposta {{ proposta.numero_proposta }}
-                                </h4>
-                            </div>
-                            <div class="col-auto">
-                                <span class="badge badge-lg 
-                                    {% if proposta.status == 'Aprovada' %}bg-success
-                                    {% elif proposta.status == 'Rejeitada' %}bg-danger
-                                    {% elif proposta.status == 'Expirada' %}bg-secondary
-                                    {% else %}bg-warning text-dark{% endif %}">
-                                    {{ proposta.status }}
-                                </span>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="card-body">
-                        <!-- Dados do Cliente -->
-                        <div class="row mb-4">
-                            <div class="col-md-6">
-                                <h6 class="text-muted border-bottom pb-2">
-                                    <i class="fas fa-user"></i> Dados do Cliente
-                                </h6>
-                                <p class="mb-1"><strong>{{ proposta.cliente_nome }}</strong></p>
-                                <p class="mb-1"><i class="fas fa-envelope"></i> {{ proposta.cliente_email }}</p>
-                                {% if proposta.cliente_telefone %}
-                                <p class="mb-1"><i class="fas fa-phone"></i> {{ proposta.cliente_telefone }}</p>
-                                {% endif %}
-                                {% if proposta.cliente_cpf_cnpj %}
-                                <p class="mb-0"><i class="fas fa-id-card"></i> {{ proposta.cliente_cpf_cnpj }}</p>
-                                {% endif %}
-                            </div>
-                            <div class="col-md-6">
-                                <h6 class="text-muted border-bottom pb-2">
-                                    <i class="fas fa-calendar"></i> Informações da Proposta
-                                </h6>
-                                <p class="mb-1"><strong>Data de Criação:</strong> {{ proposta.created_at.strftime('%d/%m/%Y') }}</p>
-                                {% if proposta.data_envio %}
-                                <p class="mb-1"><strong>Data de Envio:</strong> {{ proposta.data_envio.strftime('%d/%m/%Y') }}</p>
-                                {% endif %}
-                                {% if proposta.prazo_execucao %}
-                                <p class="mb-1"><strong>Prazo:</strong> {{ proposta.prazo_execucao }} dias</p>
-                                {% endif %}
-                                {% if proposta.data_expiracao %}
-                                <p class="mb-0"><strong>Válida até:</strong> {{ proposta.data_expiracao.strftime('%d/%m/%Y') }}</p>
-                                {% endif %}
-                            </div>
-                        </div>
-                        
-                        <!-- Dados da Obra -->
-                        <div class="mb-4">
-                            <h6 class="text-muted border-bottom pb-2">
-                                <i class="fas fa-building"></i> Dados da Obra
-                            </h6>
-                            <div class="row">
-                                <div class="col-md-8">
-                                    <p><strong>Endereço:</strong><br>{{ proposta.endereco_obra }}</p>
-                                    <p><strong>Descrição:</strong><br>{{ proposta.descricao_obra }}</p>
-                                </div>
-                                <div class="col-md-4">
-                                    {% if proposta.area_total_m2 %}
-                                    <div class="card bg-light">
-                                        <div class="card-body text-center">
-                                            <h5 class="card-title text-primary">{{ proposta.area_total_m2 }}</h5>
-                                            <p class="card-text">metros quadrados</p>
-                                        </div>
-                                    </div>
-                                    {% endif %}
-                                </div>
-                            </div>
-                        </div>
-                        
-                        <!-- Serviços -->
-                        <div class="mb-4">
-                            <h6 class="text-muted border-bottom pb-2">
-                                <i class="fas fa-tools"></i> Serviços Inclusos
-                            </h6>
-                            <div class="table-responsive">
-                                <table class="table table-sm servicos-table">
-                                    <thead>
-                                        <tr>
-                                            <th>Descrição</th>
-                                            <th width="10%">Qtd</th>
-                                            <th width="10%">Unidade</th>
-                                            <th width="15%">Valor Unit.</th>
-                                            <th width="15%">Total</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {% for servico in proposta.servicos %}
-                                        <tr>
-                                            <td>
-                                                {{ servico.descricao_servico }}
-                                                {% if servico.observacoes %}
-                                                <br><small class="text-muted">{{ servico.observacoes }}</small>
-                                                {% endif %}
-                                            </td>
-                                            <td>{{ servico.quantidade }}</td>
-                                            <td>{{ servico.unidade }}</td>
-                                            <td>R$ {{ "{:,.2f}".format(servico.valor_unitario) }}</td>
-                                            <td><strong>R$ {{ "{:,.2f}".format(servico.valor_total) }}</strong></td>
-                                        </tr>
-                                        {% endfor %}
-                                    </tbody>
-                                </table>
-                            </div>
-                        </div>
-
-                        <!-- Valor Total -->
-                        <div class="row mb-4">
-                            <div class="col-md-6 ms-auto">
-                                <div class="card valor-total text-white">
-                                    <div class="card-body text-center">
-                                        <h5 class="mb-1">Valor Total da Proposta</h5>
-                                        <h2 class="mb-0">R$ {{ "{:,.2f}".format(proposta.valor_proposta) }}</h2>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                        
-                        <!-- Ações do Cliente -->
-                        {% if proposta.status == 'Enviada' %}
-                        <div class="row mb-4">
-                            <div class="col-12">
-                                <h6 class="text-muted border-bottom pb-2">
-                                    <i class="fas fa-clipboard-check"></i> Resposta à Proposta
-                                </h6>
-                            </div>
-                            <div class="col-md-6">
-                                <form method="POST" action="{{ url_for('main.cliente_aprovar_proposta', token=proposta.token_acesso) }}">
-                                    <div class="mb-3">
-                                        <label for="observacoes" class="form-label">Observações (opcional)</label>
-                                        <textarea class="form-control" id="observacoes" name="observacoes" rows="3" 
-                                                  placeholder="Alguma observação sobre a proposta..."></textarea>
-                                    </div>
-                                    <button type="submit" class="btn btn-success btn-lg w-100" 
-                                            onclick="return confirm('Confirma a aprovação desta proposta?')">
-                                        <i class="fas fa-check"></i> Aprovar Proposta
-                                    </button>
-                                </form>
-                            </div>
-                            <div class="col-md-6">
-                                <form method="POST" action="{{ url_for('main.cliente_rejeitar_proposta', token=proposta.token_acesso) }}">
-                                    <div class="mb-3">
-                                        <label for="observacoes_rejeicao" class="form-label">Motivo da rejeição *</label>
-                                        <textarea class="form-control" id="observacoes_rejeicao" name="observacoes" rows="3" 
-                                                  placeholder="Por favor, informe o motivo da rejeição..." required></textarea>
-                                    </div>
-                                    <button type="submit" class="btn btn-danger btn-lg w-100"
-                                            onclick="return confirm('Confirma a rejeição desta proposta?')">
-                                        <i class="fas fa-times"></i> Rejeitar Proposta
-                                    </button>
-                                </form>
-                            </div>
-                        </div>
-                        {% endif %}
-                        
-                        <!-- Observações do Cliente -->
-                        {% if proposta.observacoes_cliente %}
-                        <div class="mt-4">
-                            <h6 class="text-muted border-bottom pb-2">
-                                <i class="fas fa-comment"></i> Observações do Cliente
-                            </h6>
-                            <div class="alert alert-info">
-                                <p class="mb-0">{{ proposta.observacoes_cliente }}</p>
-                                {% if proposta.data_resposta %}
-                                <small class="text-muted">Respondido em {{ proposta.data_resposta.strftime('%d/%m/%Y às %H:%M') }}</small>
-                                {% endif %}
-                            </div>
-                        </div>
-                        {% endif %}
-
-                        <!-- Mensagem de Status -->
-                        {% if proposta.status != 'Enviada' %}
-                        <div class="alert 
-                            {% if proposta.status == 'Aprovada' %}alert-success
-                            {% elif proposta.status == 'Rejeitada' %}alert-danger
-                            {% else %}alert-secondary{% endif %} text-center">
-                            <h5 class="mb-1">
-                                {% if proposta.status == 'Aprovada' %}
-                                    <i class="fas fa-check-circle"></i> Proposta Aprovada!
-                                {% elif proposta.status == 'Rejeitada' %}
-                                    <i class="fas fa-times-circle"></i> Proposta Rejeitada
-                                {% elif proposta.status == 'Expirada' %}
-                                    <i class="fas fa-clock"></i> Proposta Expirada
-                                {% endif %}
-                            </h5>
-                            <p class="mb-0">
-                                {% if proposta.status == 'Aprovada' %}
-                                    Obrigado por aceitar nossa proposta! Entraremos em contato em breve para dar início ao projeto.
-                                {% elif proposta.status == 'Rejeitada' %}
-                                    Agradecemos pelo seu tempo na avaliação de nossa proposta.
-                                {% elif proposta.status == 'Expirada' %}
-                                    Esta proposta expirou. Entre em contato conosco para uma nova proposta.
-                                {% endif %}
-                            </p>
-                        </div>
-                        {% endif %}
-                    </div>
-                    <div class="card-footer text-muted text-center">
-                        <small>
-                            <i class="fas fa-building"></i> Estruturas do Vale - Construção Civil
-                            <br>Proposta gerada automaticamente pelo sistema SIGE
-                        </small>
-                    </div>
+<body class="bg-light">
+    <!-- Header -->
+    <div class="header-gradient py-4 mb-4">
+        <div class="container cliente-container">
+            <div class="row align-items-center">
+                <div class="col-md-8">
+                    <h1 class="mb-0">
+                        <i class="fas fa-file-contract me-2"></i>
+                        Proposta {{ proposta.numero_proposta }}
+                    </h1>
+                    <p class="mb-0 mt-2">Portal do Cliente - {{ proposta.cliente_nome }}</p>
+                </div>
+                <div class="col-md-4 text-end">
+                    {% set status_class = {
+                        'Enviada': 'warning',
+                        'Aprovada': 'success',
+                        'Rejeitada': 'danger',
+                        'Expirada': 'dark'
+                    } %}
+                    <span class="badge bg-{{ status_class.get(proposta.status, 'secondary') }} status-badge">
+                        {{ proposta.status }}
+                    </span>
                 </div>
             </div>
         </div>
     </div>
-    
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+
+    <div class="container cliente-container">
+        <!-- Informações da Proposta -->
+        <div class="row mb-4">
+            <div class="col-md-8">
+                <div class="card shadow-sm">
+                    <div class="card-header bg-primary text-white">
+                        <h5 class="mb-0">Detalhes da Obra</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <h6 class="text-primary">Endereço</h6>
+                                <p>{{ proposta.endereco_obra }}</p>
+                            </div>
+                            <div class="col-md-6">
+                                <h6 class="text-primary">Descrição</h6>
+                                <p>{{ proposta.descricao_obra }}</p>
+                            </div>
+                        </div>
+                        {% if proposta.area_total_m2 %}
+                        <div class="row">
+                            <div class="col-md-6">
+                                <h6 class="text-primary">Área Total</h6>
+                                <p>{{ proposta.area_total_m2 }} m²</p>
+                            </div>
+                            {% if proposta.prazo_execucao %}
+                            <div class="col-md-6">
+                                <h6 class="text-primary">Prazo de Execução</h6>
+                                <p>{{ proposta.prazo_execucao }} dias</p>
+                            </div>
+                            {% endif %}
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+            
+            <div class="col-md-4">
+                <div class="card shadow-sm">
+                    <div class="card-header bg-success text-white">
+                        <h5 class="mb-0">Valor da Proposta</h5>
+                    </div>
+                    <div class="card-body text-center">
+                        <div class="valor-destaque">
+                            R$ {{ "%.2f"|format(proposta.valor_proposta) }}
+                        </div>
+                        <hr>
+                        <p class="mb-0"><strong>Data de Envio:</strong><br>
+                        {{ proposta.data_envio.strftime('%d/%m/%Y') if proposta.data_envio else 'N/A' }}</p>
+                        {% if proposta.data_expiracao %}
+                        <p class="mb-0 mt-2"><strong>Válida até:</strong><br>
+                        {{ proposta.data_expiracao.strftime('%d/%m/%Y') }}</p>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Serviços Detalhados -->
+        {% if proposta.servicos %}
+        <div class="card shadow-sm mb-4">
+            <div class="card-header bg-info text-white">
+                <h5 class="mb-0">Serviços Inclusos</h5>
+            </div>
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-striped mb-0">
+                        <thead class="table-dark">
+                            <tr>
+                                <th>Descrição do Serviço</th>
+                                <th class="text-center">Quantidade</th>
+                                <th class="text-center">Unidade</th>
+                                <th class="text-center">Valor Unitário</th>
+                                <th class="text-center">Total</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for servico in proposta.servicos %}
+                            <tr class="service-row">
+                                <td>
+                                    <strong>{{ servico.descricao_servico }}</strong>
+                                    {% if servico.observacoes %}
+                                    <br><small class="text-muted">{{ servico.observacoes }}</small>
+                                    {% endif %}
+                                </td>
+                                <td class="text-center">{{ servico.quantidade }}</td>
+                                <td class="text-center">{{ servico.unidade }}</td>
+                                <td class="text-center">R$ {{ "%.2f"|format(servico.valor_unitario) }}</td>
+                                <td class="text-center"><strong>R$ {{ "%.2f"|format(servico.valor_total) }}</strong></td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                        <tfoot class="table-success">
+                            <tr>
+                                <th colspan="4" class="text-end">Total Geral:</th>
+                                <th class="text-center">R$ {{ "%.2f"|format(proposta.valor_proposta) }}</th>
+                            </tr>
+                        </tfoot>
+                    </table>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Ações do Cliente -->
+        {% if proposta.status == 'Enviada' %}
+        <div class="row mb-4">
+            <div class="col-md-6">
+                <div class="card border-success shadow-sm">
+                    <div class="card-header bg-success text-white">
+                        <h5 class="mb-0"><i class="fas fa-check me-2"></i>Aprovar Proposta</h5>
+                    </div>
+                    <div class="card-body">
+                        <p>Ao aprovar esta proposta, uma obra será criada automaticamente em nosso sistema e os trabalhos poderão ser iniciados.</p>
+                        <form method="POST" action="{{ url_for('main.cliente_aprovar_proposta_final', token=proposta.token_acesso) }}">
+                            <div class="mb-3">
+                                <label class="form-label">Observações (opcional)</label>
+                                <textarea class="form-control" name="observacoes" rows="3" placeholder="Comentários adicionais sobre a aprovação"></textarea>
+                            </div>
+                            <button type="submit" class="btn btn-success btn-lg w-100" onclick="return confirm('Tem certeza que deseja aprovar esta proposta?')">
+                                <i class="fas fa-check me-2"></i>Aprovar Proposta
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="col-md-6">
+                <div class="card border-danger shadow-sm">
+                    <div class="card-header bg-danger text-white">
+                        <h5 class="mb-0"><i class="fas fa-times me-2"></i>Rejeitar Proposta</h5>
+                    </div>
+                    <div class="card-body">
+                        <p>Se esta proposta não atender às suas necessidades, você pode rejeitá-la. Por favor, informe o motivo para melhorarmos nossos serviços.</p>
+                        <form method="POST" action="{{ url_for('main.cliente_rejeitar_proposta', token=proposta.token_acesso) }}">
+                            <div class="mb-3">
+                                <label class="form-label">Motivo da rejeição *</label>
+                                <textarea class="form-control" name="observacoes" rows="3" required placeholder="Por favor, informe o motivo da rejeição"></textarea>
+                            </div>
+                            <button type="submit" class="btn btn-danger btn-lg w-100" onclick="return confirm('Tem certeza que deseja rejeitar esta proposta?')">
+                                <i class="fas fa-times me-2"></i>Rejeitar Proposta
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Status da Resposta -->
+        {% if proposta.status in ['Aprovada', 'Rejeitada'] %}
+        <div class="card shadow-sm mb-4">
+            <div class="card-header bg-{% if proposta.status == 'Aprovada' %}success{% else %}danger{% endif %} text-white">
+                <h5 class="mb-0">
+                    {% if proposta.status == 'Aprovada' %}
+                    <i class="fas fa-check-circle me-2"></i>Proposta Aprovada
+                    {% else %}
+                    <i class="fas fa-times-circle me-2"></i>Proposta Rejeitada
+                    {% endif %}
+                </h5>
+            </div>
+            <div class="card-body">
+                <p><strong>Data da Resposta:</strong> {{ proposta.data_resposta.strftime('%d/%m/%Y às %H:%M') }}</p>
+                {% if proposta.observacoes_cliente %}
+                <p><strong>Suas Observações:</strong></p>
+                <p class="bg-light p-3 rounded">{{ proposta.observacoes_cliente }}</p>
+                {% endif %}
+                
+                {% if proposta.status == 'Aprovada' %}
+                <div class="alert alert-success">
+                    <i class="fas fa-info-circle me-2"></i>
+                    <strong>Próximos Passos:</strong> Uma obra foi criada automaticamente em nosso sistema. 
+                    Nossa equipe entrará em contato em breve para agendar o início dos trabalhos.
+                </div>
+                {% endif %}
+            </div>
+        </div>
+        {% endif %}
+
+        {% if proposta.status == 'Expirada' %}
+        <div class="alert alert-warning">
+            <i class="fas fa-exclamation-triangle me-2"></i>
+            <strong>Proposta Expirada:</strong> Esta proposta perdeu sua validade. 
+            Entre em contato conosco para solicitar uma nova proposta atualizada.
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- Footer -->
+    <footer class="bg-dark text-white text-center py-3 mt-5">
+        <div class="container">
+            <p class="mb-0">Portal do Cliente - SIGE | Sistema Integrado de Gestão Empresarial</p>
+        </div>
+    </footer>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 </body>
 </html>

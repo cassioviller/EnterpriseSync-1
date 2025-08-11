@@ -797,3 +797,108 @@ class RDOMaterial(db.Model):
     
     def __repr__(self):
         return f'<RDOMaterial RDO-{self.rdo_id} - {self.material.descricao}>'
+
+
+# ===== MÓDULO 1: SISTEMA DE PROPOSTAS =====
+
+class Proposta(db.Model):
+    __tablename__ = 'proposta'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    numero_proposta = db.Column(db.String(20), unique=True, nullable=False)  # PROP-2025-001
+    
+    # Dados do Cliente
+    cliente_nome = db.Column(db.String(100), nullable=False)
+    cliente_email = db.Column(db.String(120), nullable=False)
+    cliente_telefone = db.Column(db.String(20))
+    cliente_cpf_cnpj = db.Column(db.String(18))
+    
+    # Dados da Obra
+    endereco_obra = db.Column(db.Text, nullable=False)
+    descricao_obra = db.Column(db.Text, nullable=False)
+    area_total_m2 = db.Column(db.Float)
+    
+    # Valores
+    valor_proposta = db.Column(db.Float, nullable=False)
+    prazo_execucao = db.Column(db.Integer)  # dias
+    
+    # Status e Controle
+    status = db.Column(db.String(20), default='Rascunho')  # Rascunho, Enviada, Aprovada, Rejeitada, Expirada
+    data_criacao = db.Column(db.DateTime, default=datetime.utcnow)
+    data_envio = db.Column(db.DateTime)
+    data_resposta = db.Column(db.DateTime)
+    data_expiracao = db.Column(db.DateTime)  # 30 dias após envio
+    
+    # Acesso do Cliente
+    login_cliente = db.Column(db.String(50), unique=True)
+    senha_cliente = db.Column(db.String(255))  # Hash bcrypt
+    token_acesso = db.Column(db.String(255), unique=True)
+    
+    # Resposta do Cliente
+    observacoes_cliente = db.Column(db.Text)
+    ip_assinatura = db.Column(db.String(45))
+    user_agent_assinatura = db.Column(db.Text)
+    
+    # Multi-tenant (OBRIGATÓRIO)
+    admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False)
+    criado_por_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False)
+    
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    # Relacionamentos
+    servicos = db.relationship('PropostaServico', backref='proposta_ref', lazy=True, cascade='all, delete-orphan')
+    logs = db.relationship('PropostaLog', backref='proposta_ref', lazy=True, cascade='all, delete-orphan')
+    criado_por = db.relationship('Usuario', foreign_keys=[criado_por_id])
+    
+    def __repr__(self):
+        return f'<Proposta {self.numero_proposta}>'
+
+class PropostaServico(db.Model):
+    __tablename__ = 'proposta_servico'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    proposta_id = db.Column(db.Integer, db.ForeignKey('proposta.id'), nullable=False)
+    
+    # Dados do Serviço
+    descricao_servico = db.Column(db.String(200), nullable=False)
+    quantidade = db.Column(db.Float, nullable=False)
+    unidade = db.Column(db.String(10), nullable=False)  # m², m³, un, kg, etc.
+    valor_unitario = db.Column(db.Float, nullable=False)
+    valor_total = db.Column(db.Float, nullable=False)
+    
+    # Detalhes
+    observacoes = db.Column(db.Text)
+    ordem = db.Column(db.Integer, default=1)
+    
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    
+    def __repr__(self):
+        return f'<PropostaServico {self.descricao_servico}>'
+
+class PropostaLog(db.Model):
+    __tablename__ = 'proposta_log'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    proposta_id = db.Column(db.Integer, db.ForeignKey('proposta.id'), nullable=False)
+    
+    # Ação realizada
+    acao = db.Column(db.String(50), nullable=False)  # criada, enviada, visualizada, aprovada, rejeitada
+    
+    # Usuário (NULL para ações do cliente)
+    usuario_id = db.Column(db.Integer, db.ForeignKey('usuario.id'))
+    
+    # Dados da sessão
+    ip_address = db.Column(db.String(45))
+    user_agent = db.Column(db.Text)
+    
+    # Detalhes
+    observacoes = db.Column(db.Text)
+    
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    
+    # Relacionamentos
+    usuario = db.relationship('Usuario', backref='logs_proposta')
+    
+    def __repr__(self):
+        return f'<PropostaLog {self.acao}>'

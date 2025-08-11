@@ -1,0 +1,229 @@
+{% extends "base.html" %}
+{% block title %}Proposta {{ proposta.numero_proposta }} - SIGE{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2><i class="fas fa-file-contract me-2"></i> {{ proposta.numero_proposta }}</h2>
+        <div class="btn-group">
+            {% if proposta.status == 'Rascunho' %}
+            <form method="POST" action="{{ url_for('main.enviar_proposta', id=proposta.id) }}" 
+                  style="display: inline;" onsubmit="return confirm('Enviar proposta para o cliente?')">
+                <button type="submit" class="btn btn-success">
+                    <i class="fas fa-paper-plane me-1"></i> Enviar para Cliente
+                </button>
+            </form>
+            {% endif %}
+            
+            {% if proposta.token_acesso %}
+            <a href="{{ url_for('main.cliente_proposta', token=proposta.token_acesso) }}" 
+               class="btn btn-info" target="_blank">
+                <i class="fas fa-external-link-alt me-1"></i> Portal do Cliente
+            </a>
+            {% endif %}
+            
+            <a href="{{ url_for('main.lista_propostas') }}" class="btn btn-secondary">
+                <i class="fas fa-arrow-left me-1"></i> Voltar
+            </a>
+        </div>
+    </div>
+
+    <div class="row">
+        <!-- Informações Gerais -->
+        <div class="col-md-8">
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0">Detalhes da Proposta</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <h6 class="text-primary">Cliente</h6>
+                            <p><strong>{{ proposta.cliente_nome }}</strong></p>
+                            <p>{{ proposta.cliente_email }}</p>
+                            {% if proposta.cliente_telefone %}
+                            <p>{{ proposta.cliente_telefone }}</p>
+                            {% endif %}
+                            {% if proposta.cliente_cpf_cnpj %}
+                            <p>CPF/CNPJ: {{ proposta.cliente_cpf_cnpj }}</p>
+                            {% endif %}
+                        </div>
+                        <div class="col-md-6">
+                            <h6 class="text-primary">Obra</h6>
+                            <p><strong>Endereço:</strong><br>{{ proposta.endereco_obra }}</p>
+                            <p><strong>Descrição:</strong><br>{{ proposta.descricao_obra }}</p>
+                            {% if proposta.area_total_m2 %}
+                            <p><strong>Área:</strong> {{ proposta.area_total_m2 }} m²</p>
+                            {% endif %}
+                            {% if proposta.prazo_execucao %}
+                            <p><strong>Prazo:</strong> {{ proposta.prazo_execucao }} dias</p>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Serviços -->
+            {% if proposta.servicos %}
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0">Serviços</h5>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-sm">
+                            <thead>
+                                <tr>
+                                    <th>Descrição</th>
+                                    <th>Qtd</th>
+                                    <th>Unidade</th>
+                                    <th>Valor Unit.</th>
+                                    <th>Total</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for servico in proposta.servicos %}
+                                <tr>
+                                    <td>
+                                        {{ servico.descricao_servico }}
+                                        {% if servico.observacoes %}
+                                        <br><small class="text-muted">{{ servico.observacoes }}</small>
+                                        {% endif %}
+                                    </td>
+                                    <td>{{ servico.quantidade }}</td>
+                                    <td>{{ servico.unidade }}</td>
+                                    <td>R$ {{ "%.2f"|format(servico.valor_unitario) }}</td>
+                                    <td>R$ {{ "%.2f"|format(servico.valor_total) }}</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                            <tfoot>
+                                <tr class="table-primary">
+                                    <th colspan="4">Total</th>
+                                    <th>R$ {{ "%.2f"|format(proposta.valor_proposta) }}</th>
+                                </tr>
+                            </tfoot>
+                        </table>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+
+            <!-- Logs -->
+            {% if proposta.logs %}
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">Histórico</h5>
+                </div>
+                <div class="card-body">
+                    <div class="timeline">
+                        {% for log in proposta.logs|reverse %}
+                        <div class="timeline-item">
+                            <div class="timeline-marker 
+                                {% if log.acao == 'aprovada' %}bg-success
+                                {% elif log.acao == 'rejeitada' %}bg-danger
+                                {% elif log.acao == 'enviada' %}bg-warning
+                                {% else %}bg-info{% endif %}">
+                            </div>
+                            <div class="timeline-content">
+                                <h6 class="mb-1">{{ log.acao.title() }}</h6>
+                                <p class="mb-1">{{ log.created_at.strftime('%d/%m/%Y %H:%M') }}</p>
+                                {% if log.observacoes %}
+                                <p class="mb-0 text-muted">{{ log.observacoes }}</p>
+                                {% endif %}
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+        </div>
+
+        <!-- Status e Informações -->
+        <div class="col-md-4">
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0">Status</h5>
+                </div>
+                <div class="card-body">
+                    {% set status_class = {
+                        'Rascunho': 'secondary',
+                        'Enviada': 'warning',
+                        'Aprovada': 'success',
+                        'Rejeitada': 'danger',
+                        'Expirada': 'dark'
+                    } %}
+                    <span class="badge bg-{{ status_class.get(proposta.status, 'secondary') }} fs-6">
+                        {{ proposta.status }}
+                    </span>
+                    
+                    <hr>
+                    
+                    <p><strong>Valor:</strong><br>R$ {{ "%.2f"|format(proposta.valor_proposta) }}</p>
+                    <p><strong>Criada em:</strong><br>{{ proposta.created_at.strftime('%d/%m/%Y %H:%M') }}</p>
+                    
+                    {% if proposta.data_envio %}
+                    <p><strong>Enviada em:</strong><br>{{ proposta.data_envio.strftime('%d/%m/%Y %H:%M') }}</p>
+                    {% endif %}
+                    
+                    {% if proposta.data_resposta %}
+                    <p><strong>Respondida em:</strong><br>{{ proposta.data_resposta.strftime('%d/%m/%Y %H:%M') }}</p>
+                    {% endif %}
+                    
+                    {% if proposta.data_expiracao %}
+                    <p><strong>Expira em:</strong><br>{{ proposta.data_expiracao.strftime('%d/%m/%Y') }}</p>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Credenciais do Cliente -->
+            {% if proposta.login_cliente %}
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">Acesso do Cliente</h5>
+                </div>
+                <div class="card-body">
+                    <p><strong>Login:</strong><br>{{ proposta.login_cliente }}</p>
+                    <p><strong>Link direto:</strong><br>
+                        <a href="{{ url_for('main.cliente_proposta', token=proposta.token_acesso) }}" target="_blank">
+                            Acessar Portal
+                        </a>
+                    </p>
+                    
+                    {% if proposta.observacoes_cliente %}
+                    <hr>
+                    <p><strong>Observações do Cliente:</strong><br>{{ proposta.observacoes_cliente }}</p>
+                    {% endif %}
+                </div>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<style>
+.timeline {
+    position: relative;
+    padding-left: 20px;
+}
+
+.timeline-item {
+    position: relative;
+    margin-bottom: 20px;
+}
+
+.timeline-marker {
+    position: absolute;
+    left: -25px;
+    top: 0;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+}
+
+.timeline-content {
+    padding-left: 15px;
+}
+</style>
+{% endblock %}

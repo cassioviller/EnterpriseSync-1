@@ -1,249 +1,219 @@
 {% extends "base.html" %}
-{% block title %}Nova Proposta{% endblock %}
+{% block title %}Nova Proposta - SIGE{% endblock %}
+
 {% block content %}
 <div class="container-fluid">
-    <div class="row">
-        <div class="col-lg-8 mx-auto">
-            <div class="card">
-                <div class="card-header">
-                    <h5 class="mb-0">
-                        <i class="fas fa-file-contract"></i> Nova Proposta Comercial
-                    </h5>
-                </div>
-                <div class="card-body">
-                    <form method="POST" id="formProposta">
-                        <!-- Dados do Cliente -->
-                        <div class="row mb-4">
-                            <div class="col-12">
-                                <h6 class="text-primary border-bottom pb-2">
-                                    <i class="fas fa-user"></i> Dados do Cliente
-                                </h6>
-                            </div>
-                            <div class="col-md-6">
-                                <label for="cliente_nome" class="form-label">Nome/Razão Social *</label>
-                                <input type="text" class="form-control" id="cliente_nome" name="cliente_nome" required>
-                            </div>
-                            <div class="col-md-6">
-                                <label for="cliente_email" class="form-label">Email *</label>
-                                <input type="email" class="form-control" id="cliente_email" name="cliente_email" required>
-                            </div>
-                            <div class="col-md-6">
-                                <label for="cliente_telefone" class="form-label">Telefone</label>
-                                <input type="text" class="form-control" id="cliente_telefone" name="cliente_telefone">
-                            </div>
-                            <div class="col-md-6">
-                                <label for="cliente_cpf_cnpj" class="form-label">CPF/CNPJ</label>
-                                <input type="text" class="form-control" id="cliente_cpf_cnpj" name="cliente_cpf_cnpj">
-                            </div>
+    <div class="card">
+        <div class="card-header">
+            <h5 class="mb-0"><i class="fas fa-plus me-2"></i> Nova Proposta Comercial</h5>
+        </div>
+        <div class="card-body">
+            <form method="POST" id="formNovaProposta">
+                <div class="row">
+                    <!-- Dados do Cliente -->
+                    <div class="col-md-6">
+                        <h6 class="text-primary mb-3">Dados do Cliente</h6>
+                        <div class="mb-3">
+                            <label class="form-label">Nome do Cliente *</label>
+                            <input type="text" class="form-control" name="cliente_nome" required>
                         </div>
-
-                        <!-- Dados da Obra -->
-                        <div class="row mb-4">
-                            <div class="col-12">
-                                <h6 class="text-primary border-bottom pb-2">
-                                    <i class="fas fa-building"></i> Dados da Obra
-                                </h6>
-                            </div>
-                            <div class="col-12">
-                                <label for="endereco_obra" class="form-label">Endereço da Obra *</label>
-                                <textarea class="form-control" id="endereco_obra" name="endereco_obra" rows="2" required></textarea>
-                            </div>
-                            <div class="col-12">
-                                <label for="descricao_obra" class="form-label">Descrição da Obra *</label>
-                                <textarea class="form-control" id="descricao_obra" name="descricao_obra" rows="3" required></textarea>
-                            </div>
-                            <div class="col-md-6">
-                                <label for="area_total_m2" class="form-label">Área Total (m²)</label>
-                                <input type="number" step="0.01" class="form-control" id="area_total_m2" name="area_total_m2">
-                            </div>
-                            <div class="col-md-6">
-                                <label for="prazo_execucao" class="form-label">Prazo de Execução (dias)</label>
-                                <input type="number" class="form-control" id="prazo_execucao" name="prazo_execucao" value="30">
-                            </div>
+                        <div class="mb-3">
+                            <label class="form-label">Email *</label>
+                            <input type="email" class="form-control" name="cliente_email" required>
                         </div>
-
-                        <!-- Serviços -->
-                        <div class="row mb-4">
-                            <div class="col-12">
-                                <h6 class="text-primary border-bottom pb-2">
-                                    <i class="fas fa-tools"></i> Serviços
-                                    <button type="button" class="btn btn-sm btn-success float-end" onclick="adicionarServico()">
-                                        <i class="fas fa-plus"></i> Adicionar Serviço
-                                    </button>
-                                </h6>
-                            </div>
-                            <div class="col-12">
-                                <div id="servicos-container">
-                                    <!-- Serviços serão adicionados aqui dinamicamente -->
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- Valor Total -->
-                        <div class="row mb-4">
-                            <div class="col-md-6 ms-auto">
-                                <div class="card bg-light">
-                                    <div class="card-body text-center">
-                                        <h5 class="text-muted mb-1">Valor Total da Proposta</h5>
-                                        <h3 class="text-success mb-0" id="valor-total">R$ 0,00</h3>
-                                        <input type="hidden" id="valor_proposta" name="valor_proposta" value="0">
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- Botões -->
                         <div class="row">
-                            <div class="col-12">
-                                <hr>
-                                <button type="submit" class="btn btn-primary">
-                                    <i class="fas fa-save"></i> Criar Proposta
-                                </button>
-                                <a href="{{ url_for('main.lista_propostas') }}" class="btn btn-secondary">
-                                    <i class="fas fa-arrow-left"></i> Voltar
-                                </a>
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label class="form-label">Telefone</label>
+                                    <input type="text" class="form-control" name="cliente_telefone">
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label class="form-label">CPF/CNPJ</label>
+                                    <input type="text" class="form-control" name="cliente_cpf_cnpj">
+                                </div>
                             </div>
                         </div>
-                    </form>
+                    </div>
+                    
+                    <!-- Dados da Obra -->
+                    <div class="col-md-6">
+                        <h6 class="text-primary mb-3">Dados da Obra</h6>
+                        <div class="mb-3">
+                            <label class="form-label">Endereço da Obra *</label>
+                            <textarea class="form-control" name="endereco_obra" rows="2" required></textarea>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Descrição da Obra *</label>
+                            <textarea class="form-control" name="descricao_obra" rows="3" required></textarea>
+                        </div>
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label class="form-label">Área Total (m²)</label>
+                                    <input type="number" class="form-control" name="area_total_m2" step="0.01">
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label class="form-label">Prazo (dias)</label>
+                                    <input type="number" class="form-control" name="prazo_execucao" value="30">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
-            </div>
+
+                <!-- Serviços -->
+                <hr>
+                <h6 class="text-primary mb-3">Serviços</h6>
+                <div id="servicosContainer">
+                    <div class="servico-item border rounded p-3 mb-3">
+                        <div class="row">
+                            <div class="col-md-4">
+                                <div class="mb-3">
+                                    <label class="form-label">Descrição do Serviço</label>
+                                    <input type="text" class="form-control servico-descricao" 
+                                           placeholder="Ex: Estrutura metálica">
+                                </div>
+                            </div>
+                            <div class="col-md-2">
+                                <div class="mb-3">
+                                    <label class="form-label">Quantidade</label>
+                                    <input type="number" class="form-control servico-quantidade" 
+                                           step="0.01" onchange="calcularServico(this)">
+                                </div>
+                            </div>
+                            <div class="col-md-2">
+                                <div class="mb-3">
+                                    <label class="form-label">Unidade</label>
+                                    <select class="form-select servico-unidade">
+                                        <option value="m²">m²</option>
+                                        <option value="m³">m³</option>
+                                        <option value="un">Unidade</option>
+                                        <option value="kg">kg</option>
+                                        <option value="t">Tonelada</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="col-md-2">
+                                <div class="mb-3">
+                                    <label class="form-label">Valor Unitário</label>
+                                    <input type="number" class="form-control servico-valor-unitario" 
+                                           step="0.01" onchange="calcularServico(this)">
+                                </div>
+                            </div>
+                            <div class="col-md-2">
+                                <div class="mb-3">
+                                    <label class="form-label">Total</label>
+                                    <input type="text" class="form-control servico-total" readonly>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Observações</label>
+                            <textarea class="form-control servico-observacoes" rows="2"></textarea>
+                        </div>
+                        <button type="button" class="btn btn-sm btn-outline-danger" onclick="removerServico(this)">
+                            <i class="fas fa-trash"></i> Remover
+                        </button>
+                    </div>
+                </div>
+                
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <button type="button" class="btn btn-outline-primary" onclick="adicionarServico()">
+                        <i class="fas fa-plus"></i> Adicionar Serviço
+                    </button>
+                    <div class="text-end">
+                        <h5>Total da Proposta: <span id="totalProposta">R$ 0,00</span></h5>
+                    </div>
+                </div>
+
+                <!-- Valor Manual (alternativo) -->
+                <div class="mb-3">
+                    <label class="form-label">Valor Total Manual (opcional)</label>
+                    <input type="number" class="form-control" name="valor_proposta" 
+                           step="0.01" placeholder="Use este campo se não detalhar os serviços">
+                </div>
+
+                <input type="hidden" name="servicos_json" id="servicosJson">
+
+                <div class="d-flex justify-content-end gap-2">
+                    <a href="{{ url_for('main.lista_propostas') }}" class="btn btn-secondary">Cancelar</a>
+                    <button type="submit" class="btn btn-success">Criar Proposta</button>
+                </div>
+            </form>
         </div>
     </div>
 </div>
 
 <script>
-let contadorServicos = 0;
-
 function adicionarServico() {
-    contadorServicos++;
-    const container = document.getElementById('servicos-container');
+    const container = document.getElementById('servicosContainer');
+    const novoServico = container.firstElementChild.cloneNode(true);
     
-    const servicoDiv = document.createElement('div');
-    servicoDiv.className = 'servico-item mb-3 p-3 border rounded';
-    servicoDiv.id = `servico-${contadorServicos}`;
+    // Limpar valores
+    novoServico.querySelectorAll('input, textarea, select').forEach(field => {
+        if (field.type !== 'hidden') field.value = '';
+    });
     
-    servicoDiv.innerHTML = `
-        <div class="row">
-            <div class="col-md-5">
-                <label class="form-label">Descrição do Serviço</label>
-                <input type="text" class="form-control" name="servico_descricao_${contadorServicos}" required>
-            </div>
-            <div class="col-md-2">
-                <label class="form-label">Quantidade</label>
-                <input type="number" step="0.01" class="form-control servico-quantidade" 
-                       name="servico_quantidade_${contadorServicos}" onchange="calcularTotalServico(${contadorServicos})" required>
-            </div>
-            <div class="col-md-2">
-                <label class="form-label">Unidade</label>
-                <select class="form-control" name="servico_unidade_${contadorServicos}" required>
-                    <option value="m²">m²</option>
-                    <option value="m³">m³</option>
-                    <option value="m">m</option>
-                    <option value="un">un</option>
-                    <option value="kg">kg</option>
-                    <option value="t">t</option>
-                </select>
-            </div>
-            <div class="col-md-2">
-                <label class="form-label">Valor Unit. (R$)</label>
-                <input type="number" step="0.01" class="form-control servico-valor-unitario" 
-                       name="servico_valor_unitario_${contadorServicos}" onchange="calcularTotalServico(${contadorServicos})" required>
-            </div>
-            <div class="col-md-1">
-                <label class="form-label">Ações</label>
-                <button type="button" class="btn btn-danger btn-sm d-block" onclick="removerServico(${contadorServicos})">
-                    <i class="fas fa-trash"></i>
-                </button>
-            </div>
-        </div>
-        <div class="row mt-2">
-            <div class="col-md-8">
-                <label class="form-label">Observações</label>
-                <textarea class="form-control" name="servico_observacoes_${contadorServicos}" rows="1"></textarea>
-            </div>
-            <div class="col-md-4">
-                <label class="form-label">Total do Serviço</label>
-                <input type="text" class="form-control servico-total" id="servico_total_${contadorServicos}" readonly>
-                <input type="hidden" name="servico_valor_total_${contadorServicos}" id="servico_valor_total_${contadorServicos}">
-            </div>
-        </div>
-    `;
-    
-    container.appendChild(servicoDiv);
+    container.appendChild(novoServico);
 }
 
-function removerServico(id) {
-    const servicoElement = document.getElementById(`servico-${id}`);
-    if (servicoElement) {
-        servicoElement.remove();
-        calcularTotalGeral();
+function removerServico(btn) {
+    const container = document.getElementById('servicosContainer');
+    if (container.children.length > 1) {
+        btn.closest('.servico-item').remove();
+        calcularTotal();
     }
 }
 
-function calcularTotalServico(id) {
-    const quantidade = parseFloat(document.querySelector(`input[name="servico_quantidade_${id}"]`).value) || 0;
-    const valorUnitario = parseFloat(document.querySelector(`input[name="servico_valor_unitario_${id}"]`).value) || 0;
+function calcularServico(input) {
+    const servicoItem = input.closest('.servico-item');
+    const quantidade = parseFloat(servicoItem.querySelector('.servico-quantidade').value) || 0;
+    const valorUnitario = parseFloat(servicoItem.querySelector('.servico-valor-unitario').value) || 0;
     const total = quantidade * valorUnitario;
     
-    document.getElementById(`servico_total_${id}`).value = `R$ ${total.toLocaleString('pt-BR', {minimumFractionDigits: 2})}`;
-    document.getElementById(`servico_valor_total_${id}`).value = total;
-    
-    calcularTotalGeral();
+    servicoItem.querySelector('.servico-total').value = 'R$ ' + total.toFixed(2).replace('.', ',');
+    calcularTotal();
 }
 
-function calcularTotalGeral() {
-    const totaisServicos = document.querySelectorAll('.servico-total');
-    let totalGeral = 0;
-    
-    totaisServicos.forEach(input => {
-        const valor = parseFloat(input.nextElementSibling.value) || 0;
-        totalGeral += valor;
+function calcularTotal() {
+    let total = 0;
+    document.querySelectorAll('.servico-item').forEach(item => {
+        const quantidade = parseFloat(item.querySelector('.servico-quantidade').value) || 0;
+        const valorUnitario = parseFloat(item.querySelector('.servico-valor-unitario').value) || 0;
+        total += quantidade * valorUnitario;
     });
     
-    document.getElementById('valor-total').textContent = `R$ ${totalGeral.toLocaleString('pt-BR', {minimumFractionDigits: 2})}`;
-    document.getElementById('valor_proposta').value = totalGeral;
+    document.getElementById('totalProposta').textContent = 'R$ ' + total.toFixed(2).replace('.', ',');
+    document.querySelector('input[name="valor_proposta"]').value = total.toFixed(2);
 }
 
-// Adicionar primeiro serviço automaticamente
-document.addEventListener('DOMContentLoaded', function() {
-    adicionarServico();
-});
-
-// Interceptar envio do formulário para incluir dados dos serviços
-document.getElementById('formProposta').addEventListener('submit', function(e) {
+function coletarServicos() {
     const servicos = [];
-    
-    for (let i = 1; i <= contadorServicos; i++) {
-        const servicoDiv = document.getElementById(`servico-${i}`);
-        if (servicoDiv) {
-            const descricao = servicoDiv.querySelector(`input[name="servico_descricao_${i}"]`).value;
-            const quantidade = servicoDiv.querySelector(`input[name="servico_quantidade_${i}"]`).value;
-            const unidade = servicoDiv.querySelector(`select[name="servico_unidade_${i}"]`).value;
-            const valorUnitario = servicoDiv.querySelector(`input[name="servico_valor_unitario_${i}"]`).value;
-            const valorTotal = servicoDiv.querySelector(`input[name="servico_valor_total_${i}"]`).value;
-            const observacoes = servicoDiv.querySelector(`textarea[name="servico_observacoes_${i}"]`).value;
-            
-            if (descricao && quantidade && valorUnitario) {
-                servicos.push({
-                    descricao: descricao,
-                    quantidade: parseFloat(quantidade),
-                    unidade: unidade,
-                    valor_unitario: parseFloat(valorUnitario),
-                    valor_total: parseFloat(valorTotal),
-                    observacoes: observacoes
-                });
-            }
+    document.querySelectorAll('.servico-item').forEach(item => {
+        const descricao = item.querySelector('.servico-descricao').value;
+        const quantidade = item.querySelector('.servico-quantidade').value;
+        const valorUnitario = item.querySelector('.servico-valor-unitario').value;
+        
+        if (descricao && quantidade && valorUnitario) {
+            servicos.push({
+                descricao: descricao,
+                quantidade: parseFloat(quantidade),
+                unidade: item.querySelector('.servico-unidade').value,
+                valor_unitario: parseFloat(valorUnitario),
+                observacoes: item.querySelector('.servico-observacoes').value
+            });
         }
-    }
-    
-    // Adicionar dados dos serviços como campos ocultos
-    servicos.forEach((servico, index) => {
-        const input = document.createElement('input');
-        input.type = 'hidden';
-        input.name = 'servicos';
-        input.value = JSON.stringify(servico);
-        this.appendChild(input);
     });
+    
+    document.getElementById('servicosJson').value = JSON.stringify(servicos);
+}
+
+document.getElementById('formNovaProposta').addEventListener('submit', function(e) {
+    coletarServicos();
 });
 </script>
 {% endblock %}
