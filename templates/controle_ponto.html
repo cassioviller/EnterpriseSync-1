@@ -75,6 +75,9 @@
                             <button type="button" class="btn btn-success" data-bs-toggle="modal" data-bs-target="#pontoModal">
                                 <i class="fas fa-plus"></i> Novo Registro
                             </button>
+                            <button type="button" class="btn btn-danger" data-bs-toggle="modal" data-bs-target="#exclusaoLoteModal">
+                                <i class="fas fa-trash-alt"></i> Excluir por Período
+                            </button>
                         </div>
                     </form>
                 </div>
@@ -341,6 +344,79 @@
     </div>
 </div>
 
+<!-- Modal de Exclusão por Período -->
+<div class="modal fade" id="exclusaoLoteModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="fas fa-trash-alt text-danger"></i> Excluir Registros por Período
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form id="exclusaoLoteForm">
+                <div class="modal-body">
+                    <div class="alert alert-warning">
+                        <i class="fas fa-exclamation-triangle"></i>
+                        <strong>Atenção!</strong> Esta ação irá excluir TODOS os registros de ponto no período selecionado e não pode ser desfeita.
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-6">
+                            <label for="data_inicio_exclusao" class="form-label">Data Início *</label>
+                            <input type="date" class="form-control" id="data_inicio_exclusao" name="data_inicio" required>
+                        </div>
+                        <div class="col-md-6">
+                            <label for="data_fim_exclusao" class="form-label">Data Fim *</label>
+                            <input type="date" class="form-control" id="data_fim_exclusao" name="data_fim" required>
+                        </div>
+                    </div>
+                    
+                    <div class="row mt-3">
+                        <div class="col-12">
+                            <label for="funcionario_exclusao" class="form-label">Funcionário (Opcional)</label>
+                            <select class="form-select" id="funcionario_exclusao" name="funcionario_id">
+                                <option value="">Todos os funcionários</option>
+                                {% for funcionario in funcionarios %}
+                                <option value="{{ funcionario.id }}">{{ funcionario.codigo }} - {{ funcionario.nome }}</option>
+                                {% endfor %}
+                            </select>
+                            <div class="form-text">Deixe vazio para excluir registros de todos os funcionários no período</div>
+                        </div>
+                    </div>
+                    
+                    <div class="row mt-3">
+                        <div class="col-12">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="confirmar_exclusao" required>
+                                <label class="form-check-label text-danger" for="confirmar_exclusao">
+                                    <strong>Confirmo que quero excluir os registros selecionados</strong>
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div id="preview_exclusao" class="mt-3" style="display: none;">
+                        <div class="alert alert-info">
+                            <h6>Resumo da Exclusão:</h6>
+                            <div id="preview_text"></div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="button" class="btn btn-info" onclick="previewExclusao()">
+                        <i class="fas fa-eye"></i> Visualizar
+                    </button>
+                    <button type="submit" class="btn btn-danger" id="btn_confirmar_exclusao" disabled>
+                        <i class="fas fa-trash-alt"></i> Confirmar Exclusão
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
 <script>
 $(document).ready(function() {
     // Inicializar DataTable
@@ -508,6 +584,88 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         });
     }
+});
+
+// Funcionalidade de exclusão por período
+function previewExclusao() {
+    const formData = new FormData(document.getElementById('exclusaoLoteForm'));
+    
+    $.ajax({
+        url: '/ponto/preview-exclusao',
+        type: 'POST',
+        data: formData,
+        processData: false,
+        contentType: false,
+        success: function(response) {
+            if (response.success) {
+                $('#preview_text').html(`
+                    <strong>Período:</strong> ${response.data_inicio} até ${response.data_fim}<br>
+                    <strong>Funcionário:</strong> ${response.funcionario || 'Todos'}<br>
+                    <strong>Registros encontrados:</strong> ${response.total_registros}<br>
+                    <strong>Tipos de registro:</strong> ${response.tipos_registro.join(', ')}
+                `);
+                $('#preview_exclusao').show();
+                
+                if (response.total_registros === 0) {
+                    $('#preview_text').append('<br><span class="text-warning">⚠️ Nenhum registro encontrado para exclusão</span>');
+                    $('#btn_confirmar_exclusao').prop('disabled', true);
+                } else {
+                    $('#btn_confirmar_exclusao').prop('disabled', false);
+                }
+            } else {
+                alert('Erro ao buscar registros: ' + response.message);
+            }
+        },
+        error: function() {
+            alert('Erro ao comunicar com o servidor');
+        }
+    });
+}
+
+// Habilitar/desabilitar botão de exclusão baseado no checkbox
+$('#confirmar_exclusao').change(function() {
+    const isChecked = $(this).is(':checked');
+    const hasPreview = $('#preview_exclusao').is(':visible');
+    $('#btn_confirmar_exclusao').prop('disabled', !(isChecked && hasPreview));
+});
+
+// Submissão do formulário de exclusão
+$('#exclusaoLoteForm').submit(function(e) {
+    e.preventDefault();
+    
+    if (!$('#confirmar_exclusao').is(':checked')) {
+        alert('Você deve confirmar a exclusão');
+        return;
+    }
+    
+    const formData = new FormData(this);
+    
+    $.ajax({
+        url: '/ponto/excluir-periodo',
+        type: 'POST',
+        data: formData,
+        processData: false,
+        contentType: false,
+        success: function(response) {
+            if (response.success) {
+                alert(`✅ Sucesso! ${response.registros_excluidos} registros foram excluídos.`);
+                $('#exclusaoLoteModal').modal('hide');
+                location.reload();
+            } else {
+                alert('Erro: ' + response.message);
+            }
+        },
+        error: function() {
+            alert('Erro ao excluir registros');
+        }
+    });
+});
+
+// Limpar modal ao fechar
+$('#exclusaoLoteModal').on('hidden.bs.modal', function() {
+    $('#exclusaoLoteForm')[0].reset();
+    $('#preview_exclusao').hide();
+    $('#btn_confirmar_exclusao').prop('disabled', true);
 });
 </script>
 
