@@ -1,0 +1,268 @@
+# 🎯 PROMPT RESUMIDO: EVOLUÇÃO SIGE v8.0 - JORNADA END-TO-END
+
+**Para:** Replit AI / Claude / ChatGPT  
+**Sistema:** SIGE v8.0 - Sistema Integrado de Gestão Empresarial  
+**Objetivo:** Implementar 7 módulos avançados SEM QUEBRAR o sistema existente
+
+---
+
+## ⚠️ CONTEXTO CRÍTICO - SISTEMA REAL
+
+Você está trabalhando com um sistema **REAL** em produção. O SIGE possui:
+
+### **Estrutura Atual (NÃO MODIFICAR):**
+- `app.py` - Flask app principal
+- `models.py` - 25+ classes SQLAlchemy (`Usuario`, `Funcionario`, `Obra`, `RDO`, etc.)
+- `views.py` - Blueprint `main_bp` com 50+ rotas
+- `auth.py` - Decorators: `@super_admin_required`, `@admin_required`, `@funcionario_required`
+- `utils.py` - Funções: `calcular_valor_hora_funcionario()`, `calcular_dsr_modo_estrito()`
+- Sistema multi-tenant com `admin_id` em todas as tabelas
+
+### **Classes Principais Existentes:**
+```python
+class Usuario(UserMixin, db.Model):
+    tipo_usuario = db.Column(db.Enum(TipoUsuario))  # SUPER_ADMIN, ADMIN, FUNCIONARIO
+    admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'))
+
+class Funcionario(db.Model):
+    codigo = db.Column(db.String(10), unique=True)  # F0001
+    foto_base64 = db.Column(db.Text)
+    admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'))
+
+class Obra(db.Model):
+    valor_contrato = db.Column(db.Float)
+    admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'))
+
+class RDO(db.Model):  # Sistema RDO já implementado
+    numero_rdo = db.Column(db.String(20))
+    obra_id = db.Column(db.Integer, db.ForeignKey('obra.id'))
+```
+
+---
+
+## 🚀 MÓDULOS A IMPLEMENTAR
+
+### **MÓDULO 1: SISTEMA DE PROPOSTAS**
+
+**Novas Classes (ADICIONAR EM models.py):**
+```python
+class Proposta(db.Model):
+    __tablename__ = 'proposta'
+    id = db.Column(db.Integer, primary_key=True)
+    numero_proposta = db.Column(db.String(20), unique=True)  # PROP-2025-001
+    cliente_nome = db.Column(db.String(100), nullable=False)
+    cliente_email = db.Column(db.String(120), nullable=False)
+    endereco_obra = db.Column(db.Text, nullable=False)
+    valor_proposta = db.Column(db.Float, nullable=False)
+    status = db.Column(db.String(20), default='Enviada')  # Enviada, Aprovada, Rejeitada
+    login_cliente = db.Column(db.String(50), unique=True)
+    senha_cliente = db.Column(db.String(255))
+    token_acesso = db.Column(db.String(255), unique=True)
+    admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False)
+    servicos = db.relationship('PropostaServico', backref='proposta_ref', cascade='all, delete-orphan')
+
+class PropostaServico(db.Model):
+    __tablename__ = 'proposta_servico'
+    id = db.Column(db.Integer, primary_key=True)
+    proposta_id = db.Column(db.Integer, db.ForeignKey('proposta.id'))
+    descricao_servico = db.Column(db.String(200), nullable=False)
+    quantidade = db.Column(db.Float, nullable=False)
+    valor_unitario = db.Column(db.Float, nullable=False)
+    valor_total = db.Column(db.Float, nullable=False)
+```
+
+**Rotas Principais (ADICIONAR EM views.py):**
+```python
+@main_bp.route('/propostas')
+@admin_required
+def lista_propostas():
+    # Lista propostas do admin atual
+
+@main_bp.route('/propostas/nova', methods=['GET', 'POST'])
+@admin_required
+def nova_proposta():
+    # Criar proposta + gerar número automático
+
+@main_bp.route('/cliente/proposta/<token>')
+def cliente_proposta(token):
+    # Portal do cliente (SEM Flask-Login)
+
+@main_bp.route('/cliente/proposta/<token>/aprovar', methods=['POST'])
+def cliente_aprovar_proposta(token):
+    # Cliente aprova → CRIAR OBRA AUTOMATICAMENTE
+```
+
+### **MÓDULO 2: PORTAL DO CLIENTE**
+
+**Extensão da Obra (ADICIONAR CAMPOS):**
+```python
+# ADICIONAR na classe Obra existente:
+token_cliente = db.Column(db.String(255), unique=True)
+cliente_nome = db.Column(db.String(100))
+proposta_origem_id = db.Column(db.Integer, db.ForeignKey('proposta.id'))
+```
+
+**Rotas Portal (ADICIONAR EM views.py):**
+```python
+@main_bp.route('/cliente/obra/<token>')
+def cliente_obra_dashboard(token):
+    # Dashboard com progresso baseado em RDOs existentes
+    progresso = calcular_progresso_obra_cliente(obra.id)  # Usar RDOAtividade
+    fotos_recentes = obter_fotos_obra_recentes(obra.id)   # Usar RDOFoto
+```
+
+### **MÓDULO 3: GESTÃO DE EQUIPES**
+
+**Nova Classe:**
+```python
+class AlocacaoEquipe(db.Model):
+    __tablename__ = 'alocacao_equipe'
+    funcionario_id = db.Column(db.Integer, db.ForeignKey('funcionario.id'))
+    obra_id = db.Column(db.Integer, db.ForeignKey('obra.id'))
+    data_alocacao = db.Column(db.Date, nullable=False)
+    local_trabalho = db.Column(db.String(20))  # 'oficina', 'campo'
+    rdo_gerado = db.Column(db.Boolean, default=False)
+    admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'))
+```
+
+**Funcionalidade Principal:**
+- Interface Kanban/calendário para alocar funcionários
+- Ao alocar → criar RDO automaticamente usando sistema existente
+- Integração total com `RegistroPonto` atual
+
+### **MÓDULO 4: ALMOXARIFADO COMPLETO**
+
+**Novas Classes:**
+```python
+class Material(db.Model):
+    codigo_barras = db.Column(db.String(50), unique=True)
+    descricao = db.Column(db.String(200), nullable=False)
+    estoque_atual = db.Column(db.Float, default=0.0)
+    valor_medio = db.Column(db.Float, default=0.0)  # Custo médio ponderado
+
+class MovimentacaoMaterial(db.Model):
+    material_id = db.Column(db.Integer, db.ForeignKey('material.id'))
+    tipo_movimento = db.Column(db.String(20))  # entrada, saida, devolucao
+    quantidade = db.Column(db.Float, nullable=False)
+    obra_id = db.Column(db.Integer, db.ForeignKey('obra.id'))
+    rdo_id = db.Column(db.Integer, db.ForeignKey('rdo.id'))  # Integração RDO
+
+class RDOMaterial(db.Model):  # NOVA tabela para integração
+    rdo_id = db.Column(db.Integer, db.ForeignKey('rdo.id'))
+    material_id = db.Column(db.Integer, db.ForeignKey('material.id'))
+    quantidade_requisitada = db.Column(db.Float)
+    quantidade_devolvida = db.Column(db.Float, default=0.0)
+```
+
+**Funcionalidades:**
+- Leitura código de barras + processamento XML
+- Integração com RDO: almoxarifado lança materiais na aba do RDO
+- Movimentações automáticas de saída/devolução
+
+### **MÓDULO 5: RECONHECIMENTO FACIAL**
+
+**Dependências:** `pip install opencv-python face-recognition`
+
+**Novas Classes:**
+```python
+class BiometriaFuncionario(db.Model):
+    funcionario_id = db.Column(db.Integer, db.ForeignKey('funcionario.id'))
+    encoding_facial = db.Column(db.LargeBinary)  # Criptografado
+    qualidade_imagem = db.Column(db.Float)
+
+class LogReconhecimento(db.Model):
+    funcionario_id = db.Column(db.Integer, db.ForeignKey('funcionario.id'))
+    sucesso = db.Column(db.Boolean)
+    registro_ponto_id = db.Column(db.Integer, db.ForeignKey('registro_ponto.id'))
+```
+
+**Sistema (CRIAR biometria.py):**
+```python
+class SistemaReconhecimentoFacial:
+    def reconhecer_funcionario(self, frame):
+        # Reconhecimento + registro automático de ponto
+        # Integra com RegistroPonto existente
+```
+
+### **MÓDULO 6: FOLHA DE PAGAMENTO AUTOMÁTICA**
+
+**Novas Classes:**
+```python
+class FolhaPagamento(db.Model):
+    funcionario_id = db.Column(db.Integer, db.ForeignKey('funcionario.id'))
+    mes_referencia = db.Column(db.Integer)
+    ano_referencia = db.Column(db.Integer)
+    horas_normais = db.Column(db.Float)
+    horas_extras_50 = db.Column(db.Float)
+    total_proventos = db.Column(db.Float)
+    inss = db.Column(db.Float)
+    irrf = db.Column(db.Float)
+    salario_liquido = db.Column(db.Float)
+
+class LancamentoRecorrente(db.Model):
+    funcionario_id = db.Column(db.Integer, db.ForeignKey('funcionario.id'))
+    tipo_lancamento = db.Column(db.String(30))  # vale_alimentacao, vale_transporte
+    categoria = db.Column(db.String(20))  # provento, desconto
+    valor_fixo = db.Column(db.Float)
+```
+
+**Função Principal (ADICIONAR EM utils.py):**
+```python
+def calcular_folha_funcionario(funcionario_id, mes, ano):
+    # Usar RegistroPonto existente + calcular_dsr_modo_estrito()
+    # Calcular INSS/IRRF conforme legislação
+    # Gerar holerite PDF com ReportLab
+```
+
+### **MÓDULO 7: SISTEMA CONTÁBIL INTEGRADO**
+
+**Novas Classes:**
+```python
+class PlanoContas(db.Model):
+    codigo = db.Column(db.String(20))  # 1.1.01.001
+    descricao = db.Column(db.String(200))
+    tipo_conta = db.Column(db.String(20))  # ativo, passivo, receita, despesa
+
+class LancamentoContabil(db.Model):
+    numero_lancamento = db.Column(db.String(20))  # LC-2025-001
+    origem_sistema = db.Column(db.String(30))  # folha_pagamento, almoxarifado
+    itens = db.relationship('ItemLancamento', cascade='all, delete-orphan')
+
+class ItemLancamento(db.Model):
+    conta_id = db.Column(db.Integer, db.ForeignKey('plano_contas.id'))
+    tipo_movimento = db.Column(db.String(10))  # debito, credito
+    valor = db.Column(db.Float)
+```
+
+**Integração Automática:**
+- Folha de pagamento → lançamentos contábeis automáticos
+- Almoxarifado → movimentação de estoque contábil
+- Balancete e DRE automáticos
+
+---
+
+## 🔧 INSTRUÇÕES DE IMPLEMENTAÇÃO
+
+### **PASSO 1: Instalar Dependências**
+```bash
+pip install opencv-python face-recognition reportlab lxml cryptography
+```
+
+### **PASSO 2: Implementar na Ordem**
+1. **Adicionar** todas as novas classes no final de `models.py`
+2. **Adicionar** todas as rotas no `main_bp` em `views.py`
+3. **Adicionar** funções utilitárias em `utils.py`
+4. **Criar** arquivo `biometria.py`
+5. **Executar** `db.create_all()`
+
+### **PASSO 3: Regras Críticas**
+- **NUNCA** modificar classes existentes
+- **SEMPRE** usar `admin_id` para multi-tenant
+- **MANTER** sistema de autenticação atual
+- **INTEGRAR** com RDO e RegistroPonto existentes
+
+### **RESULTADO FINAL:**
+Sistema completo com jornada end-to-end: **Proposta → Aprovação Cliente → Obra → Acompanhamento → Ponto Biométrico → Folha Automática → Contabilidade Integrada**
+
+**🎯 IMPLEMENTAÇÃO GARANTIDA EM 100% COMPATIBILIDADE COM SISTEMA ATUAL!**
+

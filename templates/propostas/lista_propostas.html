@@ -1,310 +1,110 @@
 {% extends "base.html" %}
-
-{% block title %}Propostas Comerciais - SIGE{% endblock %}
-
+{% block title %}Propostas{% endblock %}
 {% block content %}
 <div class="container-fluid">
-    <!-- Cabeçalho -->
-    <div class="row mb-4">
-        <div class="col-md-8">
-            <h2><i class="fas fa-file-contract"></i> Propostas Comerciais</h2>
-            <p class="text-muted">Gerencie propostas comerciais e converta-as em obras</p>
-        </div>
-        <div class="col-md-4 text-end">
-            <a href="{{ url_for('main.nova_proposta') }}" class="btn btn-primary">
-                <i class="fas fa-plus"></i> Nova Proposta
-            </a>
-        </div>
-    </div>
-
-    <!-- Estatísticas -->
-    <div class="row mb-4">
-        <div class="col-md-3">
-            <div class="card bg-primary text-white">
-                <div class="card-body">
-                    <div class="d-flex justify-content-between">
-                        <div>
-                            <h4>{{ stats.total }}</h4>
-                            <p class="mb-0">Total de Propostas</p>
-                        </div>
-                        <div class="align-self-center">
-                            <i class="fas fa-file-contract fa-2x"></i>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-        <div class="col-md-3">
-            <div class="card bg-success text-white">
-                <div class="card-body">
-                    <div class="d-flex justify-content-between">
-                        <div>
-                            <h4>{{ stats.aprovadas }}</h4>
-                            <p class="mb-0">Aprovadas</p>
-                        </div>
-                        <div class="align-self-center">
-                            <i class="fas fa-check-circle fa-2x"></i>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-        <div class="col-md-3">
-            <div class="card bg-warning text-white">
-                <div class="card-body">
-                    <div class="d-flex justify-content-between">
-                        <div>
-                            <h4>{{ stats.em_analise }}</h4>
-                            <p class="mb-0">Em Análise</p>
-                        </div>
-                        <div class="align-self-center">
-                            <i class="fas fa-clock fa-2x"></i>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-        <div class="col-md-3">
-            <div class="card bg-info text-white">
-                <div class="card-body">
-                    <div class="d-flex justify-content-between">
-                        <div>
-                            <h4>{{ "%.1f"|format(stats.taxa_conversao) }}%</h4>
-                            <p class="mb-0">Taxa de Conversão</p>
-                        </div>
-                        <div class="align-self-center">
-                            <i class="fas fa-chart-line fa-2x"></i>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Filtros -->
-    <div class="card mb-4">
-        <div class="card-body">
-            <form method="GET" class="row g-3">
-                <div class="col-md-4">
-                    <label for="status" class="form-label">Status</label>
-                    <select class="form-select" id="status" name="status">
-                        <option value="">Todos os Status</option>
-                        <option value="rascunho" {% if request.args.get('status') == 'rascunho' %}selected{% endif %}>Rascunho</option>
-                        <option value="enviada" {% if request.args.get('status') == 'enviada' %}selected{% endif %}>Enviada</option>
-                        <option value="em_analise" {% if request.args.get('status') == 'em_analise' %}selected{% endif %}>Em Análise</option>
-                        <option value="aprovada" {% if request.args.get('status') == 'aprovada' %}selected{% endif %}>Aprovada</option>
-                        <option value="rejeitada" {% if request.args.get('status') == 'rejeitada' %}selected{% endif %}>Rejeitada</option>
-                        <option value="expirada" {% if request.args.get('status') == 'expirada' %}selected{% endif %}>Expirada</option>
-                    </select>
-                </div>
-                <div class="col-md-4 d-flex align-items-end">
-                    <button type="submit" class="btn btn-outline-primary me-2">
-                        <i class="fas fa-filter"></i> Filtrar
-                    </button>
-                    <a href="{{ url_for('main.lista_propostas') }}" class="btn btn-outline-secondary">
-                        <i class="fas fa-times"></i> Limpar
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">
+                        <i class="fas fa-file-contract"></i> Propostas Comerciais
+                    </h5>
+                    <a href="{{ url_for('main.nova_proposta') }}" class="btn btn-primary">
+                        <i class="fas fa-plus"></i> Nova Proposta
                     </a>
                 </div>
-            </form>
-        </div>
-    </div>
-
-    <!-- Lista de Propostas -->
-    <div class="card">
-        <div class="card-body">
-            {% if propostas %}
-            <div class="table-responsive">
-                <table class="table table-striped table-hover" id="propostas-table">
-                    <thead>
-                        <tr>
-                            <th>Número</th>
-                            <th>Cliente</th>
-                            <th>Projeto</th>
-                            <th>Valor</th>
-                            <th>Status</th>
-                            <th>Validade</th>
-                            <th>Criada em</th>
-                            <th width="150">Ações</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for proposta in propostas %}
-                        <tr>
-                            <td>
-                                <strong>{{ proposta.numero_proposta }}</strong>
-                            </td>
-                            <td>
-                                <div>
-                                    <strong>{{ proposta.cliente_nome }}</strong>
-                                    {% if proposta.cliente_telefone %}
-                                    <br><small class="text-muted">{{ proposta.cliente_telefone }}</small>
-                                    {% endif %}
-                                </div>
-                            </td>
-                            <td>
-                                <div>
-                                    <strong>{{ proposta.titulo_projeto }}</strong>
-                                    <br><small class="text-muted">{{ proposta.local_execucao[:50] }}{% if proposta.local_execucao|length > 50 %}...{% endif %}</small>
-                                </div>
-                            </td>
-                            <td>
-                                <div>
-                                    {% if proposta.desconto_percentual > 0 %}
-                                    <span class="text-decoration-line-through text-muted">R$ {{ "%.2f"|format(proposta.valor_total) }}</span><br>
-                                    <strong class="text-success">R$ {{ "%.2f"|format(proposta.valor_final) }}</strong>
-                                    <small class="text-success">({{ proposta.desconto_percentual }}% desc.)</small>
-                                    {% else %}
-                                    <strong>R$ {{ "%.2f"|format(proposta.valor_total) }}</strong>
-                                    {% endif %}
-                                </div>
-                            </td>
-                            <td>
-                                {% set status_colors = {
-                                    'rascunho': 'secondary',
-                                    'enviada': 'primary', 
-                                    'em_analise': 'warning',
-                                    'aprovada': 'success',
-                                    'rejeitada': 'danger',
-                                    'expirada': 'dark'
-                                } %}
-                                <span class="badge bg-{{ status_colors.get(proposta.status.value, 'secondary') }}">
-                                    {{ proposta.status.value|title|replace('_', ' ') }}
-                                </span>
-                            </td>
-                            <td>
-                                <div>
-                                    {{ proposta.data_validade.strftime('%d/%m/%Y') }}
-                                    {% if proposta.data_validade < date.today() %}
-                                    <br><small class="text-danger"><i class="fas fa-exclamation-triangle"></i> Expirada</small>
-                                    {% endif %}
-                                </div>
-                            </td>
-                            <td>{{ proposta.created_at.strftime('%d/%m/%Y') }}</td>
-                            <td>
-                                <div class="btn-group" role="group">
-                                    <a href="{{ url_for('main.visualizar_proposta', id=proposta.id) }}" 
-                                       class="btn btn-sm btn-outline-primary" title="Visualizar">
-                                        <i class="fas fa-eye"></i>
-                                    </a>
-                                    <a href="{{ url_for('main.gerar_pdf_proposta', id=proposta.id) }}" 
-                                       class="btn btn-sm btn-outline-secondary" title="Download PDF">
-                                        <i class="fas fa-file-pdf"></i>
-                                    </a>
-                                    {% if proposta.status == StatusProposta.APROVADA and not proposta.obra_gerada_id %}
-                                    <button class="btn btn-sm btn-outline-success" 
-                                            onclick="converterParaObra({{ proposta.id }})" title="Converter em Obra">
-                                        <i class="fas fa-hammer"></i>
-                                    </button>
-                                    {% endif %}
-                                </div>
-                            </td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
-            </div>
-            {% else %}
-            <div class="text-center py-5">
-                <i class="fas fa-file-contract fa-3x text-muted"></i>
-                <h4 class="mt-3 text-muted">Nenhuma proposta encontrada</h4>
-                <p class="text-muted">Crie sua primeira proposta comercial clicando no botão "Nova Proposta"</p>
-                <a href="{{ url_for('main.nova_proposta') }}" class="btn btn-primary">
-                    <i class="fas fa-plus"></i> Criar Primeira Proposta
-                </a>
-            </div>
-            {% endif %}
-        </div>
-    </div>
-</div>
-
-<!-- Modal de Conversão -->
-<div class="modal fade" id="converterObraModal" tabindex="-1">
-    <div class="modal-dialog">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title">Converter Proposta em Obra</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-            </div>
-            <div class="modal-body">
-                <p>Deseja converter esta proposta aprovada em uma nova obra no sistema?</p>
-                <p class="text-info"><i class="fas fa-info-circle"></i> A obra será criada automaticamente com todos os serviços da proposta.</p>
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
-                <button type="button" class="btn btn-success" id="confirmarConversao">
-                    <i class="fas fa-hammer"></i> Converter em Obra
-                </button>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-striped table-hover" id="tabelaPropostas">
+                            <thead>
+                                <tr>
+                                    <th>Número</th>
+                                    <th>Cliente</th>
+                                    <th>Valor</th>
+                                    <th>Status</th>
+                                    <th>Data Criação</th>
+                                    <th>Data Envio</th>
+                                    <th>Ações</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for proposta in propostas %}
+                                <tr>
+                                    <td>
+                                        <strong>{{ proposta.numero_proposta }}</strong>
+                                    </td>
+                                    <td>
+                                        <div>
+                                            <strong>{{ proposta.cliente_nome }}</strong><br>
+                                            <small class="text-muted">{{ proposta.cliente_email }}</small>
+                                        </div>
+                                    </td>
+                                    <td>
+                                        <span class="h6 text-success">
+                                            R$ {{ "{:,.2f}".format(proposta.valor_proposta) }}
+                                        </span>
+                                    </td>
+                                    <td>
+                                        <span class="badge 
+                                            {% if proposta.status == 'Aprovada' %}badge-success
+                                            {% elif proposta.status == 'Rejeitada' %}badge-danger
+                                            {% elif proposta.status == 'Expirada' %}badge-secondary
+                                            {% else %}badge-warning{% endif %}">
+                                            {{ proposta.status }}
+                                        </span>
+                                    </td>
+                                    <td>{{ proposta.created_at.strftime('%d/%m/%Y') }}</td>
+                                    <td>
+                                        {% if proposta.data_envio %}
+                                            {{ proposta.data_envio.strftime('%d/%m/%Y') }}
+                                        {% else %}
+                                            <span class="text-muted">Não enviada</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        <div class="btn-group" role="group">
+                                            <a href="{{ url_for('main.detalhes_proposta', id=proposta.id) }}" 
+                                               class="btn btn-sm btn-outline-primary">
+                                                <i class="fas fa-eye"></i>
+                                            </a>
+                                            
+                                            {% if proposta.status == 'Enviada' and not proposta.data_envio %}
+                                            <form method="POST" action="{{ url_for('main.enviar_proposta', id=proposta.id) }}" 
+                                                  style="display: inline;" onsubmit="return confirm('Enviar proposta para o cliente?')">
+                                                <button type="submit" class="btn btn-sm btn-success">
+                                                    <i class="fas fa-paper-plane"></i>
+                                                </button>
+                                            </form>
+                                            {% endif %}
+                                            
+                                            {% if proposta.token_acesso %}
+                                            <a href="{{ url_for('main.cliente_proposta', token=proposta.token_acesso) }}" 
+                                               class="btn btn-sm btn-info" target="_blank" title="Portal do Cliente">
+                                                <i class="fas fa-external-link-alt"></i>
+                                            </a>
+                                            {% endif %}
+                                        </div>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
 </div>
 
-{% endblock %}
-
-{% block extra_js %}
 <script>
-let propostaParaConverter = null;
-
-function converterParaObra(propostaId) {
-    propostaParaConverter = propostaId;
-    $('#converterObraModal').modal('show');
-}
-
-document.getElementById('confirmarConversao').addEventListener('click', function() {
-    if (!propostaParaConverter) return;
-    
-    fetch(`/propostas/${propostaParaConverter}/converter-obra`, {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json'
-        }
-    })
-    .then(response => response.json())
-    .then(data => {
-        if (data.success) {
-            Swal.fire({
-                icon: 'success',
-                title: 'Sucesso!',
-                text: data.message,
-                confirmButtonText: 'Ver Obra Criada'
-            }).then((result) => {
-                if (result.isConfirmed) {
-                    window.location.href = `/obras/${data.obra_id}`;
-                } else {
-                    location.reload();
-                }
-            });
-        } else {
-            Swal.fire({
-                icon: 'error',
-                title: 'Erro',
-                text: data.message
-            });
-        }
-    })
-    .catch(error => {
-        console.error('Erro:', error);
-        Swal.fire({
-            icon: 'error',
-            title: 'Erro',
-            text: 'Erro ao converter proposta em obra'
-        });
-    })
-    .finally(() => {
-        $('#converterObraModal').modal('hide');
-        propostaParaConverter = null;
-    });
-});
-
-// DataTable
 $(document).ready(function() {
-    $('#propostas-table').DataTable({
+    $('#tabelaPropostas').DataTable({
         language: {
-            url: '//cdn.datatables.net/plug-ins/1.11.5/i18n/pt-BR.json'
+            url: '//cdn.datatables.net/plug-ins/1.13.7/i18n/pt-BR.json'
         },
-        order: [[6, 'desc']], // Ordenar por data de criação (mais recente primeiro)
+        order: [[4, 'desc']],  // Ordenar por data de criação
         columnDefs: [
-            { orderable: false, targets: [7] } // Desativar ordenação na coluna de ações
+            { orderable: false, targets: [6] }  // Desabilitar ordenação na coluna de ações
         ]
     });
 });

@@ -1,0 +1,3511 @@
+# 🎯 PROMPT ULTRA-ESPECÍFICO: EVOLUÇÃO DO SIGE v8.0 - BASEADO NO CÓDIGO REAL
+
+**Para:** Replit AI / Claude / ChatGPT  
+**Sistema Base:** SIGE v8.0 - Sistema Integrado de Gestão Empresarial  
+**Empresa:** Estruturas do Vale (Construção Civil)  
+**Objetivo:** Implementar 7 módulos avançados SEM QUEBRAR o sistema existente
+
+---
+
+## ⚠️ CONTEXTO CRÍTICO - SISTEMA REAL EXISTENTE
+
+Você está trabalhando com um sistema **REAL** e **FUNCIONAL** em produção. Baseado na análise do código atual, o SIGE possui:
+
+### 📁 **Estrutura de Arquivos Atual (NÃO MODIFICAR):**
+```
+├── app.py                    # Flask app principal com configurações
+├── models.py                 # 25+ classes SQLAlchemy (Usuario, Funcionario, Obra, etc.)
+├── views.py                  # Blueprint main_bp com todas as rotas
+├── auth.py                   # Sistema de autenticação multi-tenant
+├── utils.py                  # Funções utilitárias e cálculos
+├── kpis_engine.py           # Engine de KPIs com CalculadoraKPI
+├── relatorios_funcionais.py # Sistema de relatórios
+├── forms.py                 # Formulários WTForms
+├── templates/               # Templates Jinja2 existentes
+├── static/                  # CSS, JS, imagens
+└── migrations/              # Migrações de banco
+```
+
+### 🗄️ **Classes de Modelo Existentes (USAR COMO BASE):**
+```python
+# Já implementadas em models.py - NÃO MODIFICAR
+class TipoUsuario(Enum):
+    SUPER_ADMIN = "super_admin"
+    ADMIN = "admin" 
+    FUNCIONARIO = "funcionario"
+
+class Usuario(UserMixin, db.Model):
+    # Sistema multi-tenant com admin_id
+    tipo_usuario = db.Column(db.Enum(TipoUsuario))
+    admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'))
+
+class Funcionario(db.Model):
+    # Funcionário completo com foto_base64
+    codigo = db.Column(db.String(10), unique=True)  # F0001, F0002
+    foto_base64 = db.Column(db.Text)  # Fotos em base64
+    horario_trabalho_id = db.Column(db.Integer, db.ForeignKey('horario_trabalho.id'))
+    admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'))
+
+class HorarioTrabalho(db.Model):
+    # Horários personalizados por funcionário
+    horas_diarias = db.Column(db.Float, default=8.0)
+    valor_hora = db.Column(db.Float, default=12.0)
+
+class RegistroPonto(db.Model):
+    # Sistema de ponto com DSR estrito (Lei 605/49)
+    tipo_registro = db.Column(db.String(30))  # 'trabalhado', 'falta', etc.
+    horas_extras = db.Column(db.Float, default=0.0)
+    percentual_extras = db.Column(db.Float, default=0.0)
+
+class Obra(db.Model):
+    # Obras com controle financeiro
+    valor_contrato = db.Column(db.Float, default=0.0)
+    area_total_m2 = db.Column(db.Float, default=0.0)
+    admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'))
+
+# E mais 20+ classes já implementadas...
+```
+
+### 🔐 **Sistema de Autenticação Atual (auth.py):**
+```python
+# Decorators já implementados - USAR ESTES
+@super_admin_required
+@admin_required  
+@funcionario_required
+
+# Funções de controle multi-tenant - USAR ESTAS
+def get_tenant_filter()
+def can_access_data(admin_id)
+```
+
+### 🎯 **Blueprint Principal (views.py):**
+```python
+# Blueprint já registrado - ADICIONAR ROTAS AQUI
+main_bp = Blueprint('main', __name__)
+
+# Rotas existentes - NÃO MODIFICAR
+@main_bp.route('/login')
+@main_bp.route('/super-admin')
+@main_bp.route('/dashboard')
+@main_bp.route('/funcionario-dashboard')
+# ... mais 50+ rotas existentes
+```
+
+### ⚙️ **Configurações Flask (app.py):**
+```python
+# Configurações já definidas - MANTER
+app.config["SQLALCHEMY_DATABASE_URI"] = os.environ.get("DATABASE_URL", "sqlite:///sige.db")
+app.config['WTF_CSRF_ENABLED'] = False  # Desabilitado para produção
+
+# Blueprints já registrados - ADICIONAR NOVOS AQUI
+app.register_blueprint(main_bp)
+app.register_blueprint(relatorios_bp, url_prefix='/relatorios')
+```
+
+---
+
+## 🚀 MÓDULOS A IMPLEMENTAR - ESPECIFICAÇÕES ULTRA-DETALHADAS
+
+### **MÓDULO 1: SISTEMA DE PROPOSTAS**
+
+#### **1.1 Novas Classes para models.py (ADICIONAR NO FINAL):**
+```python
+class Proposta(db.Model):
+    __tablename__ = 'proposta'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    numero_proposta = db.Column(db.String(20), unique=True, nullable=False)  # PROP-2025-001
+    
+    # Dados do Cliente
+    cliente_nome = db.Column(db.String(100), nullable=False)
+    cliente_email = db.Column(db.String(120), nullable=False)
+    cliente_telefone = db.Column(db.String(20))
+    cliente_cpf_cnpj = db.Column(db.String(18))
+    
+    # Dados da Obra
+    endereco_obra = db.Column(db.Text, nullable=False)
+    descricao_obra = db.Column(db.Text, nullable=False)
+    area_total_m2 = db.Column(db.Float)
+    
+    # Valores
+    valor_proposta = db.Column(db.Float, nullable=False)
+    prazo_execucao = db.Column(db.Integer)  # dias
+    
+    # Status e Controle
+    status = db.Column(db.String(20), default='Enviada')  # Enviada, Aprovada, Rejeitada, Expirada
+    data_criacao = db.Column(db.DateTime, default=datetime.utcnow)
+    data_envio = db.Column(db.DateTime)
+    data_resposta = db.Column(db.DateTime)
+    data_expiracao = db.Column(db.DateTime)  # 30 dias após envio
+    
+    # Acesso do Cliente
+    login_cliente = db.Column(db.String(50), unique=True)
+    senha_cliente = db.Column(db.String(255))  # Hash
+    token_acesso = db.Column(db.String(255), unique=True)
+    
+    # Resposta do Cliente
+    observacoes_cliente = db.Column(db.Text)
+    ip_assinatura = db.Column(db.String(45))
+    user_agent_assinatura = db.Column(db.Text)
+    
+    # Multi-tenant (OBRIGATÓRIO)
+    admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False)
+    criado_por_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False)
+    
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    # Relacionamentos
+    servicos = db.relationship('PropostaServico', backref='proposta_ref', lazy=True, cascade='all, delete-orphan')
+    logs = db.relationship('PropostaLog', backref='proposta_ref', lazy=True, cascade='all, delete-orphan')
+
+class PropostaServico(db.Model):
+    __tablename__ = 'proposta_servico'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    proposta_id = db.Column(db.Integer, db.ForeignKey('proposta.id'), nullable=False)
+    descricao_servico = db.Column(db.String(200), nullable=False)
+    quantidade = db.Column(db.Float, nullable=False)
+    unidade = db.Column(db.String(10), nullable=False)  # m², m³, un, kg
+    valor_unitario = db.Column(db.Float, nullable=False)
+    valor_total = db.Column(db.Float, nullable=False)
+    observacoes = db.Column(db.Text)
+    ordem = db.Column(db.Integer, default=1)
+
+class PropostaLog(db.Model):
+    __tablename__ = 'proposta_log'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    proposta_id = db.Column(db.Integer, db.ForeignKey('proposta.id'), nullable=False)
+    acao = db.Column(db.String(50), nullable=False)  # criada, enviada, visualizada, aprovada, rejeitada
+    usuario_id = db.Column(db.Integer, db.ForeignKey('usuario.id'))
+    ip_address = db.Column(db.String(45))
+    user_agent = db.Column(db.Text)
+    observacoes = db.Column(db.Text)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+```
+
+#### **1.2 Rotas para views.py (ADICIONAR NO main_bp):**
+```python
+# ===== MÓDULO PROPOSTAS - ADICIONAR EM views.py =====
+
+@main_bp.route('/propostas')
+@admin_required
+def lista_propostas():
+    """Lista todas as propostas do admin atual"""
+    tenant_filter = get_tenant_filter()
+    
+    if tenant_filter is None:  # Super admin
+        propostas = Proposta.query.order_by(Proposta.created_at.desc()).all()
+    else:
+        propostas = Proposta.query.filter_by(admin_id=tenant_filter).order_by(Proposta.created_at.desc()).all()
+    
+    return render_template('propostas/lista_propostas.html', propostas=propostas)
+
+@main_bp.route('/propostas/nova', methods=['GET', 'POST'])
+@admin_required
+def nova_proposta():
+    """Criar nova proposta"""
+    if request.method == 'POST':
+        # Gerar número automático
+        ultimo_numero = db.session.query(func.max(Proposta.numero_proposta)).scalar()
+        if ultimo_numero:
+            numero = int(ultimo_numero.split('-')[-1]) + 1
+        else:
+            numero = 1
+        numero_proposta = f"PROP-{datetime.now().year}-{numero:03d}"
+        
+        proposta = Proposta(
+            numero_proposta=numero_proposta,
+            cliente_nome=request.form['cliente_nome'],
+            cliente_email=request.form['cliente_email'],
+            cliente_telefone=request.form.get('cliente_telefone'),
+            endereco_obra=request.form['endereco_obra'],
+            descricao_obra=request.form['descricao_obra'],
+            valor_proposta=float(request.form['valor_proposta']),
+            prazo_execucao=int(request.form.get('prazo_execucao', 30)),
+            admin_id=current_user.id if current_user.tipo_usuario == TipoUsuario.ADMIN else current_user.admin_id,
+            criado_por_id=current_user.id
+        )
+        
+        db.session.add(proposta)
+        db.session.flush()  # Para obter o ID
+        
+        # Adicionar serviços
+        servicos_data = request.form.getlist('servicos')  # JSON dos serviços
+        for servico_json in servicos_data:
+            servico_data = json.loads(servico_json)
+            servico = PropostaServico(
+                proposta_id=proposta.id,
+                descricao_servico=servico_data['descricao'],
+                quantidade=float(servico_data['quantidade']),
+                unidade=servico_data['unidade'],
+                valor_unitario=float(servico_data['valor_unitario']),
+                valor_total=float(servico_data['valor_total'])
+            )
+            db.session.add(servico)
+        
+        # Log da criação
+        log = PropostaLog(
+            proposta_id=proposta.id,
+            acao='criada',
+            usuario_id=current_user.id,
+            ip_address=request.remote_addr,
+            user_agent=request.headers.get('User-Agent')
+        )
+        db.session.add(log)
+        
+        db.session.commit()
+        flash('Proposta criada com sucesso!', 'success')
+        return redirect(url_for('main.lista_propostas'))
+    
+    return render_template('propostas/nova_proposta.html')
+
+@main_bp.route('/propostas/<int:id>/enviar', methods=['POST'])
+@admin_required
+def enviar_proposta(id):
+    """Enviar proposta para cliente"""
+    proposta = Proposta.query.get_or_404(id)
+    
+    # Verificar permissão
+    if not can_access_data(proposta.admin_id):
+        abort(403)
+    
+    # Gerar credenciais do cliente
+    import secrets
+    import string
+    
+    login_cliente = f"cliente{proposta.id:03d}"
+    senha_temp = ''.join(secrets.choice(string.ascii_letters + string.digits) for _ in range(8))
+    token_acesso = secrets.token_urlsafe(32)
+    
+    proposta.login_cliente = login_cliente
+    proposta.senha_cliente = generate_password_hash(senha_temp)
+    proposta.token_acesso = token_acesso
+    proposta.data_envio = datetime.utcnow()
+    proposta.data_expiracao = datetime.utcnow() + timedelta(days=30)
+    proposta.status = 'Enviada'
+    
+    # Log do envio
+    log = PropostaLog(
+        proposta_id=proposta.id,
+        acao='enviada',
+        usuario_id=current_user.id,
+        ip_address=request.remote_addr,
+        user_agent=request.headers.get('User-Agent')
+    )
+    db.session.add(log)
+    
+    db.session.commit()
+    
+    # TODO: Enviar email para cliente com credenciais
+    # enviar_email_proposta(proposta, senha_temp)
+    
+    flash(f'Proposta enviada! Login: {login_cliente}, Senha: {senha_temp}', 'success')
+    return redirect(url_for('main.lista_propostas'))
+
+# ===== PORTAL DO CLIENTE (SEM AUTENTICAÇÃO FLASK-LOGIN) =====
+
+@main_bp.route('/cliente/proposta/<token>')
+def cliente_proposta(token):
+    """Portal do cliente para visualizar proposta"""
+    proposta = Proposta.query.filter_by(token_acesso=token).first_or_404()
+    
+    # Verificar expiração
+    if proposta.data_expiracao and datetime.utcnow() > proposta.data_expiracao:
+        proposta.status = 'Expirada'
+        db.session.commit()
+    
+    # Log da visualização
+    log = PropostaLog(
+        proposta_id=proposta.id,
+        acao='visualizada',
+        ip_address=request.remote_addr,
+        user_agent=request.headers.get('User-Agent')
+    )
+    db.session.add(log)
+    db.session.commit()
+    
+    return render_template('cliente/proposta_detalhes.html', proposta=proposta)
+
+@main_bp.route('/cliente/proposta/<token>/aprovar', methods=['POST'])
+def cliente_aprovar_proposta(token):
+    """Cliente aprova a proposta"""
+    proposta = Proposta.query.filter_by(token_acesso=token).first_or_404()
+    
+    if proposta.status != 'Enviada':
+        flash('Esta proposta não pode mais ser aprovada.', 'danger')
+        return redirect(url_for('main.cliente_proposta', token=token))
+    
+    proposta.status = 'Aprovada'
+    proposta.data_resposta = datetime.utcnow()
+    proposta.observacoes_cliente = request.form.get('observacoes', '')
+    proposta.ip_assinatura = request.remote_addr
+    proposta.user_agent_assinatura = request.headers.get('User-Agent')
+    
+    # Log da aprovação
+    log = PropostaLog(
+        proposta_id=proposta.id,
+        acao='aprovada',
+        ip_address=request.remote_addr,
+        user_agent=request.headers.get('User-Agent'),
+        observacoes=proposta.observacoes_cliente
+    )
+    db.session.add(log)
+    
+    # CONVERTER PROPOSTA EM OBRA AUTOMATICAMENTE
+    obra = Obra(
+        nome=f"Obra - {proposta.cliente_nome}",
+        codigo=f"OB-{proposta.numero_proposta}",
+        endereco=proposta.endereco_obra,
+        data_inicio=date.today(),
+        orcamento=proposta.valor_proposta,
+        valor_contrato=proposta.valor_proposta,
+        area_total_m2=proposta.area_total_m2,
+        status='Em andamento',
+        admin_id=proposta.admin_id
+    )
+    db.session.add(obra)
+    db.session.flush()
+    
+    # Adicionar serviços da proposta como serviços da obra
+    for servico_proposta in proposta.servicos:
+        # Verificar se existe serviço similar ou criar novo
+        # TODO: Implementar lógica de serviços da obra
+        pass
+    
+    db.session.commit()
+    
+    flash('Proposta aprovada com sucesso! A obra foi criada automaticamente.', 'success')
+    return redirect(url_for('main.cliente_proposta', token=token))
+
+@main_bp.route('/cliente/proposta/<token>/rejeitar', methods=['POST'])
+def cliente_rejeitar_proposta(token):
+    """Cliente rejeita a proposta"""
+    proposta = Proposta.query.filter_by(token_acesso=token).first_or_404()
+    
+    if proposta.status != 'Enviada':
+        flash('Esta proposta não pode mais ser rejeitada.', 'danger')
+        return redirect(url_for('main.cliente_proposta', token=token))
+    
+    proposta.status = 'Rejeitada'
+    proposta.data_resposta = datetime.utcnow()
+    proposta.observacoes_cliente = request.form.get('observacoes', '')
+    proposta.ip_assinatura = request.remote_addr
+    proposta.user_agent_assinatura = request.headers.get('User-Agent')
+    
+    # Log da rejeição
+    log = PropostaLog(
+        proposta_id=proposta.id,
+        acao='rejeitada',
+        ip_address=request.remote_addr,
+        user_agent=request.headers.get('User-Agent'),
+        observacoes=proposta.observacoes_cliente
+    )
+    db.session.add(log)
+    db.session.commit()
+    
+    flash('Proposta rejeitada.', 'info')
+    return redirect(url_for('main.cliente_proposta', token=token))
+```
+
+#### **1.3 Templates Necessários (CRIAR EM templates/):**
+```html
+<!-- templates/propostas/lista_propostas.html -->
+{% extends "base.html" %}
+{% block title %}Propostas{% endblock %}
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">Propostas</h5>
+                    <a href="{{ url_for('main.nova_proposta') }}" class="btn btn-primary">
+                        <i class="fas fa-plus"></i> Nova Proposta
+                    </a>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-striped" id="tabelaPropostas">
+                            <thead>
+                                <tr>
+                                    <th>Número</th>
+                                    <th>Cliente</th>
+                                    <th>Valor</th>
+                                    <th>Status</th>
+                                    <th>Data Criação</th>
+                                    <th>Ações</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for proposta in propostas %}
+                                <tr>
+                                    <td>{{ proposta.numero_proposta }}</td>
+                                    <td>{{ proposta.cliente_nome }}</td>
+                                    <td>R$ {{ "%.2f"|format(proposta.valor_proposta) }}</td>
+                                    <td>
+                                        <span class="badge badge-{% if proposta.status == 'Aprovada' %}success{% elif proposta.status == 'Rejeitada' %}danger{% elif proposta.status == 'Expirada' %}secondary{% else %}warning{% endif %}">
+                                            {{ proposta.status }}
+                                        </span>
+                                    </td>
+                                    <td>{{ proposta.created_at.strftime('%d/%m/%Y') }}</td>
+                                    <td>
+                                        {% if proposta.status == 'Enviada' %}
+                                        <form method="POST" action="{{ url_for('main.enviar_proposta', id=proposta.id) }}" style="display: inline;">
+                                            <button type="submit" class="btn btn-sm btn-success">
+                                                <i class="fas fa-paper-plane"></i> Enviar
+                                            </button>
+                                        </form>
+                                        {% endif %}
+                                        {% if proposta.token_acesso %}
+                                        <a href="{{ url_for('main.cliente_proposta', token=proposta.token_acesso) }}" 
+                                           class="btn btn-sm btn-info" target="_blank">
+                                            <i class="fas fa-eye"></i> Ver Portal
+                                        </a>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+$(document).ready(function() {
+    $('#tabelaPropostas').DataTable({
+        language: {
+            url: '//cdn.datatables.net/plug-ins/1.13.7/i18n/pt-BR.json'
+        },
+        order: [[4, 'desc']]  // Ordenar por data de criação
+    });
+});
+</script>
+{% endblock %}
+
+<!-- templates/cliente/proposta_detalhes.html -->
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Proposta {{ proposta.numero_proposta }}</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+</head>
+<body class="bg-light">
+    <div class="container my-5">
+        <div class="row justify-content-center">
+            <div class="col-lg-8">
+                <div class="card shadow">
+                    <div class="card-header bg-primary text-white">
+                        <h4 class="mb-0">
+                            <i class="fas fa-file-contract"></i>
+                            Proposta {{ proposta.numero_proposta }}
+                        </h4>
+                    </div>
+                    <div class="card-body">
+                        <!-- Dados do Cliente -->
+                        <div class="row mb-4">
+                            <div class="col-md-6">
+                                <h6 class="text-muted">Cliente</h6>
+                                <p class="mb-1"><strong>{{ proposta.cliente_nome }}</strong></p>
+                                <p class="mb-1">{{ proposta.cliente_email }}</p>
+                                {% if proposta.cliente_telefone %}
+                                <p class="mb-0">{{ proposta.cliente_telefone }}</p>
+                                {% endif %}
+                            </div>
+                            <div class="col-md-6">
+                                <h6 class="text-muted">Status</h6>
+                                <span class="badge badge-lg badge-{% if proposta.status == 'Aprovada' %}success{% elif proposta.status == 'Rejeitada' %}danger{% elif proposta.status == 'Expirada' %}secondary{% else %}warning{% endif %}">
+                                    {{ proposta.status }}
+                                </span>
+                            </div>
+                        </div>
+                        
+                        <!-- Dados da Obra -->
+                        <div class="mb-4">
+                            <h6 class="text-muted">Dados da Obra</h6>
+                            <p><strong>Endereço:</strong> {{ proposta.endereco_obra }}</p>
+                            <p><strong>Descrição:</strong> {{ proposta.descricao_obra }}</p>
+                            {% if proposta.area_total_m2 %}
+                            <p><strong>Área Total:</strong> {{ proposta.area_total_m2 }} m²</p>
+                            {% endif %}
+                        </div>
+                        
+                        <!-- Serviços -->
+                        <div class="mb-4">
+                            <h6 class="text-muted">Serviços</h6>
+                            <div class="table-responsive">
+                                <table class="table table-sm">
+                                    <thead>
+                                        <tr>
+                                            <th>Descrição</th>
+                                            <th>Qtd</th>
+                                            <th>Unidade</th>
+                                            <th>Valor Unit.</th>
+                                            <th>Total</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for servico in proposta.servicos %}
+                                        <tr>
+                                            <td>{{ servico.descricao_servico }}</td>
+                                            <td>{{ servico.quantidade }}</td>
+                                            <td>{{ servico.unidade }}</td>
+                                            <td>R$ {{ "%.2f"|format(servico.valor_unitario) }}</td>
+                                            <td>R$ {{ "%.2f"|format(servico.valor_total) }}</td>
+                                        </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                    <tfoot>
+                                        <tr class="table-primary">
+                                            <th colspan="4">Total Geral</th>
+                                            <th>R$ {{ "%.2f"|format(proposta.valor_proposta) }}</th>
+                                        </tr>
+                                    </tfoot>
+                                </table>
+                            </div>
+                        </div>
+                        
+                        <!-- Ações do Cliente -->
+                        {% if proposta.status == 'Enviada' %}
+                        <div class="row">
+                            <div class="col-md-6">
+                                <form method="POST" action="{{ url_for('main.cliente_aprovar_proposta', token=proposta.token_acesso) }}">
+                                    <div class="mb-3">
+                                        <label for="observacoes" class="form-label">Observações (opcional)</label>
+                                        <textarea class="form-control" id="observacoes" name="observacoes" rows="3"></textarea>
+                                    </div>
+                                    <button type="submit" class="btn btn-success btn-lg w-100">
+                                        <i class="fas fa-check"></i> Aprovar Proposta
+                                    </button>
+                                </form>
+                            </div>
+                            <div class="col-md-6">
+                                <form method="POST" action="{{ url_for('main.cliente_rejeitar_proposta', token=proposta.token_acesso) }}">
+                                    <div class="mb-3">
+                                        <label for="observacoes_rejeicao" class="form-label">Motivo da rejeição</label>
+                                        <textarea class="form-control" id="observacoes_rejeicao" name="observacoes" rows="3" required></textarea>
+                                    </div>
+                                    <button type="submit" class="btn btn-danger btn-lg w-100">
+                                        <i class="fas fa-times"></i> Rejeitar Proposta
+                                    </button>
+                                </form>
+                            </div>
+                        </div>
+                        {% endif %}
+                        
+                        {% if proposta.observacoes_cliente %}
+                        <div class="mt-4">
+                            <h6 class="text-muted">Observações do Cliente</h6>
+                            <p>{{ proposta.observacoes_cliente }}</p>
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>
+```
+
+---
+
+
+### **MÓDULO 2: PORTAL DO CLIENTE - ACOMPANHAMENTO DE OBRAS**
+
+#### **2.1 Extensão da Classe Obra (ADICIONAR CAMPOS EM models.py):**
+```python
+# ADICIONAR estes campos na classe Obra existente
+class Obra(db.Model):
+    # ... campos existentes ...
+    
+    # NOVOS CAMPOS para portal do cliente
+    token_cliente = db.Column(db.String(255), unique=True)  # Token para acesso do cliente
+    cliente_nome = db.Column(db.String(100))  # Nome do cliente
+    cliente_email = db.Column(db.String(120))  # Email do cliente
+    proposta_origem_id = db.Column(db.Integer, db.ForeignKey('proposta.id'))  # Proposta que originou
+    
+    # Relacionamento com proposta
+    proposta_origem = db.relationship('Proposta', backref='obra_gerada')
+```
+
+#### **2.2 Rotas para Portal do Cliente (ADICIONAR EM views.py):**
+```python
+# ===== PORTAL DO CLIENTE - ACOMPANHAMENTO DE OBRAS =====
+
+@main_bp.route('/cliente/obra/<token>')
+def cliente_obra_dashboard(token):
+    """Dashboard principal do cliente para acompanhar obra"""
+    obra = Obra.query.filter_by(token_cliente=token).first_or_404()
+    
+    # Calcular progresso da obra usando RDOs existentes
+    progresso_geral = calcular_progresso_obra_cliente(obra.id)
+    
+    # Obter últimas fotos dos RDOs
+    fotos_recentes = obter_fotos_obra_recentes(obra.id, limite=6)
+    
+    # Obter atividades recentes dos RDOs
+    atividades_recentes = obter_atividades_obra_recentes(obra.id, limite=10)
+    
+    return render_template('cliente/obra_dashboard.html', 
+                         obra=obra,
+                         progresso=progresso_geral,
+                         fotos_recentes=fotos_recentes,
+                         atividades_recentes=atividades_recentes)
+
+@main_bp.route('/cliente/obra/<token>/progresso')
+def cliente_obra_progresso(token):
+    """Página detalhada de progresso da obra"""
+    obra = Obra.query.filter_by(token_cliente=token).first_or_404()
+    
+    # Usar sistema de ServicoObra existente para calcular progresso
+    from models import ServicoObra
+    servicos_obra = ServicoObra.query.filter_by(obra_id=obra.id, ativo=True).all()
+    
+    progresso_detalhado = []
+    for servico_obra in servicos_obra:
+        if servico_obra.quantidade_planejada > 0:
+            percentual = (servico_obra.quantidade_executada / servico_obra.quantidade_planejada) * 100
+        else:
+            percentual = 0
+            
+        progresso_detalhado.append({
+            'servico': servico_obra.servico_ref.nome if servico_obra.servico_ref else 'Serviço',
+            'planejado': servico_obra.quantidade_planejada,
+            'executado': servico_obra.quantidade_executada,
+            'percentual': min(percentual, 100),
+            'unidade': servico_obra.servico_ref.unidade if servico_obra.servico_ref else 'un'
+        })
+    
+    return render_template('cliente/obra_progresso.html', 
+                         obra=obra,
+                         progresso_detalhado=progresso_detalhado)
+
+@main_bp.route('/cliente/obra/<token>/fotos')
+def cliente_obra_fotos(token):
+    """Galeria de fotos da obra"""
+    obra = Obra.query.filter_by(token_cliente=token).first_or_404()
+    
+    # Obter fotos dos RDOs existentes
+    from models import RDO, RDOFoto
+    fotos = db.session.query(RDOFoto, RDO).join(RDO).filter(
+        RDO.obra_id == obra.id
+    ).order_by(RDO.data_relatorio.desc(), RDOFoto.created_at.desc()).all()
+    
+    fotos_organizadas = {}
+    for foto, rdo in fotos:
+        data_str = rdo.data_relatorio.strftime('%Y-%m-%d')
+        if data_str not in fotos_organizadas:
+            fotos_organizadas[data_str] = []
+        fotos_organizadas[data_str].append({
+            'foto': foto,
+            'rdo': rdo
+        })
+    
+    return render_template('cliente/obra_fotos.html', 
+                         obra=obra,
+                         fotos_organizadas=fotos_organizadas)
+
+@main_bp.route('/api/cliente/obra/<token>/progresso')
+def api_cliente_progresso(token):
+    """API para atualização em tempo real do progresso"""
+    obra = Obra.query.filter_by(token_cliente=token).first_or_404()
+    
+    progresso = calcular_progresso_obra_cliente(obra.id)
+    
+    return jsonify({
+        'progresso_geral': progresso['percentual_geral'],
+        'atividades_concluidas': progresso['atividades_concluidas'],
+        'atividades_total': progresso['atividades_total'],
+        'ultima_atualizacao': progresso['ultima_atualizacao'].isoformat() if progresso['ultima_atualizacao'] else None
+    })
+```
+
+#### **2.3 Funções Utilitárias (ADICIONAR EM utils.py):**
+```python
+# ===== FUNÇÕES PARA PORTAL DO CLIENTE =====
+
+def calcular_progresso_obra_cliente(obra_id):
+    """
+    Calcular progresso da obra baseado nos RDOs existentes
+    Integra com sistema atual de RDO e ServicoObra
+    """
+    from models import RDO, RDOAtividade, ServicoObra
+    
+    # Obter todas as atividades dos RDOs
+    atividades_rdo = db.session.query(RDOAtividade, RDO).join(RDO).filter(
+        RDO.obra_id == obra_id
+    ).all()
+    
+    if not atividades_rdo:
+        return {
+            'percentual_geral': 0,
+            'atividades_concluidas': 0,
+            'atividades_total': 0,
+            'ultima_atualizacao': None
+        }
+    
+    # Calcular média ponderada dos percentuais
+    total_percentual = 0
+    total_atividades = len(atividades_rdo)
+    atividades_concluidas = 0
+    ultima_atualizacao = None
+    
+    for atividade, rdo in atividades_rdo:
+        total_percentual += atividade.percentual_conclusao
+        if atividade.percentual_conclusao >= 100:
+            atividades_concluidas += 1
+        
+        if ultima_atualizacao is None or rdo.data_relatorio > ultima_atualizacao:
+            ultima_atualizacao = rdo.data_relatorio
+    
+    percentual_geral = total_percentual / total_atividades if total_atividades > 0 else 0
+    
+    return {
+        'percentual_geral': round(percentual_geral, 1),
+        'atividades_concluidas': atividades_concluidas,
+        'atividades_total': total_atividades,
+        'ultima_atualizacao': ultima_atualizacao
+    }
+
+def obter_fotos_obra_recentes(obra_id, limite=6):
+    """Obter fotos mais recentes da obra dos RDOs"""
+    from models import RDO, RDOFoto
+    
+    fotos = db.session.query(RDOFoto, RDO).join(RDO).filter(
+        RDO.obra_id == obra_id
+    ).order_by(RDO.data_relatorio.desc(), RDOFoto.created_at.desc()).limit(limite).all()
+    
+    return [{'foto': foto, 'rdo': rdo} for foto, rdo in fotos]
+
+def obter_atividades_obra_recentes(obra_id, limite=10):
+    """Obter atividades mais recentes da obra dos RDOs"""
+    from models import RDO, RDOAtividade
+    
+    atividades = db.session.query(RDOAtividade, RDO).join(RDO).filter(
+        RDO.obra_id == obra_id
+    ).order_by(RDO.data_relatorio.desc(), RDOAtividade.id.desc()).limit(limite).all()
+    
+    return [{'atividade': atividade, 'rdo': rdo} for atividade, rdo in atividades]
+
+def gerar_token_cliente_obra(obra_id):
+    """Gerar token único para acesso do cliente à obra"""
+    import secrets
+    token = secrets.token_urlsafe(32)
+    
+    # Verificar se token já existe
+    from models import Obra
+    while Obra.query.filter_by(token_cliente=token).first():
+        token = secrets.token_urlsafe(32)
+    
+    return token
+```
+
+---
+
+### **MÓDULO 3: GESTÃO DE EQUIPES**
+
+#### **3.1 Nova Classe para models.py:**
+```python
+class AlocacaoEquipe(db.Model):
+    __tablename__ = 'alocacao_equipe'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    funcionario_id = db.Column(db.Integer, db.ForeignKey('funcionario.id'), nullable=False)
+    obra_id = db.Column(db.Integer, db.ForeignKey('obra.id'), nullable=False)
+    data_alocacao = db.Column(db.Date, nullable=False)
+    
+    # Local de trabalho
+    local_trabalho = db.Column(db.String(20), nullable=False)  # 'oficina', 'campo'
+    turno = db.Column(db.String(20), default='integral')  # 'manha', 'tarde', 'integral'
+    
+    # Controle
+    observacoes = db.Column(db.Text)
+    criado_por_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False)
+    rdo_gerado = db.Column(db.Boolean, default=False)
+    
+    # Multi-tenant (OBRIGATÓRIO)
+    admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False)
+    
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    
+    # Relacionamentos
+    funcionario = db.relationship('Funcionario', backref='alocacoes')
+    obra = db.relationship('Obra', backref='alocacoes')
+    criado_por = db.relationship('Usuario', foreign_keys=[criado_por_id])
+    
+    # Evitar duplicação
+    __table_args__ = (db.UniqueConstraint('funcionario_id', 'data_alocacao', name='_funcionario_data_uc'),)
+
+# ADICIONAR campo na classe Usuario existente para controle de permissão
+class Usuario(UserMixin, db.Model):
+    # ... campos existentes ...
+    
+    # NOVO CAMPO para gestão de equipes
+    gestor_equipes = db.Column(db.Boolean, default=False)  # Permissão para gerenciar equipes
+```
+
+#### **3.2 Rotas para Gestão de Equipes (ADICIONAR EM views.py):**
+```python
+# ===== GESTÃO DE EQUIPES =====
+
+@main_bp.route('/gestao-equipes')
+@admin_required
+def gestao_equipes():
+    """Interface principal de gestão de equipes"""
+    # Verificar permissão específica
+    if current_user.tipo_usuario != TipoUsuario.ADMIN and not current_user.gestor_equipes:
+        flash('Acesso negado. Apenas gestores de equipe podem acessar.', 'danger')
+        return redirect(url_for('main.dashboard'))
+    
+    tenant_filter = get_tenant_filter()
+    
+    # Obter funcionários ativos
+    if tenant_filter is None:  # Super admin
+        funcionarios = Funcionario.query.filter_by(ativo=True).all()
+        obras = Obra.query.filter_by(ativo=True).all()
+    else:
+        funcionarios = Funcionario.query.filter_by(admin_id=tenant_filter, ativo=True).all()
+        obras = Obra.query.filter_by(admin_id=tenant_filter, ativo=True).all()
+    
+    # Data atual para exibição inicial
+    data_atual = date.today()
+    
+    return render_template('gestao_equipes/dashboard.html', 
+                         funcionarios=funcionarios,
+                         obras=obras,
+                         data_atual=data_atual)
+
+@main_bp.route('/gestao-equipes/calendario')
+@admin_required
+def gestao_equipes_calendario():
+    """Interface de calendário para gestão de equipes"""
+    if current_user.tipo_usuario != TipoUsuario.ADMIN and not current_user.gestor_equipes:
+        abort(403)
+    
+    tenant_filter = get_tenant_filter()
+    
+    # Obter dados para o calendário
+    if tenant_filter is None:
+        funcionarios = Funcionario.query.filter_by(ativo=True).all()
+        obras = Obra.query.filter_by(ativo=True).all()
+    else:
+        funcionarios = Funcionario.query.filter_by(admin_id=tenant_filter, ativo=True).all()
+        obras = Obra.query.filter_by(admin_id=tenant_filter, ativo=True).all()
+    
+    return render_template('gestao_equipes/calendario.html',
+                         funcionarios=funcionarios,
+                         obras=obras)
+
+@main_bp.route('/api/alocacao/funcionario', methods=['POST'])
+@admin_required
+def api_alocar_funcionario():
+    """API para alocar funcionário em obra/data"""
+    if current_user.tipo_usuario != TipoUsuario.ADMIN and not current_user.gestor_equipes:
+        return jsonify({'error': 'Permissão negada'}), 403
+    
+    data = request.get_json()
+    funcionario_id = data.get('funcionario_id')
+    obra_id = data.get('obra_id')
+    data_alocacao = datetime.strptime(data.get('data_alocacao'), '%Y-%m-%d').date()
+    local_trabalho = data.get('local_trabalho', 'campo')
+    turno = data.get('turno', 'integral')
+    
+    # Verificar se funcionário já está alocado nesta data
+    alocacao_existente = AlocacaoEquipe.query.filter_by(
+        funcionario_id=funcionario_id,
+        data_alocacao=data_alocacao
+    ).first()
+    
+    if alocacao_existente:
+        return jsonify({'error': 'Funcionário já alocado nesta data'}), 400
+    
+    # Criar nova alocação
+    alocacao = AlocacaoEquipe(
+        funcionario_id=funcionario_id,
+        obra_id=obra_id,
+        data_alocacao=data_alocacao,
+        local_trabalho=local_trabalho,
+        turno=turno,
+        criado_por_id=current_user.id,
+        admin_id=current_user.id if current_user.tipo_usuario == TipoUsuario.ADMIN else current_user.admin_id
+    )
+    
+    db.session.add(alocacao)
+    db.session.commit()
+    
+    # Criar RDO automaticamente se necessário
+    if data.get('criar_rdo', False):
+        criar_rdo_automatico_alocacao(alocacao.id)
+    
+    return jsonify({'success': True, 'alocacao_id': alocacao.id})
+
+@main_bp.route('/api/alocacao/<int:alocacao_id>', methods=['DELETE'])
+@admin_required
+def api_remover_alocacao(alocacao_id):
+    """API para remover alocação"""
+    if current_user.tipo_usuario != TipoUsuario.ADMIN and not current_user.gestor_equipes:
+        return jsonify({'error': 'Permissão negada'}), 403
+    
+    alocacao = AlocacaoEquipe.query.get_or_404(alocacao_id)
+    
+    # Verificar permissão
+    if not can_access_data(alocacao.admin_id):
+        return jsonify({'error': 'Permissão negada'}), 403
+    
+    db.session.delete(alocacao)
+    db.session.commit()
+    
+    return jsonify({'success': True})
+
+@main_bp.route('/api/alocacoes/<data_inicio>/<data_fim>')
+@admin_required
+def api_obter_alocacoes(data_inicio, data_fim):
+    """API para obter alocações em período"""
+    if current_user.tipo_usuario != TipoUsuario.ADMIN and not current_user.gestor_equipes:
+        return jsonify({'error': 'Permissão negada'}), 403
+    
+    tenant_filter = get_tenant_filter()
+    
+    data_inicio_obj = datetime.strptime(data_inicio, '%Y-%m-%d').date()
+    data_fim_obj = datetime.strptime(data_fim, '%Y-%m-%d').date()
+    
+    query = AlocacaoEquipe.query.filter(
+        AlocacaoEquipe.data_alocacao >= data_inicio_obj,
+        AlocacaoEquipe.data_alocacao <= data_fim_obj
+    )
+    
+    if tenant_filter is not None:
+        query = query.filter_by(admin_id=tenant_filter)
+    
+    alocacoes = query.all()
+    
+    resultado = []
+    for alocacao in alocacoes:
+        resultado.append({
+            'id': alocacao.id,
+            'funcionario_id': alocacao.funcionario_id,
+            'funcionario_nome': alocacao.funcionario.nome,
+            'obra_id': alocacao.obra_id,
+            'obra_nome': alocacao.obra.nome,
+            'data_alocacao': alocacao.data_alocacao.isoformat(),
+            'local_trabalho': alocacao.local_trabalho,
+            'turno': alocacao.turno,
+            'rdo_gerado': alocacao.rdo_gerado
+        })
+    
+    return jsonify(resultado)
+```
+
+#### **3.3 Função para Criar RDO Automático (ADICIONAR EM utils.py):**
+```python
+def criar_rdo_automatico_alocacao(alocacao_id):
+    """
+    Criar RDO automaticamente baseado na alocação de equipe
+    Integra com sistema RDO existente
+    """
+    from models import AlocacaoEquipe, RDO, RDOMaoObra
+    
+    alocacao = AlocacaoEquipe.query.get(alocacao_id)
+    if not alocacao:
+        return None
+    
+    # Verificar se já existe RDO para esta obra/data
+    rdo_existente = RDO.query.filter_by(
+        obra_id=alocacao.obra_id,
+        data_relatorio=alocacao.data_alocacao
+    ).first()
+    
+    if rdo_existente:
+        # Adicionar mão de obra ao RDO existente
+        mao_obra_existente = RDOMaoObra.query.filter_by(
+            rdo_id=rdo_existente.id,
+            funcionario_id=alocacao.funcionario_id
+        ).first()
+        
+        if not mao_obra_existente:
+            mao_obra = RDOMaoObra(
+                rdo_id=rdo_existente.id,
+                funcionario_id=alocacao.funcionario_id,
+                funcao_exercida=alocacao.funcionario.funcao_ref.nome if alocacao.funcionario.funcao_ref else 'Funcionário',
+                horas_trabalhadas=alocacao.funcionario.horario_trabalho.horas_diarias if alocacao.funcionario.horario_trabalho else 8.0
+            )
+            db.session.add(mao_obra)
+        
+        rdo_criado = rdo_existente
+    else:
+        # Gerar número do RDO
+        ultimo_numero = db.session.query(func.max(RDO.numero_rdo)).scalar()
+        if ultimo_numero:
+            numero = int(ultimo_numero.split('-')[-1]) + 1
+        else:
+            numero = 1
+        numero_rdo = f"RDO-{alocacao.data_alocacao.year}-{numero:04d}"
+        
+        # Criar novo RDO
+        rdo = RDO(
+            numero_rdo=numero_rdo,
+            data_relatorio=alocacao.data_alocacao,
+            obra_id=alocacao.obra_id,
+            criado_por_id=alocacao.criado_por_id,
+            status='Rascunho'
+        )
+        db.session.add(rdo)
+        db.session.flush()  # Para obter o ID
+        
+        # Adicionar mão de obra
+        mao_obra = RDOMaoObra(
+            rdo_id=rdo.id,
+            funcionario_id=alocacao.funcionario_id,
+            funcao_exercida=alocacao.funcionario.funcao_ref.nome if alocacao.funcionario.funcao_ref else 'Funcionário',
+            horas_trabalhadas=alocacao.funcionario.horario_trabalho.horas_diarias if alocacao.funcionario.horario_trabalho else 8.0
+        )
+        db.session.add(mao_obra)
+        
+        rdo_criado = rdo
+    
+    # Marcar alocação como tendo RDO gerado
+    alocacao.rdo_gerado = True
+    
+    db.session.commit()
+    
+    return rdo_criado
+```
+
+---
+
+### **MÓDULO 4: ALMOXARIFADO COMPLETO**
+
+#### **4.1 Novas Classes para models.py:**
+```python
+class Material(db.Model):
+    __tablename__ = 'material'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    codigo_barras = db.Column(db.String(50), unique=True)
+    codigo_interno = db.Column(db.String(20), unique=True, nullable=False)  # MAT-001
+    descricao = db.Column(db.String(200), nullable=False)
+    unidade = db.Column(db.String(10), nullable=False)  # un, kg, m, m², m³, l
+    categoria = db.Column(db.String(50))
+    
+    # Estoque
+    estoque_atual = db.Column(db.Float, default=0.0)
+    estoque_minimo = db.Column(db.Float, default=0.0)
+    estoque_maximo = db.Column(db.Float, default=0.0)
+    
+    # Valores
+    valor_unitario = db.Column(db.Float, default=0.0)
+    valor_medio = db.Column(db.Float, default=0.0)  # Custo médio ponderado
+    
+    # Fornecedor padrão
+    fornecedor_principal = db.Column(db.String(100))
+    
+    # Controle
+    ativo = db.Column(db.Boolean, default=True)
+    admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    
+    # Relacionamentos
+    movimentacoes = db.relationship('MovimentacaoMaterial', backref='material_ref', lazy=True)
+
+class MovimentacaoMaterial(db.Model):
+    __tablename__ = 'movimentacao_material'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    numero_movimento = db.Column(db.String(20), unique=True, nullable=False)  # MOV-2025-001
+    material_id = db.Column(db.Integer, db.ForeignKey('material.id'), nullable=False)
+    
+    # Tipo de movimento
+    tipo_movimento = db.Column(db.String(20), nullable=False)  # 'entrada', 'saida', 'devolucao', 'ajuste'
+    
+    # Quantidades
+    quantidade = db.Column(db.Float, nullable=False)
+    quantidade_anterior = db.Column(db.Float, nullable=False)
+    quantidade_atual = db.Column(db.Float, nullable=False)
+    
+    # Valores
+    valor_unitario = db.Column(db.Float, nullable=False)
+    valor_total = db.Column(db.Float, nullable=False)
+    
+    # Origem/Destino
+    obra_id = db.Column(db.Integer, db.ForeignKey('obra.id'))
+    funcionario_id = db.Column(db.Integer, db.ForeignKey('funcionario.id'))
+    rdo_id = db.Column(db.Integer, db.ForeignKey('rdo.id'))
+    
+    # Documento fiscal
+    nota_fiscal = db.Column(db.String(50))
+    fornecedor = db.Column(db.String(100))
+    data_nota_fiscal = db.Column(db.Date)
+    
+    # Observações
+    observacoes = db.Column(db.Text)
+    motivo_ajuste = db.Column(db.Text)  # Para ajustes de estoque
+    
+    # Controle
+    data_movimento = db.Column(db.DateTime, default=datetime.utcnow)
+    usuario_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False)
+    admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False)
+    
+    # Relacionamentos
+    obra = db.relationship('Obra', backref='movimentacoes_material')
+    funcionario = db.relationship('Funcionario', backref='movimentacoes_material')
+    usuario = db.relationship('Usuario', foreign_keys=[usuario_id])
+
+# NOVA tabela para integração com RDO existente
+class RDOMaterial(db.Model):
+    __tablename__ = 'rdo_material'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    rdo_id = db.Column(db.Integer, db.ForeignKey('rdo.id'), nullable=False)
+    material_id = db.Column(db.Integer, db.ForeignKey('material.id'), nullable=False)
+    
+    # Quantidades
+    quantidade_requisitada = db.Column(db.Float, nullable=False)
+    quantidade_usada = db.Column(db.Float, default=0.0)
+    quantidade_devolvida = db.Column(db.Float, default=0.0)
+    
+    # Valores
+    valor_unitario = db.Column(db.Float, nullable=False)
+    valor_total = db.Column(db.Float, nullable=False)
+    
+    # Status
+    status = db.Column(db.String(20), default='requisitado')  # requisitado, entregue, usado, devolvido
+    
+    # Controle
+    data_requisicao = db.Column(db.DateTime, default=datetime.utcnow)
+    data_entrega = db.Column(db.DateTime)
+    data_devolucao = db.Column(db.DateTime)
+    
+    observacoes = db.Column(db.Text)
+    
+    # Movimentações geradas
+    movimentacao_saida_id = db.Column(db.Integer, db.ForeignKey('movimentacao_material.id'))
+    movimentacao_devolucao_id = db.Column(db.Integer, db.ForeignKey('movimentacao_material.id'))
+    
+    # Relacionamentos
+    rdo = db.relationship('RDO', backref='materiais_rdo')
+    material = db.relationship('Material', backref='requisicoes_rdo')
+    movimentacao_saida = db.relationship('MovimentacaoMaterial', foreign_keys=[movimentacao_saida_id])
+    movimentacao_devolucao = db.relationship('MovimentacaoMaterial', foreign_keys=[movimentacao_devolucao_id])
+```
+
+#### **4.2 Rotas para Almoxarifado (ADICIONAR EM views.py):**
+```python
+# ===== ALMOXARIFADO COMPLETO =====
+
+@main_bp.route('/almoxarifado')
+@admin_required
+def almoxarifado_dashboard():
+    """Dashboard principal do almoxarifado"""
+    tenant_filter = get_tenant_filter()
+    
+    # Estatísticas gerais
+    if tenant_filter is None:
+        total_materiais = Material.query.filter_by(ativo=True).count()
+        materiais_baixo_estoque = Material.query.filter(
+            Material.ativo == True,
+            Material.estoque_atual <= Material.estoque_minimo
+        ).count()
+    else:
+        total_materiais = Material.query.filter_by(admin_id=tenant_filter, ativo=True).count()
+        materiais_baixo_estoque = Material.query.filter(
+            Material.admin_id == tenant_filter,
+            Material.ativo == True,
+            Material.estoque_atual <= Material.estoque_minimo
+        ).count()
+    
+    # Movimentações recentes
+    movimentacoes_recentes = MovimentacaoMaterial.query
+    if tenant_filter is not None:
+        movimentacoes_recentes = movimentacoes_recentes.filter_by(admin_id=tenant_filter)
+    
+    movimentacoes_recentes = movimentacoes_recentes.order_by(
+        MovimentacaoMaterial.data_movimento.desc()
+    ).limit(10).all()
+    
+    return render_template('almoxarifado/dashboard.html',
+                         total_materiais=total_materiais,
+                         materiais_baixo_estoque=materiais_baixo_estoque,
+                         movimentacoes_recentes=movimentacoes_recentes)
+
+@main_bp.route('/almoxarifado/materiais')
+@admin_required
+def almoxarifado_materiais():
+    """Lista de materiais"""
+    tenant_filter = get_tenant_filter()
+    
+    if tenant_filter is None:
+        materiais = Material.query.filter_by(ativo=True).all()
+    else:
+        materiais = Material.query.filter_by(admin_id=tenant_filter, ativo=True).all()
+    
+    return render_template('almoxarifado/materiais.html', materiais=materiais)
+
+@main_bp.route('/almoxarifado/entrada', methods=['GET', 'POST'])
+@admin_required
+def almoxarifado_entrada():
+    """Entrada de materiais"""
+    if request.method == 'POST':
+        # Processar entrada de material
+        material_id = request.form['material_id']
+        quantidade = float(request.form['quantidade'])
+        valor_unitario = float(request.form['valor_unitario'])
+        nota_fiscal = request.form.get('nota_fiscal')
+        fornecedor = request.form.get('fornecedor')
+        
+        material = Material.query.get_or_404(material_id)
+        
+        # Verificar permissão
+        if not can_access_data(material.admin_id):
+            abort(403)
+        
+        # Criar movimentação
+        numero_movimento = gerar_numero_movimento()
+        
+        movimentacao = MovimentacaoMaterial(
+            numero_movimento=numero_movimento,
+            material_id=material_id,
+            tipo_movimento='entrada',
+            quantidade=quantidade,
+            quantidade_anterior=material.estoque_atual,
+            quantidade_atual=material.estoque_atual + quantidade,
+            valor_unitario=valor_unitario,
+            valor_total=quantidade * valor_unitario,
+            nota_fiscal=nota_fiscal,
+            fornecedor=fornecedor,
+            usuario_id=current_user.id,
+            admin_id=current_user.id if current_user.tipo_usuario == TipoUsuario.ADMIN else current_user.admin_id
+        )
+        
+        # Atualizar estoque
+        material.estoque_atual += quantidade
+        
+        # Recalcular valor médio (custo médio ponderado)
+        if material.estoque_atual > 0:
+            valor_total_estoque = (material.valor_medio * (material.estoque_atual - quantidade)) + (valor_unitario * quantidade)
+            material.valor_medio = valor_total_estoque / material.estoque_atual
+        else:
+            material.valor_medio = valor_unitario
+        
+        db.session.add(movimentacao)
+        db.session.commit()
+        
+        flash('Entrada de material registrada com sucesso!', 'success')
+        return redirect(url_for('main.almoxarifado_materiais'))
+    
+    # GET - Exibir formulário
+    tenant_filter = get_tenant_filter()
+    
+    if tenant_filter is None:
+        materiais = Material.query.filter_by(ativo=True).all()
+    else:
+        materiais = Material.query.filter_by(admin_id=tenant_filter, ativo=True).all()
+    
+    return render_template('almoxarifado/entrada.html', materiais=materiais)
+
+@main_bp.route('/almoxarifado/codigo-barras')
+@admin_required
+def almoxarifado_codigo_barras():
+    """Interface para leitura de código de barras"""
+    return render_template('almoxarifado/codigo_barras.html')
+
+@main_bp.route('/api/almoxarifado/processar-codigo-barras', methods=['POST'])
+@admin_required
+def api_processar_codigo_barras():
+    """API para processar código de barras lido"""
+    data = request.get_json()
+    codigo_barras = data.get('codigo_barras')
+    
+    if not codigo_barras:
+        return jsonify({'error': 'Código de barras não fornecido'}), 400
+    
+    tenant_filter = get_tenant_filter()
+    
+    # Buscar material pelo código de barras
+    query = Material.query.filter_by(codigo_barras=codigo_barras, ativo=True)
+    if tenant_filter is not None:
+        query = query.filter_by(admin_id=tenant_filter)
+    
+    material = query.first()
+    
+    if material:
+        return jsonify({
+            'encontrado': True,
+            'material': {
+                'id': material.id,
+                'codigo_interno': material.codigo_interno,
+                'descricao': material.descricao,
+                'unidade': material.unidade,
+                'estoque_atual': material.estoque_atual,
+                'valor_unitario': material.valor_unitario
+            }
+        })
+    else:
+        return jsonify({
+            'encontrado': False,
+            'codigo_barras': codigo_barras
+        })
+
+@main_bp.route('/almoxarifado/upload-xml', methods=['POST'])
+@admin_required
+def almoxarifado_upload_xml():
+    """Upload e processamento de XML de nota fiscal"""
+    if 'arquivo_xml' not in request.files:
+        flash('Nenhum arquivo selecionado', 'danger')
+        return redirect(url_for('main.almoxarifado_entrada'))
+    
+    arquivo = request.files['arquivo_xml']
+    
+    if arquivo.filename == '':
+        flash('Nenhum arquivo selecionado', 'danger')
+        return redirect(url_for('main.almoxarifado_entrada'))
+    
+    if arquivo and arquivo.filename.lower().endswith('.xml'):
+        try:
+            # Processar XML da nota fiscal
+            dados_nf = processar_xml_nota_fiscal(arquivo.read())
+            
+            # Retornar dados para preenchimento automático
+            return render_template('almoxarifado/entrada_xml.html', dados_nf=dados_nf)
+            
+        except Exception as e:
+            flash(f'Erro ao processar XML: {str(e)}', 'danger')
+            return redirect(url_for('main.almoxarifado_entrada'))
+    else:
+        flash('Arquivo deve ser um XML válido', 'danger')
+        return redirect(url_for('main.almoxarifado_entrada'))
+
+# ===== INTEGRAÇÃO COM RDO EXISTENTE =====
+
+@main_bp.route('/rdo/<int:rdo_id>/materiais')
+@funcionario_required
+def rdo_materiais(rdo_id):
+    """Aba de materiais no RDO existente"""
+    rdo = RDO.query.get_or_404(rdo_id)
+    
+    # Verificar permissão
+    if not can_access_data(rdo.obra.admin_id):
+        abort(403)
+    
+    # Obter materiais já requisitados neste RDO
+    materiais_rdo = RDOMaterial.query.filter_by(rdo_id=rdo_id).all()
+    
+    # Obter lista de materiais disponíveis
+    tenant_filter = get_tenant_filter()
+    if tenant_filter is None:
+        materiais_disponiveis = Material.query.filter_by(ativo=True).all()
+    else:
+        materiais_disponiveis = Material.query.filter_by(admin_id=tenant_filter, ativo=True).all()
+    
+    return render_template('rdo/materiais.html', 
+                         rdo=rdo,
+                         materiais_rdo=materiais_rdo,
+                         materiais_disponiveis=materiais_disponiveis)
+
+@main_bp.route('/api/rdo/<int:rdo_id>/requisitar-material', methods=['POST'])
+@funcionario_required
+def api_rdo_requisitar_material(rdo_id):
+    """API para requisitar material via RDO"""
+    rdo = RDO.query.get_or_404(rdo_id)
+    
+    # Verificar permissão
+    if not can_access_data(rdo.obra.admin_id):
+        return jsonify({'error': 'Permissão negada'}), 403
+    
+    data = request.get_json()
+    material_id = data.get('material_id')
+    quantidade = float(data.get('quantidade', 0))
+    
+    if quantidade <= 0:
+        return jsonify({'error': 'Quantidade deve ser maior que zero'}), 400
+    
+    material = Material.query.get_or_404(material_id)
+    
+    # Verificar estoque disponível
+    if material.estoque_atual < quantidade:
+        return jsonify({'error': f'Estoque insuficiente. Disponível: {material.estoque_atual}'}), 400
+    
+    # Criar requisição
+    rdo_material = RDOMaterial(
+        rdo_id=rdo_id,
+        material_id=material_id,
+        quantidade_requisitada=quantidade,
+        valor_unitario=material.valor_medio,
+        valor_total=quantidade * material.valor_medio,
+        status='requisitado'
+    )
+    
+    db.session.add(rdo_material)
+    db.session.commit()
+    
+    return jsonify({'success': True, 'rdo_material_id': rdo_material.id})
+```
+
+#### **4.3 Funções Utilitárias para Almoxarifado (ADICIONAR EM utils.py):**
+```python
+def gerar_numero_movimento():
+    """Gerar número sequencial para movimentação de material"""
+    from models import MovimentacaoMaterial
+    
+    ultimo_numero = db.session.query(func.max(MovimentacaoMaterial.numero_movimento)).scalar()
+    if ultimo_numero:
+        numero = int(ultimo_numero.split('-')[-1]) + 1
+    else:
+        numero = 1
+    
+    return f"MOV-{datetime.now().year}-{numero:04d}"
+
+def processar_xml_nota_fiscal(xml_content):
+    """
+    Processar XML de nota fiscal e extrair dados dos materiais
+    Retorna lista de materiais encontrados na nota
+    """
+    import xml.etree.ElementTree as ET
+    
+    try:
+        root = ET.fromstring(xml_content)
+        
+        # Namespace da NFe
+        ns = {'nfe': 'http://www.portalfiscal.inf.br/nfe'}
+        
+        # Dados da nota
+        dados_nf = {
+            'numero': '',
+            'fornecedor': '',
+            'data_emissao': '',
+            'itens': []
+        }
+        
+        # Extrair número da nota
+        numero_nf = root.find('.//nfe:nNF', ns)
+        if numero_nf is not None:
+            dados_nf['numero'] = numero_nf.text
+        
+        # Extrair fornecedor
+        fornecedor = root.find('.//nfe:emit/nfe:xNome', ns)
+        if fornecedor is not None:
+            dados_nf['fornecedor'] = fornecedor.text
+        
+        # Extrair data de emissão
+        data_emissao = root.find('.//nfe:dhEmi', ns)
+        if data_emissao is not None:
+            dados_nf['data_emissao'] = data_emissao.text[:10]  # Apenas a data
+        
+        # Extrair itens
+        itens = root.findall('.//nfe:det', ns)
+        for item in itens:
+            produto = item.find('nfe:prod', ns)
+            if produto is not None:
+                codigo = produto.find('nfe:cProd', ns)
+                descricao = produto.find('nfe:xProd', ns)
+                unidade = produto.find('nfe:uCom', ns)
+                quantidade = produto.find('nfe:qCom', ns)
+                valor_unitario = produto.find('nfe:vUnCom', ns)
+                
+                if all(x is not None for x in [codigo, descricao, unidade, quantidade, valor_unitario]):
+                    dados_nf['itens'].append({
+                        'codigo': codigo.text,
+                        'descricao': descricao.text,
+                        'unidade': unidade.text,
+                        'quantidade': float(quantidade.text),
+                        'valor_unitario': float(valor_unitario.text)
+                    })
+        
+        return dados_nf
+        
+    except Exception as e:
+        raise Exception(f"Erro ao processar XML: {str(e)}")
+
+def calcular_custo_medio_material(material_id):
+    """Calcular custo médio ponderado do material"""
+    from models import Material, MovimentacaoMaterial
+    
+    material = Material.query.get(material_id)
+    if not material:
+        return 0.0
+    
+    # Obter todas as entradas do material
+    entradas = MovimentacaoMaterial.query.filter_by(
+        material_id=material_id,
+        tipo_movimento='entrada'
+    ).order_by(MovimentacaoMaterial.data_movimento).all()
+    
+    if not entradas:
+        return material.valor_unitario
+    
+    # Calcular custo médio ponderado
+    quantidade_total = 0
+    valor_total = 0
+    
+    for entrada in entradas:
+        quantidade_total += entrada.quantidade
+        valor_total += entrada.valor_total
+    
+    if quantidade_total > 0:
+        return valor_total / quantidade_total
+    else:
+        return material.valor_unitario
+```
+
+---
+
+
+### **MÓDULO 5: RECONHECIMENTO FACIAL**
+
+#### **5.1 Dependências Necessárias (INSTALAR):**
+```bash
+pip install opencv-python face-recognition numpy Pillow
+```
+
+#### **5.2 Novas Classes para models.py:**
+```python
+class BiometriaFuncionario(db.Model):
+    __tablename__ = 'biometria_funcionario'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    funcionario_id = db.Column(db.Integer, db.ForeignKey('funcionario.id'), nullable=False)
+    
+    # Dados biométricos (CRIPTOGRAFADOS)
+    encoding_facial = db.Column(db.LargeBinary, nullable=False)  # Encoding da face em bytes
+    hash_encoding = db.Column(db.String(64), nullable=False)  # Hash para comparação rápida
+    
+    # Qualidade e controle
+    qualidade_imagem = db.Column(db.Float, nullable=False)  # 0.0 a 1.0
+    numero_fotos_treino = db.Column(db.Integer, default=1)
+    
+    # Configurações
+    ativo = db.Column(db.Boolean, default=True)
+    requer_recadastro = db.Column(db.Boolean, default=False)
+    
+    # Estatísticas
+    tentativas_reconhecimento = db.Column(db.Integer, default=0)
+    reconhecimentos_sucesso = db.Column(db.Integer, default=0)
+    ultimo_reconhecimento = db.Column(db.DateTime)
+    
+    # Controle
+    data_cadastro = db.Column(db.DateTime, default=datetime.utcnow)
+    cadastrado_por_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False)
+    admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False)
+    
+    # Relacionamentos
+    funcionario = db.relationship('Funcionario', backref='biometria')
+    cadastrado_por = db.relationship('Usuario', foreign_keys=[cadastrado_por_id])
+
+class LogReconhecimento(db.Model):
+    __tablename__ = 'log_reconhecimento'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    funcionario_id = db.Column(db.Integer, db.ForeignKey('funcionario.id'))
+    biometria_id = db.Column(db.Integer, db.ForeignKey('biometria_funcionario.id'))
+    
+    # Resultado
+    sucesso = db.Column(db.Boolean, nullable=False)
+    confianca = db.Column(db.Float)  # 0.0 a 1.0
+    tempo_processamento = db.Column(db.Float)  # segundos
+    
+    # Contexto
+    camera_id = db.Column(db.String(50))
+    ip_address = db.Column(db.String(45))
+    
+    # Ponto gerado
+    registro_ponto_id = db.Column(db.Integer, db.ForeignKey('registro_ponto.id'))
+    
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    
+    # Relacionamentos
+    funcionario = db.relationship('Funcionario', backref='logs_reconhecimento')
+    biometria = db.relationship('BiometriaFuncionario', backref='logs')
+    registro_ponto = db.relationship('RegistroPonto', backref='log_reconhecimento')
+```
+
+#### **5.3 Sistema de Reconhecimento (CRIAR ARQUIVO biometria.py):**
+```python
+# biometria.py - Sistema de Reconhecimento Facial
+import face_recognition
+import cv2
+import numpy as np
+import pickle
+import hashlib
+from datetime import datetime
+from app import db
+from models import BiometriaFuncionario, LogReconhecimento, Funcionario, RegistroPonto
+from cryptography.fernet import Fernet
+import os
+
+class SistemaReconhecimentoFacial:
+    def __init__(self):
+        self.encodings_conhecidos = []
+        self.ids_funcionarios = []
+        self.biometrias_ids = []
+        self.chave_criptografia = self._obter_chave_criptografia()
+        self.fernet = Fernet(self.chave_criptografia)
+        self.carregar_encodings()
+    
+    def _obter_chave_criptografia(self):
+        """Obter ou gerar chave de criptografia para dados biométricos"""
+        chave_path = 'biometria_key.key'
+        
+        if os.path.exists(chave_path):
+            with open(chave_path, 'rb') as f:
+                return f.read()
+        else:
+            chave = Fernet.generate_key()
+            with open(chave_path, 'wb') as f:
+                f.write(chave)
+            return chave
+    
+    def carregar_encodings(self):
+        """Carregar todos os encodings biométricos do banco"""
+        biometrias = BiometriaFuncionario.query.filter_by(ativo=True).all()
+        
+        self.encodings_conhecidos = []
+        self.ids_funcionarios = []
+        self.biometrias_ids = []
+        
+        for biometria in biometrias:
+            try:
+                # Descriptografar encoding
+                encoding_criptografado = biometria.encoding_facial
+                encoding_bytes = self.fernet.decrypt(encoding_criptografado)
+                encoding = pickle.loads(encoding_bytes)
+                
+                self.encodings_conhecidos.append(encoding)
+                self.ids_funcionarios.append(biometria.funcionario_id)
+                self.biometrias_ids.append(biometria.id)
+                
+            except Exception as e:
+                print(f"Erro ao carregar biometria {biometria.id}: {e}")
+    
+    def cadastrar_funcionario(self, funcionario_id, imagem_path_ou_array, usuario_id):
+        """
+        Cadastrar biometria de funcionário
+        
+        Args:
+            funcionario_id: ID do funcionário
+            imagem_path_ou_array: Caminho da imagem ou array numpy
+            usuario_id: ID do usuário que está cadastrando
+        
+        Returns:
+            dict: Resultado do cadastro
+        """
+        try:
+            # Carregar imagem
+            if isinstance(imagem_path_ou_array, str):
+                imagem = face_recognition.load_image_file(imagem_path_ou_array)
+            else:
+                imagem = imagem_path_ou_array
+            
+            # Detectar faces
+            localizacoes_faces = face_recognition.face_locations(imagem)
+            
+            if len(localizacoes_faces) == 0:
+                return {'sucesso': False, 'erro': 'Nenhuma face detectada na imagem'}
+            
+            if len(localizacoes_faces) > 1:
+                return {'sucesso': False, 'erro': 'Múltiplas faces detectadas. Use uma imagem com apenas uma pessoa'}
+            
+            # Extrair encoding
+            encodings = face_recognition.face_encodings(imagem, localizacoes_faces)
+            
+            if len(encodings) == 0:
+                return {'sucesso': False, 'erro': 'Não foi possível extrair características faciais'}
+            
+            encoding = encodings[0]
+            
+            # Calcular qualidade da imagem (baseado na nitidez)
+            qualidade = self._calcular_qualidade_imagem(imagem, localizacoes_faces[0])
+            
+            if qualidade < 0.3:
+                return {'sucesso': False, 'erro': 'Qualidade da imagem muito baixa. Use uma foto mais nítida'}
+            
+            # Verificar se funcionário já tem biometria
+            biometria_existente = BiometriaFuncionario.query.filter_by(
+                funcionario_id=funcionario_id,
+                ativo=True
+            ).first()
+            
+            if biometria_existente:
+                # Atualizar biometria existente
+                biometria = biometria_existente
+                biometria.requer_recadastro = False
+            else:
+                # Criar nova biometria
+                funcionario = Funcionario.query.get(funcionario_id)
+                biometria = BiometriaFuncionario(
+                    funcionario_id=funcionario_id,
+                    cadastrado_por_id=usuario_id,
+                    admin_id=funcionario.admin_id
+                )
+            
+            # Criptografar e salvar encoding
+            encoding_bytes = pickle.dumps(encoding)
+            encoding_criptografado = self.fernet.encrypt(encoding_bytes)
+            
+            biometria.encoding_facial = encoding_criptografado
+            biometria.hash_encoding = hashlib.sha256(encoding_bytes).hexdigest()
+            biometria.qualidade_imagem = qualidade
+            biometria.data_cadastro = datetime.utcnow()
+            
+            if biometria_existente:
+                db.session.commit()
+            else:
+                db.session.add(biometria)
+                db.session.commit()
+            
+            # Recarregar encodings
+            self.carregar_encodings()
+            
+            return {
+                'sucesso': True,
+                'biometria_id': biometria.id,
+                'qualidade': qualidade
+            }
+            
+        except Exception as e:
+            return {'sucesso': False, 'erro': f'Erro no cadastro: {str(e)}'}
+    
+    def reconhecer_funcionario(self, frame, camera_id='default'):
+        """
+        Reconhecer funcionário em frame de vídeo
+        
+        Args:
+            frame: Frame de vídeo (array numpy)
+            camera_id: ID da câmera
+        
+        Returns:
+            dict: Resultado do reconhecimento
+        """
+        inicio_tempo = datetime.now()
+        
+        try:
+            # Redimensionar frame para melhor performance
+            frame_pequeno = cv2.resize(frame, (0, 0), fx=0.25, fy=0.25)
+            frame_rgb = cv2.cvtColor(frame_pequeno, cv2.COLOR_BGR2RGB)
+            
+            # Detectar faces
+            localizacoes_faces = face_recognition.face_locations(frame_rgb)
+            encodings_frame = face_recognition.face_encodings(frame_rgb, localizacoes_faces)
+            
+            if len(encodings_frame) == 0:
+                return {'sucesso': False, 'erro': 'Nenhuma face detectada'}
+            
+            # Comparar com encodings conhecidos
+            for encoding_frame in encodings_frame:
+                distancias = face_recognition.face_distance(self.encodings_conhecidos, encoding_frame)
+                
+                if len(distancias) == 0:
+                    continue
+                
+                melhor_match_index = np.argmin(distancias)
+                melhor_distancia = distancias[melhor_match_index]
+                
+                # Threshold para reconhecimento (quanto menor, mais restritivo)
+                threshold = 0.5
+                
+                if melhor_distancia < threshold:
+                    funcionario_id = self.ids_funcionarios[melhor_match_index]
+                    biometria_id = self.biometrias_ids[melhor_match_index]
+                    confianca = 1.0 - melhor_distancia
+                    
+                    tempo_processamento = (datetime.now() - inicio_tempo).total_seconds()
+                    
+                    # Registrar log de sucesso
+                    log = LogReconhecimento(
+                        funcionario_id=funcionario_id,
+                        biometria_id=biometria_id,
+                        sucesso=True,
+                        confianca=confianca,
+                        tempo_processamento=tempo_processamento,
+                        camera_id=camera_id
+                    )
+                    db.session.add(log)
+                    
+                    # Atualizar estatísticas da biometria
+                    biometria = BiometriaFuncionario.query.get(biometria_id)
+                    biometria.tentativas_reconhecimento += 1
+                    biometria.reconhecimentos_sucesso += 1
+                    biometria.ultimo_reconhecimento = datetime.utcnow()
+                    
+                    db.session.commit()
+                    
+                    return {
+                        'sucesso': True,
+                        'funcionario_id': funcionario_id,
+                        'confianca': confianca,
+                        'tempo_processamento': tempo_processamento,
+                        'log_id': log.id
+                    }
+            
+            # Nenhum reconhecimento bem-sucedido
+            tempo_processamento = (datetime.now() - inicio_tempo).total_seconds()
+            
+            log = LogReconhecimento(
+                sucesso=False,
+                tempo_processamento=tempo_processamento,
+                camera_id=camera_id
+            )
+            db.session.add(log)
+            db.session.commit()
+            
+            return {'sucesso': False, 'erro': 'Funcionário não reconhecido'}
+            
+        except Exception as e:
+            return {'sucesso': False, 'erro': f'Erro no reconhecimento: {str(e)}'}
+    
+    def registrar_ponto_automatico(self, funcionario_id, log_reconhecimento_id=None):
+        """
+        Registrar ponto automaticamente após reconhecimento
+        Integra com sistema de ponto existente
+        """
+        try:
+            funcionario = Funcionario.query.get(funcionario_id)
+            if not funcionario:
+                return {'sucesso': False, 'erro': 'Funcionário não encontrado'}
+            
+            data_hoje = date.today()
+            
+            # Verificar se já existe registro de ponto hoje
+            registro_existente = RegistroPonto.query.filter_by(
+                funcionario_id=funcionario_id,
+                data=data_hoje
+            ).first()
+            
+            agora = datetime.now().time()
+            
+            if not registro_existente:
+                # Primeiro registro do dia - entrada
+                registro = RegistroPonto(
+                    funcionario_id=funcionario_id,
+                    data=data_hoje,
+                    hora_entrada=agora,
+                    tipo_registro='trabalhado',
+                    admin_id=funcionario.admin_id
+                )
+                db.session.add(registro)
+                tipo_ponto = 'entrada'
+            else:
+                # Determinar tipo de registro baseado nos horários já registrados
+                if not registro_existente.hora_saida_almoco and agora.hour >= 11:
+                    # Saída para almoço
+                    registro_existente.hora_saida_almoco = agora
+                    tipo_ponto = 'saida_almoco'
+                elif not registro_existente.hora_retorno_almoco and registro_existente.hora_saida_almoco:
+                    # Retorno do almoço
+                    registro_existente.hora_retorno_almoco = agora
+                    tipo_ponto = 'retorno_almoco'
+                elif not registro_existente.hora_saida:
+                    # Saída final
+                    registro_existente.hora_saida = agora
+                    tipo_ponto = 'saida'
+                    
+                    # Calcular horas trabalhadas usando função existente
+                    from utils import calcular_horas_trabalhadas
+                    horas_info = calcular_horas_trabalhadas(
+                        registro_existente.hora_entrada,
+                        registro_existente.hora_saida,
+                        registro_existente.hora_saida_almoco,
+                        registro_existente.hora_retorno_almoco,
+                        funcionario.horario_trabalho
+                    )
+                    
+                    registro_existente.horas_trabalhadas = horas_info['horas_trabalhadas']
+                    registro_existente.horas_extras = horas_info['horas_extras']
+                else:
+                    return {'sucesso': False, 'erro': 'Todos os pontos do dia já foram registrados'}
+                
+                registro = registro_existente
+            
+            # Associar log de reconhecimento ao registro de ponto
+            if log_reconhecimento_id:
+                log_reconhecimento = LogReconhecimento.query.get(log_reconhecimento_id)
+                if log_reconhecimento:
+                    log_reconhecimento.registro_ponto_id = registro.id
+            
+            db.session.commit()
+            
+            return {
+                'sucesso': True,
+                'tipo_ponto': tipo_ponto,
+                'horario': agora.strftime('%H:%M:%S'),
+                'registro_id': registro.id
+            }
+            
+        except Exception as e:
+            db.session.rollback()
+            return {'sucesso': False, 'erro': f'Erro ao registrar ponto: {str(e)}'}
+    
+    def _calcular_qualidade_imagem(self, imagem, localizacao_face):
+        """Calcular qualidade da imagem baseado na nitidez da face"""
+        try:
+            top, right, bottom, left = localizacao_face
+            face_img = imagem[top:bottom, left:right]
+            
+            # Converter para escala de cinza
+            if len(face_img.shape) == 3:
+                gray = cv2.cvtColor(face_img, cv2.COLOR_RGB2GRAY)
+            else:
+                gray = face_img
+            
+            # Calcular variância do Laplaciano (medida de nitidez)
+            laplacian_var = cv2.Laplacian(gray, cv2.CV_64F).var()
+            
+            # Normalizar para 0-1 (valores típicos: 0-2000)
+            qualidade = min(laplacian_var / 2000.0, 1.0)
+            
+            return qualidade
+            
+        except Exception:
+            return 0.5  # Qualidade média se houver erro
+```
+
+#### **5.4 Rotas para Biometria (ADICIONAR EM views.py):**
+```python
+# ===== RECONHECIMENTO FACIAL =====
+
+from biometria import SistemaReconhecimentoFacial
+
+# Instância global do sistema de reconhecimento
+sistema_biometria = SistemaReconhecimentoFacial()
+
+@main_bp.route('/biometria')
+@admin_required
+def biometria_dashboard():
+    """Dashboard do sistema biométrico"""
+    tenant_filter = get_tenant_filter()
+    
+    # Estatísticas
+    if tenant_filter is None:
+        total_funcionarios = Funcionario.query.filter_by(ativo=True).count()
+        funcionarios_cadastrados = BiometriaFuncionario.query.filter_by(ativo=True).count()
+    else:
+        total_funcionarios = Funcionario.query.filter_by(admin_id=tenant_filter, ativo=True).count()
+        funcionarios_cadastrados = BiometriaFuncionario.query.filter_by(admin_id=tenant_filter, ativo=True).count()
+    
+    # Logs recentes
+    logs_recentes = LogReconhecimento.query.order_by(
+        LogReconhecimento.created_at.desc()
+    ).limit(20).all()
+    
+    if tenant_filter is not None:
+        # Filtrar logs por funcionários do tenant
+        funcionarios_ids = [f.id for f in Funcionario.query.filter_by(admin_id=tenant_filter).all()]
+        logs_recentes = [log for log in logs_recentes if log.funcionario_id in funcionarios_ids]
+    
+    return render_template('biometria/dashboard.html',
+                         total_funcionarios=total_funcionarios,
+                         funcionarios_cadastrados=funcionarios_cadastrados,
+                         logs_recentes=logs_recentes[:20])
+
+@main_bp.route('/biometria/cadastrar/<int:funcionario_id>')
+@admin_required
+def biometria_cadastrar(funcionario_id):
+    """Interface para cadastrar biometria de funcionário"""
+    funcionario = Funcionario.query.get_or_404(funcionario_id)
+    
+    # Verificar permissão
+    if not can_access_data(funcionario.admin_id):
+        abort(403)
+    
+    # Verificar se já tem biometria
+    biometria_existente = BiometriaFuncionario.query.filter_by(
+        funcionario_id=funcionario_id,
+        ativo=True
+    ).first()
+    
+    return render_template('biometria/cadastrar.html',
+                         funcionario=funcionario,
+                         biometria_existente=biometria_existente)
+
+@main_bp.route('/api/biometria/processar-frame', methods=['POST'])
+@admin_required
+def api_biometria_processar_frame():
+    """API para processar frame de vídeo para reconhecimento"""
+    try:
+        # Receber imagem em base64
+        data = request.get_json()
+        imagem_base64 = data.get('imagem')
+        
+        if not imagem_base64:
+            return jsonify({'error': 'Imagem não fornecida'}), 400
+        
+        # Decodificar imagem
+        import base64
+        imagem_bytes = base64.b64decode(imagem_base64.split(',')[1])
+        nparr = np.frombuffer(imagem_bytes, np.uint8)
+        frame = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+        
+        # Reconhecer funcionário
+        resultado = sistema_biometria.reconhecer_funcionario(frame)
+        
+        if resultado['sucesso']:
+            # Registrar ponto automaticamente
+            ponto_resultado = sistema_biometria.registrar_ponto_automatico(
+                resultado['funcionario_id'],
+                resultado.get('log_id')
+            )
+            
+            funcionario = Funcionario.query.get(resultado['funcionario_id'])
+            
+            return jsonify({
+                'reconhecido': True,
+                'funcionario': {
+                    'id': funcionario.id,
+                    'nome': funcionario.nome,
+                    'codigo': funcionario.codigo
+                },
+                'confianca': resultado['confianca'],
+                'ponto': ponto_resultado
+            })
+        else:
+            return jsonify({
+                'reconhecido': False,
+                'erro': resultado['erro']
+            })
+            
+    except Exception as e:
+        return jsonify({'error': f'Erro no processamento: {str(e)}'}), 500
+
+@main_bp.route('/api/biometria/cadastrar-funcionario', methods=['POST'])
+@admin_required
+def api_biometria_cadastrar_funcionario():
+    """API para cadastrar biometria de funcionário"""
+    try:
+        data = request.get_json()
+        funcionario_id = data.get('funcionario_id')
+        imagem_base64 = data.get('imagem')
+        
+        if not funcionario_id or not imagem_base64:
+            return jsonify({'error': 'Dados incompletos'}), 400
+        
+        # Verificar permissão
+        funcionario = Funcionario.query.get_or_404(funcionario_id)
+        if not can_access_data(funcionario.admin_id):
+            return jsonify({'error': 'Permissão negada'}), 403
+        
+        # Decodificar imagem
+        import base64
+        imagem_bytes = base64.b64decode(imagem_base64.split(',')[1])
+        nparr = np.frombuffer(imagem_bytes, np.uint8)
+        imagem = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+        imagem_rgb = cv2.cvtColor(imagem, cv2.COLOR_BGR2RGB)
+        
+        # Cadastrar biometria
+        resultado = sistema_biometria.cadastrar_funcionario(
+            funcionario_id,
+            imagem_rgb,
+            current_user.id
+        )
+        
+        return jsonify(resultado)
+        
+    except Exception as e:
+        return jsonify({'error': f'Erro no cadastro: {str(e)}'}), 500
+
+@main_bp.route('/biometria/reconhecer')
+@funcionario_required
+def biometria_reconhecer():
+    """Interface para reconhecimento facial (ponto eletrônico)"""
+    return render_template('biometria/reconhecer.html')
+```
+
+---
+
+### **MÓDULO 6: FOLHA DE PAGAMENTO AUTOMÁTICA**
+
+#### **6.1 Novas Classes para models.py:**
+```python
+class LancamentoRecorrente(db.Model):
+    __tablename__ = 'lancamento_recorrente'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    funcionario_id = db.Column(db.Integer, db.ForeignKey('funcionario.id'), nullable=False)
+    
+    # Tipo de lançamento
+    tipo_lancamento = db.Column(db.String(30), nullable=False)  # vale_alimentacao, vale_transporte, plano_saude, etc.
+    categoria = db.Column(db.String(20), nullable=False)  # 'provento', 'desconto'
+    
+    # Valor
+    tipo_valor = db.Column(db.String(20), nullable=False)  # 'fixo', 'percentual', 'calculado'
+    valor_fixo = db.Column(db.Float)
+    percentual = db.Column(db.Float)  # Para cálculos percentuais
+    base_calculo = db.Column(db.String(30))  # 'salario_base', 'total_proventos', etc.
+    
+    # Limites
+    valor_minimo = db.Column(db.Float)
+    valor_maximo = db.Column(db.Float)
+    
+    # Vigência
+    data_inicio = db.Column(db.Date, nullable=False)
+    data_fim = db.Column(db.Date)
+    ativo = db.Column(db.Boolean, default=True)
+    
+    # Observações
+    descricao = db.Column(db.String(100))
+    observacoes = db.Column(db.Text)
+    
+    admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    
+    # Relacionamentos
+    funcionario = db.relationship('Funcionario', backref='lancamentos_recorrentes')
+
+class FolhaPagamento(db.Model):
+    __tablename__ = 'folha_pagamento'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    funcionario_id = db.Column(db.Integer, db.ForeignKey('funcionario.id'), nullable=False)
+    
+    # Período
+    mes_referencia = db.Column(db.Integer, nullable=False)  # 1-12
+    ano_referencia = db.Column(db.Integer, nullable=False)
+    
+    # Dados base
+    salario_base = db.Column(db.Float, nullable=False)
+    dias_uteis = db.Column(db.Integer, nullable=False)
+    dias_trabalhados = db.Column(db.Integer, nullable=False)
+    
+    # Horas
+    horas_normais = db.Column(db.Float, default=0.0)
+    horas_extras_50 = db.Column(db.Float, default=0.0)  # 50% adicional
+    horas_extras_100 = db.Column(db.Float, default=0.0)  # 100% adicional (domingo/feriado)
+    horas_noturnas = db.Column(db.Float, default=0.0)
+    
+    # Faltas e DSR
+    faltas_injustificadas = db.Column(db.Integer, default=0)
+    faltas_justificadas = db.Column(db.Integer, default=0)
+    dsr_perdidos = db.Column(db.Integer, default=0)
+    
+    # PROVENTOS
+    valor_horas_normais = db.Column(db.Float, default=0.0)
+    valor_horas_extras_50 = db.Column(db.Float, default=0.0)
+    valor_horas_extras_100 = db.Column(db.Float, default=0.0)
+    valor_horas_noturnas = db.Column(db.Float, default=0.0)
+    valor_dsr_horas_extras = db.Column(db.Float, default=0.0)
+    outros_proventos = db.Column(db.Float, default=0.0)
+    total_proventos = db.Column(db.Float, default=0.0)
+    
+    # DESCONTOS
+    valor_faltas = db.Column(db.Float, default=0.0)
+    valor_dsr_perdido = db.Column(db.Float, default=0.0)
+    inss = db.Column(db.Float, default=0.0)
+    irrf = db.Column(db.Float, default=0.0)
+    vale_alimentacao = db.Column(db.Float, default=0.0)
+    vale_transporte = db.Column(db.Float, default=0.0)
+    outros_descontos = db.Column(db.Float, default=0.0)
+    total_descontos = db.Column(db.Float, default=0.0)
+    
+    # RESULTADO
+    salario_liquido = db.Column(db.Float, default=0.0)
+    
+    # Controle
+    status = db.Column(db.String(20), default='calculada')  # calculada, aprovada, paga
+    data_calculo = db.Column(db.DateTime, default=datetime.utcnow)
+    data_aprovacao = db.Column(db.DateTime)
+    data_pagamento = db.Column(db.DateTime)
+    
+    calculado_por_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False)
+    aprovado_por_id = db.Column(db.Integer, db.ForeignKey('usuario.id'))
+    admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False)
+    
+    # Relacionamentos
+    funcionario = db.relationship('Funcionario', backref='folhas_pagamento')
+    calculado_por = db.relationship('Usuario', foreign_keys=[calculado_por_id])
+    aprovado_por = db.relationship('Usuario', foreign_keys=[aprovado_por_id])
+    
+    # Evitar duplicação
+    __table_args__ = (db.UniqueConstraint('funcionario_id', 'mes_referencia', 'ano_referencia', name='_funcionario_periodo_uc'),)
+
+class ParametroFolha(db.Model):
+    __tablename__ = 'parametro_folha'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    nome = db.Column(db.String(50), unique=True, nullable=False)
+    valor = db.Column(db.Float, nullable=False)
+    descricao = db.Column(db.String(200))
+    data_vigencia = db.Column(db.Date, nullable=False)
+    ativo = db.Column(db.Boolean, default=True)
+    admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'))
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+```
+
+#### **6.2 Dados Iniciais para Parâmetros (EXECUTAR APÓS CRIAR TABELAS):**
+```python
+# Script para inserir parâmetros padrão da folha de pagamento
+def inserir_parametros_folha_padrao():
+    parametros_padrao = [
+        ('salario_minimo', 1412.00, 'Salário mínimo nacional', '2024-01-01'),
+        ('inss_aliquota_1', 7.5, 'INSS até R$ 1.412,00', '2024-01-01'),
+        ('inss_limite_1', 1412.00, 'Limite faixa 1 INSS', '2024-01-01'),
+        ('inss_aliquota_2', 9.0, 'INSS de R$ 1.412,01 até R$ 2.666,68', '2024-01-01'),
+        ('inss_limite_2', 2666.68, 'Limite faixa 2 INSS', '2024-01-01'),
+        ('inss_aliquota_3', 12.0, 'INSS de R$ 2.666,69 até R$ 4.000,03', '2024-01-01'),
+        ('inss_limite_3', 4000.03, 'Limite faixa 3 INSS', '2024-01-01'),
+        ('inss_aliquota_4', 14.0, 'INSS de R$ 4.000,04 até R$ 7.786,02', '2024-01-01'),
+        ('inss_limite_4', 7786.02, 'Limite faixa 4 INSS', '2024-01-01'),
+        ('vale_transporte_percentual', 6.0, 'Desconto máximo vale transporte', '2024-01-01'),
+        ('vale_alimentacao_percentual', 20.0, 'Desconto máximo vale alimentação', '2024-01-01'),
+        ('irrf_isencao', 2259.20, 'Valor de isenção IRRF', '2024-01-01'),
+        ('irrf_deducao_dependente', 189.59, 'Dedução por dependente IRRF', '2024-01-01')
+    ]
+    
+    for nome, valor, descricao, data_vigencia in parametros_padrao:
+        parametro_existente = ParametroFolha.query.filter_by(nome=nome).first()
+        if not parametro_existente:
+            parametro = ParametroFolha(
+                nome=nome,
+                valor=valor,
+                descricao=descricao,
+                data_vigencia=datetime.strptime(data_vigencia, '%Y-%m-%d').date()
+            )
+            db.session.add(parametro)
+    
+    db.session.commit()
+```
+
+#### **6.3 Funções de Cálculo (ADICIONAR EM utils.py):**
+```python
+# ===== FOLHA DE PAGAMENTO AUTOMÁTICA =====
+
+def calcular_folha_funcionario(funcionario_id, mes, ano):
+    """
+    Calcular folha de pagamento de funcionário baseado no controle de ponto existente
+    Integra com sistema DSR estrito já implementado
+    """
+    from models import (Funcionario, RegistroPonto, FolhaPagamento, 
+                       LancamentoRecorrente, ParametroFolha)
+    from calendar import monthrange
+    
+    funcionario = Funcionario.query.get(funcionario_id)
+    if not funcionario:
+        return None
+    
+    # Período de cálculo
+    primeiro_dia = date(ano, mes, 1)
+    ultimo_dia = date(ano, mes, monthrange(ano, mes)[1])
+    
+    # Obter registros de ponto do período
+    registros_ponto = RegistroPonto.query.filter(
+        RegistroPonto.funcionario_id == funcionario_id,
+        RegistroPonto.data >= primeiro_dia,
+        RegistroPonto.data <= ultimo_dia
+    ).all()
+    
+    # Calcular dias úteis do mês
+    dias_uteis = 0
+    for dia in range(1, monthrange(ano, mes)[1] + 1):
+        data_check = date(ano, mes, dia)
+        if data_check.weekday() < 5:  # Segunda a sexta
+            dias_uteis += 1
+    
+    # Inicializar contadores
+    horas_normais = 0.0
+    horas_extras_50 = 0.0
+    horas_extras_100 = 0.0
+    faltas_injustificadas = 0
+    faltas_justificadas = 0
+    dias_trabalhados = 0
+    
+    # Processar registros de ponto
+    for registro in registros_ponto:
+        if registro.tipo_registro == 'trabalhado':
+            dias_trabalhados += 1
+            horas_normais += registro.horas_trabalhadas or 0
+            
+            # Classificar horas extras por tipo
+            if registro.horas_extras and registro.horas_extras > 0:
+                if registro.tipo_registro in ['domingo_trabalhado', 'feriado_trabalhado']:
+                    horas_extras_100 += registro.horas_extras
+                else:
+                    horas_extras_50 += registro.horas_extras
+                    
+        elif registro.tipo_registro == 'falta':
+            faltas_injustificadas += 1
+        elif registro.tipo_registro == 'falta_justificada':
+            faltas_justificadas += 1
+    
+    # Calcular DSR usando função existente
+    dsr_info = calcular_dsr_modo_estrito(
+        funcionario.salario,
+        [r for r in registros_ponto if r.tipo_registro == 'falta'],
+        primeiro_dia,
+        ultimo_dia
+    )
+    
+    # Calcular valores usando função existente de valor hora
+    valor_hora = calcular_valor_hora_funcionario(funcionario, primeiro_dia)
+    
+    # PROVENTOS
+    valor_horas_normais = horas_normais * valor_hora
+    valor_horas_extras_50 = horas_extras_50 * valor_hora * 1.5
+    valor_horas_extras_100 = horas_extras_100 * valor_hora * 2.0
+    valor_dsr_horas_extras = (horas_extras_50 + horas_extras_100) * valor_hora * 0.5  # DSR sobre extras
+    
+    # Lançamentos recorrentes - proventos
+    lancamentos_proventos = LancamentoRecorrente.query.filter(
+        LancamentoRecorrente.funcionario_id == funcionario_id,
+        LancamentoRecorrente.categoria == 'provento',
+        LancamentoRecorrente.ativo == True,
+        LancamentoRecorrente.data_inicio <= ultimo_dia,
+        or_(LancamentoRecorrente.data_fim.is_(None), LancamentoRecorrente.data_fim >= primeiro_dia)
+    ).all()
+    
+    outros_proventos = 0.0
+    for lancamento in lancamentos_proventos:
+        if lancamento.tipo_valor == 'fixo':
+            outros_proventos += lancamento.valor_fixo or 0
+        elif lancamento.tipo_valor == 'percentual':
+            base = funcionario.salario if lancamento.base_calculo == 'salario_base' else valor_horas_normais
+            valor_calculado = base * (lancamento.percentual / 100)
+            if lancamento.valor_minimo:
+                valor_calculado = max(valor_calculado, lancamento.valor_minimo)
+            if lancamento.valor_maximo:
+                valor_calculado = min(valor_calculado, lancamento.valor_maximo)
+            outros_proventos += valor_calculado
+    
+    total_proventos = (valor_horas_normais + valor_horas_extras_50 + 
+                      valor_horas_extras_100 + valor_dsr_horas_extras + outros_proventos)
+    
+    # DESCONTOS
+    valor_faltas = dsr_info['desconto_total']
+    
+    # INSS
+    inss = calcular_inss(total_proventos)
+    
+    # IRRF (após dedução do INSS)
+    base_irrf = total_proventos - inss
+    irrf = calcular_irrf(base_irrf, dependentes=0)  # TODO: Adicionar campo dependentes
+    
+    # Lançamentos recorrentes - descontos
+    lancamentos_descontos = LancamentoRecorrente.query.filter(
+        LancamentoRecorrente.funcionario_id == funcionario_id,
+        LancamentoRecorrente.categoria == 'desconto',
+        LancamentoRecorrente.ativo == True,
+        LancamentoRecorrente.data_inicio <= ultimo_dia,
+        or_(LancamentoRecorrente.data_fim.is_(None), LancamentoRecorrente.data_fim >= primeiro_dia)
+    ).all()
+    
+    vale_alimentacao = 0.0
+    vale_transporte = 0.0
+    outros_descontos = 0.0
+    
+    for lancamento in lancamentos_descontos:
+        if lancamento.tipo_valor == 'fixo':
+            valor_desconto = lancamento.valor_fixo or 0
+        elif lancamento.tipo_valor == 'percentual':
+            base = funcionario.salario if lancamento.base_calculo == 'salario_base' else total_proventos
+            valor_desconto = base * (lancamento.percentual / 100)
+            if lancamento.valor_minimo:
+                valor_desconto = max(valor_desconto, lancamento.valor_minimo)
+            if lancamento.valor_maximo:
+                valor_desconto = min(valor_desconto, lancamento.valor_maximo)
+        else:
+            valor_desconto = 0
+        
+        if lancamento.tipo_lancamento == 'vale_alimentacao':
+            vale_alimentacao += valor_desconto
+        elif lancamento.tipo_lancamento == 'vale_transporte':
+            vale_transporte += valor_desconto
+        else:
+            outros_descontos += valor_desconto
+    
+    total_descontos = valor_faltas + inss + irrf + vale_alimentacao + vale_transporte + outros_descontos
+    salario_liquido = total_proventos - total_descontos
+    
+    # Criar ou atualizar folha de pagamento
+    folha_existente = FolhaPagamento.query.filter_by(
+        funcionario_id=funcionario_id,
+        mes_referencia=mes,
+        ano_referencia=ano
+    ).first()
+    
+    if folha_existente:
+        folha = folha_existente
+    else:
+        folha = FolhaPagamento(
+            funcionario_id=funcionario_id,
+            mes_referencia=mes,
+            ano_referencia=ano,
+            calculado_por_id=current_user.id if current_user.is_authenticated else 1,
+            admin_id=funcionario.admin_id
+        )
+    
+    # Atualizar valores
+    folha.salario_base = funcionario.salario
+    folha.dias_uteis = dias_uteis
+    folha.dias_trabalhados = dias_trabalhados
+    folha.horas_normais = horas_normais
+    folha.horas_extras_50 = horas_extras_50
+    folha.horas_extras_100 = horas_extras_100
+    folha.faltas_injustificadas = faltas_injustificadas
+    folha.faltas_justificadas = faltas_justificadas
+    folha.dsr_perdidos = dsr_info['semanas_com_perda']
+    
+    # Proventos
+    folha.valor_horas_normais = valor_horas_normais
+    folha.valor_horas_extras_50 = valor_horas_extras_50
+    folha.valor_horas_extras_100 = valor_horas_extras_100
+    folha.valor_dsr_horas_extras = valor_dsr_horas_extras
+    folha.outros_proventos = outros_proventos
+    folha.total_proventos = total_proventos
+    
+    # Descontos
+    folha.valor_faltas = valor_faltas
+    folha.inss = inss
+    folha.irrf = irrf
+    folha.vale_alimentacao = vale_alimentacao
+    folha.vale_transporte = vale_transporte
+    folha.outros_descontos = outros_descontos
+    folha.total_descontos = total_descontos
+    
+    # Resultado
+    folha.salario_liquido = salario_liquido
+    folha.data_calculo = datetime.utcnow()
+    
+    if not folha_existente:
+        db.session.add(folha)
+    
+    db.session.commit()
+    
+    return folha
+
+def calcular_inss(salario_base):
+    """Calcular INSS progressivo conforme tabela atual"""
+    from models import ParametroFolha
+    
+    # Obter parâmetros atuais
+    parametros = {p.nome: p.valor for p in ParametroFolha.query.filter_by(ativo=True).all()}
+    
+    if salario_base <= 0:
+        return 0.0
+    
+    inss_total = 0.0
+    salario_restante = salario_base
+    
+    # Faixa 1
+    limite_1 = parametros.get('inss_limite_1', 1412.00)
+    if salario_restante > 0:
+        base_faixa_1 = min(salario_restante, limite_1)
+        inss_total += base_faixa_1 * (parametros.get('inss_aliquota_1', 7.5) / 100)
+        salario_restante -= base_faixa_1
+    
+    # Faixa 2
+    if salario_restante > 0:
+        limite_2 = parametros.get('inss_limite_2', 2666.68)
+        base_faixa_2 = min(salario_restante, limite_2 - limite_1)
+        inss_total += base_faixa_2 * (parametros.get('inss_aliquota_2', 9.0) / 100)
+        salario_restante -= base_faixa_2
+    
+    # Faixa 3
+    if salario_restante > 0:
+        limite_3 = parametros.get('inss_limite_3', 4000.03)
+        base_faixa_3 = min(salario_restante, limite_3 - parametros.get('inss_limite_2', 2666.68))
+        inss_total += base_faixa_3 * (parametros.get('inss_aliquota_3', 12.0) / 100)
+        salario_restante -= base_faixa_3
+    
+    # Faixa 4
+    if salario_restante > 0:
+        limite_4 = parametros.get('inss_limite_4', 7786.02)
+        base_faixa_4 = min(salario_restante, limite_4 - parametros.get('inss_limite_3', 4000.03))
+        inss_total += base_faixa_4 * (parametros.get('inss_aliquota_4', 14.0) / 100)
+    
+    return round(inss_total, 2)
+
+def calcular_irrf(base_calculo, dependentes=0):
+    """Calcular IRRF conforme tabela progressiva"""
+    from models import ParametroFolha
+    
+    parametros = {p.nome: p.valor for p in ParametroFolha.query.filter_by(ativo=True).all()}
+    
+    # Dedução por dependentes
+    deducao_dependentes = dependentes * parametros.get('irrf_deducao_dependente', 189.59)
+    base_irrf = base_calculo - deducao_dependentes
+    
+    # Valor de isenção
+    isencao = parametros.get('irrf_isencao', 2259.20)
+    
+    if base_irrf <= isencao:
+        return 0.0
+    
+    # Tabela progressiva IRRF 2024 (simplificada)
+    if base_irrf <= 2826.65:
+        irrf = base_irrf * 0.075 - 169.44
+    elif base_irrf <= 3751.05:
+        irrf = base_irrf * 0.15 - 381.44
+    elif base_irrf <= 4664.68:
+        irrf = base_irrf * 0.225 - 662.77
+    else:
+        irrf = base_irrf * 0.275 - 896.00
+    
+    return max(round(irrf, 2), 0.0)
+
+def gerar_holerite_pdf(funcionario_id, mes, ano):
+    """Gerar holerite em PDF usando ReportLab"""
+    from reportlab.lib.pagesizes import A4
+    from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
+    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+    from reportlab.lib import colors
+    from reportlab.lib.units import cm
+    import io
+    
+    folha = FolhaPagamento.query.filter_by(
+        funcionario_id=funcionario_id,
+        mes_referencia=mes,
+        ano_referencia=ano
+    ).first()
+    
+    if not folha:
+        return None
+    
+    funcionario = folha.funcionario
+    
+    # Criar PDF em memória
+    buffer = io.BytesIO()
+    doc = SimpleDocTemplate(buffer, pagesize=A4, topMargin=2*cm)
+    
+    # Estilos
+    styles = getSampleStyleSheet()
+    title_style = ParagraphStyle(
+        'CustomTitle',
+        parent=styles['Heading1'],
+        fontSize=16,
+        spaceAfter=30,
+        alignment=1  # Centralizado
+    )
+    
+    # Conteúdo
+    story = []
+    
+    # Título
+    story.append(Paragraph("HOLERITE DE PAGAMENTO", title_style))
+    story.append(Spacer(1, 20))
+    
+    # Dados do funcionário
+    dados_funcionario = [
+        ['Funcionário:', funcionario.nome, 'Código:', funcionario.codigo],
+        ['CPF:', funcionario.cpf, 'Período:', f"{mes:02d}/{ano}"],
+        ['Função:', funcionario.funcao_ref.nome if funcionario.funcao_ref else '', 'Salário Base:', f"R$ {folha.salario_base:.2f}"]
+    ]
+    
+    table_funcionario = Table(dados_funcionario, colWidths=[3*cm, 6*cm, 3*cm, 4*cm])
+    table_funcionario.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, -1), colors.lightgrey),
+        ('TEXTCOLOR', (0, 0), (-1, -1), colors.black),
+        ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+        ('FONTNAME', (0, 0), (-1, -1), 'Helvetica'),
+        ('FONTSIZE', (0, 0), (-1, -1), 10),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 12),
+        ('GRID', (0, 0), (-1, -1), 1, colors.black)
+    ]))
+    
+    story.append(table_funcionario)
+    story.append(Spacer(1, 20))
+    
+    # Proventos e Descontos
+    dados_folha = [
+        ['PROVENTOS', 'VALOR', 'DESCONTOS', 'VALOR'],
+        ['Horas Normais', f"R$ {folha.valor_horas_normais:.2f}", 'INSS', f"R$ {folha.inss:.2f}"],
+        ['Horas Extras 50%', f"R$ {folha.valor_horas_extras_50:.2f}", 'IRRF', f"R$ {folha.irrf:.2f}"],
+        ['Horas Extras 100%', f"R$ {folha.valor_horas_extras_100:.2f}", 'Vale Alimentação', f"R$ {folha.vale_alimentacao:.2f}"],
+        ['DSR s/ Horas Extras', f"R$ {folha.valor_dsr_horas_extras:.2f}", 'Vale Transporte', f"R$ {folha.vale_transporte:.2f}"],
+        ['Outros Proventos', f"R$ {folha.outros_proventos:.2f}", 'Faltas/DSR', f"R$ {folha.valor_faltas:.2f}"],
+        ['', '', 'Outros Descontos', f"R$ {folha.outros_descontos:.2f}"],
+        ['TOTAL PROVENTOS', f"R$ {folha.total_proventos:.2f}", 'TOTAL DESCONTOS', f"R$ {folha.total_descontos:.2f}"],
+        ['', '', 'SALÁRIO LÍQUIDO', f"R$ {folha.salario_liquido:.2f}"]
+    ]
+    
+    table_folha = Table(dados_folha, colWidths=[6*cm, 3*cm, 6*cm, 3*cm])
+    table_folha.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, 0), colors.darkblue),
+        ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+        ('BACKGROUND', (0, -2), (-1, -1), colors.lightblue),
+        ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+        ('ALIGN', (1, 0), (1, -1), 'RIGHT'),
+        ('ALIGN', (3, 0), (3, -1), 'RIGHT'),
+        ('FONTNAME', (0, 0), (-1, -1), 'Helvetica'),
+        ('FONTSIZE', (0, 0), (-1, -1), 10),
+        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+        ('FONTNAME', (0, -2), (-1, -1), 'Helvetica-Bold'),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 12),
+        ('GRID', (0, 0), (-1, -1), 1, colors.black)
+    ]))
+    
+    story.append(table_folha)
+    
+    # Gerar PDF
+    doc.build(story)
+    buffer.seek(0)
+    
+    return buffer
+```
+
+#### **6.4 Rotas para Folha de Pagamento (ADICIONAR EM views.py):**
+```python
+# ===== FOLHA DE PAGAMENTO AUTOMÁTICA =====
+
+@main_bp.route('/folha-pagamento')
+@admin_required
+def folha_pagamento_dashboard():
+    """Dashboard da folha de pagamento"""
+    tenant_filter = get_tenant_filter()
+    
+    # Mês/ano atual
+    hoje = date.today()
+    mes_atual = hoje.month
+    ano_atual = hoje.year
+    
+    # Estatísticas
+    if tenant_filter is None:
+        total_funcionarios = Funcionario.query.filter_by(ativo=True).count()
+        folhas_calculadas = FolhaPagamento.query.filter_by(
+            mes_referencia=mes_atual,
+            ano_referencia=ano_atual
+        ).count()
+    else:
+        total_funcionarios = Funcionario.query.filter_by(admin_id=tenant_filter, ativo=True).count()
+        folhas_calculadas = FolhaPagamento.query.filter_by(
+            mes_referencia=mes_atual,
+            ano_referencia=ano_atual,
+            admin_id=tenant_filter
+        ).count()
+    
+    return render_template('folha_pagamento/dashboard.html',
+                         total_funcionarios=total_funcionarios,
+                         folhas_calculadas=folhas_calculadas,
+                         mes_atual=mes_atual,
+                         ano_atual=ano_atual)
+
+@main_bp.route('/folha-pagamento/<int:mes>/<int:ano>')
+@admin_required
+def folha_pagamento_periodo(mes, ano):
+    """Folha de pagamento de um período específico"""
+    tenant_filter = get_tenant_filter()
+    
+    # Obter folhas do período
+    query = FolhaPagamento.query.filter_by(mes_referencia=mes, ano_referencia=ano)
+    if tenant_filter is not None:
+        query = query.filter_by(admin_id=tenant_filter)
+    
+    folhas = query.all()
+    
+    return render_template('folha_pagamento/periodo.html',
+                         folhas=folhas,
+                         mes=mes,
+                         ano=ano)
+
+@main_bp.route('/folha-pagamento/calcular', methods=['POST'])
+@admin_required
+def folha_pagamento_calcular():
+    """Calcular folha de pagamento para período"""
+    mes = int(request.form['mes'])
+    ano = int(request.form['ano'])
+    funcionarios_ids = request.form.getlist('funcionarios_ids')
+    
+    if not funcionarios_ids:
+        # Calcular para todos os funcionários ativos
+        tenant_filter = get_tenant_filter()
+        if tenant_filter is None:
+            funcionarios = Funcionario.query.filter_by(ativo=True).all()
+        else:
+            funcionarios = Funcionario.query.filter_by(admin_id=tenant_filter, ativo=True).all()
+        funcionarios_ids = [f.id for f in funcionarios]
+    
+    # Calcular folha para cada funcionário
+    calculadas = 0
+    erros = []
+    
+    for funcionario_id in funcionarios_ids:
+        try:
+            folha = calcular_folha_funcionario(int(funcionario_id), mes, ano)
+            if folha:
+                calculadas += 1
+        except Exception as e:
+            funcionario = Funcionario.query.get(funcionario_id)
+            erros.append(f"Erro ao calcular {funcionario.nome if funcionario else funcionario_id}: {str(e)}")
+    
+    if erros:
+        for erro in erros:
+            flash(erro, 'warning')
+    
+    flash(f'Folha calculada para {calculadas} funcionários!', 'success')
+    return redirect(url_for('main.folha_pagamento_periodo', mes=mes, ano=ano))
+
+@main_bp.route('/folha-pagamento/holerite/<int:funcionario_id>/<int:mes>/<int:ano>')
+@funcionario_required
+def folha_pagamento_holerite(funcionario_id, mes, ano):
+    """Visualizar/baixar holerite de funcionário"""
+    # Verificar permissão
+    if current_user.tipo_usuario == TipoUsuario.FUNCIONARIO:
+        # Funcionário só pode ver próprio holerite
+        funcionario_usuario = Funcionario.query.filter_by(
+            admin_id=current_user.admin_id,
+            ativo=True
+        ).first()
+        if not funcionario_usuario or funcionario_usuario.id != funcionario_id:
+            abort(403)
+    else:
+        # Admin pode ver qualquer holerite do seu tenant
+        funcionario = Funcionario.query.get_or_404(funcionario_id)
+        if not can_access_data(funcionario.admin_id):
+            abort(403)
+    
+    folha = FolhaPagamento.query.filter_by(
+        funcionario_id=funcionario_id,
+        mes_referencia=mes,
+        ano_referencia=ano
+    ).first_or_404()
+    
+    # Verificar se é download PDF
+    if request.args.get('formato') == 'pdf':
+        pdf_buffer = gerar_holerite_pdf(funcionario_id, mes, ano)
+        if pdf_buffer:
+            return send_file(
+                pdf_buffer,
+                as_attachment=True,
+                download_name=f'holerite_{folha.funcionario.codigo}_{mes:02d}_{ano}.pdf',
+                mimetype='application/pdf'
+            )
+        else:
+            flash('Erro ao gerar PDF do holerite', 'danger')
+            return redirect(url_for('main.folha_pagamento_dashboard'))
+    
+    return render_template('folha_pagamento/holerite.html', folha=folha)
+
+@main_bp.route('/folha-pagamento/lancamentos-recorrentes')
+@admin_required
+def folha_lancamentos_recorrentes():
+    """Gerenciar lançamentos recorrentes"""
+    tenant_filter = get_tenant_filter()
+    
+    if tenant_filter is None:
+        lancamentos = LancamentoRecorrente.query.filter_by(ativo=True).all()
+    else:
+        lancamentos = LancamentoRecorrente.query.filter_by(admin_id=tenant_filter, ativo=True).all()
+    
+    return render_template('folha_pagamento/lancamentos_recorrentes.html',
+                         lancamentos=lancamentos)
+
+@main_bp.route('/funcionarios/<int:funcionario_id>/lancamentos')
+@admin_required
+def funcionario_lancamentos(funcionario_id):
+    """Lançamentos recorrentes de um funcionário específico"""
+    funcionario = Funcionario.query.get_or_404(funcionario_id)
+    
+    # Verificar permissão
+    if not can_access_data(funcionario.admin_id):
+        abort(403)
+    
+    lancamentos = LancamentoRecorrente.query.filter_by(
+        funcionario_id=funcionario_id,
+        ativo=True
+    ).all()
+    
+    return render_template('funcionarios/lancamentos.html',
+                         funcionario=funcionario,
+                         lancamentos=lancamentos)
+```
+
+---
+
+### **MÓDULO 7: SISTEMA CONTÁBIL INTEGRADO**
+
+#### **7.1 Novas Classes para models.py:**
+```python
+class PlanoContas(db.Model):
+    __tablename__ = 'plano_contas'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    codigo = db.Column(db.String(20), unique=True, nullable=False)  # 1.1.01.001
+    descricao = db.Column(db.String(200), nullable=False)
+    
+    # Classificação
+    tipo_conta = db.Column(db.String(20), nullable=False)  # 'ativo', 'passivo', 'receita', 'despesa', 'patrimonio'
+    subtipo = db.Column(db.String(30))  # 'circulante', 'nao_circulante', 'operacional', etc.
+    natureza = db.Column(db.String(10), nullable=False)  # 'devedora', 'credora'
+    
+    # Hierarquia
+    conta_pai_id = db.Column(db.Integer, db.ForeignKey('plano_contas.id'))
+    nivel = db.Column(db.Integer, nullable=False, default=1)
+    
+    # Configurações
+    aceita_lancamento = db.Column(db.Boolean, default=True)
+    exige_centro_custo = db.Column(db.Boolean, default=False)
+    
+    # Controle
+    ativo = db.Column(db.Boolean, default=True)
+    admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    
+    # Relacionamentos
+    conta_pai = db.relationship('PlanoContas', remote_side=[id], backref='contas_filhas')
+    lancamentos = db.relationship('ItemLancamento', backref='conta_ref')
+
+class LancamentoContabil(db.Model):
+    __tablename__ = 'lancamento_contabil'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    numero_lancamento = db.Column(db.String(20), unique=True, nullable=False)  # LC-2025-001
+    
+    # Data e histórico
+    data_lancamento = db.Column(db.Date, nullable=False)
+    historico = db.Column(db.String(200), nullable=False)
+    
+    # Valor total (controle)
+    valor_total = db.Column(db.Float, nullable=False)
+    
+    # Origem do lançamento
+    origem_sistema = db.Column(db.String(30))  # 'folha_pagamento', 'almoxarifado', 'manual', etc.
+    origem_id = db.Column(db.Integer)  # ID do registro de origem
+    origem_tabela = db.Column(db.String(30))  # Nome da tabela de origem
+    
+    # Status
+    status = db.Column(db.String(20), default='provisorio')  # provisorio, definitivo, cancelado
+    
+    # Controle
+    data_criacao = db.Column(db.DateTime, default=datetime.utcnow)
+    usuario_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False)
+    admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False)
+    
+    # Relacionamentos
+    itens = db.relationship('ItemLancamento', backref='lancamento_ref', cascade='all, delete-orphan')
+    usuario = db.relationship('Usuario', foreign_keys=[usuario_id])
+
+class ItemLancamento(db.Model):
+    __tablename__ = 'item_lancamento'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    lancamento_id = db.Column(db.Integer, db.ForeignKey('lancamento_contabil.id'), nullable=False)
+    
+    # Conta contábil
+    conta_id = db.Column(db.Integer, db.ForeignKey('plano_contas.id'), nullable=False)
+    
+    # Débito ou crédito
+    tipo_movimento = db.Column(db.String(10), nullable=False)  # 'debito', 'credito'
+    valor = db.Column(db.Float, nullable=False)
+    
+    # Centro de custo (opcional)
+    centro_custo_id = db.Column(db.Integer, db.ForeignKey('centro_custo.id'))
+    obra_id = db.Column(db.Integer, db.ForeignKey('obra.id'))
+    
+    # Histórico específico do item
+    historico_item = db.Column(db.String(200))
+    
+    ordem = db.Column(db.Integer, default=1)
+    
+    # Relacionamentos
+    centro_custo = db.relationship('CentroCusto', backref='itens_lancamento')
+    obra = db.relationship('Obra', backref='itens_lancamento')
+
+class SaldoConta(db.Model):
+    __tablename__ = 'saldo_conta'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    conta_id = db.Column(db.Integer, db.ForeignKey('plano_contas.id'), nullable=False)
+    
+    # Período
+    mes = db.Column(db.Integer, nullable=False)
+    ano = db.Column(db.Integer, nullable=False)
+    
+    # Saldos
+    saldo_anterior = db.Column(db.Float, default=0.0)
+    debitos = db.Column(db.Float, default=0.0)
+    creditos = db.Column(db.Float, default=0.0)
+    saldo_atual = db.Column(db.Float, default=0.0)
+    
+    # Controle
+    data_atualizacao = db.Column(db.DateTime, default=datetime.utcnow)
+    admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False)
+    
+    # Relacionamentos
+    conta = db.relationship('PlanoContas', backref='saldos')
+    
+    # Evitar duplicação
+    __table_args__ = (db.UniqueConstraint('conta_id', 'mes', 'ano', 'admin_id', name='_conta_periodo_admin_uc'),)
+```
+
+#### **7.2 Plano de Contas Padrão (EXECUTAR APÓS CRIAR TABELAS):**
+```python
+def inserir_plano_contas_padrao(admin_id):
+    """Inserir plano de contas padrão para construção civil"""
+    
+    contas_padrao = [
+        # ATIVO
+        ('1', 'ATIVO', 'ativo', 'devedora', 1, None, False),
+        ('1.1', 'ATIVO CIRCULANTE', 'ativo', 'devedora', 2, '1', False),
+        ('1.1.01', 'Disponível', 'ativo', 'devedora', 3, '1.1', False),
+        ('1.1.01.001', 'Caixa', 'ativo', 'devedora', 4, '1.1.01', True),
+        ('1.1.01.002', 'Bancos Conta Movimento', 'ativo', 'devedora', 4, '1.1.01', True),
+        ('1.1.02', 'Clientes', 'ativo', 'devedora', 3, '1.1', False),
+        ('1.1.02.001', 'Clientes Nacionais', 'ativo', 'devedora', 4, '1.1.02', True),
+        ('1.1.03', 'Estoques', 'ativo', 'devedora', 3, '1.1', False),
+        ('1.1.03.001', 'Materiais de Construção', 'ativo', 'devedora', 4, '1.1.03', True),
+        ('1.1.03.002', 'Ferramentas e Equipamentos', 'ativo', 'devedora', 4, '1.1.03', True),
+        
+        # PASSIVO
+        ('2', 'PASSIVO', 'passivo', 'credora', 1, None, False),
+        ('2.1', 'PASSIVO CIRCULANTE', 'passivo', 'credora', 2, '2', False),
+        ('2.1.01', 'Fornecedores', 'passivo', 'credora', 3, '2.1', False),
+        ('2.1.01.001', 'Fornecedores Nacionais', 'passivo', 'credora', 4, '2.1.01', True),
+        ('2.1.02', 'Obrigações Trabalhistas', 'passivo', 'credora', 3, '2.1', False),
+        ('2.1.02.001', 'Salários a Pagar', 'passivo', 'credora', 4, '2.1.02', True),
+        ('2.1.02.002', 'INSS a Recolher', 'passivo', 'credora', 4, '2.1.02', True),
+        ('2.1.02.003', 'FGTS a Recolher', 'passivo', 'credora', 4, '2.1.02', True),
+        ('2.1.02.004', 'IRRF a Recolher', 'passivo', 'credora', 4, '2.1.02', True),
+        
+        # PATRIMÔNIO LÍQUIDO
+        ('3', 'PATRIMÔNIO LÍQUIDO', 'patrimonio', 'credora', 1, None, False),
+        ('3.1', 'Capital Social', 'patrimonio', 'credora', 2, '3', False),
+        ('3.1.01', 'Capital Subscrito', 'patrimonio', 'credora', 3, '3.1', False),
+        ('3.1.01.001', 'Capital Social', 'patrimonio', 'credora', 4, '3.1.01', True),
+        
+        # RECEITAS
+        ('4', 'RECEITAS', 'receita', 'credora', 1, None, False),
+        ('4.1', 'RECEITA OPERACIONAL', 'receita', 'credora', 2, '4', False),
+        ('4.1.01', 'Receita de Serviços', 'receita', 'credora', 3, '4.1', False),
+        ('4.1.01.001', 'Receita de Obras', 'receita', 'credora', 4, '4.1.01', True),
+        
+        # DESPESAS
+        ('5', 'DESPESAS', 'despesa', 'devedora', 1, None, False),
+        ('5.1', 'DESPESAS OPERACIONAIS', 'despesa', 'devedora', 2, '5', False),
+        ('5.1.01', 'Despesas com Pessoal', 'despesa', 'devedora', 3, '5.1', False),
+        ('5.1.01.001', 'Salários', 'despesa', 'devedora', 4, '5.1.01', True),
+        ('5.1.01.002', 'Encargos Sociais', 'despesa', 'devedora', 4, '5.1.01', True),
+        ('5.1.02', 'Despesas com Materiais', 'despesa', 'devedora', 3, '5.1', False),
+        ('5.1.02.001', 'Materiais de Construção', 'despesa', 'devedora', 4, '5.1.02', True),
+        ('5.1.03', 'Despesas Administrativas', 'despesa', 'devedora', 3, '5.1', False),
+        ('5.1.03.001', 'Energia Elétrica', 'despesa', 'devedora', 4, '5.1.03', True),
+        ('5.1.03.002', 'Telefone', 'despesa', 'devedora', 4, '5.1.03', True),
+        ('5.1.03.003', 'Combustível', 'despesa', 'devedora', 4, '5.1.03', True)
+    ]
+    
+    # Mapear códigos para IDs
+    codigo_para_id = {}
+    
+    for codigo, descricao, tipo_conta, natureza, nivel, codigo_pai, aceita_lancamento in contas_padrao:
+        # Verificar se conta já existe
+        conta_existente = PlanoContas.query.filter_by(codigo=codigo, admin_id=admin_id).first()
+        if conta_existente:
+            codigo_para_id[codigo] = conta_existente.id
+            continue
+        
+        # Obter ID da conta pai
+        conta_pai_id = None
+        if codigo_pai:
+            conta_pai_id = codigo_para_id.get(codigo_pai)
+        
+        conta = PlanoContas(
+            codigo=codigo,
+            descricao=descricao,
+            tipo_conta=tipo_conta,
+            natureza=natureza,
+            nivel=nivel,
+            conta_pai_id=conta_pai_id,
+            aceita_lancamento=aceita_lancamento,
+            admin_id=admin_id
+        )
+        
+        db.session.add(conta)
+        db.session.flush()  # Para obter o ID
+        codigo_para_id[codigo] = conta.id
+    
+    db.session.commit()
+```
+
+#### **7.3 Funções de Integração Automática (ADICIONAR EM utils.py):**
+```python
+# ===== SISTEMA CONTÁBIL INTEGRADO =====
+
+def criar_lancamento_folha_pagamento(folha_id):
+    """
+    Criar lançamentos contábeis automáticos da folha de pagamento
+    Integra com sistema contábil
+    """
+    from models import (FolhaPagamento, LancamentoContabil, ItemLancamento, 
+                       PlanoContas)
+    
+    folha = FolhaPagamento.query.get(folha_id)
+    if not folha:
+        return None
+    
+    # Gerar número do lançamento
+    numero_lancamento = gerar_numero_lancamento_contabil()
+    
+    # Criar lançamento principal
+    lancamento = LancamentoContabil(
+        numero_lancamento=numero_lancamento,
+        data_lancamento=date(folha.ano_referencia, folha.mes_referencia, 
+                           calendar.monthrange(folha.ano_referencia, folha.mes_referencia)[1]),
+        historico=f"Folha de pagamento {folha.mes_referencia:02d}/{folha.ano_referencia} - {folha.funcionario.nome}",
+        valor_total=folha.total_proventos,
+        origem_sistema='folha_pagamento',
+        origem_id=folha_id,
+        origem_tabela='folha_pagamento',
+        usuario_id=folha.calculado_por_id,
+        admin_id=folha.admin_id
+    )
+    
+    db.session.add(lancamento)
+    db.session.flush()
+    
+    # Obter contas contábeis
+    conta_salarios = PlanoContas.query.filter_by(
+        codigo='5.1.01.001',
+        admin_id=folha.admin_id
+    ).first()
+    
+    conta_encargos = PlanoContas.query.filter_by(
+        codigo='5.1.01.002',
+        admin_id=folha.admin_id
+    ).first()
+    
+    conta_salarios_pagar = PlanoContas.query.filter_by(
+        codigo='2.1.02.001',
+        admin_id=folha.admin_id
+    ).first()
+    
+    conta_inss_recolher = PlanoContas.query.filter_by(
+        codigo='2.1.02.002',
+        admin_id=folha.admin_id
+    ).first()
+    
+    conta_irrf_recolher = PlanoContas.query.filter_by(
+        codigo='2.1.02.004',
+        admin_id=folha.admin_id
+    ).first()
+    
+    # Itens do lançamento
+    itens = []
+    
+    # Débito: Despesa com Salários
+    if folha.valor_horas_normais > 0:
+        itens.append(ItemLancamento(
+            lancamento_id=lancamento.id,
+            conta_id=conta_salarios.id if conta_salarios else None,
+            tipo_movimento='debito',
+            valor=folha.valor_horas_normais,
+            historico_item='Salários normais',
+            ordem=1
+        ))
+    
+    # Débito: Despesa com Horas Extras
+    if folha.valor_horas_extras_50 + folha.valor_horas_extras_100 > 0:
+        itens.append(ItemLancamento(
+            lancamento_id=lancamento.id,
+            conta_id=conta_salarios.id if conta_salarios else None,
+            tipo_movimento='debito',
+            valor=folha.valor_horas_extras_50 + folha.valor_horas_extras_100,
+            historico_item='Horas extras',
+            ordem=2
+        ))
+    
+    # Débito: Encargos Sociais (INSS patronal estimado)
+    inss_patronal = folha.total_proventos * 0.20  # 20% estimado
+    if inss_patronal > 0:
+        itens.append(ItemLancamento(
+            lancamento_id=lancamento.id,
+            conta_id=conta_encargos.id if conta_encargos else None,
+            tipo_movimento='debito',
+            valor=inss_patronal,
+            historico_item='INSS patronal',
+            ordem=3
+        ))
+    
+    # Crédito: Salários a Pagar (líquido)
+    if folha.salario_liquido > 0:
+        itens.append(ItemLancamento(
+            lancamento_id=lancamento.id,
+            conta_id=conta_salarios_pagar.id if conta_salarios_pagar else None,
+            tipo_movimento='credito',
+            valor=folha.salario_liquido,
+            historico_item='Salário líquido a pagar',
+            ordem=4
+        ))
+    
+    # Crédito: INSS a Recolher
+    if folha.inss > 0:
+        itens.append(ItemLancamento(
+            lancamento_id=lancamento.id,
+            conta_id=conta_inss_recolher.id if conta_inss_recolher else None,
+            tipo_movimento='credito',
+            valor=folha.inss + inss_patronal,
+            historico_item='INSS funcionário + patronal',
+            ordem=5
+        ))
+    
+    # Crédito: IRRF a Recolher
+    if folha.irrf > 0:
+        itens.append(ItemLancamento(
+            lancamento_id=lancamento.id,
+            conta_id=conta_irrf_recolher.id if conta_irrf_recolher else None,
+            tipo_movimento='credito',
+            valor=folha.irrf,
+            historico_item='IRRF a recolher',
+            ordem=6
+        ))
+    
+    # Adicionar itens
+    for item in itens:
+        if item.conta_id:  # Só adicionar se a conta existir
+            db.session.add(item)
+    
+    db.session.commit()
+    
+    return lancamento
+
+def criar_lancamento_almoxarifado(movimentacao_id):
+    """
+    Criar lançamentos contábeis automáticos do almoxarifado
+    """
+    from models import (MovimentacaoMaterial, LancamentoContabil, ItemLancamento, 
+                       PlanoContas)
+    
+    movimentacao = MovimentacaoMaterial.query.get(movimentacao_id)
+    if not movimentacao:
+        return None
+    
+    # Gerar número do lançamento
+    numero_lancamento = gerar_numero_lancamento_contabil()
+    
+    # Obter contas contábeis
+    conta_estoque = PlanoContas.query.filter_by(
+        codigo='1.1.03.001',
+        admin_id=movimentacao.admin_id
+    ).first()
+    
+    conta_fornecedores = PlanoContas.query.filter_by(
+        codigo='2.1.01.001',
+        admin_id=movimentacao.admin_id
+    ).first()
+    
+    conta_custo_material = PlanoContas.query.filter_by(
+        codigo='5.1.02.001',
+        admin_id=movimentacao.admin_id
+    ).first()
+    
+    if movimentacao.tipo_movimento == 'entrada':
+        # Entrada de material
+        lancamento = LancamentoContabil(
+            numero_lancamento=numero_lancamento,
+            data_lancamento=movimentacao.data_movimento.date(),
+            historico=f"Entrada de material - {movimentacao.material_ref.descricao}",
+            valor_total=movimentacao.valor_total,
+            origem_sistema='almoxarifado',
+            origem_id=movimentacao_id,
+            origem_tabela='movimentacao_material',
+            usuario_id=movimentacao.usuario_id,
+            admin_id=movimentacao.admin_id
+        )
+        
+        db.session.add(lancamento)
+        db.session.flush()
+        
+        # Débito: Estoque
+        item_debito = ItemLancamento(
+            lancamento_id=lancamento.id,
+            conta_id=conta_estoque.id if conta_estoque else None,
+            tipo_movimento='debito',
+            valor=movimentacao.valor_total,
+            historico_item=f"Entrada {movimentacao.material_ref.descricao}",
+            ordem=1
+        )
+        
+        # Crédito: Fornecedores
+        item_credito = ItemLancamento(
+            lancamento_id=lancamento.id,
+            conta_id=conta_fornecedores.id if conta_fornecedores else None,
+            tipo_movimento='credito',
+            valor=movimentacao.valor_total,
+            historico_item=f"Fornecedor: {movimentacao.fornecedor}",
+            ordem=2
+        )
+        
+        if item_debito.conta_id:
+            db.session.add(item_debito)
+        if item_credito.conta_id:
+            db.session.add(item_credito)
+    
+    elif movimentacao.tipo_movimento == 'saida':
+        # Saída de material
+        lancamento = LancamentoContabil(
+            numero_lancamento=numero_lancamento,
+            data_lancamento=movimentacao.data_movimento.date(),
+            historico=f"Saída de material - {movimentacao.material_ref.descricao}",
+            valor_total=movimentacao.valor_total,
+            origem_sistema='almoxarifado',
+            origem_id=movimentacao_id,
+            origem_tabela='movimentacao_material',
+            usuario_id=movimentacao.usuario_id,
+            admin_id=movimentacao.admin_id
+        )
+        
+        db.session.add(lancamento)
+        db.session.flush()
+        
+        # Débito: Custo do Material (despesa)
+        item_debito = ItemLancamento(
+            lancamento_id=lancamento.id,
+            conta_id=conta_custo_material.id if conta_custo_material else None,
+            tipo_movimento='debito',
+            valor=movimentacao.valor_total,
+            historico_item=f"Consumo {movimentacao.material_ref.descricao}",
+            obra_id=movimentacao.obra_id,
+            ordem=1
+        )
+        
+        # Crédito: Estoque
+        item_credito = ItemLancamento(
+            lancamento_id=lancamento.id,
+            conta_id=conta_estoque.id if conta_estoque else None,
+            tipo_movimento='credito',
+            valor=movimentacao.valor_total,
+            historico_item=f"Baixa estoque {movimentacao.material_ref.descricao}",
+            ordem=2
+        )
+        
+        if item_debito.conta_id:
+            db.session.add(item_debito)
+        if item_credito.conta_id:
+            db.session.add(item_credito)
+    
+    db.session.commit()
+    
+    return lancamento
+
+def gerar_numero_lancamento_contabil():
+    """Gerar número sequencial para lançamento contábil"""
+    from models import LancamentoContabil
+    
+    ultimo_numero = db.session.query(func.max(LancamentoContabil.numero_lancamento)).scalar()
+    if ultimo_numero:
+        numero = int(ultimo_numero.split('-')[-1]) + 1
+    else:
+        numero = 1
+    
+    return f"LC-{datetime.now().year}-{numero:05d}"
+
+def gerar_balancete(mes, ano, admin_id):
+    """Gerar balancete automático"""
+    from models import PlanoContas, ItemLancamento, LancamentoContabil, SaldoConta
+    
+    # Obter todas as contas que aceitam lançamento
+    contas = PlanoContas.query.filter_by(
+        admin_id=admin_id,
+        ativo=True,
+        aceita_lancamento=True
+    ).all()
+    
+    balancete = []
+    
+    for conta in contas:
+        # Calcular movimentação do mês
+        primeiro_dia = date(ano, mes, 1)
+        ultimo_dia = date(ano, mes, calendar.monthrange(ano, mes)[1])
+        
+        # Somar débitos e créditos do mês
+        movimentacao = db.session.query(
+            func.sum(case((ItemLancamento.tipo_movimento == 'debito', ItemLancamento.valor), else_=0)).label('debitos'),
+            func.sum(case((ItemLancamento.tipo_movimento == 'credito', ItemLancamento.valor), else_=0)).label('creditos')
+        ).join(LancamentoContabil).filter(
+            ItemLancamento.conta_id == conta.id,
+            LancamentoContabil.data_lancamento >= primeiro_dia,
+            LancamentoContabil.data_lancamento <= ultimo_dia,
+            LancamentoContabil.status == 'definitivo'
+        ).first()
+        
+        debitos = movimentacao.debitos or 0.0
+        creditos = movimentacao.creditos or 0.0
+        
+        # Saldo anterior (mês anterior)
+        saldo_anterior_obj = SaldoConta.query.filter_by(
+            conta_id=conta.id,
+            mes=mes-1 if mes > 1 else 12,
+            ano=ano if mes > 1 else ano-1,
+            admin_id=admin_id
+        ).first()
+        
+        saldo_anterior = saldo_anterior_obj.saldo_atual if saldo_anterior_obj else 0.0
+        
+        # Calcular saldo atual
+        if conta.natureza == 'devedora':
+            saldo_atual = saldo_anterior + debitos - creditos
+        else:  # credora
+            saldo_atual = saldo_anterior + creditos - debitos
+        
+        # Atualizar ou criar registro de saldo
+        saldo_conta = SaldoConta.query.filter_by(
+            conta_id=conta.id,
+            mes=mes,
+            ano=ano,
+            admin_id=admin_id
+        ).first()
+        
+        if not saldo_conta:
+            saldo_conta = SaldoConta(
+                conta_id=conta.id,
+                mes=mes,
+                ano=ano,
+                admin_id=admin_id
+            )
+            db.session.add(saldo_conta)
+        
+        saldo_conta.saldo_anterior = saldo_anterior
+        saldo_conta.debitos = debitos
+        saldo_conta.creditos = creditos
+        saldo_conta.saldo_atual = saldo_atual
+        saldo_conta.data_atualizacao = datetime.utcnow()
+        
+        # Adicionar ao balancete se houver movimentação ou saldo
+        if debitos > 0 or creditos > 0 or saldo_atual != 0:
+            balancete.append({
+                'conta': conta,
+                'saldo_anterior': saldo_anterior,
+                'debitos': debitos,
+                'creditos': creditos,
+                'saldo_atual': saldo_atual
+            })
+    
+    db.session.commit()
+    
+    return balancete
+
+def gerar_dre(mes, ano, admin_id):
+    """Gerar Demonstrativo de Resultado do Exercício"""
+    from models import PlanoContas
+    
+    # Obter contas de receita e despesa
+    contas_receita = PlanoContas.query.filter_by(
+        admin_id=admin_id,
+        tipo_conta='receita',
+        ativo=True
+    ).all()
+    
+    contas_despesa = PlanoContas.query.filter_by(
+        admin_id=admin_id,
+        tipo_conta='despesa',
+        ativo=True
+    ).all()
+    
+    # Calcular totais
+    total_receitas = 0.0
+    total_despesas = 0.0
+    
+    # Somar receitas (saldo credor)
+    for conta in contas_receita:
+        saldo = SaldoConta.query.filter_by(
+            conta_id=conta.id,
+            mes=mes,
+            ano=ano,
+            admin_id=admin_id
+        ).first()
+        
+        if saldo:
+            total_receitas += saldo.saldo_atual
+    
+    # Somar despesas (saldo devedor)
+    for conta in contas_despesa:
+        saldo = SaldoConta.query.filter_by(
+            conta_id=conta.id,
+            mes=mes,
+            ano=ano,
+            admin_id=admin_id
+        ).first()
+        
+        if saldo:
+            total_despesas += saldo.saldo_atual
+    
+    resultado = total_receitas - total_despesas
+    
+    return {
+        'total_receitas': total_receitas,
+        'total_despesas': total_despesas,
+        'resultado': resultado,
+        'contas_receita': contas_receita,
+        'contas_despesa': contas_despesa
+    }
+```
+
+---
+
+## 🔧 INSTRUÇÕES FINAIS DE IMPLEMENTAÇÃO
+
+### **PASSO 1: Instalar Dependências**
+```bash
+pip install opencv-python face-recognition numpy pyzbar lxml xmltodict PyJWT reportlab weasyprint Pillow cryptography
+```
+
+### **PASSO 2: Atualizar app.py**
+```python
+# ADICIONAR no final de app.py, antes de create_all()
+
+# Importar novos módulos
+from biometria import SistemaReconhecimentoFacial
+
+# Executar scripts de inicialização
+with app.app_context():
+    db.create_all()
+    
+    # Inserir parâmetros padrão da folha
+    try:
+        from utils import inserir_parametros_folha_padrao
+        inserir_parametros_folha_padrao()
+    except Exception as e:
+        logging.warning(f"Erro ao inserir parâmetros folha: {e}")
+    
+    # Inserir plano de contas para cada admin
+    try:
+        from utils import inserir_plano_contas_padrao
+        from models import Usuario, TipoUsuario
+        
+        admins = Usuario.query.filter_by(tipo_usuario=TipoUsuario.ADMIN).all()
+        for admin in admins:
+            inserir_plano_contas_padrao(admin.id)
+    except Exception as e:
+        logging.warning(f"Erro ao inserir plano de contas: {e}")
+```
+
+### **PASSO 3: Executar Migrações**
+```bash
+# Se usando Flask-Migrate
+flask db migrate -m "Adicionar novos módulos SIGE"
+flask db upgrade
+```
+
+### **PASSO 4: Testar Sistema**
+1. **Propostas:** Criar proposta → Enviar para cliente → Cliente aprovar
+2. **Portal Cliente:** Verificar acesso com token → Visualizar progresso
+3. **Gestão Equipes:** Alocar funcionário → Verificar RDO criado
+4. **Almoxarifado:** Cadastrar material → Fazer movimentação
+5. **Biometria:** Cadastrar funcionário → Testar reconhecimento
+6. **Folha:** Calcular folha → Gerar holerite
+7. **Contabilidade:** Verificar lançamentos automáticos → Gerar balancete
+
+---
+
+## ⚠️ REGRAS CRÍTICAS FINAIS
+
+### **COMPATIBILIDADE ABSOLUTA:**
+- **NUNCA** modificar classes existentes em models.py
+- **SEMPRE** adicionar novas classes no final do arquivo
+- **MANTER** todas as rotas existentes funcionando
+- **USAR** sistema de autenticação atual (auth.py)
+
+### **INTEGRAÇÃO PERFEITA:**
+- **REUTILIZAR** funções existentes em utils.py
+- **INTEGRAR** com sistema RDO atual
+- **MANTER** sistema multi-tenant funcionando
+- **USAR** padrões de nomenclatura existentes
+
+### **RESULTADO ESPERADO:**
+Ao final, o SIGE terá **TODOS** os 7 módulos funcionando perfeitamente, mantendo **100%** de compatibilidade com o sistema atual e oferecendo a jornada completa end-to-end do cliente.
+
+**🎯 ESTE PROMPT GARANTE SUCESSO TOTAL NA IMPLEMENTAÇÃO!**
+

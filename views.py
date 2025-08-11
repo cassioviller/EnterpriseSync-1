@@ -3,6 +3,7 @@ from flask_login import login_required, current_user, login_user, logout_user
 from werkzeug.security import check_password_hash, generate_password_hash
 from app import db
 from models import *
+from models import PropostaComercial, ServicoPropostaComercial
 from forms import *
 from utils import calcular_horas_trabalhadas, calcular_custo_real_obra, calcular_custos_mes
 from kpis_engine import kpis_engine
@@ -3408,6 +3409,174 @@ def excluir_categoria(categoria_id):
     except Exception as e:
         db.session.rollback()
         return jsonify({'success': False, 'message': f'Erro ao excluir categoria: {str(e)}'})
+
+# ================================
+# ROTAS DO SISTEMA DE PROPOSTAS
+# ================================
+
+@main_bp.route('/propostas')
+@login_required
+@admin_required
+def lista_propostas():
+    """Lista todas as propostas do admin atual"""
+    propostas = PropostaComercial.query.filter_by(admin_id=current_user.id).order_by(desc(PropostaComercial.created_at)).all()
+    return render_template('propostas/lista_propostas.html', propostas=propostas)
+
+@main_bp.route('/propostas/nova', methods=['GET', 'POST'])
+@login_required
+@admin_required
+def nova_proposta():
+    """Cria uma nova proposta comercial"""
+    if request.method == 'POST':
+        try:
+            # Gerar número da proposta
+            ultimo_numero = db.session.query(func.max(PropostaComercial.id)).scalar() or 0
+            numero_proposta = f"PROP-{datetime.now().year}-{ultimo_numero + 1:03d}"
+            
+            # Criar proposta
+            proposta = PropostaComercial(
+                numero_proposta=numero_proposta,
+                cliente_nome=request.form['cliente_nome'],
+                cliente_email=request.form['cliente_email'],
+                cliente_telefone=request.form.get('cliente_telefone'),
+                cliente_cpf_cnpj=request.form.get('cliente_cpf_cnpj'),
+                endereco_obra=request.form['endereco_obra'],
+                descricao_obra=request.form['descricao_obra'],
+                area_total_m2=float(request.form['area_total_m2']) if request.form.get('area_total_m2') else None,
+                valor_proposta=float(request.form['valor_proposta']),
+                prazo_execucao=int(request.form['prazo_execucao']) if request.form.get('prazo_execucao') else None,
+                admin_id=current_user.id,
+                criado_por_id=current_user.id
+            )
+            
+            db.session.add(proposta)
+            db.session.flush()  # Para obter o ID da proposta
+            
+            # Adicionar serviços
+            servicos_data = request.form.getlist('servicos')
+            for i, servico_json in enumerate(servicos_data):
+                servico = json.loads(servico_json)
+                servico_obj = ServicoPropostaComercial(
+                    proposta_id=proposta.id,
+                    descricao_servico=servico['descricao'],
+                    quantidade=servico['quantidade'],
+                    unidade=servico['unidade'],
+                    valor_unitario=servico['valor_unitario'],
+                    valor_total=servico['valor_total'],
+                    observacoes=servico.get('observacoes'),
+                    ordem=i + 1
+                )
+                db.session.add(servico_obj)
+            
+            db.session.commit()
+            flash('Proposta criada com sucesso!', 'success')
+            return redirect(url_for('main.detalhes_proposta', id=proposta.id))
+            
+        except Exception as e:
+            db.session.rollback()
+            flash(f'Erro ao criar proposta: {str(e)}', 'danger')
+            return redirect(url_for('main.nova_proposta'))
+    
+    return render_template('propostas/nova_proposta.html')
+
+@main_bp.route('/propostas/<int:id>')
+@login_required
+@admin_required
+def detalhes_proposta(id):
+    """Exibe os detalhes de uma proposta"""
+    proposta = PropostaComercial.query.filter_by(id=id, admin_id=current_user.id).first_or_404()
+    return render_template('propostas/detalhes_proposta.html', proposta=proposta)
+
+@main_bp.route('/propostas/<int:id>/enviar', methods=['POST'])
+@login_required
+@admin_required
+def enviar_proposta(id):
+    """Envia a proposta para o cliente"""
+    try:
+        proposta = PropostaComercial.query.filter_by(id=id, admin_id=current_user.id).first_or_404()
+        
+        # Gerar token de acesso único
+        import secrets
+        token = secrets.token_urlsafe(32)
+        
+        proposta.token_acesso = token
+        proposta.data_envio = datetime.utcnow()
+        proposta.data_expiracao = datetime.utcnow() + timedelta(days=30)
+        proposta.status = 'Enviada'
+        
+        db.session.commit()
+        
+        flash(f'Proposta enviada! Link do cliente: {request.url_root}cliente/proposta/{token}', 'success')
+        return redirect(url_for('main.lista_propostas'))
+        
+    except Exception as e:
+        db.session.rollback()
+        flash(f'Erro ao enviar proposta: {str(e)}', 'danger')
+        return redirect(url_for('main.lista_propostas'))
+
+@main_bp.route('/cliente/proposta/<token>')
+def cliente_proposta(token):
+    """Portal do cliente para visualizar proposta"""
+    proposta = PropostaComercial.query.filter_by(token_acesso=token).first_or_404()
+    
+    # Verificar se a proposta não expirou
+    if proposta.data_expiracao and datetime.utcnow() > proposta.data_expiracao:
+        proposta.status = 'Expirada'
+        db.session.commit()
+    
+    return render_template('cliente/proposta_detalhes.html', proposta=proposta)
+
+@main_bp.route('/cliente/proposta/<token>/aprovar', methods=['POST'])
+def cliente_aprovar_proposta(token):
+    """Cliente aprova a proposta"""
+    try:
+        proposta = PropostaComercial.query.filter_by(token_acesso=token).first_or_404()
+        
+        if proposta.status != 'Enviada':
+            flash('Esta proposta não pode mais ser aprovada.', 'warning')
+            return redirect(url_for('main.cliente_proposta', token=token))
+        
+        proposta.status = 'Aprovada'
+        proposta.data_resposta = datetime.utcnow()
+        proposta.observacoes_cliente = request.form.get('observacoes')
+        proposta.ip_assinatura = request.remote_addr
+        proposta.user_agent_assinatura = request.headers.get('User-Agent')
+        
+        db.session.commit()
+        
+        flash('Proposta aprovada com sucesso! Entraremos em contato em breve.', 'success')
+        return redirect(url_for('main.cliente_proposta', token=token))
+        
+    except Exception as e:
+        db.session.rollback()
+        flash(f'Erro ao aprovar proposta: {str(e)}', 'danger')
+        return redirect(url_for('main.cliente_proposta', token=token))
+
+@main_bp.route('/cliente/proposta/<token>/rejeitar', methods=['POST'])
+def cliente_rejeitar_proposta(token):
+    """Cliente rejeita a proposta"""
+    try:
+        proposta = PropostaComercial.query.filter_by(token_acesso=token).first_or_404()
+        
+        if proposta.status != 'Enviada':
+            flash('Esta proposta não pode mais ser rejeitada.', 'warning')
+            return redirect(url_for('main.cliente_proposta', token=token))
+        
+        proposta.status = 'Rejeitada'
+        proposta.data_resposta = datetime.utcnow()
+        proposta.observacoes_cliente = request.form.get('observacoes')
+        proposta.ip_assinatura = request.remote_addr
+        proposta.user_agent_assinatura = request.headers.get('User-Agent')
+        
+        db.session.commit()
+        
+        flash('Resposta registrada. Obrigado pelo seu tempo.', 'info')
+        return redirect(url_for('main.cliente_proposta', token=token))
+        
+    except Exception as e:
+        db.session.rollback()
+        flash(f'Erro ao rejeitar proposta: {str(e)}', 'danger')
+        return redirect(url_for('main.cliente_proposta', token=token))
 
 # ============================================================================
 # API ENDPOINTS PARA DROPDOWNS INTELIGENTES - RDO OPERACIONAL
@@ -7657,245 +7826,5 @@ def api_ultimo_rdo_obra(obra_id):
 
 
 
-# ================================
-# MÓDULO DE PROPOSTAS COMERCIAIS
-# ================================
 
-@main_bp.route("/propostas")
-@login_required
-@admin_required
-def lista_propostas():
-    """Lista todas as propostas comerciais"""
-    try:
-        from propostas_engine import propostas_engine
-        
-        # Filtros
-        status_filtro = request.args.get("status")
-        
-        # Buscar propostas com isolamento multi-tenant
-        propostas = propostas_engine.listar_propostas(
-            admin_id=current_user.id,
-            status=status_filtro
-        ).all()
-        
-        # Estatísticas
-        stats = propostas_engine.estatisticas_propostas(admin_id=current_user.id)
-        
-        return render_template("propostas/lista_propostas.html",
-                             propostas=propostas,
-                             stats=stats,
-                             StatusProposta=StatusProposta)
-        
-    except Exception as e:
-        flash(f"Erro ao carregar propostas: {str(e)}", "danger")
-        return redirect(url_for("main.dashboard"))
-
-@main_bp.route("/propostas/nova")
-@login_required
-@admin_required
-def nova_proposta():
-    """Formulário para criar nova proposta"""
-    try:
-        # Buscar dados para o formulário
-        funcionarios = Funcionario.query.filter_by(
-            ativo=True, 
-            admin_id=current_user.id
-        ).order_by(Funcionario.nome).all()
-        
-        servicos = Servico.query.filter_by(ativo=True).order_by(Servico.nome).all()
-        
-        return render_template("propostas/proposta_form.html",
-                             funcionarios=funcionarios,
-                             servicos=servicos,
-                             acao="criar")
-        
-    except Exception as e:
-        flash(f"Erro ao carregar formulário: {str(e)}", "danger")
-        return redirect(url_for("main.lista_propostas"))
-
-@main_bp.route("/propostas/criar", methods=["POST"])
-@login_required
-@admin_required
-def criar_proposta():
-    """Criar nova proposta comercial"""
-    try:
-        from propostas_engine import propostas_engine
-        
-        # Dados básicos da proposta
-        dados_proposta = {
-            "cliente_nome": request.form["cliente_nome"],
-            "cliente_documento": request.form.get("cliente_documento", ""),
-            "cliente_endereco": request.form.get("cliente_endereco", ""),
-            "cliente_telefone": request.form.get("cliente_telefone", ""),
-            "cliente_email": request.form.get("cliente_email", ""),
-            "titulo_projeto": request.form["titulo_projeto"],
-            "descricao_projeto": request.form.get("descricao_projeto", ""),
-            "local_execucao": request.form["local_execucao"],
-            "area_total_m2": request.form.get("area_total_m2", "0"),
-            "peso_total_kg": request.form.get("peso_total_kg", "0"),
-            "desconto_percentual": request.form.get("desconto_percentual", "0"),
-            "margem_lucro_percentual": request.form.get("margem_lucro_percentual", "30"),
-            "prazo_execucao_dias": request.form.get("prazo_execucao_dias", "30"),
-            "data_validade": request.form.get("data_validade"),
-            "observacoes": request.form.get("observacoes", ""),
-            "condicoes_pagamento": request.form.get("condicoes_pagamento", ""),
-            "garantias": request.form.get("garantias", ""),
-            "responsavel_comercial_id": request.form.get("responsavel_comercial_id")
-        }
-        
-        # Itens de serviço (enviados via JavaScript)
-        itens_json = request.form.get("itens_servicos", "[]")
-        itens_dados = json.loads(itens_json) if itens_json else []
-        
-        if not itens_dados:
-            flash("É necessário adicionar pelo menos um serviço à proposta.", "warning")
-            return redirect(url_for("main.nova_proposta"))
-        
-        # Criar proposta
-        proposta = propostas_engine.criar_proposta(
-            dados_proposta, 
-            itens_dados, 
-            admin_id=current_user.id
-        )
-        
-        if proposta:
-            flash(f"Proposta {proposta.numero_proposta} criada com sucesso!", "success")
-            return redirect(url_for("main.visualizar_proposta", id=proposta.id))
-        else:
-            flash("Erro ao criar proposta. Tente novamente.", "danger")
-            return redirect(url_for("main.nova_proposta"))
-        
-    except Exception as e:
-        flash(f"Erro ao criar proposta: {str(e)}", "danger")
-        return redirect(url_for("main.nova_proposta"))
-
-@main_bp.route("/propostas/<int:id>")
-@login_required
-@admin_required
-def visualizar_proposta(id):
-    """Visualizar detalhes da proposta"""
-    try:
-        proposta = Proposta.query.get_or_404(id)
-        
-        # Verificar acesso multi-tenant
-        if proposta.admin_id != current_user.id:
-            flash("Acesso negado.", "danger")
-            return redirect(url_for("main.lista_propostas"))
-        
-        return render_template("propostas/visualizar_proposta.html",
-                             proposta=proposta,
-                             StatusProposta=StatusProposta)
-        
-    except Exception as e:
-        flash(f"Erro ao carregar proposta: {str(e)}", "danger")
-        return redirect(url_for("main.lista_propostas"))
-
-@main_bp.route("/propostas/<int:id>/pdf")
-@login_required
-@admin_required
-def gerar_pdf_proposta(id):
-    """Gerar PDF da proposta"""
-    try:
-        from propostas_engine import propostas_engine
-        from flask import send_file
-        
-        proposta = Proposta.query.get_or_404(id)
-        
-        # Verificar acesso multi-tenant
-        if proposta.admin_id != current_user.id:
-            flash("Acesso negado.", "danger")
-            return redirect(url_for("main.lista_propostas"))
-        
-        # Gerar PDF
-        pdf_path = propostas_engine.gerar_pdf_proposta(id)
-        
-        if pdf_path:
-            return send_file(
-                pdf_path,
-                as_attachment=True,
-                download_name=f"Proposta_{proposta.numero_proposta}.pdf",
-                mimetype="application/pdf"
-            )
-        else:
-            flash("Erro ao gerar PDF da proposta.", "danger")
-            return redirect(url_for("main.visualizar_proposta", id=id))
-        
-    except Exception as e:
-        flash(f"Erro ao gerar PDF: {str(e)}", "danger")
-        return redirect(url_for("main.visualizar_proposta", id=id))
-
-@main_bp.route("/propostas/<int:id>/converter-obra", methods=["POST"])
-@login_required
-@admin_required
-def converter_proposta_obra(id):
-    """Converter proposta aprovada em obra"""
-    try:
-        from propostas_engine import propostas_engine
-        
-        proposta = Proposta.query.get_or_404(id)
-        
-        # Verificar acesso multi-tenant
-        if proposta.admin_id != current_user.id:
-            return jsonify({"success": False, "message": "Acesso negado."}), 403
-        
-        # Verificar se está aprovada
-        if proposta.status != StatusProposta.APROVADA:
-            return jsonify({
-                "success": False, 
-                "message": "Proposta precisa estar aprovada para ser convertida em obra."
-            }), 400
-        
-        # Converter para obra
-        obra = propostas_engine.converter_proposta_para_obra(id)
-        
-        if obra:
-            return jsonify({
-                "success": True,
-                "message": f"Proposta convertida para obra {obra.codigo}",
-                "obra_id": obra.id,
-                "obra_codigo": obra.codigo
-            })
-        else:
-            return jsonify({"success": False, "message": "Erro ao converter proposta em obra"}), 400
-        
-    except Exception as e:
-        return jsonify({"success": False, "message": str(e)}), 500
-
-@main_bp.route("/api/servicos/<int:id>/preco")
-@login_required
-def api_preco_servico(id):
-    """API para buscar preço unitário de um serviço"""
-    try:
-        servico = Servico.query.get_or_404(id)
-        return jsonify({
-            "success": True,
-            "preco_unitario": float(servico.preco_unitario),
-            "unidade": servico.unidade_medida,
-            "nome": servico.nome
-        })
-    except Exception as e:
-        return jsonify({"success": False, "message": str(e)}), 500
-
-@main_bp.route("/api/propostas/calcular-valores", methods=["POST"])
-@login_required
-def api_calcular_valores_proposta():
-    """API para calcular valores da proposta em tempo real"""
-    try:
-        from propostas_engine import propostas_engine
-        
-        itens_dados = request.json.get("itens", [])
-        
-        if not itens_dados:
-            return jsonify({"success": False, "message": "Nenhum item informado"}), 400
-        
-        calculo = propostas_engine.calcular_valores_proposta(itens_dados)
-        
-        return jsonify({
-            "success": True,
-            "valor_total": calculo["valor_total"],
-            "itens_processados": len(calculo["itens_processados"])
-        })
-        
-    except Exception as e:
-        return jsonify({"success": False, "message": str(e)}), 500
 

@@ -596,121 +596,63 @@ class OutroCusto(db.Model):
 # MÓDULO DE PROPOSTAS COMERCIAIS
 # ================================
 
-class StatusProposta(Enum):
-    RASCUNHO = "rascunho"
-    ENVIADA = "enviada"
-    EM_ANALISE = "em_analise"
-    APROVADA = "aprovada"
-    REJEITADA = "rejeitada"
-    EXPIRADA = "expirada"
-
-class Proposta(db.Model):
-    """Modelo para propostas comerciais que podem se tornar obras"""
-    __tablename__ = 'proposta'
+class PropostaComercial(db.Model):
+    __tablename__ = 'proposta_comercial'
     
     id = db.Column(db.Integer, primary_key=True)
-    numero_proposta = db.Column(db.String(20), unique=True, nullable=False)  # PROP-2025-001
+    numero_proposta = db.Column(db.String(20), unique=True, nullable=False)
     
     # Dados do Cliente
     cliente_nome = db.Column(db.String(100), nullable=False)
-    cliente_documento = db.Column(db.String(18))  # CPF ou CNPJ
-    cliente_endereco = db.Column(db.Text)
+    cliente_email = db.Column(db.String(120), nullable=False)
     cliente_telefone = db.Column(db.String(20))
-    cliente_email = db.Column(db.String(120))
+    cliente_cpf_cnpj = db.Column(db.String(18))
     
-    # Dados do Projeto
-    titulo_projeto = db.Column(db.String(150), nullable=False)
-    descricao_projeto = db.Column(db.Text)
-    local_execucao = db.Column(db.Text, nullable=False)
-    area_total_m2 = db.Column(db.Float, default=0.0)
-    peso_total_kg = db.Column(db.Float, default=0.0)
+    # Dados da Obra
+    endereco_obra = db.Column(db.Text, nullable=False)
+    descricao_obra = db.Column(db.Text, nullable=False)
+    area_total_m2 = db.Column(db.Float)
     
-    # Financeiro
-    valor_total = db.Column(db.Float, default=0.0)
-    desconto_percentual = db.Column(db.Float, default=0.0)
-    valor_com_desconto = db.Column(db.Float, default=0.0)
-    margem_lucro_percentual = db.Column(db.Float, default=30.0)
-    
-    # Prazos
-    prazo_execucao_dias = db.Column(db.Integer, default=30)
-    data_validade = db.Column(db.Date, nullable=False)
+    # Valores
+    valor_proposta = db.Column(db.Float, nullable=False)
+    prazo_execucao = db.Column(db.Integer)  # dias
     
     # Status e Controle
-    status = db.Column(db.Enum(StatusProposta), default=StatusProposta.RASCUNHO, nullable=False)
-    observacoes = db.Column(db.Text)
-    condicoes_pagamento = db.Column(db.Text)
-    garantias = db.Column(db.Text)
+    status = db.Column(db.String(20), default='Enviada')
+    data_criacao = db.Column(db.DateTime, default=datetime.utcnow)
+    data_envio = db.Column(db.DateTime)
+    data_resposta = db.Column(db.DateTime)
+    data_expiracao = db.Column(db.DateTime)
     
-    # Controle Interno
-    responsavel_comercial_id = db.Column(db.Integer, db.ForeignKey('funcionario.id'))
-    admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=True)
-    obra_gerada_id = db.Column(db.Integer, db.ForeignKey('obra.id'), nullable=True)  # Obra criada quando aprovada
+    # Acesso do Cliente
+    token_acesso = db.Column(db.String(255), unique=True)
+    
+    # Resposta do Cliente
+    observacoes_cliente = db.Column(db.Text)
+    ip_assinatura = db.Column(db.String(45))
+    user_agent_assinatura = db.Column(db.Text)
+    
+    # Multi-tenant
+    admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False)
+    criado_por_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False)
     
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
-    data_aprovacao = db.Column(db.DateTime)
     
     # Relacionamentos
-    responsavel_comercial = db.relationship('Funcionario', backref='propostas_comerciais', lazy=True)
-    obra_gerada = db.relationship('Obra', backref='proposta_origem', lazy=True)
-    itens = db.relationship('ItemProposta', backref='proposta', cascade='all, delete-orphan', lazy=True)
-    
-    def __repr__(self):
-        return f'<Proposta {self.numero_proposta} - {self.cliente_nome}>'
-    
-    @property
-    def valor_final(self):
-        """Calcula o valor final com desconto aplicado"""
-        if self.desconto_percentual > 0:
-            return self.valor_total * (1 - self.desconto_percentual / 100)
-        return self.valor_total
+    servicos = db.relationship('ServicoPropostaComercial', backref='proposta_ref', lazy=True, cascade='all, delete-orphan')
+    admin = db.relationship('Usuario', foreign_keys=[admin_id])
+    criado_por = db.relationship('Usuario', foreign_keys=[criado_por_id])
 
-class ItemProposta(db.Model):
-    """Itens de serviço dentro de uma proposta"""
-    __tablename__ = 'item_proposta'
+class ServicoPropostaComercial(db.Model):
+    __tablename__ = 'servico_proposta_comercial'
     
     id = db.Column(db.Integer, primary_key=True)
-    proposta_id = db.Column(db.Integer, db.ForeignKey('proposta.id'), nullable=False)
-    servico_id = db.Column(db.Integer, db.ForeignKey('servico.id'), nullable=False)
-    
-    # Quantidades e Medidas
-    quantidade = db.Column(db.Numeric(10, 4), nullable=False)
-    unidade = db.Column(db.String(10), nullable=False)  # m², kg, m³, pç, etc.
-    
-    # Preços
-    preco_unitario = db.Column(db.Numeric(10, 2), nullable=False)
-    valor_total = db.Column(db.Numeric(10, 2), nullable=False)
-    
-    # Detalhamento
-    especificacoes = db.Column(db.Text)  # Especificações técnicas específicas
+    proposta_id = db.Column(db.Integer, db.ForeignKey('proposta_comercial.id'), nullable=False)
+    descricao_servico = db.Column(db.String(200), nullable=False)
+    quantidade = db.Column(db.Float, nullable=False)
+    unidade = db.Column(db.String(10), nullable=False)
+    valor_unitario = db.Column(db.Float, nullable=False)
+    valor_total = db.Column(db.Float, nullable=False)
     observacoes = db.Column(db.Text)
-    
-    # Ordem de apresentação
     ordem = db.Column(db.Integer, default=1)
-    
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    
-    # Relacionamentos
-    servico = db.relationship('Servico', backref='itens_proposta', lazy=True)
-    
-    # Unique constraint para evitar duplicatas de serviço na mesma proposta
-    __table_args__ = (db.UniqueConstraint('proposta_id', 'servico_id', name='_proposta_servico_uc'),)
-    
-    def __repr__(self):
-        return f'<ItemProposta ID:{self.id} - Serviço:{self.servico_id}>'
-
-class HistoricoStatusProposta(db.Model):
-    """Histórico de mudanças de status das propostas"""
-    __tablename__ = 'historico_status_proposta'
-    
-    id = db.Column(db.Integer, primary_key=True)
-    proposta_id = db.Column(db.Integer, db.ForeignKey('proposta.id'), nullable=False)
-    status_anterior = db.Column(db.Enum(StatusProposta))
-    status_novo = db.Column(db.Enum(StatusProposta), nullable=False)
-    usuario_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False)
-    motivo = db.Column(db.Text)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    
-    # Relacionamentos
-    proposta = db.relationship('Proposta', backref='historico_status', lazy=True)
-    usuario = db.relationship('Usuario', backref='mudancas_status_proposta', lazy=True)
