@@ -1,10 +1,91 @@
 from datetime import datetime, timedelta, date, time
 from sqlalchemy import func
+from collections import defaultdict
+from decimal import Decimal, ROUND_HALF_UP
 import calendar
 import os
 import re
 from werkzeug.utils import secure_filename
 from flask import current_app
+
+def _round2(x: float) -> float:
+    """Arredondar para 2 casas decimais (meio para cima)"""
+    return float(Decimal(x).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP))
+
+def _particionar_semanas(inicio: date, fim: date, semana_comeca_em: str = "domingo"):
+    """Particiona período em semanas (domingo-sábado por padrão)"""
+    semanas = []
+    cur = inicio
+    
+    # Alinhar início conforme configuração
+    if semana_comeca_em == "domingo":
+        # Ir para o domingo anterior/igual
+        cur -= timedelta(days=(cur.weekday() + 1) % 7)
+    else:  # segunda-feira
+        cur -= timedelta(days=cur.weekday())
+    
+    while cur <= fim:
+        ini_sem = cur
+        fim_sem = cur + timedelta(days=6)
+        
+        semanas.append((max(ini_sem, inicio), min(fim_sem, fim)))
+        cur = fim_sem + timedelta(days=1)
+    
+    return semanas
+
+def calcular_dsr_modo_estrito(salario_mensal: float, registros_faltas, data_inicio: date, data_fim: date, horas_dia_padrao: float = 8.8):
+    """
+    Calcula DSR em modo estrito (Lei 605/49) - semana a semana
+    Retorna desconto por faltas + DSRs perdidos por semana
+    """
+    if salario_mensal <= 0 or horas_dia_padrao <= 0:
+        return {"desconto_total": 0, "faltas_total": 0, "semanas_com_perda": 0}
+    
+    valor_dia = salario_mensal / 30.0
+    
+    # Indexar faltas injustificadas por data
+    injust_por_dia = defaultdict(float)
+    for registro in registros_faltas:
+        if registro.tipo_registro != 'falta':  # Só faltas injustificadas
+            continue
+        if registro.data < data_inicio or registro.data > data_fim:
+            continue
+        
+        # Assumir falta de dia inteiro (pode ser expandido para frações)
+        injust_por_dia[registro.data] = 1.0
+    
+    # Particionar em semanas (domingo-sábado)
+    semanas = _particionar_semanas(data_inicio, data_fim, "domingo")
+    
+    faltas_injustificadas_total = 0.0
+    semanas_com_perda_dsr = 0
+    
+    for (ini_sem, fim_sem) in semanas:
+        soma_semana = 0.0
+        data_atual = ini_sem
+        
+        while data_atual <= fim_sem:
+            soma_semana += injust_por_dia.get(data_atual, 0.0)
+            data_atual += timedelta(days=1)
+        
+        # Se houve falta na semana, perde DSR
+        if soma_semana > 0:
+            semanas_com_perda_dsr += 1
+        
+        faltas_injustificadas_total += soma_semana
+    
+    desconto_por_faltas = _round2(valor_dia * faltas_injustificadas_total)
+    desconto_por_dsr = _round2(valor_dia * semanas_com_perda_dsr)
+    desconto_total = _round2(desconto_por_faltas + desconto_por_dsr)
+    
+    return {
+        "desconto_total": desconto_total,
+        "desconto_por_faltas": desconto_por_faltas,
+        "desconto_por_dsr": desconto_por_dsr,
+        "faltas_total": _round2(faltas_injustificadas_total),
+        "semanas_com_perda": semanas_com_perda_dsr,
+        "valor_dia": _round2(valor_dia)
+    }
 
 def calcular_horas_trabalhadas(hora_entrada, hora_saida, hora_almoco_saida=None, hora_almoco_retorno=None, data=None):
     """
@@ -702,20 +783,11 @@ def calcular_kpis_funcionario_periodo(funcionario_id, data_inicio=None, data_fim
         valor_falta_unitario = 2 * valor_dia
         valor_faltas = faltas * valor_falta_unitario
         
-        # MÉTODO ESTRITO (Lei 605/49)
-        # Calcular semanas com falta para DSR preciso
+        # MÉTODO ESTRITO (Lei 605/49) usando função dedicada
         registros_faltas = [r for r in registros_ponto if r.tipo_registro == 'falta']
-        semanas_identificadas = set()
-        
-        for registro in registros_faltas:
-            # Calcular número da semana (domingo = início)
-            dias_desde_domingo = (registro.data.weekday() + 1) % 7
-            inicio_semana = registro.data - timedelta(days=dias_desde_domingo)
-            semanas_identificadas.add(inicio_semana)
-        
-        semanas_com_falta = len(semanas_identificadas)
-        # Cálculo estrito: faltas + DSRs perdidos por semana
-        valor_faltas_estrito = (faltas * valor_dia) + (semanas_com_falta * valor_dia)
+        dsr_estrito = calcular_dsr_modo_estrito(funcionario.salario, registros_faltas, data_inicio, data_fim)
+        valor_faltas_estrito = dsr_estrito["desconto_total"]
+        semanas_com_falta = dsr_estrito["semanas_com_perda"]
     
     # Calcular faltas justificadas (já contado no loop acima, mas vamos recalcular para garantir)
     dias_faltas_justificadas = len([r for r in registros_ponto if r.tipo_registro == 'falta_justificada'])

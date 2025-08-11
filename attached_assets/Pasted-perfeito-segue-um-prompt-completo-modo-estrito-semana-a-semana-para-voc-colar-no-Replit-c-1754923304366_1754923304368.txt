@@ -1,0 +1,492 @@
+perfeito — segue um **prompt completo (modo estrito, semana a semana)** para você colar no Replit (como “task spec”/instruções de agente) e implementar no seu projeto. Inclui: contexto legal, entradas/saídas, algoritmo, validações, pseudocódigo, **referência em Python**, **alternativa em TypeScript**, e **dica de UI** para exibir “valor abaixo do número de faltas”.
+
+---
+
+# Prompt – Cálculo de DSR (Modo Estrito, Brasil) – Semana a Semana
+
+## Contexto
+
+Você vai implementar no SIGE (folha/KPIs) o cálculo de **DSR (Descanso Semanal Remunerado) em modo estrito**, conforme **Lei 605/49 (art. 6º)**, **CLT (art. 64)** e **Súmula 13 do TST**.
+No **modo estrito**, o DSR é avaliado **por semana** (domingo–sábado). **Se houver ao menos 1 falta injustificada na semana, perde-se 1 DSR naquela semana**, independentemente da quantidade de faltas nessa mesma semana. O **desconto do dia da falta** é **sempre proporcional** e **acumulado por falta**.
+
+**Objetivo de UI:** no **card “Faltas”** exibir **o número de faltas** e **logo abaixo** o **valor total de desconto (faltas + DSR perdido)** deste mês.
+
+---
+
+## Definições
+
+* **Semana de referência:** domingo a sábado. (Se a escala da empresa for diferente, permitir configurar `semana_comeca_em`.)
+* **Falta injustificada:** ausência sem justificativa legal; **gera desconto do dia** e **pode gerar perda do DSR da semana**.
+* **DSR perdido na semana:** se a semana tiver **≥ 1 falta injustificada**, perde-se **1 dia** (valor\_dia) referente ao DSR daquela semana.
+* **Sábado é dia útil** para efeitos de DSR (Súmula 13/TST).
+* **Valor-dia:** `salario_mensal / 30`.
+
+---
+
+## Entradas (parâmetros)
+
+* `salario_mensal: number` (ex.: `2106.00`)
+* `faltas: Array<{ data: string(YYYY-MM-DD), tipo: "injustificada" | "justificada", horas?: number }>`
+
+  * Se `horas` existir para ausências parciais, considerar proporcionalidade (ver “Faltas fracionadas” abaixo).
+* `horas_dia_padrao: number` (ex.: `8.8`) — só para fracionamento
+* `periodo: { inicio: string(YYYY-MM-DD), fim: string(YYYY-MM-DD) }` — mês de referência
+* `semana_comeca_em: "domingo" | "segunda"` (default: `"domingo"`)
+* `feriados: string[]` (opcional) — **não** altera a perda do DSR (que é semanal), mas pode ser útil para relatórios
+* `timezone: string` (ex.: `"America/Sao_Paulo"`) — apenas para normalizar datas
+
+**Observação:** **atestados/justificadas** **não** geram perda de DSR nem desconto de falta.
+
+---
+
+## Saídas (JSON)
+
+```json
+{
+  "valor_dia": 0,
+  "faltas_injustificadas_total": 0.0,
+  "semanas_com_perda_dsr": 0,
+  "desconto_por_faltas": 0.0,
+  "desconto_por_dsr": 0.0,
+  "desconto_total_mes": 0.0,
+  "por_semana": [
+    {
+      "semana_inicio": "YYYY-MM-DD",
+      "semana_fim": "YYYY-MM-DD",
+      "faltas_injustificadas": 0.0,
+      "perdeu_dsr": true
+    }
+  ],
+  "ui": {
+    "kpi_faltas_numero": 0.0,
+    "kpi_valor_abaixo": "-R$ 0,00",
+    "observacoes": "Base legal: Lei 605/49 art.6º; CLT art.64; Súmula 13/TST. Modo: estrito semanal."
+  }
+}
+```
+
+* `faltas_injustificadas_total`: soma (dias cheios + frações) no mês.
+* `semanas_com_perda_dsr`: número de semanas do período que tiveram ≥1 falta injustificada.
+* `desconto_por_faltas = valor_dia * faltas_injustificadas_total`
+* `desconto_por_dsr = valor_dia * semanas_com_perda_dsr`
+* `desconto_total_mes = desconto_por_faltas + desconto_por_dsr`
+* `kpi_faltas_numero`: exibir no topo do card (pode incluir frações, com 2 casas).
+* `kpi_valor_abaixo`: formatação monetária brasileira do `desconto_total_mes` com sinal negativo.
+
+---
+
+## Regras de Cálculo
+
+### 1) Valor-dia
+
+```
+valor_dia = salario_mensal / 30
+```
+
+### 2) Agrupar faltas por semana
+
+* Particionar o período em semanas conforme `semana_comeca_em` (default domingo–sábado).
+* Normalizar datas ao timezone antes de agrupar.
+
+### 3) Faltas fracionadas (opcional, quando `horas` vier preenchido)
+
+* Converter horas ausentes na data para fração de dia:
+
+```
+fracao_dia = min(horas / horas_dia_padrao, 1.0)
+```
+
+* Somar frações na mesma data; ao final a data contribui com **min(total\_fracao\_no\_dia, 1.0)** para as **faltas injustificadas**.
+* **Perda de DSR semanal:** se **houve qualquer fração > 0** injustificada na semana, conta como **perdeu DSR**.
+
+### 4) Totais
+
+* `faltas_injustificadas_total` = soma das contribuições diárias (0..1) em todas as semanas.
+* `semanas_com_perda_dsr` = contagem de semanas com soma de frações (ou dia inteiro) > 0.
+* `desconto_por_faltas = valor_dia * faltas_injustificadas_total`
+* `desconto_por_dsr = valor_dia * semanas_com_perda_dsr`
+* `desconto_total_mes = desconto_por_faltas + desconto_por_dsr`
+
+### 5) Arredondamentos
+
+* Valores financeiros: 2 casas decimais (meio para cima).
+* KPI (dias): 2 casas decimais.
+
+### 6) Validações
+
+* `salario_mensal > 0`, `horas_dia_padrao > 0`.
+* `tipo` deve ser `"injustificada"` ou `"justificada"`.
+* Datas dentro de `periodo`. Ignorar fora do intervalo.
+* Frações negativas ou > 1 por dia ⇒ normalizar para `0..1`.
+
+### 7) Não duplicar
+
+* **Não** somar “valor de horas perdidas” ao desconto do modo estrito.
+* O **único** desconto financeiro é: **faltas (proporcionais) + 1 DSR por semana com falta**.
+
+---
+
+## Pseudocódigo (alto nível)
+
+```
+valor_dia = salario_mensal / 30
+semanas = particionar_periodo_em_semanas(periodo, semana_comeca_em)
+
+faltas_injustificadas_total = 0
+semanas_com_perda_dsr = 0
+por_semana = []
+
+para cada semana em semanas:
+    soma_fracoes_semana = 0
+    mapa_data_para_fracao = {}
+
+    para cada falta em faltas dentro do intervalo desta semana:
+        se falta.tipo == "injustificada":
+            if falta.horas existe: f = min(falta.horas / horas_dia_padrao, 1.0)
+            else: f = 1.0
+            mapa_data_para_fracao[falta.data] += f
+        senão: # justificada
+            continue
+
+    # por data: limitar a 1.0
+    soma_fracoes_semana = soma( min(fracao_total_data, 1.0) para cada data )
+
+    perde_dsr = (soma_fracoes_semana > 0)
+    if perde_dsr: semanas_com_perda_dsr += 1
+    faltas_injustificadas_total += soma_fracoes_semana
+
+    por_semana.push({
+        semana_inicio, semana_fim,
+        faltas_injustificadas: round2(soma_fracoes_semana),
+        perdeu_dsr: perde_dsr
+    })
+
+desconto_por_faltas = round2(valor_dia * faltas_injustificadas_total)
+desconto_por_dsr    = round2(valor_dia * semanas_com_perda_dsr)
+desconto_total_mes  = round2(desconto_por_faltas + desconto_por_dsr)
+
+return {
+  valor_dia: round2(valor_dia),
+  faltas_injustificadas_total: round2(faltas_injustificadas_total),
+  semanas_com_perda_dsr,
+  desconto_por_faltas,
+  desconto_por_dsr,
+  desconto_total_mes,
+  por_semana,
+  ui: {
+    kpi_faltas_numero: round2(faltas_injustificadas_total),
+    kpi_valor_abaixo: format_brl(-desconto_total_mes),
+    observacoes: "Base legal: Lei 605/49 art.6º; CLT art.64; Súmula 13/TST. Modo: estrito semanal."
+  }
+}
+```
+
+---
+
+## Implementação de Referência (Python)
+
+```python
+from datetime import date, datetime, timedelta
+from collections import defaultdict
+from decimal import Decimal, ROUND_HALF_UP
+
+def _round2(x: float) -> float:
+    return float(Decimal(x).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP))
+
+def _iso(d: date) -> str:
+    return d.strftime("%Y-%m-%d")
+
+def _daterange(start: date, end: date):
+    cur = start
+    while cur <= end:
+        yield cur
+        cur += timedelta(days=1)
+
+def _particionar_semanas(inicio: date, fim: date, semana_comeca_em: str = "domingo"):
+    semanas = []
+    cur = inicio
+
+    # alinhar início conforme configuração
+    if semana_comeca_em == "domingo":
+        # ir para o domingo anterior/igual
+        cur -= timedelta(days=(cur.weekday() + 1) % 7)
+    elif semana_comeca_em == "segunda":
+        cur -= timedelta(days=cur.weekday())
+    else:
+        raise ValueError("semana_comeca_em deve ser 'domingo' ou 'segunda'")
+
+    while cur <= fim:
+        if semana_comeca_em == "domingo":
+            ini_sem = cur
+            fim_sem = cur + timedelta(days=6)
+        else:  # segunda
+            ini_sem = cur
+            fim_sem = cur + timedelta(days=6)
+
+        semanas.append((max(ini_sem, inicio), min(fim_sem, fim)))
+        cur = fim_sem + timedelta(days=1)
+
+    return semanas
+
+def calcular_dsr_modo_estrito(
+    salario_mensal: float,
+    faltas: list,  # [{ "data": "YYYY-MM-DD", "tipo": "injustificada"|"justificada", "horas": 0.. }]
+    periodo: dict, # { "inicio": "YYYY-MM-DD", "fim": "YYYY-MM-DD" }
+    horas_dia_padrao: float = 8.8,
+    semana_comeca_em: str = "domingo",
+):
+    if salario_mensal <= 0:
+        raise ValueError("salario_mensal deve ser > 0")
+    if horas_dia_padrao <= 0:
+        raise ValueError("horas_dia_padrao deve ser > 0")
+
+    inicio = datetime.strptime(periodo["inicio"], "%Y-%m-%d").date()
+    fim = datetime.strptime(periodo["fim"], "%Y-%m-%d").date()
+    if fim < inicio:
+        raise ValueError("periodo.fim < periodo.inicio")
+
+    valor_dia = salario_mensal / 30.0
+
+    # indexar faltas por data, acumulando frações injustificadas por dia
+    injust_por_dia = defaultdict(float)
+    for f in faltas:
+        d = datetime.strptime(f["data"], "%Y-%m-%d").date()
+        if d < inicio or d > fim:
+            continue
+        if f.get("tipo") != "injustificada":
+            continue
+        horas = f.get("horas")
+        if horas is None:
+            fracao = 1.0
+        else:
+            fracao = min(max(float(horas) / horas_dia_padrao, 0.0), 1.0)
+        injust_por_dia[d] += fracao
+
+    # limitar 1.0 por dia
+    for d, v in list(injust_por_dia.items()):
+        injust_por_dia[d] = min(v, 1.0)
+
+    semanas = _particionar_semanas(inicio, fim, semana_comeca_em)
+    faltas_injustificadas_total = 0.0
+    semanas_com_perda_dsr = 0
+    por_semana = []
+
+    for (ini_sem, fim_sem) in semanas:
+        soma_semana = 0.0
+        for d in _daterange(ini_sem, fim_sem):
+            soma_semana += injust_por_dia.get(d, 0.0)
+
+        perdeu_dsr = soma_semana > 0.0
+        if perdeu_dsr:
+            semanas_com_perda_dsr += 1
+
+        faltas_injustificadas_total += soma_semana
+        por_semana.append({
+            "semana_inicio": _iso(ini_sem),
+            "semana_fim": _iso(fim_sem),
+            "faltas_injustificadas": _round2(soma_semana),
+            "perdeu_dsr": perdeu_dsr
+        })
+
+    desconto_por_faltas = _round2(valor_dia * faltas_injustificadas_total)
+    desconto_por_dsr    = _round2(valor_dia * semanas_com_perda_dsr)
+    desconto_total_mes  = _round2(desconto_por_faltas + desconto_por_dsr)
+
+    return {
+        "valor_dia": _round2(valor_dia),
+        "faltas_injustificadas_total": _round2(faltas_injustificadas_total),
+        "semanas_com_perda_dsr": semanas_com_perda_dsr,
+        "desconto_por_faltas": desconto_por_faltas,
+        "desconto_por_dsr": desconto_por_dsr,
+        "desconto_total_mes": desconto_total_mes,
+        "por_semana": por_semana,
+        "ui": {
+            "kpi_faltas_numero": _round2(faltas_injustificadas_total),
+            "kpi_valor_abaixo": f"-R$ {desconto_total_mes:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."),
+            "observacoes": "Base legal: Lei 605/49 art.6º; CLT art.64; Súmula 13/TST. Modo: estrito semanal."
+        }
+    }
+```
+
+---
+
+## Implementação alternativa (TypeScript)
+
+```ts
+type Falta = { data: string; tipo: "injustificada" | "justificada"; horas?: number };
+type Periodo = { inicio: string; fim: string };
+
+function round2(n: number) {
+  return Math.round((n + Number.EPSILON) * 100) / 100;
+}
+
+function formatBRLNegative(n: number) {
+  // n >= 0 esperado aqui; o sinal será aplicado no prefixo
+  return new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(-n);
+}
+
+function addDays(d: Date, days: number) {
+  const nd = new Date(d);
+  nd.setDate(nd.getDate() + days);
+  return nd;
+}
+
+function ymd(d: Date) {
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${d.getFullYear()}-${m}-${day}`;
+}
+
+function partitionWeeks(inicio: Date, fim: Date, semana_comeca_em: "domingo" | "segunda") {
+  const semanas: Array<{ ini: Date; fim: Date }> = [];
+  let cur = new Date(inicio);
+
+  if (semana_comeca_em === "domingo") {
+    const weekdaySun0 = (cur.getDay() + 0) % 7; // 0=domingo
+    cur = addDays(cur, -weekdaySun0);
+  } else {
+    const weekdayMon0 = (cur.getDay() + 6) % 7; // 0=segunda
+    cur = addDays(cur, -weekdayMon0);
+  }
+
+  while (cur <= fim) {
+    const ini = cur;
+    const end = addDays(ini, 6);
+    semanas.push({ ini: ini < inicio ? inicio : ini, fim: end > fim ? fim : end });
+    cur = addDays(end, 1);
+  }
+  return semanas;
+}
+
+export function calcularDSREstrito(
+  salario_mensal: number,
+  faltas: Falta[],
+  periodo: Periodo,
+  horas_dia_padrao = 8.8,
+  semana_comeca_em: "domingo" | "segunda" = "domingo"
+) {
+  if (salario_mensal <= 0) throw new Error("salario_mensal deve ser > 0");
+  if (horas_dia_padrao <= 0) throw new Error("horas_dia_padrao deve ser > 0");
+
+  const inicio = new Date(`${periodo.inicio}T00:00:00`);
+  const fim = new Date(`${periodo.fim}T00:00:00`);
+  if (fim.getTime() < inicio.getTime()) throw new Error("periodo.fim < periodo.inicio");
+
+  const valor_dia = salario_mensal / 30;
+
+  const injustPorDia = new Map<string, number>();
+  for (const f of faltas) {
+    const d = new Date(`${f.data}T00:00:00`);
+    if (d < inicio || d > fim) continue;
+    if (f.tipo !== "injustificada") continue;
+
+    let fracao = 1;
+    if (typeof f.horas === "number") {
+      fracao = Math.min(Math.max(f.horas / horas_dia_padrao, 0), 1);
+    }
+    const key = ymd(d);
+    injustPorDia.set(key, Math.min((injustPorDia.get(key) || 0) + fracao, 1));
+  }
+
+  const semanas = partitionWeeks(inicio, fim, semana_comeca_em);
+
+  let faltas_injustificadas_total = 0;
+  let semanas_com_perda_dsr = 0;
+  const por_semana: any[] = [];
+
+  for (const w of semanas) {
+    let soma = 0;
+    for (let d = new Date(w.ini); d <= w.fim; d = addDays(d, 1)) {
+      soma += injustPorDia.get(ymd(d)) || 0;
+    }
+    const perdeu = soma > 0;
+    if (perdeu) semanas_com_perda_dsr += 1;
+    faltas_injustificadas_total += soma;
+
+    por_semana.push({
+      semana_inicio: ymd(w.ini),
+      semana_fim: ymd(w.fim),
+      faltas_injustificadas: round2(soma),
+      perdeu_dsr: perdeu
+    });
+  }
+
+  const desconto_por_faltas = round2(valor_dia * faltas_injustificadas_total);
+  const desconto_por_dsr = round2(valor_dia * semanas_com_perda_dsr);
+  const desconto_total_mes = round2(desconto_por_faltas + desconto_por_dsr);
+
+  return {
+    valor_dia: round2(valor_dia),
+    faltas_injustificadas_total: round2(faltas_injustificadas_total),
+    semanas_com_perda_dsr,
+    desconto_por_faltas,
+    desconto_por_dsr,
+    desconto_total_mes,
+    por_semana,
+    ui: {
+      kpi_faltas_numero: round2(faltas_injustificadas_total),
+      kpi_valor_abaixo: formatBRLNegative(desconto_total_mes),
+      observacoes: "Base legal: Lei 605/49 art.6º; CLT art.64; Súmula 13/TST. Modo: estrito semanal."
+    }
+  };
+}
+```
+
+---
+
+## Dica de UI (mostrar “valor abaixo do número de faltas”)
+
+### Jinja (Flask)
+
+```html
+<div class="card kpi">
+  <h4 class="m-0">{{ kpis.faltas_injustificadas_total }}</h4>
+  <div class="text-danger fw-bold">
+    {{ kpis.ui.kpi_valor_abaixo }}
+  </div>
+  <small>Faltas (desconto por faltas + DSR semanal)</small>
+</div>
+```
+
+### React (TSX)
+
+```tsx
+<Card className="p-4">
+  <div className="text-3xl font-bold">{data.faltas_injustificadas_total}</div>
+  <div className="font-semibold text-red-600">{data.ui.kpi_valor_abaixo}</div>
+  <div className="text-sm text-gray-500">Faltas (faltas + DSR semanal)</div>
+</Card>
+```
+
+---
+
+## Testes rápidos (sanity)
+
+1. **1 falta em 1 semana** – salário 2100
+
+   * `valor_dia=70`
+   * `faltas_total=1.00` → `desconto_faltas=70`
+   * `semanas_com_perda_dsr=1` → `desconto_dsr=70`
+   * **total=140**
+
+2. **2 faltas na mesma semana** – salário 2100
+
+   * `faltas_total=2.00` → `desconto_faltas=140`
+   * `semanas_com_perda_dsr=1` → `desconto_dsr=70`
+   * **total=210** (note que o DSR **não** duplica pela segunda falta na mesma semana)
+
+3. **1 falta em duas semanas diferentes** – salário 2100
+
+   * `faltas_total=2.00` → `desconto_faltas=140`
+   * `semanas_com_perda_dsr=2` → `desconto_dsr=140`
+   * **total=280**
+
+4. **Fração de 4,4h (metade do dia) em uma semana** – salário 2100, `horas_dia=8.8`
+
+   * `faltas_total=0.5` → `desconto_faltas=35`
+   * `semanas_com_perda_dsr=1` → `desconto_dsr=70`
+   * **total=105**
+
+---
+
+se quiser, eu adapto para **semana começando na segunda**, ou integro direto como **endpoint Flask**/**nó Function do n8n**. Quer que eu gere já o arquivo e a rota?
