@@ -77,13 +77,23 @@ def calcular_valor_hora_corrigido(funcionario):
     if not funcionario or not funcionario.salario:
         return 0.0
     
-    from calcular_dias_uteis_mes import calcular_dias_uteis_mes
+    from calendar import monthrange
     
     # Data atual para cálculo
     hoje = datetime.now().date()
     
     # Calcular dias úteis do mês atual
-    dias_uteis = calcular_dias_uteis_mes(hoje.year, hoje.month)
+    ano = hoje.year
+    mes = hoje.month
+    
+    dias_uteis = 0
+    primeiro_dia, ultimo_dia = monthrange(ano, mes)
+    
+    for dia in range(1, ultimo_dia + 1):
+        data_check = hoje.replace(day=dia)
+        # 0=segunda, 1=terça, ..., 6=domingo
+        if data_check.weekday() < 5:  # Segunda a sexta
+            dias_uteis += 1
     
     # Determinar horas diárias baseado no horário do funcionário
     if funcionario.horario_trabalho and funcionario.horario_trabalho.horas_diarias:
