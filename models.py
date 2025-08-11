@@ -8,6 +8,7 @@ class TipoUsuario(Enum):
     SUPER_ADMIN = "super_admin"
     ADMIN = "admin"
     GESTOR_EQUIPES = "gestor_equipes"
+    ALMOXARIFE = "almoxarife"  # MÓDULO 4: Almoxarifado
     FUNCIONARIO = "funcionario"
 
 class Usuario(UserMixin, db.Model):
@@ -800,86 +801,321 @@ class AlocacaoEquipe(db.Model):
 
 
 # ================================
-# MÓDULO 4: ALMOXARIFADO COMPLETO
+# MÓDULO 4: ALMOXARIFADO INTELIGENTE
 # ================================
 
-class Material(db.Model):
-    """Materiais do almoxarifado com controle de estoque"""
-    __tablename__ = 'material'
+from decimal import Decimal
+import xml.etree.ElementTree as ET
+
+class CategoriaProduto(db.Model):
+    """Categorias de produtos para organização do almoxarifado"""
+    __tablename__ = 'categoria_produto'
     
     id = db.Column(db.Integer, primary_key=True)
-    codigo_barras = db.Column(db.String(50), unique=True)
-    descricao = db.Column(db.String(200), nullable=False)
-    categoria = db.Column(db.String(50), nullable=False)  # ex: ferramentas, materiais_construcao
-    unidade_medida = db.Column(db.String(10), nullable=False)  # un, kg, m, m2, m3
-    estoque_atual = db.Column(db.Float, default=0.0)
-    estoque_minimo = db.Column(db.Float, default=0.0)
-    valor_medio = db.Column(db.Float, default=0.0)  # Custo médio ponderado
-    localizacao = db.Column(db.String(100))  # Localização no almoxarifado
-    ativo = db.Column(db.Boolean, default=True)
+    nome = db.Column(db.String(100), nullable=False)
+    descricao = db.Column(db.Text)
+    codigo = db.Column(db.String(10), nullable=False)  # CIM, ELE, HID, etc.
+    cor_hex = db.Column(db.String(7), default='#007bff')  # Para interface visual
     
-    # Multi-tenant
+    # Multi-tenant (OBRIGATÓRIO)
     admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False)
     
+    # Controle de tempo
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     
     # Relacionamentos
-    movimentacoes = db.relationship('MovimentacaoMaterial', backref='material_ref', cascade='all, delete-orphan')
-    admin = db.relationship('Usuario', backref='materiais_administrados')
+    produtos = db.relationship('Produto', backref='categoria', lazy='dynamic')
+    admin = db.relationship('Usuario', backref='categorias_administradas')
+    
+    # Índices
+    __table_args__ = (
+        db.UniqueConstraint('codigo', 'admin_id', name='uk_categoria_codigo_admin'),
+        db.Index('idx_categoria_admin_codigo', 'admin_id', 'codigo'),
+    )
     
     def __repr__(self):
-        return f'<Material {self.descricao}>'
+        return f'<CategoriaProduto {self.nome}>'
 
-class MovimentacaoMaterial(db.Model):
-    """Movimentações de entrada/saída do almoxarifado"""
-    __tablename__ = 'movimentacao_material'
+class Fornecedor(db.Model):
+    """Fornecedores para controle de compras e notas fiscais"""
+    __tablename__ = 'fornecedor'
     
     id = db.Column(db.Integer, primary_key=True)
-    material_id = db.Column(db.Integer, db.ForeignKey('material.id'), nullable=False)
-    tipo_movimento = db.Column(db.String(20), nullable=False)  # entrada, saida, devolucao, ajuste
-    quantidade = db.Column(db.Float, nullable=False)
-    valor_unitario = db.Column(db.Float, default=0.0)
-    valor_total = db.Column(db.Float, default=0.0)
+    razao_social = db.Column(db.String(200), nullable=False)
+    nome_fantasia = db.Column(db.String(200))
+    cnpj = db.Column(db.String(18), nullable=False)
+    inscricao_estadual = db.Column(db.String(20))
     
-    # Integração com obras e RDO
-    obra_id = db.Column(db.Integer, db.ForeignKey('obra.id'))
-    rdo_id = db.Column(db.Integer, db.ForeignKey('rdo.id'))
-    funcionario_responsavel_id = db.Column(db.Integer, db.ForeignKey('funcionario.id'))
+    # Endereço
+    endereco = db.Column(db.Text)
+    cidade = db.Column(db.String(100))
+    estado = db.Column(db.String(2))
+    cep = db.Column(db.String(10))
     
-    # Dados da movimentação
-    data_movimento = db.Column(db.Date, nullable=False, default=datetime.utcnow)
-    documento = db.Column(db.String(50))  # Nota fiscal, requisição, etc.
-    observacoes = db.Column(db.Text)
+    # Contato
+    telefone = db.Column(db.String(20))
+    email = db.Column(db.String(100))
+    contato_responsavel = db.Column(db.String(100))
     
-    # Multi-tenant
+    # Status
+    ativo = db.Column(db.Boolean, default=True)
+    
+    # Multi-tenant (OBRIGATÓRIO)
     admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False)
     
+    # Controle de tempo
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     
     # Relacionamentos
-    obra = db.relationship('Obra', backref='movimentacoes_material')
-    rdo = db.relationship('RDO', backref='materiais_utilizados')
-    funcionario_responsavel = db.relationship('Funcionario', backref='movimentacoes_responsavel')
-    admin = db.relationship('Usuario', backref='movimentacoes_administradas')
+    notas_fiscais = db.relationship('NotaFiscal', backref='fornecedor', lazy='dynamic')
+    admin = db.relationship('Usuario', backref='fornecedores_administrados')
+    
+    # Índices
+    __table_args__ = (
+        db.UniqueConstraint('cnpj', 'admin_id', name='uk_fornecedor_cnpj_admin'),
+        db.Index('idx_fornecedor_admin_ativo', 'admin_id', 'ativo'),
+    )
     
     def __repr__(self):
-        return f'<MovimentacaoMaterial {self.material_ref.descricao} - {self.tipo_movimento}>'
+        return f'<Fornecedor {self.razao_social}>'
+    
+    @property
+    def cnpj_formatado(self):
+        """Retorna CNPJ formatado"""
+        if len(self.cnpj) == 14:
+            return f"{self.cnpj[:2]}.{self.cnpj[2:5]}.{self.cnpj[5:8]}/{self.cnpj[8:12]}-{self.cnpj[12:]}"
+        return self.cnpj
 
-class RDOMaterial(db.Model):
-    """Integração de materiais com RDO"""
-    __tablename__ = 'rdo_material'
+class Produto(db.Model):
+    """Produtos/materiais do almoxarifado com controle completo"""
+    __tablename__ = 'produto'
     
     id = db.Column(db.Integer, primary_key=True)
-    rdo_id = db.Column(db.Integer, db.ForeignKey('rdo.id'), nullable=False)
-    material_id = db.Column(db.Integer, db.ForeignKey('material.id'), nullable=False)
-    quantidade_utilizada = db.Column(db.Float, nullable=False)
-    valor_unitario = db.Column(db.Float, nullable=False)
-    valor_total = db.Column(db.Float, nullable=False)
+    codigo_interno = db.Column(db.String(20), nullable=False)
+    codigo_barras = db.Column(db.String(50))
+    nome = db.Column(db.String(200), nullable=False)
+    descricao = db.Column(db.Text)
+    
+    # Classificação
+    categoria_id = db.Column(db.Integer, db.ForeignKey('categoria_produto.id'), nullable=False)
+    
+    # Unidades e medidas
+    unidade_medida = db.Column(db.String(10), nullable=False)  # UN, KG, M, L, M2, M3, etc.
+    peso_unitario = db.Column(db.Numeric(10,3))  # Para cálculos de frete
+    dimensoes = db.Column(db.String(50))  # Ex: "10x20x30 cm"
+    
+    # Controle de estoque
+    estoque_minimo = db.Column(db.Numeric(10,3), default=0)
+    estoque_maximo = db.Column(db.Numeric(10,3))
+    estoque_atual = db.Column(db.Numeric(10,3), default=0)
+    estoque_reservado = db.Column(db.Numeric(10,3), default=0)  # Para futuras funcionalidades
+    
+    # Valores
+    valor_medio = db.Column(db.Numeric(10,2), default=0)  # Calculado automaticamente
+    ultimo_valor_compra = db.Column(db.Numeric(10,2))
+    
+    # Status e controle
+    ativo = db.Column(db.Boolean, default=True)
+    critico = db.Column(db.Boolean, default=False)  # Material crítico para obras
+    
+    # Multi-tenant (OBRIGATÓRIO)
+    admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False)
+    
+    # Controle de tempo
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    # Relacionamentos
+    movimentacoes = db.relationship('MovimentacaoEstoque', backref='produto', lazy='dynamic')
+    admin = db.relationship('Usuario', backref='produtos_administrados')
+    
+    # Índices
+    __table_args__ = (
+        db.UniqueConstraint('codigo_interno', 'admin_id', name='uk_produto_codigo_admin'),
+        db.Index('idx_produto_codigo_barras', 'codigo_barras'),
+        db.Index('idx_produto_admin_ativo', 'admin_id', 'ativo'),
+        db.Index('idx_produto_categoria', 'categoria_id'),
+        db.Index('idx_produto_estoque_baixo', 'admin_id', 'estoque_atual', 'estoque_minimo'),
+    )
+    
+    def __repr__(self):
+        return f'<Produto {self.nome}>'
+    
+    @property
+    def estoque_disponivel(self):
+        """Estoque disponível (atual - reservado)"""
+        return self.estoque_atual - self.estoque_reservado
+    
+    @property
+    def status_estoque(self):
+        """Status do estoque: OK, BAIXO, CRITICO, ZERADO"""
+        if self.estoque_atual <= 0:
+            return 'ZERADO'
+        elif self.estoque_atual <= (self.estoque_minimo * 0.5):
+            return 'CRITICO'
+        elif self.estoque_atual <= self.estoque_minimo:
+            return 'BAIXO'
+        else:
+            return 'OK'
+    
+    @property
+    def valor_estoque_atual(self):
+        """Valor total do estoque atual"""
+        return self.estoque_atual * self.valor_medio
+    
+    def to_dict(self):
+        """Converter para dicionário para APIs"""
+        return {
+            'id': self.id,
+            'codigo_interno': self.codigo_interno,
+            'codigo_barras': self.codigo_barras,
+            'nome': self.nome,
+            'descricao': self.descricao,
+            'categoria': self.categoria.nome if self.categoria else None,
+            'unidade_medida': self.unidade_medida,
+            'estoque_atual': float(self.estoque_atual),
+            'estoque_minimo': float(self.estoque_minimo),
+            'valor_medio': float(self.valor_medio),
+            'status_estoque': self.status_estoque,
+            'ativo': self.ativo
+        }
+
+class NotaFiscal(db.Model):
+    """Notas fiscais para controle de entrada de materiais"""
+    __tablename__ = 'nota_fiscal'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    numero = db.Column(db.String(20), nullable=False)
+    serie = db.Column(db.String(5), nullable=False)
+    chave_acesso = db.Column(db.String(44), unique=True, nullable=False)
+    
+    # Fornecedor
+    fornecedor_id = db.Column(db.Integer, db.ForeignKey('fornecedor.id'), nullable=False)
+    
+    # Datas
+    data_emissao = db.Column(db.Date, nullable=False)
+    data_entrada = db.Column(db.Date)  # Data de entrada no estoque
+    
+    # Valores
+    valor_produtos = db.Column(db.Numeric(10,2), nullable=False)
+    valor_frete = db.Column(db.Numeric(10,2), default=0)
+    valor_desconto = db.Column(db.Numeric(10,2), default=0)
+    valor_total = db.Column(db.Numeric(10,2), nullable=False)
+    
+    # XML e processamento
+    xml_content = db.Column(db.Text)  # Armazenar XML completo
+    xml_hash = db.Column(db.String(64))  # Hash para detectar duplicatas
+    
+    # Status
+    status = db.Column(db.String(20), default='Pendente')  # Pendente, Processada, Erro
     observacoes = db.Column(db.Text)
     
-    # Multi-tenant
+    # Controle
+    processada_por_id = db.Column(db.Integer, db.ForeignKey('usuario.id'))
+    data_processamento = db.Column(db.DateTime)
+    
+    # Multi-tenant (OBRIGATÓRIO)
     admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False)
+    
+    # Controle de tempo
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    # Relacionamentos
+    movimentacoes = db.relationship('MovimentacaoEstoque', backref='nota_fiscal', lazy='dynamic')
+    processada_por = db.relationship('Usuario', foreign_keys=[processada_por_id])
+    admin = db.relationship('Usuario', foreign_keys=[admin_id], backref='notas_fiscais_administradas')
+    
+    # Índices
+    __table_args__ = (
+        db.Index('idx_nf_admin_status', 'admin_id', 'status'),
+        db.Index('idx_nf_fornecedor_data', 'fornecedor_id', 'data_emissao'),
+        db.Index('idx_nf_chave_acesso', 'chave_acesso'),
+    )
+    
+    def __repr__(self):
+        return f'<NotaFiscal {self.numero}/{self.serie}>'
+    
+    @property
+    def numero_formatado(self):
+        """Número da NF formatado"""
+        return f"{self.numero}/{self.serie}"
+
+class MovimentacaoEstoque(db.Model):
+    """Movimentações de estoque com rastreabilidade completa"""
+    __tablename__ = 'movimentacao_estoque'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    
+    # Produto
+    produto_id = db.Column(db.Integer, db.ForeignKey('produto.id'), nullable=False)
+    
+    # Tipo de movimentação
+    tipo_movimentacao = db.Column(db.String(20), nullable=False)  # ENTRADA, SAIDA, DEVOLUCAO, AJUSTE
+    
+    # Quantidades
+    quantidade = db.Column(db.Numeric(10,3), nullable=False)
+    quantidade_anterior = db.Column(db.Numeric(10,3))  # Para auditoria
+    quantidade_posterior = db.Column(db.Numeric(10,3))  # Para auditoria
+    
+    # Valores
+    valor_unitario = db.Column(db.Numeric(10,2))
+    valor_total = db.Column(db.Numeric(10,2))
+    
+    # Data e hora
+    data_movimentacao = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    
+    # Origem da movimentação (relacionamentos opcionais)
+    nota_fiscal_id = db.Column(db.Integer, db.ForeignKey('nota_fiscal.id'))
+    rdo_id = db.Column(db.Integer, db.ForeignKey('rdo.id'))
+    funcionario_id = db.Column(db.Integer, db.ForeignKey('funcionario.id'))
+    obra_id = db.Column(db.Integer, db.ForeignKey('obra.id'))
+    
+    # Controle e auditoria
+    usuario_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False)
+    observacoes = db.Column(db.Text)
+    ip_address = db.Column(db.String(45))
+    
+    # Multi-tenant (OBRIGATÓRIO)
+    admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False)
+    
+    # Relacionamentos
+    usuario = db.relationship('Usuario', foreign_keys=[usuario_id], backref='movimentacoes_estoque')
+    funcionario = db.relationship('Funcionario', backref='movimentacoes_materiais_funcionario')
+    obra = db.relationship('Obra', backref='movimentacoes_materiais_obra')
+    rdo = db.relationship('RDO', backref='movimentacoes_materiais_rdo')
+    
+    # Índices
+    __table_args__ = (
+        db.Index('idx_mov_produto_data', 'produto_id', 'data_movimentacao'),
+        db.Index('idx_mov_admin_tipo', 'admin_id', 'tipo_movimentacao'),
+        db.Index('idx_mov_obra_data', 'obra_id', 'data_movimentacao'),
+        db.Index('idx_mov_funcionario_data', 'funcionario_id', 'data_movimentacao'),
+        db.Index('idx_mov_rdo', 'rdo_id'),
+        db.Index('idx_mov_nf', 'nota_fiscal_id'),
+    )
+    
+    def __repr__(self):
+        return f'<MovimentacaoEstoque {self.tipo_movimentacao} - {self.produto.nome if self.produto else "N/A"}>'
+    
+    def to_dict(self):
+        """Converter para dicionário para APIs"""
+        return {
+            'id': self.id,
+            'produto_nome': self.produto.nome if self.produto else None,
+            'tipo_movimentacao': self.tipo_movimentacao,
+            'quantidade': float(self.quantidade),
+            'valor_unitario': float(self.valor_unitario) if self.valor_unitario else None,
+            'valor_total': float(self.valor_total) if self.valor_total else None,
+            'data_movimentacao': self.data_movimentacao.isoformat(),
+            'funcionario_nome': self.funcionario.nome if self.funcionario else None,
+            'obra_nome': self.obra.nome if self.obra else None,
+            'rdo_numero': self.rdo.numero_rdo if self.rdo else None,
+            'usuario_nome': self.usuario.nome if self.usuario else None,
+            'observacoes': self.observacoes
+        }
     
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     

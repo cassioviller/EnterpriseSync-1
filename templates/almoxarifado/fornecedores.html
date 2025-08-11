@@ -1,0 +1,94 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- Cabeçalho -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1 class="h3 mb-0 text-gray-800">
+            <i class="fas fa-truck"></i> Fornecedores
+        </h1>
+    </div>
+
+    <!-- Lista de Fornecedores -->
+    <div class="card shadow mb-4">
+        <div class="card-header py-3">
+            <h6 class="m-0 font-weight-bold text-primary">
+                Fornecedores Cadastrados ({{ fornecedores|length }})
+            </h6>
+        </div>
+        <div class="card-body">
+            {% if fornecedores %}
+                <div class="table-responsive">
+                    <table class="table table-bordered" id="dataTable" width="100%" cellspacing="0">
+                        <thead>
+                            <tr>
+                                <th>CNPJ</th>
+                                <th>Razão Social</th>
+                                <th>Nome Fantasia</th>
+                                <th>Contato</th>
+                                <th>Última Compra</th>
+                                <th>Status</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for fornecedor in fornecedores %}
+                            <tr>
+                                <td>{{ fornecedor.cnpj_formatado }}</td>
+                                <td>
+                                    <strong>{{ fornecedor.razao_social }}</strong>
+                                    {% if fornecedor.inscricao_estadual %}
+                                    <br><small class="text-muted">IE: {{ fornecedor.inscricao_estadual }}</small>
+                                    {% endif %}
+                                </td>
+                                <td>{{ fornecedor.nome_fantasia or '-' }}</td>
+                                <td>
+                                    {% if fornecedor.telefone %}
+                                    <i class="fas fa-phone"></i> {{ fornecedor.telefone }}<br>
+                                    {% endif %}
+                                    {% if fornecedor.email %}
+                                    <i class="fas fa-envelope"></i> {{ fornecedor.email }}
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if fornecedor.ultima_compra %}
+                                    {{ fornecedor.ultima_compra.strftime('%d/%m/%Y') }}
+                                    {% else %}
+                                    <span class="text-muted">-</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if fornecedor.ativo %}
+                                        <span class="badge badge-success">Ativo</span>
+                                    {% else %}
+                                        <span class="badge badge-secondary">Inativo</span>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            {% else %}
+                <div class="text-center py-4">
+                    <i class="fas fa-truck fa-3x text-muted mb-3"></i>
+                    <h5 class="text-muted">Nenhum fornecedor cadastrado</h5>
+                    <p class="text-muted">Os fornecedores são criados automaticamente ao importar notas fiscais.</p>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<script>
+// DataTable
+$(document).ready(function() {
+    $('#dataTable').DataTable({
+        "language": {
+            "url": "//cdn.datatables.net/plug-ins/1.10.24/i18n/Portuguese-Brasil.json"
+        },
+        "order": [[ 1, "asc" ]],
+        "pageLength": 25
+    });
+});
+</script>
+{% endblock %}

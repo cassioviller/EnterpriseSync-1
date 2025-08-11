@@ -699,14 +699,26 @@
                         
                         <li class="nav-item dropdown">
                             <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown">
-                                <i class="fas fa-boxes me-1"></i> Almoxarifado
+                                <i class="fas fa-warehouse me-1"></i> Almoxarifado
                             </a>
                             <ul class="dropdown-menu">
-                                <li><a class="dropdown-item" href="{{ url_for('main.lista_materiais') }}">
-                                    <i class="fas fa-box me-2"></i> Materiais
+                                <li><a class="dropdown-item" href="{{ url_for('almoxarifado.dashboard') }}">
+                                    <i class="fas fa-tachometer-alt me-2"></i> Dashboard
                                 </a></li>
-                                <li><a class="dropdown-item" href="{{ url_for('main.movimentacoes_material') }}">
+                                <li><a class="dropdown-item" href="{{ url_for('almoxarifado.listar_produtos') }}">
+                                    <i class="fas fa-boxes me-2"></i> Produtos
+                                </a></li>
+                                <li><a class="dropdown-item" href="{{ url_for('almoxarifado.listar_movimentacoes') }}">
                                     <i class="fas fa-exchange-alt me-2"></i> Movimentações
+                                </a></li>
+                                <li><a class="dropdown-item" href="{{ url_for('almoxarifado.listar_categorias') }}">
+                                    <i class="fas fa-tags me-2"></i> Categorias
+                                </a></li>
+                                <li><a class="dropdown-item" href="{{ url_for('almoxarifado.listar_fornecedores') }}">
+                                    <i class="fas fa-truck me-2"></i> Fornecedores
+                                </a></li>
+                                <li><a class="dropdown-item" href="{{ url_for('almoxarifado.listar_notas_fiscais') }}">
+                                    <i class="fas fa-file-invoice me-2"></i> Notas Fiscais
                                 </a></li>
                             </ul>
                         </li>

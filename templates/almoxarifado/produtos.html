@@ -1,0 +1,246 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- Cabeçalho -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1 class="h3 mb-0 text-gray-800">
+            <i class="fas fa-boxes"></i> Produtos do Almoxarifado
+        </h1>
+        <div>
+            {% if pode_gerenciar %}
+            <a href="{{ url_for('almoxarifado.novo_produto') }}" class="btn btn-primary">
+                <i class="fas fa-plus"></i> Novo Produto
+            </a>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Filtros -->
+    <div class="card shadow mb-4">
+        <div class="card-body">
+            <form method="GET" class="row g-3">
+                <div class="col-md-3">
+                    <label for="busca" class="form-label">Buscar</label>
+                    <input type="text" class="form-control" id="busca" name="busca" 
+                           value="{{ busca }}" placeholder="Nome, código...">
+                </div>
+                <div class="col-md-3">
+                    <label for="categoria_id" class="form-label">Categoria</label>
+                    <select class="form-select" id="categoria_id" name="categoria_id">
+                        <option value="">Todas as categorias</option>
+                        {% for categoria in categorias %}
+                        <option value="{{ categoria.id }}" {% if categoria.id == categoria_id %}selected{% endif %}>
+                            {{ categoria.nome }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <label for="status_estoque" class="form-label">Status Estoque</label>
+                    <select class="form-select" id="status_estoque" name="status_estoque">
+                        <option value="">Todos os status</option>
+                        <option value="ZERADO" {% if status_estoque == 'ZERADO' %}selected{% endif %}>Zerado</option>
+                        <option value="CRITICO" {% if status_estoque == 'CRITICO' %}selected{% endif %}>Crítico</option>
+                        <option value="BAIXO" {% if status_estoque == 'BAIXO' %}selected{% endif %}>Baixo</option>
+                    </select>
+                </div>
+                <div class="col-md-3 d-flex align-items-end">
+                    <button type="submit" class="btn btn-primary me-2">
+                        <i class="fas fa-search"></i> Filtrar
+                    </button>
+                    <a href="{{ url_for('almoxarifado.listar_produtos') }}" class="btn btn-outline-secondary">
+                        <i class="fas fa-times"></i> Limpar
+                    </a>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Lista de Produtos -->
+    <div class="card shadow mb-4">
+        <div class="card-header py-3">
+            <h6 class="m-0 font-weight-bold text-primary">
+                Produtos Cadastrados ({{ produtos|length }} encontrados)
+            </h6>
+        </div>
+        <div class="card-body">
+            {% if produtos %}
+                <div class="table-responsive">
+                    <table class="table table-bordered" id="dataTable" width="100%" cellspacing="0">
+                        <thead>
+                            <tr>
+                                <th>Código</th>
+                                <th>Nome</th>
+                                <th>Categoria</th>
+                                <th>Estoque Atual</th>
+                                <th>Estoque Mín.</th>
+                                <th>Status</th>
+                                <th>Valor Médio</th>
+                                <th>Ações</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for produto in produtos %}
+                            <tr>
+                                <td>
+                                    <strong>{{ produto.codigo_interno }}</strong>
+                                    {% if produto.codigo_barras %}
+                                    <br><small class="text-muted">{{ produto.codigo_barras }}</small>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <a href="{{ url_for('almoxarifado.ver_produto', id=produto.id) }}">
+                                        {{ produto.nome }}
+                                    </a>
+                                    {% if produto.critico %}
+                                    <span class="badge badge-warning ms-1">Crítico</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <span class="badge" style="background-color: {{ produto.categoria.cor_hex }}; color: white;">
+                                        {{ produto.categoria.nome }}
+                                    </span>
+                                </td>
+                                <td>
+                                    {{ produto.estoque_atual }} {{ produto.unidade_medida }}
+                                </td>
+                                <td>
+                                    {{ produto.estoque_minimo }} {{ produto.unidade_medida }}
+                                </td>
+                                <td>
+                                    {% if produto.status_estoque == 'OK' %}
+                                        <span class="badge badge-success">OK</span>
+                                    {% elif produto.status_estoque == 'BAIXO' %}
+                                        <span class="badge badge-warning">Baixo</span>
+                                    {% elif produto.status_estoque == 'CRITICO' %}
+                                        <span class="badge badge-danger">Crítico</span>
+                                    {% elif produto.status_estoque == 'ZERADO' %}
+                                        <span class="badge badge-dark">Zerado</span>
+                                    {% endif %}
+                                </td>
+                                <td>R$ {{ "%.2f"|format(produto.valor_medio) }}</td>
+                                <td>
+                                    <div class="btn-group" role="group">
+                                        <a href="{{ url_for('almoxarifado.ver_produto', id=produto.id) }}" 
+                                           class="btn btn-sm btn-info" title="Ver Detalhes">
+                                            <i class="fas fa-eye"></i>
+                                        </a>
+                                        {% if pode_gerenciar %}
+                                        <button type="button" class="btn btn-sm btn-primary" 
+                                                onclick="abrirModalMovimentacao({{ produto.id }}, '{{ produto.nome }}', {{ produto.estoque_atual }})"
+                                                title="Movimentar Estoque">
+                                            <i class="fas fa-exchange-alt"></i>
+                                        </button>
+                                        {% endif %}
+                                    </div>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            {% else %}
+                <div class="text-center py-4">
+                    <i class="fas fa-box-open fa-3x text-muted mb-3"></i>
+                    <h5 class="text-muted">Nenhum produto encontrado</h5>
+                    <p class="text-muted">Tente ajustar os filtros ou cadastre um novo produto.</p>
+                    {% if pode_gerenciar %}
+                    <a href="{{ url_for('almoxarifado.novo_produto') }}" class="btn btn-primary">
+                        <i class="fas fa-plus"></i> Cadastrar Primeiro Produto
+                    </a>
+                    {% endif %}
+                </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<!-- Modal de Movimentação -->
+{% if pode_gerenciar %}
+<div class="modal fade" id="modalMovimentacao" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Movimentar Estoque</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="POST" action="{{ url_for('almoxarifado.movimentar_estoque') }}">
+                <div class="modal-body">
+                    <input type="hidden" id="produto_id_modal" name="produto_id">
+                    
+                    <div class="mb-3">
+                        <label for="produto_nome_modal" class="form-label">Produto</label>
+                        <input type="text" class="form-control" id="produto_nome_modal" readonly>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="estoque_atual_modal" class="form-label">Estoque Atual</label>
+                        <input type="text" class="form-control" id="estoque_atual_modal" readonly>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="tipo_movimentacao" class="form-label">Tipo de Movimentação</label>
+                        <select class="form-select" id="tipo_movimentacao" name="tipo_movimentacao" required>
+                            <option value="">Selecione...</option>
+                            <option value="ENTRADA">Entrada</option>
+                            <option value="SAIDA">Saída</option>
+                            <option value="AJUSTE">Ajuste</option>
+                            <option value="DEVOLUCAO">Devolução</option>
+                        </select>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="quantidade" class="form-label">Quantidade</label>
+                        <input type="number" step="0.001" class="form-control" id="quantidade" 
+                               name="quantidade" required min="0.001">
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="valor_unitario" class="form-label">Valor Unitário (opcional)</label>
+                        <input type="number" step="0.01" class="form-control" id="valor_unitario" 
+                               name="valor_unitario" min="0">
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="observacoes" class="form-label">Observações</label>
+                        <textarea class="form-control" id="observacoes" name="observacoes" rows="3"></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-primary">Confirmar Movimentação</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<script>
+function abrirModalMovimentacao(produtoId, produtoNome, estoqueAtual) {
+    document.getElementById('produto_id_modal').value = produtoId;
+    document.getElementById('produto_nome_modal').value = produtoNome;
+    document.getElementById('estoque_atual_modal').value = estoqueAtual;
+    
+    // Limpar formulário
+    document.getElementById('tipo_movimentacao').value = '';
+    document.getElementById('quantidade').value = '';
+    document.getElementById('valor_unitario').value = '';
+    document.getElementById('observacoes').value = '';
+    
+    new bootstrap.Modal(document.getElementById('modalMovimentacao')).show();
+}
+
+// DataTable
+$(document).ready(function() {
+    $('#dataTable').DataTable({
+        "language": {
+            "url": "//cdn.datatables.net/plug-ins/1.10.24/i18n/Portuguese-Brasil.json"
+        },
+        "order": [[ 1, "asc" ]],
+        "pageLength": 25
+    });
+});
+</script>
+{% endblock %}

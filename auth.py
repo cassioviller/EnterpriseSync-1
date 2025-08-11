@@ -66,3 +66,34 @@ def can_access_data(admin_id):
         return current_user.id == admin_id
     else:  # FUNCIONARIO
         return current_user.admin_id == admin_id
+
+def almoxarife_required(f):
+    """Decorator para rotas que requerem acesso de almoxarife ou superior - MÓDULO 4"""
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if not current_user.is_authenticated:
+            flash('Acesso negado. Faça login primeiro.', 'danger')
+            return redirect(url_for('main.login'))
+        
+        if current_user.tipo_usuario not in [TipoUsuario.SUPER_ADMIN, TipoUsuario.ADMIN, TipoUsuario.ALMOXARIFE]:
+            flash('Acesso negado. Apenas almoxarifes podem acessar esta página.', 'danger')
+            return redirect(url_for('main.dashboard'))
+        
+        return f(*args, **kwargs)
+    return decorated_function
+
+def pode_gerenciar_almoxarifado():
+    """Verificar se o usuário atual pode gerenciar almoxarifado"""
+    if not current_user.is_authenticated:
+        return False
+    
+    return current_user.tipo_usuario in [TipoUsuario.SUPER_ADMIN, TipoUsuario.ADMIN, TipoUsuario.ALMOXARIFE]
+
+def pode_lancar_materiais():
+    """Verificar se o usuário atual pode lançar materiais"""
+    if not current_user.is_authenticated:
+        return False
+    
+    # Almoxarife pode lançar em qualquer RDO
+    # Admin e Super Admin também podem
+    return current_user.tipo_usuario in [TipoUsuario.SUPER_ADMIN, TipoUsuario.ADMIN, TipoUsuario.ALMOXARIFE]

@@ -1,0 +1,235 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- Cabeçalho -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1 class="h3 mb-0 text-gray-800">
+            <i class="fas fa-warehouse"></i> Almoxarifado Inteligente
+        </h1>
+        <div>
+            {% if pode_gerenciar %}
+            <a href="{{ url_for('almoxarifado.novo_produto') }}" class="btn btn-primary">
+                <i class="fas fa-plus"></i> Novo Produto
+            </a>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- KPIs Cards -->
+    <div class="row mb-4">
+        <div class="col-xl-3 col-md-6 mb-4">
+            <div class="card border-left-primary shadow h-100 py-2">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-primary text-uppercase mb-1">
+                                Total de Produtos</div>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800">{{ kpis.total_produtos }}</div>
+                        </div>
+                        <div class="col-auto">
+                            <i class="fas fa-boxes fa-2x text-gray-300"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-xl-3 col-md-6 mb-4">
+            <div class="card border-left-warning shadow h-100 py-2">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-warning text-uppercase mb-1">
+                                Estoque Baixo</div>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800">{{ kpis.produtos_baixo_estoque }}</div>
+                        </div>
+                        <div class="col-auto">
+                            <i class="fas fa-exclamation-triangle fa-2x text-gray-300"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-xl-3 col-md-6 mb-4">
+            <div class="card border-left-success shadow h-100 py-2">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-success text-uppercase mb-1">
+                                Valor do Estoque</div>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800">R$ {{ "%.2f"|format(kpis.valor_total_estoque) }}</div>
+                        </div>
+                        <div class="col-auto">
+                            <i class="fas fa-dollar-sign fa-2x text-gray-300"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-xl-3 col-md-6 mb-4">
+            <div class="card border-left-info shadow h-100 py-2">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-info text-uppercase mb-1">
+                                Movimentações (Mês)</div>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800">{{ kpis.movimentacoes_mes }}</div>
+                        </div>
+                        <div class="col-auto">
+                            <i class="fas fa-exchange-alt fa-2x text-gray-300"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <!-- Produtos Críticos -->
+        <div class="col-lg-6 mb-4">
+            <div class="card shadow mb-4">
+                <div class="card-header py-3 d-flex flex-row align-items-center justify-content-between">
+                    <h6 class="m-0 font-weight-bold text-primary">Produtos com Estoque Crítico</h6>
+                    <a href="{{ url_for('almoxarifado.listar_produtos', status_estoque='CRITICO') }}" class="btn btn-sm btn-outline-primary">
+                        Ver Todos
+                    </a>
+                </div>
+                <div class="card-body">
+                    {% if produtos_criticos %}
+                        <div class="table-responsive">
+                            <table class="table table-bordered">
+                                <thead>
+                                    <tr>
+                                        <th>Produto</th>
+                                        <th>Estoque</th>
+                                        <th>Status</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for produto in produtos_criticos %}
+                                    <tr>
+                                        <td>
+                                            <a href="{{ url_for('almoxarifado.ver_produto', id=produto.id) }}">
+                                                {{ produto.nome }}
+                                            </a>
+                                            <br><small class="text-muted">{{ produto.codigo_interno }}</small>
+                                        </td>
+                                        <td>{{ produto.estoque_atual }} {{ produto.unidade_medida }}</td>
+                                        <td>
+                                            <span class="badge badge-danger">{{ produto.status_estoque }}</span>
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    {% else %}
+                        <p class="text-muted">Nenhum produto com estoque crítico.</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Últimas Movimentações -->
+        <div class="col-lg-6 mb-4">
+            <div class="card shadow mb-4">
+                <div class="card-header py-3 d-flex flex-row align-items-center justify-content-between">
+                    <h6 class="m-0 font-weight-bold text-primary">Últimas Movimentações</h6>
+                    <a href="{{ url_for('almoxarifado.listar_movimentacoes') }}" class="btn btn-sm btn-outline-primary">
+                        Ver Todas
+                    </a>
+                </div>
+                <div class="card-body">
+                    {% if ultimas_movimentacoes %}
+                        <div class="table-responsive">
+                            <table class="table table-bordered">
+                                <thead>
+                                    <tr>
+                                        <th>Data</th>
+                                        <th>Produto</th>
+                                        <th>Tipo</th>
+                                        <th>Qtd</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for mov in ultimas_movimentacoes %}
+                                    <tr>
+                                        <td>{{ mov.data_movimentacao.strftime('%d/%m %H:%M') }}</td>
+                                        <td>
+                                            <a href="{{ url_for('almoxarifado.ver_produto', id=mov.produto_id) }}">
+                                                {{ mov.produto.nome[:30] }}...
+                                            </a>
+                                        </td>
+                                        <td>
+                                            {% if mov.tipo_movimentacao == 'ENTRADA' %}
+                                                <span class="badge badge-success">{{ mov.tipo_movimentacao }}</span>
+                                            {% elif mov.tipo_movimentacao == 'SAIDA' %}
+                                                <span class="badge badge-danger">{{ mov.tipo_movimentacao }}</span>
+                                            {% else %}
+                                                <span class="badge badge-info">{{ mov.tipo_movimentacao }}</span>
+                                            {% endif %}
+                                        </td>
+                                        <td>{{ mov.quantidade }} {{ mov.produto.unidade_medida }}</td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    {% else %}
+                        <p class="text-muted">Nenhuma movimentação recente.</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Notas Fiscais Pendentes -->
+    {% if nfs_pendentes %}
+    <div class="row">
+        <div class="col-12">
+            <div class="card shadow mb-4">
+                <div class="card-header py-3 d-flex flex-row align-items-center justify-content-between">
+                    <h6 class="m-0 font-weight-bold text-primary">Notas Fiscais Pendentes</h6>
+                    <a href="{{ url_for('almoxarifado.listar_notas_fiscais') }}" class="btn btn-sm btn-outline-primary">
+                        Ver Todas
+                    </a>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-bordered">
+                            <thead>
+                                <tr>
+                                    <th>Número</th>
+                                    <th>Fornecedor</th>
+                                    <th>Data Emissão</th>
+                                    <th>Valor</th>
+                                    <th>Ações</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for nf in nfs_pendentes %}
+                                <tr>
+                                    <td>{{ nf.numero_formatado }}</td>
+                                    <td>{{ nf.fornecedor.razao_social }}</td>
+                                    <td>{{ nf.data_emissao.strftime('%d/%m/%Y') }}</td>
+                                    <td>R$ {{ "%.2f"|format(nf.valor_total) }}</td>
+                                    <td>
+                                        {% if pode_gerenciar %}
+                                        <a href="#" class="btn btn-sm btn-primary">Processar</a>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

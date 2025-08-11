@@ -1,0 +1,2365 @@
+# 🎯 PROMPT ULTRA-ESPECÍFICO: MÓDULO 5 - SISTEMA DE RECONHECIMENTO FACIAL AUTOMÁTICO
+
+**CONTEXTO CRÍTICO:** Este prompt implementa o **Módulo 5** do sistema SIGE v8.0. Os **Módulos 1, 2, 3 e 4** já estão funcionando perfeitamente. Este módulo deve integrar-se **PERFEITAMENTE** com o sistema existente sem quebrar nada.
+
+**OBJETIVO:** Implementar sistema de **reconhecimento facial automático** para controle de ponto, eliminando cartões e senhas, com **99.38% de precisão** e conformidade total com LGPD.
+
+---
+
+## 📋 ESPECIFICAÇÕES TÉCNICAS ULTRA-DETALHADAS
+
+### **BIBLIOTECA PRINCIPAL: face_recognition**
+
+Usar a biblioteca **face_recognition** do Adam Geitgey (55k+ stars no GitHub):
+- **99.38% de precisão** no benchmark LFW
+- **Baseada em dlib** com deep learning state-of-the-art
+- **API extremamente simples** - 3 linhas para reconhecer
+- **Comunidade ativa** e documentação excelente
+
+**Instalação:**
+```bash
+pip install face-recognition==1.3.0
+pip install opencv-python==4.8.0.74
+pip install cryptography==41.0.1
+pip install scikit-learn==1.3.0
+```
+
+### **ARQUITETURA: 4 NOVAS CLASSES SQL**
+
+**IMPORTANTE:** Adicionar ao arquivo `models.py` existente, **SEM MODIFICAR** classes atuais:
+
+```python
+# ==========================================
+# MÓDULO 5: RECONHECIMENTO FACIAL
+# ==========================================
+
+class FuncionarioFace(db.Model):
+    """Armazenar encodings faciais dos funcionários"""
+    __tablename__ = 'funcionario_face'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    funcionario_id = db.Column(db.Integer, db.ForeignKey('funcionario.id'), nullable=False)
+    face_encoding = db.Column(db.Text, nullable=False)  # Encoding criptografado
+    face_image_path = db.Column(db.String(255))  # Caminho da foto de referência
+    quality_score = db.Column(db.Float, default=0.0)  # Qualidade da imagem (0-1)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    active = db.Column(db.Boolean, default=True)
+    admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False)
+    
+    # Relacionamentos
+    funcionario = db.relationship('Funcionario', backref='faces')
+    admin = db.relationship('Usuario', foreign_keys=[admin_id])
+    
+    # Índices para performance
+    __table_args__ = (
+        db.Index('idx_funcionario_face_funcionario_id', 'funcionario_id'),
+        db.Index('idx_funcionario_face_admin_id', 'admin_id'),
+        db.Index('idx_funcionario_face_active', 'active'),
+    )
+
+class ReconhecimentoTentativa(db.Model):
+    """Log de todas as tentativas de reconhecimento"""
+    __tablename__ = 'reconhecimento_tentativa'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    timestamp = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    funcionario_identificado_id = db.Column(db.Integer, db.ForeignKey('funcionario.id'))
+    confianca = db.Column(db.Float)  # 0.0 a 1.0
+    imagem_capturada_path = db.Column(db.String(255))  # Caminho da imagem capturada
+    status = db.Column(db.String(20), nullable=False)  # SUCESSO, FALHA, REJEITADO
+    ip_address = db.Column(db.String(45))
+    user_agent = db.Column(db.Text)
+    detalhes_erro = db.Column(db.Text)  # Detalhes se falhou
+    tempo_processamento = db.Column(db.Float)  # Segundos
+    admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False)
+    
+    # Relacionamentos
+    funcionario_identificado = db.relationship('Funcionario', backref='tentativas_reconhecimento')
+    admin = db.relationship('Usuario', foreign_keys=[admin_id])
+    
+    # Índices para performance
+    __table_args__ = (
+        db.Index('idx_reconhecimento_timestamp', 'timestamp'),
+        db.Index('idx_reconhecimento_funcionario_id', 'funcionario_identificado_id'),
+        db.Index('idx_reconhecimento_admin_id', 'admin_id'),
+        db.Index('idx_reconhecimento_status', 'status'),
+    )
+
+class ConfiguracaoReconhecimento(db.Model):
+    """Configurações de segurança do reconhecimento facial"""
+    __tablename__ = 'configuracao_reconhecimento'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False, unique=True)
+    
+    # Configurações de segurança
+    threshold_confianca = db.Column(db.Float, default=0.6)  # Limite de aceitação (0-1)
+    anti_spoofing_ativo = db.Column(db.Boolean, default=True)
+    salvar_tentativas_falhas = db.Column(db.Boolean, default=True)
+    salvar_imagens_capturadas = db.Column(db.Boolean, default=False)  # LGPD
+    
+    # Configurações de tempo
+    timeout_entre_pontos = db.Column(db.Integer, default=300)  # 5 minutos em segundos
+    tempo_maximo_processamento = db.Column(db.Integer, default=10)  # 10 segundos
+    
+    # Configurações de qualidade
+    resolucao_minima_width = db.Column(db.Integer, default=640)
+    resolucao_minima_height = db.Column(db.Integer, default=480)
+    qualidade_minima_imagem = db.Column(db.Float, default=0.7)
+    
+    # Configurações de notificação
+    notificar_falhas_multiplas = db.Column(db.Boolean, default=True)
+    limite_falhas_alerta = db.Column(db.Integer, default=5)
+    
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    # Relacionamentos
+    admin = db.relationship('Usuario', backref='config_reconhecimento')
+
+class LogReconhecimento(db.Model):
+    """Logs de auditoria para conformidade LGPD"""
+    __tablename__ = 'log_reconhecimento'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    timestamp = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    funcionario_id = db.Column(db.Integer, db.ForeignKey('funcionario.id'))
+    acao = db.Column(db.String(50), nullable=False)  # CADASTRO, RECONHECIMENTO, EXCLUSAO, ATUALIZACAO
+    detalhes = db.Column(db.Text)
+    usuario_responsavel_id = db.Column(db.Integer, db.ForeignKey('usuario.id'))
+    ip_address = db.Column(db.String(45))
+    admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False)
+    
+    # Relacionamentos
+    funcionario = db.relationship('Funcionario', backref='logs_reconhecimento')
+    usuario_responsavel = db.relationship('Usuario', foreign_keys=[usuario_responsavel_id])
+    admin = db.relationship('Usuario', foreign_keys=[admin_id])
+    
+    # Índices para auditoria
+    __table_args__ = (
+        db.Index('idx_log_reconhecimento_timestamp', 'timestamp'),
+        db.Index('idx_log_reconhecimento_funcionario_id', 'funcionario_id'),
+        db.Index('idx_log_reconhecimento_acao', 'acao'),
+        db.Index('idx_log_reconhecimento_admin_id', 'admin_id'),
+    )
+```
+
+### **EXTENSÃO DA CLASSE PONTO EXISTENTE**
+
+**IMPORTANTE:** Adicionar apenas **1 campo** à classe `Ponto` existente:
+
+```python
+# Adicionar ao final da classe Ponto existente em models.py
+class Ponto(db.Model):
+    # ... campos existentes mantidos ...
+    
+    # NOVO CAMPO PARA MÓDULO 5
+    metodo_registro = db.Column(db.String(20), default='MANUAL')  # MANUAL, FACIAL, CARTAO
+    confianca_facial = db.Column(db.Float)  # Se foi facial, qual a confiança
+    tentativa_reconhecimento_id = db.Column(db.Integer, db.ForeignKey('reconhecimento_tentativa.id'))
+    
+    # Relacionamento
+    tentativa_reconhecimento = db.relationship('ReconhecimentoTentativa', backref='ponto_registrado')
+```
+
+---
+
+## 🔧 FUNÇÕES UTILITÁRIAS CRÍTICAS
+
+Adicionar ao arquivo `utils.py` existente:
+
+```python
+# ==========================================
+# MÓDULO 5: FUNÇÕES DE RECONHECIMENTO FACIAL
+# ==========================================
+
+import face_recognition
+import cv2
+import numpy as np
+import pickle
+import base64
+from cryptography.fernet import Fernet
+import os
+import time
+from sklearn.metrics.pairwise import cosine_similarity
+
+# Cache global para performance
+cache_reconhecimento = {
+    'encodings': {},  # admin_id -> {funcionario_id -> encoding}
+    'timestamp': {},  # admin_id -> timestamp
+    'ttl': 3600  # 1 hora
+}
+
+def inicializar_reconhecimento_facial():
+    """Inicializar sistema de reconhecimento facial"""
+    
+    # Criar diretórios necessários
+    os.makedirs('static/faces', exist_ok=True)
+    os.makedirs('static/faces/captured', exist_ok=True)
+    os.makedirs('static/faces/registered', exist_ok=True)
+    
+    # Verificar se face_recognition está funcionando
+    try:
+        # Teste básico
+        test_image = np.zeros((100, 100, 3), dtype=np.uint8)
+        face_recognition.face_locations(test_image)
+        return True, "Sistema de reconhecimento facial inicializado com sucesso"
+    except Exception as e:
+        return False, f"Erro ao inicializar reconhecimento facial: {str(e)}"
+
+def gerar_chave_criptografia(admin_id):
+    """Gerar ou obter chave de criptografia para admin"""
+    
+    chave_path = f'keys/admin_{admin_id}_face.key'
+    os.makedirs('keys', exist_ok=True)
+    
+    if os.path.exists(chave_path):
+        with open(chave_path, 'rb') as f:
+            chave = f.read()
+    else:
+        chave = Fernet.generate_key()
+        with open(chave_path, 'wb') as f:
+            f.write(chave)
+    
+    return chave
+
+def criptografar_encoding(encoding, admin_id):
+    """Criptografar encoding facial para armazenamento seguro"""
+    
+    chave = gerar_chave_criptografia(admin_id)
+    cipher = Fernet(chave)
+    
+    # Serializar encoding
+    encoding_bytes = pickle.dumps(encoding)
+    
+    # Criptografar
+    encoding_criptografado = cipher.encrypt(encoding_bytes)
+    
+    # Converter para string base64 para armazenar no banco
+    return base64.b64encode(encoding_criptografado).decode()
+
+def descriptografar_encoding(encoding_criptografado, admin_id):
+    """Descriptografar encoding facial para uso"""
+    
+    try:
+        chave = gerar_chave_criptografia(admin_id)
+        cipher = Fernet(chave)
+        
+        # Converter de base64
+        encoding_bytes = base64.b64decode(encoding_criptografado.encode())
+        
+        # Descriptografar
+        encoding_descriptografado = cipher.decrypt(encoding_bytes)
+        
+        # Deserializar
+        return pickle.loads(encoding_descriptografado)
+    except Exception as e:
+        print(f"Erro ao descriptografar encoding: {e}")
+        return None
+
+def analisar_qualidade_imagem(imagem):
+    """Analisar se imagem tem qualidade suficiente para reconhecimento"""
+    
+    try:
+        # Converter para numpy array se necessário
+        if isinstance(imagem, str):
+            imagem = cv2.imread(imagem)
+        
+        if imagem is None:
+            return False, "Imagem não pôde ser carregada"
+        
+        # 1. Verificar resolução mínima
+        height, width = imagem.shape[:2]
+        if width < 640 or height < 480:
+            return False, f"Resolução muito baixa: {width}x{height}. Mínimo: 640x480"
+        
+        # 2. Verificar brilho adequado
+        gray = cv2.cvtColor(imagem, cv2.COLOR_BGR2GRAY)
+        brightness = np.mean(gray)
+        if brightness < 50:
+            return False, f"Imagem muito escura (brilho: {brightness:.1f})"
+        if brightness > 200:
+            return False, f"Imagem muito clara (brilho: {brightness:.1f})"
+        
+        # 3. Verificar nitidez (detectar blur)
+        laplacian_var = cv2.Laplacian(gray, cv2.CV_64F).var()
+        if laplacian_var < 100:
+            return False, f"Imagem muito borrada (nitidez: {laplacian_var:.1f})"
+        
+        # 4. Verificar se há exatamente uma face
+        face_locations = face_recognition.face_locations(imagem)
+        if len(face_locations) == 0:
+            return False, "Nenhuma face detectada na imagem"
+        if len(face_locations) > 1:
+            return False, f"Múltiplas faces detectadas ({len(face_locations)}). Use apenas uma pessoa"
+        
+        # 5. Verificar tamanho da face na imagem
+        top, right, bottom, left = face_locations[0]
+        face_width = right - left
+        face_height = bottom - top
+        
+        # Face deve ocupar pelo menos 20% da largura da imagem
+        if face_width < width * 0.2:
+            return False, "Face muito pequena na imagem. Aproxime-se da câmera"
+        
+        # Face não deve ocupar mais de 80% da imagem
+        if face_width > width * 0.8:
+            return False, "Face muito grande na imagem. Afaste-se da câmera"
+        
+        # 6. Calcular score de qualidade geral
+        quality_score = min(1.0, (
+            (min(brightness, 150) / 150) * 0.3 +  # Brilho normalizado
+            (min(laplacian_var, 500) / 500) * 0.4 +  # Nitidez normalizada
+            (min(face_width / width, 0.6) / 0.6) * 0.3  # Tamanho da face normalizado
+        ))
+        
+        return True, f"Qualidade adequada (score: {quality_score:.2f})"
+        
+    except Exception as e:
+        return False, f"Erro ao analisar qualidade: {str(e)}"
+
+def detectar_vida_basico(imagem):
+    """Detecção básica de vida (anti-spoofing)"""
+    
+    try:
+        # Converter para numpy array se necessário
+        if isinstance(imagem, str):
+            imagem = cv2.imread(imagem)
+        
+        if imagem is None:
+            return False, "Imagem não pôde ser carregada"
+        
+        # 1. Análise de textura para detectar papel/tela
+        gray = cv2.cvtColor(imagem, cv2.COLOR_BGR2GRAY)
+        
+        # Calcular Local Binary Pattern (LBP) para análise de textura
+        def calcular_lbp(img, radius=1, n_points=8):
+            """Calcular Local Binary Pattern simplificado"""
+            h, w = img.shape
+            lbp = np.zeros((h, w), dtype=np.uint8)
+            
+            for i in range(radius, h - radius):
+                for j in range(radius, w - radius):
+                    center = img[i, j]
+                    binary_string = ''
+                    
+                    # Verificar 8 pontos ao redor
+                    for di in [-1, -1, -1, 0, 0, 1, 1, 1]:
+                        for dj in [-1, 0, 1, -1, 1, -1, 0, 1]:
+                            if len(binary_string) < 8:
+                                neighbor = img[i + di, j + dj]
+                                binary_string += '1' if neighbor >= center else '0'
+                    
+                    lbp[i, j] = int(binary_string, 2)
+            
+            return lbp
+        
+        # Detectar face para focar análise
+        face_locations = face_recognition.face_locations(imagem)
+        if not face_locations:
+            return False, "Nenhuma face detectada para análise de vida"
+        
+        # Analisar apenas a região da face
+        top, right, bottom, left = face_locations[0]
+        face_gray = gray[top:bottom, left:right]
+        
+        # Calcular LBP na região da face
+        lbp = calcular_lbp(face_gray)
+        
+        # Calcular uniformidade da textura
+        hist, _ = np.histogram(lbp.ravel(), bins=256, range=(0, 256))
+        uniformity = np.sum(hist ** 2) / (face_gray.size ** 2)
+        
+        # Imagens impressas tendem a ter textura mais uniforme
+        if uniformity > 0.1:  # Threshold ajustável
+            return False, f"Textura muito uniforme (possível foto impressa): {uniformity:.3f}"
+        
+        # 2. Análise de bordas para detectar telas
+        edges = cv2.Canny(face_gray, 50, 150)
+        edge_density = np.sum(edges > 0) / edges.size
+        
+        # Telas tendem a ter densidade de bordas diferente
+        if edge_density < 0.05 or edge_density > 0.3:
+            return False, f"Densidade de bordas suspeita: {edge_density:.3f}"
+        
+        # 3. Análise de brilho para detectar reflexos de tela
+        brightness_std = np.std(face_gray)
+        if brightness_std < 10:  # Muito uniforme
+            return False, f"Brilho muito uniforme (possível tela): {brightness_std:.1f}"
+        
+        return True, "Detecção de vida aprovada"
+        
+    except Exception as e:
+        return False, f"Erro na detecção de vida: {str(e)}"
+
+def cadastrar_face_funcionario(funcionario_id, imagem_path, admin_id):
+    """Cadastrar face de funcionário no sistema"""
+    
+    try:
+        # Verificar se funcionário existe e pertence ao admin
+        funcionario = Funcionario.query.filter_by(
+            id=funcionario_id, 
+            admin_id=admin_id
+        ).first()
+        
+        if not funcionario:
+            return False, "Funcionário não encontrado"
+        
+        # Carregar e analisar imagem
+        imagem = cv2.imread(imagem_path)
+        if imagem is None:
+            return False, "Não foi possível carregar a imagem"
+        
+        # Verificar qualidade da imagem
+        qualidade_ok, qualidade_msg = analisar_qualidade_imagem(imagem)
+        if not qualidade_ok:
+            return False, f"Qualidade inadequada: {qualidade_msg}"
+        
+        # Verificar detecção de vida
+        vida_ok, vida_msg = detectar_vida_basico(imagem)
+        if not vida_ok:
+            return False, f"Detecção de vida falhou: {vida_msg}"
+        
+        # Gerar encoding facial
+        face_encodings = face_recognition.face_encodings(imagem)
+        if not face_encodings:
+            return False, "Não foi possível gerar encoding facial"
+        
+        encoding = face_encodings[0]
+        
+        # Calcular score de qualidade
+        quality_score = 0.8  # Simplificado, pode ser melhorado
+        
+        # Criptografar encoding
+        encoding_criptografado = criptografar_encoding(encoding, admin_id)
+        
+        # Salvar imagem de referência
+        ref_filename = f"funcionario_{funcionario_id}_{int(time.time())}.jpg"
+        ref_path = os.path.join('static/faces/registered', ref_filename)
+        cv2.imwrite(ref_path, imagem)
+        
+        # Remover face anterior se existir
+        face_anterior = FuncionarioFace.query.filter_by(
+            funcionario_id=funcionario_id,
+            admin_id=admin_id
+        ).first()
+        
+        if face_anterior:
+            # Desativar face anterior
+            face_anterior.active = False
+            
+            # Log da atualização
+            log = LogReconhecimento(
+                funcionario_id=funcionario_id,
+                acao='ATUALIZACAO',
+                detalhes=f'Face atualizada. Face anterior desativada.',
+                admin_id=admin_id
+            )
+            db.session.add(log)
+        
+        # Criar nova face
+        nova_face = FuncionarioFace(
+            funcionario_id=funcionario_id,
+            face_encoding=encoding_criptografado,
+            face_image_path=ref_path,
+            quality_score=quality_score,
+            admin_id=admin_id
+        )
+        
+        db.session.add(nova_face)
+        
+        # Log do cadastro
+        log = LogReconhecimento(
+            funcionario_id=funcionario_id,
+            acao='CADASTRO',
+            detalhes=f'Face cadastrada com sucesso. Qualidade: {quality_score:.2f}',
+            admin_id=admin_id
+        )
+        db.session.add(log)
+        
+        db.session.commit()
+        
+        # Limpar cache
+        if admin_id in cache_reconhecimento['encodings']:
+            del cache_reconhecimento['encodings'][admin_id]
+        
+        return True, "Face cadastrada com sucesso"
+        
+    except Exception as e:
+        db.session.rollback()
+        return False, f"Erro ao cadastrar face: {str(e)}"
+
+def obter_encodings_cache(admin_id):
+    """Obter encodings com cache inteligente para performance"""
+    
+    agora = time.time()
+    
+    # Verificar se cache é válido
+    if (admin_id in cache_reconhecimento['encodings'] and 
+        admin_id in cache_reconhecimento['timestamp'] and
+        agora - cache_reconhecimento['timestamp'][admin_id] < cache_reconhecimento['ttl']):
+        
+        return cache_reconhecimento['encodings'][admin_id]
+    
+    # Carregar encodings do banco
+    faces_ativas = FuncionarioFace.query.filter_by(
+        admin_id=admin_id,
+        active=True
+    ).all()
+    
+    encodings = {}
+    for face in faces_ativas:
+        encoding = descriptografar_encoding(face.face_encoding, admin_id)
+        if encoding is not None:
+            encodings[face.funcionario_id] = {
+                'encoding': encoding,
+                'funcionario': face.funcionario,
+                'quality_score': face.quality_score
+            }
+    
+    # Atualizar cache
+    cache_reconhecimento['encodings'][admin_id] = encodings
+    cache_reconhecimento['timestamp'][admin_id] = agora
+    
+    return encodings
+
+def reconhecer_funcionario(imagem_path, admin_id, ip_address=None):
+    """Função principal de reconhecimento facial"""
+    
+    inicio_processamento = time.time()
+    
+    try:
+        # Obter configurações
+        config = ConfiguracaoReconhecimento.query.filter_by(admin_id=admin_id).first()
+        if not config:
+            # Criar configuração padrão
+            config = ConfiguracaoReconhecimento(admin_id=admin_id)
+            db.session.add(config)
+            db.session.commit()
+        
+        # Carregar imagem
+        imagem = cv2.imread(imagem_path)
+        if imagem is None:
+            return criar_resultado_reconhecimento(
+                False, "Não foi possível carregar a imagem", 
+                admin_id, ip_address, inicio_processamento
+            )
+        
+        # Verificar qualidade da imagem
+        qualidade_ok, qualidade_msg = analisar_qualidade_imagem(imagem)
+        if not qualidade_ok:
+            return criar_resultado_reconhecimento(
+                False, f"Qualidade inadequada: {qualidade_msg}",
+                admin_id, ip_address, inicio_processamento
+            )
+        
+        # Verificar detecção de vida se ativada
+        if config.anti_spoofing_ativo:
+            vida_ok, vida_msg = detectar_vida_basico(imagem)
+            if not vida_ok:
+                return criar_resultado_reconhecimento(
+                    False, f"Detecção de vida falhou: {vida_msg}",
+                    admin_id, ip_address, inicio_processamento
+                )
+        
+        # Gerar encoding da imagem capturada
+        face_encodings = face_recognition.face_encodings(imagem)
+        if not face_encodings:
+            return criar_resultado_reconhecimento(
+                False, "Nenhuma face detectada na imagem",
+                admin_id, ip_address, inicio_processamento
+            )
+        
+        unknown_encoding = face_encodings[0]
+        
+        # Obter encodings cadastrados (com cache)
+        encodings_cadastrados = obter_encodings_cache(admin_id)
+        
+        if not encodings_cadastrados:
+            return criar_resultado_reconhecimento(
+                False, "Nenhuma face cadastrada no sistema",
+                admin_id, ip_address, inicio_processamento
+            )
+        
+        # Comparar com todas as faces cadastradas
+        melhor_funcionario = None
+        melhor_confianca = 0
+        
+        for funcionario_id, dados in encodings_cadastrados.items():
+            known_encoding = dados['encoding']
+            
+            # Calcular distância (menor = mais similar)
+            distance = face_recognition.face_distance([known_encoding], unknown_encoding)[0]
+            confianca = 1 - distance  # Converter para confiança (0-1)
+            
+            if confianca > melhor_confianca and confianca >= config.threshold_confianca:
+                melhor_confianca = confianca
+                melhor_funcionario = dados['funcionario']
+        
+        # Verificar se encontrou funcionário
+        if melhor_funcionario:
+            return criar_resultado_reconhecimento(
+                True, "Funcionário reconhecido com sucesso",
+                admin_id, ip_address, inicio_processamento,
+                funcionario=melhor_funcionario,
+                confianca=melhor_confianca,
+                imagem_path=imagem_path
+            )
+        else:
+            return criar_resultado_reconhecimento(
+                False, f"Funcionário não reconhecido (melhor confiança: {melhor_confianca:.2f})",
+                admin_id, ip_address, inicio_processamento,
+                confianca=melhor_confianca,
+                imagem_path=imagem_path
+            )
+        
+    except Exception as e:
+        return criar_resultado_reconhecimento(
+            False, f"Erro no reconhecimento: {str(e)}",
+            admin_id, ip_address, inicio_processamento
+        )
+
+def criar_resultado_reconhecimento(sucesso, mensagem, admin_id, ip_address, inicio_processamento, 
+                                 funcionario=None, confianca=None, imagem_path=None):
+    """Criar resultado padronizado de reconhecimento"""
+    
+    tempo_processamento = time.time() - inicio_processamento
+    
+    # Criar tentativa no banco
+    tentativa = ReconhecimentoTentativa(
+        funcionario_identificado_id=funcionario.id if funcionario else None,
+        confianca=confianca,
+        imagem_capturada_path=imagem_path,
+        status='SUCESSO' if sucesso else 'FALHA',
+        ip_address=ip_address,
+        detalhes_erro=mensagem if not sucesso else None,
+        tempo_processamento=tempo_processamento,
+        admin_id=admin_id
+    )
+    
+    db.session.add(tentativa)
+    db.session.commit()
+    
+    # Log da ação
+    log = LogReconhecimento(
+        funcionario_id=funcionario.id if funcionario else None,
+        acao='RECONHECIMENTO',
+        detalhes=f'Status: {tentativa.status}. Confiança: {confianca:.2f if confianca else 0}. Tempo: {tempo_processamento:.2f}s',
+        admin_id=admin_id,
+        ip_address=ip_address
+    )
+    db.session.add(log)
+    db.session.commit()
+    
+    return {
+        'sucesso': sucesso,
+        'mensagem': mensagem,
+        'funcionario': funcionario,
+        'confianca': confianca,
+        'tempo_processamento': tempo_processamento,
+        'tentativa_id': tentativa.id
+    }
+
+def registrar_ponto_facial(funcionario_id, admin_id, tentativa_id, ip_address=None):
+    """Registrar ponto usando reconhecimento facial"""
+    
+    try:
+        # Verificar se funcionário existe
+        funcionario = Funcionario.query.filter_by(
+            id=funcionario_id,
+            admin_id=admin_id
+        ).first()
+        
+        if not funcionario:
+            return False, "Funcionário não encontrado"
+        
+        # Verificar se já bateu ponto hoje
+        hoje = datetime.now().date()
+        ponto_hoje = Ponto.query.filter_by(
+            funcionario_id=funcionario_id,
+            data_ponto=hoje
+        ).first()
+        
+        agora = datetime.now().time()
+        
+        if not ponto_hoje:
+            # Primeiro ponto do dia (entrada)
+            novo_ponto = Ponto(
+                funcionario_id=funcionario_id,
+                data_ponto=hoje,
+                hora_entrada=agora,
+                admin_id=admin_id,
+                metodo_registro='FACIAL',
+                tentativa_reconhecimento_id=tentativa_id
+            )
+            
+            db.session.add(novo_ponto)
+            db.session.commit()
+            
+            return True, f"Entrada registrada às {agora.strftime('%H:%M')}"
+            
+        elif ponto_hoje.hora_saida is None:
+            # Segundo ponto do dia (saída)
+            ponto_hoje.hora_saida = agora
+            ponto_hoje.metodo_registro = 'FACIAL'
+            ponto_hoje.tentativa_reconhecimento_id = tentativa_id
+            
+            db.session.commit()
+            
+            return True, f"Saída registrada às {agora.strftime('%H:%M')}"
+            
+        else:
+            return False, "Ponto já completo para hoje (entrada e saída já registradas)"
+        
+    except Exception as e:
+        db.session.rollback()
+        return False, f"Erro ao registrar ponto: {str(e)}"
+
+def gerar_metricas_reconhecimento(admin_id, periodo_dias=30):
+    """Gerar métricas do sistema de reconhecimento"""
+    
+    data_inicio = datetime.utcnow() - timedelta(days=periodo_dias)
+    
+    tentativas = ReconhecimentoTentativa.query.filter(
+        ReconhecimentoTentativa.admin_id == admin_id,
+        ReconhecimentoTentativa.timestamp >= data_inicio
+    ).all()
+    
+    if not tentativas:
+        return {
+            'total_tentativas': 0,
+            'taxa_sucesso': 0,
+            'tempo_medio': 0,
+            'funcionarios_problemas': [],
+            'alertas': []
+        }
+    
+    total_tentativas = len(tentativas)
+    sucessos = len([t for t in tentativas if t.status == 'SUCESSO'])
+    falhas = len([t for t in tentativas if t.status == 'FALHA'])
+    
+    # Análise por funcionário
+    funcionarios_stats = {}
+    for tentativa in tentativas:
+        if tentativa.funcionario_identificado_id:
+            func_id = tentativa.funcionario_identificado_id
+            if func_id not in funcionarios_stats:
+                funcionarios_stats[func_id] = {'sucessos': 0, 'falhas': 0, 'funcionario': tentativa.funcionario_identificado}
+            
+            if tentativa.status == 'SUCESSO':
+                funcionarios_stats[func_id]['sucessos'] += 1
+            else:
+                funcionarios_stats[func_id]['falhas'] += 1
+    
+    # Identificar funcionários com problemas
+    funcionarios_problemas = []
+    for func_id, stats in funcionarios_stats.items():
+        total_func = stats['sucessos'] + stats['falhas']
+        if total_func >= 5:  # Mínimo de tentativas para considerar
+            taxa_sucesso_func = stats['sucessos'] / total_func
+            if taxa_sucesso_func < 0.7:  # Menos de 70% de sucesso
+                funcionarios_problemas.append({
+                    'funcionario': stats['funcionario'],
+                    'taxa_sucesso': taxa_sucesso_func,
+                    'total_tentativas': total_func
+                })
+    
+    # Calcular métricas gerais
+    taxa_sucesso = (sucessos / total_tentativas * 100) if total_tentativas > 0 else 0
+    tempo_medio = np.mean([t.tempo_processamento for t in tentativas if t.tempo_processamento])
+    confianca_media = np.mean([t.confianca for t in tentativas if t.confianca])
+    
+    # Gerar alertas
+    alertas = []
+    if taxa_sucesso < 80:
+        alertas.append(f"Taxa de sucesso baixa: {taxa_sucesso:.1f}%")
+    if tempo_medio > 5:
+        alertas.append(f"Tempo de processamento alto: {tempo_medio:.1f}s")
+    if len(funcionarios_problemas) > 0:
+        alertas.append(f"{len(funcionarios_problemas)} funcionário(s) com dificuldades")
+    
+    return {
+        'periodo_dias': periodo_dias,
+        'total_tentativas': total_tentativas,
+        'sucessos': sucessos,
+        'falhas': falhas,
+        'taxa_sucesso': taxa_sucesso,
+        'tempo_medio_processamento': tempo_medio,
+        'confianca_media': confianca_media,
+        'funcionarios_problemas': funcionarios_problemas,
+        'alertas': alertas,
+        'funcionarios_stats': funcionarios_stats
+    }
+
+def limpar_dados_funcionario_lgpd(funcionario_id, admin_id, motivo="Solicitação do funcionário"):
+    """Implementar direito ao esquecimento (LGPD)"""
+    
+    try:
+        # Verificar se funcionário pertence ao admin
+        funcionario = Funcionario.query.filter_by(
+            id=funcionario_id,
+            admin_id=admin_id
+        ).first()
+        
+        if not funcionario:
+            return False, "Funcionário não encontrado"
+        
+        # 1. Excluir todas as faces do funcionário
+        faces = FuncionarioFace.query.filter_by(funcionario_id=funcionario_id).all()
+        for face in faces:
+            # Excluir arquivo de imagem se existir
+            if face.face_image_path and os.path.exists(face.face_image_path):
+                os.remove(face.face_image_path)
+            
+            db.session.delete(face)
+        
+        # 2. Anonimizar tentativas de reconhecimento (manter para auditoria)
+        tentativas = ReconhecimentoTentativa.query.filter_by(funcionario_identificado_id=funcionario_id).all()
+        for tentativa in tentativas:
+            tentativa.funcionario_identificado_id = None
+            # Excluir imagem capturada se existir
+            if tentativa.imagem_capturada_path and os.path.exists(tentativa.imagem_capturada_path):
+                os.remove(tentativa.imagem_capturada_path)
+            tentativa.imagem_capturada_path = None
+        
+        # 3. Anonimizar logs (manter para auditoria legal)
+        logs = LogReconhecimento.query.filter_by(funcionario_id=funcionario_id).all()
+        for log in logs:
+            log.funcionario_id = None
+            log.detalhes = f"DADOS REMOVIDOS - LGPD: {motivo}"
+        
+        # 4. Log da exclusão
+        log_exclusao = LogReconhecimento(
+            funcionario_id=None,  # Já anonimizado
+            acao='EXCLUSAO_LGPD',
+            detalhes=f'Dados biométricos removidos. Motivo: {motivo}. Funcionário ID original: {funcionario_id}',
+            admin_id=admin_id
+        )
+        db.session.add(log_exclusao)
+        
+        db.session.commit()
+        
+        # Limpar cache
+        if admin_id in cache_reconhecimento['encodings']:
+            del cache_reconhecimento['encodings'][admin_id]
+        
+        return True, "Dados biométricos removidos com sucesso (LGPD)"
+        
+    except Exception as e:
+        db.session.rollback()
+        return False, f"Erro ao remover dados: {str(e)}"
+```
+
+---
+
+## 🌐 ROTAS FLASK ESPECÍFICAS
+
+Adicionar ao arquivo `views.py` existente:
+
+```python
+# ==========================================
+# MÓDULO 5: ROTAS DE RECONHECIMENTO FACIAL
+# ==========================================
+
+@app.route('/reconhecimento-facial')
+@admin_required
+def reconhecimento_facial_dashboard():
+    """Dashboard principal do reconhecimento facial"""
+    
+    admin_id = get_tenant_filter()
+    
+    # Obter métricas
+    metricas = gerar_metricas_reconhecimento(admin_id)
+    
+    # Obter configurações
+    config = ConfiguracaoReconhecimento.query.filter_by(admin_id=admin_id).first()
+    if not config:
+        config = ConfiguracaoReconhecimento(admin_id=admin_id)
+        db.session.add(config)
+        db.session.commit()
+    
+    # Obter funcionários cadastrados
+    funcionarios_com_face = db.session.query(Funcionario).join(
+        FuncionarioFace, 
+        Funcionario.id == FuncionarioFace.funcionario_id
+    ).filter(
+        Funcionario.admin_id == admin_id,
+        FuncionarioFace.active == True
+    ).all()
+    
+    # Obter funcionários sem face
+    funcionarios_sem_face = db.session.query(Funcionario).outerjoin(
+        FuncionarioFace,
+        Funcionario.id == FuncionarioFace.funcionario_id
+    ).filter(
+        Funcionario.admin_id == admin_id,
+        Funcionario.ativo == True,
+        FuncionarioFace.id == None
+    ).all()
+    
+    return render_template('reconhecimento_facial/dashboard.html',
+                         metricas=metricas,
+                         config=config,
+                         funcionarios_com_face=funcionarios_com_face,
+                         funcionarios_sem_face=funcionarios_sem_face)
+
+@app.route('/reconhecimento-facial/cadastrar-face/<int:funcionario_id>')
+@admin_required
+def cadastrar_face_form(funcionario_id):
+    """Formulário para cadastrar face de funcionário"""
+    
+    admin_id = get_tenant_filter()
+    
+    funcionario = Funcionario.query.filter_by(
+        id=funcionario_id,
+        admin_id=admin_id
+    ).first_or_404()
+    
+    # Verificar se já tem face cadastrada
+    face_existente = FuncionarioFace.query.filter_by(
+        funcionario_id=funcionario_id,
+        active=True
+    ).first()
+    
+    return render_template('reconhecimento_facial/cadastrar_face.html',
+                         funcionario=funcionario,
+                         face_existente=face_existente)
+
+@app.route('/reconhecimento-facial/processar-cadastro', methods=['POST'])
+@admin_required
+def processar_cadastro_face():
+    """Processar cadastro de face via upload"""
+    
+    admin_id = get_tenant_filter()
+    
+    try:
+        funcionario_id = request.form.get('funcionario_id', type=int)
+        
+        if not funcionario_id:
+            flash('Funcionário não especificado', 'danger')
+            return redirect(url_for('reconhecimento_facial_dashboard'))
+        
+        # Verificar se arquivo foi enviado
+        if 'face_image' not in request.files:
+            flash('Nenhuma imagem foi enviada', 'danger')
+            return redirect(url_for('cadastrar_face_form', funcionario_id=funcionario_id))
+        
+        file = request.files['face_image']
+        if file.filename == '':
+            flash('Nenhuma imagem foi selecionada', 'danger')
+            return redirect(url_for('cadastrar_face_form', funcionario_id=funcionario_id))
+        
+        # Verificar extensão do arquivo
+        allowed_extensions = {'png', 'jpg', 'jpeg'}
+        if not ('.' in file.filename and 
+                file.filename.rsplit('.', 1)[1].lower() in allowed_extensions):
+            flash('Formato de arquivo não permitido. Use PNG, JPG ou JPEG', 'danger')
+            return redirect(url_for('cadastrar_face_form', funcionario_id=funcionario_id))
+        
+        # Salvar arquivo temporário
+        filename = f"temp_{funcionario_id}_{int(time.time())}.jpg"
+        temp_path = os.path.join('static/faces/temp', filename)
+        os.makedirs('static/faces/temp', exist_ok=True)
+        file.save(temp_path)
+        
+        # Processar cadastro
+        sucesso, mensagem = cadastrar_face_funcionario(funcionario_id, temp_path, admin_id)
+        
+        # Remover arquivo temporário
+        if os.path.exists(temp_path):
+            os.remove(temp_path)
+        
+        if sucesso:
+            flash(mensagem, 'success')
+        else:
+            flash(mensagem, 'danger')
+        
+        return redirect(url_for('reconhecimento_facial_dashboard'))
+        
+    except Exception as e:
+        flash(f'Erro ao processar cadastro: {str(e)}', 'danger')
+        return redirect(url_for('reconhecimento_facial_dashboard'))
+
+@app.route('/ponto-facial')
+def ponto_facial():
+    """Interface de ponto facial para funcionários"""
+    
+    return render_template('reconhecimento_facial/ponto_facial.html')
+
+@app.route('/api/reconhecimento-facial/processar-ponto', methods=['POST'])
+def api_processar_ponto_facial():
+    """API para processar ponto via reconhecimento facial"""
+    
+    try:
+        # Obter dados da requisição
+        data = request.get_json()
+        
+        if not data or 'image_data' not in data:
+            return jsonify({
+                'sucesso': False,
+                'mensagem': 'Dados da imagem não fornecidos'
+            }), 400
+        
+        # Obter admin_id da sessão ou parâmetro
+        admin_id = data.get('admin_id')
+        if not admin_id:
+            return jsonify({
+                'sucesso': False,
+                'mensagem': 'ID da empresa não fornecido'
+            }), 400
+        
+        # Decodificar imagem base64
+        try:
+            image_data = data['image_data'].split(',')[1]  # Remover "data:image/jpeg;base64,"
+            image_bytes = base64.b64decode(image_data)
+            
+            # Salvar imagem temporária
+            temp_filename = f"capture_{int(time.time())}_{random.randint(1000, 9999)}.jpg"
+            temp_path = os.path.join('static/faces/captured', temp_filename)
+            os.makedirs('static/faces/captured', exist_ok=True)
+            
+            with open(temp_path, 'wb') as f:
+                f.write(image_bytes)
+                
+        except Exception as e:
+            return jsonify({
+                'sucesso': False,
+                'mensagem': f'Erro ao processar imagem: {str(e)}'
+            }), 400
+        
+        # Processar reconhecimento
+        ip_address = request.remote_addr
+        resultado = reconhecer_funcionario(temp_path, admin_id, ip_address)
+        
+        if resultado['sucesso']:
+            # Registrar ponto
+            funcionario = resultado['funcionario']
+            ponto_sucesso, ponto_mensagem = registrar_ponto_facial(
+                funcionario.id, 
+                admin_id, 
+                resultado['tentativa_id'],
+                ip_address
+            )
+            
+            if ponto_sucesso:
+                # Remover imagem temporária (sucesso)
+                if os.path.exists(temp_path):
+                    os.remove(temp_path)
+                
+                return jsonify({
+                    'sucesso': True,
+                    'mensagem': f'Olá, {funcionario.nome}! {ponto_mensagem}',
+                    'funcionario': {
+                        'nome': funcionario.nome,
+                        'matricula': funcionario.matricula
+                    },
+                    'confianca': resultado['confianca'],
+                    'tempo_processamento': resultado['tempo_processamento']
+                })
+            else:
+                return jsonify({
+                    'sucesso': False,
+                    'mensagem': f'Funcionário reconhecido ({funcionario.nome}), mas erro no ponto: {ponto_mensagem}',
+                    'funcionario_reconhecido': True
+                })
+        else:
+            # Manter imagem para análise se configurado
+            config = ConfiguracaoReconhecimento.query.filter_by(admin_id=admin_id).first()
+            if not (config and config.salvar_tentativas_falhas):
+                if os.path.exists(temp_path):
+                    os.remove(temp_path)
+            
+            return jsonify({
+                'sucesso': False,
+                'mensagem': resultado['mensagem'],
+                'tempo_processamento': resultado['tempo_processamento']
+            })
+        
+    except Exception as e:
+        return jsonify({
+            'sucesso': False,
+            'mensagem': f'Erro interno: {str(e)}'
+        }), 500
+
+@app.route('/api/reconhecimento-facial/qualidade-imagem', methods=['POST'])
+def api_verificar_qualidade():
+    """API para verificar qualidade da imagem em tempo real"""
+    
+    try:
+        data = request.get_json()
+        
+        if not data or 'image_data' not in data:
+            return jsonify({
+                'qualidade_ok': False,
+                'mensagem': 'Dados da imagem não fornecidos'
+            })
+        
+        # Decodificar imagem
+        image_data = data['image_data'].split(',')[1]
+        image_bytes = base64.b64decode(image_data)
+        
+        # Converter para numpy array
+        nparr = np.frombuffer(image_bytes, np.uint8)
+        imagem = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+        
+        # Analisar qualidade
+        qualidade_ok, mensagem = analisar_qualidade_imagem(imagem)
+        
+        return jsonify({
+            'qualidade_ok': qualidade_ok,
+            'mensagem': mensagem
+        })
+        
+    except Exception as e:
+        return jsonify({
+            'qualidade_ok': False,
+            'mensagem': f'Erro ao analisar qualidade: {str(e)}'
+        })
+
+@app.route('/reconhecimento-facial/configuracoes', methods=['GET', 'POST'])
+@admin_required
+def configuracoes_reconhecimento():
+    """Configurações do sistema de reconhecimento facial"""
+    
+    admin_id = get_tenant_filter()
+    
+    config = ConfiguracaoReconhecimento.query.filter_by(admin_id=admin_id).first()
+    if not config:
+        config = ConfiguracaoReconhecimento(admin_id=admin_id)
+        db.session.add(config)
+        db.session.commit()
+    
+    if request.method == 'POST':
+        try:
+            # Atualizar configurações
+            config.threshold_confianca = float(request.form.get('threshold_confianca', 0.6))
+            config.anti_spoofing_ativo = 'anti_spoofing_ativo' in request.form
+            config.salvar_tentativas_falhas = 'salvar_tentativas_falhas' in request.form
+            config.salvar_imagens_capturadas = 'salvar_imagens_capturadas' in request.form
+            config.timeout_entre_pontos = int(request.form.get('timeout_entre_pontos', 300))
+            config.tempo_maximo_processamento = int(request.form.get('tempo_maximo_processamento', 10))
+            config.resolucao_minima_width = int(request.form.get('resolucao_minima_width', 640))
+            config.resolucao_minima_height = int(request.form.get('resolucao_minima_height', 480))
+            config.qualidade_minima_imagem = float(request.form.get('qualidade_minima_imagem', 0.7))
+            config.notificar_falhas_multiplas = 'notificar_falhas_multiplas' in request.form
+            config.limite_falhas_alerta = int(request.form.get('limite_falhas_alerta', 5))
+            
+            db.session.commit()
+            
+            # Limpar cache para aplicar novas configurações
+            if admin_id in cache_reconhecimento['encodings']:
+                del cache_reconhecimento['encodings'][admin_id]
+            
+            flash('Configurações atualizadas com sucesso', 'success')
+            
+        except Exception as e:
+            flash(f'Erro ao atualizar configurações: {str(e)}', 'danger')
+    
+    return render_template('reconhecimento_facial/configuracoes.html', config=config)
+
+@app.route('/reconhecimento-facial/relatorios')
+@admin_required
+def relatorios_reconhecimento():
+    """Relatórios do sistema de reconhecimento facial"""
+    
+    admin_id = get_tenant_filter()
+    
+    # Obter período do filtro
+    periodo_dias = request.args.get('periodo', 30, type=int)
+    
+    # Gerar métricas
+    metricas = gerar_metricas_reconhecimento(admin_id, periodo_dias)
+    
+    # Obter tentativas recentes
+    tentativas_recentes = ReconhecimentoTentativa.query.filter_by(
+        admin_id=admin_id
+    ).order_by(
+        ReconhecimentoTentativa.timestamp.desc()
+    ).limit(50).all()
+    
+    return render_template('reconhecimento_facial/relatorios.html',
+                         metricas=metricas,
+                         tentativas_recentes=tentativas_recentes,
+                         periodo_dias=periodo_dias)
+
+@app.route('/reconhecimento-facial/excluir-face/<int:funcionario_id>', methods=['POST'])
+@admin_required
+def excluir_face_funcionario(funcionario_id):
+    """Excluir face de funcionário (LGPD)"""
+    
+    admin_id = get_tenant_filter()
+    
+    motivo = request.form.get('motivo', 'Solicitação do administrador')
+    
+    sucesso, mensagem = limpar_dados_funcionario_lgpd(funcionario_id, admin_id, motivo)
+    
+    if sucesso:
+        flash(mensagem, 'success')
+    else:
+        flash(mensagem, 'danger')
+    
+    return redirect(url_for('reconhecimento_facial_dashboard'))
+
+@app.route('/reconhecimento-facial/teste-sistema')
+@admin_required
+def teste_sistema_reconhecimento():
+    """Página de teste do sistema de reconhecimento"""
+    
+    admin_id = get_tenant_filter()
+    
+    # Verificar se sistema está funcionando
+    sistema_ok, sistema_msg = inicializar_reconhecimento_facial()
+    
+    # Obter estatísticas básicas
+    total_faces = FuncionarioFace.query.filter_by(admin_id=admin_id, active=True).count()
+    total_funcionarios = Funcionario.query.filter_by(admin_id=admin_id, ativo=True).count()
+    
+    return render_template('reconhecimento_facial/teste_sistema.html',
+                         sistema_ok=sistema_ok,
+                         sistema_msg=sistema_msg,
+                         total_faces=total_faces,
+                         total_funcionarios=total_funcionarios)
+```
+
+
+---
+
+## 🎨 TEMPLATES HTML RESPONSIVOS
+
+### **Template Base: reconhecimento_facial/dashboard.html**
+
+```html
+{% extends "base.html" %}
+
+{% block title %}Reconhecimento Facial - Dashboard{% endblock %}
+
+{% block extra_css %}
+<style>
+.metric-card {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    border-radius: 15px;
+    padding: 20px;
+    margin-bottom: 20px;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+}
+
+.metric-value {
+    font-size: 2.5rem;
+    font-weight: bold;
+    margin-bottom: 5px;
+}
+
+.metric-label {
+    font-size: 0.9rem;
+    opacity: 0.9;
+}
+
+.face-status-badge {
+    padding: 5px 10px;
+    border-radius: 20px;
+    font-size: 0.8rem;
+    font-weight: bold;
+}
+
+.face-registered {
+    background-color: #28a745;
+    color: white;
+}
+
+.face-missing {
+    background-color: #dc3545;
+    color: white;
+}
+
+.camera-preview {
+    border: 3px dashed #ddd;
+    border-radius: 10px;
+    min-height: 300px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background-color: #f8f9fa;
+}
+
+.alert-custom {
+    border-left: 4px solid;
+    padding: 15px;
+    margin-bottom: 20px;
+    border-radius: 5px;
+}
+
+.alert-success-custom {
+    border-left-color: #28a745;
+    background-color: #d4edda;
+    color: #155724;
+}
+
+.alert-warning-custom {
+    border-left-color: #ffc107;
+    background-color: #fff3cd;
+    color: #856404;
+}
+
+.alert-danger-custom {
+    border-left-color: #dc3545;
+    background-color: #f8d7da;
+    color: #721c24;
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h1><i class="fas fa-user-check"></i> Reconhecimento Facial</h1>
+                <div>
+                    <a href="{{ url_for('configuracoes_reconhecimento') }}" class="btn btn-outline-primary">
+                        <i class="fas fa-cog"></i> Configurações
+                    </a>
+                    <a href="{{ url_for('relatorios_reconhecimento') }}" class="btn btn-outline-info">
+                        <i class="fas fa-chart-bar"></i> Relatórios
+                    </a>
+                    <a href="{{ url_for('teste_sistema_reconhecimento') }}" class="btn btn-outline-warning">
+                        <i class="fas fa-vial"></i> Testar Sistema
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Métricas Principais -->
+    <div class="row">
+        <div class="col-md-3">
+            <div class="metric-card">
+                <div class="metric-value">{{ "%.1f"|format(metricas.taxa_sucesso) }}%</div>
+                <div class="metric-label">Taxa de Sucesso</div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="metric-card">
+                <div class="metric-value">{{ metricas.total_tentativas }}</div>
+                <div class="metric-label">Tentativas (30 dias)</div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="metric-card">
+                <div class="metric-value">{{ "%.1f"|format(metricas.tempo_medio_processamento) }}s</div>
+                <div class="metric-label">Tempo Médio</div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="metric-card">
+                <div class="metric-value">{{ funcionarios_com_face|length }}</div>
+                <div class="metric-label">Faces Cadastradas</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Alertas -->
+    {% if metricas.alertas %}
+    <div class="row">
+        <div class="col-12">
+            {% for alerta in metricas.alertas %}
+            <div class="alert-custom alert-warning-custom">
+                <i class="fas fa-exclamation-triangle"></i> {{ alerta }}
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+
+    <div class="row">
+        <!-- Funcionários com Face Cadastrada -->
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header">
+                    <h5><i class="fas fa-check-circle text-success"></i> Funcionários com Face Cadastrada</h5>
+                </div>
+                <div class="card-body">
+                    {% if funcionarios_com_face %}
+                    <div class="table-responsive">
+                        <table class="table table-sm">
+                            <thead>
+                                <tr>
+                                    <th>Nome</th>
+                                    <th>Matrícula</th>
+                                    <th>Cadastrado em</th>
+                                    <th>Ações</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for funcionario in funcionarios_com_face %}
+                                <tr>
+                                    <td>{{ funcionario.nome }}</td>
+                                    <td>{{ funcionario.matricula }}</td>
+                                    <td>
+                                        {% for face in funcionario.faces %}
+                                        {% if face.active %}
+                                        {{ face.created_at.strftime('%d/%m/%Y') }}
+                                        {% endif %}
+                                        {% endfor %}
+                                    </td>
+                                    <td>
+                                        <a href="{{ url_for('cadastrar_face_form', funcionario_id=funcionario.id) }}" 
+                                           class="btn btn-sm btn-outline-primary" title="Atualizar Face">
+                                            <i class="fas fa-sync"></i>
+                                        </a>
+                                        <button class="btn btn-sm btn-outline-danger" 
+                                                onclick="confirmarExclusao({{ funcionario.id }}, '{{ funcionario.nome }}')"
+                                                title="Excluir Face">
+                                            <i class="fas fa-trash"></i>
+                                        </button>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    {% else %}
+                    <p class="text-muted">Nenhuma face cadastrada ainda.</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Funcionários sem Face -->
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header">
+                    <h5><i class="fas fa-exclamation-circle text-warning"></i> Funcionários sem Face Cadastrada</h5>
+                </div>
+                <div class="card-body">
+                    {% if funcionarios_sem_face %}
+                    <div class="table-responsive">
+                        <table class="table table-sm">
+                            <thead>
+                                <tr>
+                                    <th>Nome</th>
+                                    <th>Matrícula</th>
+                                    <th>Ações</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for funcionario in funcionarios_sem_face %}
+                                <tr>
+                                    <td>{{ funcionario.nome }}</td>
+                                    <td>{{ funcionario.matricula }}</td>
+                                    <td>
+                                        <a href="{{ url_for('cadastrar_face_form', funcionario_id=funcionario.id) }}" 
+                                           class="btn btn-sm btn-primary">
+                                            <i class="fas fa-plus"></i> Cadastrar Face
+                                        </a>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    {% else %}
+                    <div class="alert-custom alert-success-custom">
+                        <i class="fas fa-check"></i> Todos os funcionários ativos têm face cadastrada!
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Configurações Rápidas -->
+    <div class="row mt-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5><i class="fas fa-sliders-h"></i> Configurações Rápidas</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-3">
+                            <strong>Threshold de Confiança:</strong><br>
+                            <span class="badge badge-info">{{ "%.0f"|format(config.threshold_confianca * 100) }}%</span>
+                        </div>
+                        <div class="col-md-3">
+                            <strong>Anti-Spoofing:</strong><br>
+                            <span class="badge badge-{{ 'success' if config.anti_spoofing_ativo else 'danger' }}">
+                                {{ 'Ativo' if config.anti_spoofing_ativo else 'Inativo' }}
+                            </span>
+                        </div>
+                        <div class="col-md-3">
+                            <strong>Timeout entre Pontos:</strong><br>
+                            <span class="badge badge-secondary">{{ config.timeout_entre_pontos // 60 }} min</span>
+                        </div>
+                        <div class="col-md-3">
+                            <strong>Resolução Mínima:</strong><br>
+                            <span class="badge badge-secondary">{{ config.resolucao_minima_width }}x{{ config.resolucao_minima_height }}</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal de Confirmação de Exclusão -->
+<div class="modal fade" id="modalExclusao" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Confirmar Exclusão</h5>
+                <button type="button" class="close" data-dismiss="modal">
+                    <span>&times;</span>
+                </button>
+            </div>
+            <form method="POST" id="formExclusao">
+                <div class="modal-body">
+                    <p>Tem certeza que deseja excluir a face cadastrada de <strong id="nomeFuncionario"></strong>?</p>
+                    <p class="text-warning">
+                        <i class="fas fa-exclamation-triangle"></i>
+                        Esta ação não pode ser desfeita e está em conformidade com a LGPD.
+                    </p>
+                    <div class="form-group">
+                        <label for="motivo">Motivo da exclusão:</label>
+                        <select class="form-control" name="motivo" required>
+                            <option value="">Selecione o motivo</option>
+                            <option value="Solicitação do funcionário">Solicitação do funcionário</option>
+                            <option value="Funcionário desligado">Funcionário desligado</option>
+                            <option value="Atualização de dados">Atualização de dados</option>
+                            <option value="Problemas de reconhecimento">Problemas de reconhecimento</option>
+                            <option value="Outros">Outros</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-danger">Excluir Face</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function confirmarExclusao(funcionarioId, nomeFuncionario) {
+    document.getElementById('nomeFuncionario').textContent = nomeFuncionario;
+    document.getElementById('formExclusao').action = '/reconhecimento-facial/excluir-face/' + funcionarioId;
+    $('#modalExclusao').modal('show');
+}
+
+// Atualizar métricas a cada 30 segundos
+setInterval(function() {
+    location.reload();
+}, 30000);
+</script>
+{% endblock %}
+```
+
+### **Template: reconhecimento_facial/ponto_facial.html**
+
+```html
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ponto Facial - SIGE</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        body {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        .ponto-container {
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        .camera-container {
+            background: white;
+            border-radius: 20px;
+            padding: 30px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            text-align: center;
+        }
+
+        .camera-preview {
+            width: 100%;
+            max-width: 400px;
+            height: 300px;
+            border: 3px solid #ddd;
+            border-radius: 15px;
+            margin: 20px auto;
+            display: block;
+            object-fit: cover;
+        }
+
+        .camera-placeholder {
+            width: 100%;
+            max-width: 400px;
+            height: 300px;
+            border: 3px dashed #ddd;
+            border-radius: 15px;
+            margin: 20px auto;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background-color: #f8f9fa;
+            color: #6c757d;
+            font-size: 1.2rem;
+        }
+
+        .status-indicator {
+            padding: 10px 20px;
+            border-radius: 25px;
+            margin: 10px 0;
+            font-weight: bold;
+        }
+
+        .status-waiting {
+            background-color: #fff3cd;
+            color: #856404;
+            border: 1px solid #ffeaa7;
+        }
+
+        .status-analyzing {
+            background-color: #cce5ff;
+            color: #004085;
+            border: 1px solid #74c0fc;
+        }
+
+        .status-success {
+            background-color: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+
+        .status-error {
+            background-color: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+
+        .confidence-bar {
+            width: 100%;
+            height: 20px;
+            background-color: #e9ecef;
+            border-radius: 10px;
+            overflow: hidden;
+            margin: 10px 0;
+        }
+
+        .confidence-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #dc3545 0%, #ffc107 50%, #28a745 100%);
+            transition: width 0.3s ease;
+            border-radius: 10px;
+        }
+
+        .btn-ponto {
+            background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+            border: none;
+            color: white;
+            padding: 15px 30px;
+            font-size: 1.2rem;
+            border-radius: 50px;
+            box-shadow: 0 5px 15px rgba(40, 167, 69, 0.3);
+            transition: all 0.3s ease;
+        }
+
+        .btn-ponto:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(40, 167, 69, 0.4);
+        }
+
+        .btn-ponto:disabled {
+            background: #6c757d;
+            box-shadow: none;
+            transform: none;
+        }
+
+        .face-guide {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 200px;
+            height: 250px;
+            border: 3px solid #28a745;
+            border-radius: 50%;
+            opacity: 0.7;
+            pointer-events: none;
+        }
+
+        .loading-spinner {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #007bff;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .empresa-selector {
+            background: white;
+            border-radius: 15px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+        }
+
+        .time-display {
+            background: rgba(255,255,255,0.9);
+            border-radius: 10px;
+            padding: 15px;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+
+        .current-time {
+            font-size: 2rem;
+            font-weight: bold;
+            color: #333;
+        }
+
+        .current-date {
+            font-size: 1.1rem;
+            color: #666;
+        }
+    </style>
+</head>
+<body>
+    <div class="container-fluid">
+        <div class="ponto-container">
+            <!-- Display de Hora -->
+            <div class="time-display">
+                <div class="current-time" id="currentTime">--:--:--</div>
+                <div class="current-date" id="currentDate">-- de ------ de ----</div>
+            </div>
+
+            <!-- Seletor de Empresa -->
+            <div class="empresa-selector">
+                <h5><i class="fas fa-building"></i> Selecione sua Empresa</h5>
+                <select class="form-select" id="empresaSelect" required>
+                    <option value="">Selecione sua empresa...</option>
+                    <!-- Opções serão carregadas dinamicamente -->
+                </select>
+            </div>
+
+            <!-- Container Principal -->
+            <div class="camera-container">
+                <h2><i class="fas fa-user-check"></i> Ponto Facial</h2>
+                <p class="text-muted">Posicione seu rosto na câmera para registrar o ponto</p>
+
+                <!-- Área da Câmera -->
+                <div style="position: relative; display: inline-block;">
+                    <video id="cameraPreview" class="camera-preview" autoplay muted style="display: none;"></video>
+                    <div id="cameraPlaceholder" class="camera-placeholder">
+                        <div>
+                            <i class="fas fa-camera fa-3x mb-3"></i><br>
+                            Clique em "Iniciar Câmera" para começar
+                        </div>
+                    </div>
+                    <div class="face-guide" id="faceGuide" style="display: none;"></div>
+                </div>
+
+                <!-- Canvas oculto para captura -->
+                <canvas id="captureCanvas" style="display: none;"></canvas>
+
+                <!-- Status -->
+                <div id="statusIndicator" class="status-indicator status-waiting">
+                    <i class="fas fa-info-circle"></i> Aguardando...
+                </div>
+
+                <!-- Barra de Confiança -->
+                <div id="confidenceContainer" style="display: none;">
+                    <label>Confiança do Reconhecimento:</label>
+                    <div class="confidence-bar">
+                        <div id="confidenceFill" class="confidence-fill" style="width: 0%;"></div>
+                    </div>
+                    <small id="confidenceText">0%</small>
+                </div>
+
+                <!-- Botões -->
+                <div class="mt-4">
+                    <button id="btnIniciarCamera" class="btn btn-primary btn-lg me-3">
+                        <i class="fas fa-camera"></i> Iniciar Câmera
+                    </button>
+                    <button id="btnBaterPonto" class="btn-ponto btn-lg" disabled>
+                        <i class="fas fa-fingerprint"></i> Bater Ponto
+                    </button>
+                </div>
+
+                <!-- Instruções -->
+                <div class="mt-4">
+                    <small class="text-muted">
+                        <strong>Instruções:</strong><br>
+                        1. Selecione sua empresa<br>
+                        2. Posicione seu rosto dentro do círculo<br>
+                        3. Mantenha-se imóvel por alguns segundos<br>
+                        4. Clique em "Bater Ponto" quando indicado
+                    </small>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        // Variáveis globais
+        let stream = null;
+        let isProcessing = false;
+        let qualityCheckInterval = null;
+
+        // Elementos DOM
+        const empresaSelect = document.getElementById('empresaSelect');
+        const cameraPreview = document.getElementById('cameraPreview');
+        const cameraPlaceholder = document.getElementById('cameraPlaceholder');
+        const faceGuide = document.getElementById('faceGuide');
+        const statusIndicator = document.getElementById('statusIndicator');
+        const confidenceContainer = document.getElementById('confidenceContainer');
+        const confidenceFill = document.getElementById('confidenceFill');
+        const confidenceText = document.getElementById('confidenceText');
+        const btnIniciarCamera = document.getElementById('btnIniciarCamera');
+        const btnBaterPonto = document.getElementById('btnBaterPonto');
+        const captureCanvas = document.getElementById('captureCanvas');
+        const currentTime = document.getElementById('currentTime');
+        const currentDate = document.getElementById('currentDate');
+
+        // Atualizar relógio
+        function updateClock() {
+            const now = new Date();
+            const timeString = now.toLocaleTimeString('pt-BR');
+            const dateString = now.toLocaleDateString('pt-BR', {
+                weekday: 'long',
+                year: 'numeric',
+                month: 'long',
+                day: 'numeric'
+            });
+            
+            currentTime.textContent = timeString;
+            currentDate.textContent = dateString;
+        }
+
+        // Carregar empresas (simulado - adaptar conforme necessário)
+        function carregarEmpresas() {
+            // Em produção, fazer requisição para API
+            const empresas = [
+                { id: 1, nome: 'Empresa Demo' },
+                // Adicionar mais empresas conforme necessário
+            ];
+
+            empresas.forEach(empresa => {
+                const option = document.createElement('option');
+                option.value = empresa.id;
+                option.textContent = empresa.nome;
+                empresaSelect.appendChild(option);
+            });
+        }
+
+        // Inicializar câmera
+        async function iniciarCamera() {
+            try {
+                updateStatus('Iniciando câmera...', 'analyzing');
+                
+                stream = await navigator.mediaDevices.getUserMedia({
+                    video: {
+                        width: { ideal: 640 },
+                        height: { ideal: 480 },
+                        facingMode: 'user'
+                    }
+                });
+
+                cameraPreview.srcObject = stream;
+                cameraPreview.style.display = 'block';
+                cameraPlaceholder.style.display = 'none';
+                faceGuide.style.display = 'block';
+
+                btnIniciarCamera.disabled = true;
+                btnIniciarCamera.innerHTML = '<i class="fas fa-camera"></i> Câmera Ativa';
+
+                updateStatus('Posicione seu rosto no círculo', 'waiting');
+
+                // Iniciar verificação de qualidade
+                startQualityCheck();
+
+            } catch (error) {
+                console.error('Erro ao acessar câmera:', error);
+                updateStatus('Erro ao acessar câmera. Verifique as permissões.', 'error');
+            }
+        }
+
+        // Verificação contínua de qualidade
+        function startQualityCheck() {
+            qualityCheckInterval = setInterval(async () => {
+                if (!isProcessing && stream) {
+                    await checkImageQuality();
+                }
+            }, 1000);
+        }
+
+        // Verificar qualidade da imagem
+        async function checkImageQuality() {
+            try {
+                const imageData = captureFrame();
+                
+                const response = await fetch('/api/reconhecimento-facial/qualidade-imagem', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        image_data: imageData
+                    })
+                });
+
+                const result = await response.json();
+
+                if (result.qualidade_ok) {
+                    updateStatus('Qualidade boa! Clique em "Bater Ponto"', 'success');
+                    btnBaterPonto.disabled = false;
+                    faceGuide.style.borderColor = '#28a745';
+                } else {
+                    updateStatus(result.mensagem, 'waiting');
+                    btnBaterPonto.disabled = true;
+                    faceGuide.style.borderColor = '#ffc107';
+                }
+
+            } catch (error) {
+                console.error('Erro na verificação de qualidade:', error);
+            }
+        }
+
+        // Capturar frame da câmera
+        function captureFrame() {
+            const canvas = captureCanvas;
+            const context = canvas.getContext('2d');
+            
+            canvas.width = cameraPreview.videoWidth;
+            canvas.height = cameraPreview.videoHeight;
+            
+            context.drawImage(cameraPreview, 0, 0);
+            
+            return canvas.toDataURL('image/jpeg', 0.8);
+        }
+
+        // Processar ponto facial
+        async function processarPonto() {
+            if (isProcessing) return;
+
+            const empresaId = empresaSelect.value;
+            if (!empresaId) {
+                alert('Por favor, selecione sua empresa primeiro.');
+                return;
+            }
+
+            isProcessing = true;
+            btnBaterPonto.disabled = true;
+            
+            try {
+                updateStatus('Processando reconhecimento...', 'analyzing');
+                confidenceContainer.style.display = 'block';
+
+                const imageData = captureFrame();
+
+                const response = await fetch('/api/reconhecimento-facial/processar-ponto', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        image_data: imageData,
+                        admin_id: empresaId
+                    })
+                });
+
+                const result = await response.json();
+
+                if (result.sucesso) {
+                    updateStatus(result.mensagem, 'success');
+                    updateConfidence(result.confianca * 100);
+                    
+                    // Parar câmera após sucesso
+                    setTimeout(() => {
+                        pararCamera();
+                        location.reload(); // Reiniciar para novo ponto
+                    }, 3000);
+
+                } else {
+                    updateStatus(result.mensagem, 'error');
+                    if (result.confianca) {
+                        updateConfidence(result.confianca * 100);
+                    }
+                }
+
+            } catch (error) {
+                console.error('Erro ao processar ponto:', error);
+                updateStatus('Erro de conexão. Tente novamente.', 'error');
+            } finally {
+                isProcessing = false;
+                setTimeout(() => {
+                    if (!isProcessing) {
+                        btnBaterPonto.disabled = false;
+                    }
+                }, 2000);
+            }
+        }
+
+        // Atualizar status
+        function updateStatus(message, type) {
+            statusIndicator.className = `status-indicator status-${type}`;
+            
+            let icon = 'fas fa-info-circle';
+            switch (type) {
+                case 'analyzing':
+                    icon = 'fas fa-spinner fa-spin';
+                    break;
+                case 'success':
+                    icon = 'fas fa-check-circle';
+                    break;
+                case 'error':
+                    icon = 'fas fa-exclamation-circle';
+                    break;
+            }
+            
+            statusIndicator.innerHTML = `<i class="${icon}"></i> ${message}`;
+        }
+
+        // Atualizar barra de confiança
+        function updateConfidence(percentage) {
+            confidenceFill.style.width = `${percentage}%`;
+            confidenceText.textContent = `${Math.round(percentage)}%`;
+        }
+
+        // Parar câmera
+        function pararCamera() {
+            if (stream) {
+                stream.getTracks().forEach(track => track.stop());
+                stream = null;
+            }
+
+            if (qualityCheckInterval) {
+                clearInterval(qualityCheckInterval);
+                qualityCheckInterval = null;
+            }
+
+            cameraPreview.style.display = 'none';
+            cameraPlaceholder.style.display = 'flex';
+            faceGuide.style.display = 'none';
+            confidenceContainer.style.display = 'none';
+
+            btnIniciarCamera.disabled = false;
+            btnIniciarCamera.innerHTML = '<i class="fas fa-camera"></i> Iniciar Câmera';
+            btnBaterPonto.disabled = true;
+
+            updateStatus('Aguardando...', 'waiting');
+        }
+
+        // Event listeners
+        btnIniciarCamera.addEventListener('click', iniciarCamera);
+        btnBaterPonto.addEventListener('click', processarPonto);
+
+        // Inicialização
+        document.addEventListener('DOMContentLoaded', function() {
+            updateClock();
+            setInterval(updateClock, 1000);
+            carregarEmpresas();
+        });
+
+        // Limpar recursos ao sair da página
+        window.addEventListener('beforeunload', function() {
+            pararCamera();
+        });
+    </script>
+</body>
+</html>
+```
+
+---
+
+## 📋 INSTRUÇÕES DE IMPLEMENTAÇÃO
+
+### **PASSO 1: Preparação do Ambiente**
+
+```bash
+# 1. Instalar dependências
+pip install face-recognition==1.3.0
+pip install opencv-python==4.8.0.74
+pip install cryptography==41.0.1
+pip install scikit-learn==1.3.0
+
+# 2. Criar diretórios necessários
+mkdir -p static/faces/registered
+mkdir -p static/faces/captured
+mkdir -p static/faces/temp
+mkdir -p keys
+mkdir -p templates/reconhecimento_facial
+
+# 3. Verificar se dlib está funcionando
+python -c "import face_recognition; print('Face recognition OK!')"
+```
+
+### **PASSO 2: Atualização do Banco de Dados**
+
+```python
+# Executar no terminal Python do Flask
+from app import app, db
+with app.app_context():
+    # Criar novas tabelas
+    db.create_all()
+    print("Tabelas do Módulo 5 criadas com sucesso!")
+    
+    # Verificar se tabelas foram criadas
+    from sqlalchemy import inspect
+    inspector = inspect(db.engine)
+    tabelas = inspector.get_table_names()
+    
+    tabelas_modulo5 = [
+        'funcionario_face',
+        'reconhecimento_tentativa', 
+        'configuracao_reconhecimento',
+        'log_reconhecimento'
+    ]
+    
+    for tabela in tabelas_modulo5:
+        if tabela in tabelas:
+            print(f"✓ Tabela {tabela} criada")
+        else:
+            print(f"✗ Erro: Tabela {tabela} não foi criada")
+```
+
+### **PASSO 3: Integração com Sistema Existente**
+
+**IMPORTANTE:** Adicionar apenas **1 campo** à tabela Ponto existente:
+
+```sql
+-- Executar no banco de dados
+ALTER TABLE ponto ADD COLUMN metodo_registro VARCHAR(20) DEFAULT 'MANUAL';
+ALTER TABLE ponto ADD COLUMN confianca_facial FLOAT;
+ALTER TABLE ponto ADD COLUMN tentativa_reconhecimento_id INTEGER;
+
+-- Criar índice para performance
+CREATE INDEX idx_ponto_metodo_registro ON ponto(metodo_registro);
+```
+
+### **PASSO 4: Configuração de Segurança**
+
+```python
+# Adicionar ao arquivo de configuração
+import os
+
+# Configurações do reconhecimento facial
+FACE_RECOGNITION_CONFIG = {
+    'THRESHOLD_CONFIANCA_PADRAO': 0.6,
+    'ANTI_SPOOFING_ATIVO': True,
+    'SALVAR_TENTATIVAS_FALHAS': True,
+    'TIMEOUT_ENTRE_PONTOS': 300,  # 5 minutos
+    'RESOLUCAO_MINIMA': (640, 480),
+    'QUALIDADE_MINIMA': 0.7,
+    'TEMPO_MAXIMO_PROCESSAMENTO': 10,  # segundos
+}
+
+# Diretórios
+FACE_UPLOAD_FOLDER = 'static/faces'
+FACE_KEYS_FOLDER = 'keys'
+
+# Criar diretórios se não existirem
+os.makedirs(FACE_UPLOAD_FOLDER, exist_ok=True)
+os.makedirs(FACE_KEYS_FOLDER, exist_ok=True)
+```
+
+### **PASSO 5: Inicialização do Sistema**
+
+```python
+# Adicionar ao arquivo principal (app.py)
+from utils import inicializar_reconhecimento_facial
+
+# Inicializar sistema de reconhecimento facial na inicialização da app
+with app.app_context():
+    sucesso, mensagem = inicializar_reconhecimento_facial()
+    if sucesso:
+        print(f"✓ {mensagem}")
+    else:
+        print(f"✗ {mensagem}")
+```
+
+### **PASSO 6: Testes de Funcionamento**
+
+```python
+# Script de teste (executar no terminal)
+def testar_sistema_reconhecimento():
+    """Testar se sistema está funcionando"""
+    
+    print("=== TESTE DO SISTEMA DE RECONHECIMENTO FACIAL ===")
+    
+    # 1. Testar importação das bibliotecas
+    try:
+        import face_recognition
+        import cv2
+        import numpy as np
+        print("✓ Bibliotecas importadas com sucesso")
+    except ImportError as e:
+        print(f"✗ Erro na importação: {e}")
+        return False
+    
+    # 2. Testar detecção de face básica
+    try:
+        # Criar imagem de teste
+        test_image = np.zeros((100, 100, 3), dtype=np.uint8)
+        face_locations = face_recognition.face_locations(test_image)
+        print("✓ Detecção de face funcionando")
+    except Exception as e:
+        print(f"✗ Erro na detecção: {e}")
+        return False
+    
+    # 3. Testar criptografia
+    try:
+        from utils import gerar_chave_criptografia, criptografar_encoding, descriptografar_encoding
+        
+        # Teste com encoding fake
+        fake_encoding = np.random.rand(128)
+        admin_id = 1
+        
+        encrypted = criptografar_encoding(fake_encoding, admin_id)
+        decrypted = descriptografar_encoding(encrypted, admin_id)
+        
+        if np.allclose(fake_encoding, decrypted):
+            print("✓ Criptografia funcionando")
+        else:
+            print("✗ Erro na criptografia")
+            return False
+            
+    except Exception as e:
+        print(f"✗ Erro na criptografia: {e}")
+        return False
+    
+    # 4. Testar análise de qualidade
+    try:
+        from utils import analisar_qualidade_imagem
+        
+        # Criar imagem de teste com resolução adequada
+        test_image = np.random.randint(0, 255, (480, 640, 3), dtype=np.uint8)
+        qualidade_ok, mensagem = analisar_qualidade_imagem(test_image)
+        print(f"✓ Análise de qualidade: {mensagem}")
+        
+    except Exception as e:
+        print(f"✗ Erro na análise de qualidade: {e}")
+        return False
+    
+    print("\n🎉 TODOS OS TESTES PASSARAM! Sistema pronto para uso.")
+    return True
+
+# Executar teste
+if __name__ == "__main__":
+    testar_sistema_reconhecimento()
+```
+
+---
+
+## 🔗 INTEGRAÇÃO COM MÓDULOS ANTERIORES
+
+### **Com Módulo 1 (Propostas):**
+- Quando proposta é aprovada e vira obra, funcionários podem ser cadastrados automaticamente
+- Sistema pode sugerir cadastro de faces durante onboarding
+
+### **Com Módulo 2 (Portal Cliente):**
+- Cliente vê em tempo real quais funcionários estão presentes na obra
+- Transparência total sobre equipe trabalhando
+
+### **Com Módulo 3 (Gestão Equipes):**
+- Alocação de funcionário detecta automaticamente quando ele chega na obra
+- RDO pode ser iniciado automaticamente com primeiro ponto facial
+- Integração perfeita com sistema de alocação
+
+### **Com Módulo 4 (Almoxarifado):**
+- Reconhecimento facial pode ser usado para liberar materiais
+- Rastreabilidade automática de quem pegou cada material
+- Segurança adicional no almoxarifado
+
+---
+
+## ⚠️ REGRAS CRÍTICAS DE IMPLEMENTAÇÃO
+
+### **1. COMPATIBILIDADE TOTAL:**
+- **NUNCA** modificar classes existentes além do especificado
+- **SEMPRE** usar `admin_id` para multi-tenant
+- **MANTER** todas as funcionalidades atuais funcionando
+
+### **2. SEGURANÇA OBRIGATÓRIA:**
+- **SEMPRE** criptografar encodings antes de salvar
+- **NUNCA** armazenar imagens originais por muito tempo
+- **IMPLEMENTAR** logs de auditoria completos
+- **RESPEITAR** LGPD com direito ao esquecimento
+
+### **3. PERFORMANCE:**
+- **USAR** cache inteligente para encodings
+- **LIMITAR** tempo de processamento a 10 segundos
+- **OTIMIZAR** queries com índices apropriados
+- **IMPLEMENTAR** processamento assíncrono quando possível
+
+### **4. EXPERIÊNCIA DO USUÁRIO:**
+- **FORNECER** feedback visual em tempo real
+- **IMPLEMENTAR** instruções claras de posicionamento
+- **GARANTIR** funcionamento em dispositivos móveis
+- **CRIAR** fallback para casos de falha
+
+### **5. CONFORMIDADE LEGAL:**
+- **OBTER** consentimento explícito do funcionário
+- **IMPLEMENTAR** direito ao esquecimento
+- **MANTER** logs de auditoria por tempo legal
+- **CRIPTOGRAFAR** todos os dados biométricos
+
+---
+
+## 🎯 RESULTADO ESPERADO
+
+Após implementação completa, o sistema terá:
+
+✅ **Reconhecimento facial automático** com 99.38% de precisão  
+✅ **Interface mobile e desktop** responsiva  
+✅ **Anti-spoofing** com detecção de vida  
+✅ **Integração perfeita** com sistema de ponto existente  
+✅ **Dashboard de monitoramento** em tempo real  
+✅ **Conformidade LGPD** completa  
+✅ **Cache inteligente** para performance  
+✅ **Logs de auditoria** detalhados  
+✅ **Configurações flexíveis** por empresa  
+✅ **Fallback manual** para emergências  
+
+**🚀 O Módulo 5 transformará o controle de ponto em uma experiência moderna, segura e eficiente!**
+
+---
+
+## 📞 SUPORTE E MANUTENÇÃO
+
+### **Monitoramento Contínuo:**
+- Taxa de sucesso deve ser > 90%
+- Tempo de processamento < 3 segundos
+- Zero falsos positivos críticos
+
+### **Manutenção Preventiva:**
+- Limpeza de imagens temporárias diária
+- Backup de chaves de criptografia semanal
+- Análise de logs de segurança mensal
+
+### **Atualizações Futuras:**
+- Suporte a múltiplas faces por funcionário
+- Reconhecimento com máscara
+- Integração com catracas eletrônicas
+- API para aplicativos móveis nativos
+
+**Status:** Módulo 5 especificado e pronto para implementação imediata! 🎯
+
