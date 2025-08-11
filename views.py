@@ -7828,3 +7828,240 @@ def api_ultimo_rdo_obra(obra_id):
 
 
 
+
+
+# ================================
+# MÓDULO 2: PORTAL DO CLIENTE
+# ================================
+
+@main_bp.route("/cliente/obra/<token>")
+def cliente_obra_dashboard(token):
+    """Portal do cliente para acompanhar progresso da obra"""
+    try:
+        obra = Obra.query.filter_by(token_cliente=token).first()
+        if not obra:
+            return "Token inválido", 404
+        
+        rdos = RDO.query.filter_by(obra_id=obra.id).count()
+        progresso = min(100, (rdos * 10))
+        
+        return f"""
+        <h1>Obra: {obra.nome}</h1>
+        <p>Endereço: {obra.endereco}</p>
+        <p>Progresso: {progresso}%</p>
+        <p>RDOs executados: {rdos}</p>
+        """
+    except Exception as e:
+        return f"Erro: {str(e)}", 500
+
+@main_bp.route("/cliente/proposta/<token>/aprovar", methods=["POST"])
+def cliente_aprovar_proposta_v2(token):
+    """Cliente aprova proposta e gera obra"""
+    try:
+        proposta = PropostaComercial.query.filter_by(token_acesso=token).first()
+        if not proposta:
+            return jsonify({"success": False, "message": "Proposta não encontrada"}), 404
+        
+        proposta.status = StatusProposta.APROVADA
+        
+        import secrets
+        obra_codigo = f"OBR-{datetime.now().year}-{Obra.query.count() + 1:03d}"
+        cliente_token = secrets.token_urlsafe(16)
+        
+        nova_obra = Obra(
+            nome=f"Obra - {proposta.titulo_projeto}",
+            codigo=obra_codigo,
+            endereco=proposta.endereco_execucao or "Não informado",
+            data_inicio=datetime.now().date(),
+            orcamento=proposta.valor_total,
+            valor_contrato=proposta.valor_total,
+            status="Planejamento",
+            cliente_nome=proposta.cliente_nome,
+            token_cliente=cliente_token,
+            proposta_origem_id=proposta.id,
+            admin_id=proposta.admin_id
+        )
+        
+        db.session.add(nova_obra)
+        db.session.commit()
+        
+        return jsonify({
+            "success": True,
+            "message": f"Obra {obra_codigo} criada!",
+            "cliente_token": cliente_token
+        })
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({"success": False, "message": str(e)}), 500
+
+# ================================
+# MÓDULO 3: GESTÃO DE EQUIPES
+# ================================
+
+@main_bp.route("/equipes")
+@login_required
+@admin_required
+def gestao_equipes():
+    """Interface para gestão de equipes"""
+    try:
+        funcionarios = Funcionario.query.filter_by(
+            ativo=True,
+            admin_id=current_user.id
+        ).all()
+        
+        obras = Obra.query.filter_by(
+            ativo=True,
+            admin_id=current_user.id
+        ).all()
+        
+        alocacoes = AlocacaoEquipe.query.filter_by(
+            admin_id=current_user.id
+        ).order_by(AlocacaoEquipe.data_alocacao.desc()).limit(20).all()
+        
+        return render_template("equipes/gestao_equipes.html",
+                             funcionarios=funcionarios,
+                             obras=obras,
+                             alocacoes=alocacoes)
+        
+    except Exception as e:
+        flash(f"Erro: {str(e)}", "danger")
+        return redirect(url_for("main.dashboard"))
+
+@main_bp.route("/equipes/alocar", methods=["POST"])
+@login_required
+@admin_required
+def alocar_funcionario():
+    """Alocar funcionário em obra"""
+    try:
+        funcionario_id = request.form["funcionario_id"]
+        obra_id = request.form["obra_id"]
+        data_alocacao = datetime.strptime(request.form["data_alocacao"], "%Y-%m-%d").date()
+        local_trabalho = request.form.get("local_trabalho", "campo")
+        
+        nova_alocacao = AlocacaoEquipe(
+            funcionario_id=funcionario_id,
+            obra_id=obra_id,
+            data_alocacao=data_alocacao,
+            local_trabalho=local_trabalho,
+            admin_id=current_user.id
+        )
+        
+        db.session.add(nova_alocacao)
+        db.session.commit()
+        
+        flash("Funcionário alocado com sucesso!", "success")
+        return redirect(url_for("main.gestao_equipes"))
+        
+    except Exception as e:
+        db.session.rollback()
+        flash(f"Erro: {str(e)}", "danger")
+        return redirect(url_for("main.gestao_equipes"))
+
+
+
+# ================================
+# MÓDULO 4: ALMOXARIFADO COMPLETO
+# ================================
+
+@main_bp.route("/materiais")
+@login_required
+@admin_required
+def lista_materiais():
+    """Lista todos os materiais do almoxarifado"""
+    try:
+        materiais = Material.query.filter_by(
+            admin_id=current_user.id,
+            ativo=True
+        ).order_by(Material.descricao).all()
+        
+        return render_template("almoxarifado/lista_materiais.html",
+                             materiais=materiais)
+        
+    except Exception as e:
+        flash(f"Erro ao carregar materiais: {str(e)}", "danger")
+        return redirect(url_for("main.dashboard"))
+
+@main_bp.route("/materiais/novo", methods=["GET", "POST"])
+@login_required
+@admin_required
+def novo_material():
+    """Cadastrar novo material"""
+    if request.method == "POST":
+        try:
+            novo_material = Material(
+                descricao=request.form["descricao"],
+                categoria=request.form["categoria"],
+                unidade_medida=request.form["unidade_medida"],
+                estoque_minimo=float(request.form.get("estoque_minimo", 0)),
+                localizacao=request.form.get("localizacao", ""),
+                codigo_barras=request.form.get("codigo_barras", ""),
+                admin_id=current_user.id
+            )
+            
+            db.session.add(novo_material)
+            db.session.commit()
+            
+            flash("Material cadastrado com sucesso!", "success")
+            return redirect(url_for("main.lista_materiais"))
+            
+        except Exception as e:
+            db.session.rollback()
+            flash(f"Erro ao cadastrar material: {str(e)}", "danger")
+    
+    return render_template("almoxarifado/material_form.html")
+
+@main_bp.route("/movimentacoes-material")
+@login_required
+@admin_required
+def movimentacoes_material():
+    """Lista movimentações de materiais"""
+    try:
+        movimentacoes = MovimentacaoMaterial.query.filter_by(
+            admin_id=current_user.id
+        ).order_by(MovimentacaoMaterial.created_at.desc()).limit(50).all()
+        
+        return render_template("almoxarifado/movimentacoes.html",
+                             movimentacoes=movimentacoes)
+        
+    except Exception as e:
+        flash(f"Erro ao carregar movimentações: {str(e)}", "danger")
+        return redirect(url_for("main.dashboard"))
+
+@main_bp.route("/movimentacoes-material/nova", methods=["POST"])
+@login_required
+@admin_required
+def nova_movimentacao():
+    """Registrar nova movimentação de material"""
+    try:
+        nova_mov = MovimentacaoMaterial(
+            material_id=request.form["material_id"],
+            tipo_movimento=request.form["tipo_movimento"],
+            quantidade=float(request.form["quantidade"]),
+            valor_unitario=float(request.form.get("valor_unitario", 0)),
+            data_movimento=datetime.strptime(request.form["data_movimento"], "%Y-%m-%d").date(),
+            observacoes=request.form.get("observacoes", ""),
+            admin_id=current_user.id
+        )
+        
+        # Calcular valor total
+        nova_mov.valor_total = nova_mov.quantidade * nova_mov.valor_unitario
+        
+        # Atualizar estoque do material
+        material = Material.query.get(nova_mov.material_id)
+        if nova_mov.tipo_movimento == "entrada":
+            material.estoque_atual += nova_mov.quantidade
+        elif nova_mov.tipo_movimento == "saida":
+            material.estoque_atual -= nova_mov.quantidade
+        
+        db.session.add(nova_mov)
+        db.session.commit()
+        
+        flash("Movimentação registrada com sucesso!", "success")
+        return redirect(url_for("main.movimentacoes_material"))
+        
+    except Exception as e:
+        db.session.rollback()
+        flash(f"Erro ao registrar movimentação: {str(e)}", "danger")
+        return redirect(url_for("main.movimentacoes_material"))
+

@@ -1,0 +1,226 @@
+{% extends "base.html" %}
+
+{% block title %}Materiais - Almoxarifado - SIGE{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2><i class="fas fa-box me-2"></i> Materiais do Almoxarifado</h2>
+        <div>
+            <button class="btn btn-success me-2" data-bs-toggle="modal" data-bs-target="#modalNovoMaterial">
+                <i class="fas fa-plus me-1"></i> Novo Material
+            </button>
+            <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#modalMovimentacao">
+                <i class="fas fa-exchange-alt me-1"></i> Nova Movimentação
+            </button>
+        </div>
+    </div>
+
+    <!-- Lista de Materiais -->
+    <div class="card">
+        <div class="card-body">
+            {% if materiais %}
+                <div class="table-responsive">
+                    <table class="table table-hover" id="tabelaMateriais">
+                        <thead>
+                            <tr>
+                                <th>Descrição</th>
+                                <th>Categoria</th>
+                                <th>Estoque Atual</th>
+                                <th>Estoque Mínimo</th>
+                                <th>Unidade</th>
+                                <th>Localização</th>
+                                <th>Status</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for material in materiais %}
+                            <tr>
+                                <td>{{ material.descricao }}</td>
+                                <td><span class="badge bg-secondary">{{ material.categoria }}</span></td>
+                                <td>
+                                    <span class="{% if material.estoque_atual <= material.estoque_minimo %}text-danger fw-bold{% endif %}">
+                                        {{ "%.2f"|format(material.estoque_atual) }}
+                                    </span>
+                                </td>
+                                <td>{{ "%.2f"|format(material.estoque_minimo) }}</td>
+                                <td>{{ material.unidade_medida }}</td>
+                                <td>{{ material.localizacao or "Não definida" }}</td>
+                                <td>
+                                    {% if material.estoque_atual <= material.estoque_minimo %}
+                                        <span class="badge bg-danger">Estoque Baixo</span>
+                                    {% else %}
+                                        <span class="badge bg-success">OK</span>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            {% else %}
+                <div class="text-center py-4">
+                    <i class="fas fa-box-open fa-3x text-muted mb-3"></i>
+                    <p class="text-muted">Nenhum material cadastrado</p>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<!-- Modal Novo Material -->
+<div class="modal fade" id="modalNovoMaterial" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Cadastrar Material</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="POST" action="{{ url_for('main.novo_material') }}">
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label">Descrição *</label>
+                        <input type="text" class="form-control" name="descricao" required>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label">Categoria *</label>
+                                <select class="form-select" name="categoria" required>
+                                    <option value="">Selecione</option>
+                                    <option value="ferramentas">Ferramentas</option>
+                                    <option value="materiais_construcao">Materiais de Construção</option>
+                                    <option value="epis">EPIs</option>
+                                    <option value="eletricos">Materiais Elétricos</option>
+                                    <option value="hidraulicos">Materiais Hidráulicos</option>
+                                    <option value="consumiveis">Consumíveis</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label">Unidade *</label>
+                                <select class="form-select" name="unidade_medida" required>
+                                    <option value="">Selecione</option>
+                                    <option value="un">Unidade</option>
+                                    <option value="kg">Quilograma</option>
+                                    <option value="m">Metro</option>
+                                    <option value="m2">Metro²</option>
+                                    <option value="m3">Metro³</option>
+                                    <option value="l">Litro</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label">Estoque Mínimo</label>
+                                <input type="number" class="form-control" name="estoque_minimo" value="0" step="0.01">
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label">Código de Barras</label>
+                                <input type="text" class="form-control" name="codigo_barras">
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label">Localização</label>
+                        <input type="text" class="form-control" name="localizacao" placeholder="Ex: Prateleira A1">
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-success">Cadastrar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Nova Movimentação -->
+<div class="modal fade" id="modalMovimentacao" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Nova Movimentação</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="POST" action="{{ url_for('main.nova_movimentacao') }}">
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label">Material *</label>
+                        <select class="form-select" name="material_id" required>
+                            <option value="">Selecione o material</option>
+                            {% for material in materiais %}
+                            <option value="{{ material.id }}">{{ material.descricao }} ({{ material.estoque_atual }} {{ material.unidade_medida }})</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label">Tipo *</label>
+                                <select class="form-select" name="tipo_movimento" required>
+                                    <option value="">Selecione</option>
+                                    <option value="entrada">Entrada</option>
+                                    <option value="saida">Saída</option>
+                                    <option value="devolucao">Devolução</option>
+                                    <option value="ajuste">Ajuste</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label">Quantidade *</label>
+                                <input type="number" class="form-control" name="quantidade" required step="0.01">
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label">Valor Unitário</label>
+                                <input type="number" class="form-control" name="valor_unitario" step="0.01" value="0">
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label">Data *</label>
+                                <input type="date" class="form-control" name="data_movimento" value="{{ date.today() }}" required>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label">Observações</label>
+                        <textarea class="form-control" name="observacoes" rows="2"></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-primary">Registrar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+$(document).ready(function() {
+    $('#tabelaMateriais').DataTable({
+        language: {
+            url: '//cdn.datatables.net/plug-ins/1.13.7/i18n/pt-BR.json'
+        },
+        order: [[0, 'asc']]
+    });
+});
+</script>
+{% endblock %}

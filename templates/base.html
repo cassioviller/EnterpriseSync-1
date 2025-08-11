@@ -677,10 +677,35 @@
                             </a>
                         </li>
                         
-                        <li class="nav-item">
-                            <a class="nav-link" href="{{ url_for('main.lista_propostas') }}">
-                                <i class="fas fa-file-contract me-1"></i> Propostas
+                        <li class="nav-item dropdown">
+                            <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown">
+                                <i class="fas fa-briefcase me-1"></i> Comercial
                             </a>
+                            <ul class="dropdown-menu">
+                                <li><a class="dropdown-item" href="{{ url_for('main.lista_propostas') }}">
+                                    <i class="fas fa-file-contract me-2"></i> Propostas
+                                </a></li>
+                            </ul>
+                        </li>
+                        
+                        <li class="nav-item">
+                            <a class="nav-link" href="{{ url_for('main.gestao_equipes') }}">
+                                <i class="fas fa-users-cog me-1"></i> Equipes
+                            </a>
+                        </li>
+                        
+                        <li class="nav-item dropdown">
+                            <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown">
+                                <i class="fas fa-boxes me-1"></i> Almoxarifado
+                            </a>
+                            <ul class="dropdown-menu">
+                                <li><a class="dropdown-item" href="{{ url_for('main.lista_materiais') }}">
+                                    <i class="fas fa-box me-2"></i> Materiais
+                                </a></li>
+                                <li><a class="dropdown-item" href="{{ url_for('main.movimentacoes_material') }}">
+                                    <i class="fas fa-exchange-alt me-2"></i> Movimentações
+                                </a></li>
+                            </ul>
                         </li>
                         
                         <li class="nav-item dropdown">

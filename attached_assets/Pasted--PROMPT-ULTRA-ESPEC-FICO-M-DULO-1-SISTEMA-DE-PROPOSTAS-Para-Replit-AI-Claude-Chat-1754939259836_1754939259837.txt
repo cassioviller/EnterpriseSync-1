@@ -1,0 +1,1142 @@
+# 🎯 PROMPT ULTRA-ESPECÍFICO: MÓDULO 1 - SISTEMA DE PROPOSTAS
+
+**Para:** Replit AI / Claude / ChatGPT  
+**Sistema:** SIGE v8.0 - Sistema Integrado de Gestão Empresarial  
+**Módulo:** 1 de 7 - Sistema de Propostas Digitais  
+**Status:** Implementação focada - Primeiro módulo da evolução
+
+---
+
+## ⚠️ CONTEXTO CRÍTICO - IMPLEMENTAÇÃO EM ANDAMENTO
+
+Você está implementando **APENAS O MÓDULO 1** de uma evolução maior do SIGE. Este é um sistema **REAL** em produção com estrutura específica que deve ser mantida.
+
+### **Sistema Base Atual (NÃO MODIFICAR):**
+```
+├── app.py                    # Flask app principal
+├── models.py                 # Classes: Usuario, Funcionario, Obra, RDO (25+ classes)
+├── views.py                  # Blueprint main_bp com 50+ rotas
+├── auth.py                   # Decorators: @admin_required, @funcionario_required
+├── utils.py                  # Funções: calcular_valor_hora_funcionario()
+└── templates/                # Templates Bootstrap 4 existentes
+```
+
+### **Classes Principais Existentes (USAR COMO BASE):**
+```python
+class Usuario(UserMixin, db.Model):
+    tipo_usuario = db.Column(db.Enum(TipoUsuario))  # SUPER_ADMIN, ADMIN, FUNCIONARIO
+    admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'))
+
+class Obra(db.Model):  # ESTA CLASSE SERÁ USADA NA CONVERSÃO
+    id = db.Column(db.Integer, primary_key=True)
+    nome = db.Column(db.String(100), nullable=False)
+    codigo = db.Column(db.String(20), unique=True)
+    endereco = db.Column(db.Text)
+    valor_contrato = db.Column(db.Float, default=0.0)
+    admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False)
+```
+
+### **Sistema de Autenticação Atual (USAR ESTES):**
+```python
+# Em auth.py - USAR ESTES DECORATORS
+@admin_required
+@funcionario_required
+def get_tenant_filter()  # Retorna admin_id para filtros
+def can_access_data(admin_id)  # Verifica permissões
+```
+
+---
+
+## 🎯 MÓDULO 1: SISTEMA DE PROPOSTAS - ESPECIFICAÇÃO COMPLETA
+
+### **OBJETIVO DO MÓDULO:**
+Criar sistema completo de propostas digitais que permite:
+1. **Admin cria proposta** com serviços detalhados
+2. **Sistema gera credenciais** para cliente
+3. **Cliente acessa portal** via token único
+4. **Cliente aprova/rejeita** com assinatura digital
+5. **Aprovação converte automaticamente** em Obra
+
+---
+
+## 📊 IMPLEMENTAÇÃO TÉCNICA DETALHADA
+
+### **PASSO 1: Novas Classes SQL (ADICIONAR NO FINAL DE models.py)**
+
+```python
+# ===== MÓDULO 1: SISTEMA DE PROPOSTAS =====
+# ADICIONAR estas classes NO FINAL do arquivo models.py
+
+class Proposta(db.Model):
+    __tablename__ = 'proposta'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    numero_proposta = db.Column(db.String(20), unique=True, nullable=False)  # PROP-2025-001
+    
+    # Dados do Cliente
+    cliente_nome = db.Column(db.String(100), nullable=False)
+    cliente_email = db.Column(db.String(120), nullable=False)
+    cliente_telefone = db.Column(db.String(20))
+    cliente_cpf_cnpj = db.Column(db.String(18))
+    
+    # Dados da Obra
+    endereco_obra = db.Column(db.Text, nullable=False)
+    descricao_obra = db.Column(db.Text, nullable=False)
+    area_total_m2 = db.Column(db.Float)
+    
+    # Valores
+    valor_proposta = db.Column(db.Float, nullable=False)
+    prazo_execucao = db.Column(db.Integer)  # dias
+    
+    # Status e Controle
+    status = db.Column(db.String(20), default='Rascunho')  # Rascunho, Enviada, Aprovada, Rejeitada, Expirada
+    data_criacao = db.Column(db.DateTime, default=datetime.utcnow)
+    data_envio = db.Column(db.DateTime)
+    data_resposta = db.Column(db.DateTime)
+    data_expiracao = db.Column(db.DateTime)  # 30 dias após envio
+    
+    # Acesso do Cliente
+    login_cliente = db.Column(db.String(50), unique=True)
+    senha_cliente = db.Column(db.String(255))  # Hash bcrypt
+    token_acesso = db.Column(db.String(255), unique=True)
+    
+    # Resposta do Cliente
+    observacoes_cliente = db.Column(db.Text)
+    ip_assinatura = db.Column(db.String(45))
+    user_agent_assinatura = db.Column(db.Text)
+    
+    # Multi-tenant (OBRIGATÓRIO)
+    admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False)
+    criado_por_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False)
+    
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    # Relacionamentos
+    servicos = db.relationship('PropostaServico', backref='proposta_ref', lazy=True, cascade='all, delete-orphan')
+    logs = db.relationship('PropostaLog', backref='proposta_ref', lazy=True, cascade='all, delete-orphan')
+    criado_por = db.relationship('Usuario', foreign_keys=[criado_por_id])
+    
+    def __repr__(self):
+        return f'<Proposta {self.numero_proposta}>'
+
+class PropostaServico(db.Model):
+    __tablename__ = 'proposta_servico'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    proposta_id = db.Column(db.Integer, db.ForeignKey('proposta.id'), nullable=False)
+    
+    # Dados do Serviço
+    descricao_servico = db.Column(db.String(200), nullable=False)
+    quantidade = db.Column(db.Float, nullable=False)
+    unidade = db.Column(db.String(10), nullable=False)  # m², m³, un, kg, etc.
+    valor_unitario = db.Column(db.Float, nullable=False)
+    valor_total = db.Column(db.Float, nullable=False)
+    
+    # Detalhes
+    observacoes = db.Column(db.Text)
+    ordem = db.Column(db.Integer, default=1)
+    
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    
+    def __repr__(self):
+        return f'<PropostaServico {self.descricao_servico}>'
+
+class PropostaLog(db.Model):
+    __tablename__ = 'proposta_log'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    proposta_id = db.Column(db.Integer, db.ForeignKey('proposta.id'), nullable=False)
+    
+    # Ação realizada
+    acao = db.Column(db.String(50), nullable=False)  # criada, enviada, visualizada, aprovada, rejeitada
+    
+    # Usuário (NULL para ações do cliente)
+    usuario_id = db.Column(db.Integer, db.ForeignKey('usuario.id'))
+    
+    # Dados da sessão
+    ip_address = db.Column(db.String(45))
+    user_agent = db.Column(db.Text)
+    
+    # Detalhes
+    observacoes = db.Column(db.Text)
+    
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    
+    # Relacionamentos
+    usuario = db.relationship('Usuario', backref='logs_proposta')
+    
+    def __repr__(self):
+        return f'<PropostaLog {self.acao}>'
+```
+
+### **PASSO 2: Rotas Administrativas (ADICIONAR EM views.py NO main_bp)**
+
+```python
+# ===== MÓDULO 1: SISTEMA DE PROPOSTAS =====
+# ADICIONAR estas rotas no Blueprint main_bp existente
+
+import secrets
+import json
+from datetime import datetime, timedelta
+from werkzeug.security import generate_password_hash
+from sqlalchemy import func
+
+@main_bp.route('/propostas')
+@admin_required
+def lista_propostas():
+    """Lista todas as propostas do admin atual"""
+    tenant_filter = get_tenant_filter()
+    
+    if tenant_filter is None:  # Super admin
+        propostas = Proposta.query.order_by(Proposta.created_at.desc()).all()
+    else:
+        propostas = Proposta.query.filter_by(admin_id=tenant_filter).order_by(Proposta.created_at.desc()).all()
+    
+    return render_template('propostas/lista_propostas.html', propostas=propostas)
+
+@main_bp.route('/propostas/nova', methods=['GET', 'POST'])
+@admin_required
+def nova_proposta():
+    """Criar nova proposta"""
+    if request.method == 'POST':
+        try:
+            # Gerar número automático da proposta
+            ultimo_numero = db.session.query(func.max(Proposta.numero_proposta)).scalar()
+            if ultimo_numero:
+                numero = int(ultimo_numero.split('-')[-1]) + 1
+            else:
+                numero = 1
+            numero_proposta = f"PROP-{datetime.now().year}-{numero:03d}"
+            
+            # Determinar admin_id correto
+            admin_id = current_user.id if current_user.tipo_usuario == TipoUsuario.ADMIN else current_user.admin_id
+            
+            # Criar proposta
+            proposta = Proposta(
+                numero_proposta=numero_proposta,
+                cliente_nome=request.form['cliente_nome'],
+                cliente_email=request.form['cliente_email'],
+                cliente_telefone=request.form.get('cliente_telefone'),
+                cliente_cpf_cnpj=request.form.get('cliente_cpf_cnpj'),
+                endereco_obra=request.form['endereco_obra'],
+                descricao_obra=request.form['descricao_obra'],
+                area_total_m2=float(request.form['area_total_m2']) if request.form.get('area_total_m2') else None,
+                valor_proposta=float(request.form['valor_proposta']),
+                prazo_execucao=int(request.form.get('prazo_execucao', 30)),
+                admin_id=admin_id,
+                criado_por_id=current_user.id
+            )
+            
+            db.session.add(proposta)
+            db.session.flush()  # Para obter o ID
+            
+            # Processar serviços (JSON do frontend)
+            servicos_json = request.form.get('servicos_json', '[]')
+            servicos_data = json.loads(servicos_json)
+            
+            valor_total_servicos = 0
+            for i, servico_data in enumerate(servicos_data):
+                quantidade = float(servico_data['quantidade'])
+                valor_unitario = float(servico_data['valor_unitario'])
+                valor_total = quantidade * valor_unitario
+                valor_total_servicos += valor_total
+                
+                servico = PropostaServico(
+                    proposta_id=proposta.id,
+                    descricao_servico=servico_data['descricao'],
+                    quantidade=quantidade,
+                    unidade=servico_data['unidade'],
+                    valor_unitario=valor_unitario,
+                    valor_total=valor_total,
+                    observacoes=servico_data.get('observacoes'),
+                    ordem=i + 1
+                )
+                db.session.add(servico)
+            
+            # Atualizar valor total da proposta
+            proposta.valor_proposta = valor_total_servicos
+            
+            # Log da criação
+            log = PropostaLog(
+                proposta_id=proposta.id,
+                acao='criada',
+                usuario_id=current_user.id,
+                ip_address=request.remote_addr,
+                user_agent=request.headers.get('User-Agent'),
+                observacoes=f'Proposta criada com {len(servicos_data)} serviços'
+            )
+            db.session.add(log)
+            
+            db.session.commit()
+            flash(f'Proposta {numero_proposta} criada com sucesso!', 'success')
+            return redirect(url_for('main.lista_propostas'))
+            
+        except Exception as e:
+            db.session.rollback()
+            flash(f'Erro ao criar proposta: {str(e)}', 'danger')
+            return redirect(url_for('main.nova_proposta'))
+    
+    return render_template('propostas/nova_proposta.html')
+
+@main_bp.route('/propostas/<int:id>')
+@admin_required
+def detalhes_proposta(id):
+    """Ver detalhes da proposta"""
+    proposta = Proposta.query.get_or_404(id)
+    
+    # Verificar permissão
+    if not can_access_data(proposta.admin_id):
+        abort(403)
+    
+    return render_template('propostas/detalhes_proposta.html', proposta=proposta)
+
+@main_bp.route('/propostas/<int:id>/enviar', methods=['POST'])
+@admin_required
+def enviar_proposta(id):
+    """Enviar proposta para cliente"""
+    proposta = Proposta.query.get_or_404(id)
+    
+    # Verificar permissão
+    if not can_access_data(proposta.admin_id):
+        abort(403)
+    
+    # Verificar se pode enviar
+    if proposta.status not in ['Rascunho']:
+        flash('Esta proposta não pode ser enviada.', 'warning')
+        return redirect(url_for('main.detalhes_proposta', id=id))
+    
+    try:
+        # Gerar credenciais do cliente
+        login_cliente = f"cliente{proposta.id:04d}"
+        senha_temp = secrets.token_urlsafe(8)  # Senha temporária
+        token_acesso = secrets.token_urlsafe(32)  # Token para acesso direto
+        
+        # Atualizar proposta
+        proposta.login_cliente = login_cliente
+        proposta.senha_cliente = generate_password_hash(senha_temp)
+        proposta.token_acesso = token_acesso
+        proposta.data_envio = datetime.utcnow()
+        proposta.data_expiracao = datetime.utcnow() + timedelta(days=30)
+        proposta.status = 'Enviada'
+        
+        # Log do envio
+        log = PropostaLog(
+            proposta_id=proposta.id,
+            acao='enviada',
+            usuario_id=current_user.id,
+            ip_address=request.remote_addr,
+            user_agent=request.headers.get('User-Agent'),
+            observacoes=f'Credenciais geradas: {login_cliente}'
+        )
+        db.session.add(log)
+        
+        db.session.commit()
+        
+        # Mostrar credenciais para o admin
+        flash(f'Proposta enviada! Credenciais do cliente:', 'success')
+        flash(f'Login: {login_cliente}', 'info')
+        flash(f'Senha: {senha_temp}', 'info')
+        flash(f'Link direto: {request.url_root}cliente/proposta/{token_acesso}', 'info')
+        
+        return redirect(url_for('main.detalhes_proposta', id=id))
+        
+    except Exception as e:
+        db.session.rollback()
+        flash(f'Erro ao enviar proposta: {str(e)}', 'danger')
+        return redirect(url_for('main.detalhes_proposta', id=id))
+
+@main_bp.route('/propostas/<int:id>/cancelar', methods=['POST'])
+@admin_required
+def cancelar_proposta(id):
+    """Cancelar proposta"""
+    proposta = Proposta.query.get_or_404(id)
+    
+    # Verificar permissão
+    if not can_access_data(proposta.admin_id):
+        abort(403)
+    
+    if proposta.status in ['Aprovada', 'Rejeitada']:
+        flash('Esta proposta não pode ser cancelada.', 'warning')
+        return redirect(url_for('main.detalhes_proposta', id=id))
+    
+    proposta.status = 'Cancelada'
+    
+    # Log do cancelamento
+    log = PropostaLog(
+        proposta_id=proposta.id,
+        acao='cancelada',
+        usuario_id=current_user.id,
+        ip_address=request.remote_addr,
+        user_agent=request.headers.get('User-Agent'),
+        observacoes=request.form.get('motivo', 'Cancelada pelo admin')
+    )
+    db.session.add(log)
+    
+    db.session.commit()
+    flash('Proposta cancelada com sucesso!', 'success')
+    return redirect(url_for('main.lista_propostas'))
+```
+
+### **PASSO 3: Portal do Cliente (ADICIONAR EM views.py - SEM AUTENTICAÇÃO)**
+
+```python
+# ===== PORTAL DO CLIENTE - SEM FLASK-LOGIN =====
+
+@main_bp.route('/cliente/proposta/<token>')
+def cliente_proposta(token):
+    """Portal do cliente para visualizar proposta"""
+    proposta = Proposta.query.filter_by(token_acesso=token).first_or_404()
+    
+    # Verificar expiração
+    if proposta.data_expiracao and datetime.utcnow() > proposta.data_expiracao:
+        proposta.status = 'Expirada'
+        db.session.commit()
+    
+    # Log da visualização
+    log = PropostaLog(
+        proposta_id=proposta.id,
+        acao='visualizada',
+        ip_address=request.remote_addr,
+        user_agent=request.headers.get('User-Agent'),
+        observacoes='Cliente acessou portal'
+    )
+    db.session.add(log)
+    db.session.commit()
+    
+    return render_template('cliente/proposta_detalhes.html', proposta=proposta)
+
+@main_bp.route('/cliente/proposta/<token>/aprovar', methods=['POST'])
+def cliente_aprovar_proposta(token):
+    """Cliente aprova a proposta"""
+    proposta = Proposta.query.filter_by(token_acesso=token).first_or_404()
+    
+    if proposta.status != 'Enviada':
+        flash('Esta proposta não pode mais ser aprovada.', 'danger')
+        return redirect(url_for('main.cliente_proposta', token=token))
+    
+    try:
+        # Atualizar proposta
+        proposta.status = 'Aprovada'
+        proposta.data_resposta = datetime.utcnow()
+        proposta.observacoes_cliente = request.form.get('observacoes', '')
+        proposta.ip_assinatura = request.remote_addr
+        proposta.user_agent_assinatura = request.headers.get('User-Agent')
+        
+        # Log da aprovação
+        log = PropostaLog(
+            proposta_id=proposta.id,
+            acao='aprovada',
+            ip_address=request.remote_addr,
+            user_agent=request.headers.get('User-Agent'),
+            observacoes=proposta.observacoes_cliente
+        )
+        db.session.add(log)
+        
+        # CONVERTER PROPOSTA EM OBRA AUTOMATICAMENTE
+        # Gerar código da obra
+        ultimo_codigo = db.session.query(func.max(Obra.codigo)).scalar()
+        if ultimo_codigo and ultimo_codigo.startswith('OB-'):
+            numero = int(ultimo_codigo.split('-')[-1]) + 1
+        else:
+            numero = 1
+        codigo_obra = f"OB-{numero:04d}"
+        
+        # Criar obra baseada na proposta
+        obra = Obra(
+            nome=f"Obra - {proposta.cliente_nome}",
+            codigo=codigo_obra,
+            endereco=proposta.endereco_obra,
+            data_inicio=datetime.now().date(),
+            orcamento=proposta.valor_proposta,
+            valor_contrato=proposta.valor_proposta,
+            area_total_m2=proposta.area_total_m2,
+            status='Planejamento',
+            admin_id=proposta.admin_id
+        )
+        db.session.add(obra)
+        db.session.flush()
+        
+        # TODO: Adicionar serviços da proposta como serviços da obra
+        # Isso será implementado quando o módulo de serviços estiver pronto
+        
+        db.session.commit()
+        
+        flash('Proposta aprovada com sucesso! A obra foi criada automaticamente.', 'success')
+        return redirect(url_for('main.cliente_proposta', token=token))
+        
+    except Exception as e:
+        db.session.rollback()
+        flash(f'Erro ao aprovar proposta: {str(e)}', 'danger')
+        return redirect(url_for('main.cliente_proposta', token=token))
+
+@main_bp.route('/cliente/proposta/<token>/rejeitar', methods=['POST'])
+def cliente_rejeitar_proposta(token):
+    """Cliente rejeita a proposta"""
+    proposta = Proposta.query.filter_by(token_acesso=token).first_or_404()
+    
+    if proposta.status != 'Enviada':
+        flash('Esta proposta não pode mais ser rejeitada.', 'danger')
+        return redirect(url_for('main.cliente_proposta', token=token))
+    
+    try:
+        # Atualizar proposta
+        proposta.status = 'Rejeitada'
+        proposta.data_resposta = datetime.utcnow()
+        proposta.observacoes_cliente = request.form.get('observacoes', '')
+        proposta.ip_assinatura = request.remote_addr
+        proposta.user_agent_assinatura = request.headers.get('User-Agent')
+        
+        # Log da rejeição
+        log = PropostaLog(
+            proposta_id=proposta.id,
+            acao='rejeitada',
+            ip_address=request.remote_addr,
+            user_agent=request.headers.get('User-Agent'),
+            observacoes=proposta.observacoes_cliente
+        )
+        db.session.add(log)
+        
+        db.session.commit()
+        
+        flash('Proposta rejeitada. Obrigado pelo seu tempo.', 'info')
+        return redirect(url_for('main.cliente_proposta', token=token))
+        
+    except Exception as e:
+        db.session.rollback()
+        flash(f'Erro ao rejeitar proposta: {str(e)}', 'danger')
+        return redirect(url_for('main.cliente_proposta', token=token))
+```
+
+
+### **PASSO 4: Templates HTML (CRIAR EM templates/)**
+
+#### **Template Admin - Lista de Propostas**
+```html
+<!-- templates/propostas/lista_propostas.html -->
+{% extends "base.html" %}
+{% block title %}Propostas{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">
+                        <i class="fas fa-file-contract"></i> Propostas
+                    </h5>
+                    <a href="{{ url_for('main.nova_proposta') }}" class="btn btn-primary">
+                        <i class="fas fa-plus"></i> Nova Proposta
+                    </a>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-striped table-hover" id="tabelaPropostas">
+                            <thead class="thead-dark">
+                                <tr>
+                                    <th>Número</th>
+                                    <th>Cliente</th>
+                                    <th>Valor</th>
+                                    <th>Status</th>
+                                    <th>Data Criação</th>
+                                    <th>Data Envio</th>
+                                    <th>Ações</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for proposta in propostas %}
+                                <tr>
+                                    <td>
+                                        <strong>{{ proposta.numero_proposta }}</strong>
+                                    </td>
+                                    <td>
+                                        <div>
+                                            <strong>{{ proposta.cliente_nome }}</strong><br>
+                                            <small class="text-muted">{{ proposta.cliente_email }}</small>
+                                        </div>
+                                    </td>
+                                    <td>
+                                        <strong>R$ {{ "%.2f"|format(proposta.valor_proposta) }}</strong>
+                                    </td>
+                                    <td>
+                                        {% set status_class = {
+                                            'Rascunho': 'secondary',
+                                            'Enviada': 'warning',
+                                            'Aprovada': 'success',
+                                            'Rejeitada': 'danger',
+                                            'Expirada': 'dark',
+                                            'Cancelada': 'secondary'
+                                        } %}
+                                        <span class="badge badge-{{ status_class.get(proposta.status, 'secondary') }}">
+                                            {{ proposta.status }}
+                                        </span>
+                                    </td>
+                                    <td>
+                                        {{ proposta.created_at.strftime('%d/%m/%Y %H:%M') }}
+                                    </td>
+                                    <td>
+                                        {% if proposta.data_envio %}
+                                            {{ proposta.data_envio.strftime('%d/%m/%Y %H:%M') }}
+                                        {% else %}
+                                            <span class="text-muted">-</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        <div class="btn-group" role="group">
+                                            <a href="{{ url_for('main.detalhes_proposta', id=proposta.id) }}" 
+                                               class="btn btn-sm btn-outline-primary" title="Ver Detalhes">
+                                                <i class="fas fa-eye"></i>
+                                            </a>
+                                            
+                                            {% if proposta.status == 'Rascunho' %}
+                                            <form method="POST" action="{{ url_for('main.enviar_proposta', id=proposta.id) }}" 
+                                                  style="display: inline;" onsubmit="return confirm('Enviar proposta para o cliente?')">
+                                                <button type="submit" class="btn btn-sm btn-success" title="Enviar para Cliente">
+                                                    <i class="fas fa-paper-plane"></i>
+                                                </button>
+                                            </form>
+                                            {% endif %}
+                                            
+                                            {% if proposta.token_acesso %}
+                                            <a href="{{ url_for('main.cliente_proposta', token=proposta.token_acesso) }}" 
+                                               class="btn btn-sm btn-info" target="_blank" title="Ver Portal do Cliente">
+                                                <i class="fas fa-external-link-alt"></i>
+                                            </a>
+                                            {% endif %}
+                                        </div>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+$(document).ready(function() {
+    $('#tabelaPropostas').DataTable({
+        language: {
+            url: '//cdn.datatables.net/plug-ins/1.13.7/i18n/pt-BR.json'
+        },
+        order: [[4, 'desc']],  // Ordenar por data de criação
+        pageLength: 25,
+        responsive: true,
+        columnDefs: [
+            { targets: [6], orderable: false }  // Coluna de ações não ordenável
+        ]
+    });
+});
+</script>
+{% endblock %}
+```
+
+#### **Template Admin - Nova Proposta**
+```html
+<!-- templates/propostas/nova_proposta.html -->
+{% extends "base.html" %}
+{% block title %}Nova Proposta{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">
+                        <i class="fas fa-plus"></i> Nova Proposta
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <form method="POST" id="formNovaProposta">
+                        <!-- Dados do Cliente -->
+                        <div class="row">
+                            <div class="col-md-6">
+                                <h6 class="text-primary">Dados do Cliente</h6>
+                                <div class="form-group">
+                                    <label for="cliente_nome">Nome do Cliente *</label>
+                                    <input type="text" class="form-control" id="cliente_nome" name="cliente_nome" required>
+                                </div>
+                                <div class="form-group">
+                                    <label for="cliente_email">Email *</label>
+                                    <input type="email" class="form-control" id="cliente_email" name="cliente_email" required>
+                                </div>
+                                <div class="form-group">
+                                    <label for="cliente_telefone">Telefone</label>
+                                    <input type="text" class="form-control" id="cliente_telefone" name="cliente_telefone">
+                                </div>
+                                <div class="form-group">
+                                    <label for="cliente_cpf_cnpj">CPF/CNPJ</label>
+                                    <input type="text" class="form-control" id="cliente_cpf_cnpj" name="cliente_cpf_cnpj">
+                                </div>
+                            </div>
+                            
+                            <div class="col-md-6">
+                                <h6 class="text-primary">Dados da Obra</h6>
+                                <div class="form-group">
+                                    <label for="endereco_obra">Endereço da Obra *</label>
+                                    <textarea class="form-control" id="endereco_obra" name="endereco_obra" rows="3" required></textarea>
+                                </div>
+                                <div class="form-group">
+                                    <label for="descricao_obra">Descrição da Obra *</label>
+                                    <textarea class="form-control" id="descricao_obra" name="descricao_obra" rows="3" required></textarea>
+                                </div>
+                                <div class="form-group">
+                                    <label for="area_total_m2">Área Total (m²)</label>
+                                    <input type="number" step="0.01" class="form-control" id="area_total_m2" name="area_total_m2">
+                                </div>
+                                <div class="form-group">
+                                    <label for="prazo_execucao">Prazo de Execução (dias)</label>
+                                    <input type="number" class="form-control" id="prazo_execucao" name="prazo_execucao" value="30">
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <hr>
+                        
+                        <!-- Serviços -->
+                        <div class="row">
+                            <div class="col-12">
+                                <h6 class="text-primary">Serviços da Proposta</h6>
+                                <div class="table-responsive">
+                                    <table class="table table-bordered" id="tabelaServicos">
+                                        <thead class="thead-light">
+                                            <tr>
+                                                <th width="40%">Descrição do Serviço</th>
+                                                <th width="10%">Qtd</th>
+                                                <th width="10%">Unidade</th>
+                                                <th width="15%">Valor Unit.</th>
+                                                <th width="15%">Total</th>
+                                                <th width="10%">Ações</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="servicosBody">
+                                            <!-- Serviços serão adicionados via JavaScript -->
+                                        </tbody>
+                                        <tfoot>
+                                            <tr class="table-primary">
+                                                <th colspan="4">Total Geral</th>
+                                                <th id="totalGeral">R$ 0,00</th>
+                                                <th></th>
+                                            </tr>
+                                        </tfoot>
+                                    </table>
+                                </div>
+                                
+                                <button type="button" class="btn btn-outline-primary" onclick="adicionarServico()">
+                                    <i class="fas fa-plus"></i> Adicionar Serviço
+                                </button>
+                            </div>
+                        </div>
+                        
+                        <hr>
+                        
+                        <!-- Botões -->
+                        <div class="row">
+                            <div class="col-12">
+                                <input type="hidden" id="servicos_json" name="servicos_json" value="[]">
+                                <input type="hidden" id="valor_proposta" name="valor_proposta" value="0">
+                                
+                                <button type="submit" class="btn btn-success">
+                                    <i class="fas fa-save"></i> Salvar Proposta
+                                </button>
+                                <a href="{{ url_for('main.lista_propostas') }}" class="btn btn-secondary">
+                                    <i class="fas fa-times"></i> Cancelar
+                                </a>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+let servicos = [];
+let servicoCounter = 0;
+
+function adicionarServico() {
+    servicoCounter++;
+    const tbody = document.getElementById('servicosBody');
+    const row = tbody.insertRow();
+    
+    row.innerHTML = `
+        <td><input type="text" class="form-control" id="desc_${servicoCounter}" placeholder="Descrição do serviço" required></td>
+        <td><input type="number" step="0.01" class="form-control" id="qtd_${servicoCounter}" placeholder="0" onchange="calcularTotal(${servicoCounter})" required></td>
+        <td>
+            <select class="form-control" id="unidade_${servicoCounter}" required>
+                <option value="">Selecione</option>
+                <option value="m²">m²</option>
+                <option value="m³">m³</option>
+                <option value="m">m</option>
+                <option value="un">un</option>
+                <option value="kg">kg</option>
+                <option value="t">t</option>
+            </select>
+        </td>
+        <td><input type="number" step="0.01" class="form-control" id="valor_${servicoCounter}" placeholder="0,00" onchange="calcularTotal(${servicoCounter})" required></td>
+        <td><span id="total_${servicoCounter}" class="font-weight-bold">R$ 0,00</span></td>
+        <td><button type="button" class="btn btn-sm btn-danger" onclick="removerServico(this, ${servicoCounter})"><i class="fas fa-trash"></i></button></td>
+    `;
+}
+
+function calcularTotal(id) {
+    const qtd = parseFloat(document.getElementById(`qtd_${id}`).value) || 0;
+    const valor = parseFloat(document.getElementById(`valor_${id}`).value) || 0;
+    const total = qtd * valor;
+    
+    document.getElementById(`total_${id}`).textContent = `R$ ${total.toFixed(2).replace('.', ',')}`;
+    
+    calcularTotalGeral();
+}
+
+function calcularTotalGeral() {
+    let totalGeral = 0;
+    
+    for (let i = 1; i <= servicoCounter; i++) {
+        const totalElement = document.getElementById(`total_${i}`);
+        if (totalElement) {
+            const valor = parseFloat(totalElement.textContent.replace('R$ ', '').replace(',', '.')) || 0;
+            totalGeral += valor;
+        }
+    }
+    
+    document.getElementById('totalGeral').textContent = `R$ ${totalGeral.toFixed(2).replace('.', ',')}`;
+    document.getElementById('valor_proposta').value = totalGeral.toFixed(2);
+}
+
+function removerServico(button, id) {
+    button.closest('tr').remove();
+    calcularTotalGeral();
+}
+
+document.getElementById('formNovaProposta').addEventListener('submit', function(e) {
+    // Coletar dados dos serviços
+    const servicosData = [];
+    
+    for (let i = 1; i <= servicoCounter; i++) {
+        const descElement = document.getElementById(`desc_${i}`);
+        if (descElement && descElement.closest('tr').parentNode) {
+            const qtd = parseFloat(document.getElementById(`qtd_${i}`).value) || 0;
+            const valor = parseFloat(document.getElementById(`valor_${i}`).value) || 0;
+            
+            if (qtd > 0 && valor > 0) {
+                servicosData.push({
+                    descricao: descElement.value,
+                    quantidade: qtd,
+                    unidade: document.getElementById(`unidade_${i}`).value,
+                    valor_unitario: valor
+                });
+            }
+        }
+    }
+    
+    if (servicosData.length === 0) {
+        e.preventDefault();
+        alert('Adicione pelo menos um serviço à proposta!');
+        return;
+    }
+    
+    document.getElementById('servicos_json').value = JSON.stringify(servicosData);
+});
+
+// Adicionar primeiro serviço automaticamente
+document.addEventListener('DOMContentLoaded', function() {
+    adicionarServico();
+});
+</script>
+{% endblock %}
+```
+
+#### **Template Cliente - Portal da Proposta**
+```html
+<!-- templates/cliente/proposta_detalhes.html -->
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Proposta {{ proposta.numero_proposta }}</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@4.6.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        body { background-color: #f8f9fa; }
+        .proposta-header { background: linear-gradient(135deg, #007bff, #0056b3); color: white; }
+        .status-badge { font-size: 1.1em; }
+        .servico-item { border-left: 4px solid #007bff; }
+        .btn-acao { min-width: 150px; }
+        @media (max-width: 768px) {
+            .btn-acao { width: 100%; margin-bottom: 10px; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container my-4">
+        <div class="row justify-content-center">
+            <div class="col-lg-10">
+                <!-- Header -->
+                <div class="card shadow-lg">
+                    <div class="card-header proposta-header text-center py-4">
+                        <h3 class="mb-2">
+                            <i class="fas fa-file-contract"></i>
+                            Proposta {{ proposta.numero_proposta }}
+                        </h3>
+                        <span class="status-badge badge badge-light">
+                            Status: {{ proposta.status }}
+                        </span>
+                    </div>
+                    
+                    <div class="card-body p-4">
+                        <!-- Dados do Cliente e Obra -->
+                        <div class="row mb-4">
+                            <div class="col-md-6">
+                                <h5 class="text-primary">
+                                    <i class="fas fa-user"></i> Dados do Cliente
+                                </h5>
+                                <div class="bg-light p-3 rounded">
+                                    <p class="mb-1"><strong>Nome:</strong> {{ proposta.cliente_nome }}</p>
+                                    <p class="mb-1"><strong>Email:</strong> {{ proposta.cliente_email }}</p>
+                                    {% if proposta.cliente_telefone %}
+                                    <p class="mb-1"><strong>Telefone:</strong> {{ proposta.cliente_telefone }}</p>
+                                    {% endif %}
+                                    {% if proposta.cliente_cpf_cnpj %}
+                                    <p class="mb-0"><strong>CPF/CNPJ:</strong> {{ proposta.cliente_cpf_cnpj }}</p>
+                                    {% endif %}
+                                </div>
+                            </div>
+                            
+                            <div class="col-md-6">
+                                <h5 class="text-primary">
+                                    <i class="fas fa-building"></i> Dados da Obra
+                                </h5>
+                                <div class="bg-light p-3 rounded">
+                                    <p class="mb-1"><strong>Endereço:</strong> {{ proposta.endereco_obra }}</p>
+                                    <p class="mb-1"><strong>Descrição:</strong> {{ proposta.descricao_obra }}</p>
+                                    {% if proposta.area_total_m2 %}
+                                    <p class="mb-1"><strong>Área Total:</strong> {{ proposta.area_total_m2 }} m²</p>
+                                    {% endif %}
+                                    {% if proposta.prazo_execucao %}
+                                    <p class="mb-0"><strong>Prazo:</strong> {{ proposta.prazo_execucao }} dias</p>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Serviços -->
+                        <div class="mb-4">
+                            <h5 class="text-primary">
+                                <i class="fas fa-list"></i> Serviços Propostos
+                            </h5>
+                            <div class="table-responsive">
+                                <table class="table table-striped">
+                                    <thead class="thead-dark">
+                                        <tr>
+                                            <th>Descrição</th>
+                                            <th class="text-center">Qtd</th>
+                                            <th class="text-center">Unidade</th>
+                                            <th class="text-right">Valor Unit.</th>
+                                            <th class="text-right">Total</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for servico in proposta.servicos %}
+                                        <tr class="servico-item">
+                                            <td>{{ servico.descricao_servico }}</td>
+                                            <td class="text-center">{{ servico.quantidade }}</td>
+                                            <td class="text-center">{{ servico.unidade }}</td>
+                                            <td class="text-right">R$ {{ "%.2f"|format(servico.valor_unitario) }}</td>
+                                            <td class="text-right"><strong>R$ {{ "%.2f"|format(servico.valor_total) }}</strong></td>
+                                        </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                    <tfoot class="thead-dark">
+                                        <tr>
+                                            <th colspan="4" class="text-right">Total Geral:</th>
+                                            <th class="text-right">R$ {{ "%.2f"|format(proposta.valor_proposta) }}</th>
+                                        </tr>
+                                    </tfoot>
+                                </table>
+                            </div>
+                        </div>
+                        
+                        <!-- Informações Adicionais -->
+                        <div class="row mb-4">
+                            <div class="col-md-6">
+                                <div class="alert alert-info">
+                                    <h6><i class="fas fa-info-circle"></i> Informações Importantes</h6>
+                                    <ul class="mb-0">
+                                        <li>Proposta válida até: <strong>{{ proposta.data_expiracao.strftime('%d/%m/%Y') if proposta.data_expiracao else 'Não definido' }}</strong></li>
+                                        <li>Prazo de execução: <strong>{{ proposta.prazo_execucao or 'A definir' }} dias</strong></li>
+                                        <li>Valores incluem materiais e mão de obra</li>
+                                    </ul>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="alert alert-warning">
+                                    <h6><i class="fas fa-exclamation-triangle"></i> Atenção</h6>
+                                    <p class="mb-0">
+                                        Ao aprovar esta proposta, você está concordando com todos os termos e valores apresentados.
+                                        Esta ação não pode ser desfeita.
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Ações do Cliente -->
+                        {% if proposta.status == 'Enviada' %}
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <div class="card border-success">
+                                    <div class="card-header bg-success text-white">
+                                        <h6 class="mb-0"><i class="fas fa-check"></i> Aprovar Proposta</h6>
+                                    </div>
+                                    <div class="card-body">
+                                        <form method="POST" action="{{ url_for('main.cliente_aprovar_proposta', token=proposta.token_acesso) }}" 
+                                              onsubmit="return confirm('Tem certeza que deseja APROVAR esta proposta? Esta ação não pode ser desfeita.')">
+                                            <div class="form-group">
+                                                <label for="observacoes_aprovacao">Observações (opcional)</label>
+                                                <textarea class="form-control" id="observacoes_aprovacao" name="observacoes" 
+                                                          rows="3" placeholder="Comentários adicionais..."></textarea>
+                                            </div>
+                                            <button type="submit" class="btn btn-success btn-acao">
+                                                <i class="fas fa-check"></i> Aprovar Proposta
+                                            </button>
+                                        </form>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="col-md-6 mb-3">
+                                <div class="card border-danger">
+                                    <div class="card-header bg-danger text-white">
+                                        <h6 class="mb-0"><i class="fas fa-times"></i> Rejeitar Proposta</h6>
+                                    </div>
+                                    <div class="card-body">
+                                        <form method="POST" action="{{ url_for('main.cliente_rejeitar_proposta', token=proposta.token_acesso) }}" 
+                                              onsubmit="return confirm('Tem certeza que deseja REJEITAR esta proposta?')">
+                                            <div class="form-group">
+                                                <label for="observacoes_rejeicao">Motivo da rejeição *</label>
+                                                <textarea class="form-control" id="observacoes_rejeicao" name="observacoes" 
+                                                          rows="3" placeholder="Por favor, informe o motivo..." required></textarea>
+                                            </div>
+                                            <button type="submit" class="btn btn-danger btn-acao">
+                                                <i class="fas fa-times"></i> Rejeitar Proposta
+                                            </button>
+                                        </form>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        {% endif %}
+                        
+                        <!-- Observações do Cliente -->
+                        {% if proposta.observacoes_cliente %}
+                        <div class="alert alert-secondary">
+                            <h6><i class="fas fa-comment"></i> Observações do Cliente</h6>
+                            <p class="mb-0">{{ proposta.observacoes_cliente }}</p>
+                            <small class="text-muted">
+                                Respondido em: {{ proposta.data_resposta.strftime('%d/%m/%Y às %H:%M') if proposta.data_resposta else 'Data não disponível' }}
+                            </small>
+                        </div>
+                        {% endif %}
+                        
+                        <!-- Status Final -->
+                        {% if proposta.status in ['Aprovada', 'Rejeitada', 'Expirada'] %}
+                        <div class="text-center mt-4">
+                            {% if proposta.status == 'Aprovada' %}
+                            <div class="alert alert-success">
+                                <h5><i class="fas fa-check-circle"></i> Proposta Aprovada!</h5>
+                                <p class="mb-0">Obrigado! Entraremos em contato em breve para iniciar a obra.</p>
+                            </div>
+                            {% elif proposta.status == 'Rejeitada' %}
+                            <div class="alert alert-danger">
+                                <h5><i class="fas fa-times-circle"></i> Proposta Rejeitada</h5>
+                                <p class="mb-0">Obrigado pelo seu tempo. Ficamos à disposição para futuras oportunidades.</p>
+                            </div>
+                            {% elif proposta.status == 'Expirada' %}
+                            <div class="alert alert-warning">
+                                <h5><i class="fas fa-clock"></i> Proposta Expirada</h5>
+                                <p class="mb-0">Esta proposta expirou. Entre em contato conosco para uma nova proposta.</p>
+                            </div>
+                            {% endif %}
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <script src="https://cdn.jsdelivr.net/npm/jquery@3.6.0/dist/jquery.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@4.6.2/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>
+```
+
+---
+
+## 🔧 INSTRUÇÕES FINAIS DE IMPLEMENTAÇÃO
+
+### **PASSO 5: Atualizar app.py**
+```python
+# ADICIONAR no final de app.py, antes de create_all()
+
+with app.app_context():
+    db.create_all()
+    
+    # Criar índices para performance
+    try:
+        db.engine.execute('CREATE INDEX IF NOT EXISTS idx_proposta_admin_id ON proposta(admin_id)')
+        db.engine.execute('CREATE INDEX IF NOT EXISTS idx_proposta_token ON proposta(token_acesso)')
+        db.engine.execute('CREATE INDEX IF NOT EXISTS idx_proposta_status ON proposta(status)')
+        db.engine.execute('CREATE INDEX IF NOT EXISTS idx_proposta_log_proposta_id ON proposta_log(proposta_id)')
+    except Exception as e:
+        logging.warning(f"Erro ao criar índices: {e}")
+```
+
+### **PASSO 6: Testar o Módulo**
+1. **Criar proposta** via admin
+2. **Enviar proposta** → verificar credenciais geradas
+3. **Acessar portal** do cliente via token
+4. **Aprovar proposta** → verificar criação automática da obra
+5. **Testar rejeição** de proposta
+6. **Verificar logs** de auditoria
+
+### **PASSO 7: Validações Críticas**
+- ✅ **Multi-tenant:** Todas as consultas filtram por `admin_id`
+- ✅ **Segurança:** Tokens únicos e seguros
+- ✅ **Auditoria:** Todos os logs registrados
+- ✅ **Integração:** Conversão automática para `Obra`
+- ✅ **UX:** Interface responsiva para mobile
+
+---
+
+## ⚠️ REGRAS CRÍTICAS FINAIS
+
+### **COMPATIBILIDADE ABSOLUTA:**
+- **NUNCA** modificar classes existentes em `models.py`
+- **SEMPRE** adicionar novas classes no final do arquivo
+- **MANTER** todas as rotas existentes funcionando
+- **USAR** sistema de autenticação atual (`auth.py`)
+
+### **INTEGRAÇÃO PERFEITA:**
+- **REUTILIZAR** decorators existentes (`@admin_required`)
+- **INTEGRAR** com classe `Obra` existente
+- **MANTER** sistema multi-tenant funcionando
+- **USAR** padrões de nomenclatura atuais
+
+### **RESULTADO ESPERADO:**
+Módulo 1 funcionando perfeitamente com:
+- ✅ **Criação de propostas** pelo admin
+- ✅ **Portal do cliente** responsivo
+- ✅ **Assinatura digital** segura
+- ✅ **Conversão automática** em obra
+- ✅ **Auditoria completa** de ações
+
+**🎯 MÓDULO 1 PRONTO PARA IMPLEMENTAÇÃO IMEDIATA NO REPLIT!**
+

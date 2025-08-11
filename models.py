@@ -92,6 +92,12 @@ class Obra(db.Model):
     area_total_m2 = db.Column(db.Float, default=0.0)  # Área total da obra
     status = db.Column(db.String(20), default='Em andamento')
     responsavel_id = db.Column(db.Integer, db.ForeignKey('funcionario.id'))
+    
+    # MÓDULO 2: Portal do Cliente - Novos campos
+    token_cliente = db.Column(db.String(255), unique=True)
+    cliente_nome = db.Column(db.String(100))
+    proposta_origem_id = db.Column(db.Integer, db.ForeignKey('proposta_comercial.id'))
+    
     ativo = db.Column(db.Boolean, default=True)  # Campo para controle de obras ativas
     admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=True)  # Para isolamento multi-tenant
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
@@ -656,3 +662,138 @@ class ServicoPropostaComercial(db.Model):
     valor_total = db.Column(db.Float, nullable=False)
     observacoes = db.Column(db.Text)
     ordem = db.Column(db.Integer, default=1)
+    
+    def __repr__(self):
+        return f'<ServicoPropostaComercial {self.descricao_servico}>'
+
+
+# ================================
+# MÓDULO 3: GESTÃO DE EQUIPES
+# ================================
+
+class AlocacaoEquipe(db.Model):
+    """Alocação de funcionários em obras com geração automática de RDO"""
+    __tablename__ = 'alocacao_equipe'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    funcionario_id = db.Column(db.Integer, db.ForeignKey('funcionario.id'), nullable=False)
+    obra_id = db.Column(db.Integer, db.ForeignKey('obra.id'), nullable=False)
+    data_alocacao = db.Column(db.Date, nullable=False)
+    local_trabalho = db.Column(db.String(20), nullable=False)  # 'oficina', 'campo'
+    turno = db.Column(db.String(20), default='matutino')  # matutino, vespertino, noturno
+    status = db.Column(db.String(20), default='ativo')  # ativo, concluido, cancelado
+    rdo_gerado = db.Column(db.Boolean, default=False)
+    observacoes = db.Column(db.Text)
+    
+    # Multi-tenant
+    admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False)
+    
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    # Relacionamentos
+    funcionario = db.relationship('Funcionario', backref='alocacoes_equipe')
+    obra = db.relationship('Obra', backref='alocacoes_equipe')
+    admin = db.relationship('Usuario', backref='alocacoes_administradas')
+    
+    # Constraint para evitar duplicatas
+    __table_args__ = (
+        db.UniqueConstraint('funcionario_id', 'obra_id', 'data_alocacao', name='_func_obra_data_uc'),
+    )
+    
+    def __repr__(self):
+        return f'<AlocacaoEquipe {self.funcionario.nome} - {self.obra.nome} - {self.data_alocacao}>'
+
+
+# ================================
+# MÓDULO 4: ALMOXARIFADO COMPLETO
+# ================================
+
+class Material(db.Model):
+    """Materiais do almoxarifado com controle de estoque"""
+    __tablename__ = 'material'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    codigo_barras = db.Column(db.String(50), unique=True)
+    descricao = db.Column(db.String(200), nullable=False)
+    categoria = db.Column(db.String(50), nullable=False)  # ex: ferramentas, materiais_construcao
+    unidade_medida = db.Column(db.String(10), nullable=False)  # un, kg, m, m2, m3
+    estoque_atual = db.Column(db.Float, default=0.0)
+    estoque_minimo = db.Column(db.Float, default=0.0)
+    valor_medio = db.Column(db.Float, default=0.0)  # Custo médio ponderado
+    localizacao = db.Column(db.String(100))  # Localização no almoxarifado
+    ativo = db.Column(db.Boolean, default=True)
+    
+    # Multi-tenant
+    admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False)
+    
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    # Relacionamentos
+    movimentacoes = db.relationship('MovimentacaoMaterial', backref='material_ref', cascade='all, delete-orphan')
+    admin = db.relationship('Usuario', backref='materiais_administrados')
+    
+    def __repr__(self):
+        return f'<Material {self.descricao}>'
+
+class MovimentacaoMaterial(db.Model):
+    """Movimentações de entrada/saída do almoxarifado"""
+    __tablename__ = 'movimentacao_material'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    material_id = db.Column(db.Integer, db.ForeignKey('material.id'), nullable=False)
+    tipo_movimento = db.Column(db.String(20), nullable=False)  # entrada, saida, devolucao, ajuste
+    quantidade = db.Column(db.Float, nullable=False)
+    valor_unitario = db.Column(db.Float, default=0.0)
+    valor_total = db.Column(db.Float, default=0.0)
+    
+    # Integração com obras e RDO
+    obra_id = db.Column(db.Integer, db.ForeignKey('obra.id'))
+    rdo_id = db.Column(db.Integer, db.ForeignKey('rdo.id'))
+    funcionario_responsavel_id = db.Column(db.Integer, db.ForeignKey('funcionario.id'))
+    
+    # Dados da movimentação
+    data_movimento = db.Column(db.Date, nullable=False, default=datetime.utcnow)
+    documento = db.Column(db.String(50))  # Nota fiscal, requisição, etc.
+    observacoes = db.Column(db.Text)
+    
+    # Multi-tenant
+    admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False)
+    
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    
+    # Relacionamentos
+    obra = db.relationship('Obra', backref='movimentacoes_material')
+    rdo = db.relationship('RDO', backref='materiais_utilizados')
+    funcionario_responsavel = db.relationship('Funcionario', backref='movimentacoes_responsavel')
+    admin = db.relationship('Usuario', backref='movimentacoes_administradas')
+    
+    def __repr__(self):
+        return f'<MovimentacaoMaterial {self.material_ref.descricao} - {self.tipo_movimento} - {self.quantidade}>'
+
+class RDOMaterial(db.Model):
+    """Materiais utilizados em RDO específico"""
+    __tablename__ = 'rdo_material'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    rdo_id = db.Column(db.Integer, db.ForeignKey('rdo.id'), nullable=False)
+    material_id = db.Column(db.Integer, db.ForeignKey('material.id'), nullable=False)
+    quantidade_requisitada = db.Column(db.Float, nullable=False)
+    quantidade_utilizada = db.Column(db.Float, default=0.0)
+    quantidade_devolvida = db.Column(db.Float, default=0.0)
+    observacoes = db.Column(db.Text)
+    
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    
+    # Relacionamentos
+    rdo = db.relationship('RDO', backref='materiais_rdo')
+    material = db.relationship('Material', backref='rdos_utilizacao')
+    
+    # Constraint para evitar duplicatas
+    __table_args__ = (
+        db.UniqueConstraint('rdo_id', 'material_id', name='_rdo_material_uc'),
+    )
+    
+    def __repr__(self):
+        return f'<RDOMaterial RDO-{self.rdo_id} - {self.material.descricao}>'
