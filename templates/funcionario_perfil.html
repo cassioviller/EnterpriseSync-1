@@ -241,8 +241,8 @@
                     </div>
                     <div class="col-md-3">
                         <div class="text-center p-3 border rounded">
-                            <h4 class="text-success mb-1">{{ '{:.1f}%'.format(kpis.pontualidade if kpis.pontualidade is defined else 100) }}</h4>
-                            <small class="text-muted">Pontualidade</small>
+                            <h4 class="text-primary mb-1">R$ {{ '{:.2f}'.format(kpis.valor_hora_atual if kpis.valor_hora_atual is defined else 0) }}</h4>
+                            <small class="text-muted">Valor Hora Atual</small>
                         </div>
                     </div>
                     <div class="col-md-3">

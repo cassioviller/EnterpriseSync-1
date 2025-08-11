@@ -691,7 +691,8 @@ def calcular_kpis_funcionario_periodo(funcionario_id, data_inicio=None, data_fim
         'horas_trabalhadas': total_horas_trabalhadas,
         'horas_extras': total_horas_extras,
         'h_extras': total_horas_extras,  # Alias para compatibilidade com template
-        'valor_horas_extras': valor_horas_extras,  # NOVO: Valor monetário das horas extras
+        'valor_horas_extras': valor_horas_extras,  # Valor monetário das horas extras
+        'valor_hora_atual': valor_hora_base,  # NOVO: Valor hora atual do funcionário
         'faltas': faltas,
         'atrasos': atrasos,
         'dias_faltas_justificadas': dias_faltas_justificadas,

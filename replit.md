@@ -11,29 +11,24 @@ Preferred communication style: Simple, everyday language.
 ## Recent Changes
 
 **Latest Update - August 11, 2025:**
-- ✅ **CRITICAL ISSUE RESOLVED**: Fixed weekend point record creation problem
-  - **Root Cause**: User was trying to create records for non-existent employee ID 14
-  - **Database Error**: Foreign key constraint violation prevented record creation
-  - **Real Problem**: Employee ID 14 does not exist in the production database
-  - **Solution**: Identified actual available employees (IDs range from higher numbers)
+- ✅ **OVERTIME CALCULATION COMPLIANCE**: Fixed overtime calculations to comply with Brazilian labor legislation (CLT)
+  - **Methodology**: Uses actual working days per month instead of fixed 220h standard
+  - **Carlos Alberto Example**: 8.8h/day × 23 working days (July) = 202.4h base, R$ 2,106 salary = R$ 10.41/hour
+  - **Overtime Value**: 7.8h × R$ 10.41 × 1.5 = R$ 121.74 (with proper 1.5x multiplier)
+  - **Template Updates**: Enhanced employee profile displays to show both overtime hours and monetary values
+- ✅ **SYSTEM ARCHITECTURE FIXES**: Resolved critical import and circular dependency issues
+  - Fixed `ModuleNotFoundError` in `utils.py` by implementing inline working days calculation
+  - Corrected `calcular_valor_hora_corrigido` function to use `calendar.monthrange`
+  - Updated `calcular_kpis_funcionario_periodo` to include monetary values for overtime
+- ✅ **KPI DASHBOARD IMPROVEMENTS**: Enhanced employee profile KPI cards
+  - Added `valor_horas_extras` field showing monetary value of overtime
+  - Replaced duplicate "Horas Extras" card with "Valor Hora Atual" (R$ 10.41)
+  - Updated templates to display both hours (7.8h) and monetary values (R$ 121.74) in green
 - ✅ **WEEKEND FUNCTIONALITY VERIFIED**: System correctly supports weekend records
   - Fixed endpoint `/ponto/registro` to properly handle Saturday/Sunday entries
   - Added automatic detection and configuration for weekend work types
   - Implemented proper percentage calculation (50% Saturday, 100% Sunday)
   - Confirmed multi-tenancy filtering works correctly for all record types
-- ✅ **COMPREHENSIVE DEBUGGING**: Created diagnostic tools for production troubleshooting
-  - `testar_lancamento_manual.py` - Manual testing with real employee data
-  - `debug_frontend_backend.py` - Complete frontend/backend communication analysis
-  - `corrigir_funcionario_real.py` - Employee validation and correction tools
-- ✅ **BULK DELETION FEATURE**: Implemented complete bulk deletion functionality
-  - Added "Excluir por Período" (Delete by Period) button with modal interface
-  - Created preview functionality to show records before deletion
-  - Added optional filtering by employee and date range
-  - Implemented safety measures with confirmation checkbox
-- ✅ **PRODUCTION DEPLOYMENT**: All previous fixes maintained and validated
-  - Multi-tenancy filtering working correctly (405 total records, 171 visible for Admin 4)
-  - Weekend records display and creation functioning properly
-  - All endpoints responding correctly with proper authentication
 
 **Previous Update - August 8, 2025:**
 - ✅ Resolved critical `UndefinedColumn` errors for database schema consistency
