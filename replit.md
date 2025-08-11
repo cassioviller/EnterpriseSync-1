@@ -11,24 +11,31 @@ Preferred communication style: Simple, everyday language.
 ## Recent Changes
 
 **Latest Update - August 11, 2025:**
+- ✅ **DSR CALCULATION SYSTEM (Lei 605/49)**: Implemented complete absence penalty calculation system
+  - **Simplified Method**: 1 absence = 2 days penalty (absence + DSR) = R$ 140.40
+  - **Strict Method**: Week-by-week DSR analysis per Lei 605/49 legislation
+  - **Carlos Alberto Example**: 1 absence = R$ 70.20 (absence) + R$ 70.20 (DSR) = R$ 140.40
+  - **Multiple Absences**: 4 absences in 3 different weeks = R$ 280.80 (absences) + R$ 210.60 (3 DSRs) = R$ 491.40
+- ✅ **LEGISLATIVE COMPLIANCE**: Full compliance with Brazilian labor law
+  - **CLT Article 64**: Proportional salary deduction for absences
+  - **Lei 605/49 Article 6**: Weekly rest payment rules
+  - **TST Precedent 13**: Saturday as working day for DSR calculation
+  - **Week Definition**: Sunday to Saturday period analysis
+- ✅ **DASHBOARD IMPLEMENTATION**: Enhanced absence display with dual calculation methods
+  - **Default Display**: Simplified method for operational ease
+  - **Legal Display**: Strict method shown when different from simplified
+  - **Transparency**: Shows both "4 absences" count and "-R$ 491.40" penalty
+  - **Layout**: Eliminated financial duplication between "Hours Lost" and "Absence Value" cards
+- ✅ **TESTING FRAMEWORK**: Comprehensive validation system created
+  - **Unit Tests**: `teste_dsr_estrito.py` with multiple scenarios
+  - **Integration Tests**: `teste_integracao_dsr.py` with real system integration
+  - **Validation**: All calculations verified against CLT requirements
 - ✅ **OVERTIME CALCULATION COMPLIANCE**: Fixed overtime calculations to comply with Brazilian labor legislation (CLT)
   - **Methodology**: Uses actual working days per month instead of fixed 220h standard
   - **Carlos Alberto Example**: 8.8h/day × 23 working days (July) = 202.4h base, R$ 2,106 salary = R$ 10.41/hour
   - **Overtime Value**: 7.8h × R$ 10.41 × 1.5 = R$ 121.74 (with proper 1.5x multiplier)
-  - **Template Updates**: Enhanced employee profile displays to show both overtime hours and monetary values
 - ✅ **SYSTEM ARCHITECTURE FIXES**: Resolved critical import and circular dependency issues
-  - Fixed `ModuleNotFoundError` in `utils.py` by implementing inline working days calculation
-  - Corrected `calcular_valor_hora_corrigido` function to use `calendar.monthrange`
-  - Updated `calcular_kpis_funcionario_periodo` to include monetary values for overtime
-- ✅ **KPI DASHBOARD IMPROVEMENTS**: Enhanced employee profile KPI cards
-  - Added `valor_horas_extras` field showing monetary value of overtime
-  - Replaced duplicate "Horas Extras" card with "Valor Hora Atual" (R$ 10.41)
-  - Updated templates to display both hours (7.8h) and monetary values (R$ 121.74) in green
 - ✅ **WEEKEND FUNCTIONALITY VERIFIED**: System correctly supports weekend records
-  - Fixed endpoint `/ponto/registro` to properly handle Saturday/Sunday entries
-  - Added automatic detection and configuration for weekend work types
-  - Implemented proper percentage calculation (50% Saturday, 100% Sunday)
-  - Confirmed multi-tenancy filtering works correctly for all record types
 
 **Previous Update - August 8, 2025:**
 - ✅ Resolved critical `UndefinedColumn` errors for database schema consistency
