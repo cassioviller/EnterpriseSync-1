@@ -241,11 +241,8 @@
                     </div>
                     <div class="col-md-3">
                         <div class="text-center p-3 border rounded">
-                            <h4 class="text-warning mb-1">{{ '{:.1f}h'.format(kpis.h_extras if kpis.h_extras is defined else 0) }}</h4>
-                            {% if kpis.valor_horas_extras is defined and kpis.valor_horas_extras > 0 %}
-                            <div class="text-success fw-bold">R$ {{ '{:,.2f}'.format(kpis.valor_horas_extras) }}</div>
-                            {% endif %}
-                            <small class="text-muted">Horas Extras</small>
+                            <h4 class="text-success mb-1">{{ '{:.1f}%'.format(kpis.pontualidade if kpis.pontualidade is defined else 100) }}</h4>
+                            <small class="text-muted">Pontualidade</small>
                         </div>
                     </div>
                     <div class="col-md-3">
