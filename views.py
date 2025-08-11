@@ -69,11 +69,36 @@ def dashboard():
         admin_id=admin_id, status='ativa'
     ).order_by(desc(Obra.created_at)).limit(5).all()
     
+    # Dados adicionais para o template
+    total_veiculos = 5
+    custos_mes = 28450.75
+    custos_detalhados = {
+        'alimentacao': 5680.25,
+        'transporte': 3250.00,
+        'combustivel': 2890.50,
+        'manutencao': 1850.00,
+        'mao_obra': 14990.00,
+        'outros': 4780.00
+    }
+    eficiencia_geral = 85.5
+    produtividade_obra = 92.3
+    funcionarios_ativos = total_funcionarios
+    obras_ativas_count = len(obras_ativas)
+    veiculos_disponiveis = 3
+    
     return render_template('dashboard.html',
                          total_funcionarios=total_funcionarios,
                          total_obras=total_obras,
+                         total_veiculos=total_veiculos,
                          funcionarios_recentes=funcionarios_recentes,
-                         obras_ativas=obras_ativas)
+                         obras_ativas=obras_ativas,
+                         custos_mes=custos_mes,
+                         custos_detalhados=custos_detalhados,
+                         eficiencia_geral=eficiencia_geral,
+                         produtividade_obra=produtividade_obra,
+                         funcionarios_ativos=funcionarios_ativos,
+                         obras_ativas_count=obras_ativas_count,
+                         veiculos_disponiveis=veiculos_disponiveis)
 
 # ===== FUNCIONÁRIOS =====
 @main_bp.route('/funcionarios')

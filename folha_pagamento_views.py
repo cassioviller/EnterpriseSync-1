@@ -5,8 +5,8 @@ Versão limpa e funcional
 """
 
 from flask import Blueprint, render_template, request, jsonify, redirect, url_for, flash
-        from models import FolhaPagamento
-        from flask_login import login_required, current_user
+from models import FolhaPagamento
+from flask_login import login_required, current_user
 from datetime import datetime, date, timedelta
 import calendar
 
