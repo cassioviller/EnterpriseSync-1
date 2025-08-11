@@ -182,12 +182,15 @@ class CalculadoraKPI:
     
     def _calcular_custo_mensal(self, funcionario_id, data_inicio, data_fim):
         """
-        9. Custo Mão de Obra: LÓGICA CORRETA
+        9. Custo Mão de Obra: LÓGICA CORRIGIDA CONFORME LEGISLAÇÃO BRASILEIRA
         
         FÓRMULA CORRIGIDA:
-        Salário Base - (Valor_Dia × Faltas) + Valor_Horas_Extras
+        Salário Base + (Valor_Hora_Extra × Horas_Extras × Multiplicador)
         
-        Esta é a lógica correta para calcular o custo real mensal de um funcionário.
+        Multiplicadores conforme CLT:
+        - Horas extras normais: 1.5x (50% adicional)
+        - Sábado trabalhado: 1.5x (50% adicional) 
+        - Domingo/Feriado: 2.0x (100% adicional)
         """
         funcionario = Funcionario.query.get(funcionario_id)
         if not funcionario or not funcionario.salario:
@@ -195,29 +198,54 @@ class CalculadoraKPI:
         
         salario_base = float(funcionario.salario)
         
-        # 1. Calcular dias úteis do período
-        dias_uteis = self._calcular_dias_uteis_periodo(data_inicio, data_fim)
-        if dias_uteis == 0:
-            return salario_base  # Fallback para período sem dias úteis
+        # 1. Calcular valor/hora baseado no horário específico do funcionário
+        horario = funcionario.horario_trabalho
+        if horario and horario.horas_diarias:
+            # Usar horário específico: horas_diarias × 22 dias úteis
+            horas_mensais = horario.horas_diarias * 22
+        else:
+            # Fallback: jornada padrão 8h × 22 dias = 176h (não 220h!)
+            horas_mensais = 176
         
-        valor_por_dia = salario_base / dias_uteis
+        valor_hora_normal = salario_base / horas_mensais
         
-        # 2. Contar faltas e descontar do salário
-        faltas = db.session.query(func.count(RegistroPonto.id)).filter(
+        # 2. Buscar registros de ponto por tipo para calcular extras específicos
+        registros = RegistroPonto.query.filter(
             RegistroPonto.funcionario_id == funcionario_id,
             RegistroPonto.data >= data_inicio,
             RegistroPonto.data <= data_fim,
-            RegistroPonto.tipo_registro == 'falta'
-        ).scalar() or 0
+            RegistroPonto.horas_extras.isnot(None),
+            RegistroPonto.horas_extras > 0
+        ).all()
         
+        total_custo_extras = 0.0
+        
+        for registro in registros:
+            horas_extras = float(registro.horas_extras or 0)
+            
+            # Aplicar multiplicador conforme legislação brasileira
+            if registro.tipo_registro in ['trabalho_normal', 'sabado_trabalhado', 'sabado_horas_extras']:
+                # 50% adicional (Art. 59 CLT)
+                multiplicador = 1.5
+            elif registro.tipo_registro in ['domingo_trabalhado', 'domingo_horas_extras', 'feriado_trabalhado']:
+                # 100% adicional (Art. 7º CF)
+                multiplicador = 2.0
+            else:
+                # Padrão 50%
+                multiplicador = 1.5
+            
+            custo_extras_registro = horas_extras * valor_hora_normal * multiplicador
+            total_custo_extras += custo_extras_registro
+        
+        # 3. Calcular desconto por faltas
+        faltas = self._calcular_faltas(funcionario_id, data_inicio, data_fim)
+        
+        # Valor por dia baseado nas horas contratuais
+        valor_por_dia = (valor_hora_normal * horas_mensais) / 22  # 22 dias úteis
         desconto_faltas = valor_por_dia * faltas
-        salario_liquido = salario_base - desconto_faltas
         
-        # 3. Calcular valor das horas extras
-        valor_horas_extras = self._calcular_valor_horas_extras(funcionario_id, data_inicio, data_fim)
-        
-        # 4. Custo total = salário líquido + horas extras
-        custo_total = salario_liquido + valor_horas_extras
+        # 4. Custo total = salário base - descontos + extras
+        custo_total = salario_base - desconto_faltas + total_custo_extras
         
         return custo_total
     

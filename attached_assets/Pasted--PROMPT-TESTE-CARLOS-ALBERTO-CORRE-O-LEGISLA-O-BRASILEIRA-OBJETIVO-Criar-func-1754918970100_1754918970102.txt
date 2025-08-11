@@ -1,0 +1,434 @@
+# 🎯 PROMPT: TESTE CARLOS ALBERTO + CORREÇÃO LEGISLAÇÃO BRASILEIRA
+
+## 📋 **OBJETIVO**
+Criar funcionário fictício com dados do Carlos Alberto, corrigir lógica de cálculo de horas extras e implementar conformidade com a legislação trabalhista brasileira.
+
+---
+
+## 🇧🇷 **LEGISLAÇÃO BRASILEIRA - HORAS EXTRAS**
+
+### **📚 Base Legal (CLT):**
+- **Art. 59:** Adicional mínimo de 50% sobre hora normal
+- **Art. 7º CF:** Domingos e feriados com 100% adicional
+- **Base de cálculo:** Salário ÷ (jornada diária × dias úteis mensais)
+
+### **🧮 Fórmula Correta:**
+```
+Valor/Hora = Salário Mensal ÷ (Horas Diárias × Dias Úteis)
+Hora Extra = Valor/Hora × (1 + Percentual Adicional)
+
+Exemplos:
+- Jornada 8h/dia, 22 dias úteis = 176h mensais
+- Jornada 6h/dia, 22 dias úteis = 132h mensais
+- NÃO é 220h fixo!
+```
+
+---
+
+## 🔧 **ETAPA 1: CRIAR FUNCIONÁRIO CARLOS FICTÍCIO**
+
+```python
+# 1. Criar funcionário com dados reais do Carlos Alberto
+def criar_carlos_ficticio():
+    """Cria funcionário fictício com dados do Carlos Alberto de produção"""
+    from app import app, db
+    from models import Funcionario, HorarioTrabalho
+    from datetime import datetime
+    
+    with app.app_context():
+        print("👤 CRIANDO CARLOS ALBERTO FICTÍCIO...")
+        
+        # Verificar se já existe
+        carlos_existente = Funcionario.query.filter_by(
+            nome="Carlos Alberto Rigolin Junior"
+        ).first()
+        
+        if carlos_existente:
+            print("ℹ️  Carlos já existe, atualizando dados...")
+            carlos = carlos_existente
+        else:
+            # Criar novo funcionário
+            carlos = Funcionario(
+                nome="Carlos Alberto Rigolin Junior",
+                cpf="334.645.878-43",
+                data_nascimento=datetime(1986, 12, 10).date(),
+                telefone="(12) 98840-2355",
+                data_admissao=datetime(2021, 1, 12).date(),
+                salario=2106.00,  # Salário real da produção
+                departamento="Almoxarife",
+                funcao="Almoxarife",
+                ativo=True,
+                endereco="Travessa Waldemar Teixeira, 80, Jardim Torrão de Ouro, SAO JOSE DOS CAMPOS, SP, CEP: 12200-000"
+            )
+            db.session.add(carlos)
+        
+        # Definir horário de trabalho (Segunda a Sexta)
+        horario = HorarioTrabalho.query.filter_by(
+            funcionario_id=carlos.id if carlos_existente else None
+        ).first()
+        
+        if not horario:
+            horario = HorarioTrabalho(
+                funcionario_id=carlos.id if carlos_existente else None,
+                entrada_padrao="07:12",
+                saida_padrao="17:00",
+                almoco_inicio="12:00",
+                almoco_fim="13:00",
+                dias_semana="1,2,3,4,5",  # Segunda a sexta
+                horas_diarias=8.0,  # 8h por dia
+                dias_uteis_mes=22,  # 22 dias úteis padrão
+                ativo=True
+            )
+            
+            if not carlos_existente:
+                db.session.flush()  # Para obter o ID do Carlos
+                horario.funcionario_id = carlos.id
+            
+            db.session.add(horario)
+        
+        db.session.commit()
+        
+        print(f"✅ CARLOS CRIADO/ATUALIZADO:")
+        print(f"   - ID: {carlos.id}")
+        print(f"   - Nome: {carlos.nome}")
+        print(f"   - Salário: R$ {carlos.salario:,.2f}")
+        print(f"   - Horário: {horario.entrada_padrao} às {horario.saida_padrao}")
+        print(f"   - Horas/dia: {horario.horas_diarias}h")
+        print(f"   - Dias úteis: {horario.dias_uteis_mes}")
+        
+        return carlos, horario
+
+# EXECUTAR
+carlos, horario_carlos = criar_carlos_ficticio()
+```
+
+---
+
+## 🧮 **ETAPA 2: IMPLEMENTAR CÁLCULO CORRETO**
+
+```python
+# 2. Função de cálculo conforme legislação brasileira
+def calcular_valor_hora_legislacao(funcionario, horario_trabalho):
+    """Calcula valor/hora conforme legislação brasileira"""
+    
+    # Base de cálculo correta
+    salario_mensal = funcionario.salario
+    horas_diarias = horario_trabalho.horas_diarias
+    dias_uteis_mes = horario_trabalho.dias_uteis_mes
+    
+    # Cálculo das horas mensais
+    horas_mensais = horas_diarias * dias_uteis_mes
+    
+    # Valor da hora normal
+    valor_hora_normal = salario_mensal / horas_mensais
+    
+    print(f"📊 CÁLCULO VALOR/HORA - {funcionario.nome}:")
+    print(f"   - Salário mensal: R$ {salario_mensal:,.2f}")
+    print(f"   - Horas diárias: {horas_diarias}h")
+    print(f"   - Dias úteis/mês: {dias_uteis_mes}")
+    print(f"   - Horas mensais: {horas_mensais}h")
+    print(f"   - Valor/hora normal: R$ {valor_hora_normal:.2f}")
+    
+    # Valores de horas extras conforme legislação
+    valores_extras = {
+        'normal': valor_hora_normal,
+        'extra_50': valor_hora_normal * 1.5,  # 50% adicional
+        'extra_100': valor_hora_normal * 2.0,  # 100% adicional (domingo/feriado)
+        'noturno': valor_hora_normal * 1.2,   # 20% adicional noturno
+    }
+    
+    print(f"   - Hora extra 50%: R$ {valores_extras['extra_50']:.2f}")
+    print(f"   - Hora extra 100%: R$ {valores_extras['extra_100']:.2f}")
+    print(f"   - Hora noturna: R$ {valores_extras['noturno']:.2f}")
+    
+    return valores_extras
+
+# EXECUTAR CÁLCULO
+valores_carlos = calcular_valor_hora_legislacao(carlos, horario_carlos)
+```
+
+---
+
+## 🧪 **ETAPA 3: SIMULAR CENÁRIO REAL**
+
+```python
+# 3. Simular 7.8h extras como na imagem
+def simular_cenario_carlos():
+    """Simula cenário real do Carlos com 7.8h extras"""
+    
+    horas_extras = 7.8
+    
+    print(f"🧪 SIMULAÇÃO - 7.8H EXTRAS:")
+    print(f"   - Horas extras: {horas_extras}h")
+    
+    # Cenário 1: Todas extras com 50%
+    custo_50 = horas_extras * valores_carlos['extra_50']
+    custo_total_50 = carlos.salario + custo_50
+    
+    print(f"\n📊 CENÁRIO 1 - Todas 50% extras:")
+    print(f"   - Custo extras: R$ {custo_50:.2f}")
+    print(f"   - Custo total: R$ {custo_total_50:.2f}")
+    print(f"   - Diferença produção: R$ {custo_total_50 - 2125.38:.2f}")
+    
+    # Cenário 2: Mix de extras (50% e 100%)
+    horas_50 = 5.8  # Horas normais extras
+    horas_100 = 2.0  # Sábado/domingo
+    
+    custo_mix = (horas_50 * valores_carlos['extra_50']) + (horas_100 * valores_carlos['extra_100'])
+    custo_total_mix = carlos.salario + custo_mix
+    
+    print(f"\n📊 CENÁRIO 2 - Mix (5.8h@50% + 2h@100%):")
+    print(f"   - Custo extras: R$ {custo_mix:.2f}")
+    print(f"   - Custo total: R$ {custo_total_mix:.2f}")
+    print(f"   - Diferença produção: R$ {custo_total_mix - 2125.38:.2f}")
+    
+    # Cenário 3: Valor reverso (como está na produção)
+    valor_real_produção = 19.38  # R$ 2.125,38 - R$ 2.106,00
+    valor_hora_reverso = valor_real_produção / horas_extras
+    
+    print(f"\n📊 CENÁRIO 3 - Reverso (produção):")
+    print(f"   - Valor/hora extras: R$ {valor_hora_reverso:.2f}")
+    print(f"   - Valor/hora base: R$ {valor_hora_reverso / 1.5:.2f}")
+    print(f"   - Horas mensais implícitas: {carlos.salario / (valor_hora_reverso / 1.5):.0f}h")
+    
+    return {
+        'cenario_50': custo_total_50,
+        'cenario_mix': custo_total_mix,
+        'producao': 2125.38,
+        'diferenca_50': custo_total_50 - 2125.38,
+        'diferenca_mix': custo_total_mix - 2125.38
+    }
+
+# EXECUTAR SIMULAÇÃO
+resultados = simular_cenario_carlos()
+```
+
+---
+
+## 🔧 **ETAPA 4: CORRIGIR FUNÇÃO DE CÁLCULO NO SISTEMA**
+
+```python
+# 4. Atualizar função de cálculo no sistema
+def corrigir_calculo_horas_extras():
+    """Corrige função de cálculo de horas extras no sistema"""
+    
+    print("🔧 CORRIGINDO FUNÇÃO DE CÁLCULO...")
+    
+    # Código corrigido para implementar
+    codigo_corrigido = '''
+def calcular_custo_funcionario(funcionario, horas_trabalhadas, horas_extras, tipo_extras="normal"):
+    """
+    Calcula custo do funcionário conforme legislação brasileira
+    
+    Args:
+        funcionario: Objeto Funcionario
+        horas_trabalhadas: Horas normais trabalhadas
+        horas_extras: Horas extras trabalhadas
+        tipo_extras: "normal" (50%), "domingo" (100%), "noturno" (20%)
+    """
+    
+    # Buscar horário de trabalho
+    horario = HorarioTrabalho.query.filter_by(
+        funcionario_id=funcionario.id,
+        ativo=True
+    ).first()
+    
+    if not horario:
+        # Usar padrão se não encontrar
+        horas_mensais = 176  # 8h × 22 dias
+    else:
+        horas_mensais = horario.horas_diarias * horario.dias_uteis_mes
+    
+    # Valor da hora normal
+    valor_hora_normal = funcionario.salario / horas_mensais
+    
+    # Multiplicadores por tipo
+    multiplicadores = {
+        "normal": 1.5,    # 50% adicional
+        "sabado": 1.5,    # 50% adicional
+        "domingo": 2.0,   # 100% adicional
+        "feriado": 2.0,   # 100% adicional
+        "noturno": 1.2    # 20% adicional
+    }
+    
+    multiplicador = multiplicadores.get(tipo_extras, 1.5)
+    valor_hora_extra = valor_hora_normal * multiplicador
+    
+    # Cálculos
+    custo_horas_normais = horas_trabalhadas * valor_hora_normal
+    custo_horas_extras = horas_extras * valor_hora_extra
+    custo_total = custo_horas_normais + custo_horas_extras
+    
+    return {
+        "valor_hora_normal": valor_hora_normal,
+        "valor_hora_extra": valor_hora_extra,
+        "custo_horas_normais": custo_horas_normais,
+        "custo_horas_extras": custo_horas_extras,
+        "custo_total": custo_total,
+        "horas_mensais_base": horas_mensais
+    }
+'''
+    
+    print("✅ CÓDIGO CORRIGIDO GERADO")
+    print("📋 IMPLEMENTAR EM:")
+    print("   - models/funcionario.py")
+    print("   - routes/ponto.py")
+    print("   - utils/calculadora.py")
+    
+    return codigo_corrigido
+
+# EXECUTAR CORREÇÃO
+codigo_novo = corrigir_calculo_horas_extras()
+```
+
+---
+
+## 🧪 **ETAPA 5: TESTAR COM DADOS REAIS**
+
+```python
+# 5. Testar cálculo corrigido
+def testar_calculo_corrigido():
+    """Testa cálculo corrigido com dados do Carlos"""
+    
+    print("🧪 TESTANDO CÁLCULO CORRIGIDO...")
+    
+    # Simular função corrigida
+    def calcular_custo_funcionario_corrigido(funcionario, horas_extras, tipo="normal"):
+        # Horário padrão: 8h/dia × 22 dias = 176h
+        horas_mensais = 176
+        valor_hora_normal = funcionario.salario / horas_mensais
+        
+        multiplicadores = {"normal": 1.5, "domingo": 2.0}
+        valor_hora_extra = valor_hora_normal * multiplicadores.get(tipo, 1.5)
+        
+        custo_extras = horas_extras * valor_hora_extra
+        custo_total = funcionario.salario + custo_extras
+        
+        return {
+            "valor_hora_normal": valor_hora_normal,
+            "valor_hora_extra": valor_hora_extra,
+            "custo_extras": custo_extras,
+            "custo_total": custo_total
+        }
+    
+    # Testar com 7.8h extras
+    resultado = calcular_custo_funcionario_corrigido(carlos, 7.8, "normal")
+    
+    print(f"📊 RESULTADO CÁLCULO CORRIGIDO:")
+    print(f"   - Valor/hora normal: R$ {resultado['valor_hora_normal']:.2f}")
+    print(f"   - Valor/hora extra: R$ {resultado['valor_hora_extra']:.2f}")
+    print(f"   - Custo extras: R$ {resultado['custo_extras']:.2f}")
+    print(f"   - Custo total: R$ {resultado['custo_total']:.2f}")
+    print(f"   - Diferença produção: R$ {resultado['custo_total'] - 2125.38:.2f}")
+    
+    # Comparar com produção
+    if abs(resultado['custo_total'] - 2125.38) < 10:
+        print("✅ CÁLCULO CORRETO - Próximo da produção!")
+    else:
+        print("❌ AINDA HÁ DIFERENÇA - Investigar mais")
+    
+    return resultado
+
+# EXECUTAR TESTE
+teste_final = testar_calculo_corrigido()
+```
+
+---
+
+## 📊 **ETAPA 6: RELATÓRIO FINAL**
+
+```python
+# 6. Gerar relatório completo
+def gerar_relatorio_final():
+    """Gera relatório final da análise"""
+    
+    relatorio = f"""
+# 📊 RELATÓRIO - ANÁLISE CARLOS ALBERTO
+
+## 👤 FUNCIONÁRIO CRIADO
+- **Nome:** {carlos.nome}
+- **Salário:** R$ {carlos.salario:,.2f}
+- **Horário:** {horario_carlos.entrada_padrao} às {horario_carlos.saida_padrao}
+- **Horas/dia:** {horario_carlos.horas_diarias}h
+- **Dias úteis:** {horario_carlos.dias_uteis_mes}
+
+## 🧮 CÁLCULOS LEGISLAÇÃO BRASILEIRA
+- **Horas mensais:** {horario_carlos.horas_diarias * horario_carlos.dias_uteis_mes}h
+- **Valor/hora normal:** R$ {valores_carlos['normal']:.2f}
+- **Valor/hora extra 50%:** R$ {valores_carlos['extra_50']:.2f}
+- **Valor/hora extra 100%:** R$ {valores_carlos['extra_100']:.2f}
+
+## 🎯 SIMULAÇÃO 7.8H EXTRAS
+- **Cenário 50%:** R$ {resultados['cenario_50']:.2f} (diferença: R$ {resultados['diferenca_50']:.2f})
+- **Cenário mix:** R$ {resultados['cenario_mix']:.2f} (diferença: R$ {resultados['diferenca_mix']:.2f})
+- **Produção real:** R$ {resultados['producao']:.2f}
+
+## ✅ CONCLUSÕES
+1. **Legislação implementada** corretamente
+2. **Funcionário fictício** criado com dados reais
+3. **Cálculos corrigidos** conforme CLT
+4. **Diferenças identificadas** entre sistema e produção
+
+## 🔧 PRÓXIMOS PASSOS
+1. Implementar código corrigido no sistema
+2. Atualizar função de cálculo de custos
+3. Testar com outros funcionários
+4. Validar em produção
+"""
+    
+    print(relatorio)
+    
+    # Salvar em arquivo
+    with open('relatorio_carlos_horas_extras.md', 'w', encoding='utf-8') as f:
+        f.write(relatorio)
+    
+    print("✅ RELATÓRIO SALVO: relatorio_carlos_horas_extras.md")
+    
+    return relatorio
+
+# EXECUTAR RELATÓRIO
+relatorio_completo = gerar_relatorio_final()
+```
+
+---
+
+## 🎯 **INSTRUÇÕES DE EXECUÇÃO**
+
+**Execute na ordem:**
+
+```python
+# 1. Criar funcionário
+carlos, horario_carlos = criar_carlos_ficticio()
+
+# 2. Calcular valores conforme legislação
+valores_carlos = calcular_valor_hora_legislacao(carlos, horario_carlos)
+
+# 3. Simular cenários
+resultados = simular_cenario_carlos()
+
+# 4. Corrigir código
+codigo_novo = corrigir_calculo_horas_extras()
+
+# 5. Testar correção
+teste_final = testar_calculo_corrigido()
+
+# 6. Gerar relatório
+relatorio_completo = gerar_relatorio_final()
+```
+
+---
+
+## 📋 **CHECKLIST**
+
+```
+□ Funcionário Carlos criado
+□ Horário de trabalho definido
+□ Cálculo conforme legislação
+□ Simulação de cenários
+□ Código corrigido
+□ Testes realizados
+□ Relatório gerado
+```
+
+**RESULTADO ESPERADO:** Funcionário fictício criado, lógica corrigida conforme legislação brasileira e análise completa do cálculo de horas extras.
+

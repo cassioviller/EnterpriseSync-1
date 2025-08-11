@@ -5036,8 +5036,22 @@ def gerar_relatorio(tipo):
         total_valor = 0
         
         for r in registros:
-            valor_hora = (r.funcionario.salario / 220) * 1.5 if r.funcionario.salario else 0
-            valor_extras = r.horas_extras * valor_hora
+            # Usar cálculo corrigido conforme legislação brasileira
+            horario = r.funcionario.horario_trabalho
+            if horario and horario.horas_diarias:
+                horas_mensais = horario.horas_diarias * 22  # 22 dias úteis
+            else:
+                horas_mensais = 176  # 8h × 22 dias (não 220h!)
+            
+            valor_hora_normal = r.funcionario.salario / horas_mensais if r.funcionario.salario else 0
+            
+            # Multiplicador conforme tipo de registro
+            if r.tipo_registro in ['domingo_trabalhado', 'domingo_horas_extras', 'feriado_trabalhado']:
+                multiplicador = 2.0  # 100% adicional
+            else:
+                multiplicador = 1.5  # 50% adicional padrão
+            
+            valor_extras = r.horas_extras * valor_hora_normal * multiplicador
             total_horas += r.horas_extras
             total_valor += valor_extras
             
