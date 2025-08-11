@@ -1,0 +1,220 @@
+{% extends "base.html" %}
+
+{% block title %}Auditoria Contábil{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- Page Heading -->
+    <div class="d-sm-flex align-items-center justify-content-between mb-4">
+        <h1 class="h3 mb-0 text-gray-800">
+            <i class="fas fa-search"></i> Auditoria Contábil
+        </h1>
+        <div class="btn-group">
+            <a href="{{ url_for('contabilidade.dashboard_contabil') }}" class="btn btn-sm btn-secondary">
+                <i class="fas fa-arrow-left"></i> Voltar
+            </a>
+            <a href="{{ url_for('contabilidade.auditoria_contabil', executar=1) }}" class="btn btn-sm btn-primary">
+                <i class="fas fa-play"></i> Executar Auditoria
+            </a>
+        </div>
+    </div>
+
+    <!-- Status da Auditoria -->
+    <div class="row mb-4">
+        <div class="col-xl-3 col-md-6 mb-4">
+            <div class="card border-left-{% if alertas|selectattr('resultado', 'equalto', 'NAO_CONFORME')|list|length == 0 %}success{% else %}danger{% endif %} shadow h-100 py-2">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-{% if alertas|selectattr('resultado', 'equalto', 'NAO_CONFORME')|list|length == 0 %}success{% else %}danger{% endif %} text-uppercase mb-1">
+                                Não Conformidades
+                            </div>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800">
+                                {{ alertas|selectattr('resultado', 'equalto', 'NAO_CONFORME')|list|length }}
+                            </div>
+                        </div>
+                        <div class="col-auto">
+                            <i class="fas fa-exclamation-triangle fa-2x text-gray-300"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-xl-3 col-md-6 mb-4">
+            <div class="card border-left-warning shadow h-100 py-2">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-warning text-uppercase mb-1">
+                                Alertas
+                            </div>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800">
+                                {{ alertas|selectattr('resultado', 'equalto', 'ALERTA')|list|length }}
+                            </div>
+                        </div>
+                        <div class="col-auto">
+                            <i class="fas fa-exclamation fa-2x text-gray-300"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-xl-3 col-md-6 mb-4">
+            <div class="card border-left-success shadow h-100 py-2">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-success text-uppercase mb-1">
+                                Conformes
+                            </div>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800">
+                                {{ alertas|selectattr('resultado', 'equalto', 'CONFORME')|list|length }}
+                            </div>
+                        </div>
+                        <div class="col-auto">
+                            <i class="fas fa-check fa-2x text-gray-300"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-xl-3 col-md-6 mb-4">
+            <div class="card border-left-info shadow h-100 py-2">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-info text-uppercase mb-1">
+                                Total de Verificações
+                            </div>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800">
+                                {{ alertas|length }}
+                            </div>
+                        </div>
+                        <div class="col-auto">
+                            <i class="fas fa-list fa-2x text-gray-300"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Lista de Alertas -->
+    <div class="card shadow mb-4">
+        <div class="card-header py-3">
+            <h6 class="m-0 font-weight-bold text-primary">Alertas de Auditoria</h6>
+        </div>
+        <div class="card-body">
+            {% if alertas %}
+            <div class="table-responsive">
+                <table class="table table-bordered" id="dataTable" width="100%" cellspacing="0">
+                    <thead>
+                        <tr>
+                            <th>Data</th>
+                            <th>Tipo de Verificação</th>
+                            <th>Resultado</th>
+                            <th>Observações</th>
+                            <th>Divergência</th>
+                            <th>Status</th>
+                            <th>Ações</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for alerta in alertas %}
+                        <tr>
+                            <td>{{ alerta.data_auditoria.strftime('%d/%m/%Y %H:%M') }}</td>
+                            <td>{{ alerta.tipo_verificacao }}</td>
+                            <td>
+                                <span class="badge badge-{% if alerta.resultado == 'CONFORME' %}success{% elif alerta.resultado == 'NAO_CONFORME' %}danger{% else %}warning{% endif %}">
+                                    {{ alerta.resultado }}
+                                </span>
+                            </td>
+                            <td>{{ alerta.observacoes[:100] }}{% if alerta.observacoes and alerta.observacoes|length > 100 %}...{% endif %}</td>
+                            <td class="text-right">
+                                {% if alerta.valor_divergencia %}
+                                    R$ {{ "%.2f"|format(alerta.valor_divergencia|float) }}
+                                {% else %}
+                                    -
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if alerta.corrigido %}
+                                    <span class="badge badge-success">Corrigido</span>
+                                {% else %}
+                                    <span class="badge badge-danger">Pendente</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if not alerta.corrigido %}
+                                <button class="btn btn-sm btn-warning" onclick="marcarCorrigido({{ alerta.id }})">
+                                    <i class="fas fa-check"></i> Marcar como Corrigido
+                                </button>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <div class="alert alert-success text-center">
+                <i class="fas fa-check-circle fa-3x mb-3"></i>
+                <h5>Sistema em Conformidade</h5>
+                <p>Nenhum alerta de auditoria pendente. Todos os lançamentos estão conformes.</p>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Tipos de Verificações -->
+    <div class="card shadow mb-4">
+        <div class="card-header py-3">
+            <h6 class="m-0 font-weight-bold text-primary">Tipos de Verificações Automáticas</h6>
+        </div>
+        <div class="card-body">
+            <div class="row">
+                <div class="col-md-6">
+                    <h6>Verificações de Integridade:</h6>
+                    <ul class="list-unstyled">
+                        <li><i class="fas fa-check text-success"></i> Lançamentos balanceados (Débito = Crédito)</li>
+                        <li><i class="fas fa-check text-success"></i> Contas contábeis válidas</li>
+                        <li><i class="fas fa-check text-success"></i> Valores positivos</li>
+                        <li><i class="fas fa-check text-success"></i> Datas válidas</li>
+                    </ul>
+                </div>
+                <div class="col-md-6">
+                    <h6>Verificações de Consistência:</h6>
+                    <ul class="list-unstyled">
+                        <li><i class="fas fa-check text-success"></i> Centros de custo válidos</li>
+                        <li><i class="fas fa-check text-success"></i> Sequência de numeração</li>
+                        <li><i class="fas fa-check text-success"></i> Históricos obrigatórios</li>
+                        <li><i class="fas fa-check text-success"></i> Origem dos lançamentos</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function marcarCorrigido(alertaId) {
+    if (confirm('Confirma que este item foi corrigido?')) {
+        // Implementar AJAX para marcar como corrigido
+        alert('Funcionalidade em desenvolvimento');
+    }
+}
+
+$(document).ready(function() {
+    $('#dataTable').DataTable({
+        "language": {
+            "url": "//cdn.datatables.net/plug-ins/1.10.24/i18n/Portuguese-Brasil.json"
+        },
+        "order": [[ 0, "desc" ]],
+        "pageLength": 25
+    });
+});
+</script>
+{% endblock %}

@@ -1,0 +1,240 @@
+{% extends "base.html" %}
+
+{% block title %}Relatórios Contábeis{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- Page Heading -->
+    <div class="d-sm-flex align-items-center justify-content-between mb-4">
+        <h1 class="h3 mb-0 text-gray-800">
+            <i class="fas fa-chart-bar"></i> Central de Relatórios Contábeis
+        </h1>
+        <a href="{{ url_for('contabilidade.dashboard_contabil') }}" class="btn btn-sm btn-secondary">
+            <i class="fas fa-arrow-left"></i> Voltar ao Dashboard
+        </a>
+    </div>
+
+    <!-- Relatórios Principais -->
+    <div class="row">
+        <!-- Balancete -->
+        <div class="col-lg-4 mb-4">
+            <div class="card shadow h-100">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-primary text-uppercase mb-1">
+                                Balancete de Verificação
+                            </div>
+                            <div class="mb-0 text-gray-800">
+                                Saldos das contas contábeis por período
+                            </div>
+                            <div class="mt-3">
+                                <a href="{{ url_for('contabilidade.balancete') }}" class="btn btn-primary btn-sm">
+                                    <i class="fas fa-table"></i> Visualizar
+                                </a>
+                            </div>
+                        </div>
+                        <div class="col-auto">
+                            <i class="fas fa-table fa-2x text-gray-300"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- DRE -->
+        <div class="col-lg-4 mb-4">
+            <div class="card shadow h-100">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-success text-uppercase mb-1">
+                                DRE - Demonstração do Resultado
+                            </div>
+                            <div class="mb-0 text-gray-800">
+                                Receitas, custos, despesas e resultado
+                            </div>
+                            <div class="mt-3">
+                                <a href="{{ url_for('contabilidade.dre') }}" class="btn btn-success btn-sm">
+                                    <i class="fas fa-chart-line"></i> Visualizar
+                                </a>
+                            </div>
+                        </div>
+                        <div class="col-auto">
+                            <i class="fas fa-chart-line fa-2x text-gray-300"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Balanço Patrimonial -->
+        <div class="col-lg-4 mb-4">
+            <div class="card shadow h-100">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-info text-uppercase mb-1">
+                                Balanço Patrimonial
+                            </div>
+                            <div class="mb-0 text-gray-800">
+                                Ativo, Passivo e Patrimônio Líquido
+                            </div>
+                            <div class="mt-3">
+                                <a href="{{ url_for('contabilidade.balanco_patrimonial') }}" class="btn btn-info btn-sm">
+                                    <i class="fas fa-balance-scale"></i> Visualizar
+                                </a>
+                            </div>
+                        </div>
+                        <div class="col-auto">
+                            <i class="fas fa-balance-scale fa-2x text-gray-300"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Relatórios Auxiliares -->
+    <div class="row">
+        <!-- Lançamentos -->
+        <div class="col-lg-4 mb-4">
+            <div class="card shadow h-100">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-warning text-uppercase mb-1">
+                                Livro Diário
+                            </div>
+                            <div class="mb-0 text-gray-800">
+                                Histórico de lançamentos contábeis
+                            </div>
+                            <div class="mt-3">
+                                <a href="{{ url_for('contabilidade.lancamentos_contabeis') }}" class="btn btn-warning btn-sm">
+                                    <i class="fas fa-edit"></i> Visualizar
+                                </a>
+                            </div>
+                        </div>
+                        <div class="col-auto">
+                            <i class="fas fa-edit fa-2x text-gray-300"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Plano de Contas -->
+        <div class="col-lg-4 mb-4">
+            <div class="card shadow h-100">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-secondary text-uppercase mb-1">
+                                Plano de Contas
+                            </div>
+                            <div class="mb-0 text-gray-800">
+                                Estrutura contábil da empresa
+                            </div>
+                            <div class="mt-3">
+                                <a href="{{ url_for('contabilidade.plano_de_contas') }}" class="btn btn-secondary btn-sm">
+                                    <i class="fas fa-sitemap"></i> Visualizar
+                                </a>
+                            </div>
+                        </div>
+                        <div class="col-auto">
+                            <i class="fas fa-sitemap fa-2x text-gray-300"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Auditoria -->
+        <div class="col-lg-4 mb-4">
+            <div class="card shadow h-100">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-danger text-uppercase mb-1">
+                                Auditoria Contábil
+                            </div>
+                            <div class="mb-0 text-gray-800">
+                                Verificações e alertas automáticos
+                            </div>
+                            <div class="mt-3">
+                                <a href="{{ url_for('contabilidade.auditoria_contabil') }}" class="btn btn-danger btn-sm">
+                                    <i class="fas fa-search"></i> Visualizar
+                                </a>
+                            </div>
+                        </div>
+                        <div class="col-auto">
+                            <i class="fas fa-search fa-2x text-gray-300"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Relatórios Fiscais -->
+    <div class="card shadow mb-4">
+        <div class="card-header py-3">
+            <h6 class="m-0 font-weight-bold text-primary">Relatórios Fiscais</h6>
+        </div>
+        <div class="card-body">
+            <div class="row">
+                <div class="col-md-6">
+                    <div class="card border-left-warning">
+                        <div class="card-body">
+                            <h6 class="text-warning">SPED Contábil</h6>
+                            <p class="mb-3">Arquivo para transmissão à Receita Federal</p>
+                            <a href="{{ url_for('contabilidade.sped') }}" class="btn btn-warning btn-sm">
+                                <i class="fas fa-file-export"></i> Gerar SPED
+                            </a>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="col-md-6">
+                    <div class="card border-left-info">
+                        <div class="card-body">
+                            <h6 class="text-info">Livro Razão</h6>
+                            <p class="mb-3">Em desenvolvimento</p>
+                            <button class="btn btn-secondary btn-sm" disabled>
+                                <i class="fas fa-book"></i> Em Breve
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Instruções -->
+    <div class="card shadow mb-4">
+        <div class="card-header py-3">
+            <h6 class="m-0 font-weight-bold text-primary">Como Usar os Relatórios</h6>
+        </div>
+        <div class="card-body">
+            <div class="row">
+                <div class="col-md-6">
+                    <h6>Relatórios Gerenciais:</h6>
+                    <ul>
+                        <li><strong>Balancete:</strong> Verificação mensal dos saldos</li>
+                        <li><strong>DRE:</strong> Resultado financeiro do período</li>
+                        <li><strong>Balanço:</strong> Posição patrimonial em uma data</li>
+                    </ul>
+                </div>
+                <div class="col-md-6">
+                    <h6>Relatórios Fiscais:</h6>
+                    <ul>
+                        <li><strong>SPED:</strong> Obrigatório para empresas do Lucro Real</li>
+                        <li><strong>Livro Diário:</strong> Registro cronológico dos fatos</li>
+                        <li><strong>Auditoria:</strong> Verificações de conformidade</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

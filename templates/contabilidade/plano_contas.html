@@ -1,0 +1,155 @@
+{% extends "base.html" %}
+
+{% block title %}Plano de Contas{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- Page Heading -->
+    <div class="d-sm-flex align-items-center justify-content-between mb-4">
+        <h1 class="h3 mb-0 text-gray-800">
+            <i class="fas fa-sitemap"></i> Plano de Contas
+        </h1>
+        <a href="{{ url_for('contabilidade.dashboard_contabil') }}" class="btn btn-sm btn-secondary">
+            <i class="fas fa-arrow-left"></i> Voltar ao Dashboard
+        </a>
+    </div>
+
+    <!-- DataTales Example -->
+    <div class="card shadow mb-4">
+        <div class="card-header py-3">
+            <h6 class="m-0 font-weight-bold text-primary">
+                Estrutura Hierárquica das Contas
+            </h6>
+        </div>
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-bordered table-sm" id="dataTable" width="100%" cellspacing="0">
+                    <thead class="thead-light">
+                        <tr>
+                            <th>Código</th>
+                            <th>Nome da Conta</th>
+                            <th>Tipo</th>
+                            <th>Natureza</th>
+                            <th>Aceita Lançamento</th>
+                            <th>Status</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for conta in contas %}
+                        <tr>
+                            <td>
+                                <span style="margin-left: {{ (conta.nivel - 1) * 20 }}px;">
+                                    {{ conta.codigo }}
+                                </span>
+                            </td>
+                            <td>
+                                <span style="margin-left: {{ (conta.nivel - 1) * 20 }}px;">
+                                    {% if conta.nivel == 1 %}
+                                        <strong>{{ conta.nome }}</strong>
+                                    {% elif conta.nivel == 2 %}
+                                        <strong>{{ conta.nome }}</strong>
+                                    {% else %}
+                                        {{ conta.nome }}
+                                    {% endif %}
+                                </span>
+                            </td>
+                            <td>
+                                <span class="badge badge-{% if conta.tipo_conta == 'ATIVO' %}primary{% elif conta.tipo_conta == 'PASSIVO' %}warning{% elif conta.tipo_conta == 'PATRIMONIO' %}success{% elif conta.tipo_conta == 'RECEITA' %}info{% else %}danger{% endif %}">
+                                    {{ conta.tipo_conta }}
+                                </span>
+                            </td>
+                            <td>
+                                <span class="badge badge-{% if conta.natureza == 'DEVEDORA' %}secondary{% else %}dark{% endif %}">
+                                    {{ conta.natureza }}
+                                </span>
+                            </td>
+                            <td class="text-center">
+                                {% if conta.aceita_lancamento %}
+                                    <i class="fas fa-check text-success"></i>
+                                {% else %}
+                                    <i class="fas fa-times text-muted"></i>
+                                {% endif %}
+                            </td>
+                            <td class="text-center">
+                                {% if conta.ativo %}
+                                    <span class="badge badge-success">Ativa</span>
+                                {% else %}
+                                    <span class="badge badge-secondary">Inativa</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Resumo por Tipo -->
+    <div class="row">
+        <div class="col-md-12">
+            <div class="card shadow mb-4">
+                <div class="card-header py-3">
+                    <h6 class="m-0 font-weight-bold text-primary">Resumo por Tipo de Conta</h6>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-2">
+                            <div class="text-center">
+                                <h4 class="text-primary">{{ contas|selectattr('tipo_conta', 'equalto', 'ATIVO')|list|length }}</h4>
+                                <small>Contas de Ativo</small>
+                            </div>
+                        </div>
+                        <div class="col-md-2">
+                            <div class="text-center">
+                                <h4 class="text-warning">{{ contas|selectattr('tipo_conta', 'equalto', 'PASSIVO')|list|length }}</h4>
+                                <small>Contas de Passivo</small>
+                            </div>
+                        </div>
+                        <div class="col-md-2">
+                            <div class="text-center">
+                                <h4 class="text-success">{{ contas|selectattr('tipo_conta', 'equalto', 'PATRIMONIO')|list|length }}</h4>
+                                <small>Patrimônio Líquido</small>
+                            </div>
+                        </div>
+                        <div class="col-md-2">
+                            <div class="text-center">
+                                <h4 class="text-info">{{ contas|selectattr('tipo_conta', 'equalto', 'RECEITA')|list|length }}</h4>
+                                <small>Contas de Receita</small>
+                            </div>
+                        </div>
+                        <div class="col-md-2">
+                            <div class="text-center">
+                                <h4 class="text-danger">{{ contas|selectattr('tipo_conta', 'equalto', 'DESPESA')|list|length }}</h4>
+                                <small>Contas de Despesa</small>
+                            </div>
+                        </div>
+                        <div class="col-md-2">
+                            <div class="text-center">
+                                <h4 class="text-secondary">{{ contas|selectattr('aceita_lancamento', 'equalto', true)|list|length }}</h4>
+                                <small>Contas Analíticas</small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+</div>
+
+<script>
+$(document).ready(function() {
+    $('#dataTable').DataTable({
+        "language": {
+            "url": "//cdn.datatables.net/plug-ins/1.10.24/i18n/Portuguese-Brasil.json"
+        },
+        "pageLength": 50,
+        "order": [[ 0, "asc" ]],
+        "columnDefs": [
+            { "orderable": false, "targets": [4, 5] }
+        ]
+    });
+});
+</script>
+{% endblock %}

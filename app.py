@@ -78,6 +78,14 @@ with app.app_context():
     except Exception as e:
         logging.error(f"❌ Erro ao registrar blueprint folha de pagamento: {e}")
     
+    # Registrar blueprint de contabilidade após inicialização
+    try:
+        from contabilidade_views import contabilidade_bp
+        app.register_blueprint(contabilidade_bp, url_prefix='/contabilidade')
+        logging.info("✅ Blueprint contabilidade registrado")
+    except Exception as e:
+        logging.error(f"❌ Erro ao registrar blueprint contabilidade: {e}")
+    
     # Executar migração da coluna foto_base64 automaticamente
     try:
         from sqlalchemy import text

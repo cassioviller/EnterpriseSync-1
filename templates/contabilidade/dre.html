@@ -1,0 +1,195 @@
+{% extends "base.html" %}
+
+{% block title %}DRE - Demonstração do Resultado do Exercício{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- Page Heading -->
+    <div class="d-sm-flex align-items-center justify-content-between mb-4">
+        <h1 class="h3 mb-0 text-gray-800">
+            <i class="fas fa-chart-line"></i> DRE - Demonstração do Resultado
+        </h1>
+        <div class="btn-group">
+            <a href="{{ url_for('contabilidade.dashboard_contabil') }}" class="btn btn-sm btn-secondary">
+                <i class="fas fa-arrow-left"></i> Voltar
+            </a>
+            <button class="btn btn-sm btn-primary" onclick="window.print()">
+                <i class="fas fa-print"></i> Imprimir
+            </button>
+        </div>
+    </div>
+
+    <!-- Filtros -->
+    <div class="card shadow mb-4">
+        <div class="card-header py-3">
+            <h6 class="m-0 font-weight-bold text-primary">Período de Referência</h6>
+        </div>
+        <div class="card-body">
+            <form method="GET" class="row">
+                <div class="col-md-3">
+                    <label>Mês:</label>
+                    <select name="mes" class="form-control">
+                        {% for i in range(1, 13) %}
+                        <option value="{{ i }}" {% if i == mes_referencia.month %}selected{% endif %}>
+                            {% if i == 1 %}Janeiro{% elif i == 2 %}Fevereiro{% elif i == 3 %}Março{% elif i == 4 %}Abril{% elif i == 5 %}Maio{% elif i == 6 %}Junho{% elif i == 7 %}Julho{% elif i == 8 %}Agosto{% elif i == 9 %}Setembro{% elif i == 10 %}Outubro{% elif i == 11 %}Novembro{% else %}Dezembro{% endif %}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <label>Ano:</label>
+                    <select name="ano" class="form-control">
+                        {% for ano in range(2020, 2030) %}
+                        <option value="{{ ano }}" {% if ano == mes_referencia.year %}selected{% endif %}>{{ ano }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <label>&nbsp;</label><br>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-search"></i> Consultar
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- DRE -->
+    <div class="card shadow mb-4">
+        <div class="card-header py-3">
+            <h6 class="m-0 font-weight-bold text-primary">
+                DRE - {{ mes_referencia.strftime('%m/%Y') }}
+            </h6>
+        </div>
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-borderless">
+                    <tbody>
+                        <tr class="border-bottom">
+                            <td><strong>RECEITA BRUTA</strong></td>
+                            <td class="text-right"><strong>R$ {{ "%.2f"|format(dre.receita_bruta|float) }}</strong></td>
+                        </tr>
+                        <tr>
+                            <td style="padding-left: 20px;">(-) Impostos sobre Vendas</td>
+                            <td class="text-right text-danger">R$ ({{ "%.2f"|format(dre.impostos_sobre_vendas|float) }})</td>
+                        </tr>
+                        <tr class="table-light border-bottom">
+                            <td><strong>RECEITA LÍQUIDA</strong></td>
+                            <td class="text-right"><strong>R$ {{ "%.2f"|format(dre.receita_liquida|float) }}</strong></td>
+                        </tr>
+                        <tr>
+                            <td style="padding-left: 20px;">(-) Custo dos Serviços Prestados</td>
+                            <td class="text-right text-danger">R$ ({{ "%.2f"|format(dre.custo_total|float) }})</td>
+                        </tr>
+                        <tr class="table-success border-bottom">
+                            <td><strong>LUCRO BRUTO</strong></td>
+                            <td class="text-right"><strong>R$ {{ "%.2f"|format(dre.lucro_bruto|float) }}</strong></td>
+                        </tr>
+                        <tr>
+                            <td><strong>DESPESAS OPERACIONAIS</strong></td>
+                            <td></td>
+                        </tr>
+                        <tr>
+                            <td style="padding-left: 20px;">(-) Despesas Administrativas</td>
+                            <td class="text-right text-danger">R$ ({{ "%.2f"|format((dre.total_despesas|float) * 0.6) }})</td>
+                        </tr>
+                        <tr>
+                            <td style="padding-left: 20px;">(-) Despesas com Pessoal</td>
+                            <td class="text-right text-danger">R$ ({{ "%.2f"|format((dre.total_despesas|float) * 0.4) }})</td>
+                        </tr>
+                        <tr class="border-bottom">
+                            <td style="padding-left: 20px;"><strong>Total das Despesas</strong></td>
+                            <td class="text-right text-danger"><strong>R$ ({{ "%.2f"|format(dre.total_despesas|float) }})</strong></td>
+                        </tr>
+                        <tr class="table-info border-bottom">
+                            <td><strong>LUCRO OPERACIONAL</strong></td>
+                            <td class="text-right"><strong>R$ {{ "%.2f"|format(dre.lucro_operacional|float) }}</strong></td>
+                        </tr>
+                        <tr class="table-{% if dre.lucro_liquido >= 0 %}success{% else %}danger{% endif %} border-bottom">
+                            <td><strong>LUCRO LÍQUIDO DO PERÍODO</strong></td>
+                            <td class="text-right">
+                                <strong>
+                                    R$ {{ "%.2f"|format(dre.lucro_liquido|float) }}
+                                    {% if dre.lucro_liquido >= 0 %}
+                                        <i class="fas fa-arrow-up text-success ml-2"></i>
+                                    {% else %}
+                                        <i class="fas fa-arrow-down text-danger ml-2"></i>
+                                    {% endif %}
+                                </strong>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Indicadores -->
+            <div class="row mt-4">
+                <div class="col-md-3">
+                    <div class="card border-left-primary">
+                        <div class="card-body py-3">
+                            <div class="text-xs font-weight-bold text-primary text-uppercase mb-1">
+                                Margem Bruta
+                            </div>
+                            <div class="h6 mb-0 font-weight-bold text-gray-800">
+                                {% if dre.receita_liquida > 0 %}
+                                    {{ "%.1f"|format((dre.lucro_bruto / dre.receita_liquida * 100)|float) }}%
+                                {% else %}
+                                    0.0%
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card border-left-success">
+                        <div class="card-body py-3">
+                            <div class="text-xs font-weight-bold text-success text-uppercase mb-1">
+                                Margem Líquida
+                            </div>
+                            <div class="h6 mb-0 font-weight-bold text-gray-800">
+                                {% if dre.receita_liquida > 0 %}
+                                    {{ "%.1f"|format((dre.lucro_liquido / dre.receita_liquida * 100)|float) }}%
+                                {% else %}
+                                    0.0%
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card border-left-info">
+                        <div class="card-body py-3">
+                            <div class="text-xs font-weight-bold text-info text-uppercase mb-1">
+                                Peso dos Custos
+                            </div>
+                            <div class="h6 mb-0 font-weight-bold text-gray-800">
+                                {% if dre.receita_liquida > 0 %}
+                                    {{ "%.1f"|format((dre.custo_total / dre.receita_liquida * 100)|float) }}%
+                                {% else %}
+                                    0.0%
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card border-left-warning">
+                        <div class="card-body py-3">
+                            <div class="text-xs font-weight-bold text-warning text-uppercase mb-1">
+                                Peso das Despesas
+                            </div>
+                            <div class="h6 mb-0 font-weight-bold text-gray-800">
+                                {% if dre.receita_liquida > 0 %}
+                                    {{ "%.1f"|format((dre.total_despesas / dre.receita_liquida * 100)|float) }}%
+                                {% else %}
+                                    0.0%
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

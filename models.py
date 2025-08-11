@@ -1483,6 +1483,179 @@ class NotificacaoCliente(db.Model):
     def __repr__(self):
         return f'<NotificacaoCliente {self.titulo}>'
 
+# ===============================================================
+# == MÓDULO 7: SISTEMA CONTÁBIL COMPLETO
+# ===============================================================
 
+class PlanoContas(db.Model):
+    """Plano de Contas brasileiro completo e hierárquico."""
+    __tablename__ = 'plano_contas'
+    codigo = db.Column(db.String(20), primary_key=True)  # Ex: 1.1.01.001
+    nome = db.Column(db.String(200), nullable=False)
+    tipo_conta = db.Column(db.String(20), nullable=False)  # ATIVO, PASSIVO, PATRIMONIO, RECEITA, DESPESA
+    natureza = db.Column(db.String(10), nullable=False)  # DEVEDORA, CREDORA
+    nivel = db.Column(db.Integer, nullable=False)
+    conta_pai_codigo = db.Column(db.String(20), db.ForeignKey('plano_contas.codigo'))
+    aceita_lancamento = db.Column(db.Boolean, default=True)  # True para contas analíticas
+    ativo = db.Column(db.Boolean, default=True)
+    admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False)
 
+    conta_pai = db.relationship('PlanoContas', remote_side=[codigo])
+
+class CentroCustoContabil(db.Model):
+    """Centros de Custo para rateio contábil (Obras, Departamentos)."""
+    __tablename__ = 'centro_custo_contabil'
+    id = db.Column(db.Integer, primary_key=True)
+    codigo = db.Column(db.String(20), nullable=False)
+    nome = db.Column(db.String(100), nullable=False)
+    tipo = db.Column(db.String(20), nullable=False)  # OBRA, DEPARTAMENTO, PROJETO
+    obra_id = db.Column(db.Integer, db.ForeignKey('obra.id'))
+    ativo = db.Column(db.Boolean, default=True)
+    admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False)
+
+    obra = db.relationship('Obra')
+    __table_args__ = (db.UniqueConstraint('codigo', 'admin_id', name='uq_centro_custo_contabil_codigo_admin'),)
+
+class LancamentoContabil(db.Model):
+    """Cabeçalho dos Lançamentos Contábeis (partidas dobradas)."""
+    __tablename__ = 'lancamento_contabil'
+    id = db.Column(db.Integer, primary_key=True)
+    numero = db.Column(db.Integer, nullable=False) # Sequencial por admin
+    data_lancamento = db.Column(db.Date, nullable=False, index=True)
+    historico = db.Column(db.String(500), nullable=False)
+    valor_total = db.Column(db.Numeric(15, 2), nullable=False)
+    origem = db.Column(db.String(50))  # MANUAL, MODULO_1, MODULO_4, MODULO_6
+    origem_id = db.Column(db.Integer) # ID do registro de origem (Proposta, NotaFiscal, etc)
+    usuario_id = db.Column(db.Integer, db.ForeignKey('usuario.id'))
+    admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False, index=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    partidas = db.relationship('PartidaContabil', backref='lancamento', cascade="all, delete-orphan")
+    usuario = db.relationship('Usuario', foreign_keys=[usuario_id])
+
+class PartidaContabil(db.Model):
+    """Itens do Lançamento Contábil (Débito e Crédito)."""
+    __tablename__ = 'partida_contabil'
+    id = db.Column(db.Integer, primary_key=True)
+    lancamento_id = db.Column(db.Integer, db.ForeignKey('lancamento_contabil.id'), nullable=False)
+    sequencia = db.Column(db.Integer, nullable=False)
+    conta_codigo = db.Column(db.String(20), db.ForeignKey('plano_contas.codigo'), nullable=False, index=True)
+    centro_custo_id = db.Column(db.Integer, db.ForeignKey('centro_custo_contabil.id'))
+    tipo_partida = db.Column(db.String(10), nullable=False)  # DEBITO, CREDITO
+    valor = db.Column(db.Numeric(15, 2), nullable=False)
+    historico_complementar = db.Column(db.String(200))
+    admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False)
+
+    conta = db.relationship('PlanoContas')
+    centro_custo = db.relationship('CentroCustoContabil')
+
+class BalanceteMensal(db.Model):
+    """Armazena os saldos mensais para geração rápida de relatórios."""
+    __tablename__ = 'balancete_mensal'
+    id = db.Column(db.Integer, primary_key=True)
+    conta_codigo = db.Column(db.String(20), db.ForeignKey('plano_contas.codigo'), nullable=False)
+    mes_referencia = db.Column(db.Date, nullable=False)  # Primeiro dia do mês
+    saldo_anterior = db.Column(db.Numeric(15, 2), default=0)
+    debitos_mes = db.Column(db.Numeric(15, 2), default=0)
+    creditos_mes = db.Column(db.Numeric(15, 2), default=0)
+    saldo_atual = db.Column(db.Numeric(15, 2), default=0)
+    admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False)
+    processado_em = db.Column(db.DateTime, default=datetime.utcnow)
+
+    __table_args__ = (db.UniqueConstraint('conta_codigo', 'mes_referencia', 'admin_id', name='uq_balancete_conta_mes_admin'),)
+
+class DREMensal(db.Model):
+    """Demonstração do Resultado do Exercício (DRE) mensal."""
+    __tablename__ = 'dre_mensal'
+    id = db.Column(db.Integer, primary_key=True)
+    mes_referencia = db.Column(db.Date, nullable=False)
+    receita_bruta = db.Column(db.Numeric(15, 2), default=0)
+    impostos_sobre_vendas = db.Column(db.Numeric(15, 2), default=0)
+    receita_liquida = db.Column(db.Numeric(15, 2), default=0)
+    custo_total = db.Column(db.Numeric(15, 2), default=0)
+    lucro_bruto = db.Column(db.Numeric(15, 2), default=0)
+    total_despesas = db.Column(db.Numeric(15, 2), default=0)
+    lucro_operacional = db.Column(db.Numeric(15, 2), default=0)
+    lucro_liquido = db.Column(db.Numeric(15, 2), default=0)
+    admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False)
+    processado_em = db.Column(db.DateTime, default=datetime.utcnow)
+
+    __table_args__ = (db.UniqueConstraint('mes_referencia', 'admin_id', name='uq_dre_mes_admin'),)
+
+class BalancoPatrimonial(db.Model):
+    """Balanço Patrimonial em uma data específica."""
+    __tablename__ = 'balanco_patrimonial'
+    id = db.Column(db.Integer, primary_key=True)
+    data_referencia = db.Column(db.Date, nullable=False)
+    total_ativo = db.Column(db.Numeric(15, 2), default=0)
+    total_passivo_patrimonio = db.Column(db.Numeric(15, 2), default=0)
+    admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False)
+    processado_em = db.Column(db.DateTime, default=datetime.utcnow)
+
+    __table_args__ = (db.UniqueConstraint('data_referencia', 'admin_id', name='uq_balanco_data_admin'),)
+
+class FluxoCaixaContabil(db.Model):
+    """Registro de todas as entradas e saídas de caixa."""
+    __tablename__ = 'fluxo_caixa_contabil'
+    id = db.Column(db.Integer, primary_key=True)
+    data_movimento = db.Column(db.Date, nullable=False)
+    tipo_movimento = db.Column(db.String(20), nullable=False)  # ENTRADA, SAIDA
+    categoria = db.Column(db.String(50), nullable=False)  # OPERACIONAL, INVESTIMENTO, FINANCIAMENTO
+    descricao = db.Column(db.String(200), nullable=False)
+    valor = db.Column(db.Numeric(15, 2), nullable=False)
+    conta_codigo = db.Column(db.String(20), db.ForeignKey('plano_contas.codigo'))
+    centro_custo_id = db.Column(db.Integer, db.ForeignKey('centro_custo_contabil.id'))
+    origem = db.Column(db.String(50))
+    origem_id = db.Column(db.Integer)
+    admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False)
+
+class ConciliacaoBancaria(db.Model):
+    """Registros para conciliação bancária."""
+    __tablename__ = 'conciliacao_bancaria'
+    id = db.Column(db.Integer, primary_key=True)
+    conta_banco = db.Column(db.String(50), nullable=False)
+    data_movimento = db.Column(db.Date, nullable=False)
+    historico = db.Column(db.String(200), nullable=False)
+    valor = db.Column(db.Numeric(15, 2), nullable=False)
+    tipo = db.Column(db.String(10), nullable=False)  # DEBITO, CREDITO
+    conciliado = db.Column(db.Boolean, default=False)
+    lancamento_id = db.Column(db.Integer, db.ForeignKey('lancamento_contabil.id'))
+    admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False)
+
+class ProvisaoMensal(db.Model):
+    """Controle de provisões automáticas (Férias, 13º)."""
+    __tablename__ = 'provisao_mensal'
+    id = db.Column(db.Integer, primary_key=True)
+    mes_referencia = db.Column(db.Date, nullable=False)
+    tipo_provisao = db.Column(db.String(50), nullable=False)  # FERIAS, DECIMO_TERCEIRO, INSS_EMPRESA
+    valor_provisionado = db.Column(db.Numeric(15, 2), nullable=False)
+    admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False)
+
+class SpedContabil(db.Model):
+    """Registro dos arquivos SPED Contábil gerados."""
+    __tablename__ = 'sped_contabil'
+    id = db.Column(db.Integer, primary_key=True)
+    periodo_inicial = db.Column(db.Date, nullable=False)
+    periodo_final = db.Column(db.Date, nullable=False)
+    arquivo_gerado = db.Column(db.String(200), nullable=False)
+    hash_arquivo = db.Column(db.String(64), nullable=False)
+    status = db.Column(db.String(20), default='GERADO') # GERADO, TRANSMITIDO, ACEITO
+    data_geracao = db.Column(db.DateTime, default=datetime.utcnow)
+    admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False)
+
+class AuditoriaContabil(db.Model):
+    """Logs da auditoria automática do sistema."""
+    __tablename__ = 'auditoria_contabil'
+    id = db.Column(db.Integer, primary_key=True)
+    data_auditoria = db.Column(db.DateTime, default=datetime.utcnow)
+    tipo_verificacao = db.Column(db.String(100), nullable=False)
+    resultado = db.Column(db.String(20), nullable=False)  # CONFORME, NAO_CONFORME, ALERTA
+    observacoes = db.Column(db.Text)
+    valor_divergencia = db.Column(db.Numeric(15, 2))
+    corrigido = db.Column(db.Boolean, default=False)
+    admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False)
+
+# Atualização de timestamp para verificar se o modelo é alterado
+# Essa linha força o gunicorn a recarregar quando há mudanças
+# Última modificação: 2025-08-11 20:30:00 - Módulo 7 Contábil implementado
 

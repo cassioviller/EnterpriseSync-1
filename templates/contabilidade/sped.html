@@ -1,0 +1,216 @@
+{% extends "base.html" %}
+
+{% block title %}SPED Contábil{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- Page Heading -->
+    <div class="d-sm-flex align-items-center justify-content-between mb-4">
+        <h1 class="h3 mb-0 text-gray-800">
+            <i class="fas fa-file-export"></i> SPED Contábil
+        </h1>
+        <a href="{{ url_for('contabilidade.dashboard_contabil') }}" class="btn btn-sm btn-secondary">
+            <i class="fas fa-arrow-left"></i> Voltar ao Dashboard
+        </a>
+    </div>
+
+    <!-- Geração de Novo SPED -->
+    <div class="card shadow mb-4">
+        <div class="card-header py-3">
+            <h6 class="m-0 font-weight-bold text-primary">Gerar Novo Arquivo SPED</h6>
+        </div>
+        <div class="card-body">
+            <form method="POST" class="row">
+                <div class="col-md-3">
+                    <label>Data Inicial:</label>
+                    <input type="date" name="data_inicial" class="form-control" required>
+                </div>
+                <div class="col-md-3">
+                    <label>Data Final:</label>
+                    <input type="date" name="data_final" class="form-control" required>
+                </div>
+                <div class="col-md-3">
+                    <label>&nbsp;</label><br>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-cogs"></i> Gerar SPED
+                    </button>
+                </div>
+            </form>
+            
+            <div class="alert alert-info mt-3">
+                <i class="fas fa-info-circle"></i>
+                <strong>Informação:</strong> O arquivo SPED será gerado com base nos lançamentos contábeis do período selecionado.
+                Certifique-se de que todos os lançamentos estão corretos antes de gerar o arquivo.
+            </div>
+        </div>
+    </div>
+
+    <!-- Arquivos SPED Gerados -->
+    <div class="card shadow mb-4">
+        <div class="card-header py-3">
+            <h6 class="m-0 font-weight-bold text-primary">Arquivos SPED Gerados</h6>
+        </div>
+        <div class="card-body">
+            {% if speds %}
+            <div class="table-responsive">
+                <table class="table table-bordered" id="dataTable" width="100%" cellspacing="0">
+                    <thead>
+                        <tr>
+                            <th>Período</th>
+                            <th>Arquivo</th>
+                            <th>Data de Geração</th>
+                            <th>Status</th>
+                            <th>Hash</th>
+                            <th>Ações</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for sped in speds %}
+                        <tr>
+                            <td>{{ sped.periodo_inicial.strftime('%d/%m/%Y') }} a {{ sped.periodo_final.strftime('%d/%m/%Y') }}</td>
+                            <td>{{ sped.arquivo_gerado }}</td>
+                            <td>{{ sped.data_geracao.strftime('%d/%m/%Y %H:%M') }}</td>
+                            <td>
+                                <span class="badge badge-{% if sped.status == 'GERADO' %}primary{% elif sped.status == 'TRANSMITIDO' %}warning{% else %}success{% endif %}">
+                                    {{ sped.status }}
+                                </span>
+                            </td>
+                            <td>
+                                <code class="small">{{ sped.hash_arquivo[:16] }}...</code>
+                            </td>
+                            <td>
+                                <button class="btn btn-sm btn-success" onclick="downloadSped({{ sped.id }})">
+                                    <i class="fas fa-download"></i> Download
+                                </button>
+                                {% if sped.status == 'GERADO' %}
+                                <button class="btn btn-sm btn-warning" onclick="marcarTransmitido({{ sped.id }})">
+                                    <i class="fas fa-paper-plane"></i> Marcar Transmitido
+                                </button>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <div class="alert alert-info text-center">
+                <i class="fas fa-file-excel fa-3x mb-3"></i>
+                <h5>Nenhum arquivo SPED gerado</h5>
+                <p>Utilize o formulário acima para gerar seu primeiro arquivo SPED Contábil.</p>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Informações sobre SPED -->
+    <div class="card shadow mb-4">
+        <div class="card-header py-3">
+            <h6 class="m-0 font-weight-bold text-primary">Informações sobre SPED Contábil</h6>
+        </div>
+        <div class="card-body">
+            <div class="row">
+                <div class="col-md-6">
+                    <h6>O que é o SPED Contábil?</h6>
+                    <p>O Sistema Público de Escrituração Digital (SPED) Contábil é uma obrigação acessória que consiste na escrituração contábil de forma digital.</p>
+                    
+                    <h6>Quem deve enviar?</h6>
+                    <ul>
+                        <li>Empresas tributadas pelo Lucro Real</li>
+                        <li>Empresas tributadas pelo Lucro Presumido (receita bruta superior a R$ 78 milhões)</li>
+                        <li>Empresas imunes ou isentas</li>
+                    </ul>
+                </div>
+                <div class="col-md-6">
+                    <h6>Prazo de Entrega:</h6>
+                    <p>Último dia útil do mês de maio do ano seguinte ao ano-calendário a que se refere a escrituração.</p>
+                    
+                    <h6>Penalidades:</h6>
+                    <ul>
+                        <li>Não entrega: R$ 500,00 por mês-calendário</li>
+                        <li>Entrega com erro: R$ 200,00 por mês-calendário</li>
+                        <li>Entrega fora do prazo: R$ 200,00 por mês-calendário</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Checklist de Validação -->
+    <div class="card shadow mb-4">
+        <div class="card-header py-3">
+            <h6 class="m-0 font-weight-bold text-warning">Checklist de Validação</h6>
+        </div>
+        <div class="card-body">
+            <div class="row">
+                <div class="col-md-6">
+                    <h6>Antes de Gerar o SPED:</h6>
+                    <div class="form-check">
+                        <input type="checkbox" class="form-check-input" id="check1">
+                        <label class="form-check-label" for="check1">
+                            Todos os lançamentos do período estão registrados
+                        </label>
+                    </div>
+                    <div class="form-check">
+                        <input type="checkbox" class="form-check-input" id="check2">
+                        <label class="form-check-label" for="check2">
+                            Balancete está balanceado (débitos = créditos)
+                        </label>
+                    </div>
+                    <div class="form-check">
+                        <input type="checkbox" class="form-check-input" id="check3">
+                        <label class="form-check-label" for="check3">
+                            DRE e Balanço Patrimonial foram revisados
+                        </label>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <h6>Após Gerar o SPED:</h6>
+                    <div class="form-check">
+                        <input type="checkbox" class="form-check-input" id="check4">
+                        <label class="form-check-label" for="check4">
+                            Arquivo foi validado no PVA (Programa Validador)
+                        </label>
+                    </div>
+                    <div class="form-check">
+                        <input type="checkbox" class="form-check-input" id="check5">
+                        <label class="form-check-label" for="check5">
+                            Backup do arquivo foi realizado
+                        </label>
+                    </div>
+                    <div class="form-check">
+                        <input type="checkbox" class="form-check-input" id="check6">
+                        <label class="form-check-label" for="check6">
+                            Arquivo foi transmitido dentro do prazo
+                        </label>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function downloadSped(spedId) {
+    // Implementar download do arquivo SPED
+    alert('Download do arquivo SPED - Funcionalidade em desenvolvimento');
+}
+
+function marcarTransmitido(spedId) {
+    if (confirm('Confirma que o arquivo foi transmitido para a Receita Federal?')) {
+        // Implementar marcação como transmitido
+        alert('Funcionalidade em desenvolvimento');
+    }
+}
+
+$(document).ready(function() {
+    $('#dataTable').DataTable({
+        "language": {
+            "url": "//cdn.datatables.net/plug-ins/1.10.24/i18n/Portuguese-Brasil.json"
+        },
+        "order": [[ 2, "desc" ]],
+        "pageLength": 25
+    });
+});
+</script>
+{% endblock %}

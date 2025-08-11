@@ -1,0 +1,134 @@
+{% extends "base.html" %}
+
+{% block title %}Lançamentos Contábeis{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- Page Heading -->
+    <div class="d-sm-flex align-items-center justify-content-between mb-4">
+        <h1 class="h3 mb-0 text-gray-800">
+            <i class="fas fa-edit"></i> Lançamentos Contábeis
+        </h1>
+        <a href="{{ url_for('contabilidade.dashboard_contabil') }}" class="btn btn-sm btn-secondary">
+            <i class="fas fa-arrow-left"></i> Voltar ao Dashboard
+        </a>
+    </div>
+
+    <!-- DataTales Example -->
+    <div class="card shadow mb-4">
+        <div class="card-header py-3">
+            <h6 class="m-0 font-weight-bold text-primary">
+                Histórico de Lançamentos
+            </h6>
+        </div>
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-bordered" id="dataTable" width="100%" cellspacing="0">
+                    <thead>
+                        <tr>
+                            <th>Número</th>
+                            <th>Data</th>
+                            <th>Histórico</th>
+                            <th>Valor Total</th>
+                            <th>Origem</th>
+                            <th>Ações</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for lancamento in lancamentos.items %}
+                        <tr>
+                            <td>{{ lancamento.numero }}</td>
+                            <td>{{ lancamento.data_lancamento.strftime('%d/%m/%Y') }}</td>
+                            <td>{{ lancamento.historico[:50] }}{% if lancamento.historico|length > 50 %}...{% endif %}</td>
+                            <td class="text-right">R$ {{ "%.2f"|format(lancamento.valor_total|float) }}</td>
+                            <td>
+                                <span class="badge badge-{% if lancamento.origem == 'MANUAL' %}secondary{% elif lancamento.origem == 'MODULO_1' %}primary{% elif lancamento.origem == 'MODULO_4' %}warning{% elif lancamento.origem == 'MODULO_6' %}success{% else %}info{% endif %}">
+                                    {{ lancamento.origem or 'MANUAL' }}
+                                </span>
+                            </td>
+                            <td>
+                                <button class="btn btn-sm btn-info" onclick="verDetalhes({{ lancamento.id }})">
+                                    <i class="fas fa-eye"></i>
+                                </button>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            
+            <!-- Paginação -->
+            {% if lancamentos.pages > 1 %}
+            <nav>
+                <ul class="pagination justify-content-center">
+                    {% if lancamentos.has_prev %}
+                        <li class="page-item">
+                            <a class="page-link" href="{{ url_for('contabilidade.lancamentos_contabeis', page=lancamentos.prev_num) }}">Anterior</a>
+                        </li>
+                    {% endif %}
+                    
+                    {% for page_num in lancamentos.iter_pages() %}
+                        {% if page_num %}
+                            {% if page_num != lancamentos.page %}
+                                <li class="page-item">
+                                    <a class="page-link" href="{{ url_for('contabilidade.lancamentos_contabeis', page=page_num) }}">{{ page_num }}</a>
+                                </li>
+                            {% else %}
+                                <li class="page-item active">
+                                    <span class="page-link">{{ page_num }}</span>
+                                </li>
+                            {% endif %}
+                        {% else %}
+                            <li class="page-item disabled">
+                                <span class="page-link">...</span>
+                            </li>
+                        {% endif %}
+                    {% endfor %}
+                    
+                    {% if lancamentos.has_next %}
+                        <li class="page-item">
+                            <a class="page-link" href="{{ url_for('contabilidade.lancamentos_contabeis', page=lancamentos.next_num) }}">Próximo</a>
+                        </li>
+                    {% endif %}
+                </ul>
+            </nav>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<!-- Modal para detalhes do lançamento -->
+<div class="modal fade" id="detalhesModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Detalhes do Lançamento</h5>
+                <button type="button" class="close" data-dismiss="modal">
+                    <span>&times;</span>
+                </button>
+            </div>
+            <div class="modal-body" id="detalhesContent">
+                <!-- Conteúdo será carregado via AJAX -->
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function verDetalhes(lancamentoId) {
+    // Implementar carregamento de detalhes via AJAX
+    $('#detalhesModal').modal('show');
+    $('#detalhesContent').html('<p>Carregando detalhes...</p>');
+}
+
+$(document).ready(function() {
+    $('#dataTable').DataTable({
+        "language": {
+            "url": "//cdn.datatables.net/plug-ins/1.10.24/i18n/Portuguese-Brasil.json"
+        },
+        "order": [[ 1, "desc" ], [ 0, "desc" ]],
+        "pageLength": 25
+    });
+});
+</script>
+{% endblock %}

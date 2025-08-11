@@ -1,0 +1,207 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard Contábil{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- Page Heading -->
+    <div class="d-sm-flex align-items-center justify-content-between mb-4">
+        <h1 class="h3 mb-0 text-gray-800">
+            <i class="fas fa-calculator"></i> Dashboard Contábil
+        </h1>
+        <div class="btn-group" role="group">
+            <a href="{{ url_for('contabilidade.balancete') }}" class="btn btn-sm btn-primary">
+                <i class="fas fa-table"></i> Balancete
+            </a>
+            <a href="{{ url_for('contabilidade.dre') }}" class="btn btn-sm btn-success">
+                <i class="fas fa-chart-line"></i> DRE
+            </a>
+            <a href="{{ url_for('contabilidade.balanco_patrimonial') }}" class="btn btn-sm btn-info">
+                <i class="fas fa-balance-scale"></i> Balanço
+            </a>
+        </div>
+    </div>
+
+    <!-- Content Row -->
+    <div class="row">
+        <!-- Caixa Card -->
+        <div class="col-xl-3 col-md-6 mb-4">
+            <div class="card border-left-primary shadow h-100 py-2">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-primary text-uppercase mb-1">
+                                Saldo em Caixa</div>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800">
+                                R$ {{ "%.2f"|format(saldo_caixa|float) }}
+                            </div>
+                        </div>
+                        <div class="col-auto">
+                            <i class="fas fa-cash-register fa-2x text-gray-300"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Bancos Card -->
+        <div class="col-xl-3 col-md-6 mb-4">
+            <div class="card border-left-success shadow h-100 py-2">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-success text-uppercase mb-1">
+                                Saldo Bancário</div>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800">
+                                R$ {{ "%.2f"|format(saldo_bancos|float) }}
+                            </div>
+                        </div>
+                        <div class="col-auto">
+                            <i class="fas fa-university fa-2x text-gray-300"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Clientes Card -->
+        <div class="col-xl-3 col-md-6 mb-4">
+            <div class="card border-left-info shadow h-100 py-2">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-info text-uppercase mb-1">
+                                Contas a Receber</div>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800">
+                                R$ {{ "%.2f"|format(saldo_clientes|float) }}
+                            </div>
+                        </div>
+                        <div class="col-auto">
+                            <i class="fas fa-users fa-2x text-gray-300"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Lançamentos Card -->
+        <div class="col-xl-3 col-md-6 mb-4">
+            <div class="card border-left-warning shadow h-100 py-2">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-warning text-uppercase mb-1">
+                                Total de Lançamentos</div>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800">
+                                {{ total_lancamentos }}
+                            </div>
+                        </div>
+                        <div class="col-auto">
+                            <i class="fas fa-clipboard-list fa-2x text-gray-300"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Content Row -->
+    <div class="row">
+        <!-- DRE Card -->
+        <div class="col-xl-8 col-lg-7">
+            <div class="card shadow mb-4">
+                <div class="card-header py-3 d-flex flex-row align-items-center justify-content-between">
+                    <h6 class="m-0 font-weight-bold text-primary">
+                        DRE - {{ mes_atual.strftime('%m/%Y') }}
+                    </h6>
+                    <a href="{{ url_for('contabilidade.dre') }}" class="btn btn-sm btn-primary">
+                        Ver Completa
+                    </a>
+                </div>
+                <div class="card-body">
+                    {% if dre_atual %}
+                    <div class="table-responsive">
+                        <table class="table table-sm">
+                            <tr>
+                                <td><strong>Receita Bruta</strong></td>
+                                <td class="text-right">R$ {{ "%.2f"|format(dre_atual.receita_bruta|float) }}</td>
+                            </tr>
+                            <tr>
+                                <td>(-) Impostos sobre Vendas</td>
+                                <td class="text-right text-danger">R$ ({{ "%.2f"|format(dre_atual.impostos_sobre_vendas|float) }})</td>
+                            </tr>
+                            <tr class="table-light">
+                                <td><strong>Receita Líquida</strong></td>
+                                <td class="text-right"><strong>R$ {{ "%.2f"|format(dre_atual.receita_liquida|float) }}</strong></td>
+                            </tr>
+                            <tr>
+                                <td>(-) Custos</td>
+                                <td class="text-right text-danger">R$ ({{ "%.2f"|format(dre_atual.custo_total|float) }})</td>
+                            </tr>
+                            <tr class="table-light">
+                                <td><strong>Lucro Bruto</strong></td>
+                                <td class="text-right"><strong>R$ {{ "%.2f"|format(dre_atual.lucro_bruto|float) }}</strong></td>
+                            </tr>
+                            <tr>
+                                <td>(-) Despesas Operacionais</td>
+                                <td class="text-right text-danger">R$ ({{ "%.2f"|format(dre_atual.total_despesas|float) }})</td>
+                            </tr>
+                            <tr class="table-success">
+                                <td><strong>Lucro Líquido</strong></td>
+                                <td class="text-right"><strong>R$ {{ "%.2f"|format(dre_atual.lucro_liquido|float) }}</strong></td>
+                            </tr>
+                        </table>
+                    </div>
+                    {% else %}
+                    <p class="text-muted">Nenhuma DRE processada para este mês.</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Ações Rápidas -->
+        <div class="col-xl-4 col-lg-5">
+            <div class="card shadow mb-4">
+                <div class="card-header py-3">
+                    <h6 class="m-0 font-weight-bold text-primary">Ações Rápidas</h6>
+                </div>
+                <div class="card-body">
+                    <div class="list-group list-group-flush">
+                        <a href="{{ url_for('contabilidade.plano_de_contas') }}" class="list-group-item list-group-item-action">
+                            <i class="fas fa-sitemap"></i> Plano de Contas
+                        </a>
+                        <a href="{{ url_for('contabilidade.lancamentos_contabeis') }}" class="list-group-item list-group-item-action">
+                            <i class="fas fa-edit"></i> Lançamentos Contábeis
+                        </a>
+                        <a href="{{ url_for('contabilidade.auditoria_contabil') }}" class="list-group-item list-group-item-action">
+                            <i class="fas fa-search"></i> Auditoria Contábil
+                        </a>
+                        <a href="{{ url_for('contabilidade.sped') }}" class="list-group-item list-group-item-action">
+                            <i class="fas fa-file-export"></i> SPED Contábil
+                        </a>
+                        <a href="{{ url_for('contabilidade.relatorios') }}" class="list-group-item list-group-item-action">
+                            <i class="fas fa-chart-bar"></i> Relatórios
+                        </a>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Status do Sistema -->
+            <div class="card shadow mb-4">
+                <div class="card-header py-3">
+                    <h6 class="m-0 font-weight-bold text-success">Status do Sistema</h6>
+                </div>
+                <div class="card-body">
+                    <div class="small">
+                        <span class="badge badge-success">✓</span> Plano de Contas Configurado<br>
+                        <span class="badge badge-success">✓</span> Integração Automática Ativa<br>
+                        <span class="badge badge-warning">⚠</span> Auditoria Pendente<br>
+                        <span class="badge badge-info">ℹ</span> SPED não gerado
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+</div>
+{% endblock %}
