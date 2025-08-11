@@ -10,32 +10,43 @@ Preferred communication style: Simple, everyday language.
 
 ## Recent Changes
 
-**Latest Update - August 8, 2025:**
+**Latest Update - August 11, 2025:**
+- ✅ **CRITICAL FIX**: Resolved multi-tenancy issue in point control system (`controle_ponto()` function)
+  - Added proper JOIN with Funcionario table and admin_id filtering
+  - Fixed production environment display issues - weekend records now visible
+  - Ensured proper tenant isolation for all point control operations
+- ✅ **NEW FEATURE**: Implemented bulk deletion functionality for point records
+  - Added "Excluir por Período" (Delete by Period) button with modal interface
+  - Created preview functionality to show records before deletion
+  - Added optional filtering by employee and date range
+  - Implemented safety measures with confirmation checkbox
+  - Added comprehensive validation and error handling
+- ✅ **PRODUCTION DEPLOYMENT**: Created automated fix scripts for production environment
+  - `corrigir_controle_ponto_producao.py` - Production fix validation
+  - `deploy_hotfix_controle_ponto.py` - Hotfix deployment automation
+  - `melhorar_controle_ponto.py` - Performance improvements
+  - `implementar_filtros_avancados.py` - Advanced filtering capabilities
+  - `otimizar_controle_ponto.py` - Performance optimization
+  - `relatorio_final_controle_ponto.py` - Final implementation report
+- ✅ **TEMPLATE ENHANCEMENTS**: Updated `controle_ponto.html` with new bulk operations
+  - Added bulk deletion modal with date period selection
+  - Implemented JavaScript for preview and confirmation workflow
+  - Enhanced user interface with better button organization
+  - Added comprehensive form validation and user feedback
+- ✅ **BACKEND IMPROVEMENTS**: Enhanced `views.py` with new endpoints
+  - `/ponto/preview-exclusao` - Preview records to be deleted
+  - `/ponto/excluir-periodo` - Execute bulk deletion with safety checks
+  - Maintained multi-tenancy filtering in all new operations
+  - Added detailed logging and error handling
+
+**Previous Update - August 8, 2025:**
 - ✅ Resolved critical `UndefinedColumn` errors for database schema consistency
 - ✅ Fixed `outro_custo.admin_id` column issue in production environments
 - ✅ Fixed `outro_custo.kpi_associado` column metadata caching issue
 - ✅ **CRITICAL FIX**: Implemented intelligent KPI association logic for cost categorization
-  - Transporte costs now correctly associated with `custo_transporte` KPI
-  - Alimentação costs now correctly associated with `custo_alimentacao` KPI  
-  - Automated correction of 28 existing records with wrong associations
-  - Smart type-based assignment for new records in `views.py`
 - ✅ **MAJOR ENHANCEMENT**: Completely resolved photo persistence issue
-  - Added `foto_base64` column to `funcionario` table for permanent photo storage
-  - Migrated all 26 existing employee photos from SVG files to base64 format
-  - Created intelligent photo display system with automatic fallbacks
-  - Implemented automated deployment migration system
-  - Photos now survive all deployments and container rebuilds
-  - Enhanced `utils.py` with `obter_foto_funcionario()` function for unified photo access
-  - Updated templates (`funcionario_perfil.html`, `funcionarios.html`) to use base64 photos
-  - Created comprehensive testing and validation system
-- ✅ Created automated deployment scripts for production fixes:
-  - `deploy_admin_id_fix.py` - Direct execution script
-  - `deploy_fotos_persistentes.py` - Photo migration automation
-  - `migrations/add_admin_id_to_outro_custo.py` - Automated migration
-  - `docker-entrypoint.sh` - Enhanced with schema validation and KPI correction logic
+- ✅ Created automated deployment scripts for production fixes
 - ✅ Updated Dockerfile for automated deployment with comprehensive migration execution
-- ✅ Fixed template dependencies in `funcionario_perfil.html` to use available KPI fields
-- ✅ Implemented comprehensive deployment verification and rollback protection
 - ✅ Complete production-ready solution with automated schema validation during deployment
 
 ## System Architecture
