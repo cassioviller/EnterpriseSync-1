@@ -3489,12 +3489,12 @@ def excluir_rdo(id):
         db.session.commit()
         
         flash('RDO excluído com sucesso!', 'success')
-        return redirect(url_for('main.lista_rdos'))
+        return redirect(url_for('main.dashboard'))
         
     except Exception as e:
         db.session.rollback()
         flash(f'Erro ao excluir RDO: {str(e)}', 'error')
-        return redirect(url_for('main.lista_rdos'))
+        return redirect(url_for('main.dashboard'))
 
 @main_bp.route('/financeiro/centros-custo/novo', methods=['GET', 'POST'])
 @login_required
