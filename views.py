@@ -1081,6 +1081,11 @@ def lancamento_multiplo_ponto():
     try:
         data = request.get_json()
         
+        # Log de debug
+        print(f"🔍 DEBUG - Lançamento múltiplo recebido:")
+        print(f"   User ID: {current_user.id}")
+        print(f"   Dados: {data}")
+        
         # Validações básicas
         periodo_inicio = datetime.strptime(data.get('periodo_inicio'), '%Y-%m-%d').date()
         periodo_fim = datetime.strptime(data.get('periodo_fim'), '%Y-%m-%d').date()
@@ -1095,7 +1100,14 @@ def lancamento_multiplo_ponto():
         # Verificar se obra existe e pertence ao tenant
         obra = Obra.query.filter_by(id=obra_id, admin_id=current_user.id).first()
         if not obra:
-            return jsonify({'success': False, 'message': 'Obra não encontrada'})
+            # Debug adicional para problemas de tenant
+            obra_qualquer = Obra.query.get(obra_id)
+            if obra_qualquer:
+                print(f"❌ DEBUG - Obra {obra_id} existe mas pertence ao admin {obra_qualquer.admin_id}, user atual: {current_user.id}")
+                return jsonify({'success': False, 'message': f'Obra não encontrada ou não autorizada (Obra pertence ao admin {obra_qualquer.admin_id})'})
+            else:
+                print(f"❌ DEBUG - Obra {obra_id} não existe no banco")
+                return jsonify({'success': False, 'message': f'Obra ID {obra_id} não existe no sistema'})
         
         # Configurar horários baseados no tipo de lançamento
         hora_entrada = None
