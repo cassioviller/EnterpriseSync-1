@@ -5969,8 +5969,10 @@ def controle_ponto():
     data_fim = request.args.get('data_fim')
     tipo_registro = request.args.get('tipo_registro')
     
-    # Query base
-    query = RegistroPonto.query
+    # Query base com filtro de tenant - CORREÇÃO CRÍTICA para multi-tenancy
+    query = RegistroPonto.query.join(Funcionario).filter(
+        Funcionario.admin_id == current_user.id
+    )
     
     # Aplicar filtros
     if funcionario_id:
@@ -5991,9 +5993,16 @@ def controle_ponto():
         joinedload(RegistroPonto.obra)
     ).order_by(RegistroPonto.data.desc()).all()
     
-    # Dados para formulário
-    funcionarios = Funcionario.query.filter_by(ativo=True).order_by(Funcionario.nome).all()
-    obras = Obra.query.filter_by(status='Em andamento').order_by(Obra.nome).all()
+    # Dados para formulário - também com filtro de tenant
+    funcionarios = Funcionario.query.filter_by(
+        admin_id=current_user.id, 
+        ativo=True
+    ).order_by(Funcionario.nome).all()
+    
+    obras = Obra.query.filter_by(
+        admin_id=current_user.id,
+        status='Em andamento'
+    ).order_by(Obra.nome).all()
     
     return render_template('controle_ponto.html',
                          registros=registros,
