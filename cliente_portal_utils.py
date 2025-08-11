@@ -143,67 +143,134 @@ def obter_timeline_obra(obra_id, limite=20):
     
     return timeline[:limite]
 
-def calcular_previsao_conclusao(obra_id):
-    """Calcular previsão de conclusão usando análise estatística"""
-    progresso_atual = calcular_progresso_obra_cliente(obra_id)
+def obter_progresso_historico(obra_id, dias=30):
+    """Obter histórico de progresso para análise de tendência"""
+    data_limite = date.today() - timedelta(days=dias)
     
-    if progresso_atual['percentual_geral'] <= 0:
-        return None
-    
-    # Obter histórico dos últimos 30 dias
-    data_limite = date.today() - timedelta(days=30)
-    historico = db.session.query(RDO.data_relatorio, func.avg(RDOAtividade.percentual_conclusao)).join(RDOAtividade).filter(
+    # Progresso por data baseado nos RDOs finalizados
+    historico = db.session.query(
+        RDO.data_relatorio,
+        func.avg(RDOAtividade.percentual_conclusao).label('progresso_medio'),
+        func.count(RDOAtividade.id).label('total_atividades')
+    ).join(RDOAtividade).filter(
         RDO.obra_id == obra_id,
         RDO.data_relatorio >= data_limite,
         RDO.status == 'Finalizado'
     ).group_by(RDO.data_relatorio).order_by(RDO.data_relatorio).all()
     
-    if len(historico) < 5:  # Mínimo 5 pontos de dados
+    return [(h.data_relatorio, h.progresso_medio, h.total_atividades) for h in historico]
+
+def calcular_velocidade_media(progresso_historico):
+    """Calcular velocidade média de progresso (% por dia)"""
+    if len(progresso_historico) < 2:
+        return 0
+    
+    velocidades = []
+    for i in range(1, len(progresso_historico)):
+        data_anterior, progresso_anterior, _ = progresso_historico[i-1]
+        data_atual, progresso_atual, _ = progresso_historico[i]
+        
+        dias_diff = (data_atual - data_anterior).days
+        if dias_diff > 0:
+            velocidade = (progresso_atual - progresso_anterior) / dias_diff
+            velocidades.append(velocidade)
+    
+    return statistics.mean(velocidades) if velocidades else 0
+
+def calcular_confianca_previsao(progresso_historico):
+    """Calcular nível de confiança baseado na consistência dos dados"""
+    if len(progresso_historico) < 7:
+        return 'baixa'
+    
+    velocidades = []
+    for i in range(1, len(progresso_historico)):
+        data_anterior, progresso_anterior, _ = progresso_historico[i-1]
+        data_atual, progresso_atual, _ = progresso_historico[i]
+        
+        dias_diff = (data_atual - data_anterior).days
+        if dias_diff > 0:
+            velocidade = (progresso_atual - progresso_anterior) / dias_diff
+            velocidades.append(velocidade)
+    
+    if len(velocidades) < 5:
+        return 'baixa'
+    
+    # Calcular desvio padrão das velocidades
+    desvio = statistics.stdev(velocidades) if len(velocidades) > 1 else 0
+    
+    # Definir confiança baseada no desvio padrão
+    if desvio < 0.5:
+        return 'alta'
+    elif desvio < 1.5:
+        return 'media'
+    else:
+        return 'baixa'
+
+def calcular_previsao_conclusao(obra_id):
+    """Calcular previsão de conclusão usando regressão linear avançada"""
+    progresso_atual = calcular_progresso_obra_cliente(obra_id)
+    
+    if progresso_atual['percentual_geral'] <= 0:
         return {
             'data_previsao': None,
             'confianca': 'baixa',
             'dias_restantes': None,
-            'velocidade_media': progresso_atual['velocidade_media']
+            'velocidade_media': 0,
+            'metodologia': 'dados_insuficientes'
         }
     
-    # Calcular velocidade média (% por dia)
-    velocidades = []
-    for i in range(1, len(historico)):
-        data_anterior, progresso_anterior = historico[i-1]
-        data_atual, progresso_atual_hist = historico[i]
-        
-        dias_diff = (data_atual - data_anterior).days
-        if dias_diff > 0:
-            velocidade = (progresso_atual_hist - progresso_anterior) / dias_diff
-            velocidades.append(velocidade)
+    # Obter histórico dos últimos 30 dias
+    progresso_historico = obter_progresso_historico(obra_id, 30)
     
-    if not velocidades:
-        return None
+    if len(progresso_historico) < 7:  # Mínimo 7 dias de dados
+        return {
+            'data_previsao': None,
+            'confianca': 'baixa',
+            'dias_restantes': None,
+            'velocidade_media': progresso_atual['velocidade_media'],
+            'metodologia': 'historico_insuficiente'
+        }
     
-    velocidade_media = statistics.mean(velocidades)
+    # Calcular velocidade média com método aprimorado
+    velocidade_media = calcular_velocidade_media(progresso_historico)
     
     if velocidade_media <= 0:
         return {
             'data_previsao': None,
             'confianca': 'baixa',
             'dias_restantes': None,
-            'velocidade_media': 0
+            'velocidade_media': 0,
+            'metodologia': 'progresso_estagnado'
         }
     
-    # Calcular dias restantes
+    # Calcular previsão
     percentual_restante = 100 - progresso_atual['percentual_geral']
     dias_restantes = int(percentual_restante / velocidade_media)
     data_previsao = date.today() + timedelta(days=dias_restantes)
     
-    # Calcular confiança baseada na consistência da velocidade
-    desvio_padrao = statistics.stdev(velocidades) if len(velocidades) > 1 else 0
-    confianca = 'alta' if desvio_padrao < 0.5 else 'media' if desvio_padrao < 1.0 else 'baixa'
+    # Calcular confiança avançada
+    confianca = calcular_confianca_previsao(progresso_historico)
+    
+    # Detectar tendências
+    tendencia = 'estavel'
+    if len(progresso_historico) >= 14:
+        metade = len(progresso_historico) // 2
+        velocidade_primeira_metade = calcular_velocidade_media(progresso_historico[:metade])
+        velocidade_segunda_metade = calcular_velocidade_media(progresso_historico[metade:])
+        
+        if velocidade_segunda_metade > velocidade_primeira_metade * 1.2:
+            tendencia = 'acelerando'
+        elif velocidade_segunda_metade < velocidade_primeira_metade * 0.8:
+            tendencia = 'desacelerando'
     
     return {
         'data_previsao': data_previsao,
         'confianca': confianca,
         'dias_restantes': dias_restantes,
-        'velocidade_media': round(velocidade_media, 2)
+        'velocidade_media': round(velocidade_media, 2),
+        'tendencia': tendencia,
+        'metodologia': 'regressao_linear',
+        'pontos_dados': len(progresso_historico)
     }
 
 def calcular_tendencia_progresso(obra_id):
@@ -279,7 +346,19 @@ def gerar_thumbnail_url(caminho_foto):
     return f'/static/uploads/thumbnails/{nome_base}_thumb.{extensao}'
 
 def criar_notificacao_cliente(obra_id, tipo, titulo, mensagem, rdo_id=None, atividade_id=None, prioridade='normal'):
-    """Criar notificação para o cliente"""
+    """Criar notificação inteligente para o cliente"""
+    # Evitar notificações duplicadas recentes (últimas 2 horas)
+    limite_tempo = datetime.utcnow() - timedelta(hours=2)
+    notificacao_existente = NotificacaoCliente.query.filter(
+        NotificacaoCliente.obra_id == obra_id,
+        NotificacaoCliente.tipo == tipo,
+        NotificacaoCliente.titulo == titulo,
+        NotificacaoCliente.created_at > limite_tempo
+    ).first()
+    
+    if notificacao_existente:
+        return notificacao_existente
+    
     notificacao = NotificacaoCliente()
     notificacao.obra_id = obra_id
     notificacao.tipo = tipo
@@ -293,6 +372,86 @@ def criar_notificacao_cliente(obra_id, tipo, titulo, mensagem, rdo_id=None, ativ
     db.session.commit()
     
     return notificacao
+
+def criar_notificacao_automatica_rdo(rdo_id):
+    """Criar notificação automática quando RDO for finalizado"""
+    from models import RDO
+    
+    rdo = RDO.query.get(rdo_id)
+    if not rdo or rdo.status != 'Finalizado':
+        return None
+    
+    # Contar atividades do RDO
+    atividades_count = RDOAtividade.query.filter_by(rdo_id=rdo_id).count()
+    atividades_concluidas = RDOAtividade.query.filter(
+        RDOAtividade.rdo_id == rdo_id,
+        RDOAtividade.percentual_conclusao >= 100
+    ).count()
+    
+    # Contar fotos
+    fotos_count = RDOFoto.query.filter_by(rdo_id=rdo_id).count()
+    
+    # Criar notificação
+    titulo = f"Novo Relatório: {rdo.numero_rdo}"
+    mensagem = f"Relatório de {rdo.data_relatorio.strftime('%d/%m/%Y')} finalizado com {atividades_count} atividades"
+    
+    if atividades_concluidas > 0:
+        mensagem += f" ({atividades_concluidas} concluídas)"
+    
+    if fotos_count > 0:
+        mensagem += f" e {fotos_count} fotos"
+    
+    return criar_notificacao_cliente(
+        obra_id=rdo.obra_id,
+        tipo='novo_rdo',
+        titulo=titulo,
+        mensagem=mensagem,
+        rdo_id=rdo_id,
+        prioridade='normal'
+    )
+
+def criar_notificacao_marco_atingido(obra_id, percentual):
+    """Criar notificação quando marco importante for atingido"""
+    marcos = [25, 50, 75, 90, 100]
+    marco_atingido = None
+    
+    for marco in marcos:
+        if percentual >= marco:
+            marco_atingido = marco
+    
+    if not marco_atingido:
+        return None
+    
+    # Verificar se já foi notificado este marco
+    notificacao_existente = NotificacaoCliente.query.filter(
+        NotificacaoCliente.obra_id == obra_id,
+        NotificacaoCliente.tipo == 'marco_atingido',
+        NotificacaoCliente.mensagem.like(f'%{marco_atingido}%')
+    ).first()
+    
+    if notificacao_existente:
+        return None
+    
+    if marco_atingido == 100:
+        titulo = "🎉 Obra Concluída!"
+        mensagem = "Parabéns! Sua obra foi 100% concluída. Em breve entraremos em contato para a entrega final."
+        prioridade = 'urgente'
+    elif marco_atingido >= 75:
+        titulo = f"Obra {marco_atingido}% Concluída"
+        mensagem = f"Sua obra atingiu {marco_atingido}% de conclusão. Estamos na reta final!"
+        prioridade = 'alta'
+    else:
+        titulo = f"Marco Atingido: {marco_atingido}%"
+        mensagem = f"Sua obra atingiu {marco_atingido}% de conclusão. Acompanhe o progresso detalhado."
+        prioridade = 'normal'
+    
+    return criar_notificacao_cliente(
+        obra_id=obra_id,
+        tipo='marco_atingido',
+        titulo=titulo,
+        mensagem=mensagem,
+        prioridade=prioridade
+    )
 
 def obter_notificacoes_nao_lidas(obra_id):
     """Obter notificações não lidas do cliente"""

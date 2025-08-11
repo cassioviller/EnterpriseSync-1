@@ -5908,30 +5908,56 @@ def cliente_rejeitar_proposta(token):
 
 @main_bp.route('/cliente/obra/<token>')
 def cliente_obra_dashboard(token):
-    """Dashboard principal do cliente para acompanhar obra"""
+    """Dashboard avançado do cliente para acompanhamento de obra"""
     obra = Obra.query.filter_by(token_cliente=token).first_or_404()
     
     # Verificar se portal está ativo
     if not obra.portal_ativo:
         return render_template('cliente/portal_inativo.html', obra=obra)
     
+    # Log de acesso do cliente
+    from flask import request
+    import logging
+    logging.info(f"Cliente acessou obra {obra.nome} via token {token[:8]}... - IP: {request.remote_addr}")
+    
     # Atualizar última visualização
     obra.ultima_visualizacao_cliente = datetime.utcnow()
     db.session.commit()
     
-    # Calcular dados do dashboard
+    # Calcular dados avançados do dashboard
     progresso = calcular_progresso_obra_cliente(obra.id)
     fotos_recentes = obter_fotos_obra_recentes(obra.id, limite=6)
-    timeline_recente = obter_timeline_obra(obra.id, limite=5)
+    timeline_recente = obter_timeline_obra(obra.id, limite=8)
     previsao = calcular_previsao_conclusao(obra.id)
     notificacoes_nao_lidas = obter_notificacoes_nao_lidas(obra.id)
     
-    # Estatísticas adicionais
+    # Estatísticas detalhadas
     total_rdos = RDO.query.filter_by(obra_id=obra.id, status='Finalizado').count()
+    total_rdos_rascunho = RDO.query.filter_by(obra_id=obra.id, status='Rascunho').count()
+    
     total_fotos = db.session.query(func.count(RDOFoto.id)).join(RDO).filter(
         RDO.obra_id == obra.id,
         RDO.status == 'Finalizado'
     ).scalar() or 0
+    
+    # Atividades esta semana
+    inicio_semana = date.today() - timedelta(days=date.today().weekday())
+    atividades_semana = db.session.query(func.count(RDOAtividade.id)).join(RDO).filter(
+        RDO.obra_id == obra.id,
+        RDO.data_relatorio >= inicio_semana,
+        RDO.status == 'Finalizado'
+    ).scalar() or 0
+    
+    # Verificar marcos atingidos para notificações
+    if progresso['percentual_geral'] > 0:
+        criar_notificacao_marco_atingido(obra.id, progresso['percentual_geral'])
+    
+    # Dados de contexto para analytics
+    contexto_analytics = {
+        'dias_desde_inicio': (date.today() - obra.data_inicio).days if obra.data_inicio else 0,
+        'rdos_por_semana': round(total_rdos / max(1, (date.today() - obra.data_inicio).days / 7), 1) if obra.data_inicio else 0,
+        'fotos_por_rdo': round(total_fotos / max(1, total_rdos), 1) if total_rdos > 0 else 0
+    }
     
     return render_template('cliente/obra_dashboard.html',
                          obra=obra,
@@ -5941,4 +5967,150 @@ def cliente_obra_dashboard(token):
                          previsao=previsao,
                          notificacoes_nao_lidas=notificacoes_nao_lidas,
                          total_rdos=total_rdos,
-                         total_fotos=total_fotos)
+                         total_rdos_rascunho=total_rdos_rascunho,
+                         total_fotos=total_fotos,
+                         atividades_semana=atividades_semana,
+                         contexto_analytics=contexto_analytics)
+
+
+# ===== PORTAL DO CLIENTE - ROTAS AVANÇADAS =====
+
+@main_bp.route("/cliente/obra/<token>/progresso")  
+def cliente_obra_progresso(token):
+    """Página detalhada de progresso com análise avançada"""
+    from collections import defaultdict
+    obra = Obra.query.filter_by(token_cliente=token).first_or_404()
+    
+    if not obra.portal_ativo:
+        return redirect(url_for("main.cliente_obra_dashboard", token=token))
+    
+    # Progresso detalhado por RDO
+    rdos_progresso = []
+    rdos = RDO.query.filter_by(obra_id=obra.id, status="Finalizado").order_by(RDO.data_relatorio.desc()).all()
+    
+    for rdo in rdos:
+        atividades = RDOAtividade.query.filter_by(rdo_id=rdo.id).all()
+        
+        if atividades:
+            progresso_rdo = sum(a.percentual_conclusao or 0 for a in atividades) / len(atividades)
+            atividades_concluidas = len([a for a in atividades if (a.percentual_conclusao or 0) >= 100])
+            
+            rdos_progresso.append({
+                "rdo": rdo,
+                "atividades": atividades,
+                "progresso_medio": round(progresso_rdo, 1),
+                "atividades_concluidas": atividades_concluidas,
+                "atividades_total": len(atividades),
+                "eficiencia": round((atividades_concluidas / len(atividades)) * 100, 1)
+            })
+    
+    # Progresso geral
+    progresso_geral = calcular_progresso_obra_cliente(obra.id)
+    previsao = calcular_previsao_conclusao(obra.id)
+    
+    return render_template("cliente/obra_progresso.html",
+                         obra=obra,
+                         rdos_progresso=rdos_progresso,
+                         progresso_geral=progresso_geral,
+                         previsao=previsao)
+
+@main_bp.route("/cliente/obra/<token>/fotos")
+def cliente_obra_fotos(token):
+    """Galeria avançada de fotos"""
+    from collections import defaultdict
+    obra = Obra.query.filter_by(token_cliente=token).first_or_404()
+    
+    if not obra.portal_ativo:
+        return redirect(url_for("main.cliente_obra_dashboard", token=token))
+    
+    # Obter todas as fotos
+    fotos_query = db.session.query(RDOFoto, RDO).join(RDO).filter(
+        RDO.obra_id == obra.id,
+        RDO.status == "Finalizado"
+    ).order_by(RDO.data_relatorio.desc())
+    
+    todas_fotos = fotos_query.all()
+    
+    # Organizar por data
+    fotos_por_data = defaultdict(list)
+    for foto, rdo in todas_fotos:
+        data_str = rdo.data_relatorio.strftime("%Y-%m-%d")
+        fotos_por_data[data_str].append({"foto": foto, "rdo": rdo})
+    
+    fotos_organizadas = []
+    for data_str in sorted(fotos_por_data.keys(), reverse=True):
+        fotos_do_dia = fotos_por_data[data_str]
+        fotos_organizadas.append({
+            "data": datetime.strptime(data_str, "%Y-%m-%d").date(),
+            "fotos": fotos_do_dia,
+            "total": len(fotos_do_dia)
+        })
+    
+    return render_template("cliente/obra_fotos.html",
+                         obra=obra,
+                         fotos_organizadas=fotos_organizadas,
+                         total_fotos=len(todas_fotos))
+
+@main_bp.route("/cliente/obra/<token>/timeline")
+def cliente_obra_timeline(token):
+    """Timeline completa"""
+    obra = Obra.query.filter_by(token_cliente=token).first_or_404()
+    
+    if not obra.portal_ativo:
+        return redirect(url_for("main.cliente_obra_dashboard", token=token))
+    
+    timeline_completa = obter_timeline_obra(obra.id, limite=50)
+    progresso = calcular_progresso_obra_cliente(obra.id)
+    
+    return render_template("cliente/obra_timeline.html",
+                         obra=obra,
+                         timeline_completa=timeline_completa,
+                         progresso=progresso)
+
+@main_bp.route("/cliente/obra/<token>/notificacoes")
+def cliente_obra_notificacoes(token):
+    """Central de notificações"""
+    obra = Obra.query.filter_by(token_cliente=token).first_or_404()
+    
+    if not obra.portal_ativo:
+        return redirect(url_for("main.cliente_obra_dashboard", token=token))
+    
+    # Marcar como lidas
+    NotificacaoCliente.query.filter_by(obra_id=obra.id).update({"visualizada": True})
+    db.session.commit()
+    
+    notificacoes = NotificacaoCliente.query.filter_by(obra_id=obra.id).order_by(
+        NotificacaoCliente.created_at.desc()
+    ).all()
+    
+    return render_template("cliente/obra_notificacoes.html",
+                         obra=obra,
+                         notificacoes=notificacoes)
+
+# ===== APIs EM TEMPO REAL =====
+
+@main_bp.route("/api/cliente/obra/<token>/progresso")
+def api_cliente_progresso(token):
+    """API para progresso em tempo real"""
+    obra = Obra.query.filter_by(token_cliente=token).first_or_404()
+    progresso = calcular_progresso_obra_cliente(obra.id)
+    
+    return jsonify({
+        "progresso_geral": progresso["percentual_geral"],
+        "atividades_concluidas": progresso["atividades_concluidas"],
+        "atividades_total": progresso["atividades_total"],
+        "velocidade_media": progresso["velocidade_media"]
+    })
+
+@main_bp.route("/api/cliente/obra/<token>/fotos-recentes")
+def api_cliente_fotos_recentes(token):
+    """API para fotos recentes"""
+    obra = Obra.query.filter_by(token_cliente=token).first_or_404()
+    fotos = obter_fotos_obra_recentes(obra.id, 3)
+    
+    return jsonify([{
+        "url": foto["url"],
+        "descricao": foto["descricao"],
+        "data": foto["data"].isoformat()
+    } for foto in fotos])
+
