@@ -106,8 +106,9 @@
         <div class="col-md-3">
             <div class="card bg-warning text-white">
                 <div class="card-body">
-                    <h5 class="card-title">Horas Extras</h5>
                     <h3 class="mb-0">{{ '{:.1f}h'.format(registros|sum(attribute='horas_extras') or 0) }}</h3>
+                    <h6 class="mb-2">R$ {{ '{:,.2f}'.format(total_valor_extras or 0) }}</h6>
+                    <h5 class="card-title mb-0">Horas Extras</h5>
                 </div>
             </div>
         </div>

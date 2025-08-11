@@ -6029,10 +6029,35 @@ def controle_ponto():
         status='Em andamento'
     ).order_by(Obra.nome).all()
     
+    # Calcular valor total das horas extras com base na legislação brasileira
+    total_valor_extras = 0.0
+    for registro in registros:
+        if registro.horas_extras and registro.horas_extras > 0 and registro.funcionario:
+            funcionario = registro.funcionario
+            
+            # Usar horário específico ou padrão 176h
+            if funcionario.horario_trabalho and funcionario.horario_trabalho.horas_diarias:
+                horas_mensais = funcionario.horario_trabalho.horas_diarias * 22
+            else:
+                horas_mensais = 176  # 8h × 22 dias úteis
+            
+            if funcionario.salario:
+                valor_hora_normal = funcionario.salario / horas_mensais
+                
+                # Multiplicador conforme legislação brasileira (CLT)
+                if registro.tipo_registro in ['domingo_trabalhado', 'domingo_horas_extras', 'feriado_trabalhado']:
+                    multiplicador = 2.0  # 100% adicional
+                else:
+                    multiplicador = 1.5  # 50% adicional padrão
+                
+                valor_extras_registro = registro.horas_extras * valor_hora_normal * multiplicador
+                total_valor_extras += valor_extras_registro
+    
     return render_template('controle_ponto.html',
                          registros=registros,
                          funcionarios=funcionarios,
-                         obras=obras)
+                         obras=obras,
+                         total_valor_extras=total_valor_extras)
 
 @main_bp.route('/ponto/registro', methods=['POST'])
 @login_required
