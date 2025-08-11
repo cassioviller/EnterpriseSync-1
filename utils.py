@@ -772,21 +772,17 @@ def calcular_kpis_funcionario_periodo(funcionario_id, data_inicio=None, data_fim
     # Calcular valor monetário das faltas com DSR (Lei 605/49 + CLT)
     valor_faltas = 0.0
     valor_dia = 0.0
-    valor_faltas_estrito = 0.0
+
     semanas_com_falta = 0
     
     if faltas > 0 and funcionario.salario:
         valor_dia = funcionario.salario / 30  # Valor do dia
         
-        # MÉTODO SIMPLIFICADO (prática comum)
-        # 1 falta injustificada = 2 dias de desconto (falta + DSR)
-        valor_falta_unitario = 2 * valor_dia
-        valor_faltas = faltas * valor_falta_unitario
-        
-        # MÉTODO ESTRITO (Lei 605/49) usando função dedicada
+        # CÁLCULO DE FALTAS INJUSTIFICADAS - MODO ESTRITO (Lei 605/49)
+        # Análise semana a semana conforme legislação brasileira
         registros_faltas = [r for r in registros_ponto if r.tipo_registro == 'falta']
         dsr_estrito = calcular_dsr_modo_estrito(funcionario.salario, registros_faltas, data_inicio, data_fim)
-        valor_faltas_estrito = dsr_estrito["desconto_total"]
+        valor_faltas = dsr_estrito["desconto_total"]
         semanas_com_falta = dsr_estrito["semanas_com_perda"]
     
     # Calcular faltas justificadas (já contado no loop acima, mas vamos recalcular para garantir)
@@ -838,8 +834,7 @@ def calcular_kpis_funcionario_periodo(funcionario_id, data_inicio=None, data_fim
         'valor_horas_extras': valor_horas_extras,  # Valor monetário das horas extras
         'valor_hora_atual': valor_hora_base,  # Valor hora atual do funcionário
         'faltas': faltas,
-        'valor_faltas': valor_faltas,  # Método simplificado (2 dias/falta)
-        'valor_faltas_estrito': valor_faltas_estrito,  # Método estrito (Lei 605/49)
+        'valor_faltas': valor_faltas,  # Método estrito Lei 605/49 (DSR semana a semana)
         'valor_dia': valor_dia,  # Valor do dia para transparência
         'semanas_com_falta': semanas_com_falta,  # Semanas que perderam DSR
         'atrasos': atrasos,

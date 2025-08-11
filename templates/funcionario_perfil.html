@@ -166,10 +166,7 @@
                             <h4 class="text-danger mb-1">{{ kpis.faltas }}</h4>
                             {% if kpis.valor_faltas is defined and kpis.valor_faltas > 0 %}
                             <div class="text-danger fw-bold">-R$ {{ '{:,.2f}'.format(kpis.valor_faltas) }}</div>
-                            <div class="text-muted" style="font-size: 10px;">(Falta+DSR) Simplificado</div>
-                            {% if kpis.valor_faltas_estrito is defined and kpis.valor_faltas_estrito != kpis.valor_faltas %}
-                            <div class="text-info" style="font-size: 9px;">Estrito: -R$ {{ '{:,.2f}'.format(kpis.valor_faltas_estrito) }}</div>
-                            {% endif %}
+                            <div class="text-muted" style="font-size: 10px;">Lei 605/49 (DSR estrito)</div>
                             {% endif %}
                             <small class="text-muted">Faltas</small>
                         </div>
