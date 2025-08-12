@@ -3,6 +3,111 @@
 {% block title %}Dashboard - SIGE{% endblock %}
 
 {% block content %}
+<style>
+/* Correção de alinhamento para botões do header */
+.header-btn {
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    padding: 0.5rem 1rem !important;
+    min-height: 38px !important;
+    white-space: nowrap !important;
+    vertical-align: middle !important;
+}
+
+.header-btn i {
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    width: 16px !important;
+    height: 16px !important;
+    margin-right: 0.5rem !important;
+    margin-top: 0 !important;
+    margin-bottom: 0 !important;
+    vertical-align: middle !important;
+    line-height: 1 !important;
+}
+
+.header-btn span {
+    display: inline-flex !important;
+    align-items: center !important;
+    height: 16px !important;
+    line-height: 16px !important;
+    vertical-align: middle !important;
+    margin: 0 !important;
+}
+
+/* Correção específica para btn-group */
+.btn-group .header-btn {
+    border-radius: 0 !important;
+}
+
+.btn-group .header-btn:first-child {
+    border-top-left-radius: 0.375rem !important;
+    border-bottom-left-radius: 0.375rem !important;
+}
+
+.btn-group .header-btn:last-child {
+    border-top-right-radius: 0.375rem !important;
+    border-bottom-right-radius: 0.375rem !important;
+}
+
+/* Garantir alinhamento em qualquer dispositivo */
+@media (max-width: 768px) {
+    .header-btn {
+        min-height: 36px !important;
+        padding: 0.4rem 0.8rem !important;
+    }
+}
+
+/* Correção global para todos os ícones e textos desalinhados */
+.card-title i,
+.btn i,
+.nav-link i,
+.dropdown-item i {
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    width: 16px !important;
+    height: 16px !important;
+    margin-right: 0.5rem !important;
+    vertical-align: middle !important;
+    line-height: 1 !important;
+}
+
+/* Correção para elementos de formulário */
+.form-label,
+.btn span,
+.card-title,
+.nav-link span {
+    display: inline-flex !important;
+    align-items: center !important;
+    vertical-align: middle !important;
+    line-height: 1.4 !important;
+}
+
+/* Correção específica para tema escuro */
+html[data-bs-theme="dark"] .header-btn {
+    color: inherit !important;
+}
+
+html[data-bs-theme="dark"] .header-btn i {
+    color: inherit !important;
+}
+
+/* Correção para navbar e outros componentes */
+.navbar-nav .nav-link {
+    display: inline-flex !important;
+    align-items: center !important;
+    padding: 0.5rem 1rem !important;
+}
+
+.card-header .card-title {
+    display: inline-flex !important;
+    align-items: center !important;
+    margin-bottom: 0 !important;
+}
+</style>
 <div class="container-fluid">
     <!-- Header Profissional Completo -->
     <div class="d-flex justify-content-between align-items-center mb-4 p-4 bg-white rounded shadow-sm border">
@@ -20,32 +125,32 @@
         </div>
         <div class="d-flex flex-wrap gap-2">
             <div class="btn-group">
-                <a href="/funcionarios" class="btn btn-primary d-flex align-items-center">
-                    <i class="fas fa-users me-2"></i>
+                <a href="/funcionarios" class="btn btn-primary header-btn">
+                    <i class="fas fa-users"></i>
                     <span>Funcionários</span>
                 </a>
-                <a href="/obras" class="btn btn-outline-primary d-flex align-items-center">
-                    <i class="fas fa-building me-2"></i>
+                <a href="/obras" class="btn btn-outline-primary header-btn">
+                    <i class="fas fa-building"></i>
                     <span>Obras</span>
                 </a>
             </div>
             <div class="btn-group">
-                <a href="/propostas" class="btn btn-outline-success d-flex align-items-center">
-                    <i class="fas fa-handshake me-2"></i>
+                <a href="/propostas" class="btn btn-outline-success header-btn">
+                    <i class="fas fa-handshake"></i>
                     <span>Propostas</span>
                 </a>
-                <a href="/relatorios" class="btn btn-outline-info d-flex align-items-center">
-                    <i class="fas fa-chart-bar me-2"></i>
+                <a href="/relatorios" class="btn btn-outline-info header-btn">
+                    <i class="fas fa-chart-bar"></i>
                     <span>Relatórios</span>
                 </a>
             </div>
             <div class="btn-group">
-                <a href="/veiculos" class="btn btn-outline-warning d-flex align-items-center">
-                    <i class="fas fa-truck me-2"></i>
+                <a href="/veiculos" class="btn btn-outline-warning header-btn">
+                    <i class="fas fa-truck"></i>
                     <span>Veículos</span>
                 </a>
-                <a href="{{ url_for('servicos.dashboard') }}" class="btn btn-outline-secondary d-flex align-items-center">
-                    <i class="fas fa-cogs me-2"></i>
+                <a href="{{ url_for('servicos.dashboard') }}" class="btn btn-outline-secondary header-btn">
+                    <i class="fas fa-cogs"></i>
                     <span>Serviços</span>
                 </a>
             </div>
