@@ -1,0 +1,395 @@
+{% extends "base.html" %}
+
+{% block title %}Proposta {{ proposta.numero_proposta }} - SIGE{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <!-- Cabeçalho -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h1 class="h3 mb-2">
+                <i class="fas fa-file-contract text-primary me-2"></i>
+                Proposta {{ proposta.numero_proposta }}
+            </h1>
+            <p class="text-muted mb-0">{{ proposta.cliente_nome }} - {{ proposta.assunto }}</p>
+        </div>
+        <div class="btn-group">
+            <a href="{{ url_for('propostas.listar_propostas') }}" class="btn btn-secondary">
+                <i class="fas fa-arrow-left me-2"></i>Voltar
+            </a>
+            <a href="{{ url_for('propostas.editar_proposta', id=proposta.id) }}" class="btn btn-warning">
+                <i class="fas fa-edit me-2"></i>Editar
+            </a>
+            <a href="{{ url_for('propostas.gerar_pdf', id=proposta.id) }}" class="btn btn-success" target="_blank">
+                <i class="fas fa-file-pdf me-2"></i>PDF
+            </a>
+            {% if proposta.status == 'rascunho' %}
+            <button type="button" class="btn btn-primary" onclick="enviarProposta()">
+                <i class="fas fa-paper-plane me-2"></i>Enviar
+            </button>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="row">
+        <!-- Informações Principais -->
+        <div class="col-lg-8">
+            <!-- Status e Dados Básicos -->
+            <div class="card mb-4">
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-3">
+                            <h6 class="text-muted">Status</h6>
+                            {% if proposta.status == 'rascunho' %}
+                                <span class="badge bg-secondary fs-6">Rascunho</span>
+                            {% elif proposta.status == 'enviada' %}
+                                <span class="badge bg-warning fs-6">Enviada</span>
+                            {% elif proposta.status == 'aprovada' %}
+                                <span class="badge bg-success fs-6">Aprovada</span>
+                            {% elif proposta.status == 'rejeitada' %}
+                                <span class="badge bg-danger fs-6">Rejeitada</span>
+                            {% endif %}
+                        </div>
+                        <div class="col-md-3">
+                            <h6 class="text-muted">Data da Proposta</h6>
+                            <p class="mb-0">{{ proposta.data_proposta.strftime('%d/%m/%Y') if proposta.data_proposta else '' }}</p>
+                        </div>
+                        <div class="col-md-3">
+                            <h6 class="text-muted">Valor Total</h6>
+                            <p class="mb-0 text-success fw-bold fs-5">
+                                R$ {{ "{:,.2f}".format(proposta.valor_total or 0).replace(',', 'X').replace('.', ',').replace('X', '.') }}
+                            </p>
+                        </div>
+                        <div class="col-md-3">
+                            <h6 class="text-muted">Validade</h6>
+                            <p class="mb-0">{{ proposta.validade_dias }} dias</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Dados do Cliente -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="fas fa-user me-2"></i>Dados do Cliente</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <h6 class="text-muted">Nome</h6>
+                            <p>{{ proposta.cliente_nome }}</p>
+                        </div>
+                        <div class="col-md-3">
+                            <h6 class="text-muted">Telefone</h6>
+                            <p>{{ proposta.cliente_telefone or '-' }}</p>
+                        </div>
+                        <div class="col-md-3">
+                            <h6 class="text-muted">E-mail</h6>
+                            <p>{{ proposta.cliente_email or '-' }}</p>
+                        </div>
+                        {% if proposta.cliente_endereco %}
+                        <div class="col-12">
+                            <h6 class="text-muted">Endereço</h6>
+                            <p>{{ proposta.cliente_endereco }}</p>
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+
+            <!-- Objeto da Proposta -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="fas fa-file-alt me-2"></i>Objeto da Proposta</h5>
+                </div>
+                <div class="card-body">
+                    <h6 class="text-muted">Assunto</h6>
+                    <p>{{ proposta.assunto }}</p>
+                    
+                    <h6 class="text-muted">Descrição</h6>
+                    <p style="white-space: pre-line;">{{ proposta.objeto }}</p>
+                    
+                    {% if proposta.documentos_referencia %}
+                    <h6 class="text-muted">Documentos de Referência</h6>
+                    <p style="white-space: pre-line;">{{ proposta.documentos_referencia }}</p>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Tabela de Serviços -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="fas fa-table me-2"></i>Tabela de Serviços</h5>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-bordered">
+                            <thead class="table-light">
+                                <tr>
+                                    <th style="width: 5%">Item</th>
+                                    <th style="width: 50%">Descrição</th>
+                                    <th style="width: 10%">Qtd</th>
+                                    <th style="width: 10%">Unidade</th>
+                                    <th style="width: 12.5%">Preço Unit.</th>
+                                    <th style="width: 12.5%">Subtotal</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for item in proposta.itens %}
+                                <tr>
+                                    <td class="text-center">{{ item.item_numero }}</td>
+                                    <td>{{ item.descricao }}</td>
+                                    <td class="text-center">{{ "{:,.3f}".format(item.quantidade).replace(',', 'X').replace('.', ',').replace('X', '.') }}</td>
+                                    <td class="text-center">{{ item.unidade }}</td>
+                                    <td class="text-end">R$ {{ "{:,.2f}".format(item.preco_unitario).replace(',', 'X').replace('.', ',').replace('X', '.') }}</td>
+                                    <td class="text-end">R$ {{ "{:,.2f}".format(item.subtotal).replace(',', 'X').replace('.', ',').replace('X', '.') }}</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                            <tfoot>
+                                <tr class="table-success">
+                                    <td colspan="5" class="text-end"><strong>VALOR TOTAL:</strong></td>
+                                    <td class="text-end"><strong>R$ {{ "{:,.2f}".format(proposta.valor_total or 0).replace(',', 'X').replace('.', ',').replace('X', '.') }}</strong></td>
+                                </tr>
+                            </tfoot>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Itens Inclusos e Exclusos -->
+            <div class="row">
+                <div class="col-md-6">
+                    <div class="card mb-4">
+                        <div class="card-header">
+                            <h6 class="mb-0"><i class="fas fa-check-circle text-success me-2"></i>Itens Inclusos</h6>
+                        </div>
+                        <div class="card-body">
+                            {% if proposta.itens_inclusos %}
+                                <ul class="list-unstyled mb-0">
+                                    {% for item in proposta.itens_inclusos %}
+                                    <li><i class="fas fa-check text-success me-2"></i>{{ item }}</li>
+                                    {% endfor %}
+                                </ul>
+                            {% else %}
+                                <p class="text-muted">Nenhum item especificado</p>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="col-md-6">
+                    <div class="card mb-4">
+                        <div class="card-header">
+                            <h6 class="mb-0"><i class="fas fa-times-circle text-danger me-2"></i>Itens Exclusos</h6>
+                        </div>
+                        <div class="card-body">
+                            {% if proposta.itens_exclusos %}
+                                <ul class="list-unstyled mb-0">
+                                    {% for item in proposta.itens_exclusos %}
+                                    <li><i class="fas fa-times text-danger me-2"></i>{{ item }}</li>
+                                    {% endfor %}
+                                </ul>
+                            {% else %}
+                                <p class="text-muted">Nenhum item especificado</p>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Sidebar -->
+        <div class="col-lg-4">
+            <!-- Condições -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h6 class="mb-0"><i class="fas fa-handshake me-2"></i>Condições</h6>
+                </div>
+                <div class="card-body">
+                    <h6 class="text-muted">Prazo de Entrega</h6>
+                    <p>{{ proposta.prazo_entrega_dias }} dias</p>
+                    
+                    {% if proposta.observacoes_entrega %}
+                    <h6 class="text-muted">Observações de Entrega</h6>
+                    <p style="white-space: pre-line;">{{ proposta.observacoes_entrega }}</p>
+                    {% endif %}
+                    
+                    <h6 class="text-muted">Percentual Nota Fiscal</h6>
+                    <p>{{ proposta.percentual_nota_fiscal }}%</p>
+                </div>
+            </div>
+
+            <!-- Condições de Pagamento -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h6 class="mb-0"><i class="fas fa-credit-card me-2"></i>Condições de Pagamento</h6>
+                </div>
+                <div class="card-body">
+                    <p style="white-space: pre-line;">{{ proposta.condicoes_pagamento }}</p>
+                </div>
+            </div>
+
+            <!-- Garantias -->
+            {% if proposta.garantias %}
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h6 class="mb-0"><i class="fas fa-shield-alt me-2"></i>Garantias</h6>
+                </div>
+                <div class="card-body">
+                    <p style="white-space: pre-line;">{{ proposta.garantias }}</p>
+                </div>
+            </div>
+            {% endif %}
+
+            <!-- Portal do Cliente -->
+            {% if proposta.status != 'rascunho' %}
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h6 class="mb-0"><i class="fas fa-link me-2"></i>Portal do Cliente</h6>
+                </div>
+                <div class="card-body">
+                    <p class="small text-muted">Link para o cliente visualizar e aprovar a proposta:</p>
+                    <div class="input-group">
+                        <input type="text" class="form-control" 
+                               value="{{ url_for('propostas.portal_cliente', token=proposta.token_cliente, _external=True) }}" 
+                               id="linkPortal" readonly>
+                        <button class="btn btn-outline-secondary" type="button" onclick="copiarLink()">
+                            <i class="fas fa-copy"></i>
+                        </button>
+                    </div>
+                    {% if proposta.data_resposta_cliente %}
+                    <div class="mt-3">
+                        <p class="small text-muted mb-1">Resposta do cliente:</p>
+                        <p class="small">{{ proposta.data_resposta_cliente.strftime('%d/%m/%Y às %H:%M') }}</p>
+                        {% if proposta.observacoes_cliente %}
+                        <p class="small">{{ proposta.observacoes_cliente }}</p>
+                        {% endif %}
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+            {% endif %}
+
+            <!-- Arquivos -->
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h6 class="mb-0"><i class="fas fa-paperclip me-2"></i>Arquivos</h6>
+                    <button class="btn btn-primary btn-sm" onclick="$('#modalUpload').modal('show')">
+                        <i class="fas fa-upload"></i> Upload
+                    </button>
+                </div>
+                <div class="card-body">
+                    {% if proposta.arquivos %}
+                        <div class="list-group list-group-flush">
+                            {% for arquivo in proposta.arquivos %}
+                            <div class="list-group-item d-flex justify-content-between align-items-center px-0">
+                                <div>
+                                    <i class="fas fa-file me-2"></i>
+                                    <span class="small">{{ arquivo.nome_original }}</span>
+                                    <br>
+                                    <small class="text-muted">{{ arquivo.categoria }} - {{ (arquivo.tamanho_bytes / 1024) | round(1) }}KB</small>
+                                </div>
+                                <a href="#" class="btn btn-outline-primary btn-sm">
+                                    <i class="fas fa-download"></i>
+                                </a>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    {% else %}
+                        <p class="text-muted text-center">Nenhum arquivo anexado</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal de Upload -->
+<div class="modal fade" id="modalUpload" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Upload de Arquivo</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="formUpload" enctype="multipart/form-data">
+                    <div class="mb-3">
+                        <label class="form-label">Selecionar Arquivo</label>
+                        <input type="file" name="arquivo" class="form-control" accept=".pdf,.dwg,.dxf,.png,.jpg,.jpeg,.gif,.doc,.docx,.xlsx,.xls">
+                        <div class="form-text">Formatos permitidos: PDF, DWG, DXF, imagens, documentos</div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-primary" onclick="uploadArquivo()">Upload</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal de Envio -->
+<div class="modal fade" id="modalEnviar" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Enviar Proposta</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p>Tem certeza que deseja enviar esta proposta para o cliente?</p>
+                <p class="text-info"><small>Após o envio, será gerado um link para o cliente visualizar e aprovar a proposta.</small></p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <form method="POST" action="{{ url_for('propostas.enviar_proposta', id=proposta.id) }}" style="display: inline;">
+                    <button type="submit" class="btn btn-primary">Enviar</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function copiarLink() {
+    const linkInput = document.getElementById('linkPortal');
+    linkInput.select();
+    document.execCommand('copy');
+    
+    // Mostrar feedback
+    const btn = event.target.closest('button');
+    const originalHtml = btn.innerHTML;
+    btn.innerHTML = '<i class="fas fa-check text-success"></i>';
+    setTimeout(() => {
+        btn.innerHTML = originalHtml;
+    }, 2000);
+}
+
+function enviarProposta() {
+    new bootstrap.Modal(document.getElementById('modalEnviar')).show();
+}
+
+function uploadArquivo() {
+    const form = document.getElementById('formUpload');
+    const formData = new FormData(form);
+    
+    fetch(`{{ url_for('propostas.upload_arquivo', id=proposta.id) }}`, {
+        method: 'POST',
+        body: formData
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            location.reload();
+        } else {
+            alert('Erro ao fazer upload: ' + data.error);
+        }
+    })
+    .catch(error => {
+        alert('Erro ao fazer upload: ' + error.message);
+    });
+}
+</script>
+{% endblock %}

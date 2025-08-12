@@ -3411,11 +3411,11 @@ def excluir_categoria(categoria_id):
 # ================================
         try:
             # Gerar número da proposta
-            ultimo_numero = db.session.query(func.max(PropostaComercial.id)).scalar() or 0
+            ultimo_numero = db.session.query(func.max(PropostaComercialSIGE.id)).scalar() or 0
             numero_proposta = f"PROP-{datetime.now().year}-{ultimo_numero + 1:03d}"
             
             # Criar proposta
-            proposta = PropostaComercial(
+            proposta = PropostaComercialSIGE(
                 numero_proposta=numero_proposta,
                 cliente_nome=request.form['cliente_nome'],
                 cliente_email=request.form['cliente_email'],
@@ -3437,7 +3437,7 @@ def excluir_categoria(categoria_id):
             servicos_data = request.form.getlist('servicos')
             for i, servico_json in enumerate(servicos_data):
                 servico = json.loads(servico_json)
-                servico_obj = ServicoPropostaComercial(
+                servico_obj = ServicoPropostaComercialSIGE(
                     proposta_id=proposta.id,
                     descricao_servico=servico['descricao'],
                     quantidade=servico['quantidade'],
@@ -3465,7 +3465,7 @@ def excluir_categoria(categoria_id):
 @admin_required
 def detalhes_proposta(id):
     """Exibe os detalhes de uma proposta"""
-    proposta = PropostaComercial.query.filter_by(id=id, admin_id=current_user.id).first_or_404()
+    proposta = PropostaComercialSIGE.query.filter_by(id=id, admin_id=current_user.id).first_or_404()
     return render_template('propostas/detalhes_proposta.html', proposta=proposta)
 
 @main_bp.route('/propostas/<int:id>/enviar', methods=['POST'])
@@ -3474,7 +3474,7 @@ def detalhes_proposta(id):
 def enviar_proposta(id):
     """Envia a proposta para o cliente"""
     try:
-        proposta = PropostaComercial.query.filter_by(id=id, admin_id=current_user.id).first_or_404()
+        proposta = PropostaComercialSIGE.query.filter_by(id=id, admin_id=current_user.id).first_or_404()
         
         # Gerar token de acesso único
         import secrets
@@ -3498,7 +3498,7 @@ def enviar_proposta(id):
 @main_bp.route('/cliente/proposta/<token>')
 def cliente_proposta(token):
     """Portal do cliente para visualizar proposta"""
-    proposta = PropostaComercial.query.filter_by(token_acesso=token).first_or_404()
+    proposta = PropostaComercialSIGE.query.filter_by(token_acesso=token).first_or_404()
     
     # Verificar se a proposta não expirou
     if proposta.data_expiracao and datetime.utcnow() > proposta.data_expiracao:
@@ -3511,7 +3511,7 @@ def cliente_proposta(token):
 def cliente_aprovar_proposta(token):
     """Cliente aprova a proposta"""
     try:
-        proposta = PropostaComercial.query.filter_by(token_acesso=token).first_or_404()
+        proposta = PropostaComercialSIGE.query.filter_by(token_acesso=token).first_or_404()
         
         if proposta.status != 'Enviada':
             flash('Esta proposta não pode mais ser aprovada.', 'warning')
@@ -3537,7 +3537,7 @@ def cliente_aprovar_proposta(token):
 def cliente_rejeitar_proposta(token):
     """Cliente rejeita a proposta"""
     try:
-        proposta = PropostaComercial.query.filter_by(token_acesso=token).first_or_404()
+        proposta = PropostaComercialSIGE.query.filter_by(token_acesso=token).first_or_404()
         
         if proposta.status != 'Enviada':
             flash('Esta proposta não pode mais ser rejeitada.', 'warning')
@@ -7835,7 +7835,7 @@ def cliente_obra_dashboard(token):
 def cliente_aprovar_proposta_v2(token):
     """Cliente aprova proposta e gera obra"""
     try:
-        proposta = PropostaComercial.query.filter_by(token_acesso=token).first()
+        proposta = PropostaComercialSIGE.query.filter_by(token_acesso=token).first()
         if not proposta:
             return jsonify({"success": False, "message": "Proposta não encontrada"}), 404
         

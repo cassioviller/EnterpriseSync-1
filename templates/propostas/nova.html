@@ -1,0 +1,369 @@
+{% extends "base.html" %}
+
+{% block title %}Nova Proposta - SIGE{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <div class="row">
+        <div class="col-12">
+            <!-- Cabeçalho -->
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <div>
+                    <h1 class="h3 mb-2">
+                        <i class="fas fa-file-contract text-primary me-2"></i>
+                        Nova Proposta Comercial
+                    </h1>
+                    <p class="text-muted mb-0">Preencha os dados para gerar uma proposta profissional</p>
+                </div>
+                <a href="{{ url_for('propostas.listar_propostas') }}" class="btn btn-secondary">
+                    <i class="fas fa-arrow-left me-2"></i>Voltar
+                </a>
+            </div>
+
+            <form method="POST" action="{{ url_for('propostas.criar_proposta') }}" id="formProposta">
+                <div class="row">
+                    <!-- Coluna Principal -->
+                    <div class="col-lg-8">
+                        <!-- Dados do Cliente -->
+                        <div class="card mb-4">
+                            <div class="card-header">
+                                <h5 class="mb-0"><i class="fas fa-user me-2"></i>Dados do Cliente</h5>
+                            </div>
+                            <div class="card-body">
+                                <div class="row g-3">
+                                    <div class="col-md-6">
+                                        <label class="form-label">Nome do Cliente *</label>
+                                        <input type="text" name="cliente_nome" class="form-control" required>
+                                    </div>
+                                    <div class="col-md-3">
+                                        <label class="form-label">Telefone</label>
+                                        <input type="text" name="cliente_telefone" class="form-control">
+                                    </div>
+                                    <div class="col-md-3">
+                                        <label class="form-label">E-mail</label>
+                                        <input type="email" name="cliente_email" class="form-control">
+                                    </div>
+                                    <div class="col-12">
+                                        <label class="form-label">Endereço</label>
+                                        <textarea name="cliente_endereco" class="form-control" rows="2"></textarea>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Dados da Proposta -->
+                        <div class="card mb-4">
+                            <div class="card-header">
+                                <h5 class="mb-0"><i class="fas fa-file-alt me-2"></i>Dados da Proposta</h5>
+                            </div>
+                            <div class="card-body">
+                                <div class="row g-3">
+                                    <div class="col-12">
+                                        <label class="form-label">Assunto *</label>
+                                        <input type="text" name="assunto" class="form-control" 
+                                               placeholder="Ex: Fabricação e montagem de estrutura metálica" required>
+                                    </div>
+                                    <div class="col-12">
+                                        <label class="form-label">Objeto da Proposta *</label>
+                                        <textarea name="objeto" class="form-control" rows="4" required
+                                                  placeholder="Descreva detalhadamente o escopo do trabalho..."></textarea>
+                                    </div>
+                                    <div class="col-12">
+                                        <label class="form-label">Documentos de Referência</label>
+                                        <textarea name="documentos_referencia" class="form-control" rows="2"
+                                                  placeholder="Liste os documentos fornecidos pelo cliente..."></textarea>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Tabela de Serviços -->
+                        <div class="card mb-4">
+                            <div class="card-header d-flex justify-content-between align-items-center">
+                                <h5 class="mb-0"><i class="fas fa-table me-2"></i>Tabela de Serviços</h5>
+                                <div>
+                                    <select id="selectorTemplate" class="form-select form-select-sm me-2" style="width: auto; display: inline-block;">
+                                        <option value="">Selecionar template...</option>
+                                        {% for template in templates %}
+                                        <option value="{{ template.id }}">{{ template.nome }}</option>
+                                        {% endfor %}
+                                    </select>
+                                    <button type="button" class="btn btn-success btn-sm" onclick="adicionarItem()">
+                                        <i class="fas fa-plus"></i> Adicionar Item
+                                    </button>
+                                </div>
+                            </div>
+                            <div class="card-body">
+                                <div class="table-responsive">
+                                    <table class="table table-bordered" id="tabelaServicos">
+                                        <thead>
+                                            <tr class="table-light">
+                                                <th style="width: 5%">Item</th>
+                                                <th style="width: 45%">Descrição</th>
+                                                <th style="width: 10%">Qtd</th>
+                                                <th style="width: 10%">Unidade</th>
+                                                <th style="width: 15%">Preço Unit.</th>
+                                                <th style="width: 15%">Subtotal</th>
+                                                <th style="width: 5%">Ações</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="itensServicos">
+                                            <!-- Itens serão adicionados dinamicamente -->
+                                        </tbody>
+                                        <tfoot>
+                                            <tr class="table-success">
+                                                <td colspan="5" class="text-end"><strong>VALOR TOTAL:</strong></td>
+                                                <td><strong id="valorTotal">R$ 0,00</strong></td>
+                                                <td></td>
+                                            </tr>
+                                        </tfoot>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Itens Inclusos e Exclusos -->
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="card mb-4">
+                                    <div class="card-header">
+                                        <h6 class="mb-0"><i class="fas fa-check-circle text-success me-2"></i>Itens Inclusos</h6>
+                                    </div>
+                                    <div class="card-body">
+                                        <div class="form-check">
+                                            <input class="form-check-input" type="checkbox" name="itens_inclusos" value="Mão de obra para execução dos serviços" checked>
+                                            <label class="form-check-label">Mão de obra para execução dos serviços</label>
+                                        </div>
+                                        <div class="form-check">
+                                            <input class="form-check-input" type="checkbox" name="itens_inclusos" value="Todos os equipamentos de segurança necessários" checked>
+                                            <label class="form-check-label">Todos os equipamentos de segurança necessários</label>
+                                        </div>
+                                        <div class="form-check">
+                                            <input class="form-check-input" type="checkbox" name="itens_inclusos" value="Transporte e alimentação da equipe" checked>
+                                            <label class="form-check-label">Transporte e alimentação da equipe</label>
+                                        </div>
+                                        <div class="form-check">
+                                            <input class="form-check-input" type="checkbox" name="itens_inclusos" value="Container para guarda de ferramentas" checked>
+                                            <label class="form-check-label">Container para guarda de ferramentas</label>
+                                        </div>
+                                        <div class="form-check">
+                                            <input class="form-check-input" type="checkbox" name="itens_inclusos" value="Movimentação de carga (Munck)" checked>
+                                            <label class="form-check-label">Movimentação de carga (Munck)</label>
+                                        </div>
+                                        <div class="form-check">
+                                            <input class="form-check-input" type="checkbox" name="itens_inclusos" value="Transporte dos materiais" checked>
+                                            <label class="form-check-label">Transporte dos materiais</label>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="col-md-6">
+                                <div class="card mb-4">
+                                    <div class="card-header">
+                                        <h6 class="mb-0"><i class="fas fa-times-circle text-danger me-2"></i>Itens Exclusos</h6>
+                                    </div>
+                                    <div class="card-body">
+                                        <div class="form-check">
+                                            <input class="form-check-input" type="checkbox" name="itens_exclusos" value="Projeto e execução de qualquer obra civil" checked>
+                                            <label class="form-check-label">Projeto e execução de qualquer obra civil</label>
+                                        </div>
+                                        <div class="form-check">
+                                            <input class="form-check-input" type="checkbox" name="itens_exclusos" value="Execução de ensaios destrutivos" checked>
+                                            <label class="form-check-label">Execução de ensaios destrutivos</label>
+                                        </div>
+                                        <div class="form-check">
+                                            <input class="form-check-input" type="checkbox" name="itens_exclusos" value="Fornecimento de local para armazenagem" checked>
+                                            <label class="form-check-label">Fornecimento de local para armazenagem</label>
+                                        </div>
+                                        <div class="form-check">
+                                            <input class="form-check-input" type="checkbox" name="itens_exclusos" value="Fornecimento de escoramento" checked>
+                                            <label class="form-check-label">Fornecimento de escoramento</label>
+                                        </div>
+                                        <div class="form-check">
+                                            <input class="form-check-input" type="checkbox" name="itens_exclusos" value="Fornecimento de andaimes" checked>
+                                            <label class="form-check-label">Fornecimento de andaimes</label>
+                                        </div>
+                                        <div class="form-check">
+                                            <input class="form-check-input" type="checkbox" name="itens_exclusos" value="Pintura final de acabamento" checked>
+                                            <label class="form-check-label">Pintura final de acabamento</label>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Sidebar -->
+                    <div class="col-lg-4">
+                        <!-- Condições de Entrega -->
+                        <div class="card mb-4">
+                            <div class="card-header">
+                                <h6 class="mb-0"><i class="fas fa-clock me-2"></i>Condições de Entrega</h6>
+                            </div>
+                            <div class="card-body">
+                                <div class="mb-3">
+                                    <label class="form-label">Prazo de Entrega (dias)</label>
+                                    <input type="number" name="prazo_entrega_dias" class="form-control" value="90" min="1">
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label">Observações</label>
+                                    <textarea name="observacoes_entrega" class="form-control" rows="3"
+                                              placeholder="Observações sobre prazos e entregas..."></textarea>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Condições de Pagamento -->
+                        <div class="card mb-4">
+                            <div class="card-header">
+                                <h6 class="mb-0"><i class="fas fa-credit-card me-2"></i>Condições de Pagamento</h6>
+                            </div>
+                            <div class="card-body">
+                                <div class="mb-3">
+                                    <label class="form-label">Percentual Nota Fiscal (%)</label>
+                                    <input type="number" name="percentual_nota_fiscal" class="form-control" value="13.5" step="0.1" min="0">
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label">Condições</label>
+                                    <textarea name="condicoes_pagamento" class="form-control" rows="6">10% de entrada na assinatura do contrato
+10% após projeto aprovado
+45% compra dos perfis
+25% no início da montagem in loco
+10% após a conclusão da montagem</textarea>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Outras Configurações -->
+                        <div class="card mb-4">
+                            <div class="card-header">
+                                <h6 class="mb-0"><i class="fas fa-cog me-2"></i>Configurações</h6>
+                            </div>
+                            <div class="card-body">
+                                <div class="mb-3">
+                                    <label class="form-label">Validade da Proposta (dias)</label>
+                                    <input type="number" name="validade_dias" class="form-control" value="7" min="1">
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Botões de Ação -->
+                        <div class="card">
+                            <div class="card-body">
+                                <button type="submit" class="btn btn-primary w-100 mb-2">
+                                    <i class="fas fa-save me-2"></i>Salvar Proposta
+                                </button>
+                                <a href="{{ url_for('propostas.listar_propostas') }}" class="btn btn-secondary w-100">
+                                    <i class="fas fa-times me-2"></i>Cancelar
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+let contadorItens = 0;
+
+function adicionarItem(descricao = '', quantidade = 1, unidade = 'un', preco = 0) {
+    contadorItens++;
+    
+    const tbody = document.getElementById('itensServicos');
+    const tr = document.createElement('tr');
+    tr.id = `item-${contadorItens}`;
+    
+    tr.innerHTML = `
+        <td class="text-center">${contadorItens}</td>
+        <td>
+            <input type="text" name="item_descricao" class="form-control" value="${descricao}" placeholder="Descrição do serviço">
+        </td>
+        <td>
+            <input type="number" name="item_quantidade" class="form-control" value="${quantidade}" step="0.001" min="0" onchange="calcularSubtotal(${contadorItens})">
+        </td>
+        <td>
+            <select name="item_unidade" class="form-select">
+                <option value="un" ${unidade === 'un' ? 'selected' : ''}>un</option>
+                <option value="m²" ${unidade === 'm²' ? 'selected' : ''}>m²</option>
+                <option value="m³" ${unidade === 'm³' ? 'selected' : ''}>m³</option>
+                <option value="kg" ${unidade === 'kg' ? 'selected' : ''}>kg</option>
+                <option value="vb" ${unidade === 'vb' ? 'selected' : ''}>vb</option>
+            </select>
+        </td>
+        <td>
+            <input type="number" name="item_preco" class="form-control" value="${preco}" step="0.01" min="0" onchange="calcularSubtotal(${contadorItens})">
+        </td>
+        <td>
+            <span class="subtotal fw-bold">R$ 0,00</span>
+        </td>
+        <td class="text-center">
+            <button type="button" class="btn btn-danger btn-sm" onclick="removerItem(${contadorItens})">
+                <i class="fas fa-trash"></i>
+            </button>
+        </td>
+    `;
+    
+    tbody.appendChild(tr);
+    calcularSubtotal(contadorItens);
+    calcularTotal();
+}
+
+function removerItem(itemId) {
+    const item = document.getElementById(`item-${itemId}`);
+    if (item) {
+        item.remove();
+        calcularTotal();
+    }
+}
+
+function calcularSubtotal(itemId) {
+    const tr = document.getElementById(`item-${itemId}`);
+    const quantidade = parseFloat(tr.querySelector('input[name="item_quantidade"]').value) || 0;
+    const preco = parseFloat(tr.querySelector('input[name="item_preco"]').value) || 0;
+    const subtotal = quantidade * preco;
+    
+    tr.querySelector('.subtotal').textContent = 'R$ ' + subtotal.toLocaleString('pt-BR', {minimumFractionDigits: 2});
+    calcularTotal();
+}
+
+function calcularTotal() {
+    let total = 0;
+    document.querySelectorAll('.subtotal').forEach(span => {
+        const valor = parseFloat(span.textContent.replace('R$ ', '').replace('.', '').replace(',', '.'));
+        if (!isNaN(valor)) total += valor;
+    });
+    
+    document.getElementById('valorTotal').textContent = 'R$ ' + total.toLocaleString('pt-BR', {minimumFractionDigits: 2});
+}
+
+// Carregar template
+document.getElementById('selectorTemplate').addEventListener('change', function() {
+    const templateId = this.value;
+    if (!templateId) return;
+    
+    fetch(`/propostas/api/template/${templateId}`)
+        .then(response => response.json())
+        .then(data => {
+            // Limpar itens existentes
+            document.getElementById('itensServicos').innerHTML = '';
+            contadorItens = 0;
+            
+            // Adicionar itens do template
+            if (data.itens_padrao) {
+                data.itens_padrao.forEach(item => {
+                    adicionarItem(item.descricao, item.quantidade, item.unidade, item.preco_unitario);
+                });
+            }
+        })
+        .catch(error => console.error('Erro ao carregar template:', error));
+});
+
+// Adicionar primeiro item vazio
+document.addEventListener('DOMContentLoaded', function() {
+    adicionarItem();
+});
+</script>
+{% endblock %}

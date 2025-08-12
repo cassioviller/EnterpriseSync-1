@@ -1,0 +1,209 @@
+{% extends "base.html" %}
+
+{% block title %}Propostas Comerciais - SIGE{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <!-- Cabeçalho -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h1 class="h3 mb-2">
+                <i class="fas fa-file-contract text-primary me-2"></i>
+                Propostas Comerciais
+            </h1>
+            <p class="text-muted mb-0">Gerencie todas as propostas enviadas aos clientes</p>
+        </div>
+        <a href="{{ url_for('propostas.nova_proposta') }}" class="btn btn-primary">
+            <i class="fas fa-plus me-2"></i>Nova Proposta
+        </a>
+    </div>
+
+    <!-- Filtros -->
+    <div class="card mb-4">
+        <div class="card-body">
+            <form method="GET" class="row g-3">
+                <div class="col-md-3">
+                    <label class="form-label">Status</label>
+                    <select name="status" class="form-select">
+                        <option value="">Todos os status</option>
+                        <option value="rascunho" {{ 'selected' if status_filter == 'rascunho' }}>Rascunho</option>
+                        <option value="enviada" {{ 'selected' if status_filter == 'enviada' }}>Enviada</option>
+                        <option value="aprovada" {{ 'selected' if status_filter == 'aprovada' }}>Aprovada</option>
+                        <option value="rejeitada" {{ 'selected' if status_filter == 'rejeitada' }}>Rejeitada</option>
+                    </select>
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label">Cliente</label>
+                    <input type="text" name="cliente" class="form-control" placeholder="Nome do cliente" value="{{ cliente_filter }}">
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label">&nbsp;</label>
+                    <div>
+                        <button type="submit" class="btn btn-outline-primary me-2">
+                            <i class="fas fa-search"></i> Filtrar
+                        </button>
+                        <a href="{{ url_for('propostas.listar_propostas') }}" class="btn btn-outline-secondary">
+                            <i class="fas fa-times"></i>
+                        </a>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Lista de Propostas -->
+    <div class="card">
+        <div class="card-body">
+            {% if propostas.items %}
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead>
+                            <tr>
+                                <th>Número</th>
+                                <th>Cliente</th>
+                                <th>Assunto</th>
+                                <th>Valor Total</th>
+                                <th>Status</th>
+                                <th>Data</th>
+                                <th class="text-center">Ações</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for proposta in propostas.items %}
+                            <tr>
+                                <td>
+                                    <strong class="text-primary">{{ proposta.numero_proposta }}</strong>
+                                </td>
+                                <td>
+                                    <div>
+                                        <strong>{{ proposta.cliente_nome }}</strong>
+                                        {% if proposta.cliente_telefone %}
+                                            <br><small class="text-muted">{{ proposta.cliente_telefone }}</small>
+                                        {% endif %}
+                                    </div>
+                                </td>
+                                <td>{{ proposta.assunto[:50] }}{% if proposta.assunto|length > 50 %}...{% endif %}</td>
+                                <td>
+                                    <strong class="text-success">R$ {{ "{:,.2f}".format(proposta.valor_total or 0).replace(',', 'X').replace('.', ',').replace('X', '.') }}</strong>
+                                </td>
+                                <td>
+                                    {% if proposta.status == 'rascunho' %}
+                                        <span class="badge bg-secondary">Rascunho</span>
+                                    {% elif proposta.status == 'enviada' %}
+                                        <span class="badge bg-warning">Enviada</span>
+                                    {% elif proposta.status == 'aprovada' %}
+                                        <span class="badge bg-success">Aprovada</span>
+                                    {% elif proposta.status == 'rejeitada' %}
+                                        <span class="badge bg-danger">Rejeitada</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <small>{{ proposta.criado_em.strftime('%d/%m/%Y') if proposta.criado_em else '' }}</small>
+                                </td>
+                                <td class="text-center">
+                                    <div class="btn-group btn-group-sm">
+                                        <a href="{{ url_for('propostas.visualizar_proposta', id=proposta.id) }}" 
+                                           class="btn btn-outline-primary" title="Visualizar">
+                                            <i class="fas fa-eye"></i>
+                                        </a>
+                                        <a href="{{ url_for('propostas.editar_proposta', id=proposta.id) }}" 
+                                           class="btn btn-outline-warning" title="Editar">
+                                            <i class="fas fa-edit"></i>
+                                        </a>
+                                        <a href="{{ url_for('propostas.gerar_pdf', id=proposta.id) }}" 
+                                           class="btn btn-outline-success" title="PDF" target="_blank">
+                                            <i class="fas fa-file-pdf"></i>
+                                        </a>
+                                        {% if proposta.status == 'rascunho' %}
+                                        <button type="button" class="btn btn-outline-danger" 
+                                                onclick="excluirProposta({{ proposta.id }})" title="Excluir">
+                                            <i class="fas fa-trash"></i>
+                                        </button>
+                                        {% endif %}
+                                    </div>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- Paginação -->
+                {% if propostas.pages > 1 %}
+                <nav aria-label="Navegação das propostas" class="mt-4">
+                    <ul class="pagination justify-content-center">
+                        {% if propostas.has_prev %}
+                            <li class="page-item">
+                                <a class="page-link" href="{{ url_for('propostas.listar_propostas', page=propostas.prev_num, status=status_filter, cliente=cliente_filter) }}">Anterior</a>
+                            </li>
+                        {% endif %}
+                        
+                        {% for page_num in propostas.iter_pages() %}
+                            {% if page_num %}
+                                {% if page_num != propostas.page %}
+                                    <li class="page-item">
+                                        <a class="page-link" href="{{ url_for('propostas.listar_propostas', page=page_num, status=status_filter, cliente=cliente_filter) }}">{{ page_num }}</a>
+                                    </li>
+                                {% else %}
+                                    <li class="page-item active">
+                                        <span class="page-link">{{ page_num }}</span>
+                                    </li>
+                                {% endif %}
+                            {% else %}
+                                <li class="page-item disabled">
+                                    <span class="page-link">…</span>
+                                </li>
+                            {% endif %}
+                        {% endfor %}
+                        
+                        {% if propostas.has_next %}
+                            <li class="page-item">
+                                <a class="page-link" href="{{ url_for('propostas.listar_propostas', page=propostas.next_num, status=status_filter, cliente=cliente_filter) }}">Próxima</a>
+                            </li>
+                        {% endif %}
+                    </ul>
+                </nav>
+                {% endif %}
+            {% else %}
+                <div class="text-center py-5">
+                    <i class="fas fa-file-contract fa-3x text-muted mb-3"></i>
+                    <h5>Nenhuma proposta encontrada</h5>
+                    <p class="text-muted">Comece criando sua primeira proposta comercial</p>
+                    <a href="{{ url_for('propostas.nova_proposta') }}" class="btn btn-primary">
+                        <i class="fas fa-plus me-2"></i>Criar Proposta
+                    </a>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<!-- Modal de Confirmação -->
+<div class="modal fade" id="modalExcluir" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Confirmar Exclusão</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p>Tem certeza que deseja excluir esta proposta?</p>
+                <p class="text-danger"><small>Esta ação não pode ser desfeita.</small></p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <form id="formExcluir" method="POST" style="display: inline;">
+                    <button type="submit" class="btn btn-danger">Excluir</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function excluirProposta(id) {
+    document.getElementById('formExcluir').action = '/propostas/' + id + '/excluir';
+    new bootstrap.Modal(document.getElementById('modalExcluir')).show();
+}
+</script>
+{% endblock %}

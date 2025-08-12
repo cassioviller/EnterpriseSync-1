@@ -5388,7 +5388,7 @@ def api_ultimo_rdo_obra(obra_id):
 def cliente_aprovar_proposta_v2(token):
     """Cliente aprova proposta e gera obra"""
     try:
-        proposta = PropostaComercial.query.filter_by(token_acesso=token).first()
+        proposta = PropostaComercialSIGE.query.filter_by(token_acesso=token).first()
         if not proposta:
             return jsonify({"success": False, "message": "Proposta não encontrada"}), 404
         

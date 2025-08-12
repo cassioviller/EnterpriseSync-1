@@ -1,0 +1,1741 @@
+# 🚀 PROMPT: MÓDULO DE PROPOSTAS AUTOMATIZADO - SIGE v8.0
+
+## 🎯 **OBJETIVO**
+Criar um módulo de propostas completo e automatizado para o SIGE v8.0 que substitua o processo manual atual de preenchimento de Word e Excel. O sistema deve gerar propostas profissionais, gerenciar arquivos relacionados e integrar-se perfeitamente com os outros módulos do SIGE para transformar propostas em obras de forma automática.
+
+## 📋 **FUNCIONALIDADES PRINCIPAIS**
+
+### **1. Criação de Propostas Inteligente**
+- **Interface intuitiva:** Formulário web para preenchimento de todas as informações da proposta, substituindo o Word.
+- **Campos dinâmicos:** Todos os campos do documento Word atual devem estar presentes no formulário, como:
+    - Dados do cliente (nome, contato, endereço)
+    - Objeto da proposta
+    - Documentos de referência
+    - Condições de pagamento
+    - Prazos de entrega
+    - Garantias
+    - Considerações gerais
+    - Validade da proposta
+- **Tabelas de serviços interativas:**
+    - O sistema deve permitir a criação de tabelas de serviços, assim como no Excel.
+    - O usuário poderá adicionar, editar e remover itens da tabela.
+    - Os cálculos de subtotal e valor total devem ser automáticos.
+    - Deve haver um catálogo de serviços pré-cadastrados para agilizar o preenchimento.
+- **Templates de propostas:**
+    - O sistema deve ter templates pré-definidos para diferentes tipos de obras (mezanino, cobertura, etc.).
+    - Ao selecionar um template, a tabela de serviços e outras informações relevantes devem ser preenchidas automaticamente.
+
+### **2. Geração de Propostas em PDF**
+- **Geração automática:** Com um clique, o sistema deve gerar um documento PDF profissional com base nas informações preenchidas.
+- **Layout personalizável:** O layout do PDF deve ser similar ao do documento Word atual, com o logo da empresa e formatação profissional.
+- **Envio por e-mail:** O sistema deve permitir o envio da proposta em PDF diretamente para o cliente por e-mail.
+
+### **3. Gestão de Arquivos**
+- **Upload de arquivos:** O usuário poderá anexar arquivos à proposta, como:
+    - Desenhos em DWG
+    - Plantas em PDF
+    - Documentos do cliente
+    - Fotos do local
+- **Armazenamento seguro:** Os arquivos devem ser armazenados de forma segura e associados à proposta correspondente.
+- **Acesso fácil:** Os arquivos devem ser facilmente acessíveis a partir da página da proposta.
+
+### **4. Aprovação e Assinatura Digital**
+- **Portal do cliente:** Ao enviar a proposta, o sistema deve gerar um link único para um portal do cliente.
+- **Visualização da proposta:** O cliente poderá visualizar a proposta completa no portal.
+- **Aprovação ou rejeição:** O cliente poderá aprovar ou rejeitar a proposta com um clique.
+- **Assinatura digital:** Em caso de aprovação, o cliente poderá assinar digitalmente a proposta no próprio portal.
+
+### **5. Integração com Módulo de Obras**
+- **Conversão automática:** Ao aprovar e assinar a proposta, o sistema deve automaticamente:
+    - Criar uma nova obra no SIGE.
+    - Preencher todas as informações da obra com os dados da proposta.
+    - Anexar todos os arquivos da proposta à obra.
+    - Notificar os gestores sobre a nova obra.
+
+## ⚙️ **ESPECIFICAÇÕES TÉCNICAS**
+
+### **Backend (Flask)**
+- **Models:**
+    - `Proposta`: Armazena todas as informações da proposta (cliente, objeto, condições, etc.).
+    - `PropostaItem`: Armazena os itens da tabela de serviços (descrição, quantidade, valor, etc.).
+    - `PropostaArquivo`: Armazena os arquivos anexados à proposta.
+- **Rotas:**
+    - `/propostas`: Listar todas as propostas.
+    - `/propostas/nova`: Formulário para criar nova proposta.
+    - `/propostas/<id>`: Visualizar, editar e gerar PDF de uma proposta.
+    - `/propostas/<id>/enviar`: Enviar proposta por e-mail.
+    - `/cliente/proposta/<token>`: Portal do cliente para visualização e aprovação.
+- **Bibliotecas:**
+    - `Flask-SQLAlchemy`: Para interação com o banco de dados.
+    - `WeasyPrint` ou `FPDF2`: Para geração de PDFs.
+    - `Flask-Mail`: Para envio de e-mails.
+
+### **Frontend (React)**
+- **Componentes:**
+    - `FormularioProposta`: Formulário completo para criação e edição de propostas.
+    - `TabelaServicos`: Componente interativo para a tabela de serviços.
+    - `VisualizadorPDF`: Componente para visualizar o PDF da proposta.
+    - `PortalCliente`: Página para o cliente visualizar e aprovar a proposta.
+- **Bibliotecas:**
+    - `React-PDF`: Para renderizar o PDF no frontend.
+    - `Axios`: Para comunicação com o backend.
+
+## 🚀 **RESULTADO ESPERADO**
+Um módulo de propostas completo e integrado que:
+- **Automatiza 100%** do processo de criação de propostas.
+- **Reduz em 80%** o tempo gasto na elaboração de propostas.
+- **Elimina erros** de cálculo e digitação.
+- **Profissionaliza** a apresentação das propostas.
+- **Agiliza** o processo de aprovação com o cliente.
+- **Integra perfeitamente** com o restante do sistema SIGE.
+
+**Este módulo será o ponto de partida para a jornada do cliente no SIGE v8.0, garantindo uma experiência fluida e profissional desde o primeiro contato.**
+
+
+
+## 📊 **ANÁLISE DOS DOCUMENTOS ATUAIS**
+
+### **Documento Word - PropostaComercial-JEFFERSON.docx**
+Baseado na análise do documento atual, o sistema deve incluir os seguintes campos obrigatórios:
+
+#### **Cabeçalho da Proposta:**
+- **Data da proposta:** Campo de data com valor padrão para hoje
+- **Cliente:** Nome completo do cliente
+- **Contato:** Telefone e e-mail do cliente
+- **Assunto:** Descrição do tipo de serviço (ex: "Fabricação e montagem de estrutura metálica")
+- **Número de referência:** Gerado automaticamente (ex: "Proposta Comercial 001.25")
+
+#### **Seção 1 - Objeto:**
+- **Descrição do objeto:** Campo de texto longo para descrever o escopo do trabalho
+- **Documentos de referência:** Campo para referenciar documentos enviados pelo cliente
+
+#### **Seção 2 - Preços e Escopo:**
+- **Tabela de serviços:** Baseada no modelo Excel analisado
+- **Escopo de fornecimento:** Lista de itens inclusos
+
+#### **Seção 3 - Itens Inclusos:**
+- **Lista pré-definida** com checkboxes para seleção:
+  - Mão de obra para execução dos serviços
+  - Todos os equipamentos de segurança necessários
+  - Transporte e alimentação da equipe
+  - Container para guarda de ferramentas
+  - Movimentação de carga (Munck)
+  - Transporte dos materiais
+
+#### **Seção 4 - Itens Exclusos:**
+- **Lista pré-definida** com checkboxes para seleção:
+  - Projeto e execução de qualquer obra civil, fundações, alvenarias, elétrica, automação, tubulações etc.
+  - Execução de ensaios destrutivos e radiográficos
+  - Fornecimento de local para armazenagem das peças
+  - Fornecimento e/ou serviços não especificados claramente nesta proposta
+  - Fornecimento de escoramento (escoras)
+  - Fornecimento de andaimes e plataformas
+  - Técnico de segurança
+  - Pintura final de acabamento
+  - Calhas, rufos, condutores e pingadeiras
+
+#### **Seção 5 - Condições de Pagamento:**
+- **Template padrão** baseado no documento atual:
+  - 10% de entrada na assinatura do contrato
+  - 10% após projeto aprovado
+  - 45% compra dos perfis
+  - 25% no início da montagem in loco
+  - 10% após a conclusão da montagem
+- **Campo editável** para personalizar as condições
+- **Percentual de nota fiscal:** Campo para inserir percentual (padrão: 13,5%)
+
+#### **Seção 6 - Condições de Entrega:**
+- **Prazo estimado:** Campo numérico para dias (padrão: 90 dias)
+- **Observações sobre entrega:** Campo de texto livre
+
+#### **Seção 7 - Garantias:**
+- **Texto padrão** baseado no documento atual
+- **Campo editável** para personalizar as garantias
+
+#### **Seção 8 - Considerações Gerais:**
+- **Modificações e Cancelamentos:** Texto padrão editável
+- **Obrigações do contratante:** Lista de responsabilidades do cliente
+- **Água e energia:** Condições sobre fornecimento pelo cliente
+
+#### **Seção 9 - Validade da Proposta:**
+- **Prazo de validade:** Campo numérico para dias (padrão: 7 dias)
+
+### **Arquivo Excel - MODELOTABELAS.xlsx**
+Baseado na análise da planilha, o sistema deve incluir diferentes templates de tabelas:
+
+#### **Template 1 - MEZANINO:**
+- Fornecimento de ART (vb - R$ 1.000)
+- Perfis Metálicos (kg - R$ 14)
+- Mão de obra para fabricação e montagem das estruturas (kg - R$ 14)
+- Fornecimento de placa NTF INFIBRA 25mm (uni - R$ 450)
+- Mão de obra para montagem das placas NTF (uni - R$ 140)
+
+#### **Template 2 - ESTRUTURA METÁLICA - VIGA W:**
+- ART (Atestado de responsabilidade técnica) (vb - R$ 1.200)
+- Içamento das estruturas (vb - R$ 3.250)
+- Fornecimento de perfis metálicos e montagem da estrutura (kg - R$ 37)
+- Fornecimento de telha termo acústica trapézio 40/980 (m² - R$ 190)
+- Mão de obra para fabricação e montagem das telhas (m² - R$ 45)
+- Fornecimento de calhas e rufos metálicos (vb - R$ 4.381)
+- Fornecimento de platibanda metálica (vb - R$ 5.555)
+
+#### **Template 3 - COBERTURA ÁREA GOURMET:**
+- ART (Atestado de responsabilidade técnica) (vb - R$ 1.200)
+- Içamento das estruturas (vb - R$ 3.250)
+- Fornecimento de perfis metálicos e montagem da estrutura (kg - R$ 37)
+- Fornecimento de telha termo acústica trapézio 40/980 (m² - R$ 190)
+- Mão de obra para fabricação e montagem das telhas (m² - R$ 45)
+- Fornecimento de calhas e rufos metálicos (vb - R$ 4.381)
+- Fornecimento de platibanda metálica (vb - R$ 5.555)
+
+## 🗄️ **ESTRUTURA DO BANCO DE DADOS**
+
+### **Tabela: propostas**
+```sql
+CREATE TABLE propostas (
+    id SERIAL PRIMARY KEY,
+    numero_proposta VARCHAR(50) UNIQUE NOT NULL,
+    data_proposta DATE NOT NULL DEFAULT CURRENT_DATE,
+    
+    -- Dados do Cliente
+    cliente_nome VARCHAR(255) NOT NULL,
+    cliente_telefone VARCHAR(20),
+    cliente_email VARCHAR(255),
+    cliente_endereco TEXT,
+    
+    -- Dados da Proposta
+    assunto VARCHAR(255) NOT NULL,
+    objeto TEXT NOT NULL,
+    documentos_referencia TEXT,
+    
+    -- Condições
+    prazo_entrega_dias INTEGER DEFAULT 90,
+    observacoes_entrega TEXT,
+    validade_dias INTEGER DEFAULT 7,
+    percentual_nota_fiscal DECIMAL(5,2) DEFAULT 13.5,
+    
+    -- Condições de Pagamento
+    condicoes_pagamento TEXT,
+    
+    -- Garantias e Considerações
+    garantias TEXT,
+    consideracoes_gerais TEXT,
+    
+    -- Itens Inclusos/Exclusos (JSON)
+    itens_inclusos JSON,
+    itens_exclusos JSON,
+    
+    -- Status
+    status VARCHAR(50) DEFAULT 'rascunho', -- rascunho, enviada, aprovada, rejeitada
+    token_cliente VARCHAR(100) UNIQUE,
+    data_envio TIMESTAMP,
+    data_resposta_cliente TIMESTAMP,
+    observacoes_cliente TEXT,
+    
+    -- Valores
+    valor_total DECIMAL(15,2) DEFAULT 0,
+    
+    -- Metadados
+    criado_por INTEGER REFERENCES usuarios(id),
+    criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    atualizado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    
+    -- Integração com Obras
+    obra_id INTEGER REFERENCES obras(id),
+    convertida_em_obra BOOLEAN DEFAULT FALSE
+);
+```
+
+### **Tabela: proposta_itens**
+```sql
+CREATE TABLE proposta_itens (
+    id SERIAL PRIMARY KEY,
+    proposta_id INTEGER REFERENCES propostas(id) ON DELETE CASCADE,
+    item_numero INTEGER NOT NULL,
+    descricao VARCHAR(500) NOT NULL,
+    quantidade DECIMAL(10,3) NOT NULL,
+    unidade VARCHAR(10) NOT NULL,
+    preco_unitario DECIMAL(10,2) NOT NULL,
+    subtotal DECIMAL(15,2) GENERATED ALWAYS AS (quantidade * preco_unitario) STORED,
+    ordem INTEGER NOT NULL,
+    
+    criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+```
+
+### **Tabela: proposta_arquivos**
+```sql
+CREATE TABLE proposta_arquivos (
+    id SERIAL PRIMARY KEY,
+    proposta_id INTEGER REFERENCES propostas(id) ON DELETE CASCADE,
+    nome_arquivo VARCHAR(255) NOT NULL,
+    nome_original VARCHAR(255) NOT NULL,
+    tipo_arquivo VARCHAR(100),
+    tamanho_bytes BIGINT,
+    caminho_arquivo VARCHAR(500) NOT NULL,
+    categoria VARCHAR(50), -- 'dwg', 'pdf', 'foto', 'documento', 'outros'
+    
+    enviado_por INTEGER REFERENCES usuarios(id),
+    enviado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+```
+
+### **Tabela: proposta_templates**
+```sql
+CREATE TABLE proposta_templates (
+    id SERIAL PRIMARY KEY,
+    nome VARCHAR(100) NOT NULL,
+    descricao TEXT,
+    itens_padrao JSON, -- Array de itens padrão para este template
+    ativo BOOLEAN DEFAULT TRUE,
+    
+    criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+```
+
+## 🔧 **IMPLEMENTAÇÃO BACKEND (Flask)**
+
+### **Models (models.py)**
+```python
+from flask_sqlalchemy import SQLAlchemy
+from datetime import datetime, timedelta
+import secrets
+import json
+
+db = SQLAlchemy()
+
+class Proposta(db.Model):
+    __tablename__ = 'propostas'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    numero_proposta = db.Column(db.String(50), unique=True, nullable=False)
+    data_proposta = db.Column(db.Date, nullable=False, default=datetime.utcnow().date())
+    
+    # Dados do Cliente
+    cliente_nome = db.Column(db.String(255), nullable=False)
+    cliente_telefone = db.Column(db.String(20))
+    cliente_email = db.Column(db.String(255))
+    cliente_endereco = db.Column(db.Text)
+    
+    # Dados da Proposta
+    assunto = db.Column(db.String(255), nullable=False)
+    objeto = db.Column(db.Text, nullable=False)
+    documentos_referencia = db.Column(db.Text)
+    
+    # Condições
+    prazo_entrega_dias = db.Column(db.Integer, default=90)
+    observacoes_entrega = db.Column(db.Text)
+    validade_dias = db.Column(db.Integer, default=7)
+    percentual_nota_fiscal = db.Column(db.Numeric(5,2), default=13.5)
+    
+    # Condições de Pagamento
+    condicoes_pagamento = db.Column(db.Text)
+    
+    # Garantias e Considerações
+    garantias = db.Column(db.Text)
+    consideracoes_gerais = db.Column(db.Text)
+    
+    # Itens Inclusos/Exclusos
+    itens_inclusos = db.Column(db.JSON)
+    itens_exclusos = db.Column(db.JSON)
+    
+    # Status
+    status = db.Column(db.String(50), default='rascunho')
+    token_cliente = db.Column(db.String(100), unique=True)
+    data_envio = db.Column(db.DateTime)
+    data_resposta_cliente = db.Column(db.DateTime)
+    observacoes_cliente = db.Column(db.Text)
+    
+    # Valores
+    valor_total = db.Column(db.Numeric(15,2), default=0)
+    
+    # Metadados
+    criado_por = db.Column(db.Integer, db.ForeignKey('usuarios.id'))
+    criado_em = db.Column(db.DateTime, default=datetime.utcnow)
+    atualizado_em = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    # Integração com Obras
+    obra_id = db.Column(db.Integer, db.ForeignKey('obras.id'))
+    convertida_em_obra = db.Column(db.Boolean, default=False)
+    
+    # Relacionamentos
+    itens = db.relationship('PropostaItem', backref='proposta', lazy=True, cascade='all, delete-orphan')
+    arquivos = db.relationship('PropostaArquivo', backref='proposta', lazy=True, cascade='all, delete-orphan')
+    
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        if not self.numero_proposta:
+            self.numero_proposta = self.gerar_numero_proposta()
+        if not self.token_cliente:
+            self.token_cliente = secrets.token_urlsafe(32)
+    
+    def gerar_numero_proposta(self):
+        ano = datetime.now().year
+        ultimo_numero = db.session.query(db.func.max(Proposta.id)).scalar() or 0
+        return f"PROP{str(ultimo_numero + 1).zfill(3)}.{str(ano)[2:]}"
+    
+    def calcular_valor_total(self):
+        total = sum(item.subtotal for item in self.itens)
+        self.valor_total = total
+        return total
+    
+    def data_vencimento(self):
+        return self.data_proposta + timedelta(days=self.validade_dias)
+    
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'numero_proposta': self.numero_proposta,
+            'data_proposta': self.data_proposta.isoformat(),
+            'cliente_nome': self.cliente_nome,
+            'cliente_telefone': self.cliente_telefone,
+            'cliente_email': self.cliente_email,
+            'assunto': self.assunto,
+            'status': self.status,
+            'valor_total': float(self.valor_total) if self.valor_total else 0,
+            'data_vencimento': self.data_vencimento().isoformat(),
+            'itens_count': len(self.itens),
+            'arquivos_count': len(self.arquivos)
+        }
+
+class PropostaItem(db.Model):
+    __tablename__ = 'proposta_itens'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    proposta_id = db.Column(db.Integer, db.ForeignKey('propostas.id'), nullable=False)
+    item_numero = db.Column(db.Integer, nullable=False)
+    descricao = db.Column(db.String(500), nullable=False)
+    quantidade = db.Column(db.Numeric(10,3), nullable=False)
+    unidade = db.Column(db.String(10), nullable=False)
+    preco_unitario = db.Column(db.Numeric(10,2), nullable=False)
+    ordem = db.Column(db.Integer, nullable=False)
+    
+    criado_em = db.Column(db.DateTime, default=datetime.utcnow)
+    
+    @property
+    def subtotal(self):
+        return self.quantidade * self.preco_unitario
+    
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'item_numero': self.item_numero,
+            'descricao': self.descricao,
+            'quantidade': float(self.quantidade),
+            'unidade': self.unidade,
+            'preco_unitario': float(self.preco_unitario),
+            'subtotal': float(self.subtotal),
+            'ordem': self.ordem
+        }
+
+class PropostaArquivo(db.Model):
+    __tablename__ = 'proposta_arquivos'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    proposta_id = db.Column(db.Integer, db.ForeignKey('propostas.id'), nullable=False)
+    nome_arquivo = db.Column(db.String(255), nullable=False)
+    nome_original = db.Column(db.String(255), nullable=False)
+    tipo_arquivo = db.Column(db.String(100))
+    tamanho_bytes = db.Column(db.BigInteger)
+    caminho_arquivo = db.Column(db.String(500), nullable=False)
+    categoria = db.Column(db.String(50))
+    
+    enviado_por = db.Column(db.Integer, db.ForeignKey('usuarios.id'))
+    enviado_em = db.Column(db.DateTime, default=datetime.utcnow)
+    
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'nome_original': self.nome_original,
+            'tipo_arquivo': self.tipo_arquivo,
+            'tamanho_bytes': self.tamanho_bytes,
+            'categoria': self.categoria,
+            'enviado_em': self.enviado_em.isoformat()
+        }
+
+class PropostaTemplate(db.Model):
+    __tablename__ = 'proposta_templates'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    nome = db.Column(db.String(100), nullable=False)
+    descricao = db.Column(db.Text)
+    itens_padrao = db.Column(db.JSON)
+    ativo = db.Column(db.Boolean, default=True)
+    
+    criado_em = db.Column(db.DateTime, default=datetime.utcnow)
+    
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'nome': self.nome,
+            'descricao': self.descricao,
+            'itens_padrao': self.itens_padrao,
+            'ativo': self.ativo
+        }
+```
+
+### **Rotas (routes/propostas.py)**
+```python
+from flask import Blueprint, request, jsonify, send_file, url_for
+from flask_login import login_required, current_user
+from models import db, Proposta, PropostaItem, PropostaArquivo, PropostaTemplate
+from utils.pdf_generator import gerar_pdf_proposta
+from utils.email_sender import enviar_proposta_email
+from utils.file_handler import salvar_arquivo_proposta
+import os
+from werkzeug.utils import secure_filename
+
+propostas_bp = Blueprint('propostas', __name__)
+
+@propostas_bp.route('/propostas', methods=['GET'])
+@login_required
+def listar_propostas():
+    """Lista todas as propostas do usuário"""
+    page = request.args.get('page', 1, type=int)
+    per_page = request.args.get('per_page', 10, type=int)
+    status = request.args.get('status')
+    
+    query = Proposta.query.filter_by(criado_por=current_user.id)
+    
+    if status:
+        query = query.filter_by(status=status)
+    
+    propostas = query.order_by(Proposta.criado_em.desc()).paginate(
+        page=page, per_page=per_page, error_out=False
+    )
+    
+    return jsonify({
+        'propostas': [p.to_dict() for p in propostas.items],
+        'total': propostas.total,
+        'pages': propostas.pages,
+        'current_page': page
+    })
+
+@propostas_bp.route('/propostas', methods=['POST'])
+@login_required
+def criar_proposta():
+    """Cria uma nova proposta"""
+    data = request.get_json()
+    
+    try:
+        proposta = Proposta(
+            cliente_nome=data['cliente_nome'],
+            cliente_telefone=data.get('cliente_telefone'),
+            cliente_email=data.get('cliente_email'),
+            cliente_endereco=data.get('cliente_endereco'),
+            assunto=data['assunto'],
+            objeto=data['objeto'],
+            documentos_referencia=data.get('documentos_referencia'),
+            prazo_entrega_dias=data.get('prazo_entrega_dias', 90),
+            observacoes_entrega=data.get('observacoes_entrega'),
+            validade_dias=data.get('validade_dias', 7),
+            percentual_nota_fiscal=data.get('percentual_nota_fiscal', 13.5),
+            condicoes_pagamento=data.get('condicoes_pagamento'),
+            garantias=data.get('garantias'),
+            consideracoes_gerais=data.get('consideracoes_gerais'),
+            itens_inclusos=data.get('itens_inclusos', []),
+            itens_exclusos=data.get('itens_exclusos', []),
+            criado_por=current_user.id
+        )
+        
+        db.session.add(proposta)
+        db.session.flush()  # Para obter o ID
+        
+        # Adicionar itens
+        for item_data in data.get('itens', []):
+            item = PropostaItem(
+                proposta_id=proposta.id,
+                item_numero=item_data['item_numero'],
+                descricao=item_data['descricao'],
+                quantidade=item_data['quantidade'],
+                unidade=item_data['unidade'],
+                preco_unitario=item_data['preco_unitario'],
+                ordem=item_data.get('ordem', item_data['item_numero'])
+            )
+            db.session.add(item)
+        
+        proposta.calcular_valor_total()
+        db.session.commit()
+        
+        return jsonify({
+            'message': 'Proposta criada com sucesso',
+            'proposta': proposta.to_dict()
+        }), 201
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 400
+
+@propostas_bp.route('/propostas/<int:proposta_id>', methods=['GET'])
+@login_required
+def obter_proposta(proposta_id):
+    """Obtém uma proposta específica"""
+    proposta = Proposta.query.filter_by(
+        id=proposta_id, 
+        criado_por=current_user.id
+    ).first_or_404()
+    
+    return jsonify({
+        'proposta': {
+            **proposta.to_dict(),
+            'cliente_endereco': proposta.cliente_endereco,
+            'objeto': proposta.objeto,
+            'documentos_referencia': proposta.documentos_referencia,
+            'observacoes_entrega': proposta.observacoes_entrega,
+            'condicoes_pagamento': proposta.condicoes_pagamento,
+            'garantias': proposta.garantias,
+            'consideracoes_gerais': proposta.consideracoes_gerais,
+            'itens_inclusos': proposta.itens_inclusos,
+            'itens_exclusos': proposta.itens_exclusos,
+            'itens': [item.to_dict() for item in proposta.itens],
+            'arquivos': [arquivo.to_dict() for arquivo in proposta.arquivos]
+        }
+    })
+
+@propostas_bp.route('/propostas/<int:proposta_id>/pdf', methods=['GET'])
+@login_required
+def gerar_pdf(proposta_id):
+    """Gera PDF da proposta"""
+    proposta = Proposta.query.filter_by(
+        id=proposta_id, 
+        criado_por=current_user.id
+    ).first_or_404()
+    
+    pdf_path = gerar_pdf_proposta(proposta)
+    
+    return send_file(
+        pdf_path,
+        as_attachment=True,
+        download_name=f'Proposta_{proposta.numero_proposta}.pdf',
+        mimetype='application/pdf'
+    )
+
+@propostas_bp.route('/propostas/<int:proposta_id>/enviar', methods=['POST'])
+@login_required
+def enviar_proposta(proposta_id):
+    """Envia proposta por e-mail para o cliente"""
+    proposta = Proposta.query.filter_by(
+        id=proposta_id, 
+        criado_por=current_user.id
+    ).first_or_404()
+    
+    if not proposta.cliente_email:
+        return jsonify({'error': 'Cliente não possui e-mail cadastrado'}), 400
+    
+    try:
+        # Gerar PDF
+        pdf_path = gerar_pdf_proposta(proposta)
+        
+        # Enviar e-mail
+        link_cliente = url_for('propostas.portal_cliente', 
+                              token=proposta.token_cliente, 
+                              _external=True)
+        
+        enviar_proposta_email(proposta, pdf_path, link_cliente)
+        
+        # Atualizar status
+        proposta.status = 'enviada'
+        proposta.data_envio = datetime.utcnow()
+        db.session.commit()
+        
+        return jsonify({'message': 'Proposta enviada com sucesso'})
+        
+    except Exception as e:
+        return jsonify({'error': f'Erro ao enviar proposta: {str(e)}'}), 500
+
+@propostas_bp.route('/propostas/<int:proposta_id>/arquivos', methods=['POST'])
+@login_required
+def upload_arquivo(proposta_id):
+    """Upload de arquivo para a proposta"""
+    proposta = Proposta.query.filter_by(
+        id=proposta_id, 
+        criado_por=current_user.id
+    ).first_or_404()
+    
+    if 'arquivo' not in request.files:
+        return jsonify({'error': 'Nenhum arquivo enviado'}), 400
+    
+    arquivo = request.files['arquivo']
+    categoria = request.form.get('categoria', 'outros')
+    
+    if arquivo.filename == '':
+        return jsonify({'error': 'Nome do arquivo inválido'}), 400
+    
+    try:
+        arquivo_salvo = salvar_arquivo_proposta(arquivo, proposta_id)
+        
+        proposta_arquivo = PropostaArquivo(
+            proposta_id=proposta.id,
+            nome_arquivo=arquivo_salvo['nome_arquivo'],
+            nome_original=arquivo.filename,
+            tipo_arquivo=arquivo.content_type,
+            tamanho_bytes=arquivo_salvo['tamanho'],
+            caminho_arquivo=arquivo_salvo['caminho'],
+            categoria=categoria,
+            enviado_por=current_user.id
+        )
+        
+        db.session.add(proposta_arquivo)
+        db.session.commit()
+        
+        return jsonify({
+            'message': 'Arquivo enviado com sucesso',
+            'arquivo': proposta_arquivo.to_dict()
+        })
+        
+    except Exception as e:
+        return jsonify({'error': f'Erro ao salvar arquivo: {str(e)}'}), 500
+
+# Portal do Cliente (sem autenticação)
+@propostas_bp.route('/cliente/proposta/<token>', methods=['GET'])
+def portal_cliente(token):
+    """Portal do cliente para visualizar proposta"""
+    proposta = Proposta.query.filter_by(token_cliente=token).first_or_404()
+    
+    return jsonify({
+        'proposta': {
+            'numero_proposta': proposta.numero_proposta,
+            'data_proposta': proposta.data_proposta.isoformat(),
+            'cliente_nome': proposta.cliente_nome,
+            'assunto': proposta.assunto,
+            'objeto': proposta.objeto,
+            'valor_total': float(proposta.valor_total),
+            'data_vencimento': proposta.data_vencimento().isoformat(),
+            'status': proposta.status,
+            'itens': [item.to_dict() for item in proposta.itens],
+            'condicoes_pagamento': proposta.condicoes_pagamento,
+            'prazo_entrega_dias': proposta.prazo_entrega_dias,
+            'garantias': proposta.garantias
+        }
+    })
+
+@propostas_bp.route('/cliente/proposta/<token>/aprovar', methods=['POST'])
+def aprovar_proposta(token):
+    """Cliente aprova a proposta"""
+    proposta = Proposta.query.filter_by(token_cliente=token).first_or_404()
+    
+    if proposta.status != 'enviada':
+        return jsonify({'error': 'Proposta não pode ser aprovada'}), 400
+    
+    data = request.get_json()
+    
+    try:
+        proposta.status = 'aprovada'
+        proposta.data_resposta_cliente = datetime.utcnow()
+        proposta.observacoes_cliente = data.get('observacoes', '')
+        
+        db.session.commit()
+        
+        # TODO: Integrar com módulo de obras
+        # converter_proposta_em_obra(proposta)
+        
+        return jsonify({'message': 'Proposta aprovada com sucesso'})
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500
+
+@propostas_bp.route('/cliente/proposta/<token>/rejeitar', methods=['POST'])
+def rejeitar_proposta(token):
+    """Cliente rejeita a proposta"""
+    proposta = Proposta.query.filter_by(token_cliente=token).first_or_404()
+    
+    if proposta.status != 'enviada':
+        return jsonify({'error': 'Proposta não pode ser rejeitada'}), 400
+    
+    data = request.get_json()
+    
+    try:
+        proposta.status = 'rejeitada'
+        proposta.data_resposta_cliente = datetime.utcnow()
+        proposta.observacoes_cliente = data.get('observacoes', '')
+        
+        db.session.commit()
+        
+        return jsonify({'message': 'Proposta rejeitada'})
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500
+
+# Templates
+@propostas_bp.route('/propostas/templates', methods=['GET'])
+@login_required
+def listar_templates():
+    """Lista templates de proposta"""
+    templates = PropostaTemplate.query.filter_by(ativo=True).all()
+    return jsonify({
+        'templates': [t.to_dict() for t in templates]
+    })
+```
+
+
+## 🛠️ **UTILITÁRIOS (utils/)**
+
+### **Gerador de PDF (utils/pdf_generator.py)**
+```python
+from reportlab.lib.pagesizes import A4
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
+from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+from reportlab.lib.units import inch
+from reportlab.lib import colors
+from reportlab.lib.enums import TA_CENTER, TA_LEFT, TA_RIGHT
+import os
+from datetime import datetime
+
+def gerar_pdf_proposta(proposta):
+    """Gera PDF da proposta baseado no template atual"""
+    
+    # Criar diretório se não existir
+    pdf_dir = os.path.join('static', 'pdfs', 'propostas')
+    os.makedirs(pdf_dir, exist_ok=True)
+    
+    filename = f'proposta_{proposta.numero_proposta}_{datetime.now().strftime("%Y%m%d_%H%M%S")}.pdf'
+    filepath = os.path.join(pdf_dir, filename)
+    
+    # Criar documento
+    doc = SimpleDocTemplate(filepath, pagesize=A4, topMargin=0.5*inch)
+    story = []
+    
+    # Estilos
+    styles = getSampleStyleSheet()
+    title_style = ParagraphStyle(
+        'CustomTitle',
+        parent=styles['Heading1'],
+        fontSize=16,
+        spaceAfter=30,
+        alignment=TA_CENTER
+    )
+    
+    header_style = ParagraphStyle(
+        'CustomHeader',
+        parent=styles['Heading2'],
+        fontSize=14,
+        spaceAfter=12,
+        textColor=colors.HexColor('#1976d2')
+    )
+    
+    normal_style = styles['Normal']
+    normal_style.fontSize = 10
+    normal_style.spaceAfter = 6
+    
+    # Cabeçalho da empresa
+    story.append(Paragraph("ESTRUTURAS DO VALE", title_style))
+    story.append(Paragraph("Engº Lucas Barbosa Alves Pinto - CREA 5070458626-SP", normal_style))
+    story.append(Paragraph("contato@estruturasdovale.com.br | 12 99187-7435", normal_style))
+    story.append(Paragraph("Rua Benedita Nunes de Campos, 140. Residencial União, São José dos Campos - CEP 12.239-008", normal_style))
+    story.append(Spacer(1, 20))
+    
+    # Data e destinatário
+    data_formatada = proposta.data_proposta.strftime("%d de %B de %Y")
+    story.append(Paragraph(f"São José dos Campos, {data_formatada}.", normal_style))
+    story.append(Spacer(1, 12))
+    
+    story.append(Paragraph(f"À: {proposta.cliente_nome}", normal_style))
+    if proposta.cliente_telefone:
+        story.append(Paragraph(f"Telefone: {proposta.cliente_telefone}", normal_style))
+    if proposta.cliente_email:
+        story.append(Paragraph(f"E-mail: {proposta.cliente_email}", normal_style))
+    story.append(Spacer(1, 12))
+    
+    story.append(Paragraph(f"Ass.: {proposta.assunto}", normal_style))
+    story.append(Paragraph(f"N. Ref.: {proposta.numero_proposta}", normal_style))
+    story.append(Spacer(1, 20))
+    
+    # Introdução
+    story.append(Paragraph("Prezados;", normal_style))
+    story.append(Spacer(1, 6))
+    story.append(Paragraph(
+        'Atendendo à solicitação de V.Sas., apresentamos nossas "Condições Comerciais", para o fornecimento em referência.',
+        normal_style
+    ))
+    story.append(Spacer(1, 6))
+    story.append(Paragraph(
+        "Na expectativa de ter atendido às condições especificadas, aproveitamos para expressar os nossos votos de estima e consideração.",
+        normal_style
+    ))
+    story.append(Spacer(1, 12))
+    story.append(Paragraph("Atenciosamente,", normal_style))
+    story.append(Paragraph("Jefferson Luiz Moreira – Gerente Estruturas do Vale", normal_style))
+    story.append(Spacer(1, 30))
+    
+    # 1. OBJETO
+    story.append(Paragraph("1. OBJETO:", header_style))
+    story.append(Paragraph(proposta.objeto, normal_style))
+    if proposta.documentos_referencia:
+        story.append(Paragraph(f"Documentos de referência: {proposta.documentos_referencia}", normal_style))
+    story.append(Spacer(1, 20))
+    
+    # 2. PREÇOS E ESCOPO
+    story.append(Paragraph("2. PREÇOS UNITÁRIOS E TOTAIS ESTIMADOS:", header_style))
+    story.append(Paragraph("2.1 ESCOPO DE FORNECIMENTO:", normal_style))
+    story.append(Spacer(1, 12))
+    
+    # Tabela de itens
+    if proposta.itens:
+        table_data = [['ITEM', 'DESCRIÇÃO', 'QTD', 'UNID', 'PREÇO UNI', 'SUBTOTAL']]
+        
+        for item in proposta.itens:
+            table_data.append([
+                str(item.item_numero),
+                item.descricao,
+                f"{item.quantidade:,.3f}".replace(',', 'X').replace('.', ',').replace('X', '.'),
+                item.unidade,
+                f"R$ {item.preco_unitario:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.'),
+                f"R$ {item.subtotal:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.')
+            ])
+        
+        # Linha de total
+        table_data.append([
+            '', 'VALOR TOTAL', '', '', '',
+            f"R$ {proposta.valor_total:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.')
+        ])
+        
+        table = Table(table_data, colWidths=[0.8*inch, 3*inch, 0.8*inch, 0.8*inch, 1.2*inch, 1.2*inch])
+        table.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#1976d2')),
+            ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('FONTSIZE', (0, 0), (-1, 0), 10),
+            ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+            ('BACKGROUND', (0, 1), (-1, -2), colors.beige),
+            ('BACKGROUND', (0, -1), (-1, -1), colors.HexColor('#e3f2fd')),
+            ('FONTNAME', (0, -1), (-1, -1), 'Helvetica-Bold'),
+            ('GRID', (0, 0), (-1, -1), 1, colors.black)
+        ]))
+        
+        story.append(table)
+        story.append(Spacer(1, 20))
+    
+    # 3. ITENS INCLUSOS
+    story.append(Paragraph("3. ITENS INCLUSOS NO FORNECIMENTO", header_style))
+    if proposta.itens_inclusos:
+        for item in proposta.itens_inclusos:
+            story.append(Paragraph(f"• {item}", normal_style))
+    story.append(Spacer(1, 20))
+    
+    # 4. ITENS EXCLUSOS
+    story.append(Paragraph("4. ITENS EXCLUSOS DO FORNECIMENTO", header_style))
+    if proposta.itens_exclusos:
+        for item in proposta.itens_exclusos:
+            story.append(Paragraph(f"• {item}", normal_style))
+    story.append(Spacer(1, 20))
+    
+    # 5. CONDIÇÕES DE PAGAMENTO
+    story.append(Paragraph("5. CONDIÇÕES DE PAGAMENTO", header_style))
+    if proposta.condicoes_pagamento:
+        story.append(Paragraph(proposta.condicoes_pagamento, normal_style))
+    story.append(Paragraph(f"Considerar {proposta.percentual_nota_fiscal}% para emissão de nota fiscal;", normal_style))
+    story.append(Spacer(1, 20))
+    
+    # 6. CONDIÇÕES DE ENTREGA
+    story.append(Paragraph("6. CONDIÇÕES DE ENTREGA", header_style))
+    story.append(Paragraph(f"Prazos estimados para montagem das estruturas {proposta.prazo_entrega_dias} dias com agendamento prévio;", normal_style))
+    if proposta.observacoes_entrega:
+        story.append(Paragraph(proposta.observacoes_entrega, normal_style))
+    story.append(Spacer(1, 20))
+    
+    # 7. GARANTIAS
+    if proposta.garantias:
+        story.append(Paragraph("7. GARANTIAS", header_style))
+        story.append(Paragraph(proposta.garantias, normal_style))
+        story.append(Spacer(1, 20))
+    
+    # 8. CONSIDERAÇÕES GERAIS
+    if proposta.consideracoes_gerais:
+        story.append(Paragraph("8. CONSIDERAÇÕES GERAIS", header_style))
+        story.append(Paragraph(proposta.consideracoes_gerais, normal_style))
+        story.append(Spacer(1, 20))
+    
+    # 9. VALIDADE
+    story.append(Paragraph("9. VALIDADE DA PROPOSTA:", header_style))
+    story.append(Paragraph(
+        f"Todos os termos e condições da presente proposta permanecerão válidos por um período de {proposta.validade_dias:02d} dias, contados a partir da data de emissão desta.",
+        normal_style
+    ))
+    
+    # Gerar PDF
+    doc.build(story)
+    
+    return filepath
+```
+
+### **Envio de E-mail (utils/email_sender.py)**
+```python
+from flask_mail import Message
+from flask import current_app, render_template_string
+from extensions import mail
+import os
+
+def enviar_proposta_email(proposta, pdf_path, link_cliente):
+    """Envia proposta por e-mail para o cliente"""
+    
+    subject = f"Proposta Comercial {proposta.numero_proposta} - {proposta.assunto}"
+    
+    # Template do e-mail
+    email_template = """
+    <html>
+    <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
+        <div style="max-width: 600px; margin: 0 auto; padding: 20px;">
+            <div style="text-align: center; margin-bottom: 30px;">
+                <h2 style="color: #1976d2;">ESTRUTURAS DO VALE</h2>
+                <p>Engenharia e Construção</p>
+            </div>
+            
+            <h3>Prezado(a) {{ proposta.cliente_nome }},</h3>
+            
+            <p>Conforme solicitado, segue em anexo nossa proposta comercial para <strong>{{ proposta.assunto }}</strong>.</p>
+            
+            <div style="background-color: #f5f5f5; padding: 20px; border-radius: 5px; margin: 20px 0;">
+                <h4 style="margin-top: 0; color: #1976d2;">Detalhes da Proposta:</h4>
+                <ul style="list-style: none; padding: 0;">
+                    <li><strong>Número:</strong> {{ proposta.numero_proposta }}</li>
+                    <li><strong>Data:</strong> {{ proposta.data_proposta.strftime('%d/%m/%Y') }}</li>
+                    <li><strong>Valor Total:</strong> R$ {{ "{:,.2f}".format(proposta.valor_total).replace(',', 'X').replace('.', ',').replace('X', '.') }}</li>
+                    <li><strong>Validade:</strong> {{ proposta.data_vencimento().strftime('%d/%m/%Y') }}</li>
+                </ul>
+            </div>
+            
+            <p>Para sua comodidade, você pode visualizar e responder a esta proposta através do nosso portal online:</p>
+            
+            <div style="text-align: center; margin: 30px 0;">
+                <a href="{{ link_cliente }}" 
+                   style="background-color: #1976d2; color: white; padding: 12px 30px; text-decoration: none; border-radius: 5px; display: inline-block;">
+                    Visualizar Proposta Online
+                </a>
+            </div>
+            
+            <p>No portal você poderá:</p>
+            <ul>
+                <li>Visualizar todos os detalhes da proposta</li>
+                <li>Aprovar ou solicitar alterações</li>
+                <li>Fazer download do PDF</li>
+                <li>Entrar em contato conosco</li>
+            </ul>
+            
+            <p>Estamos à disposição para esclarecer qualquer dúvida.</p>
+            
+            <div style="margin-top: 40px; padding-top: 20px; border-top: 1px solid #ddd;">
+                <p><strong>Jefferson Luiz Moreira</strong><br>
+                Gerente - Estruturas do Vale<br>
+                📧 contato@estruturasdovale.com.br<br>
+                📱 (12) 99187-7435</p>
+            </div>
+        </div>
+    </body>
+    </html>
+    """
+    
+    html_body = render_template_string(
+        email_template, 
+        proposta=proposta, 
+        link_cliente=link_cliente
+    )
+    
+    msg = Message(
+        subject=subject,
+        sender=current_app.config['MAIL_DEFAULT_SENDER'],
+        recipients=[proposta.cliente_email],
+        html=html_body
+    )
+    
+    # Anexar PDF
+    if os.path.exists(pdf_path):
+        with open(pdf_path, 'rb') as f:
+            msg.attach(
+                filename=f"Proposta_{proposta.numero_proposta}.pdf",
+                content_type="application/pdf",
+                data=f.read()
+            )
+    
+    mail.send(msg)
+
+def enviar_notificacao_aprovacao(proposta):
+    """Envia notificação quando proposta é aprovada"""
+    
+    subject = f"Proposta {proposta.numero_proposta} APROVADA - {proposta.cliente_nome}"
+    
+    # Template de notificação
+    notification_template = """
+    <html>
+    <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
+        <div style="max-width: 600px; margin: 0 auto; padding: 20px;">
+            <div style="background-color: #4caf50; color: white; padding: 20px; border-radius: 5px; text-align: center;">
+                <h2 style="margin: 0;">🎉 PROPOSTA APROVADA!</h2>
+            </div>
+            
+            <div style="padding: 20px;">
+                <h3>Boa notícia!</h3>
+                <p>A proposta <strong>{{ proposta.numero_proposta }}</strong> foi aprovada pelo cliente <strong>{{ proposta.cliente_nome }}</strong>.</p>
+                
+                <div style="background-color: #f5f5f5; padding: 15px; border-radius: 5px; margin: 20px 0;">
+                    <h4 style="margin-top: 0;">Detalhes:</h4>
+                    <ul style="list-style: none; padding: 0;">
+                        <li><strong>Cliente:</strong> {{ proposta.cliente_nome }}</li>
+                        <li><strong>Valor:</strong> R$ {{ "{:,.2f}".format(proposta.valor_total).replace(',', 'X').replace('.', ',').replace('X', '.') }}</li>
+                        <li><strong>Data de Aprovação:</strong> {{ proposta.data_resposta_cliente.strftime('%d/%m/%Y às %H:%M') }}</li>
+                    </ul>
+                    
+                    {% if proposta.observacoes_cliente %}
+                    <p><strong>Observações do Cliente:</strong><br>{{ proposta.observacoes_cliente }}</p>
+                    {% endif %}
+                </div>
+                
+                <p><strong>Próximos passos:</strong></p>
+                <ol>
+                    <li>A obra será criada automaticamente no sistema</li>
+                    <li>Entre em contato com o cliente para agendar o início</li>
+                    <li>Prepare a documentação necessária</li>
+                </ol>
+            </div>
+        </div>
+    </body>
+    </html>
+    """
+    
+    html_body = render_template_string(notification_template, proposta=proposta)
+    
+    # Enviar para equipe interna
+    msg = Message(
+        subject=subject,
+        sender=current_app.config['MAIL_DEFAULT_SENDER'],
+        recipients=[current_app.config['MAIL_ADMIN']],  # E-mail da equipe
+        html=html_body
+    )
+    
+    mail.send(msg)
+```
+
+### **Manipulador de Arquivos (utils/file_handler.py)**
+```python
+import os
+import uuid
+from werkzeug.utils import secure_filename
+from flask import current_app
+
+ALLOWED_EXTENSIONS = {
+    'dwg', 'dxf', 'pdf', 'doc', 'docx', 'xls', 'xlsx', 
+    'jpg', 'jpeg', 'png', 'gif', 'bmp', 'tiff',
+    'zip', 'rar', '7z', 'txt', 'rtf'
+}
+
+def allowed_file(filename):
+    """Verifica se o arquivo é permitido"""
+    return '.' in filename and \
+           filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
+
+def salvar_arquivo_proposta(arquivo, proposta_id):
+    """Salva arquivo da proposta no diretório apropriado"""
+    
+    if not allowed_file(arquivo.filename):
+        raise ValueError(f"Tipo de arquivo não permitido: {arquivo.filename}")
+    
+    # Criar diretório se não existir
+    upload_dir = os.path.join(
+        current_app.config['UPLOAD_FOLDER'], 
+        'propostas', 
+        str(proposta_id)
+    )
+    os.makedirs(upload_dir, exist_ok=True)
+    
+    # Gerar nome único para o arquivo
+    filename = secure_filename(arquivo.filename)
+    name, ext = os.path.splitext(filename)
+    unique_filename = f"{name}_{uuid.uuid4().hex[:8]}{ext}"
+    
+    filepath = os.path.join(upload_dir, unique_filename)
+    
+    # Salvar arquivo
+    arquivo.save(filepath)
+    
+    # Obter tamanho do arquivo
+    file_size = os.path.getsize(filepath)
+    
+    return {
+        'nome_arquivo': unique_filename,
+        'caminho': filepath,
+        'tamanho': file_size
+    }
+
+def obter_categoria_arquivo(filename):
+    """Determina a categoria do arquivo baseado na extensão"""
+    ext = filename.rsplit('.', 1)[1].lower() if '.' in filename else ''
+    
+    categorias = {
+        'dwg': ['dwg', 'dxf'],
+        'pdf': ['pdf'],
+        'documento': ['doc', 'docx', 'txt', 'rtf'],
+        'planilha': ['xls', 'xlsx'],
+        'foto': ['jpg', 'jpeg', 'png', 'gif', 'bmp', 'tiff'],
+        'compactado': ['zip', 'rar', '7z']
+    }
+    
+    for categoria, extensoes in categorias.items():
+        if ext in extensoes:
+            return categoria
+    
+    return 'outros'
+
+def excluir_arquivo_proposta(caminho_arquivo):
+    """Exclui arquivo da proposta"""
+    try:
+        if os.path.exists(caminho_arquivo):
+            os.remove(caminho_arquivo)
+            return True
+    except Exception as e:
+        current_app.logger.error(f"Erro ao excluir arquivo {caminho_arquivo}: {str(e)}")
+    
+    return False
+```
+
+## ⚛️ **FRONTEND REACT**
+
+### **Componente Principal (components/Propostas/FormularioProposta.jsx)**
+```jsx
+import React, { useState, useEffect } from 'react';
+import {
+  Box, Card, CardContent, Typography, TextField, Button,
+  Grid, Divider, FormControl, InputLabel, Select, MenuItem,
+  Chip, IconButton, Dialog, DialogTitle, DialogContent,
+  DialogActions, Snackbar, Alert, Tabs, Tab, Paper
+} from '@mui/material';
+import {
+  Add as AddIcon, Delete as DeleteIcon, Upload as UploadIcon,
+  Send as SendIcon, PictureAsPdf as PdfIcon, Save as SaveIcon
+} from '@mui/icons-material';
+import { useParams, useNavigate } from 'react-router-dom';
+import TabelaServicos from './TabelaServicos';
+import GestorArquivos from './GestorArquivos';
+import api from '../../services/api';
+
+function TabPanel({ children, value, index, ...other }) {
+  return (
+    <div
+      role="tabpanel"
+      hidden={value !== index}
+      id={`proposta-tabpanel-${index}`}
+      aria-labelledby={`proposta-tab-${index}`}
+      {...other}
+    >
+      {value === index && <Box sx={{ p: 3 }}>{children}</Box>}
+    </div>
+  );
+}
+
+export default function FormularioProposta() {
+  const { id } = useParams();
+  const navigate = useNavigate();
+  const isEdit = Boolean(id);
+  
+  const [tabValue, setTabValue] = useState(0);
+  const [loading, setLoading] = useState(false);
+  const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' });
+  
+  const [proposta, setProposta] = useState({
+    // Dados do Cliente
+    cliente_nome: '',
+    cliente_telefone: '',
+    cliente_email: '',
+    cliente_endereco: '',
+    
+    // Dados da Proposta
+    assunto: '',
+    objeto: '',
+    documentos_referencia: '',
+    
+    // Condições
+    prazo_entrega_dias: 90,
+    observacoes_entrega: '',
+    validade_dias: 7,
+    percentual_nota_fiscal: 13.5,
+    
+    // Condições de Pagamento
+    condicoes_pagamento: `A) 10% de entrada na assinatura do contrato;
+B) 10% após projeto aprovado;
+C) 45% compra dos perfis;
+D) 25% no início da montagem in loco;
+E) 10% após a conclusão da montagem.`,
+    
+    // Garantias e Considerações
+    garantias: `A garantia da Estruturas do Vale limita-se a reparar ou substituir os itens defeituosos de seu fornecimento, sem qualquer outra despesa.
+
+A COMPRADORA não poderá executar qualquer serviço atinente à garantia, nem mesmo permitir que terceiros o façam, sem autorização prévia e por escrita da Estruturas do vale.`,
+    
+    consideracoes_gerais: `8.1 Modificações e Cancelamentos
+As mudanças solicitadas pelo Contratante, decorrentes de alterações de projeto, serão incorporadas ao Escopo do fornecimento desta proposta mediante a aprovação de orçamento específico apresentado pela Contratada.
+
+Se houver a necessidade de paralisação de alguma atividade na obra, deveremos ser informados com pelo menos 5 (cinco) dias de antecedência;
+
+Os dias parados em decorrência de chuvas fortes e suas consequências ou por quaisquer outros motivos, alheios à nossa vontade e que impossibilitem a execução, serão acrescidos à data de entrega da obra;
+
+8.2 Obrigações do contratante
+Proteção da área a ser trabalhada, Proteção de pisos, portas e janelas de vidro, portas em madeira, paredes e tetos com pinturas já acabadas);
+
+8.3 Água e energia
+Água e energia elétrica para execução dos serviços nos locais de instalação correm por conta do cliente;`,
+    
+    // Itens Inclusos/Exclusos
+    itens_inclusos: [
+      'Mão de obra para execução dos serviços',
+      'Todos os equipamentos de segurança necessários',
+      'Transporte e alimentação da equipe',
+      'Container para guarda de ferramentas',
+      'Movimentação de carga (Munck)',
+      'Transporte dos materiais'
+    ],
+    
+    itens_exclusos: [
+      'Projeto e execução de qualquer obra civil, fundações, alvenarias, elétrica, automação, tubulações etc., salvo se inclusas no escopo do serviço',
+      'Execução de ensaios destrutivos e radiográficos',
+      'Fornecimento de local para armazenagem das peças',
+      'Fornecimento e/ou serviços não especificados claramente nesta proposta',
+      'Fornecimento de escoramento (escoras)',
+      'Fornecimento de andaimes e plataformas',
+      'Técnico de segurança',
+      'Pintura final de acabamento',
+      'Calhas, rufos, condutores e pingadeiras'
+    ],
+    
+    // Itens da tabela
+    itens: [],
+    
+    // Arquivos
+    arquivos: []
+  });
+  
+  const [templates, setTemplates] = useState([]);
+  const [templateSelecionado, setTemplateSelecionado] = useState('');
+
+  useEffect(() => {
+    carregarTemplates();
+    if (isEdit) {
+      carregarProposta();
+    }
+  }, [id]);
+
+  const carregarTemplates = async () => {
+    try {
+      const response = await api.get('/propostas/templates');
+      setTemplates(response.data.templates);
+    } catch (error) {
+      console.error('Erro ao carregar templates:', error);
+    }
+  };
+
+  const carregarProposta = async () => {
+    try {
+      setLoading(true);
+      const response = await api.get(`/propostas/${id}`);
+      setProposta(response.data.proposta);
+    } catch (error) {
+      setSnackbar({
+        open: true,
+        message: 'Erro ao carregar proposta',
+        severity: 'error'
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const aplicarTemplate = (templateId) => {
+    const template = templates.find(t => t.id === templateId);
+    if (template && template.itens_padrao) {
+      setProposta(prev => ({
+        ...prev,
+        itens: template.itens_padrao.map((item, index) => ({
+          ...item,
+          item_numero: index + 1,
+          ordem: index + 1
+        }))
+      }));
+    }
+  };
+
+  const handleInputChange = (field, value) => {
+    setProposta(prev => ({
+      ...prev,
+      [field]: value
+    }));
+  };
+
+  const handleItensChange = (novosItens) => {
+    setProposta(prev => ({
+      ...prev,
+      itens: novosItens
+    }));
+  };
+
+  const handleArquivosChange = (novosArquivos) => {
+    setProposta(prev => ({
+      ...prev,
+      arquivos: novosArquivos
+    }));
+  };
+
+  const salvarProposta = async () => {
+    try {
+      setLoading(true);
+      
+      const url = isEdit ? `/propostas/${id}` : '/propostas';
+      const method = isEdit ? 'put' : 'post';
+      
+      const response = await api[method](url, proposta);
+      
+      setSnackbar({
+        open: true,
+        message: isEdit ? 'Proposta atualizada com sucesso' : 'Proposta criada com sucesso',
+        severity: 'success'
+      });
+      
+      if (!isEdit) {
+        navigate(`/propostas/${response.data.proposta.id}`);
+      }
+      
+    } catch (error) {
+      setSnackbar({
+        open: true,
+        message: 'Erro ao salvar proposta',
+        severity: 'error'
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const gerarPDF = async () => {
+    try {
+      setLoading(true);
+      const response = await api.get(`/propostas/${id}/pdf`, {
+        responseType: 'blob'
+      });
+      
+      const url = window.URL.createObjectURL(new Blob([response.data]));
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', `Proposta_${proposta.numero_proposta}.pdf`);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      
+    } catch (error) {
+      setSnackbar({
+        open: true,
+        message: 'Erro ao gerar PDF',
+        severity: 'error'
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const enviarProposta = async () => {
+    try {
+      setLoading(true);
+      await api.post(`/propostas/${id}/enviar`);
+      
+      setSnackbar({
+        open: true,
+        message: 'Proposta enviada com sucesso',
+        severity: 'success'
+      });
+      
+      // Recarregar proposta para atualizar status
+      carregarProposta();
+      
+    } catch (error) {
+      setSnackbar({
+        open: true,
+        message: error.response?.data?.error || 'Erro ao enviar proposta',
+        severity: 'error'
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <Box sx={{ maxWidth: 1200, mx: 'auto', p: 3 }}>
+      <Card>
+        <CardContent>
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
+            <Typography variant="h4" component="h1">
+              {isEdit ? `Proposta ${proposta.numero_proposta}` : 'Nova Proposta'}
+            </Typography>
+            
+            <Box sx={{ display: 'flex', gap: 1 }}>
+              <Button
+                variant="outlined"
+                startIcon={<SaveIcon />}
+                onClick={salvarProposta}
+                disabled={loading}
+              >
+                Salvar
+              </Button>
+              
+              {isEdit && (
+                <>
+                  <Button
+                    variant="outlined"
+                    startIcon={<PdfIcon />}
+                    onClick={gerarPDF}
+                    disabled={loading}
+                  >
+                    PDF
+                  </Button>
+                  
+                  <Button
+                    variant="contained"
+                    startIcon={<SendIcon />}
+                    onClick={enviarProposta}
+                    disabled={loading || !proposta.cliente_email}
+                  >
+                    Enviar
+                  </Button>
+                </>
+              )}
+            </Box>
+          </Box>
+
+          <Tabs value={tabValue} onChange={(e, newValue) => setTabValue(newValue)}>
+            <Tab label="Dados Gerais" />
+            <Tab label="Serviços" />
+            <Tab label="Condições" />
+            <Tab label="Arquivos" />
+          </Tabs>
+
+          {/* Aba 1: Dados Gerais */}
+          <TabPanel value={tabValue} index={0}>
+            <Grid container spacing={3}>
+              {/* Template */}
+              {!isEdit && (
+                <Grid item xs={12}>
+                  <FormControl fullWidth>
+                    <InputLabel>Template</InputLabel>
+                    <Select
+                      value={templateSelecionado}
+                      onChange={(e) => {
+                        setTemplateSelecionado(e.target.value);
+                        aplicarTemplate(e.target.value);
+                      }}
+                    >
+                      <MenuItem value="">Nenhum template</MenuItem>
+                      {templates.map(template => (
+                        <MenuItem key={template.id} value={template.id}>
+                          {template.nome}
+                        </MenuItem>
+                      ))}
+                    </Select>
+                  </FormControl>
+                </Grid>
+              )}
+
+              {/* Dados do Cliente */}
+              <Grid item xs={12}>
+                <Typography variant="h6" gutterBottom>Dados do Cliente</Typography>
+              </Grid>
+              
+              <Grid item xs={12} md={6}>
+                <TextField
+                  fullWidth
+                  label="Nome do Cliente"
+                  value={proposta.cliente_nome}
+                  onChange={(e) => handleInputChange('cliente_nome', e.target.value)}
+                  required
+                />
+              </Grid>
+              
+              <Grid item xs={12} md={3}>
+                <TextField
+                  fullWidth
+                  label="Telefone"
+                  value={proposta.cliente_telefone}
+                  onChange={(e) => handleInputChange('cliente_telefone', e.target.value)}
+                />
+              </Grid>
+              
+              <Grid item xs={12} md={3}>
+                <TextField
+                  fullWidth
+                  label="E-mail"
+                  type="email"
+                  value={proposta.cliente_email}
+                  onChange={(e) => handleInputChange('cliente_email', e.target.value)}
+                />
+              </Grid>
+              
+              <Grid item xs={12}>
+                <TextField
+                  fullWidth
+                  label="Endereço"
+                  multiline
+                  rows={2}
+                  value={proposta.cliente_endereco}
+                  onChange={(e) => handleInputChange('cliente_endereco', e.target.value)}
+                />
+              </Grid>
+
+              {/* Dados da Proposta */}
+              <Grid item xs={12}>
+                <Divider sx={{ my: 2 }} />
+                <Typography variant="h6" gutterBottom>Dados da Proposta</Typography>
+              </Grid>
+              
+              <Grid item xs={12}>
+                <TextField
+                  fullWidth
+                  label="Assunto"
+                  value={proposta.assunto}
+                  onChange={(e) => handleInputChange('assunto', e.target.value)}
+                  required
+                />
+              </Grid>
+              
+              <Grid item xs={12}>
+                <TextField
+                  fullWidth
+                  label="Objeto"
+                  multiline
+                  rows={4}
+                  value={proposta.objeto}
+                  onChange={(e) => handleInputChange('objeto', e.target.value)}
+                  required
+                />
+              </Grid>
+              
+              <Grid item xs={12}>
+                <TextField
+                  fullWidth
+                  label="Documentos de Referência"
+                  value={proposta.documentos_referencia}
+                  onChange={(e) => handleInputChange('documentos_referencia', e.target.value)}
+                />
+              </Grid>
+            </Grid>
+          </TabPanel>
+
+          {/* Aba 2: Serviços */}
+          <TabPanel value={tabValue} index={1}>
+            <TabelaServicos
+              itens={proposta.itens}
+              onChange={handleItensChange}
+            />
+          </TabPanel>
+
+          {/* Aba 3: Condições */}
+          <TabPanel value={tabValue} index={2}>
+            <Grid container spacing={3}>
+              {/* Condições de Entrega */}
+              <Grid item xs={12} md={6}>
+                <TextField
+                  fullWidth
+                  label="Prazo de Entrega (dias)"
+                  type="number"
+                  value={proposta.prazo_entrega_dias}
+                  onChange={(e) => handleInputChange('prazo_entrega_dias', parseInt(e.target.value))}
+                />
+              </Grid>
+              
+              <Grid item xs={12} md={6}>
+                <TextField
+                  fullWidth
+                  label="Validade da Proposta (dias)"
+                  type="number"
+                  value={proposta.validade_dias}
+                  onChange={(e) => handleInputChange('validade_dias', parseInt(e.target.value))}
+                />
+              </Grid>
+              
+              <Grid item xs={12}>
+                <TextField
+                  fullWidth
+                  label="Observações sobre Entrega"
+                  multiline
+                  rows={3}
+                  value={proposta.observacoes_entrega}
+                  onChange={(e) => handleInputChange('observacoes_entrega', e.target.value)}
+                />
+              </Grid>
+
+              {/* Condições de Pagamento */}
+              <Grid item xs={12}>
+                <TextField
+                  fullWidth
+                  label="Condições de Pagamento"
+                  multiline
+                  rows={6}
+                  value={proposta.condicoes_pagamento}
+                  onChange={(e) => handleInputChange('condicoes_pagamento', e.target.value)}
+                />
+              </Grid>
+              
+              <Grid item xs={12} md={6}>
+                <TextField
+                  fullWidth
+                  label="Percentual Nota Fiscal (%)"
+                  type="number"
+                  step="0.1"
+                  value={proposta.percentual_nota_fiscal}
+                  onChange={(e) => handleInputChange('percentual_nota_fiscal', parseFloat(e.target.value))}
+                />
+              </Grid>
+
+              {/* Garantias */}
+              <Grid item xs={12}>
+                <TextField
+                  fullWidth
+                  label="Garantias"
+                  multiline
+                  rows={4}
+                  value={proposta.garantias}
+                  onChange={(e) => handleInputChange('garantias', e.target.value)}
+                />
+              </Grid>
+
+              {/* Considerações Gerais */}
+              <Grid item xs={12}>
+                <TextField
+                  fullWidth
+                  label="Considerações Gerais"
+                  multiline
+                  rows={8}
+                  value={proposta.consideracoes_gerais}
+                  onChange={(e) => handleInputChange('consideracoes_gerais', e.target.value)}
+                />
+              </Grid>
+            </Grid>
+          </TabPanel>
+
+          {/* Aba 4: Arquivos */}
+          <TabPanel value={tabValue} index={3}>
+            {isEdit && (
+              <GestorArquivos
+                propostaId={id}
+                arquivos={proposta.arquivos}
+                onChange={handleArquivosChange}
+              />
+            )}
+            {!isEdit && (
+              <Typography variant="body2" color="text.secondary">
+                Salve a proposta primeiro para poder anexar arquivos.
+              </Typography>
+            )}
+          </TabPanel>
+        </CardContent>
+      </Card>
+
+      <Snackbar
+        open={snackbar.open}
+        autoHideDuration={6000}
+        onClose={() => setSnackbar({ ...snackbar, open: false })}
+      >
+        <Alert severity={snackbar.severity} onClose={() => setSnackbar({ ...snackbar, open: false })}>
+          {snackbar.message}
+        </Alert>
+      </Snackbar>
+    </Box>
+  );
+}
+```
+

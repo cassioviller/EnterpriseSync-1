@@ -1,0 +1,312 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Proposta Comercial {{ proposta.numero_proposta }}</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            font-size: 12px;
+            line-height: 1.4;
+            margin: 20px;
+            color: #333;
+        }
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+            border-bottom: 2px solid #0066cc;
+            padding-bottom: 20px;
+        }
+        .company-info {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+        .proposal-title {
+            font-size: 18px;
+            font-weight: bold;
+            color: #0066cc;
+            margin: 20px 0;
+        }
+        .section {
+            margin: 20px 0;
+            page-break-inside: avoid;
+        }
+        .section-title {
+            font-size: 14px;
+            font-weight: bold;
+            color: #0066cc;
+            margin-bottom: 10px;
+            border-bottom: 1px solid #ccc;
+            padding-bottom: 5px;
+        }
+        .table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 15px 0;
+        }
+        .table th,
+        .table td {
+            border: 1px solid #ddd;
+            padding: 8px;
+            text-align: left;
+        }
+        .table th {
+            background-color: #f5f5f5;
+            font-weight: bold;
+        }
+        .table .number {
+            text-align: center;
+        }
+        .table .currency {
+            text-align: right;
+        }
+        .total-row {
+            background-color: #e8f5e8;
+            font-weight: bold;
+        }
+        .info-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            margin: 20px 0;
+        }
+        .info-item {
+            margin-bottom: 15px;
+        }
+        .info-label {
+            font-weight: bold;
+            color: #666;
+            margin-bottom: 5px;
+        }
+        .list-items {
+            margin: 10px 0;
+        }
+        .list-items ul {
+            margin: 0;
+            padding-left: 20px;
+        }
+        .list-items li {
+            margin: 5px 0;
+        }
+        .signature-section {
+            margin-top: 50px;
+            page-break-inside: avoid;
+        }
+        .signature-box {
+            border-top: 1px solid #333;
+            width: 300px;
+            margin: 50px auto 20px;
+            text-align: center;
+            padding-top: 10px;
+        }
+        @media print {
+            .no-print {
+                display: none;
+            }
+            body {
+                margin: 0;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Cabeçalho da Empresa -->
+    <div class="header">
+        <div class="company-info">
+            <h1>ESTRUTURAS DO VALE</h1>
+            <p>Estruturas Metálicas e Construção Civil</p>
+            <p>CNPJ: XX.XXX.XXX/XXXX-XX | Telefone: (XX) XXXXX-XXXX</p>
+            <p>Email: contato@estruturasdovale.com.br</p>
+        </div>
+        
+        <div class="proposal-title">
+            PROPOSTA COMERCIAL Nº {{ proposta.numero_proposta }}
+        </div>
+        
+        <div class="info-grid" style="text-align: left;">
+            <div>
+                <div class="info-item">
+                    <div class="info-label">Data:</div>
+                    <div>{{ proposta.data_proposta.strftime('%d/%m/%Y') if proposta.data_proposta }}</div>
+                </div>
+            </div>
+            <div>
+                <div class="info-item">
+                    <div class="info-label">Validade:</div>
+                    <div>{{ proposta.validade_dias }} dias</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Dados do Cliente -->
+    <div class="section">
+        <h2 class="section-title">DADOS DO CLIENTE</h2>
+        <div class="info-grid">
+            <div>
+                <div class="info-item">
+                    <div class="info-label">Nome:</div>
+                    <div>{{ proposta.cliente_nome }}</div>
+                </div>
+                <div class="info-item">
+                    <div class="info-label">Telefone:</div>
+                    <div>{{ proposta.cliente_telefone or '-' }}</div>
+                </div>
+            </div>
+            <div>
+                <div class="info-item">
+                    <div class="info-label">E-mail:</div>
+                    <div>{{ proposta.cliente_email or '-' }}</div>
+                </div>
+                {% if proposta.cliente_endereco %}
+                <div class="info-item">
+                    <div class="info-label">Endereço:</div>
+                    <div>{{ proposta.cliente_endereco }}</div>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Objeto da Proposta -->
+    <div class="section">
+        <h2 class="section-title">1. OBJETO</h2>
+        <div class="info-item">
+            <div class="info-label">Assunto:</div>
+            <div>{{ proposta.assunto }}</div>
+        </div>
+        <div class="info-item">
+            <div class="info-label">Descrição:</div>
+            <div style="white-space: pre-line;">{{ proposta.objeto }}</div>
+        </div>
+        {% if proposta.documentos_referencia %}
+        <div class="info-item">
+            <div class="info-label">Documentos de Referência:</div>
+            <div style="white-space: pre-line;">{{ proposta.documentos_referencia }}</div>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- Tabela de Preços -->
+    <div class="section">
+        <h2 class="section-title">2. PREÇOS E ESCOPO</h2>
+        <table class="table">
+            <thead>
+                <tr>
+                    <th style="width: 5%">Item</th>
+                    <th style="width: 50%">Descrição</th>
+                    <th style="width: 10%">Qtd</th>
+                    <th style="width: 10%">Unid.</th>
+                    <th style="width: 12.5%">Preço Unit.</th>
+                    <th style="width: 12.5%">Subtotal</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for item in proposta.itens %}
+                <tr>
+                    <td class="number">{{ item.item_numero }}</td>
+                    <td>{{ item.descricao }}</td>
+                    <td class="number">{{ "{:,.3f}".format(item.quantidade).replace(',', 'X').replace('.', ',').replace('X', '.') }}</td>
+                    <td class="number">{{ item.unidade }}</td>
+                    <td class="currency">R$ {{ "{:,.2f}".format(item.preco_unitario).replace(',', 'X').replace('.', ',').replace('X', '.') }}</td>
+                    <td class="currency">R$ {{ "{:,.2f}".format(item.subtotal).replace(',', 'X').replace('.', ',').replace('X', '.') }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+            <tfoot>
+                <tr class="total-row">
+                    <td colspan="5" style="text-align: right;"><strong>VALOR TOTAL:</strong></td>
+                    <td class="currency"><strong>R$ {{ "{:,.2f}".format(proposta.valor_total or 0).replace(',', 'X').replace('.', ',').replace('X', '.') }}</strong></td>
+                </tr>
+            </tfoot>
+        </table>
+    </div>
+
+    <!-- Itens Inclusos -->
+    {% if proposta.itens_inclusos %}
+    <div class="section">
+        <h2 class="section-title">3. ITENS INCLUSOS</h2>
+        <div class="list-items">
+            <ul>
+                {% for item in proposta.itens_inclusos %}
+                <li>{{ item }}</li>
+                {% endfor %}
+            </ul>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Itens Exclusos -->
+    {% if proposta.itens_exclusos %}
+    <div class="section">
+        <h2 class="section-title">4. ITENS EXCLUSOS</h2>
+        <div class="list-items">
+            <ul>
+                {% for item in proposta.itens_exclusos %}
+                <li>{{ item }}</li>
+                {% endfor %}
+            </ul>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Condições de Pagamento -->
+    <div class="section">
+        <h2 class="section-title">5. CONDIÇÕES DE PAGAMENTO</h2>
+        <div style="white-space: pre-line;">{{ proposta.condicoes_pagamento }}</div>
+        <p><strong>Percentual de Nota Fiscal:</strong> {{ proposta.percentual_nota_fiscal }}%</p>
+    </div>
+
+    <!-- Condições de Entrega -->
+    <div class="section">
+        <h2 class="section-title">6. CONDIÇÕES DE ENTREGA</h2>
+        <p><strong>Prazo estimado:</strong> {{ proposta.prazo_entrega_dias }} dias após confirmação do pedido e aprovação do projeto.</p>
+        {% if proposta.observacoes_entrega %}
+        <div style="white-space: pre-line;">{{ proposta.observacoes_entrega }}</div>
+        {% endif %}
+    </div>
+
+    <!-- Garantias -->
+    {% if proposta.garantias %}
+    <div class="section">
+        <h2 class="section-title">7. GARANTIAS</h2>
+        <div style="white-space: pre-line;">{{ proposta.garantias }}</div>
+    </div>
+    {% endif %}
+
+    <!-- Considerações Gerais -->
+    {% if proposta.consideracoes_gerais %}
+    <div class="section">
+        <h2 class="section-title">8. CONSIDERAÇÕES GERAIS</h2>
+        <div style="white-space: pre-line;">{{ proposta.consideracoes_gerais }}</div>
+    </div>
+    {% endif %}
+
+    <!-- Validade -->
+    <div class="section">
+        <h2 class="section-title">9. VALIDADE DA PROPOSTA</h2>
+        <p>Esta proposta tem validade de <strong>{{ proposta.validade_dias }} ({{ proposta.validade_dias|int|spell_number }}) dias</strong> a partir da data de sua emissão.</p>
+    </div>
+
+    <!-- Assinatura -->
+    <div class="signature-section">
+        <p style="text-align: center;">Aguardamos sua confirmação e permanecemos à disposição para quaisquer esclarecimentos.</p>
+        
+        <div class="signature-box">
+            <div><strong>ESTRUTURAS DO VALE</strong></div>
+            <div>Responsável Técnico</div>
+        </div>
+    </div>
+
+    <!-- Botões para impressão -->
+    <div class="no-print" style="text-align: center; margin-top: 30px; padding: 20px;">
+        <button onclick="window.print()" style="padding: 10px 20px; margin: 10px; background-color: #0066cc; color: white; border: none; border-radius: 5px; cursor: pointer;">
+            Imprimir PDF
+        </button>
+        <button onclick="window.close()" style="padding: 10px 20px; margin: 10px; background-color: #666; color: white; border: none; border-radius: 5px; cursor: pointer;">
+            Fechar
+        </button>
+    </div>
+</body>
+</html>

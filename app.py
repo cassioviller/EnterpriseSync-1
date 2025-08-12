@@ -96,6 +96,21 @@ with app.app_context():
     except Exception as e:
         logging.error(f"❌ Erro ao registrar blueprint serviços: {e}")
     
+    # Importar modelos de propostas
+    try:
+        from models_propostas import PropostaComercialSIGE, PropostaItem, PropostaArquivo, PropostaTemplate
+        logging.info("✅ Modelos de propostas importados")
+    except ImportError as e:
+        logging.warning(f"⚠️ Erro ao importar modelos de propostas: {e}")
+    
+    # Registrar blueprint de propostas
+    try:
+        from propostas_views import propostas_bp
+        app.register_blueprint(propostas_bp, url_prefix='/propostas')
+        logging.info("✅ Blueprint propostas registrado")
+    except Exception as e:
+        logging.error(f"❌ Erro ao registrar blueprint propostas: {e}")
+    
     # Migrate photos if necessary
     try:
         import base64

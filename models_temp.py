@@ -118,7 +118,7 @@ class Obra(db.Model):
     custos = db.relationship('CustoObra', backref='obra_ref', lazy=True, overlaps="obra_ref")
     
     # MÓDULO 2: Relacionamentos do Portal do Cliente
-    proposta_origem = db.relationship('PropostaComercial', backref='obra_gerada')
+    proposta_origem = db.relationship('PropostaComercialSIGE', backref='obra_gerada')
     servicos_obra = db.relationship('ServicoObra', backref='obra', cascade='all, delete-orphan', lazy=True)
 
 class ServicoObra(db.Model):
@@ -622,7 +622,7 @@ class OutroCusto(db.Model):
 # MÓDULO DE PROPOSTAS COMERCIAIS
 # ================================
 
-class PropostaComercial(db.Model):
+class PropostaComercialSIGE(db.Model):
     __tablename__ = 'proposta_comercial'
     
     id = db.Column(db.Integer, primary_key=True)
@@ -666,11 +666,11 @@ class PropostaComercial(db.Model):
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     
     # Relacionamentos
-    servicos = db.relationship('ServicoPropostaComercial', backref='proposta_ref', lazy=True, cascade='all, delete-orphan')
+    servicos = db.relationship('ServicoPropostaComercialSIGE', backref='proposta_ref', lazy=True, cascade='all, delete-orphan')
     admin = db.relationship('Usuario', foreign_keys=[admin_id])
     criado_por = db.relationship('Usuario', foreign_keys=[criado_por_id])
 
-class ServicoPropostaComercial(db.Model):
+class ServicoPropostaComercialSIGE(db.Model):
     __tablename__ = 'servico_proposta_comercial'
     
     id = db.Column(db.Integer, primary_key=True)
@@ -684,7 +684,7 @@ class ServicoPropostaComercial(db.Model):
     ordem = db.Column(db.Integer, default=1)
     
     def __repr__(self):
-        return f'<ServicoPropostaComercial {self.descricao_servico}>'
+        return f'<ServicoPropostaComercialSIGE {self.descricao_servico}>'
 
 
 # ================================
