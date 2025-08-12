@@ -1,0 +1,236 @@
+{% extends "base.html" %}
+
+{% block title %}{{ tabela.nome }} - SIGE{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row mb-4">
+        <div class="col-md-8">
+            <h2><i class="fas fa-table text-primary"></i> {{ tabela.nome }}</h2>
+            <p class="text-muted">Tabela de composição - {{ tabela.tipo_estrutura.title() }}</p>
+        </div>
+        <div class="col-md-4 text-end">
+            <div class="btn-group" role="group">
+                <a href="{{ url_for('servicos.editar_tabela', id=tabela.id) }}" class="btn btn-warning">
+                    <i class="fas fa-edit"></i> Editar
+                </a>
+                <a href="{{ url_for('servicos.listar_tabelas') }}" class="btn btn-outline-secondary">
+                    <i class="fas fa-arrow-left"></i> Voltar
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-md-8">
+            <!-- Informações da Tabela -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5><i class="fas fa-info-circle me-2"></i>Informações da Tabela</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <p><strong>Nome:</strong> {{ tabela.nome }}</p>
+                            <p><strong>Tipo de Estrutura:</strong> 
+                                <span class="badge bg-info">{{ tabela.tipo_estrutura.title() }}</span>
+                            </p>
+                            <p><strong>Status:</strong> 
+                                <span class="badge bg-{{ 'success' if tabela.status == 'ativa' else 'secondary' }}">
+                                    {{ tabela.status.title() }}
+                                </span>
+                            </p>
+                        </div>
+                        <div class="col-md-6">
+                            <p><strong>Área de Aplicação:</strong> {{ tabela.area_minima }}m² - {{ tabela.area_maxima }}m²</p>
+                            <p><strong>Altura de Aplicação:</strong> {{ tabela.altura_minima }}m - {{ tabela.altura_maxima }}m</p>
+                            <p><strong>Criada em:</strong> {{ tabela.criado_em.strftime('%d/%m/%Y às %H:%M') }}</p>
+                        </div>
+                    </div>
+                    {% if tabela.descricao %}
+                    <hr>
+                    <p><strong>Descrição:</strong></p>
+                    <p class="text-muted">{{ tabela.descricao }}</p>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Itens da Tabela -->
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5><i class="fas fa-list me-2"></i>Itens da Composição ({{ tabela.itens|length }})</h5>
+                    <a href="{{ url_for('servicos.novo_item_tabela', tabela_id=tabela.id) }}" class="btn btn-sm btn-primary">
+                        <i class="fas fa-plus"></i> Adicionar Item
+                    </a>
+                </div>
+                <div class="card-body">
+                    {% if tabela.itens %}
+                        <div class="table-responsive">
+                            <table class="table table-striped">
+                                <thead>
+                                    <tr>
+                                        <th>Serviço</th>
+                                        <th>Quantidade</th>
+                                        <th>Aplicação (%)</th>
+                                        <th>Fator</th>
+                                        <th>Ações</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for item in tabela.itens %}
+                                    <tr>
+                                        <td>
+                                            <strong>{{ item.servico_mestre.nome }}</strong><br>
+                                            <small class="text-muted">{{ item.servico_mestre.codigo }}</small>
+                                        </td>
+                                        <td>{{ item.quantidade }} {{ item.servico_mestre.unidade }}</td>
+                                        <td>{{ item.percentual_aplicacao }}%</td>
+                                        <td>{{ item.fator_multiplicador }}x</td>
+                                        <td>
+                                            <div class="btn-group btn-group-sm">
+                                                <a href="{{ url_for('servicos.editar_item_tabela', id=item.id) }}" 
+                                                   class="btn btn-outline-warning" title="Editar">
+                                                    <i class="fas fa-edit"></i>
+                                                </a>
+                                                <button class="btn btn-outline-danger" 
+                                                        title="Remover"
+                                                        onclick="removerItem({{ item.id }})">
+                                                    <i class="fas fa-trash"></i>
+                                                </button>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    {% else %}
+                        <div class="text-center py-4">
+                            <i class="fas fa-list fa-3x text-muted mb-3"></i>
+                            <h5 class="text-muted">Nenhum item na composição</h5>
+                            <p class="text-muted">Adicione serviços à esta tabela de composição.</p>
+                            <a href="{{ url_for('servicos.novo_item_tabela', tabela_id=tabela.id) }}" class="btn btn-primary">
+                                <i class="fas fa-plus"></i> Adicionar Primeiro Item
+                            </a>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-4">
+            <!-- Resumo -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h6><i class="fas fa-chart-pie me-2"></i>Resumo</h6>
+                </div>
+                <div class="card-body">
+                    <div class="row text-center">
+                        <div class="col-6">
+                            <h4 class="text-primary">{{ tabela.itens|length }}</h4>
+                            <small class="text-muted">Itens</small>
+                        </div>
+                        <div class="col-6">
+                            <h4 class="text-info">{{ tabela.tipo_estrutura.title() }}</h4>
+                            <small class="text-muted">Tipo</small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Ações Rápidas -->
+            <div class="card">
+                <div class="card-header">
+                    <h6><i class="fas fa-bolt me-2"></i>Ações Rápidas</h6>
+                </div>
+                <div class="card-body">
+                    <div class="d-grid gap-2">
+                        <a href="{{ url_for('servicos.novo_item_tabela', tabela_id=tabela.id) }}" class="btn btn-outline-primary">
+                            <i class="fas fa-plus"></i> Adicionar Item
+                        </a>
+                        <a href="{{ url_for('servicos.editar_tabela', id=tabela.id) }}" class="btn btn-outline-warning">
+                            <i class="fas fa-edit"></i> Editar Tabela
+                        </a>
+                        <button class="btn btn-outline-success" onclick="duplicarTabela({{ tabela.id }})">
+                            <i class="fas fa-copy"></i> Duplicar Tabela
+                        </button>
+                        <hr>
+                        <button class="btn btn-outline-danger" onclick="excluirTabela({{ tabela.id }}, '{{ tabela.nome }}')">
+                            <i class="fas fa-trash"></i> Excluir Tabela
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function removerItem(itemId) {
+    if (confirm('Tem certeza que deseja remover este item da composição?')) {
+        fetch(`/servicos/itens-tabela/${itemId}`, {
+            method: 'DELETE',
+            headers: {
+                'Content-Type': 'application/json',
+            }
+        })
+        .then(response => {
+            if (response.ok) {
+                location.reload();
+            } else {
+                alert('Erro ao remover item. Tente novamente.');
+            }
+        })
+        .catch(error => {
+            console.error('Erro:', error);
+            alert('Erro ao remover item. Tente novamente.');
+        });
+    }
+}
+
+function duplicarTabela(tabelaId) {
+    if (confirm('Deseja criar uma cópia desta tabela de composição?')) {
+        fetch(`/servicos/tabelas/${tabelaId}/duplicar`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                window.location.href = `/servicos/tabelas/${data.nova_tabela_id}`;
+            } else {
+                alert('Erro ao duplicar tabela. Tente novamente.');
+            }
+        })
+        .catch(error => {
+            console.error('Erro:', error);
+            alert('Erro ao duplicar tabela. Tente novamente.');
+        });
+    }
+}
+
+function excluirTabela(tabelaId, tabelaNome) {
+    if (confirm(`Tem certeza que deseja excluir a tabela "${tabelaNome}"?\n\nEsta ação não pode ser desfeita.`)) {
+        fetch(`/servicos/tabelas/${tabelaId}`, {
+            method: 'DELETE',
+            headers: {
+                'Content-Type': 'application/json',
+            }
+        })
+        .then(response => {
+            if (response.ok) {
+                window.location.href = '/servicos/tabelas';
+            } else {
+                alert('Erro ao excluir tabela. Tente novamente.');
+            }
+        })
+        .catch(error => {
+            console.error('Erro:', error);
+            alert('Erro ao excluir tabela. Tente novamente.');
+        });
+    }
+}
+</script>
+{% endblock %}

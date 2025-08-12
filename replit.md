@@ -8,6 +8,25 @@ SIGE (Sistema Integrado de Gestão Empresarial) is a comprehensive business mana
 
 Preferred communication style: Simple, everyday language.
 
+## Recent Changes
+
+**Latest Update - August 12, 2025 (11:44 BRT) - MÓDULO DE SERVIÇOS COMERCIAIS COMPLETO:**
+- 🎯 **SISTEMA COMPLETO IMPLEMENTADO**: Módulo de Gestão de Serviços para Propostas Comerciais 100% funcional
+  - **5 Modelos Integrados**: ServicoMestre, SubServico, TabelaComposicao, ItemTabelaComposicao, ItemServicoPropostaDinamica
+  - **Sistema CRUD Completo**: Dashboard, listagem, criação, edição, visualização para serviços e tabelas
+  - **8+ Endpoints Funcionais**: /servicos/dashboard, /servicos/servicos, /servicos/tabelas, APIs de integração
+  - **3+ Templates Criados**: Dashboard principal, formulários com preview, listagens com filtros
+  - **Códigos Automáticos**: Sistema hierárquico SRV001, SRV001.001, SRV002.001...
+  - **Preview de Preços**: Cálculo dinâmico de margem de lucro em tempo real
+  - **Tabelas de Composição**: Sistema avançado por tipo de estrutura (galpão, edifício, ponte)
+  - **Parâmetros Técnicos**: Área mínima/máxima, altura, fatores multiplicadores
+  - **Multi-tenant**: Isolamento completo de dados por administrador
+  - **APIs de Integração**: Endpoints para aplicar serviços completos em propostas
+  - **Sistema de Subserviços**: Componentes hierárquicos com preços independentes
+  - **Blueprint Registrado**: /servicos/* totalmente operacional no app.py
+  - **Correções SQLAlchemy**: Relacionamentos entre Proposta e ItemServicoPropostaDinamica funcionando
+  - **Templates Responsivos**: Interface profissional com Bootstrap e JavaScript interativo
+
 ## System Architecture
 
 ### Core Design Principles

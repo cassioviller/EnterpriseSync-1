@@ -1,0 +1,155 @@
+{% extends "base.html" %}
+
+{% block title %}Nova Tabela de Composição - SIGE{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row mb-4">
+        <div class="col-md-8">
+            <h2><i class="fas fa-table text-primary"></i> Nova Tabela de Composição</h2>
+            <p class="text-muted">Criar tabela de preços por tipo de estrutura</p>
+        </div>
+        <div class="col-md-4 text-end">
+            <a href="{{ url_for('servicos.listar_tabelas') }}" class="btn btn-outline-secondary">
+                <i class="fas fa-arrow-left"></i> Voltar à Lista
+            </a>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-header">
+            <h5><i class="fas fa-plus me-2"></i>Dados da Tabela</h5>
+        </div>
+        <form method="POST">
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-8">
+                        <div class="mb-3">
+                            <label class="form-label">Nome da Tabela</label>
+                            <input type="text" name="nome" class="form-control" 
+                                   placeholder="Ex: Galpão Industrial Padrão" required>
+                            <div class="form-text">Nome que identifica esta composição</div>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="mb-3">
+                            <label class="form-label">Tipo de Estrutura</label>
+                            <select name="tipo_estrutura" class="form-select" required>
+                                <option value="">Selecione...</option>
+                                <option value="galpao">Galpão</option>
+                                <option value="edificio">Edifício</option>
+                                <option value="ponte">Ponte</option>
+                                <option value="cobertura">Cobertura</option>
+                                <option value="mezanino">Mezanino</option>
+                                <option value="torre">Torre</option>
+                                <option value="escada">Escada</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label">Descrição</label>
+                    <textarea name="descricao" class="form-control" rows="3" 
+                              placeholder="Características técnicas desta composição..."></textarea>
+                    <div class="form-text">Informações sobre quando usar esta tabela</div>
+                </div>
+
+                <h5 class="mb-3"><i class="fas fa-ruler-combined me-2"></i>Parâmetros Técnicos</h5>
+                
+                <div class="row">
+                    <div class="col-md-3">
+                        <div class="mb-3">
+                            <label class="form-label">Área Mínima (m²)</label>
+                            <input type="number" name="area_minima" class="form-control" 
+                                   step="0.01" min="0" value="0" required>
+                            <div class="form-text">Área mínima de aplicação</div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="mb-3">
+                            <label class="form-label">Área Máxima (m²)</label>
+                            <input type="number" name="area_maxima" class="form-control" 
+                                   step="0.01" min="0" value="999999" required>
+                            <div class="form-text">Área máxima de aplicação</div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="mb-3">
+                            <label class="form-label">Altura Mínima (m)</label>
+                            <input type="number" name="altura_minima" class="form-control" 
+                                   step="0.01" min="0" value="0" required>
+                            <div class="form-text">Altura mínima da estrutura</div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="mb-3">
+                            <label class="form-label">Altura Máxima (m)</label>
+                            <input type="number" name="altura_maxima" class="form-control" 
+                                   step="0.01" min="0" value="999" required>
+                            <div class="form-text">Altura máxima da estrutura</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="row">
+                    <div class="col-md-4">
+                        <div class="mb-3">
+                            <label class="form-label">Status</label>
+                            <select name="status" class="form-select">
+                                <option value="ativa" selected>Ativa</option>
+                                <option value="inativa">Inativa</option>
+                            </select>
+                            <div class="form-text">Apenas tabelas ativas são usadas</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Preview dos Parâmetros -->
+                <div class="alert alert-info">
+                    <h6><i class="fas fa-info-circle me-2"></i>Aplicação da Tabela</h6>
+                    <div id="preview-parametros">
+                        <p>Esta tabela será aplicada em estruturas do tipo <strong id="preview-tipo">-</strong> 
+                        com área entre <strong id="preview-area">0 e 999999 m²</strong> 
+                        e altura entre <strong id="preview-altura">0 e 999 m</strong>.</p>
+                    </div>
+                </div>
+            </div>
+            <div class="card-footer">
+                <div class="d-flex justify-content-between">
+                    <a href="{{ url_for('servicos.listar_tabelas') }}" class="btn btn-secondary">
+                        <i class="fas fa-times"></i> Cancelar
+                    </a>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-save"></i> Criar Tabela
+                    </button>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+function atualizarPreview() {
+    const tipo = document.querySelector('[name="tipo_estrutura"]').value || '-';
+    const areaMin = document.querySelector('[name="area_minima"]').value || '0';
+    const areaMax = document.querySelector('[name="area_maxima"]').value || '999999';
+    const alturaMin = document.querySelector('[name="altura_minima"]').value || '0';
+    const alturaMax = document.querySelector('[name="altura_maxima"]').value || '999';
+    
+    document.getElementById('preview-tipo').textContent = tipo;
+    document.getElementById('preview-area').textContent = `${areaMin} e ${areaMax} m²`;
+    document.getElementById('preview-altura').textContent = `${alturaMin} e ${alturaMax} m`;
+}
+
+// Atualizar preview quando valores mudarem
+document.addEventListener('DOMContentLoaded', function() {
+    const campos = ['tipo_estrutura', 'area_minima', 'area_maxima', 'altura_minima', 'altura_maxima'];
+    campos.forEach(campo => {
+        document.querySelector(`[name="${campo}"]`).addEventListener('change', atualizarPreview);
+        document.querySelector(`[name="${campo}"]`).addEventListener('input', atualizarPreview);
+    });
+    atualizarPreview();
+});
+</script>
+{% endblock %}
