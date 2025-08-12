@@ -4,20 +4,29 @@
 
 {% block content %}
 <div class="container-fluid">
-    <div class="row mb-4">
-        <div class="col-md-8">
-            <h2><i class="fas fa-table text-primary me-2"></i>{{ tabela.nome }}</h2>
-            <p class="text-muted">Tabela de composição - {{ tabela.tipo_estrutura.title() }}</p>
-        </div>
-        <div class="col-md-4 text-end">
-            <div class="btn-group" role="group">
-                <a href="{{ url_for('servicos.editar_tabela', id=tabela.id) }}" class="btn btn-warning">
-                    <i class="fas fa-edit me-1"></i>Editar
-                </a>
-                <a href="{{ url_for('servicos.listar_tabelas') }}" class="btn btn-outline-secondary">
-                    <i class="fas fa-arrow-left me-1"></i>Voltar
-                </a>
+    <!-- Header Profissional -->
+    <div class="d-flex justify-content-between align-items-center mb-4 p-4 bg-white rounded shadow-sm border">
+        <div class="d-flex align-items-center">
+            <div class="me-3">
+                <div class="bg-primary bg-gradient rounded-circle d-flex align-items-center justify-content-center" 
+                     style="width: 48px; height: 48px;">
+                    <i class="fas fa-eye text-white fs-5"></i>
+                </div>
             </div>
+            <div>
+                <h1 class="h3 mb-1 fw-bold text-dark">{{ tabela.nome }}</h1>
+                <p class="text-muted mb-0 small">Tabela de composição - {{ tabela.tipo_estrutura.title() }}</p>
+            </div>
+        </div>
+        <div class="d-flex gap-2">
+            <a href="{{ url_for('servicos.editar_tabela', id=tabela.id) }}" class="btn btn-warning d-flex align-items-center">
+                <i class="fas fa-edit me-2"></i>
+                <span>Editar</span>
+            </a>
+            <a href="{{ url_for('servicos.listar_tabelas') }}" class="btn btn-outline-secondary d-flex align-items-center">
+                <i class="fas fa-arrow-left me-2"></i>
+                <span>Voltar</span>
+            </a>
         </div>
     </div>
 
