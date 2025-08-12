@@ -63,6 +63,7 @@ def dashboard():
     variacao = ((total_folha - total_anterior) / total_anterior * 100) if total_anterior > 0 else 0
     
     # Status do processamento
+    from models import Funcionario
     funcionarios_ativos = Funcionario.query.filter_by(
         admin_id=current_user.id,
         ativo=True
