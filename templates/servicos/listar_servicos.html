@@ -1,0 +1,193 @@
+{% extends "base.html" %}
+
+{% block title %}Lista de Serviços - SIGE{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row mb-4">
+        <div class="col-md-8">
+            <h2><i class="fas fa-cogs text-primary"></i> Gestão de Serviços</h2>
+            <p class="text-muted">Lista completa de serviços cadastrados</p>
+        </div>
+        <div class="col-md-4 text-end">
+            <a href="{{ url_for('servicos.novo_servico') }}" class="btn btn-primary">
+                <i class="fas fa-plus"></i> Novo Serviço
+            </a>
+            <a href="{{ url_for('servicos.dashboard') }}" class="btn btn-outline-secondary">
+                <i class="fas fa-tachometer-alt"></i> Dashboard
+            </a>
+        </div>
+    </div>
+
+    <!-- Filtros -->
+    <div class="card mb-4">
+        <div class="card-body">
+            <form method="GET" class="row g-3">
+                <div class="col-md-4">
+                    <label class="form-label">Status</label>
+                    <select name="status" class="form-select">
+                        <option value="todos" {{ 'selected' if status_filter == 'todos' }}>Todos</option>
+                        <option value="ativo" {{ 'selected' if status_filter == 'ativo' }}>Ativos</option>
+                        <option value="inativo" {{ 'selected' if status_filter == 'inativo' }}>Inativos</option>
+                        <option value="descontinuado" {{ 'selected' if status_filter == 'descontinuado' }}>Descontinuados</option>
+                    </select>
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label">Pesquisar</label>
+                    <input type="text" name="search" class="form-control" 
+                           placeholder="Código ou nome do serviço..." 
+                           value="{{ search }}">
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label">&nbsp;</label>
+                    <button type="submit" class="btn btn-primary w-100">
+                        <i class="fas fa-search"></i> Filtrar
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Lista de Serviços -->
+    <div class="card">
+        <div class="card-header">
+            <h5><i class="fas fa-list me-2"></i>Serviços ({{ servicos.total }})</h5>
+        </div>
+        <div class="card-body">
+            {% if servicos.items %}
+                <div class="table-responsive">
+                    <table class="table table-striped">
+                        <thead>
+                            <tr>
+                                <th>Código</th>
+                                <th>Nome</th>
+                                <th>Unidade</th>
+                                <th>Preço Base</th>
+                                <th>Preço Final</th>
+                                <th>Subserviços</th>
+                                <th>Status</th>
+                                <th class="text-center">Ações</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for servico in servicos.items %}
+                            <tr>
+                                <td><strong>{{ servico.codigo }}</strong></td>
+                                <td>
+                                    <strong>{{ servico.nome }}</strong>
+                                    {% if servico.descricao %}
+                                        <br><small class="text-muted">{{ servico.descricao[:60] }}{% if servico.descricao|length > 60 %}...{% endif %}</small>
+                                    {% endif %}
+                                </td>
+                                <td>{{ servico.unidade }}</td>
+                                <td>R$ {{ "%.2f"|format(servico.preco_base) }}</td>
+                                <td>
+                                    <strong class="text-success">R$ {{ "%.2f"|format(servico.preco_final) }}</strong>
+                                    <br><small class="text-muted">{{ servico.margem_lucro }}% margem</small>
+                                </td>
+                                <td>
+                                    {% if servico.total_subservicos > 0 %}
+                                        <span class="badge bg-info">{{ servico.total_subservicos }} itens</span>
+                                    {% else %}
+                                        <span class="text-muted">Nenhum</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <span class="badge bg-{{ 'success' if servico.status == 'ativo' else 'secondary' }}">
+                                        {{ servico.status.title() }}
+                                    </span>
+                                </td>
+                                <td class="text-center">
+                                    <div class="btn-group btn-group-sm" role="group">
+                                        <a href="{{ url_for('servicos.ver_servico', id=servico.id) }}" 
+                                           class="btn btn-outline-primary" title="Ver Detalhes">
+                                            <i class="fas fa-eye"></i>
+                                        </a>
+                                        <a href="{{ url_for('servicos.editar_servico', id=servico.id) }}" 
+                                           class="btn btn-outline-warning" title="Editar">
+                                            <i class="fas fa-edit"></i>
+                                        </a>
+                                        <button class="btn btn-outline-success" 
+                                                title="Usar em Proposta"
+                                                onclick="usarEmProposta({{ servico.id }}, '{{ servico.nome }}')">
+                                            <i class="fas fa-file-contract"></i>
+                                        </button>
+                                    </div>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- Paginação -->
+                {% if servicos.pages > 1 %}
+                <nav aria-label="Navegação de páginas">
+                    <ul class="pagination justify-content-center">
+                        {% if servicos.has_prev %}
+                            <li class="page-item">
+                                <a class="page-link" href="{{ url_for('servicos.listar_servicos', page=servicos.prev_num, status=status_filter, search=search) }}">
+                                    Anterior
+                                </a>
+                            </li>
+                        {% endif %}
+                        
+                        {% for page_num in servicos.iter_pages() %}
+                            {% if page_num %}
+                                {% if page_num != servicos.page %}
+                                    <li class="page-item">
+                                        <a class="page-link" href="{{ url_for('servicos.listar_servicos', page=page_num, status=status_filter, search=search) }}">
+                                            {{ page_num }}
+                                        </a>
+                                    </li>
+                                {% else %}
+                                    <li class="page-item active">
+                                        <span class="page-link">{{ page_num }}</span>
+                                    </li>
+                                {% endif %}
+                            {% else %}
+                                <li class="page-item disabled">
+                                    <span class="page-link">…</span>
+                                </li>
+                            {% endif %}
+                        {% endfor %}
+                        
+                        {% if servicos.has_next %}
+                            <li class="page-item">
+                                <a class="page-link" href="{{ url_for('servicos.listar_servicos', page=servicos.next_num, status=status_filter, search=search) }}">
+                                    Próxima
+                                </a>
+                            </li>
+                        {% endif %}
+                    </ul>
+                </nav>
+                {% endif %}
+            {% else %}
+                <div class="text-center py-5">
+                    <i class="fas fa-cogs fa-3x text-muted mb-3"></i>
+                    <h4 class="text-muted">Nenhum serviço encontrado</h4>
+                    <p class="text-muted">
+                        {% if search or status_filter != 'todos' %}
+                            Tente ajustar os filtros de pesquisa.
+                        {% else %}
+                            Comece criando seu primeiro serviço.
+                        {% endif %}
+                    </p>
+                    <a href="{{ url_for('servicos.novo_servico') }}" class="btn btn-primary">
+                        <i class="fas fa-plus"></i> Criar Primeiro Serviço
+                    </a>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<script>
+function usarEmProposta(servicoId, servicoNome) {
+    if (confirm(`Deseja usar o serviço "${servicoNome}" em uma nova proposta?`)) {
+        // Redirecionar para criação de proposta com serviço pré-selecionado
+        window.location.href = `/propostas/nova?servico_id=${servicoId}`;
+    }
+}
+</script>
+{% endblock %}

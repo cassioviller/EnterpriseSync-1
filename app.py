@@ -81,6 +81,14 @@ with app.app_context():
     except Exception as e:
         logging.error(f"❌ Erro ao registrar blueprint contabilidade: {e}")
     
+    # Registrar blueprint de serviços
+    try:
+        from servicos_views import servicos_bp
+        app.register_blueprint(servicos_bp, url_prefix='/servicos')
+        logging.info("✅ Blueprint serviços registrado")
+    except Exception as e:
+        logging.error(f"❌ Erro ao registrar blueprint serviços: {e}")
+    
     # Migrate photos if necessary
     try:
         import base64

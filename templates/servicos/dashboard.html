@@ -1,0 +1,214 @@
+{% extends "base.html" %}
+
+{% block title %}Gestão de Serviços - SIGE{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row mb-4">
+        <div class="col-md-8">
+            <h2><i class="fas fa-cogs text-primary"></i> Gestão de Serviços</h2>
+            <p class="text-muted">Sistema completo para gerenciar serviços, subserviços e tabelas de composição</p>
+        </div>
+        <div class="col-md-4 text-end">
+            <div class="btn-group" role="group">
+                <a href="{{ url_for('servicos.novo_servico') }}" class="btn btn-primary">
+                    <i class="fas fa-plus"></i> Novo Serviço
+                </a>
+                <a href="{{ url_for('servicos.nova_tabela') }}" class="btn btn-outline-primary">
+                    <i class="fas fa-table"></i> Nova Tabela
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Cards de Estatísticas -->
+    <div class="row mb-4">
+        <div class="col-md-3">
+            <div class="card border-primary">
+                <div class="card-body text-center">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <h3 class="text-primary mb-0">{{ total_servicos }}</h3>
+                            <small class="text-muted">Total de Serviços</small>
+                        </div>
+                        <div class="text-primary fs-1">
+                            <i class="fas fa-cogs"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-3">
+            <div class="card border-success">
+                <div class="card-body text-center">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <h3 class="text-success mb-0">{{ servicos_ativos }}</h3>
+                            <small class="text-muted">Serviços Ativos</small>
+                        </div>
+                        <div class="text-success fs-1">
+                            <i class="fas fa-check-circle"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-3">
+            <div class="card border-info">
+                <div class="card-body text-center">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <h3 class="text-info mb-0">{{ total_subservicos }}</h3>
+                            <small class="text-muted">Subserviços</small>
+                        </div>
+                        <div class="text-info fs-1">
+                            <i class="fas fa-list"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-3">
+            <div class="card border-warning">
+                <div class="card-body text-center">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <h3 class="text-warning mb-0">{{ total_tabelas }}</h3>
+                            <small class="text-muted">Tabelas de Composição</small>
+                        </div>
+                        <div class="text-warning fs-1">
+                            <i class="fas fa-table"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <!-- Serviços Mais Utilizados -->
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header">
+                    <h5><i class="fas fa-chart-bar me-2"></i>Serviços Mais Utilizados</h5>
+                </div>
+                <div class="card-body">
+                    {% if servicos_populares %}
+                        {% for servico, uso_count in servicos_populares %}
+                        <div class="d-flex justify-content-between align-items-center mb-3">
+                            <div>
+                                <strong>{{ servico.codigo }}</strong> - {{ servico.nome }}
+                                <br>
+                                <small class="text-muted">{{ servico.unidade }} - R$ {{ "%.2f"|format(servico.preco_final) }}</small>
+                            </div>
+                            <span class="badge bg-primary">{{ uso_count }} usos</span>
+                        </div>
+                        {% endfor %}
+                    {% else %}
+                        <div class="text-center py-3">
+                            <i class="fas fa-chart-bar fa-2x text-muted mb-2"></i>
+                            <p class="text-muted">Nenhum uso registrado ainda</p>
+                        </div>
+                    {% endif %}
+                </div>
+                <div class="card-footer">
+                    <a href="{{ url_for('servicos.listar_servicos') }}" class="btn btn-outline-primary btn-sm">
+                        Ver Todos os Serviços
+                    </a>
+                </div>
+            </div>
+        </div>
+
+        <!-- Serviços Recentes -->
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header">
+                    <h5><i class="fas fa-clock me-2"></i>Serviços Recentes</h5>
+                </div>
+                <div class="card-body">
+                    {% if servicos_recentes %}
+                        {% for servico in servicos_recentes %}
+                        <div class="d-flex justify-content-between align-items-center mb-3">
+                            <div>
+                                <strong>{{ servico.codigo }}</strong> - {{ servico.nome }}
+                                <br>
+                                <small class="text-muted">
+                                    Criado em {{ servico.criado_em.strftime('%d/%m/%Y') }}
+                                    {% if servico.total_subservicos > 0 %}
+                                        - {{ servico.total_subservicos }} subserviços
+                                    {% endif %}
+                                </small>
+                            </div>
+                            <div>
+                                <span class="badge bg-{{ 'success' if servico.status == 'ativo' else 'secondary' }}">
+                                    {{ servico.status.title() }}
+                                </span>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    {% else %}
+                        <div class="text-center py-3">
+                            <i class="fas fa-clock fa-2x text-muted mb-2"></i>
+                            <p class="text-muted">Nenhum serviço cadastrado</p>
+                        </div>
+                    {% endif %}
+                </div>
+                <div class="card-footer">
+                    <a href="{{ url_for('servicos.novo_servico') }}" class="btn btn-primary btn-sm">
+                        <i class="fas fa-plus"></i> Criar Primeiro Serviço
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Menu de Ações Rápidas -->
+    <div class="row mt-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5><i class="fas fa-bolt me-2"></i>Ações Rápidas</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-3">
+                            <a href="{{ url_for('servicos.listar_servicos') }}" class="btn btn-outline-primary w-100 mb-2">
+                                <i class="fas fa-list d-block fs-2 mb-2"></i>
+                                Gerenciar Serviços
+                            </a>
+                        </div>
+                        <div class="col-md-3">
+                            <a href="{{ url_for('servicos.listar_tabelas') }}" class="btn btn-outline-info w-100 mb-2">
+                                <i class="fas fa-table d-block fs-2 mb-2"></i>
+                                Tabelas de Composição
+                            </a>
+                        </div>
+                        <div class="col-md-3">
+                            <a href="{{ url_for('main.propostas') }}" class="btn btn-outline-success w-100 mb-2">
+                                <i class="fas fa-file-contract d-block fs-2 mb-2"></i>
+                                Aplicar em Propostas
+                            </a>
+                        </div>
+                        <div class="col-md-3">
+                            <button class="btn btn-outline-warning w-100 mb-2" onclick="exportarServicos()">
+                                <i class="fas fa-download d-block fs-2 mb-2"></i>
+                                Exportar Catálogo
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function exportarServicos() {
+    // Implementar exportação de catálogo de serviços
+    alert('Funcionalidade de exportação será implementada em breve!');
+}
+</script>
+{% endblock %}
