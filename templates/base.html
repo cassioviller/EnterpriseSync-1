@@ -668,10 +668,10 @@
                         </li>
                     </ul>
                 {% elif current_user.tipo_usuario.name == 'ADMIN' %}
-                    <!-- Navegação em duas linhas -->
-                    <div class="w-100">
+                    <!-- Navegação em duas linhas centralizadas -->
+                    <div class="w-100 d-flex flex-column align-items-center">
                         <!-- Primeira Linha -->
-                        <div class="d-flex flex-wrap align-items-center justify-content-start mb-2">
+                        <div class="d-flex flex-wrap align-items-center justify-content-center mb-2">
                             <ul class="navbar-nav d-flex flex-row">
                                 <li class="nav-item me-3">
                                     <a class="nav-link" href="{{ url_for('main.dashboard') }}">
@@ -772,7 +772,7 @@
                         </div>
                         
                         <!-- Segunda Linha -->
-                        <div class="d-flex flex-wrap align-items-center justify-content-start">
+                        <div class="d-flex flex-wrap align-items-center justify-content-center">
                             <ul class="navbar-nav d-flex flex-row">
                                 <li class="nav-item me-3">
                                     <a class="nav-link" href="{{ url_for('main.veiculos') }}">
