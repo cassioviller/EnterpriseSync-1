@@ -1690,6 +1690,7 @@ class Proposta(db.Model):
     # Relacionamentos
     cliente = db.relationship('Cliente', backref='propostas')
     admin = db.relationship('Usuario', backref='propostas_administradas')
+    itens_servicos_dinamicos = db.relationship('ItemServicoPropostaDinamica', back_populates='proposta', cascade='all, delete-orphan')
 
 class PropostaHistorico(db.Model):
     id = db.Column(db.Integer, primary_key=True)

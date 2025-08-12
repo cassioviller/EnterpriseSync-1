@@ -40,6 +40,13 @@ csrf.init_app(app)
 # Import models after db initialization
 from models import *
 
+# Import models de serviços
+try:
+    from models_servicos import *
+    logging.info("✅ Modelos de serviços importados")
+except Exception as e:
+    logging.error(f"❌ Erro ao importar modelos de serviços: {e}")
+
 # Import views
 from views import main_bp
 try:
