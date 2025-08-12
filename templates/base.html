@@ -658,16 +658,18 @@
             </button>
             
             <div class="collapse navbar-collapse" id="navbarNav">
-                <ul class="navbar-nav me-auto">
-                    {% if current_user.tipo_usuario.name == 'SUPER_ADMIN' %}
-                        <!-- Super Admin Menu - Apenas Cadastro de Admins -->
+                {% if current_user.tipo_usuario.name == 'SUPER_ADMIN' %}
+                    <!-- Super Admin Menu - Apenas Cadastro de Admins -->
+                    <ul class="navbar-nav me-auto">
                         <li class="nav-item">
                             <a class="nav-link" href="{{ url_for('main.super_admin_dashboard') }}">
                                 <i class="fas fa-users-cog me-1"></i> Gerenciar Administradores
                             </a>
                         </li>
-                    {% elif current_user.tipo_usuario.name == 'ADMIN' %}
-                        <!-- Admin Menu - Acesso Completo -->
+                    </ul>
+                {% elif current_user.tipo_usuario.name == 'ADMIN' %}
+                    <!-- Primeira Linha - Módulos Principais -->
+                    <ul class="navbar-nav me-auto mb-2 mb-lg-0">
                         <li class="nav-item">
                             <a class="nav-link" href="{{ url_for('main.dashboard') }}">
                                 <i class="fas fa-home me-1"></i> Dashboard
@@ -739,7 +741,10 @@
                                 </a></li>
                             </ul>
                         </li>
-                        
+                    </ul>
+                    
+                    <!-- Segunda Linha - Módulos Secundários -->
+                    <ul class="navbar-nav me-auto d-none d-lg-flex">
                         <li class="nav-item">
                             <a class="nav-link" href="{{ url_for('main.veiculos') }}">
                                 <i class="fas fa-truck me-1"></i> Veículos
@@ -799,8 +804,10 @@
                                 </a></li>
                             </ul>
                         </li>
-                    {% else %}
-                        <!-- Funcionario Menu - Apenas RDO e Veículos -->
+                    </ul>
+                {% else %}
+                    <!-- Funcionario Menu - Apenas RDO e Veículos -->
+                    <ul class="navbar-nav me-auto">
                         <li class="nav-item">
                             <a class="nav-link" href="{{ url_for('main.dashboard') }}">
                                 <i class="fas fa-home me-1"></i> Meu Dashboard
@@ -818,8 +825,8 @@
                                 <i class="fas fa-truck me-1"></i> Uso de Veículo
                             </a>
                         </li>
-                    {% endif %}
-                </ul>
+                    </ul>
+                {% endif %}
                 
                 <ul class="navbar-nav">
                     <li class="nav-item">
