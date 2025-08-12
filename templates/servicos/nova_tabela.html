@@ -6,13 +6,18 @@
 <div class="container-fluid">
     <div class="row mb-4">
         <div class="col-md-8">
-            <h2><i class="fas fa-table text-primary"></i> Nova Tabela de Composição</h2>
-            <p class="text-muted">Criar tabela de preços por tipo de estrutura</p>
+            <h2><i class="fas fa-table text-primary me-2"></i>Nova Tabela de Composição</h2>
+            <p class="text-muted">Criar tabela de preços organizada por tipo de estrutura</p>
         </div>
         <div class="col-md-4 text-end">
-            <a href="{{ url_for('servicos.listar_tabelas') }}" class="btn btn-outline-secondary">
-                <i class="fas fa-arrow-left"></i> Voltar à Lista
-            </a>
+            <div class="btn-group" role="group">
+                <a href="{{ url_for('servicos.listar_tabelas') }}" class="btn btn-outline-secondary">
+                    <i class="fas fa-arrow-left me-1"></i>Voltar à Lista
+                </a>
+                <a href="{{ url_for('servicos.dashboard') }}" class="btn btn-outline-primary">
+                    <i class="fas fa-tachometer-alt me-1"></i>Dashboard
+                </a>
+            </div>
         </div>
     </div>
 

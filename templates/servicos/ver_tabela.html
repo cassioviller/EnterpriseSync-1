@@ -6,16 +6,16 @@
 <div class="container-fluid">
     <div class="row mb-4">
         <div class="col-md-8">
-            <h2><i class="fas fa-table text-primary"></i> {{ tabela.nome }}</h2>
+            <h2><i class="fas fa-table text-primary me-2"></i>{{ tabela.nome }}</h2>
             <p class="text-muted">Tabela de composição - {{ tabela.tipo_estrutura.title() }}</p>
         </div>
         <div class="col-md-4 text-end">
             <div class="btn-group" role="group">
                 <a href="{{ url_for('servicos.editar_tabela', id=tabela.id) }}" class="btn btn-warning">
-                    <i class="fas fa-edit"></i> Editar
+                    <i class="fas fa-edit me-1"></i>Editar
                 </a>
                 <a href="{{ url_for('servicos.listar_tabelas') }}" class="btn btn-outline-secondary">
-                    <i class="fas fa-arrow-left"></i> Voltar
+                    <i class="fas fa-arrow-left me-1"></i>Voltar
                 </a>
             </div>
         </div>
