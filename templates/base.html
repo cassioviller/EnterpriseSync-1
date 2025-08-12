@@ -648,7 +648,7 @@
 <body>
     <!-- Navigation -->
     <nav class="navbar navbar-expand-lg">
-        <div class="container">
+        <div class="container-fluid">
             <a class="navbar-brand fw-bold d-flex align-items-center" href="{% if current_user.tipo_usuario.name == 'SUPER_ADMIN' %}{{ url_for('main.super_admin_dashboard') }}{% elif current_user.tipo_usuario.name == 'FUNCIONARIO' %}{{ url_for('main.funcionario_dashboard') }}{% else %}{{ url_for('main.dashboard') }}{% endif %}">
                 <i class="fas fa-building me-2"></i><span>SIGE</span>
             </a>
@@ -668,143 +668,150 @@
                         </li>
                     </ul>
                 {% elif current_user.tipo_usuario.name == 'ADMIN' %}
-                    <!-- Primeira Linha - Módulos Principais -->
-                    <ul class="navbar-nav me-auto mb-2 mb-lg-0">
-                        <li class="nav-item">
-                            <a class="nav-link" href="{{ url_for('main.dashboard') }}">
-                                <i class="fas fa-home me-1"></i> Dashboard
-                            </a>
-                        </li>
-                        
-                        <li class="nav-item">
-                            <a class="nav-link" href="{{ url_for('main.funcionarios') }}">
-                                <i class="fas fa-users me-1"></i> Funcionários
-                            </a>
-                        </li>
-                        
-                        <li class="nav-item dropdown">
-                            <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown">
-                                <i class="fas fa-briefcase me-1"></i> Comercial
-                            </a>
-                            <ul class="dropdown-menu">
-                                <li><a class="dropdown-item" href="{{ url_for('main.propostas') }}">
-                                    <i class="fas fa-file-contract me-2"></i> Propostas
-                                </a></li>
-                                <li><a class="dropdown-item" href="{{ url_for('main.nova_proposta') }}">
-                                    <i class="fas fa-plus me-2"></i> Nova Proposta
-                                </a></li>
+                    <!-- Navegação em duas linhas -->
+                    <div class="w-100">
+                        <!-- Primeira Linha -->
+                        <div class="d-flex flex-wrap align-items-center justify-content-start mb-2">
+                            <ul class="navbar-nav d-flex flex-row">
+                                <li class="nav-item me-3">
+                                    <a class="nav-link" href="{{ url_for('main.dashboard') }}">
+                                        <i class="fas fa-home me-1"></i> Dashboard
+                                    </a>
+                                </li>
+                                
+                                <li class="nav-item me-3">
+                                    <a class="nav-link" href="{{ url_for('main.funcionarios') }}">
+                                        <i class="fas fa-users me-1"></i> Funcionários
+                                    </a>
+                                </li>
+                                
+                                <li class="nav-item dropdown me-3">
+                                    <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown">
+                                        <i class="fas fa-briefcase me-1"></i> Comercial
+                                    </a>
+                                    <ul class="dropdown-menu">
+                                        <li><a class="dropdown-item" href="{{ url_for('main.propostas') }}">
+                                            <i class="fas fa-file-contract me-2"></i> Propostas
+                                        </a></li>
+                                        <li><a class="dropdown-item" href="{{ url_for('main.nova_proposta') }}">
+                                            <i class="fas fa-plus me-2"></i> Nova Proposta
+                                        </a></li>
+                                    </ul>
+                                </li>
+                                
+                                <li class="nav-item me-3">
+                                    <a class="nav-link" href="{{ url_for('main.equipes') }}">
+                                        <i class="fas fa-users-cog me-1"></i> Equipes
+                                    </a>
+                                </li>
+                                
+                                <li class="nav-item dropdown me-3">
+                                    <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown">
+                                        <i class="fas fa-warehouse me-1"></i> Almoxarifado
+                                    </a>
+                                    <ul class="dropdown-menu">
+                                        <li><a class="dropdown-item" href="{{ url_for('almoxarifado.dashboard') }}">
+                                            <i class="fas fa-tachometer-alt me-2"></i> Dashboard
+                                        </a></li>
+                                        <li><a class="dropdown-item" href="{{ url_for('almoxarifado.listar_produtos') }}">
+                                            <i class="fas fa-boxes me-2"></i> Produtos
+                                        </a></li>
+                                        <li><a class="dropdown-item" href="{{ url_for('almoxarifado.listar_movimentacoes_estoque') }}">
+                                            <i class="fas fa-exchange-alt me-2"></i> Movimentações
+                                        </a></li>
+                                        <li><a class="dropdown-item" href="{{ url_for('almoxarifado.listar_categorias') }}">
+                                            <i class="fas fa-tags me-2"></i> Categorias
+                                        </a></li>
+                                        <li><a class="dropdown-item" href="{{ url_for('almoxarifado.listar_fornecedores') }}">
+                                            <i class="fas fa-truck me-2"></i> Fornecedores
+                                        </a></li>
+                                        <li><a class="dropdown-item" href="{{ url_for('almoxarifado.listar_notas_fiscais') }}">
+                                            <i class="fas fa-file-invoice me-2"></i> Notas Fiscais
+                                        </a></li>
+                                    </ul>
+                                </li>
+                                
+                                <li class="nav-item dropdown me-3">
+                                    <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown">
+                                        <i class="fas fa-building me-1"></i> Obras
+                                    </a>
+                                    <ul class="dropdown-menu">
+                                        <li><a class="dropdown-item" href="{{ url_for('main.obras') }}">
+                                            <i class="fas fa-building me-2"></i> Todas as Obras
+                                        </a></li>
+                                        <li><a class="dropdown-item" href="{{ url_for('main.dashboard') }}">
+                                            <i class="fas fa-clipboard-list me-2"></i> RDO
+                                        </a></li>
+                                    </ul>
+                                </li>
+                                
+                                <li class="nav-item dropdown">
+                                    <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown">
+                                        <i class="fas fa-cog me-1"></i> Configurações
+                                    </a>
+                                    <ul class="dropdown-menu">
+                                        <li><a class="dropdown-item" href="{{ url_for('main.dashboard') }}">
+                                            <i class="fas fa-key me-2"></i> Acessos
+                                        </a></li>
+                                        <li><hr class="dropdown-divider"></li>
+                                        <li><a class="dropdown-item" href="{{ url_for('main.dashboard') }}">
+                                            <i class="fas fa-sitemap me-2"></i> Departamentos
+                                        </a></li>
+                                        <li><a class="dropdown-item" href="{{ url_for('main.dashboard') }}">
+                                            <i class="fas fa-user-tie me-2"></i> Funções
+                                        </a></li>
+                                        <li><a class="dropdown-item" href="{{ url_for('main.dashboard') }}">
+                                            <i class="fas fa-clock me-2"></i> Horários de Trabalho
+                                        </a></li>
+                                        <li><a class="dropdown-item" href="{{ url_for('main.dashboard') }}">
+                                            <i class="fas fa-tools me-2"></i> Serviços
+                                        </a></li>
+                                    </ul>
+                                </li>
                             </ul>
-                        </li>
+                        </div>
                         
-                        <li class="nav-item">
-                            <a class="nav-link" href="{{ url_for('main.equipes') }}">
-                                <i class="fas fa-users-cog me-1"></i> Equipes
-                            </a>
-                        </li>
-                        
-                        <li class="nav-item dropdown">
-                            <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown">
-                                <i class="fas fa-warehouse me-1"></i> Almoxarifado
-                            </a>
-                            <ul class="dropdown-menu">
-                                <li><a class="dropdown-item" href="{{ url_for('almoxarifado.dashboard') }}">
-                                    <i class="fas fa-tachometer-alt me-2"></i> Dashboard
-                                </a></li>
-                                <li><a class="dropdown-item" href="{{ url_for('almoxarifado.listar_produtos') }}">
-                                    <i class="fas fa-boxes me-2"></i> Produtos
-                                </a></li>
-                                <li><a class="dropdown-item" href="{{ url_for('almoxarifado.listar_movimentacoes_estoque') }}">
-                                    <i class="fas fa-exchange-alt me-2"></i> Movimentações
-                                </a></li>
-                                <li><a class="dropdown-item" href="{{ url_for('almoxarifado.listar_categorias') }}">
-                                    <i class="fas fa-tags me-2"></i> Categorias
-                                </a></li>
-                                <li><a class="dropdown-item" href="{{ url_for('almoxarifado.listar_fornecedores') }}">
-                                    <i class="fas fa-truck me-2"></i> Fornecedores
-                                </a></li>
-                                <li><a class="dropdown-item" href="{{ url_for('almoxarifado.listar_notas_fiscais') }}">
-                                    <i class="fas fa-file-invoice me-2"></i> Notas Fiscais
-                                </a></li>
+                        <!-- Segunda Linha -->
+                        <div class="d-flex flex-wrap align-items-center justify-content-start">
+                            <ul class="navbar-nav d-flex flex-row">
+                                <li class="nav-item me-3">
+                                    <a class="nav-link" href="{{ url_for('main.veiculos') }}">
+                                        <i class="fas fa-truck me-1"></i> Veículos
+                                    </a>
+                                </li>
+                                
+                                <li class="nav-item me-3">
+                                    <a class="nav-link" href="{{ url_for('main.dashboard') }}">
+                                        <i class="fas fa-utensils me-1"></i> Alimentação
+                                    </a>
+                                </li>
+                                
+                                <li class="nav-item me-3">
+                                    <a class="nav-link" href="{{ url_for('main.dashboard') }}">
+                                        <i class="fas fa-dollar-sign me-1"></i> Financeiro
+                                    </a>
+                                </li>
+                                
+                                <li class="nav-item me-3">
+                                    <a class="nav-link" href="/folha-pagamento/dashboard">
+                                        <i class="fas fa-money-check-alt me-1"></i> Folha de Pagamento
+                                    </a>
+                                </li>
+                                
+                                <li class="nav-item me-3">
+                                    <a class="nav-link" href="/contabilidade/dashboard">
+                                        <i class="fas fa-calculator me-1"></i> Contabilidade
+                                    </a>
+                                </li>
+                                
+                                <li class="nav-item">
+                                    <a class="nav-link" href="{{ url_for('main.dashboard') }}">
+                                        <i class="fas fa-chart-bar me-1"></i> Relatórios
+                                    </a>
+                                </li>
                             </ul>
-                        </li>
-                        
-                        <li class="nav-item dropdown">
-                            <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown">
-                                <i class="fas fa-building me-1"></i> Obras
-                            </a>
-                            <ul class="dropdown-menu">
-                                <li><a class="dropdown-item" href="{{ url_for('main.obras') }}">
-                                    <i class="fas fa-building me-2"></i> Todas as Obras
-                                </a></li>
-                                <li><a class="dropdown-item" href="{{ url_for('main.dashboard') }}">
-                                    <i class="fas fa-clipboard-list me-2"></i> RDO
-                                </a></li>
-                            </ul>
-                        </li>
-                    </ul>
-                    
-                    <!-- Segunda Linha - Módulos Secundários -->
-                    <ul class="navbar-nav me-auto d-none d-lg-flex">
-                        <li class="nav-item">
-                            <a class="nav-link" href="{{ url_for('main.veiculos') }}">
-                                <i class="fas fa-truck me-1"></i> Veículos
-                            </a>
-                        </li>
-                        
-                        <li class="nav-item">
-                            <a class="nav-link" href="{{ url_for('main.dashboard') }}">
-                                <i class="fas fa-utensils me-1"></i> Alimentação
-                            </a>
-                        </li>
-                        
-                        <li class="nav-item">
-                            <a class="nav-link" href="{{ url_for('main.dashboard') }}">
-                                <i class="fas fa-dollar-sign me-1"></i> Financeiro
-                            </a>
-                        </li>
-                        
-                        <li class="nav-item">
-                            <a class="nav-link" href="/folha-pagamento/dashboard">
-                                <i class="fas fa-money-check-alt me-1"></i> Folha de Pagamento
-                            </a>
-                        </li>
-                        
-                        <li class="nav-item">
-                            <a class="nav-link" href="/contabilidade/dashboard">
-                                <i class="fas fa-calculator me-1"></i> Contabilidade
-                            </a>
-                        </li>
-                        
-                        <li class="nav-item">
-                            <a class="nav-link" href="{{ url_for('main.dashboard') }}">
-                                <i class="fas fa-chart-bar me-1"></i> Relatórios
-                            </a>
-                        </li>
-                        
-                        <li class="nav-item dropdown">
-                            <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown">
-                                <i class="fas fa-cog me-1"></i> Configurações
-                            </a>
-                            <ul class="dropdown-menu">
-                                <li><a class="dropdown-item" href="{{ url_for('main.dashboard') }}">
-                                    <i class="fas fa-key me-2"></i> Acessos
-                                </a></li>
-                                <li><hr class="dropdown-divider"></li>
-                                <li><a class="dropdown-item" href="{{ url_for('main.dashboard') }}">
-                                    <i class="fas fa-sitemap me-2"></i> Departamentos
-                                </a></li>
-                                <li><a class="dropdown-item" href="{{ url_for('main.dashboard') }}">
-                                    <i class="fas fa-user-tie me-2"></i> Funções
-                                </a></li>
-                                <li><a class="dropdown-item" href="{{ url_for('main.dashboard') }}">
-                                    <i class="fas fa-clock me-2"></i> Horários de Trabalho
-                                </a></li>
-                                <li><a class="dropdown-item" href="{{ url_for('main.dashboard') }}">
-                                    <i class="fas fa-tools me-2"></i> Serviços
-                                </a></li>
-                            </ul>
-                        </li>
-                    </ul>
+                        </div>
+                    </div>
                 {% else %}
                     <!-- Funcionario Menu - Apenas RDO e Veículos -->
                     <ul class="navbar-nav me-auto">
