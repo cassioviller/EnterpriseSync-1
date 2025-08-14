@@ -26,9 +26,9 @@
 
 ## 🔧 CONFIGURAÇÃO EASYPANEL
 
-### Database URL (Automática)
+### Database URL (Corrigida)
 ```
-postgresql://sige:sige@viajey_sige:5432/sige
+postgres://sige:sige@viajey_sige:5432/sige?sslmode=disable
 ```
 
 ### Environment Variables

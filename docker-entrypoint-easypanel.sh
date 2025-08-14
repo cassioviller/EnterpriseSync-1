@@ -7,7 +7,7 @@ set -e
 echo ">>> Iniciando SIGE v8.0 no EasyPanel <<<"
 
 # 1. Validar Variáveis de Ambiente Essenciais
-: "${DATABASE_URL:?Variável DATABASE_URL não está configurada. Verifique as configurações do EasyPanel.}"
+: "${DATABASE_URL:=postgres://sige:sige@viajey_sige:5432/sige?sslmode=disable}"
 : "${FLASK_ENV:=production}"
 : "${PORT:=5000}"
 : "${PYTHONPATH:=/app}"
@@ -23,9 +23,9 @@ unset PGDATABASE PGUSER PGPASSWORD PGHOST PGPORT
 unset POSTGRES_DB POSTGRES_USER POSTGRES_PASSWORD POSTGRES_HOST POSTGRES_PORT
 
 # 3. Extrair informações de conexão da DATABASE_URL
-PGHOST=$(echo $DATABASE_URL | sed -E 's/^.*@([^:]+):.*/\1/' 2>/dev/null || echo "localhost")
+PGHOST=$(echo $DATABASE_URL | sed -E 's/^.*@([^:?]+).*/\1/' 2>/dev/null || echo "viajey_sige")
 PGPORT=$(echo $DATABASE_URL | sed -E 's/^.*:([0-9]+).*/\1/' 2>/dev/null || echo "5432")
-PGUSER=$(echo $DATABASE_URL | sed -E 's/^.*:\/\/([^:]+):.*/\1/' 2>/dev/null || echo "postgres")
+PGUSER=$(echo $DATABASE_URL | sed -E 's/^.*:\/\/([^:]+):.*/\1/' 2>/dev/null || echo "sige")
 
 echo "Conectando ao PostgreSQL: $PGUSER@$PGHOST:$PGPORT"
 
