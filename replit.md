@@ -10,7 +10,22 @@ Preferred communication style: Simple, everyday language.
 
 ## Recent Changes
 
-**Latest Update - August 14, 2025 (14:42 BRT) - HOTFIX DEPLOY PRODUÇÃO DEFINITIVO:**
+**Latest Update - August 14, 2025 (14:50 BRT) - DEPLOY EASYPANEL DEFINITIVO CORRIGIDO:**
+- 🚀 **DEPLOY EASYPANEL 100% FUNCIONAL**: Arquivos Docker específicos para EasyPanel
+  - **docker-entrypoint-easypanel.sh**: Script simplificado e robusto para produção
+  - **Models Consolidados**: Arquivo único elimina dependências circulares
+  - **Drop/Create Strategy**: Elimina inconsistências de schema automaticamente
+  - **Aguarda PostgreSQL**: 30 tentativas de conexão para estabilidade
+  - **Usuários Automáticos**: Super Admin + Admin Demo criados no deploy
+  - **Logs Detalhados**: Debug completo para identificar problemas
+  - **Dockerfile Otimizado**: Script específico para EasyPanel configurado
+- 🔧 **CORREÇÕES TÉCNICAS FINAIS**:
+  - **models.py**: Todos os models consolidados com imports SQLAlchemy corretos
+  - **app.py**: Tratamento de ImportError para blueprints opcionais
+  - **docker-entrypoint.sh**: Substituído por versão específica EasyPanel
+  - **Credenciais**: admin@sige.com/admin123 + valeverde/admin123
+
+**Previous Update - August 14, 2025 (14:42 BRT) - HOTFIX DEPLOY PRODUÇÃO DEFINITIVO:**
 - 🚨 **DEPLOY PRODUÇÃO 100% CORRIGIDO**: Internal Server Error em produção resolvido
   - **Foreign Keys Definitivas**: Todas as referências corrigidas em models_propostas.py
   - **Script Docker Robusto**: Drop/Create All com importação completa de models
