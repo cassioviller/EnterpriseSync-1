@@ -29,19 +29,9 @@ flask db upgrade 2>/dev/null || {
     echo "Migrações falharam, criando tabelas diretamente..."
     python3 -c "
 from app import app, db
-# Import all models to ensure they are registered
+# Import consolidated models
 import models
-try:
-    from models_servicos import *
-    print('✅ Models de serviços importados')
-except:
-    print('⚠️ Models de serviços não encontrados')
-
-try:
-    from models_propostas import *
-    print('✅ Models de propostas importados')
-except:
-    print('⚠️ Models de propostas não encontrados')
+print('✅ Models consolidados importados')
 
 with app.app_context():
     try:

@@ -113,21 +113,21 @@ with app.app_context():
         from servicos_views import servicos_bp
         app.register_blueprint(servicos_bp, url_prefix='/servicos')
         logging.info("✅ Blueprint serviços registrado")
+    except ImportError as e:
+        logging.warning(f"⚠️ Blueprint serviços não encontrado: {e}")
     except Exception as e:
         logging.error(f"❌ Erro ao registrar blueprint serviços: {e}")
     
-    # Importar modelos de propostas
-    try:
-        from models_propostas import PropostaComercialSIGE, PropostaItem, PropostaArquivo, PropostaTemplate
-        logging.info("✅ Modelos de propostas importados")
-    except ImportError as e:
-        logging.warning(f"⚠️ Erro ao importar modelos de propostas: {e}")
+    # Modelos de propostas já estão consolidados em models.py
+    logging.info("✅ Modelos de propostas importados do arquivo consolidado")
     
     # Registrar blueprint de propostas
     try:
         from propostas_views import propostas_bp
         app.register_blueprint(propostas_bp, url_prefix='/propostas')
         logging.info("✅ Blueprint propostas registrado")
+    except ImportError as e:
+        logging.warning(f"⚠️ Blueprint propostas não encontrado: {e}")
     except Exception as e:
         logging.error(f"❌ Erro ao registrar blueprint propostas: {e}")
     
