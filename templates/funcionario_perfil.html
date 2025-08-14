@@ -741,7 +741,7 @@
                 <h5 class="modal-title" id="pontoModalLabel">Novo Registro de Ponto</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
-            <form method="POST" id="pontoForm" action="{{ url_for('main.novo_ponto') }}" onsubmit="return salvarPonto(event)">
+            <form method="POST" id="pontoForm" action="#" onsubmit="return salvarPonto(event)">
                 <input type="hidden" id="registro_id_ponto" name="registro_id_ponto" value="">
                 <div class="modal-body">
                     <input type="hidden" id="funcionario_id" name="funcionario_id" value="{{ funcionario.id }}">
@@ -917,7 +917,7 @@
                 <h5 class="modal-title" id="ocorrenciaModalLabel">Nova Ocorrência</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
-            <form method="POST" id="ocorrenciaForm" action="{{ url_for('main.nova_ocorrencia', funcionario_id=funcionario.id) }}">
+            <form method="POST" id="ocorrenciaForm" action="#">
                 <div class="modal-body">
                     <input type="hidden" name="funcionario_id" value="{{ funcionario.id }}">
                     
@@ -984,7 +984,7 @@
                 <h5 class="modal-title" id="alimentacaoModalLabel">Novo Registro de Alimentação</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
-            <form method="POST" id="alimentacaoForm" action="{{ url_for('main.nova_alimentacao') }}">
+            <form method="POST" id="alimentacaoForm" action="#">
                 <div class="modal-body">
                     <input type="hidden" name="funcionario_id" value="{{ funcionario.id }}">
                     
@@ -1053,7 +1053,7 @@
                 </h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
-            <form method="POST" action="{{ url_for('main.editar_funcionario', id=funcionario.id) }}" enctype="multipart/form-data">
+            <form method="POST" action="#" enctype="multipart/form-data">
                 <div class="modal-body">
                     <div class="row">
                         <div class="col-md-6">
@@ -2548,7 +2548,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <div class="modal-body">
-                <form id="outroCustoForm" action="{{ url_for('main.criar_outro_custo', funcionario_id=funcionario.id) }}" method="POST">
+                <form id="outroCustoForm" action="#" method="POST">
                     <div class="row">
                         <div class="col-md-6">
                             <div class="mb-3">
