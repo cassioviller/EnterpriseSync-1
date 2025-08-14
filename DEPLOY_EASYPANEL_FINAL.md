@@ -56,23 +56,33 @@ PYTHONPATH=/app
 - **Login**: valeverde
 - **Senha**: admin123
 
-## 📋 LOGS ESPERADOS
+## 📋 LOGS ESPERADOS (Deploy Robusto)
 
 ```
-🚀 SIGE v8.0 - Deploy EasyPanel
-DATABASE_URL: postgresql://sige:sige@viajey_sige:5432/sige
-✅ PostgreSQL conectado!
-🗄️ Criando estrutura do banco de dados...
-✅ App importado com sucesso
-🗑️ Tabelas antigas removidas
-✅ Tabelas criadas com sucesso
-📊 35 tabelas criadas: ['usuario', 'funcionario', 'obra', 'registro_ponto']...
+>>> Iniciando SIGE v8.0 no EasyPanel <<<
+Configurações validadas:
+- DATABASE_URL: postgresql://...
+- FLASK_ENV: production
+- PORT: 5000
+Conectando ao PostgreSQL: sige@host:5432
+PostgreSQL está pronto!
+Verificando se as tabelas do banco de dados existem...
+Tabelas não existem. Criando estrutura inicial...
+🔧 Importando aplicação...
+🗑️ Limpando banco...
+🏗️ Criando tabelas...
+✅ Estrutura criada com sucesso!
+>>> Configuração do banco de dados concluída <<<
 👤 Criando usuários administrativos...
 ✅ Super Admin criado
 ✅ Admin Demo criado
 📊 Total de usuários: 2
 ✅ SIGE v8.0 PRONTO PARA PRODUÇÃO!
-🚀 Iniciando servidor Gunicorn...
+🔐 CREDENCIAIS:
+   • Super Admin: admin@sige.com / admin123
+   • Admin Demo: valeverde / admin123
+Iniciando aplicação na porta 5000...
+Starting gunicorn...
 ```
 
 ## 🚀 PRÓXIMO PASSO

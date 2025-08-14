@@ -77,35 +77,31 @@ except:
 if [ "$TABLE_EXISTS" = "exists" ]; then
     echo "Tabelas já existem, pulando migração."
 else
-    echo "Tabelas não existem. Executando migração inicial..."
+    echo "Tabelas não existem. Criando estrutura inicial..."
     python3 -c "
-import os
 import sys
+import os
 sys.path.insert(0, '/app')
+os.environ['FLASK_APP'] = 'app.py'
 
 try:
+    print('🔧 Importando aplicação...')
     from app import app, db
-    print('✅ App importado com sucesso')
     
     with app.app_context():
-        # Dropar e recriar todas as tabelas
+        print('🗑️ Limpando banco...')
         db.drop_all()
-        print('🗑️ Tabelas antigas removidas')
         
+        print('🏗️ Criando tabelas...')
         db.create_all()
-        print('✅ Tabelas criadas com sucesso')
         
-        # Verificar tabelas criadas
-        from sqlalchemy import inspect
-        inspector = inspect(db.engine)
-        tables = inspector.get_table_names()
-        print(f'📊 {len(tables)} tabelas criadas: {tables[:5]}...')
+        print('✅ Estrutura criada com sucesso!')
         
 except Exception as e:
-    print(f'❌ Erro na criação de tabelas: {e}')
+    print(f'❌ ERRO: {e}')
     import traceback
     traceback.print_exc()
-    sys.exit(1)
+    exit(1)
 "
 fi
 
