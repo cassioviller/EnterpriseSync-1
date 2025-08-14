@@ -324,12 +324,8 @@ def controle_ponto():
     data_fim = request.args.get('data_fim')
     tipo_registro = request.args.get('tipo_registro')
     
-    # Valores padrão para data_inicio e data_fim se não fornecidos
-    from datetime import date
-    if not data_inicio:
-        data_inicio = date.today().replace(day=1).strftime('%Y-%m-%d')
-    if not data_fim:
-        data_fim = date.today().strftime('%Y-%m-%d')
+    # NÃO aplicar filtros de data por padrão - mostrar todos os registros
+    # Apenas aplicar filtros quando explicitamente fornecidos
     
     # Query base com filtro de tenant - CORREÇÃO CRÍTICA para multi-tenancy
     query = RegistroPonto.query.join(Funcionario).filter(
@@ -340,23 +336,23 @@ def controle_ponto():
     if funcionario_id:
         query = query.filter(RegistroPonto.funcionario_id == funcionario_id)
     
-    # Corrigir filtros de data - converter strings para objetos date  
+    # Aplicar filtros de data APENAS se fornecidos pelo usuário
     data_inicio_obj = None
     data_fim_obj = None
     
-    if data_inicio:
+    if data_inicio and data_inicio.strip():
         try:
             data_inicio_obj = datetime.strptime(data_inicio, '%Y-%m-%d').date()
             query = query.filter(RegistroPonto.data >= data_inicio_obj)
         except ValueError:
-            pass
+            flash(f'Data início inválida: {data_inicio}', 'warning')
     
-    if data_fim:
+    if data_fim and data_fim.strip():
         try:
             data_fim_obj = datetime.strptime(data_fim, '%Y-%m-%d').date()
             query = query.filter(RegistroPonto.data <= data_fim_obj)
         except ValueError:
-            pass
+            flash(f'Data fim inválida: {data_fim}', 'warning')
     
     if tipo_registro:
         query = query.filter(RegistroPonto.tipo_registro == tipo_registro)
