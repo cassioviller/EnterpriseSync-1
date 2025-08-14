@@ -231,35 +231,35 @@ class FuncionarioPDFGenerator:
         ]))
         
         elementos.append(financeiro_table)
+        
+        # Adicionar totalizador final na mesma seção
         elementos.append(Spacer(1, 10))
         
-        # Resumo financeiro
-        elementos.append(Paragraph("Resumo Financeiro:", self.styles['Heading3']))
-        
-        resumo_data = [
+        # Linha de totalizadores consolidados
+        total_data = [
+            ['TOTALIZADORES DO PERÍODO', 'VALOR'],
             ['Custo Total Mão de Obra', f"R$ {kpis.get('custo_mao_obra', 0):,.2f}"],
-            ['Valor Hora Atual', f"R$ {valor_hora:,.2f}"],
-            ['Desconto Faltas Diretas', f"R$ {valor_faltas_direto:,.2f}"],
-            ['Desconto DSR Perdido', f"R$ {valor_dsr_perdido:,.2f}"],
-            ['Total Descontos', f"R$ {valor_faltas_direto + valor_dsr_perdido:,.2f}"],
-            ['Custo Líquido do Período', f"R$ {kpis.get('custo_total_geral', 0) - (valor_faltas_direto + valor_dsr_perdido):,.2f}"]
+            ['Total Descontos (Faltas + DSR)', f"R$ {valor_faltas_direto + valor_dsr_perdido:,.2f}"],
+            ['Custo Líquido Final', f"R$ {kpis.get('custo_total', 0):,.2f}"]
         ]
         
-        resumo_table = Table(resumo_data, colWidths=[3.5*inch, 2*inch])
-        resumo_table.setStyle(TableStyle([
-            ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
-            ('ALIGN', (1, 0), (-1, -1), 'RIGHT'),
-            ('FONTNAME', (0, 0), (0, -1), 'Helvetica-Bold'),
-            ('FONTNAME', (1, 0), (1, -1), 'Helvetica'),
+        total_table = Table(total_data, colWidths=[4*inch, 2.3*inch])
+        total_table.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#2c3e50')),
+            ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+            ('ALIGN', (0, 1), (0, -1), 'LEFT'),
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
             ('FONTSIZE', (0, 0), (-1, -1), 10),
             ('GRID', (0, 0), (-1, -1), 1, colors.black),
             ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-            ('BACKGROUND', (0, 0), (0, -1), colors.HexColor('#e8f5e8')),
-            ('BACKGROUND', (1, 0), (1, -1), colors.HexColor('#fff2e8')),
-            ('BACKGROUND', (0, -1), (-1, -1), colors.HexColor('#d4edda'))  # Linha final destacada
+            ('BACKGROUND', (0, -1), (-1, -1), colors.HexColor('#28a745')),  # Linha final em verde
+            ('TEXTCOLOR', (0, -1), (-1, -1), colors.whitesmoke),
+            ('FONTNAME', (0, -1), (-1, -1), 'Helvetica-Bold')
         ]))
         
-        elementos.append(financeiro_table)
+        elementos.append(total_table)
         return elementos
 
     def _criar_tabela_ponto(self, registros_ponto):
