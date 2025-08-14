@@ -20,11 +20,18 @@ if not database_url:
     # EasyPanel default PostgreSQL URL pattern
     database_url = "postgresql://sige:sige@viajey_sige:5432/sige"
 
+# Convert postgres:// to postgresql:// for SQLAlchemy compatibility
+if database_url and database_url.startswith("postgres://"):
+    database_url = database_url.replace("postgres://", "postgresql://", 1)
+
 app.config["SQLALCHEMY_DATABASE_URI"] = database_url
 app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {
     "pool_recycle": 300,
     "pool_pre_ping": True,
+    "pool_size": 10,
+    "max_overflow": 20,
 }
+app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 app.config['WTF_CSRF_ENABLED'] = False
 
 # Initialize extensions

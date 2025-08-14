@@ -82,20 +82,54 @@ else
 import sys
 import os
 sys.path.insert(0, '/app')
+
+# Configurar ambiente
 os.environ['FLASK_APP'] = 'app.py'
+os.environ['FLASK_ENV'] = 'production'
 
 try:
-    print('🔧 Importando aplicação...')
-    from app import app, db
+    print('🔧 Configurando SQLAlchemy...')
     
+    # Import específico para evitar problemas de dialeto
+    from flask import Flask
+    from flask_sqlalchemy import SQLAlchemy
+    from sqlalchemy.orm import DeclarativeBase
+    import logging
+    
+    # Configurar logging
+    logging.basicConfig(level=logging.ERROR)
+    
+    # Criar app Flask limpa
+    app = Flask(__name__)
+    app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL')
+    app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
+        'pool_recycle': 300,
+        'pool_pre_ping': True,
+    }
+    app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+    
+    class Base(DeclarativeBase):
+        pass
+    
+    db = SQLAlchemy(model_class=Base)
+    db.init_app(app)
+    
+    print('🔧 Importando models...')
     with app.app_context():
+        # Import dos models essenciais apenas
+        import models
+        
         print('🗑️ Limpando banco...')
         db.drop_all()
         
         print('🏗️ Criando tabelas...')
         db.create_all()
         
-        print('✅ Estrutura criada com sucesso!')
+        # Verificar criação
+        from sqlalchemy import inspect
+        inspector = inspect(db.engine)
+        tables = inspector.get_table_names()
+        print(f'✅ {len(tables)} tabelas criadas com sucesso!')
         
 except Exception as e:
     print(f'❌ ERRO: {e}')
