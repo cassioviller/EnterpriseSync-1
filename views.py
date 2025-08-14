@@ -239,10 +239,19 @@ def funcionario_perfil(id):
     faltas_justificadas = len([r for r in registros if r.tipo_registro == 'falta_justificada'])
     total_atrasos = sum(r.total_atraso_horas or 0 for r in registros)  # Campo correto do modelo
     
-    # Calcular valores monetários
+    # Calcular valores monetários detalhados
     valor_hora = (funcionario.salario / 220) if funcionario.salario else 0
     valor_horas_extras = total_extras * valor_hora * 1.5
     valor_faltas = total_faltas * valor_hora * 8  # Desconto de 8h por falta
+    valor_faltas_justificadas = faltas_justificadas * valor_hora * 8  # Faltas justificadas
+    
+    # Calcular DSR das faltas (Lei 605/49)
+    # DSR = Descanso Semanal Remunerado perdido por faltas injustificadas
+    # Para cada 6 dias trabalhados, 1 dia de DSR
+    # Faltas fazem perder proporcionalmente o DSR
+    dias_uteis_periodo = len([r for r in registros if r.data.weekday() < 5])  # Segunda a sexta
+    dsr_perdido_dias = total_faltas / 6 if total_faltas > 0 else 0  # Proporção de DSR perdido
+    valor_dsr_perdido = dsr_perdido_dias * valor_hora * 8  # Valor do DSR perdido
     
     # Calcular estatísticas adicionais
     dias_trabalhados = len([r for r in registros if r.horas_trabalhadas and r.horas_trabalhadas > 0])
@@ -256,6 +265,9 @@ def funcionario_perfil(id):
         'atrasos': total_atrasos,
         'valor_horas_extras': valor_horas_extras,
         'valor_faltas': valor_faltas,
+        'valor_faltas_justificadas': valor_faltas_justificadas,
+        'dsr_perdido_dias': round(dsr_perdido_dias, 2),
+        'valor_dsr_perdido': valor_dsr_perdido,
         'taxa_eficiencia': (total_horas / (dias_trabalhados * 8) * 100) if dias_trabalhados > 0 else 0,
         'custo_total': (total_horas + total_extras * 1.5) * valor_hora,
         'absenteismo': taxa_absenteismo,
@@ -273,7 +285,7 @@ def funcionario_perfil(id):
         'custo_total_geral': (total_horas + total_extras * 1.5) * valor_hora,
         'horas_perdidas_total': total_faltas * 8 + total_atrasos,
         'valor_hora_atual': valor_hora,
-        'custo_faltas_justificadas': faltas_justificadas * valor_hora * 8
+        'custo_faltas_justificadas': valor_faltas_justificadas
     }
     
     # Dados para gráficos (dados básicos para evitar erros)

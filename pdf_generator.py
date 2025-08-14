@@ -172,18 +172,50 @@ class FuncionarioPDFGenerator:
         elementos.append(kpi_table)
         elementos.append(Spacer(1, 15))
         
-        # KPIs financeiros
-        elementos.append(Paragraph("Indicadores Financeiros:", self.styles['Heading3']))
+        # KPIs financeiros separados
+        elementos.append(Paragraph("Indicadores Financeiros Detalhados:", self.styles['Heading3']))
         
+        # Tabela principal com valores
         financeiro_data = [
-            ['Custo Total Mão de Obra', f"R$ {kpis.get('custo_mao_obra', 0):,.2f}"],
-            ['Valor Horas Extras', f"R$ {kpis.get('valor_horas_extras', 0):,.2f}"],
-            ['Valor Hora Atual', f"R$ {kpis.get('valor_hora_atual', 0):,.2f}"],
-            ['Custo Total Geral', f"R$ {kpis.get('custo_total_geral', 0):,.2f}"]
+            ['Item', 'Quantidade', 'Valor Unit.', 'Valor Total'],
+            ['Horas Extras', f"{kpis.get('horas_extras', 0):.1f}h", f"R$ {kpis.get('valor_hora_atual', 0) * 1.5:,.2f}", f"R$ {kpis.get('valor_horas_extras', 0):,.2f}"],
+            ['Faltas Injustificadas', f"{kpis.get('faltas', 0)} dias", f"R$ {kpis.get('valor_hora_atual', 0) * 8:,.2f}", f"R$ {kpis.get('valor_faltas', 0):,.2f}"],
+            ['Faltas Justificadas', f"{kpis.get('faltas_justificadas', 0)} dias", f"R$ {kpis.get('valor_hora_atual', 0) * 8:,.2f}", f"R$ {kpis.get('valor_faltas_justificadas', 0):,.2f}"],
+            ['DSR Perdido', f"{kpis.get('dsr_perdido_dias', 0):.2f} dias", f"R$ {kpis.get('valor_hora_atual', 0) * 8:,.2f}", f"R$ {kpis.get('valor_dsr_perdido', 0):,.2f}"]
         ]
         
-        financeiro_table = Table(financeiro_data, colWidths=[3*inch, 2*inch])
+        financeiro_table = Table(financeiro_data, colWidths=[2.2*inch, 1.3*inch, 1.3*inch, 1.5*inch])
         financeiro_table.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#2c3e50')),
+            ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+            ('ALIGN', (0, 1), (0, -1), 'LEFT'),
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
+            ('FONTSIZE', (0, 0), (-1, -1), 9),
+            ('GRID', (0, 0), (-1, -1), 1, colors.black),
+            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+            ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.HexColor('#f8f9fa')]),
+            # Destacar valores negativos (descontos)
+            ('BACKGROUND', (0, 2), (-1, 4), colors.HexColor('#ffe6e6')),  # Faltas e DSR em vermelho claro
+            ('BACKGROUND', (0, 1), (-1, 1), colors.HexColor('#e6ffe6'))   # Horas extras em verde claro
+        ]))
+        
+        elementos.append(financeiro_table)
+        elementos.append(Spacer(1, 10))
+        
+        # Resumo financeiro
+        elementos.append(Paragraph("Resumo Financeiro:", self.styles['Heading3']))
+        
+        resumo_data = [
+            ['Custo Total Mão de Obra', f"R$ {kpis.get('custo_mao_obra', 0):,.2f}"],
+            ['Valor Hora Atual', f"R$ {kpis.get('valor_hora_atual', 0):,.2f}"],
+            ['Total Descontos (Faltas + DSR)', f"R$ {kpis.get('valor_faltas', 0) + kpis.get('valor_dsr_perdido', 0):,.2f}"],
+            ['Custo Líquido do Período', f"R$ {kpis.get('custo_total_geral', 0) - kpis.get('valor_faltas', 0) - kpis.get('valor_dsr_perdido', 0):,.2f}"]
+        ]
+        
+        resumo_table = Table(resumo_data, colWidths=[3.5*inch, 2*inch])
+        resumo_table.setStyle(TableStyle([
             ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
             ('ALIGN', (1, 0), (-1, -1), 'RIGHT'),
             ('FONTNAME', (0, 0), (0, -1), 'Helvetica-Bold'),
@@ -192,7 +224,8 @@ class FuncionarioPDFGenerator:
             ('GRID', (0, 0), (-1, -1), 1, colors.black),
             ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
             ('BACKGROUND', (0, 0), (0, -1), colors.HexColor('#e8f5e8')),
-            ('BACKGROUND', (1, 0), (1, -1), colors.HexColor('#fff2e8'))
+            ('BACKGROUND', (1, 0), (1, -1), colors.HexColor('#fff2e8')),
+            ('BACKGROUND', (0, -1), (-1, -1), colors.HexColor('#d4edda'))  # Linha final destacada
         ]))
         
         elementos.append(financeiro_table)
@@ -220,7 +253,9 @@ class FuncionarioPDFGenerator:
                 'domingo_horas_extras': 'Domingo', 
                 'feriado_trabalhado': 'Feriado Trab.',
                 'falta': 'Falta',
-                'falta_justificada': 'Falta Just.'
+                'falta_justificada': 'Falta Just.',
+                'sabado_folga': 'Sáb. Folga',
+                'domingo_folga': 'Dom. Folga'
             }
             tipo = tipo_map.get(registro.tipo_registro, registro.tipo_registro or 'N/A')
             
