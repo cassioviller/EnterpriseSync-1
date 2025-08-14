@@ -141,12 +141,12 @@ with app.app_context():
     except Exception as e:
         logging.error(f"Erro na migração de fotos: {e}")
 
-    # Importar bypass de autenticação para desenvolvimento
+    # Sistema de autenticação real ativado - bypass removido para permitir login normal
     try:
-        import simple_bypass
-        logging.info("🔓 Sistema de bypass simples carregado")
+        # import simple_bypass  # Comentado para usar login real
+        logging.info("🔐 Sistema de autenticação real ativado")
     except Exception as e:
-        logging.error(f"Erro ao carregar bypass: {e}")
+        logging.error(f"Erro na configuração de auth: {e}")
 
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=5000)
