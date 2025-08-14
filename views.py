@@ -289,6 +289,8 @@ def funcionario_perfil(id):
                          data_inicio=data_inicio,
                          data_fim=data_fim,
                          registros=registros,
+                         registros_ponto=registros,  # Template espera esta variável
+                         registros_alimentacao=[],  # Vazio por enquanto
                          graficos=graficos)
 
 # ===== OBRAS =====
