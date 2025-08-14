@@ -175,16 +175,13 @@ class FuncionarioPDFGenerator:
         # KPIs financeiros separados
         elementos.append(Paragraph("Indicadores Financeiros Detalhados:", self.styles['Heading3']))
         
-        # Tabela principal com valores - VALORES CORRIGIDOS
-        # Calcular valor diário correto (salário mensal ÷ 30 dias)
-        valor_dia_correto = kpis.get('custo_total_geral', 0) / 30 if kpis.get('custo_total_geral', 0) > 0 else (funcionario.salario / 30 if funcionario.salario else 0)
-        
+        # Tabela principal com valores
         financeiro_data = [
             ['Item', 'Quantidade', 'Valor Unit.', 'Valor Total'],
             ['Horas Extras', f"{kpis.get('horas_extras', 0):.1f}h", f"R$ {kpis.get('valor_hora_atual', 0) * 1.5:,.2f}", f"R$ {kpis.get('valor_horas_extras', 0):,.2f}"],
-            ['Faltas Injustificadas', f"{kpis.get('faltas', 0)} dia(s)", f"R$ {valor_dia_correto:,.2f}", f"R$ {kpis.get('valor_faltas', 0):,.2f}"],
-            ['Faltas Justificadas', f"{kpis.get('faltas_justificadas', 0)} dia(s)", f"R$ {valor_dia_correto:,.2f}", f"R$ 0,00"],
-            ['DSR Perdido (Lei 605/49)', f"{kpis.get('dsr_perdido_dias', 0)} semana(s)", f"R$ {valor_dia_correto:,.2f}", f"R$ {kpis.get('valor_dsr_perdido', 0):,.2f}"]
+            ['Faltas Injustificadas', f"{kpis.get('faltas', 0)} dias", f"R$ {kpis.get('valor_hora_atual', 0) * 8:,.2f}", f"R$ {kpis.get('valor_faltas', 0):,.2f}"],
+            ['Faltas Justificadas', f"{kpis.get('faltas_justificadas', 0)} dias", f"R$ {kpis.get('valor_hora_atual', 0) * 8:,.2f}", f"R$ {kpis.get('valor_faltas_justificadas', 0):,.2f}"],
+            ['DSR Perdido (Lei 605/49)', f"{kpis.get('dsr_perdido_dias', 0)} semana(s)", f"R$ {kpis.get('valor_hora_atual', 0) * 8:,.2f}", f"R$ {kpis.get('valor_dsr_perdido', 0):,.2f}"]
         ]
         
         financeiro_table = Table(financeiro_data, colWidths=[2.2*inch, 1.3*inch, 1.3*inch, 1.5*inch])
