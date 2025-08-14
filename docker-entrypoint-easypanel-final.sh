@@ -55,6 +55,10 @@ CREATE TABLE IF NOT EXISTS funcionario (
     data_admissao DATE,
     ativo BOOLEAN DEFAULT TRUE,
     admin_id INTEGER NOT NULL,
+    foto_base64 TEXT,
+    departamento_id INTEGER,
+    funcao_id INTEGER,
+    horario_trabalho_id INTEGER,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -67,6 +71,8 @@ CREATE TABLE IF NOT EXISTS obra (
     data_inicio DATE,
     data_fim_prevista DATE,
     admin_id INTEGER NOT NULL,
+    token_cliente VARCHAR(255) UNIQUE,
+    responsavel_id INTEGER,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -95,18 +101,50 @@ INSERT INTO funcionario (codigo, nome, cpf, cargo, salario, data_admissao, admin
 VALUES ('FUN001', 'Carlos Alberto Santos', '123.456.789-00', 'Operador', 2500.00, '2024-01-15', 10)
 ON CONFLICT (codigo) DO NOTHING;
 
+-- OBRA DEMO
+INSERT INTO obra (codigo, nome, descricao, status, data_inicio, data_fim_prevista, admin_id, token_cliente)
+VALUES ('OBR001', 'Jardim das Flores - Vargem Velha', 'Construção de galpão industrial 500m²', 'andamento', '2024-07-01', '2024-12-31', 10, 'demo_token_cliente_123')
+ON CONFLICT (codigo) DO NOTHING;
+
 EOSQL
 
     echo "✅ Estrutura criada via SQL direto!"
 fi
 
+# Adicionar colunas que podem estar faltando
+echo "🔧 Atualizando schema para compatibilidade..."
+psql "$DATABASE_URL" << 'EOSQL' || true
+-- Adicionar campos que podem estar faltando (compatibilidade com schema existente)
+ALTER TABLE obra ADD COLUMN IF NOT EXISTS token_cliente VARCHAR(255) UNIQUE;
+ALTER TABLE obra ADD COLUMN IF NOT EXISTS responsavel_id INTEGER;
+ALTER TABLE obra ADD COLUMN IF NOT EXISTS cliente_nome VARCHAR(100);
+ALTER TABLE obra ADD COLUMN IF NOT EXISTS cliente_email VARCHAR(120);
+ALTER TABLE obra ADD COLUMN IF NOT EXISTS portal_ativo BOOLEAN DEFAULT TRUE;
+ALTER TABLE obra ADD COLUMN IF NOT EXISTS data_previsao_fim DATE;
+
+ALTER TABLE funcionario ADD COLUMN IF NOT EXISTS foto_base64 TEXT;
+ALTER TABLE funcionario ADD COLUMN IF NOT EXISTS departamento_id INTEGER;
+ALTER TABLE funcionario ADD COLUMN IF NOT EXISTS funcao_id INTEGER;
+ALTER TABLE funcionario ADD COLUMN IF NOT EXISTS horario_trabalho_id INTEGER;
+ALTER TABLE funcionario ADD COLUMN IF NOT EXISTS rg VARCHAR(20);
+ALTER TABLE funcionario ADD COLUMN IF NOT EXISTS telefone VARCHAR(20);
+ALTER TABLE funcionario ADD COLUMN IF NOT EXISTS email VARCHAR(120);
+
+-- Criar índices para performance
+CREATE INDEX IF NOT EXISTS idx_obra_token_cliente ON obra(token_cliente);
+CREATE INDEX IF NOT EXISTS idx_funcionario_admin_id ON funcionario(admin_id);
+CREATE INDEX IF NOT EXISTS idx_obra_admin_id ON obra(admin_id);
+EOSQL
+
 # Verificação final
 FINAL_TABLES=$(psql "$DATABASE_URL" -t -c "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = 'public';" | tr -d ' ')
 FINAL_USERS=$(psql "$DATABASE_URL" -t -c "SELECT COUNT(*) FROM usuario;" | tr -d ' ')
+FINAL_OBRAS=$(psql "$DATABASE_URL" -t -c "SELECT COUNT(*) FROM obra;" | tr -d ' ')
 
 echo "📊 DEPLOY CONCLUÍDO:"
 echo "   • Tabelas: $FINAL_TABLES"
 echo "   • Usuários: $FINAL_USERS"
+echo "   • Obras: $FINAL_OBRAS"
 echo "   • Credenciais: admin@sige.com / admin123"
 echo "   • Credenciais: valeverde@sige.com / admin123"
 
