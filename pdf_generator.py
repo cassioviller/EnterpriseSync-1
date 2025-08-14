@@ -231,35 +231,6 @@ class FuncionarioPDFGenerator:
         ]))
         
         elementos.append(financeiro_table)
-        
-        # Adicionar totalizador final na mesma seção
-        elementos.append(Spacer(1, 10))
-        
-        # Linha de totalizadores consolidados
-        total_data = [
-            ['TOTALIZADORES DO PERÍODO', 'VALOR'],
-            ['Custo Total Mão de Obra', f"R$ {kpis.get('custo_mao_obra', 0):,.2f}"],
-            ['Total Descontos (Faltas + DSR)', f"R$ {valor_faltas_direto + valor_dsr_perdido:,.2f}"],
-            ['Custo Líquido Final', f"R$ {kpis.get('custo_total', 0):,.2f}"]
-        ]
-        
-        total_table = Table(total_data, colWidths=[4*inch, 2.3*inch])
-        total_table.setStyle(TableStyle([
-            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#2c3e50')),
-            ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
-            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-            ('ALIGN', (0, 1), (0, -1), 'LEFT'),
-            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-            ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
-            ('FONTSIZE', (0, 0), (-1, -1), 10),
-            ('GRID', (0, 0), (-1, -1), 1, colors.black),
-            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-            ('BACKGROUND', (0, -1), (-1, -1), colors.HexColor('#28a745')),  # Linha final em verde
-            ('TEXTCOLOR', (0, -1), (-1, -1), colors.whitesmoke),
-            ('FONTNAME', (0, -1), (-1, -1), 'Helvetica-Bold')
-        ]))
-        
-        elementos.append(total_table)
         return elementos
 
     def _criar_tabela_ponto(self, registros_ponto):
