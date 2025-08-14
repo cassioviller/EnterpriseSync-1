@@ -11,6 +11,10 @@
                 <i class="fas fa-user"></i> {{ funcionario.nome }}
             </h1>
             <div class="btn-group">
+                <a href="/funcionario_perfil/{{ funcionario.id }}/pdf?data_inicio={{ data_inicio }}&data_fim={{ data_fim }}" 
+                   class="btn btn-danger" target="_blank" title="Exportar perfil em PDF">
+                    <i class="fas fa-file-pdf"></i> Exportar PDF
+                </a>
                 <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#editarFuncionarioModal">
                     <i class="fas fa-edit"></i> Editar
                 </button>

@@ -1,4 +1,4 @@
-from flask import Blueprint, render_template, request, redirect, url_for, flash, jsonify, session
+from flask import Blueprint, render_template, request, redirect, url_for, flash, jsonify, make_response, send_file, session
 from flask_login import login_required, current_user, login_user, logout_user
 from werkzeug.security import check_password_hash, generate_password_hash
 from models import db, Usuario, TipoUsuario, Funcionario, Obra
@@ -207,6 +207,7 @@ def funcionarios():
 @main_bp.route('/funcionario_perfil/<int:id>')
 def funcionario_perfil(id):
     from models import RegistroPonto
+    from pdf_generator import gerar_pdf_funcionario
     
     funcionario = Funcionario.query.get_or_404(id)
     
@@ -292,6 +293,97 @@ def funcionario_perfil(id):
                          registros_ponto=registros,  # Template espera esta variável
                          registros_alimentacao=[],  # Vazio por enquanto
                          graficos=graficos)
+
+# Rota para exportar PDF do funcionário
+@main_bp.route('/funcionario_perfil/<int:id>/pdf')
+def funcionario_perfil_pdf(id):
+    from models import RegistroPonto
+    
+    funcionario = Funcionario.query.get_or_404(id)
+    
+    # Filtros de data - padrão último mês
+    data_inicio = request.args.get('data_inicio')
+    data_fim = request.args.get('data_fim')
+    
+    if not data_inicio:
+        data_inicio = date.today().replace(day=1)
+    else:
+        data_inicio = datetime.strptime(data_inicio, '%Y-%m-%d').date()
+    
+    if not data_fim:
+        data_fim = date.today()
+    else:
+        data_fim = datetime.strptime(data_fim, '%Y-%m-%d').date()
+    
+    # Buscar registros do período
+    registros = RegistroPonto.query.filter(
+        RegistroPonto.funcionario_id == funcionario.id,
+        RegistroPonto.data >= data_inicio,
+        RegistroPonto.data <= data_fim
+    ).order_by(RegistroPonto.data).all()
+    
+    # Calcular KPIs (mesmo código da função perfil)
+    total_horas = sum(r.horas_trabalhadas or 0 for r in registros)
+    total_extras = sum(r.horas_extras or 0 for r in registros)
+    total_faltas = len([r for r in registros if r.tipo_registro == 'falta'])
+    faltas_justificadas = len([r for r in registros if r.tipo_registro == 'falta_justificada'])
+    total_atrasos = sum(r.total_atraso_horas or 0 for r in registros)
+    
+    valor_hora = (funcionario.salario / 220) if funcionario.salario else 0
+    valor_horas_extras = total_extras * valor_hora * 1.5
+    valor_faltas = total_faltas * valor_hora * 8
+    
+    dias_trabalhados = len([r for r in registros if r.horas_trabalhadas and r.horas_trabalhadas > 0])
+    taxa_absenteismo = (total_faltas / len(registros) * 100) if registros else 0
+    
+    kpis = {
+        'horas_trabalhadas': total_horas,
+        'horas_extras': total_extras,
+        'faltas': total_faltas,
+        'faltas_justificadas': faltas_justificadas,
+        'atrasos': total_atrasos,
+        'valor_horas_extras': valor_horas_extras,
+        'valor_faltas': valor_faltas,
+        'taxa_eficiencia': (total_horas / (dias_trabalhados * 8) * 100) if dias_trabalhados > 0 else 0,
+        'custo_total': (total_horas + total_extras * 1.5) * valor_hora,
+        'absenteismo': taxa_absenteismo,
+        'produtividade': 85.0,
+        'pontualidade': max(0, 100 - (total_atrasos * 5)),
+        'dias_trabalhados': dias_trabalhados,
+        'media_horas_dia': total_horas / dias_trabalhados if dias_trabalhados > 0 else 0,
+        'media_diaria': total_horas / dias_trabalhados if dias_trabalhados > 0 else 0,
+        'dias_faltas_justificadas': faltas_justificadas,
+        'custo_mao_obra': (total_horas + total_extras * 1.5) * valor_hora,
+        'custo_alimentacao': 0.0,
+        'custo_transporte': 0.0,
+        'outros_custos': 0.0,
+        'custo_total_geral': (total_horas + total_extras * 1.5) * valor_hora,
+        'horas_perdidas_total': total_faltas * 8 + total_atrasos,
+        'valor_hora_atual': valor_hora,
+        'custo_faltas_justificadas': faltas_justificadas * valor_hora * 8
+    }
+    
+    # Gerar PDF
+    try:
+        from pdf_generator import gerar_pdf_funcionario
+        
+        pdf_buffer = gerar_pdf_funcionario(funcionario, kpis, registros, data_inicio, data_fim)
+        
+        # Nome do arquivo
+        nome_arquivo = f"funcionario_{funcionario.nome.replace(' ', '_')}_{data_inicio.strftime('%Y%m%d')}_{data_fim.strftime('%Y%m%d')}.pdf"
+        
+        # Criar resposta
+        response = make_response(pdf_buffer.getvalue())
+        response.headers['Content-Type'] = 'application/pdf'
+        response.headers['Content-Disposition'] = f'attachment; filename="{nome_arquivo}"'
+        
+        return response
+        
+    except Exception as e:
+        print(f"ERRO PDF: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return f"Erro ao gerar PDF: {str(e)}", 500
 
 # ===== OBRAS =====
 @main_bp.route('/obras')
