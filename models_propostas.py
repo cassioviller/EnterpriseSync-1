@@ -72,7 +72,7 @@ class PropostaComercialSIGE(db.Model):
     valor_total = db.Column(db.Numeric(15,2), default=0)
     
     # Metadados
-    criado_por = db.Column(db.Integer, db.ForeignKey('users.id'))
+    criado_por = db.Column(db.Integer, db.ForeignKey('usuario.id'))
     criado_em = db.Column(db.DateTime, default=datetime.utcnow)
     atualizado_em = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     
