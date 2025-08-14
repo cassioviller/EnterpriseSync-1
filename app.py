@@ -143,8 +143,8 @@ with app.app_context():
 
     # Importar bypass de autenticação para desenvolvimento
     try:
-        import bypass_auth
-        logging.info("🔓 Sistema de bypass de autenticação carregado")
+        import simple_bypass
+        logging.info("🔓 Sistema de bypass simples carregado")
     except Exception as e:
         logging.error(f"Erro ao carregar bypass: {e}")
 
