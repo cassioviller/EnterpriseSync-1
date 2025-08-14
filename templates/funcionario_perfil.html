@@ -309,8 +309,9 @@
                             <strong>Legenda:</strong>
                             <span class="badge bg-success ms-2"><i class="fas fa-calendar-week"></i> SÁBADO</span>
                             <span class="badge bg-info ms-2"><i class="fas fa-sun"></i> DOMINGO</span>
+                            <span class="badge bg-success ms-2"><i class="fas fa-calendar-times"></i> SÁB. FOLGA</span>
+                            <span class="badge bg-info ms-2"><i class="fas fa-home"></i> DOM. FOLGA</span>
                             <span class="badge bg-info ms-2"><i class="fas fa-star"></i> FERIADO TRAB.</span>
-                            <span class="badge bg-secondary ms-2"><i class="fas fa-home"></i> FERIADO NORMAL</span>
                             <span class="badge bg-primary ms-2"><i class="fas fa-check"></i> JUSTIFICADA</span>
                             <span class="badge bg-danger ms-2"><i class="fas fa-times"></i> FALTA</span>
                         </div>
@@ -359,9 +360,9 @@
                                             <span class="badge bg-success ms-2"><i class="fas fa-calendar-week"></i> SÁBADO</span>
                                         {% elif registro.tipo_registro == 'domingo_horas_extras' or (dia_semana == 6 and 'trabalhado' in (registro.tipo_registro or '')) %}
                                             <span class="badge bg-info ms-2"><i class="fas fa-sun"></i> DOMINGO</span>
-                                        {% elif registro.tipo_registro == 'sabado_nao_trabalhado' or (dia_semana == 5 and 'folga' in (registro.tipo_registro or '')) %}
+                                        {% elif registro.tipo_registro == 'sabado_folga' or registro.tipo_registro == 'sabado_nao_trabalhado' %}
                                             <span class="badge bg-success ms-2"><i class="fas fa-calendar-times"></i> SÁB. FOLGA</span>
-                                        {% elif registro.tipo_registro == 'domingo_nao_trabalhado' or (dia_semana == 6 and 'folga' in (registro.tipo_registro or '')) %}
+                                        {% elif registro.tipo_registro == 'domingo_folga' or registro.tipo_registro == 'domingo_nao_trabalhado' %}
                                             <span class="badge bg-info ms-2"><i class="fas fa-home"></i> DOM. FOLGA</span>
                                         {% elif registro.tipo_registro == 'feriado_trabalhado' %}
                                             <span class="badge bg-info ms-2"><i class="fas fa-star"></i> FERIADO TRAB.</span>
@@ -383,6 +384,8 @@
                                         <span class="fw-bold" style="color: #28a745;">Falta Justificada</span>
                                     {% elif registro.tipo_registro == 'falta' %}
                                         <span class="fw-bold" style="color: #dc3545;">Falta</span>
+                                    {% elif registro.tipo_registro == 'sabado_folga' or registro.tipo_registro == 'domingo_folga' %}
+                                        <span class="fw-bold" style="color: #28a745;">Folga</span>
                                     {% elif registro.hora_entrada %}
                                         <span class="badge bg-info">{{ registro.hora_entrada.strftime('%H:%M') }}</span>
                                     {% else %}
@@ -396,6 +399,8 @@
                                         <span class="fw-bold" style="color: #28a745;">Falta Justificada</span>
                                     {% elif registro.tipo_registro == 'falta' %}
                                         <span class="fw-bold" style="color: #dc3545;">Falta</span>
+                                    {% elif registro.tipo_registro == 'sabado_folga' or registro.tipo_registro == 'domingo_folga' %}
+                                        <span class="fw-bold" style="color: #28a745;">Folga</span>
                                     {% elif registro.hora_almoco_saida %}
                                         <span class="badge bg-warning">{{ registro.hora_almoco_saida.strftime('%H:%M') }}</span>
                                     {% else %}
@@ -409,6 +414,8 @@
                                         <span class="fw-bold" style="color: #28a745;">Falta Justificada</span>
                                     {% elif registro.tipo_registro == 'falta' %}
                                         <span class="fw-bold" style="color: #dc3545;">Falta</span>
+                                    {% elif registro.tipo_registro == 'sabado_folga' or registro.tipo_registro == 'domingo_folga' %}
+                                        <span class="fw-bold" style="color: #28a745;">Folga</span>
                                     {% elif registro.hora_almoco_retorno %}
                                         <span class="badge bg-info">{{ registro.hora_almoco_retorno.strftime('%H:%M') }}</span>
                                     {% else %}
@@ -422,6 +429,8 @@
                                         <span class="fw-bold" style="color: #28a745;">Falta Justificada</span>
                                     {% elif registro.tipo_registro == 'falta' %}
                                         <span class="fw-bold" style="color: #dc3545;">Falta</span>
+                                    {% elif registro.tipo_registro == 'sabado_folga' or registro.tipo_registro == 'domingo_folga' %}
+                                        <span class="fw-bold" style="color: #28a745;">Folga</span>
                                     {% elif registro.hora_saida %}
                                         <span class="badge bg-danger">{{ registro.hora_saida.strftime('%H:%M') }}</span>
                                     {% else %}
@@ -435,6 +444,8 @@
                                         <span class="fw-bold" style="color: #28a745;">Falta Justificada</span>
                                     {% elif registro.tipo_registro == 'falta' %}
                                         <span class="fw-bold" style="color: #dc3545;">Falta</span>
+                                    {% elif registro.tipo_registro == 'sabado_folga' or registro.tipo_registro == 'domingo_folga' %}
+                                        <span class="fw-bold" style="color: #28a745;">0.0h</span>
                                     {% elif registro.horas_trabalhadas %}
                                         <span class="fw-bold text-primary">{{ '{:.2f}h'.format(registro.horas_trabalhadas) }}</span>
                                     {% else %}
