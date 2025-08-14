@@ -239,11 +239,14 @@ def funcionario_perfil(id):
     faltas_justificadas = len([r for r in registros if r.tipo_registro == 'falta_justificada'])
     total_atrasos = sum(r.total_atraso_horas or 0 for r in registros)  # Campo correto do modelo
     
-    # Calcular valores monetários detalhados
+    # Calcular valores monetários detalhados - CORREÇÃO DOS VALORES
     valor_hora = (funcionario.salario / 220) if funcionario.salario else 0
     valor_horas_extras = total_extras * valor_hora * 1.5
-    valor_faltas = total_faltas * valor_hora * 8  # Desconto de 8h por falta
-    valor_faltas_justificadas = faltas_justificadas * valor_hora * 8  # Faltas justificadas
+    
+    # CORREÇÃO: Calcular valor diário baseado no salário mensal (30 dias)
+    valor_dia = funcionario.salario / 30 if funcionario.salario else 0
+    valor_faltas = total_faltas * valor_dia  # 1 dia de salário por falta
+    valor_faltas_justificadas = faltas_justificadas * valor_dia  # Faltas justificadas não descontam na prática
     
     # Calcular DSR perdido conforme Lei 605/49 - LÓGICA CORRETA
     # "Não será devida a remuneração quando, sem motivo justificado, 
@@ -265,7 +268,7 @@ def funcionario_perfil(id):
     
     # DSRs perdidos = número de semanas com pelo menos 1 falta
     dsrs_perdidos = len(semanas_com_faltas)
-    valor_dsr_perdido = dsrs_perdidos * valor_hora * 8  # 8 horas por dia de DSR
+    valor_dsr_perdido = dsrs_perdidos * valor_dia  # 1 dia de salário por DSR perdido
     
     # Calcular estatísticas adicionais
     dias_trabalhados = len([r for r in registros if r.horas_trabalhadas and r.horas_trabalhadas > 0])

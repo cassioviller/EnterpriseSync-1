@@ -1,0 +1,496 @@
+# 🎯 PROMPT: CORREÇÃO DSR NO RELATÓRIO DE EXPORTAÇÃO
+
+## 📋 **PROBLEMA IDENTIFICADO**
+O relatório de exportação está separando corretamente "Faltas Injustificadas" e "DSR Perdido", mas o cálculo do DSR está incorreto:
+
+**❌ SITUAÇÃO ATUAL:**
+- Faltas Injustificadas: 1 dia = R$ 163,64 ✅
+- DSR Perdido: 0 semana(s) = R$ 0,00 ❌ (deveria ser 1 semana)
+
+**✅ SITUAÇÃO ESPERADA:**
+- Faltas Injustificadas: 1 dia = R$ 163,64
+- DSR Perdido: 1 semana(s) = R$ 163,64
+
+---
+
+## 🔧 **ETAPA 1: LOCALIZAR FUNÇÃO DE EXPORTAÇÃO**
+
+```python
+# 1. Encontrar e analisar função de exportação atual
+def analisar_funcao_exportacao():
+    """Analisa função atual de exportação de relatórios"""
+    
+    print("🔍 ANALISANDO FUNÇÃO DE EXPORTAÇÃO...")
+    
+    # Procurar por arquivos relacionados a exportação/relatórios
+    import os
+    import re
+    
+    arquivos_relatorio = []
+    
+    # Buscar arquivos que podem conter a função
+    for root, dirs, files in os.walk('.'):
+        for file in files:
+            if file.endswith('.py'):
+                filepath = os.path.join(root, file)
+                try:
+                    with open(filepath, 'r', encoding='utf-8') as f:
+                        content = f.read()
+                        if any(termo in content.lower() for termo in ['export', 'relatorio', 'dsr', 'falta']):
+                            arquivos_relatorio.append(filepath)
+                except:
+                    pass
+    
+    print("📊 ARQUIVOS RELACIONADOS A RELATÓRIOS:")
+    for arquivo in arquivos_relatorio:
+        print(f"   - {arquivo}")
+    
+    # Procurar função específica de cálculo de DSR
+    for arquivo in arquivos_relatorio:
+        print(f"\n🔍 ANALISANDO: {arquivo}")
+        try:
+            with open(arquivo, 'r', encoding='utf-8') as f:
+                lines = f.readlines()
+                for i, line in enumerate(lines, 1):
+                    if 'dsr' in line.lower() and ('def ' in line or 'class ' in line):
+                        print(f"   Linha {i}: {line.strip()}")
+        except:
+            print(f"   ❌ Erro ao ler arquivo")
+    
+    return arquivos_relatorio
+
+# EXECUTAR ANÁLISE
+arquivos_encontrados = analisar_funcao_exportacao()
+```
+
+---
+
+## 🔧 **ETAPA 2: CORRIGIR CÁLCULO DE DSR**
+
+```python
+# 2. Função corrigida para cálculo de DSR no relatório
+def calcular_indicadores_financeiros_corrigido(funcionario_id, data_inicio, data_fim):
+    """
+    Calcula indicadores financeiros com DSR correto para exportação
+    """
+    from app import app, db
+    from models import Funcionario, RegistroPonto
+    from datetime import datetime, timedelta
+    
+    with app.app_context():
+        funcionario = Funcionario.query.get(funcionario_id)
+        
+        # Buscar faltas injustificadas
+        faltas_injustificadas = RegistroPonto.query.filter(
+            RegistroPonto.funcionario_id == funcionario_id,
+            RegistroPonto.data.between(data_inicio, data_fim),
+            RegistroPonto.tipo_registro == 'falta'
+        ).all()
+        
+        # Buscar faltas justificadas
+        faltas_justificadas = RegistroPonto.query.filter(
+            RegistroPonto.funcionario_id == funcionario_id,
+            RegistroPonto.data.between(data_inicio, data_fim),
+            RegistroPonto.tipo_registro == 'falta_justificada'
+        ).all()
+        
+        # Calcular DSR perdido usando lógica estrita
+        dsr_info = calcular_dsr_estrito(funcionario_id, data_inicio, data_fim)
+        
+        # Valores financeiros
+        valor_dia = funcionario.salario / 30
+        
+        # Horas extras (manter cálculo existente)
+        horas_extras = calcular_horas_extras_periodo(funcionario_id, data_inicio, data_fim)
+        
+        # Montar indicadores corrigidos
+        indicadores = {
+            'horas_extras': {
+                'quantidade': f"{horas_extras['total_horas']:.1f}h",
+                'valor_unitario': horas_extras['valor_hora_extra'],
+                'valor_total': horas_extras['custo_total']
+            },
+            'faltas_injustificadas': {
+                'quantidade': f"{len(faltas_injustificadas)} dia(s)",
+                'valor_unitario': valor_dia,
+                'valor_total': len(faltas_injustificadas) * valor_dia
+            },
+            'faltas_justificadas': {
+                'quantidade': f"{len(faltas_justificadas)} dia(s)",
+                'valor_unitario': valor_dia,
+                'valor_total': 0.0  # Faltas justificadas não descontam
+            },
+            'dsr_perdido': {
+                'quantidade': f"{dsr_info['dsrs_perdidos']} semana(s)",
+                'valor_unitario': valor_dia,
+                'valor_total': dsr_info['dsrs_perdidos'] * valor_dia
+            }
+        }
+        
+        print(f"📊 INDICADORES CORRIGIDOS - {funcionario.nome}:")
+        print(f"   - Faltas injustificadas: {len(faltas_injustificadas)} dia(s) = R$ {indicadores['faltas_injustificadas']['valor_total']:.2f}")
+        print(f"   - Faltas justificadas: {len(faltas_justificadas)} dia(s) = R$ {indicadores['faltas_justificadas']['valor_total']:.2f}")
+        print(f"   - DSR perdido: {dsr_info['dsrs_perdidos']} semana(s) = R$ {indicadores['dsr_perdido']['valor_total']:.2f}")
+        print(f"   - Horas extras: {horas_extras['total_horas']:.1f}h = R$ {indicadores['horas_extras']['valor_total']:.2f}")
+        
+        return indicadores
+
+# Testar função corrigida
+def testar_indicadores_corrigidos():
+    """Testa função corrigida de indicadores"""
+    from datetime import date
+    
+    # Buscar Carlos
+    carlos = Funcionario.query.filter_by(
+        nome="Carlos Alberto Rigolin Junior"
+    ).first()
+    
+    if not carlos:
+        print("❌ Carlos não encontrado")
+        return
+    
+    # Testar com período de julho
+    indicadores = calcular_indicadores_financeiros_corrigido(
+        carlos.id,
+        date(2025, 7, 1),
+        date(2025, 7, 31)
+    )
+    
+    return indicadores
+
+# EXECUTAR TESTE
+indicadores_teste = testar_indicadores_corrigidos()
+```
+
+---
+
+## 🔧 **ETAPA 3: ATUALIZAR TEMPLATE DE EXPORTAÇÃO**
+
+```python
+# 3. Template HTML corrigido para exportação
+def gerar_template_exportacao_corrigido():
+    """Gera template HTML corrigido para exportação"""
+    
+    template_corrigido = '''
+<!-- Template corrigido para relatório de exportação -->
+<div class="relatorio-exportacao">
+    <h3>Indicadores Financeiros Detalhados:</h3>
+    <table class="table table-bordered">
+        <thead>
+            <tr>
+                <th>Item</th>
+                <th>Quantidade</th>
+                <th>Valor Unit.</th>
+                <th>Valor Total</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td>Horas Extras</td>
+                <td>{{ indicadores.horas_extras.quantidade }}</td>
+                <td>R$ {{ "%.2f"|format(indicadores.horas_extras.valor_unitario) }}</td>
+                <td class="text-success">R$ {{ "%.2f"|format(indicadores.horas_extras.valor_total) }}</td>
+            </tr>
+            <tr class="table-danger">
+                <td>Faltas Injustificadas</td>
+                <td>{{ indicadores.faltas_injustificadas.quantidade }}</td>
+                <td>R$ {{ "%.2f"|format(indicadores.faltas_injustificadas.valor_unitario) }}</td>
+                <td>R$ {{ "%.2f"|format(indicadores.faltas_injustificadas.valor_total) }}</td>
+            </tr>
+            <tr>
+                <td>Faltas Justificadas</td>
+                <td>{{ indicadores.faltas_justificadas.quantidade }}</td>
+                <td>R$ {{ "%.2f"|format(indicadores.faltas_justificadas.valor_unitario) }}</td>
+                <td>R$ {{ "%.2f"|format(indicadores.faltas_justificadas.valor_total) }}</td>
+            </tr>
+            <tr class="table-danger">
+                <td>DSR Perdido (Lei 605/49)</td>
+                <td>{{ indicadores.dsr_perdido.quantidade }}</td>
+                <td>R$ {{ "%.2f"|format(indicadores.dsr_perdido.valor_unitario) }}</td>
+                <td>R$ {{ "%.2f"|format(indicadores.dsr_perdido.valor_total) }}</td>
+            </tr>
+        </tbody>
+    </table>
+    
+    <h3>Resumo Financeiro:</h3>
+    <table class="table table-bordered">
+        <thead>
+            <tr>
+                <th>Item</th>
+                <th>Quantidade</th>
+                <th>Valor Unit.</th>
+                <th>Valor Total</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td>Horas Extras</td>
+                <td>{{ indicadores.horas_extras.quantidade }}</td>
+                <td>R$ {{ "%.2f"|format(indicadores.horas_extras.valor_unitario) }}</td>
+                <td class="text-success">R$ {{ "%.2f"|format(indicadores.horas_extras.valor_total) }}</td>
+            </tr>
+            <tr class="table-danger">
+                <td>Faltas Injustificadas</td>
+                <td>{{ indicadores.faltas_injustificadas.quantidade }}</td>
+                <td>R$ {{ "%.2f"|format(indicadores.faltas_injustificadas.valor_unitario) }}</td>
+                <td>R$ {{ "%.2f"|format(indicadores.faltas_injustificadas.valor_total) }}</td>
+            </tr>
+            <tr>
+                <td>Faltas Justificadas</td>
+                <td>{{ indicadores.faltas_justificadas.quantidade }}</td>
+                <td>R$ {{ "%.2f"|format(indicadores.faltas_justificadas.valor_unitario) }}</td>
+                <td>R$ {{ "%.2f"|format(indicadores.faltas_justificadas.valor_total) }}</td>
+            </tr>
+            <tr class="table-danger">
+                <td>DSR Perdido (Lei 605/49)</td>
+                <td>{{ indicadores.dsr_perdido.quantidade }}</td>
+                <td>R$ {{ "%.2f"|format(indicadores.dsr_perdido.valor_unitario) }}</td>
+                <td>R$ {{ "%.2f"|format(indicadores.dsr_perdido.valor_total) }}</td>
+            </tr>
+        </tbody>
+    </table>
+</div>
+'''
+    
+    print("✅ TEMPLATE CORRIGIDO GERADO")
+    return template_corrigido
+
+# EXECUTAR GERAÇÃO
+template_novo = gerar_template_exportacao_corrigido()
+```
+
+---
+
+## 🔧 **ETAPA 4: ATUALIZAR ROTA DE EXPORTAÇÃO**
+
+```python
+# 4. Rota corrigida para exportação
+def atualizar_rota_exportacao():
+    """Atualiza rota de exportação com cálculo correto"""
+    
+    codigo_rota_corrigida = '''
+@app.route('/funcionarios/<int:funcionario_id>/relatorio/exportar')
+def exportar_relatorio_funcionario(funcionario_id):
+    """Exporta relatório do funcionário com cálculos corretos"""
+    
+    # Obter parâmetros de data
+    data_inicio = request.args.get('data_inicio')
+    data_fim = request.args.get('data_fim')
+    
+    if not data_inicio or not data_fim:
+        flash('Período obrigatório para exportação', 'error')
+        return redirect(url_for('funcionarios.perfil', funcionario_id=funcionario_id))
+    
+    # Converter datas
+    data_inicio = datetime.strptime(data_inicio, '%Y-%m-%d').date()
+    data_fim = datetime.strptime(data_fim, '%Y-%m-%d').date()
+    
+    # Buscar funcionário
+    funcionario = Funcionario.query.get_or_404(funcionario_id)
+    
+    # Calcular indicadores corrigidos
+    indicadores = calcular_indicadores_financeiros_corrigido(
+        funcionario_id, 
+        data_inicio, 
+        data_fim
+    )
+    
+    # Calcular totais
+    total_descontos = (
+        indicadores['faltas_injustificadas']['valor_total'] + 
+        indicadores['dsr_perdido']['valor_total']
+    )
+    
+    total_acrescimos = indicadores['horas_extras']['valor_total']
+    
+    saldo_final = total_acrescimos - total_descontos
+    
+    # Dados para template
+    dados_relatorio = {
+        'funcionario': funcionario,
+        'periodo': {
+            'inicio': data_inicio.strftime('%d/%m/%Y'),
+            'fim': data_fim.strftime('%d/%m/%Y')
+        },
+        'indicadores': indicadores,
+        'totais': {
+            'descontos': total_descontos,
+            'acrescimos': total_acrescimos,
+            'saldo': saldo_final
+        }
+    }
+    
+    return render_template('relatorios/funcionario_exportacao.html', **dados_relatorio)
+'''
+    
+    print("✅ CÓDIGO ROTA CORRIGIDA GERADO")
+    return codigo_rota_corrigida
+
+# EXECUTAR ATUALIZAÇÃO
+codigo_rota_nova = atualizar_rota_exportacao()
+```
+
+---
+
+## 🧪 **ETAPA 5: TESTAR CENÁRIO COMPLETO**
+
+```python
+# 5. Testar cenário completo com dados reais
+def testar_cenario_completo_exportacao():
+    """Testa cenário completo de exportação com DSR correto"""
+    from datetime import date
+    
+    print("🧪 TESTANDO CENÁRIO COMPLETO DE EXPORTAÇÃO:")
+    
+    # Buscar Carlos
+    carlos = Funcionario.query.filter_by(
+        nome="Carlos Alberto Rigolin Junior"
+    ).first()
+    
+    if not carlos:
+        print("❌ Carlos não encontrado")
+        return
+    
+    # Simular dados para teste
+    print(f"\n📊 DADOS SIMULADOS:")
+    print(f"   - Funcionário: {carlos.nome}")
+    print(f"   - Salário: R$ {carlos.salario:,.2f}")
+    print(f"   - Valor/dia: R$ {carlos.salario / 30:.2f}")
+    
+    # Cenário: 1 falta injustificada
+    faltas_injustificadas = 1
+    dsrs_perdidos = 1  # 1 falta = 1 semana afetada = 1 DSR
+    valor_dia = carlos.salario / 30
+    
+    print(f"\n📋 CENÁRIO DE TESTE:")
+    print(f"   - Faltas injustificadas: {faltas_injustificadas} dia")
+    print(f"   - DSRs perdidos: {dsrs_perdidos} semana")
+    print(f"   - Horas extras: 34.0h")
+    
+    # Calcular valores
+    desconto_faltas = faltas_injustificadas * valor_dia
+    desconto_dsr = dsrs_perdidos * valor_dia
+    custo_horas_extras = 34.0 * 30.68  # Valor da imagem
+    
+    print(f"\n💰 VALORES CALCULADOS:")
+    print(f"   - Desconto faltas: R$ {desconto_faltas:.2f}")
+    print(f"   - Desconto DSR: R$ {desconto_dsr:.2f}")
+    print(f"   - Custo horas extras: R$ {custo_horas_extras:.2f}")
+    print(f"   - Total descontos: R$ {desconto_faltas + desconto_dsr:.2f}")
+    
+    # Resultado esperado no relatório
+    print(f"\n📊 RESULTADO ESPERADO NO RELATÓRIO:")
+    print(f"   - Faltas Injustificadas: {faltas_injustificadas} dia(s) = R$ {desconto_faltas:.2f}")
+    print(f"   - DSR Perdido: {dsrs_perdidos} semana(s) = R$ {desconto_dsr:.2f}")
+    print(f"   - Horas Extras: 34.0h = R$ {custo_horas_extras:.2f}")
+    
+    # Comparar com imagem atual
+    print(f"\n🔍 COMPARAÇÃO COM IMAGEM ATUAL:")
+    print(f"   ATUAL: DSR Perdido: 0 semana(s) = R$ 0,00 ❌")
+    print(f"   CORRETO: DSR Perdido: {dsrs_perdidos} semana(s) = R$ {desconto_dsr:.2f} ✅")
+    
+    return {
+        'faltas_injustificadas': {'quantidade': faltas_injustificadas, 'valor': desconto_faltas},
+        'dsr_perdido': {'quantidade': dsrs_perdidos, 'valor': desconto_dsr},
+        'horas_extras': {'quantidade': 34.0, 'valor': custo_horas_extras}
+    }
+
+# EXECUTAR TESTE COMPLETO
+resultado_completo = testar_cenario_completo_exportacao()
+```
+
+---
+
+## 📋 **ETAPA 6: CHECKLIST DE CORREÇÃO**
+
+```python
+# 6. Checklist para implementação
+def gerar_checklist_correcao():
+    """Gera checklist para correção do DSR"""
+    
+    checklist = '''
+📋 CHECKLIST DE CORREÇÃO DSR NO RELATÓRIO:
+
+□ 1. LOCALIZAR FUNÇÃO DE EXPORTAÇÃO
+   - Encontrar arquivo que gera o relatório
+   - Identificar função de cálculo de DSR
+   - Verificar lógica atual
+
+□ 2. CORRIGIR CÁLCULO DE DSR
+   - Implementar função calcular_dsr_estrito()
+   - Usar lógica: 1 falta injustificada = 1 semana afetada = 1 DSR
+   - Testar com dados reais
+
+□ 3. ATUALIZAR TEMPLATE
+   - Modificar template HTML de exportação
+   - Garantir que DSR apareça separado das faltas
+   - Manter formatação atual
+
+□ 4. ATUALIZAR ROTA
+   - Modificar rota de exportação
+   - Usar função corrigida de cálculo
+   - Testar endpoint
+
+□ 5. VALIDAR RESULTADO
+   - Testar com 1 falta injustificada
+   - Verificar se DSR mostra "1 semana(s)"
+   - Confirmar valor R$ 163,64 (ou equivalente)
+
+□ 6. TESTAR CENÁRIOS
+   - 0 faltas = 0 DSR
+   - 1 falta = 1 DSR
+   - 2 faltas mesma semana = 1 DSR
+   - 2 faltas semanas diferentes = 2 DSRs
+'''
+    
+    print(checklist)
+    return checklist
+
+# EXECUTAR CHECKLIST
+checklist_final = gerar_checklist_correcao()
+```
+
+---
+
+## 🎯 **RESULTADO ESPERADO**
+
+**ANTES (atual):**
+```
+Faltas Injustificadas    | 1 dias     | R$ 163,64 | R$ 163,64
+DSR Perdido (Lei 605/49) | 0 semana(s)| R$ 163,64 | R$ 0,00   ❌
+```
+
+**DEPOIS (corrigido):**
+```
+Faltas Injustificadas    | 1 dias     | R$ 163,64 | R$ 163,64
+DSR Perdido (Lei 605/49) | 1 semana(s)| R$ 163,64 | R$ 163,64 ✅
+```
+
+---
+
+## 🎯 **INSTRUÇÕES DE EXECUÇÃO**
+
+**Execute na ordem:**
+
+```python
+# 1. Analisar função atual
+analisar_funcao_exportacao()
+
+# 2. Implementar cálculo corrigido
+calcular_indicadores_financeiros_corrigido()
+
+# 3. Testar função
+testar_indicadores_corrigidos()
+
+# 4. Atualizar template
+gerar_template_exportacao_corrigido()
+
+# 5. Atualizar rota
+atualizar_rota_exportacao()
+
+# 6. Teste completo
+testar_cenario_completo_exportacao()
+```
+
+**RESULTADO ESPERADO:** Relatório de exportação mostrando DSR perdido correto: "1 semana(s) = R$ 163,64" quando há 1 falta injustificada.
+
