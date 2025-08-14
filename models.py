@@ -1,12 +1,19 @@
+# MODELS CONSOLIDADOS - SIGE v8.0
+# Arquivo único para eliminar dependências circulares
+
 from flask_login import UserMixin
 from datetime import datetime, date
-from sqlalchemy import func
+from sqlalchemy import func, JSON, Column, Integer, String, Text, Float, Boolean, DateTime, Date, Time, Numeric, ForeignKey, Enum as SQLEnum
 from enum import Enum
-
 from flask_sqlalchemy import SQLAlchemy
+from sqlalchemy.orm import DeclarativeBase, relationship, backref
+import uuid
+import secrets
 
-# Instância única do SQLAlchemy
-db = SQLAlchemy()
+class Base(DeclarativeBase):
+    pass
+
+db = SQLAlchemy(model_class=Base)
 
 class TipoUsuario(Enum):
     SUPER_ADMIN = "super_admin"
@@ -710,7 +717,6 @@ class AlocacaoEquipe(db.Model):
     
     def pode_ser_cancelada(self):
         """Verifica se a alocação pode ser cancelada"""
-        from datetime import date
         return self.status == 'Planejado' and self.data_alocacao >= date.today()
     
     def gerar_numero_rdo_automatico(self):
@@ -743,8 +749,6 @@ class AlocacaoEquipe(db.Model):
 # MÓDULO 4: ALMOXARIFADO INTELIGENTE
 # ================================
 
-from decimal import Decimal
-import xml.etree.ElementTree as ET
 
 class CategoriaProduto(db.Model):
     """Categorias de produtos para organização do almoxarifado"""
@@ -1642,4 +1646,415 @@ class PropostaHistorico(db.Model):
 # Atualização de timestamp para verificar se o modelo é alterado
 # Essa linha força o gunicorn a recarregar quando há mudanças
 # Última modificação: 2025-08-11 21:05:00 - Módulo 1 Propostas adicionado
+
+
+
+# MODELS DE SERVIÇOS
+class StatusServico(Enum):
+    ATIVO = "ativo"
+    INATIVO = "inativo"
+    DESCONTINUADO = "descontinuado"
+
+class TipoUnidade(Enum):
+    M2 = "m2"
+    M3 = "m3"
+    ML = "ml"
+    UN = "un"
+    KG = "kg"
+    H = "h"
+    VERBA = "verba"
+
+class ServicoMestre(db.Model):
+    """Serviços principais que podem ser utilizados nas propostas"""
+    __tablename__ = 'servico_mestre'
+    
+    id = Column(Integer, primary_key=True)
+    admin_id = Column(Integer, ForeignKey('usuario.id'), nullable=False)
+    
+    # Dados básicos
+    codigo = Column(String(20), nullable=False)  # Ex: SRV001
+    nome = Column(String(100), nullable=False)   # Ex: "Estrutura Metálica Industrial"
+    descricao = Column(Text)
+    
+    # Dados comerciais
+    unidade = Column(String(10), nullable=False, default='m2')  # m2, m3, ml, un, kg, h, verba
+    preco_base = Column(Numeric(10, 2), nullable=False, default=0.00)
+    margem_lucro = Column(Numeric(5, 2), nullable=False, default=30.00)  # %
+    
+    # Status e controle
+    status = Column(String(20), nullable=False, default='ativo')
+    criado_em = Column(DateTime, default=datetime.utcnow)
+    atualizado_em = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    # Relacionamentos
+    subservicos = relationship('SubServico', back_populates='servico_mestre', cascade='all, delete-orphan')
+    itens_proposta = relationship('ItemServicoPropostaDinamica', back_populates='servico_mestre')
+    
+    # Administrador
+    admin = relationship('Usuario', foreign_keys=[admin_id])
+    
+    def __repr__(self):
+        return f'<ServicoMestre {self.codigo}: {self.nome}>'
+    
+    @property
+    def preco_final(self):
+        """Calcula preço final com margem de lucro"""
+        if self.preco_base:
+            return float(self.preco_base) * (1 + float(self.margem_lucro) / 100)
+        return 0.0
+    
+    @property
+    def total_subservicos(self):
+        """Conta quantos subserviços este serviço possui"""
+        return len(self.subservicos)
+
+class SubServico(db.Model):
+    """Subserviços que compõem um serviço mestre"""
+    __tablename__ = 'sub_servico'
+    
+    id = Column(Integer, primary_key=True)
+    servico_mestre_id = Column(Integer, ForeignKey('servico_mestre.id'), nullable=False)
+    admin_id = Column(Integer, ForeignKey('usuario.id'), nullable=False)
+    
+    # Dados básicos
+    codigo = Column(String(20), nullable=False)  # Ex: SRV001.001
+    nome = Column(String(100), nullable=False)   # Ex: "Soldagem de Viga Principal"
+    descricao = Column(Text)
+    
+    # Dados técnicos
+    unidade = Column(String(10), nullable=False, default='m2')
+    quantidade_base = Column(Numeric(10, 2), nullable=False, default=1.00)  # Quantidade por unidade do serviço mestre
+    preco_unitario = Column(Numeric(10, 2), nullable=False, default=0.00)
+    
+    # Dados de execução
+    tempo_execucao = Column(Numeric(5, 2), default=0.00)  # Horas
+    nivel_dificuldade = Column(String(20), default='medio')  # facil, medio, dificil
+    
+    # Status e controle
+    status = Column(String(20), nullable=False, default='ativo')
+    criado_em = Column(DateTime, default=datetime.utcnow)
+    atualizado_em = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    # Relacionamentos
+    servico_mestre = relationship('ServicoMestre', back_populates='subservicos')
+    admin = relationship('Usuario', foreign_keys=[admin_id])
+    
+    def __repr__(self):
+        return f'<SubServico {self.codigo}: {self.nome}>'
+    
+    @property
+    def valor_total_base(self):
+        """Calcula valor total baseado na quantidade base"""
+        return float(self.quantidade_base) * float(self.preco_unitario)
+
+class TabelaComposicao(db.Model):
+    """Tabelas de composição de custos por tipo de estrutura"""
+    __tablename__ = 'tabela_composicao'
+    
+    id = Column(Integer, primary_key=True)
+    admin_id = Column(Integer, ForeignKey('usuario.id'), nullable=False)
+    
+    # Dados básicos
+    nome = Column(String(100), nullable=False)  # Ex: "Galpão Industrial Padrão"
+    descricao = Column(Text)
+    tipo_estrutura = Column(String(50), nullable=False)  # galpao, edificio, ponte, etc.
+    
+    # Parâmetros técnicos
+    area_minima = Column(Numeric(10, 2), default=0.00)  # m²
+    area_maxima = Column(Numeric(10, 2), default=999999.99)  # m²
+    altura_minima = Column(Numeric(5, 2), default=0.00)  # metros
+    altura_maxima = Column(Numeric(5, 2), default=999.99)  # metros
+    
+    # Status e controle
+    status = Column(String(20), nullable=False, default='ativa')
+    criado_em = Column(DateTime, default=datetime.utcnow)
+    atualizado_em = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    # Relacionamentos
+    itens_composicao = relationship('ItemTabelaComposicao', back_populates='tabela', cascade='all, delete-orphan')
+    admin = relationship('Usuario', foreign_keys=[admin_id])
+    
+    def __repr__(self):
+        return f'<TabelaComposicao {self.nome}>'
+    
+    @property
+    def custo_total_m2(self):
+        """Calcula custo total por m²"""
+        return sum(item.valor_total for item in self.itens_composicao)
+
+class ItemTabelaComposicao(db.Model):
+    """Itens que compõem uma tabela de composição"""
+    __tablename__ = 'item_tabela_composicao'
+    
+    id = Column(Integer, primary_key=True)
+    tabela_composicao_id = Column(Integer, ForeignKey('tabela_composicao.id'), nullable=False)
+    servico_mestre_id = Column(Integer, ForeignKey('servico_mestre.id'), nullable=False)
+    admin_id = Column(Integer, ForeignKey('usuario.id'), nullable=False)
+    
+    # Dados de composição
+    quantidade = Column(Numeric(10, 2), nullable=False, default=1.00)  # Quantidade por m²
+    percentual_aplicacao = Column(Numeric(5, 2), default=100.00)  # % do serviço aplicado
+    
+    # Ajustes específicos
+    fator_multiplicador = Column(Numeric(5, 2), default=1.00)  # Multiplicador de preço
+    observacoes = Column(Text)
+    
+    # Relacionamentos
+    tabela = relationship('TabelaComposicao', back_populates='itens_composicao')
+    servico_mestre = relationship('ServicoMestre')
+    admin = relationship('Usuario', foreign_keys=[admin_id])
+    
+    def __repr__(self):
+        return f'<ItemTabelaComposicao {self.servico_mestre.nome} - {self.quantidade}>'
+    
+    @property
+    def valor_unitario_ajustado(self):
+        """Preço unitário com fator multiplicador"""
+        return self.servico_mestre.preco_final * float(self.fator_multiplicador)
+    
+    @property
+    def valor_total(self):
+        """Valor total do item na composição"""
+        return float(self.quantidade) * self.valor_unitario_ajustado * (float(self.percentual_aplicacao) / 100)
+
+class ItemServicoPropostaDinamica(db.Model):
+    """Itens de serviço dinamicamente adicionados à proposta"""
+    __tablename__ = 'item_servico_proposta_dinamica'
+    
+    id = Column(Integer, primary_key=True)
+    proposta_id = Column(Integer, ForeignKey('proposta.id'), nullable=False)
+    servico_mestre_id = Column(Integer, ForeignKey('servico_mestre.id'), nullable=True)
+    admin_id = Column(Integer, ForeignKey('usuario.id'), nullable=False)
+    
+    # Dados do item
+    codigo_item = Column(String(20))  # Código customizado
+    nome_item = Column(String(100), nullable=False)  # Nome pode ser customizado
+    descricao_item = Column(Text)
+    
+    # Dados comerciais
+    quantidade = Column(Numeric(10, 2), nullable=False, default=1.00)
+    unidade = Column(String(10), nullable=False, default='m2')
+    preco_unitario = Column(Numeric(10, 2), nullable=False, default=0.00)
+    desconto_percentual = Column(Numeric(5, 2), default=0.00)
+    
+    # Flags de controle
+    e_servico_mestre = Column(Boolean, default=False)  # Se foi gerado de um serviço mestre
+    inclui_subservicos = Column(Boolean, default=False)  # Se incluiu subserviços automaticamente
+    
+    # Status e controle
+    criado_em = Column(DateTime, default=datetime.utcnow)
+    ordem = Column(Integer, default=1)  # Ordem na proposta
+    
+    # Relacionamentos
+    proposta = relationship('Proposta', back_populates='itens_servicos_dinamicos', foreign_keys=[proposta_id])
+    servico_mestre = relationship('ServicoMestre', back_populates='itens_proposta')
+    admin = relationship('Usuario', foreign_keys=[admin_id])
+    
+    def __repr__(self):
+        return f'<ItemServicoPropostaDinamica {self.nome_item}>'
+    
+    @property
+    def valor_com_desconto(self):
+        """Valor unitário com desconto aplicado"""
+        desconto = float(self.desconto_percentual) / 100
+        return float(self.preco_unitario) * (1 - desconto)
+    
+    @property
+    def valor_total(self):
+        """Valor total do item"""
+        return float(self.quantidade) * self.valor_com_desconto
+
+# MODELS DE PROPOSTAS
+class PropostaComercialSIGE(db.Model):
+    __tablename__ = 'propostas_comerciais'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    numero_proposta = db.Column(db.String(50), unique=True, nullable=False)
+    data_proposta = db.Column(db.Date, nullable=False, default=date.today)
+    
+    # Dados do Cliente
+    cliente_nome = db.Column(db.String(255), nullable=False)
+    cliente_telefone = db.Column(db.String(20))
+    cliente_email = db.Column(db.String(255))
+    cliente_endereco = db.Column(db.Text)
+    
+    # Dados da Proposta
+    assunto = db.Column(db.String(255), nullable=False)
+    objeto = db.Column(db.Text, nullable=False)
+    documentos_referencia = db.Column(db.Text)
+    
+    # Condições
+    prazo_entrega_dias = db.Column(db.Integer, default=90)
+    observacoes_entrega = db.Column(db.Text)
+    validade_dias = db.Column(db.Integer, default=7)
+    percentual_nota_fiscal = db.Column(db.Numeric(5,2), default=13.5)
+    
+    # Condições de Pagamento
+    condicoes_pagamento = db.Column(db.Text, default="""10% de entrada na assinatura do contrato
+10% após projeto aprovado
+45% compra dos perfis
+25% no início da montagem in loco
+10% após a conclusão da montagem""")
+    
+    # Garantias e Considerações
+    garantias = db.Column(db.Text, default="""A Estruturas do Vale garante todos os materiais empregados nos serviços contra defeitos de fabricação pelo prazo de 12 (doze) meses contados a partir da data de conclusão da obra, conforme NBR 8800.""")
+    consideracoes_gerais = db.Column(db.Text, default="""Modificações nesta proposta somente serão válidas por escrito e com aceite mútuo. Em caso de cancelamento do contrato pela contratante, será cobrada multa de 30% sobre o valor total.""")
+    
+    # Itens Inclusos/Exclusos (JSON)
+    itens_inclusos = db.Column(JSON, default=[
+        "Mão de obra para execução dos serviços",
+        "Todos os equipamentos de segurança necessários",
+        "Transporte e alimentação da equipe",
+        "Container para guarda de ferramentas",
+        "Movimentação de carga (Munck)",
+        "Transporte dos materiais"
+    ])
+    
+    itens_exclusos = db.Column(JSON, default=[
+        "Projeto e execução de qualquer obra civil, fundações, alvenarias, elétrica, automação, tubulações etc.",
+        "Execução de ensaios destrutivos e radiográficos",
+        "Fornecimento de local para armazenagem das peças",
+        "Fornecimento e/ou serviços não especificados claramente nesta proposta",
+        "Fornecimento de escoramento (escoras)",
+        "Fornecimento de andaimes e plataformas",
+        "Técnico de segurança",
+        "Pintura final de acabamento",
+        "Calhas, rufos, condutores e pingadeiras"
+    ])
+    
+    # Status
+    status = db.Column(db.String(50), default='rascunho')  # rascunho, enviada, aprovada, rejeitada
+    token_cliente = db.Column(db.String(100), unique=True)
+    data_envio = db.Column(db.DateTime)
+    data_resposta_cliente = db.Column(db.DateTime)
+    observacoes_cliente = db.Column(db.Text)
+    
+    # Valores
+    valor_total = db.Column(db.Numeric(15,2), default=0)
+    
+    # Metadados
+    criado_por = db.Column(db.Integer, db.ForeignKey('usuario.id'))
+    criado_em = db.Column(db.DateTime, default=datetime.utcnow)
+    atualizado_em = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    # Integração com Obras
+    obra_id = db.Column(db.Integer, db.ForeignKey('obra.id'))
+    convertida_em_obra = db.Column(db.Boolean, default=False)
+    
+    # Relacionamentos
+    itens = db.relationship('PropostaItem', backref='proposta', lazy=True, cascade='all, delete-orphan')
+    arquivos = db.relationship('PropostaArquivo', backref='proposta', lazy=True, cascade='all, delete-orphan')
+    
+    def __init__(self, **kwargs):
+        super(PropostaComercialSIGE, self).__init__(**kwargs)
+        if not self.numero_proposta:
+            self.numero_proposta = self.gerar_numero_proposta()
+        if not self.token_cliente:
+            self.token_cliente = secrets.token_urlsafe(32)
+    
+    def gerar_numero_proposta(self):
+        """Gera número sequencial da proposta"""
+        ano_atual = date.today().year
+        # Contar propostas do ano atual
+        count = db.session.query(func.count(PropostaComercialSIGE.id)).filter(
+            func.extract('year', PropostaComercialSIGE.data_proposta) == ano_atual
+        ).scalar() or 0
+        
+        proximo_numero = count + 1
+        return f"{proximo_numero:03d}.{str(ano_atual)[-2:]}"
+    
+    def calcular_valor_total(self):
+        """Calcula o valor total da proposta"""
+        total = sum(float(item.subtotal) for item in self.itens)
+        self.valor_total = total
+        return total
+    
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'numero_proposta': self.numero_proposta,
+            'data_proposta': self.data_proposta.isoformat() if self.data_proposta else None,
+            'cliente_nome': self.cliente_nome,
+            'cliente_telefone': self.cliente_telefone,
+            'cliente_email': self.cliente_email,
+            'assunto': self.assunto,
+            'status': self.status,
+            'valor_total': float(self.valor_total) if self.valor_total else 0,
+            'criado_em': self.criado_em.isoformat() if self.criado_em else None
+        }
+
+class PropostaItem(db.Model):
+    __tablename__ = 'proposta_itens'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    proposta_id = db.Column(db.Integer, db.ForeignKey('propostas_comerciais.id'), nullable=False)
+    item_numero = db.Column(db.Integer, nullable=False)
+    descricao = db.Column(db.String(500), nullable=False)
+    quantidade = db.Column(db.Numeric(10,3), nullable=False)
+    unidade = db.Column(db.String(10), nullable=False)
+    preco_unitario = db.Column(db.Numeric(10,2), nullable=False)
+    ordem = db.Column(db.Integer, nullable=False)
+    
+    criado_em = db.Column(db.DateTime, default=datetime.utcnow)
+    
+    @property
+    def subtotal(self):
+        return self.quantidade * self.preco_unitario
+    
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'item_numero': self.item_numero,
+            'descricao': self.descricao,
+            'quantidade': float(self.quantidade),
+            'unidade': self.unidade,
+            'preco_unitario': float(self.preco_unitario),
+            'subtotal': float(self.subtotal),
+            'ordem': self.ordem
+        }
+
+class PropostaArquivo(db.Model):
+    __tablename__ = 'proposta_arquivos'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    proposta_id = db.Column(db.Integer, db.ForeignKey('propostas_comerciais.id'), nullable=False)
+    nome_arquivo = db.Column(db.String(255), nullable=False)
+    nome_original = db.Column(db.String(255), nullable=False)
+    tipo_arquivo = db.Column(db.String(100))
+    tamanho_bytes = db.Column(db.BigInteger)
+    caminho_arquivo = db.Column(db.String(500), nullable=False)
+    categoria = db.Column(db.String(50))  # 'dwg', 'pdf', 'foto', 'documento', 'outros'
+    
+    enviado_por = db.Column(db.Integer, db.ForeignKey('usuario.id'))
+    enviado_em = db.Column(db.DateTime, default=datetime.utcnow)
+    
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'nome_original': self.nome_original,
+            'tipo_arquivo': self.tipo_arquivo,
+            'tamanho_bytes': self.tamanho_bytes,
+            'categoria': self.categoria,
+            'enviado_em': self.enviado_em.isoformat() if self.enviado_em else None
+        }
+
+class PropostaTemplate(db.Model):
+    __tablename__ = 'proposta_templates'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    nome = db.Column(db.String(100), nullable=False)
+    descricao = db.Column(db.Text)
+    itens_padrao = db.Column(JSON)  # Array de itens padrão para este template
+    ativo = db.Column(db.Boolean, default=True)
+    
+    criado_em = db.Column(db.DateTime, default=datetime.utcnow)
+    
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'nome': self.nome,
+            'descricao': self.descricao,
+            'itens_padrao': self.itens_padrao,
+            'ativo': self.ativo
+        }
 

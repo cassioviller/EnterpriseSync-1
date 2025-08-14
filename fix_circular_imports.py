@@ -1,92 +1,107 @@
+#!/usr/bin/env python3
 """
-Script para corrigir imports circulares no SIGE v8.0
-Conforme documentação de debugging fornecida
+Script para corrigir imports circulares e consolidar models
 """
 
-import re
 import os
-import glob
+import shutil
 
-def fix_imports_in_file(filepath):
-    """Corrige imports circulares em um arquivo específico"""
-    try:
-        with open(filepath, 'r', encoding='utf-8') as f:
-            content = f.read()
-        
-        original_content = content
-        
-        # Padrão 1: from app import db ANTES de from models import
-        if 'from app import db' in content and 'from models import' in content:
-            # Reorganizar ordem dos imports
-            lines = content.split('\n')
-            new_lines = []
-            db_import = None
-            models_import = None
+def consolidate_models():
+    """Consolida todos os models em um único arquivo"""
+    
+    # Backup dos arquivos originais
+    if os.path.exists('models_backup.py'):
+        os.remove('models_backup.py')
+    shutil.copy('models.py', 'models_backup.py')
+    
+    # Ler conteúdo dos arquivos de models
+    models_content = ""
+    models_servicos_content = ""
+    models_propostas_content = ""
+    
+    if os.path.exists('models.py'):
+        with open('models.py', 'r') as f:
+            models_content = f.read()
+    
+    if os.path.exists('models_servicos.py'):
+        with open('models_servicos.py', 'r') as f:
+            models_servicos_content = f.read()
             
-            for line in lines:
-                if line.strip().startswith('from app import db'):
-                    db_import = line
-                elif line.strip().startswith('from models import'):
-                    models_import = line
-                else:
-                    new_lines.append(line)
-            
-            if db_import and models_import:
-                # Inserir imports na ordem correta
-                for i, line in enumerate(new_lines):
-                    if line.strip().startswith('from flask') or line.strip().startswith('import'):
-                        # Inserir após outros imports básicos
-                        if i < len(new_lines) - 1:
-                            new_lines.insert(i + 1, models_import)
-                            new_lines.insert(i + 2, db_import)
-                            break
+    if os.path.exists('models_propostas.py'):
+        with open('models_propostas.py', 'r') as f:
+            models_propostas_content = f.read()
+    
+    # Consolidar em um único arquivo
+    consolidated_content = """# MODELS CONSOLIDADOS - SIGE v8.0
+# Arquivo único para eliminar dependências circulares
+
+from flask_login import UserMixin
+from datetime import datetime, date
+from sqlalchemy import func, JSON
+from enum import Enum
+from flask_sqlalchemy import SQLAlchemy
+from sqlalchemy.orm import DeclarativeBase
+import uuid
+import secrets
+
+class Base(DeclarativeBase):
+    pass
+
+db = SQLAlchemy(model_class=Base)
+
+"""
+    
+    # Remover imports e db definitions dos conteúdos
+    def clean_content(content):
+        lines = content.split('\n')
+        cleaned_lines = []
+        skip_imports = True
+        
+        for line in lines:
+            # Pular imports e definições de db
+            if line.strip().startswith('from ') or line.strip().startswith('import '):
+                continue
+            if 'db = SQLAlchemy' in line:
+                continue
+            if 'class Base(' in line:
+                continue
                 
-                content = '\n'.join(new_lines)
+            # Começar a adicionar linhas após encontrar primeira class
+            if line.strip().startswith('class ') and not 'Base(' in line:
+                skip_imports = False
+                
+            if not skip_imports:
+                cleaned_lines.append(line)
+                
+        return '\n'.join(cleaned_lines)
+    
+    # Adicionar conteúdo limpo
+    if models_content:
+        consolidated_content += clean_content(models_content)
+        consolidated_content += "\n\n"
+    
+    if models_servicos_content:
+        consolidated_content += "# MODELS DE SERVIÇOS\n"
+        consolidated_content += clean_content(models_servicos_content)
+        consolidated_content += "\n\n"
         
-        # Padrão 2: Mover imports de models para dentro de funções quando necessário
-        if 'from models import *' in content and len(content.split('from models import')[1].split('\n')[0]) > 100:
-            # Import muito grande, mover para função
-            print(f"⚠️  Import muito grande em {filepath}, considerando refatoração")
-        
-        # Salvar apenas se houve mudanças
-        if content != original_content:
-            with open(filepath, 'w', encoding='utf-8') as f:
-                f.write(content)
-            print(f"✅ Corrigido: {filepath}")
-            return True
-        
-        return False
-        
-    except Exception as e:
-        print(f"❌ Erro ao corrigir {filepath}: {e}")
-        return False
+    if models_propostas_content:
+        consolidated_content += "# MODELS DE PROPOSTAS\n" 
+        consolidated_content += clean_content(models_propostas_content)
+        consolidated_content += "\n\n"
+    
+    # Escrever arquivo consolidado
+    with open('models.py', 'w') as f:
+        f.write(consolidated_content)
+    
+    print("✅ Models consolidados em models.py")
+    print("✅ Backup salvo em models_backup.py")
+    
+    # Remover arquivos separados para evitar conflitos
+    for file in ['models_servicos.py', 'models_propostas.py']:
+        if os.path.exists(file):
+            os.rename(file, f"{file}.disabled")
+            print(f"✅ {file} desabilitado")
 
-def main():
-    """Executa correções em todos os arquivos Python"""
-    print("🔧 INICIANDO CORREÇÃO DE IMPORTS CIRCULARES")
-    print("=" * 50)
-    
-    # Arquivos Python no diretório atual
-    python_files = glob.glob("*.py")
-    
-    # Remover arquivos que não devem ser modificados
-    exclude_files = ['fix_circular_imports.py', 'main.py']
-    python_files = [f for f in python_files if f not in exclude_files]
-    
-    fixed_files = 0
-    total_files = len(python_files)
-    
-    for filepath in python_files:
-        if fix_imports_in_file(filepath):
-            fixed_files += 1
-    
-    print("\n" + "=" * 50)
-    print(f"📊 RESULTADO: {fixed_files}/{total_files} arquivos corrigidos")
-    
-    if fixed_files > 0:
-        print("\n🔄 Reinicie o servidor para aplicar as correções")
-    else:
-        print("\n✅ Nenhuma correção necessária")
-
-if __name__ == "__main__":
-    main()
+if __name__ == '__main__':
+    consolidate_models()

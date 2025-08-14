@@ -42,15 +42,9 @@ login_manager.login_message = 'Por favor, faça login para acessar esta página.
 csrf = CSRFProtect()
 csrf.init_app(app)
 
-# Import models after db initialization
+# Import all models (now consolidated)
 from models import *
-
-# Import models de serviços
-try:
-    from models_servicos import *
-    logging.info("✅ Modelos de serviços importados")
-except Exception as e:
-    logging.error(f"❌ Erro ao importar modelos de serviços: {e}")
+logging.info("✅ Todos os modelos importados do arquivo consolidado")
 
 # Import views
 from views import main_bp
