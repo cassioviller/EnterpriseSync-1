@@ -211,58 +211,77 @@
                     </div>
                 </div>
 
-                <!-- Linha 3: KPIs Financeiros -->
-                <div class="row mb-3">
-                    <div class="col-md-3">
-                        <div class="text-center p-3 border rounded">
-                            <h4 class="text-success mb-1">R$ {{ '{:,.2f}'.format(kpis.custo_mao_obra) if kpis.custo_mao_obra is defined else '0,00' }}</h4>
-                            <small class="text-muted">Custo Mão de Obra</small>
-                        </div>
-                    </div>
-                    <div class="col-md-3">
-                        <div class="text-center p-3 border rounded">
-                            <h4 class="text-primary mb-1">R$ {{ '{:,.2f}'.format(kpis.custo_alimentacao) if kpis.custo_alimentacao is defined else '0,00' }}</h4>
-                            <small class="text-muted">Custo Alimentação</small>
-                        </div>
-                    </div>
-                    <div class="col-md-3">
-                        <div class="text-center p-3 border rounded">
-                            <h4 class="text-warning mb-1">R$ {{ '{:,.2f}'.format(kpis.custo_transporte) if kpis.custo_transporte is defined else '0,00' }}</h4>
-                            <small class="text-muted">Custo Transporte</small>
-                        </div>
-                    </div>
-                    <div class="col-md-3">
-                        <div class="text-center p-3 border rounded">
-                            <h4 class="text-info mb-1">R$ {{ '{:,.2f}'.format(kpis.outros_custos if kpis.outros_custos is defined else 0) }}</h4>
-                            <small class="text-muted">Outros Custos</small>
+                <!-- Linha 3: Indicadores Financeiros Consolidados -->
+                <div class="row mb-4">
+                    <div class="col-12">
+                        <div class="card border-success">
+                            <div class="card-header bg-success text-white">
+                                <h6 class="mb-0">
+                                    <i class="fas fa-dollar-sign"></i> Resumo Financeiro Completo
+                                </h6>
+                            </div>
+                            <div class="card-body">
+                                <div class="row">
+                                    <div class="col-md-2">
+                                        <div class="text-center p-3 border rounded">
+                                            <h5 class="text-success mb-1">R$ {{ '{:,.2f}'.format(kpis.custo_mao_obra) if kpis.custo_mao_obra is defined else '0,00' }}</h5>
+                                            <small class="text-muted fw-bold">Custo Mão de Obra</small>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-2">
+                                        <div class="text-center p-3 border rounded">
+                                            <h5 class="text-primary mb-1">R$ {{ '{:,.2f}'.format(kpis.custo_alimentacao) if kpis.custo_alimentacao is defined else '0,00' }}</h5>
+                                            <small class="text-muted fw-bold">Custo Alimentação</small>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-2">
+                                        <div class="text-center p-3 border rounded">
+                                            <h5 class="text-warning mb-1">R$ {{ '{:,.2f}'.format(kpis.custo_transporte) if kpis.custo_transporte is defined else '0,00' }}</h5>
+                                            <small class="text-muted fw-bold">Custo Transporte</small>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-2">
+                                        <div class="text-center p-3 border rounded">
+                                            <h5 class="text-info mb-1">R$ {{ '{:,.2f}'.format(kpis.outros_custos if kpis.outros_custos is defined else 0) }}</h5>
+                                            <small class="text-muted fw-bold">Outros Custos</small>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-2">
+                                        <div class="text-center p-3 border rounded">
+                                            <h5 class="text-danger mb-1">R$ {{ '{:,.2f}'.format(kpis.custo_faltas_justificadas if kpis.custo_faltas_justificadas is defined else 0) }}</h5>
+                                            <small class="text-muted fw-bold">Custo Faltas Just.</small>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-2">
+                                        <div class="text-center p-3 border rounded bg-primary text-white">
+                                            <h4 class="mb-1 fw-bold text-white">R$ {{ '{:,.2f}'.format(kpis.custo_total) if kpis.custo_total is defined else '0,00' }}</h4>
+                                            <small class="text-white fw-bold">💰 CUSTO TOTAL</small>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>
                 
-                <!-- Linha 4: KPIs Resumo (4 indicadores) -->
+                <!-- Linha 4: KPIs Complementares -->
                 <div class="row mb-3">
-                    <div class="col-md-3">
+                    <div class="col-md-4">
                         <div class="text-center p-3 border rounded">
                             <h4 class="text-danger mb-1">{{ '{:.1f}h'.format(kpis.horas_perdidas_total if kpis.horas_perdidas_total is defined else 0) }}</h4>
                             <small class="text-muted">Horas Perdidas</small>
                         </div>
                     </div>
-                    <div class="col-md-3">
+                    <div class="col-md-4">
                         <div class="text-center p-3 border rounded">
                             <h4 class="text-primary mb-1">R$ {{ '{:.2f}'.format(kpis.valor_hora_atual if kpis.valor_hora_atual is defined else 0) }}</h4>
                             <small class="text-muted">Valor Hora Atual</small>
                         </div>
                     </div>
-                    <div class="col-md-3">
+                    <div class="col-md-4">
                         <div class="text-center p-3 border rounded">
-                            <h4 class="text-success mb-1">R$ {{ '{:,.2f}'.format(kpis.custo_faltas_justificadas if kpis.custo_faltas_justificadas is defined else 0) }}</h4>
-                            <small class="text-muted">Custo Faltas Justificadas</small>
-                        </div>
-                    </div>
-                    <div class="col-md-3">
-                        <div class="text-center p-3 border rounded bg-primary text-white">
-                            <h4 class="mb-1 fw-bold text-white">R$ {{ '{:,.2f}'.format(kpis.custo_total) if kpis.custo_total is defined else '0,00' }}</h4>
-                            <small class="text-white">🔵 Custo Total</small>
+                            <h4 class="text-success mb-1">{{ '{:.1f}%'.format(kpis.eficiencia if kpis.eficiencia is defined else 0) }}</h4>
+                            <small class="text-muted">Eficiência Geral</small>
                         </div>
                     </div>
                 </div>
