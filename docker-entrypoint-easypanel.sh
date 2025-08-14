@@ -1,34 +1,84 @@
 #!/bin/bash
-# DOCKER ENTRYPOINT EASYPANEL - SIGE v8.0 FINAL
-# Versão simplificada e robusta para deploy em produção
+# DOCKER ENTRYPOINT EASYPANEL - SIGE v8.0 ROBUSTO
+# Baseado nas melhores práticas do guia de deploy
 
 set -e
 
-# Configurações de ambiente para EasyPanel
-export DATABASE_URL="${DATABASE_URL:-postgresql://sige:sige@viajey_sige:5432/sige}"
-export FLASK_APP=app.py
-export FLASK_ENV=production
-export PYTHONPATH=/app
+echo ">>> Iniciando SIGE v8.0 no EasyPanel <<<"
 
-echo "🚀 SIGE v8.0 - Deploy EasyPanel"
-echo "DATABASE_URL: $DATABASE_URL"
+# 1. Validar Variáveis de Ambiente Essenciais
+: "${DATABASE_URL:?Variável DATABASE_URL não está configurada. Verifique as configurações do EasyPanel.}"
+: "${FLASK_ENV:=production}"
+: "${PORT:=5000}"
+: "${PYTHONPATH:=/app}"
 
-# Aguardar PostgreSQL
-echo "⏳ Aguardando PostgreSQL..."
-for i in {1..30}; do
-    if pg_isready -h viajey_sige -p 5432 -U sige >/dev/null 2>&1; then
-        echo "✅ PostgreSQL conectado!"
+echo "Configurações validadas:"
+echo "- DATABASE_URL: ${DATABASE_URL}"
+echo "- FLASK_ENV: ${FLASK_ENV}"
+echo "- PORT: ${PORT}"
+
+# 2. Limpar variáveis conflitantes (seguindo o guia)
+# Isso garante que apenas DATABASE_URL seja usada
+unset PGDATABASE PGUSER PGPASSWORD PGHOST PGPORT
+unset POSTGRES_DB POSTGRES_USER POSTGRES_PASSWORD POSTGRES_HOST POSTGRES_PORT
+
+# 3. Extrair informações de conexão da DATABASE_URL
+PGHOST=$(echo $DATABASE_URL | sed -E 's/^.*@([^:]+):.*/\1/' 2>/dev/null || echo "localhost")
+PGPORT=$(echo $DATABASE_URL | sed -E 's/^.*:([0-9]+).*/\1/' 2>/dev/null || echo "5432")
+PGUSER=$(echo $DATABASE_URL | sed -E 's/^.*:\/\/([^:]+):.*/\1/' 2>/dev/null || echo "postgres")
+
+echo "Conectando ao PostgreSQL: $PGUSER@$PGHOST:$PGPORT"
+
+# 4. Aguardar PostgreSQL estar pronto (robusto)
+echo "Aguardando inicialização do PostgreSQL..."
+MAX_ATTEMPTS=30
+ATTEMPTS=0
+
+check_db_connection() {
+    pg_isready -h "$PGHOST" -p "$PGPORT" -U "$PGUSER" > /dev/null 2>&1
+    return $?
+}
+
+while [ $ATTEMPTS -lt $MAX_ATTEMPTS ]; do
+    if check_db_connection; then
+        echo "PostgreSQL está pronto!"
         break
     fi
-    echo "Tentativa $i/30..."
+    ATTEMPTS=$((ATTEMPTS+1))
+    echo "PostgreSQL não está pronto - tentativa $ATTEMPTS de $MAX_ATTEMPTS - aguardando..."
     sleep 2
 done
 
+if [ $ATTEMPTS -eq $MAX_ATTEMPTS ]; then
+    echo "ERRO: Não foi possível conectar ao PostgreSQL após $MAX_ATTEMPTS tentativas."
+    echo "Verifique a DATABASE_URL e a conectividade de rede."
+    exit 1
+fi
+
+echo "Banco de dados conectado com sucesso!"
+
 cd /app
 
-# Criar tabelas diretamente (método mais confiável)
-echo "🗄️ Criando estrutura do banco de dados..."
-python3 -c "
+# 5. Verificar se tabelas já existem (como no guia Node.js)
+echo "Verificando se as tabelas do banco de dados existem..."
+TABLE_EXISTS=$(python3 -c "
+import sys
+sys.path.insert(0, '/app')
+try:
+    from app import app, db
+    from sqlalchemy import text
+    with app.app_context():
+        result = db.session.execute(text('SELECT to_regclass(\\'public.usuario\\');')).scalar()
+        print('exists' if result else 'not_exists')
+except:
+    print('not_exists')
+" 2>/dev/null || echo "not_exists")
+
+if [ "$TABLE_EXISTS" = "exists" ]; then
+    echo "Tabelas já existem, pulando migração."
+else
+    echo "Tabelas não existem. Executando migração inicial..."
+    python3 -c "
 import os
 import sys
 sys.path.insert(0, '/app')
@@ -57,6 +107,9 @@ except Exception as e:
     traceback.print_exc()
     sys.exit(1)
 "
+fi
+
+echo ">>> Configuração do banco de dados concluída <<<"
 
 # Criar usuários administrativos
 echo "👤 Criando usuários administrativos..."
@@ -113,6 +166,6 @@ echo "🔐 CREDENCIAIS:"
 echo "   • Super Admin: admin@sige.com / admin123"
 echo "   • Admin Demo: valeverde / admin123"
 
-# Iniciar servidor
-echo "🚀 Iniciando servidor Gunicorn..."
-exec gunicorn --bind 0.0.0.0:${PORT:-5000} --workers 1 --timeout 120 --access-logfile - main:app
+# 7. Iniciar a aplicação (seguindo padrão exec "$@")
+echo "Iniciando aplicação na porta $PORT..."
+exec "$@"

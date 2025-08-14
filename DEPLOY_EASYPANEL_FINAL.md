@@ -1,21 +1,26 @@
 # 🚀 DEPLOY EASYPANEL FINAL - SIGE v8.0
+## BASEADO NO GUIA DE MELHORES PRÁTICAS
 
 ## ✅ ARQUIVOS DOCKER CORRIGIDOS
 
-### 1. **Dockerfile Otimizado**
-- Script de entrada específico para EasyPanel
-- Configuração robusta para PostgreSQL
+### 1. **Dockerfile Robusto** (Seguindo Guia)
+- Healthcheck integrado para monitoramento
+- PostgreSQL client + wget + curl instalados
+- Variáveis de ambiente com fallbacks
+- CMD separado do ENTRYPOINT (padrão exec)
 - Usuário não-root para segurança
 
-### 2. **docker-entrypoint-easypanel.sh**
-- Script simplificado e robusto
-- Aguarda PostgreSQL (30 tentativas)
-- Drop/Create All para eliminar inconsistências
-- Criação automática de usuários
-- Logs detalhados para debugging
+### 2. **docker-entrypoint-easypanel.sh** (Inspirado no Guia Node.js)
+- Validação robusta de variáveis essenciais
+- Limpeza de variáveis conflitantes (PG*, POSTGRES_*)
+- Extração segura de dados da DATABASE_URL
+- Loop inteligente de espera pelo PostgreSQL (30 tentativas)
+- Verificação condicional de tabelas existentes
+- Padrão exec "$@" para processo principal
 
-### 3. **Models Consolidados**
+### 3. **Models Consolidados + Health Check**
 - Arquivo único `models.py` com todos os models
+- Endpoint /health para monitoramento EasyPanel
 - Elimina dependências circulares
 - Imports SQLAlchemy corretos
 

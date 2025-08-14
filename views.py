@@ -4,11 +4,21 @@ from werkzeug.security import check_password_hash, generate_password_hash
 from models import db, Usuario, TipoUsuario, Funcionario, Obra
 from auth import super_admin_required, admin_required, funcionario_required
 from datetime import datetime, date, timedelta
-from sqlalchemy import func, desc, or_, and_
+from sqlalchemy import func, desc, or_, and_, text
 import os
 import json
 
 main_bp = Blueprint('main', __name__)
+
+# Health check endpoint para EasyPanel
+@main_bp.route('/health')
+def health_check():
+    try:
+        # Verificar conexão com banco
+        db.session.execute(text('SELECT 1'))
+        return {'status': 'healthy', 'database': 'connected'}, 200
+    except Exception as e:
+        return {'status': 'unhealthy', 'error': str(e)}, 500
 
 # ===== ROTAS DE AUTENTICAÇÃO =====
 @main_bp.route('/login', methods=['GET', 'POST'])

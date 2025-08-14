@@ -12,10 +12,11 @@ LABEL maintainer="SIGE v8.0" \
 # Variáveis de build
 ARG DEBIAN_FRONTEND=noninteractive
 
-# Instalar dependências do sistema
+# Instalar dependências do sistema (seguindo o guia)
 RUN apt-get update && apt-get install -y --no-install-recommends \
     postgresql-client \
     curl \
+    wget \
     gcc \
     python3-dev \
     libpq-dev \
@@ -58,5 +59,10 @@ ENV FLASK_ENV=production \
 # Expor porta
 EXPOSE 5000
 
-# Comando de entrada
+# Healthcheck para EasyPanel
+HEALTHCHECK --interval=30s --timeout=5s --start-period=30s --retries=3 \
+  CMD curl -f http://localhost:${PORT:-5000}/health || exit 1
+
+# Comando de entrada (padrão do guia)
 ENTRYPOINT ["/app/docker-entrypoint.sh"]
+CMD ["gunicorn", "--bind", "0.0.0.0:5000", "--workers", "1", "--timeout", "120", "--access-logfile", "-", "main:app"]
