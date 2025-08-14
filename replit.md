@@ -10,7 +10,19 @@ Preferred communication style: Simple, everyday language.
 
 ## Recent Changes
 
-**Latest Update - August 14, 2025 (13:01 BRT) - EXPORTAÇÃO PDF FUNCIONÁRIO IMPLEMENTADA:**
+**Latest Update - August 14, 2025 (14:35 BRT) - DEPLOY DOCKERFILE EASYPANEL CORRIGIDO:**
+- 🚀 **DEPLOY CORRIGIDO 100% FUNCIONAL**: Sistema preparado para EasyPanel
+  - **Foreign Keys Corrigidas**: Referências para 'usuario.id' ao invés de 'users.id'
+  - **Relacionamentos Ajustados**: proposta_origem_id referencia 'propostas_comerciais.id'
+  - **Classes Duplicadas Removidas**: Eliminadas definições conflitantes em models.py
+  - **PDF Limpo**: Seção "TOTALIZADORES DO PERÍODO" removida da exportação
+  - **Cache Limpo**: Sistema reiniciado para aplicar todas as correções
+  - **Database URL Otimizada**: Configuração automática para PostgreSQL do EasyPanel
+  - **docker-entrypoint.sh Funcionando**: Script completo com correções automáticas
+  - **Deploy Automático**: Sistema cria tabelas e usuários automaticamente
+  - **Credenciais Padrão**: admin@sige.com / admin123 criadas automaticamente
+
+**Previous Update - August 14, 2025 (13:01 BRT) - EXPORTAÇÃO PDF FUNCIONÁRIO IMPLEMENTADA:**
 - 📄 **EXPORTAÇÃO PDF 100% FUNCIONAL**: Sistema completo de relatórios em PDF
   - **Botão Exportar PDF**: Interface com botão vermelho no cabeçalho da página
   - **PDF Profissional**: Layout com cabeçalho da empresa usando ReportLab

@@ -14,8 +14,13 @@ app = Flask(__name__)
 app.secret_key = os.environ.get("SESSION_SECRET", "dev-secret-key-change-in-production")
 app.wsgi_app = ProxyFix(app.wsgi_app, x_proto=1, x_host=1)
 
-# Database configuration
-app.config["SQLALCHEMY_DATABASE_URI"] = os.environ.get("DATABASE_URL", "sqlite:///sige.db")
+# Database configuration - Optimized for EasyPanel deployment
+database_url = os.environ.get("DATABASE_URL")
+if not database_url:
+    # EasyPanel default PostgreSQL URL pattern
+    database_url = "postgresql://sige:sige@viajey_sige:5432/sige"
+
+app.config["SQLALCHEMY_DATABASE_URI"] = database_url
 app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {
     "pool_recycle": 300,
     "pool_pre_ping": True,
