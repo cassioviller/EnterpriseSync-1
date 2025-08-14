@@ -129,7 +129,7 @@
                         <div class="flex-grow-1">
                             <h6 class="card-title mb-0">Faltas Justificadas</h6>
                             <h4 class="mb-0">{{ kpis_geral.total_faltas_justificadas_geral if kpis_geral else 0 }} dias</h4>
-                            <small>R$ {{ '{:,.2f}'.format(kpis_geral.total_custo_faltas_geral if kpis_geral and kpis_geral.total_custo_faltas_geral else 0).replace(',', '.') }}</small>
+                            <small>R$ {{ '{:,.2f}'.format(kpis_geral.total_custo_faltas_geral if kpis_geral else 0).replace(',', '.') }}</small>
                         </div>
                         <div class="ms-3">
                             <i class="fas fa-exclamation-triangle fa-2x opacity-75"></i>

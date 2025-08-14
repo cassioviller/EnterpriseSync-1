@@ -111,72 +111,9 @@ def dashboard():
 def funcionarios():
     admin_id = current_user.id if current_user.tipo_usuario == TipoUsuario.ADMIN else current_user.admin_id
     
-    # Buscar funcionários com filtros de data (implementação completa)
-    from datetime import date
-    data_inicio = request.args.get('data_inicio')
-    data_fim = request.args.get('data_fim')
+    funcionarios = Funcionario.query.filter_by(admin_id=admin_id).order_by(Funcionario.nome).all()
     
-    # Definir período padrão (mês atual)
-    if not data_inicio:
-        data_inicio = date.today().replace(day=1)
-    else:
-        from datetime import datetime
-        data_inicio = datetime.strptime(data_inicio, '%Y-%m-%d').date()
-    
-    if not data_fim:
-        data_fim = date.today()
-    else:
-        from datetime import datetime
-        data_fim = datetime.strptime(data_fim, '%Y-%m-%d').date()
-    
-    # Buscar funcionários ativos do admin
-    funcionarios = Funcionario.query.filter_by(
-        admin_id=admin_id,
-        ativo=True
-    ).order_by(Funcionario.nome).all()
-    
-    print(f"DEBUG - Funcionários encontrados: {len(funcionarios)}")
-    for func in funcionarios:
-        print(f"  - {func.nome} (ID: {func.id})")
-    
-    # Buscar funcionários inativos
-    funcionarios_inativos = Funcionario.query.filter_by(
-        admin_id=admin_id,
-        ativo=False
-    ).order_by(Funcionario.nome).all()
-    
-    # KPIs completos para exibição
-    from models import Obra, Departamento, Funcao, HorarioTrabalho
-    kpis_geral = {
-        'total_funcionarios': len(funcionarios),
-        'total_custo_geral': 0.0,
-        'total_horas_geral': 0.0,
-        'total_custo_faltas_geral': 0.0,
-        'total_faltas_justificadas_geral': 0,
-        'total_faltas_geral': 0,
-        'taxa_absenteismo_geral': 0.0,
-        'total_horas_extras_geral': 0.0,
-        'total_custo_alimentacao_geral': 0.0,
-        'total_custo_outros_geral': 0.0,
-        'funcionarios_kpis': []
-    }
-    
-    # Buscar obras ativas para modais
-    obras_ativas = Obra.query.filter_by(
-        admin_id=admin_id,
-        status='Em andamento'
-    ).order_by(Obra.nome).all()
-    
-    return render_template('funcionarios_simple.html',
-                         funcionarios=funcionarios,
-                         funcionarios_kpis=kpis_geral['funcionarios_kpis'],
-                         kpis_geral=kpis_geral,
-                         obras_ativas=obras_ativas,
-                         departamentos=Departamento.query.all(),
-                         funcoes=Funcao.query.all(),
-                         horarios=HorarioTrabalho.query.all(),
-                         data_inicio=data_inicio,
-                         data_fim=data_fim)
+    return render_template('funcionarios.html', funcionarios=funcionarios)
 
 # ===== OBRAS =====
 @main_bp.route('/obras')
