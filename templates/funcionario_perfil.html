@@ -320,8 +320,8 @@
                             <small>
                                 <strong>Resumo do período:</strong>
                                 {{ registros_ponto|length }} registros encontrados |
-                                Horas Extras: {{ '{:.1f}h'.format(registros_ponto|sum(attribute='horas_extras') or 0) }} |
-                                Horas Trabalhadas: {{ '{:.1f}h'.format(registros_ponto|sum(attribute='horas_trabalhadas') or 0) }}
+                                Horas Extras: {{ '{:.1f}h'.format(kpis.horas_extras or 0) }} |
+                                Horas Trabalhadas: {{ '{:.1f}h'.format(kpis.horas_trabalhadas or 0) }}
                             </small>
                         </div>
                     </div>

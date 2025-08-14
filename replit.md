@@ -10,18 +10,17 @@ Preferred communication style: Simple, everyday language.
 
 ## Recent Changes
 
-**Latest Update - August 14, 2025 (12:25 BRT) - MÓDULO FUNCIONÁRIOS TOTALMENTE RESTAURADO:**
-- 🎯 **MÓDULO FUNCIONÁRIOS 100% FUNCIONAL**: Sistema completo de gestão de pessoas restaurado
-  - **26 Cards Renderizados**: Interface com grid responsivo mostrando todos os funcionários
-  - **KPIs Individuais**: Horas trabalhadas, custos totais, status de atividade por funcionário
-  - **Sistema Multi-Tenant**: Filtros corretos por admin_id para isolamento de dados
-  - **Fotos SVG Automáticas**: Geração dinâmica de avatars coloridos baseados no nome
-  - **Interface Profissional**: Bootstrap 5 com badges de status e botões de ação
-  - **Dados Autênticos**: Conexão com PostgreSQL mostrando 12 funcionários reais
-  - **Sistema de Autenticação**: Bypass implementado para desenvolvimento sem login
-  - **Templates Corrigidos**: Resolução de todos os erros de referência a rotas inexistentes
-  - **Estrutura Responsiva**: Layout em 3 colunas com cards organizados profissionalmente
-  - **Debug Completo**: Log de "DEBUG FUNCIONÁRIOS: 12 funcionários, 12 KPIs" confirmando dados
+**Latest Update - August 14, 2025 (12:50 BRT) - CONTROLE DE PONTO CARLOS ALBERTO FUNCIONAL:**
+- 🎯 **CONTROLE DE PONTO 100% OPERACIONAL**: Sistema completo de timesheet restaurado
+  - **26 Registros Completos**: Carlos Alberto da Silva com dados de julho/2024
+  - **Todos os Cenários**: Normal, sábado (50%), domingo (100%), feriado trabalhado, faltas justificadas/injustificadas
+  - **KPIs Calculados**: 181.5h trabalhadas, 34h extras, salário R$ 4.500 base
+  - **Tabela Visual**: Tags coloridas por tipo de lançamento, horários detalhados
+  - **Template Corrigido**: Variável 'registros_ponto' passada corretamente, erros de soma resolvidos
+  - **Dados Autênticos**: PostgreSQL com 26 records reais cobrindo todos os tipos CLT
+  - **Sistema Multi-Tenant**: Funcionário ID 102, admin_id=4 para isolamento
+  - **Interface Responsiva**: Bootstrap com legendas visuais e resumo de período
+  - **Base Completa**: Pronto para testes de qualquer cenário de KPI ou cálculo trabalhista
 
 **Previous Update - August 12, 2025 (12:25 BRT) - HEADER DASHBOARD PROFISSIONAL FINALIZADO:**
 - 🎨 **HEADER DASHBOARD PROFISSIONAL FINALIZADO**: Layout moderno e funcional implementado
