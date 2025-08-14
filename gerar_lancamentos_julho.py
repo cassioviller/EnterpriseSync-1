@@ -38,26 +38,26 @@ def gerar_lancamentos_julho_funcionario(funcionario_id, ano=2025, mes=7):
             data_atual = date(ano, mes, dia)
             dia_semana = data_atual.weekday()  # 0=segunda, 6=domingo
             
-            # Segunda a sexta: trabalho normal
+            # Segunda a sexta: trabalho normal (Horário Vale Verde: 7h12 às 17h)
             if dia_semana < 5:  # Segunda a sexta
                 tipo_registro = 'trabalho_normal'
-                entrada = '07:00'
-                saida_almoco = '12:00'
-                retorno_almoco = '13:00'
-                saida = '17:00'
-                horas_trabalhadas = 8.0
+                hora_entrada = '07:12'
+                hora_almoco_saida = '12:00'
+                hora_almoco_retorno = '13:00'
+                hora_saida = '17:00'
+                horas_trabalhadas = 8.8  # 7h12 às 17h com 1h almoço = 8h48min
                 horas_extras = 0.0
                 
                 # Adicionar algumas variações realistas
                 if dia % 7 == 0:  # A cada 7 dias, adicionar horas extras
-                    saida = '19:00'
-                    horas_trabalhadas = 10.0
+                    hora_saida = '19:00'
+                    horas_trabalhadas = 10.8  # 7h12 às 19h com 1h almoço = 10h48min
                     horas_extras = 2.0
                 
                 if dia % 10 == 0:  # A cada 10 dias, pequeno atraso
-                    entrada = '07:15'
-                    total_atraso_minutos = 15
-                    total_atraso_horas = 0.25
+                    hora_entrada = '07:30'
+                    total_atraso_minutos = 18  # 18 minutos de atraso
+                    total_atraso_horas = 0.3
                 else:
                     total_atraso_minutos = 0
                     total_atraso_horas = 0.0
@@ -65,20 +65,20 @@ def gerar_lancamentos_julho_funcionario(funcionario_id, ano=2025, mes=7):
             elif dia_semana == 5:  # Sábado
                 if dia % 2 == 0:  # Trabalha sábados alternados
                     tipo_registro = 'sabado_trabalhado'
-                    entrada = '07:00'
-                    saida_almoco = None
-                    retorno_almoco = None
-                    saida = '12:00'
-                    horas_trabalhadas = 5.0
-                    horas_extras = 5.0  # Sábado é 100% extra
+                    hora_entrada = '07:12'
+                    hora_almoco_saida = None
+                    hora_almoco_retorno = None
+                    hora_saida = '12:00'
+                    horas_trabalhadas = 4.8
+                    horas_extras = 4.8  # Sábado é 100% extra
                     total_atraso_minutos = 0
                     total_atraso_horas = 0.0
                 else:
                     tipo_registro = 'sabado_folga'
-                    entrada = None
-                    saida_almoco = None
-                    retorno_almoco = None
-                    saida = None
+                    hora_entrada = None
+                    hora_almoco_saida = None
+                    hora_almoco_retorno = None
+                    hora_saida = None
                     horas_trabalhadas = 0.0
                     horas_extras = 0.0
                     total_atraso_minutos = 0
@@ -86,10 +86,10 @@ def gerar_lancamentos_julho_funcionario(funcionario_id, ano=2025, mes=7):
                     
             else:  # Domingo
                 tipo_registro = 'domingo_folga'
-                entrada = None
-                saida_almoco = None
-                retorno_almoco = None
-                saida = None
+                hora_entrada = None
+                hora_almoco_saida = None
+                hora_almoco_retorno = None
+                hora_saida = None
                 horas_trabalhadas = 0.0
                 horas_extras = 0.0
                 total_atraso_minutos = 0
@@ -98,10 +98,10 @@ def gerar_lancamentos_julho_funcionario(funcionario_id, ano=2025, mes=7):
             # Adicionar algumas faltas realistas
             if dia in [15, 25]:  # 2 faltas no mês
                 tipo_registro = 'falta'
-                entrada = None
-                saida_almoco = None
-                retorno_almoco = None
-                saida = None
+                hora_entrada = None
+                hora_almoco_saida = None
+                hora_almoco_retorno = None
+                hora_saida = None
                 horas_trabalhadas = 0.0
                 horas_extras = 0.0
                 total_atraso_minutos = 0
@@ -112,10 +112,10 @@ def gerar_lancamentos_julho_funcionario(funcionario_id, ano=2025, mes=7):
                 funcionario_id=funcionario_id,
                 data=data_atual,
                 tipo_registro=tipo_registro,
-                entrada=entrada,
-                saida_almoco=saida_almoco,
-                retorno_almoco=retorno_almoco,
-                saida=saida,
+                hora_entrada=hora_entrada,
+                hora_almoco_saida=hora_almoco_saida,
+                hora_almoco_retorno=hora_almoco_retorno,
+                hora_saida=hora_saida,
                 horas_trabalhadas=horas_trabalhadas,
                 horas_extras=horas_extras,
                 total_atraso_minutos=total_atraso_minutos,
@@ -142,11 +142,5 @@ def gerar_lancamentos_julho_funcionario(funcionario_id, ano=2025, mes=7):
         return True
 
 if __name__ == '__main__':
-    # Gerar para Roberto Alves Souza (ID 111)
-    funcionario_id = 111
-    sucesso = gerar_lancamentos_julho_funcionario(funcionario_id)
-    
-    if sucesso:
-        print("🎉 Lançamentos de julho gerados com sucesso!")
-    else:
-        print("❌ Erro ao gerar lançamentos")
+    # Será chamado com o ID do funcionário criado
+    pass
