@@ -324,10 +324,15 @@ def controle_ponto():
     data_fim = request.args.get('data_fim')
     tipo_registro = request.args.get('tipo_registro')
     
-    # NÃO aplicar filtros de data por padrão - mostrar todos os registros
-    # Apenas aplicar filtros quando explicitamente fornecidos
+    # Valores padrão para data_inicio e data_fim se não fornecidos
+    from datetime import date
+    if not data_inicio:
+        data_inicio = date.today().replace(day=1).strftime('%Y-%m-%d')
+    if not data_fim:
+        data_fim = date.today().strftime('%Y-%m-%d')
     
     # Query base com filtro de tenant - CORREÇÃO CRÍTICA para multi-tenancy
+    print(f"DEBUG: current_user.id = {current_user.id}")
     query = RegistroPonto.query.join(Funcionario).filter(
         Funcionario.admin_id == current_user.id
     )
@@ -336,20 +341,22 @@ def controle_ponto():
     if funcionario_id:
         query = query.filter(RegistroPonto.funcionario_id == funcionario_id)
     
-    # Aplicar filtros de data APENAS se fornecidos pelo usuário
+    # Aplicar filtros de data - CORRIGIR para incluir TODOS os registros do período
     data_inicio_obj = None
     data_fim_obj = None
     
-    if data_inicio and data_inicio.strip():
+    if data_inicio:
         try:
             data_inicio_obj = datetime.strptime(data_inicio, '%Y-%m-%d').date()
+            # Usar >= para incluir o próprio dia de início
             query = query.filter(RegistroPonto.data >= data_inicio_obj)
         except ValueError:
             flash(f'Data início inválida: {data_inicio}', 'warning')
     
-    if data_fim and data_fim.strip():
+    if data_fim:
         try:
             data_fim_obj = datetime.strptime(data_fim, '%Y-%m-%d').date()
+            # Usar <= para incluir o próprio dia de fim
             query = query.filter(RegistroPonto.data <= data_fim_obj)
         except ValueError:
             flash(f'Data fim inválida: {data_fim}', 'warning')
@@ -362,6 +369,13 @@ def controle_ponto():
         joinedload(RegistroPonto.funcionario),
         joinedload(RegistroPonto.obra)
     ).order_by(RegistroPonto.data.desc()).all()
+    
+    print(f"DEBUG: Total registros encontrados: {len(registros)}")
+    if registros and data_inicio and data_fim:
+        print(f"DEBUG: Filtro aplicado - de {data_inicio} até {data_fim}")
+        print(f"DEBUG: Primeiros 3 registros:")
+        for i, reg in enumerate(registros[:3]):
+            print(f"  {i+1}. {reg.data} - {reg.funcionario.nome if reg.funcionario else 'Sem funcionário'} - {reg.tipo_registro}")
     
     # Dados para formulário - também com filtro de tenant
     funcionarios = Funcionario.query.filter_by(
