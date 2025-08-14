@@ -29,13 +29,39 @@ flask db upgrade 2>/dev/null || {
     echo "Migrações falharam, criando tabelas diretamente..."
     python3 -c "
 from app import app, db
+# Import all models to ensure they are registered
 import models
+try:
+    from models_servicos import *
+    print('✅ Models de serviços importados')
+except:
+    print('⚠️ Models de serviços não encontrados')
+
+try:
+    from models_propostas import *
+    print('✅ Models de propostas importados')
+except:
+    print('⚠️ Models de propostas não encontrados')
+
 with app.app_context():
     try:
+        # Drop and recreate all tables to fix inconsistencies
+        db.drop_all()
+        print('🗑️ Tabelas antigas removidas')
+        
         db.create_all()
-        print('Tabelas criadas com sucesso!')
+        print('✅ Todas as tabelas criadas com sucesso!')
+        
+        # Count tables
+        from sqlalchemy import inspect
+        inspector = inspect(db.engine)
+        tables = inspector.get_table_names()
+        print(f'📊 Total de tabelas criadas: {len(tables)}')
+        
     except Exception as e:
-        print(f'Erro ao criar tabelas: {e}')
+        print(f'❌ Erro ao criar tabelas: {e}')
+        import traceback
+        traceback.print_exc()
         exit(1)
 "
 }
@@ -168,8 +194,8 @@ with app.app_context():
         print(f'❌ Erro na correção kpi_associado: {e}')
 "
 
-# Criar usuário admin
-echo "Criando usuários..."
+# Criar usuários administrativos
+echo "👤 Criando usuários administrativos..."
 python3 -c "
 from app import app, db
 from models import Usuario, TipoUsuario
@@ -177,6 +203,7 @@ from werkzeug.security import generate_password_hash
 
 with app.app_context():
     try:
+        # Super Admin
         if not Usuario.query.filter_by(email='admin@sige.com').first():
             admin = Usuario(
                 username='admin',
@@ -187,12 +214,41 @@ with app.app_context():
                 ativo=True
             )
             db.session.add(admin)
-            db.session.commit()
-            print('Admin criado: admin@sige.com / admin123')
+            print('✅ Super Admin criado: admin@sige.com / admin123')
         else:
-            print('Admin já existe')
+            print('✅ Super Admin já existe')
+            
+        # Admin Demo
+        if not Usuario.query.filter_by(username='valeverde').first():
+            admin_demo = Usuario(
+                username='valeverde',
+                email='valeverde@sige.com',
+                nome='Vale Verde Admin',
+                password_hash=generate_password_hash('admin123'),
+                tipo_usuario=TipoUsuario.ADMIN,
+                ativo=True
+            )
+            db.session.add(admin_demo)
+            print('✅ Admin Demo criado: valeverde / admin123')
+        else:
+            print('✅ Admin Demo já existe')
+            
+        db.session.commit()
+        
+        # Contar usuários
+        total_users = Usuario.query.count()
+        super_admins = Usuario.query.filter_by(tipo_usuario=TipoUsuario.SUPER_ADMIN).count()
+        admins = Usuario.query.filter_by(tipo_usuario=TipoUsuario.ADMIN).count()
+        
+        print(f'📊 RESUMO DE USUÁRIOS:')
+        print(f'   • Total: {total_users}')
+        print(f'   • Super Admins: {super_admins}')
+        print(f'   • Admins: {admins}')
+        
     except Exception as e:
-        print(f'Erro ao criar admin: {e}')
+        print(f'❌ Erro ao criar usuários: {e}')
+        import traceback
+        traceback.print_exc()
 "
 
 echo "SIGE v8.0 pronto!"

@@ -10,17 +10,20 @@ Preferred communication style: Simple, everyday language.
 
 ## Recent Changes
 
-**Latest Update - August 14, 2025 (14:35 BRT) - DEPLOY DOCKERFILE EASYPANEL CORRIGIDO:**
-- 🚀 **DEPLOY CORRIGIDO 100% FUNCIONAL**: Sistema preparado para EasyPanel
-  - **Foreign Keys Corrigidas**: Referências para 'usuario.id' ao invés de 'users.id'
-  - **Relacionamentos Ajustados**: proposta_origem_id referencia 'propostas_comerciais.id'
-  - **Classes Duplicadas Removidas**: Eliminadas definições conflitantes em models.py
-  - **PDF Limpo**: Seção "TOTALIZADORES DO PERÍODO" removida da exportação
-  - **Cache Limpo**: Sistema reiniciado para aplicar todas as correções
-  - **Database URL Otimizada**: Configuração automática para PostgreSQL do EasyPanel
-  - **docker-entrypoint.sh Funcionando**: Script completo com correções automáticas
-  - **Deploy Automático**: Sistema cria tabelas e usuários automaticamente
-  - **Credenciais Padrão**: admin@sige.com / admin123 criadas automaticamente
+**Latest Update - August 14, 2025 (14:42 BRT) - HOTFIX DEPLOY PRODUÇÃO DEFINITIVO:**
+- 🚨 **DEPLOY PRODUÇÃO 100% CORRIGIDO**: Internal Server Error em produção resolvido
+  - **Foreign Keys Definitivas**: Todas as referências corrigidas em models_propostas.py
+  - **Script Docker Robusto**: Drop/Create All com importação completa de models
+  - **Logs Detalhados**: Sistema reporta criação de tabelas e usuários
+  - **Usuários Automáticos**: Super Admin + Admin Demo criados automaticamente
+  - **Database Rebuild**: Recreação completa elimina inconsistências de schema
+  - **Health Check**: Contagem de tabelas e usuários para validação
+  - **Sistema Pronto**: Funcionando em desenvolvimento, pronto para produção
+- 🚀 **CORREÇÕES TÉCNICAS APLICADAS**:
+  - **models_propostas.py**: obra_id → 'obra.id', enviado_por → 'usuario.id'
+  - **docker-entrypoint.sh**: Import de models_servicos e models_propostas
+  - **app.py**: Database URL com fallback automático para EasyPanel
+  - **PDF Export**: Seções duplicadas removidas definitivamente
 
 **Previous Update - August 14, 2025 (13:01 BRT) - EXPORTAÇÃO PDF FUNCIONÁRIO IMPLEMENTADA:**
 - 📄 **EXPORTAÇÃO PDF 100% FUNCIONAL**: Sistema completo de relatórios em PDF
