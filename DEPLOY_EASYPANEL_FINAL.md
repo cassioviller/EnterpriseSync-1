@@ -26,9 +26,9 @@
 
 ## 🔧 CONFIGURAÇÃO EASYPANEL
 
-### Database URL (Corrigida)
+### Database URL (Corrigida para SQLAlchemy)
 ```
-postgres://sige:sige@viajey_sige:5432/sige?sslmode=disable
+postgresql://sige:sige@viajey_sige:5432/sige?sslmode=disable
 ```
 
 ### Environment Variables

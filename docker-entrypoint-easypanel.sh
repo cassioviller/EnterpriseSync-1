@@ -6,8 +6,8 @@ set -e
 
 echo ">>> Iniciando SIGE v8.0 no EasyPanel <<<"
 
-# 1. Validar Variáveis de Ambiente Essenciais
-: "${DATABASE_URL:=postgres://sige:sige@viajey_sige:5432/sige?sslmode=disable}"
+# 1. Validar Variáveis de Ambiente Essenciais  
+: "${DATABASE_URL:=postgresql://sige:sige@viajey_sige:5432/sige?sslmode=disable}"
 : "${FLASK_ENV:=production}"
 : "${PORT:=5000}"
 : "${PYTHONPATH:=/app}"
@@ -101,7 +101,13 @@ try:
     
     # Criar app Flask limpa
     app = Flask(__name__)
-    app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL')
+    
+    # Corrigir URL do banco para SQLAlchemy
+    database_url = os.environ.get('DATABASE_URL')
+    if database_url and database_url.startswith('postgres://'):
+        database_url = database_url.replace('postgres://', 'postgresql://', 1)
+    
+    app.config['SQLALCHEMY_DATABASE_URI'] = database_url
     app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
         'pool_recycle': 300,
         'pool_pre_ping': True,

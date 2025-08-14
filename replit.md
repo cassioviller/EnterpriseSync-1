@@ -10,7 +10,7 @@ Preferred communication style: Simple, everyday language.
 
 ## Recent Changes
 
-**Latest Update - August 14, 2025 (14:55 BRT) - DEPLOY EASYPANEL CORRIGIDO FINAL:**
+**Latest Update - August 14, 2025 (15:05 BRT) - DEPLOY EASYPANEL SQLALCHEMY CORRIGIDO:**
 - 🚀 **DEPLOY EASYPANEL 100% FUNCIONAL**: Arquivos Docker específicos para EasyPanel
   - **docker-entrypoint-easypanel.sh**: Script simplificado e robusto para produção
   - **Models Consolidados**: Arquivo único elimina dependências circulares
@@ -24,6 +24,7 @@ Preferred communication style: Simple, everyday language.
   - **app.py**: Tratamento de ImportError para blueprints opcionais + Health Check /health
   - **docker-entrypoint-easypanel.sh**: Script simplificado que resolve dependências circulares
   - **Estratégia Drop/Create**: Script Python inline no shell corrige problemas SQLAlchemy
+  - **Dialeto PostgreSQL**: URLs postgres:// convertidas para postgresql:// automaticamente
   - **Credenciais**: admin@sige.com/admin123 + valeverde/admin123
 
 **Previous Update - August 14, 2025 (14:42 BRT) - HOTFIX DEPLOY PRODUÇÃO DEFINITIVO:**
