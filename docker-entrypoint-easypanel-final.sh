@@ -73,6 +73,16 @@ CREATE TABLE IF NOT EXISTS obra (
     admin_id INTEGER NOT NULL,
     token_cliente VARCHAR(255) UNIQUE,
     responsavel_id INTEGER,
+    endereco TEXT,
+    orcamento DECIMAL(10,2) DEFAULT 0.0,
+    valor_contrato DECIMAL(10,2) DEFAULT 0.0,
+    area_total_m2 DECIMAL(10,2) DEFAULT 0.0,
+    cliente_nome VARCHAR(100),
+    cliente_email VARCHAR(120),
+    cliente_telefone VARCHAR(20),
+    portal_ativo BOOLEAN DEFAULT TRUE,
+    data_previsao_fim DATE,
+    ativo BOOLEAN DEFAULT TRUE,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -119,8 +129,12 @@ ALTER TABLE obra ADD COLUMN IF NOT EXISTS token_cliente VARCHAR(255) UNIQUE;
 ALTER TABLE obra ADD COLUMN IF NOT EXISTS responsavel_id INTEGER;
 ALTER TABLE obra ADD COLUMN IF NOT EXISTS cliente_nome VARCHAR(100);
 ALTER TABLE obra ADD COLUMN IF NOT EXISTS cliente_email VARCHAR(120);
+ALTER TABLE obra ADD COLUMN IF NOT EXISTS cliente_telefone VARCHAR(20);
 ALTER TABLE obra ADD COLUMN IF NOT EXISTS portal_ativo BOOLEAN DEFAULT TRUE;
 ALTER TABLE obra ADD COLUMN IF NOT EXISTS data_previsao_fim DATE;
+ALTER TABLE obra ADD COLUMN IF NOT EXISTS orcamento DECIMAL(10,2) DEFAULT 0.0;
+ALTER TABLE obra ADD COLUMN IF NOT EXISTS valor_contrato DECIMAL(10,2) DEFAULT 0.0;
+ALTER TABLE obra ADD COLUMN IF NOT EXISTS area_total_m2 DECIMAL(10,2) DEFAULT 0.0;
 
 ALTER TABLE funcionario ADD COLUMN IF NOT EXISTS foto_base64 TEXT;
 ALTER TABLE funcionario ADD COLUMN IF NOT EXISTS departamento_id INTEGER;
