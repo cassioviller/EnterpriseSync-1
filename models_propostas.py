@@ -77,7 +77,7 @@ class PropostaComercialSIGE(db.Model):
     atualizado_em = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     
     # Integração com Obras
-    obra_id = db.Column(db.Integer, db.ForeignKey('obras.id'))
+    obra_id = db.Column(db.Integer, db.ForeignKey('obra.id'))
     convertida_em_obra = db.Column(db.Boolean, default=False)
     
     # Relacionamentos
@@ -164,7 +164,7 @@ class PropostaArquivo(db.Model):
     caminho_arquivo = db.Column(db.String(500), nullable=False)
     categoria = db.Column(db.String(50))  # 'dwg', 'pdf', 'foto', 'documento', 'outros'
     
-    enviado_por = db.Column(db.Integer, db.ForeignKey('usuarios.id'))
+    enviado_por = db.Column(db.Integer, db.ForeignKey('usuario.id'))
     enviado_em = db.Column(db.DateTime, default=datetime.utcnow)
     
     def to_dict(self):
