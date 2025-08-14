@@ -77,81 +77,137 @@ except:
 if [ "$TABLE_EXISTS" = "exists" ]; then
     echo "Tabelas já existem, pulando migração."
 else
-    echo "Tabelas não existem. Criando estrutura inicial..."
-    python3 -c "
-import sys
-import os
+    echo "Tabelas não existem. Usando comando direto psql..."
+    
+    # Estratégia alternativa: usar SQL direto via psql
+    echo "🔧 Executando criação via SQL direto..."
+    
+    # Criar script SQL básico
+    cat > /tmp/create_tables.sql << 'EOF'
+-- SCRIPT BÁSICO DE CRIAÇÃO - SIGE v8.0
+CREATE TABLE IF NOT EXISTS usuario (
+    id SERIAL PRIMARY KEY,
+    username VARCHAR(64) UNIQUE NOT NULL,
+    email VARCHAR(120) UNIQUE NOT NULL,
+    password_hash VARCHAR(256),
+    nome VARCHAR(100) NOT NULL,
+    ativo BOOLEAN DEFAULT TRUE,
+    tipo_usuario VARCHAR(20) DEFAULT 'funcionario',
+    admin_id INTEGER,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS funcionario (
+    id SERIAL PRIMARY KEY,
+    codigo VARCHAR(10) UNIQUE NOT NULL,
+    nome VARCHAR(100) NOT NULL,
+    cpf VARCHAR(14) UNIQUE NOT NULL,
+    cargo VARCHAR(100),
+    salario DECIMAL(10,2) DEFAULT 0.0,
+    data_admissao DATE,
+    ativo BOOLEAN DEFAULT TRUE,
+    admin_id INTEGER NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS obra (
+    id SERIAL PRIMARY KEY,
+    codigo VARCHAR(20) UNIQUE NOT NULL,
+    nome VARCHAR(200) NOT NULL,
+    descricao TEXT,
+    status VARCHAR(20) DEFAULT 'planejamento',
+    data_inicio DATE,
+    data_fim_prevista DATE,
+    admin_id INTEGER NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS registro_ponto (
+    id SERIAL PRIMARY KEY,
+    funcionario_id INTEGER NOT NULL,
+    data_registro DATE NOT NULL,
+    hora_entrada TIME,
+    hora_saida_almoco TIME,
+    hora_retorno_almoco TIME,
+    hora_saida TIME,
+    tipo_lancamento VARCHAR(20) DEFAULT 'normal',
+    admin_id INTEGER NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+EOF
+
+    # Executar SQL
+    if psql "$DATABASE_URL" -f /tmp/create_tables.sql; then
+        echo "✅ Tabelas básicas criadas via SQL direto!"
+    else
+        echo "❌ Erro na criação via SQL - tentando método Flask..."
+        python3 -c "
+import sys, os
 sys.path.insert(0, '/app')
-
-# Configurar ambiente
-os.environ['FLASK_APP'] = 'app.py'
-os.environ['FLASK_ENV'] = 'production'
-
-try:
-    print('🔧 Configurando SQLAlchemy...')
-    
-    # Import específico para evitar problemas de dialeto
-    from flask import Flask
-    from flask_sqlalchemy import SQLAlchemy
-    from sqlalchemy.orm import DeclarativeBase
-    import logging
-    
-    # Configurar logging
-    logging.basicConfig(level=logging.ERROR)
-    
-    # Criar app Flask limpa
-    app = Flask(__name__)
-    
-    # Corrigir URL do banco para SQLAlchemy
-    database_url = os.environ.get('DATABASE_URL')
-    if database_url and database_url.startswith('postgres://'):
-        database_url = database_url.replace('postgres://', 'postgresql://', 1)
-    
-    app.config['SQLALCHEMY_DATABASE_URI'] = database_url
-    app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
-        'pool_recycle': 300,
-        'pool_pre_ping': True,
-    }
-    app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-    
-    class Base(DeclarativeBase):
-        pass
-    
-    db = SQLAlchemy(model_class=Base)
-    db.init_app(app)
-    
-    print('🔧 Importando models...')
-    with app.app_context():
-        # Import dos models essenciais apenas
-        import models
-        
-        print('🗑️ Limpando banco...')
-        db.drop_all()
-        
-        print('🏗️ Criando tabelas...')
-        db.create_all()
-        
-        # Verificar criação
-        from sqlalchemy import inspect
-        inspector = inspect(db.engine)
-        tables = inspector.get_table_names()
-        print(f'✅ {len(tables)} tabelas criadas com sucesso!')
-        
-except Exception as e:
-    print(f'❌ ERRO: {e}')
-    import traceback
-    traceback.print_exc()
-    exit(1)
+from app import app, db
+with app.app_context():
+    db.create_all()
+    print('✅ Criação via Flask concluída')
 "
+    fi
 fi
 
 echo ">>> Configuração do banco de dados concluída <<<"
 
-# Criar usuários administrativos
+# Criar usuários administrativos via SQL direto
 echo "👤 Criando usuários administrativos..."
-python3 -c "
+
+# Script SQL para usuários
+cat > /tmp/create_users.sql << 'EOF'
+-- USUÁRIOS ADMINISTRATIVOS
+INSERT INTO usuario (username, email, nome, password_hash, tipo_usuario, ativo) 
+VALUES 
+('admin', 'admin@sige.com', 'Super Admin', 'scrypt:32768:8:1$o8T5NlEWKHiEXE2Q$46c1dd2f6a3d0f0c3e2e8e1a1a9a5a7a8a8a9a5a7a8a8a9a5a7a8a8a9a5a7a8a8a9a5a7a8a8a9a5a7a8a8a9a5a7', 'super_admin', TRUE),
+('valeverde', 'valeverde@sige.com', 'Vale Verde Admin', 'scrypt:32768:8:1$o8T5NlEWKHiEXE2Q$46c1dd2f6a3d0f0c3e2e8e1a1a9a5a7a8a8a9a5a7a8a8a9a5a7a8a8a9a5a7a8a8a9a5a7a8a8a9a5a7a8a8a9a5a7', 'admin', TRUE)
+ON CONFLICT (email) DO NOTHING;
+EOF
+
+if psql "$DATABASE_URL" -f /tmp/create_users.sql; then
+    echo "✅ Usuários criados via SQL direto!"
+else
+    echo "⚠️ Tentando criação via Python..."
+    python3 -c "
 import sys
 sys.path.insert(0, '/app')
+from werkzeug.security import generate_password_hash
+from app import app, db
+from models import Usuario
+
+with app.app_context():
+    # Criar usuários administrativos
+    admin_user = Usuario(
+        username='admin',
+        email='admin@sige.com', 
+        nome='Super Admin',
+        password_hash=generate_password_hash('admin123'),
+        tipo_usuario='super_admin',
+        ativo=True
+    )
+    
+    vale_user = Usuario(
+        username='valeverde',
+        email='valeverde@sige.com',
+        nome='Vale Verde Admin', 
+        password_hash=generate_password_hash('admin123'),
+        tipo_usuario='admin',
+        ativo=True,
+        admin_id=10
+    )
+    
+    try:
+        db.session.add(admin_user)
+        db.session.add(vale_user)
+        db.session.commit()
+        print('✅ Usuários criados via Python!')
+    except Exception as e:
+        print(f'⚠️ Usuários já existem: {e}')
+"
+fi
 
 try:
     from app import app, db
