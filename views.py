@@ -113,8 +113,12 @@ def funcionarios():
     from models import Departamento, Funcao, HorarioTrabalho, RegistroPonto
     
     # Debug admin_id para multi-tenancy
-    # Para desenvolvimento, usar admin_id=4 (que tem 12 funcionários)
-    admin_id = 4
+    # Para desenvolvimento, mostrar funcionários de todos os admins ou permitir alternar
+    admin_id_param = request.args.get('admin_id', '10')  # Default admin_id=10 (Vale Verde)
+    try:
+        admin_id = int(admin_id_param)
+    except:
+        admin_id = 10  # Fallback para Vale Verde
     
     # Filtros de data dos parâmetros
     data_inicio = request.args.get('data_inicio')
