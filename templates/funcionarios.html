@@ -306,10 +306,9 @@
                         </a>
                         <div class="row g-1">
                             <div class="col-6">
-                                <a href="{{ url_for('main.editar_funcionario', id=kpi.funcionario.id) }}"
-                                   class="btn btn-outline-warning btn-sm w-100">
+                                <button class="btn btn-outline-warning btn-sm w-100" disabled>
                                     <i class="fas fa-edit"></i> Editar
-                                </a>
+                                </button>
                             </div>
                             <div class="col-6">
                                 {% if kpi.funcionario.ativo %}

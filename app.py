@@ -68,6 +68,27 @@ app.register_blueprint(main_bp)
 def load_user(user_id):
     return Usuario.query.get(int(user_id))
 
+# Função para templates
+@app.template_global()
+def obter_foto_funcionario(funcionario):
+    """Obter foto do funcionário (base64 ou padrão)"""
+    if funcionario.foto_base64:
+        return funcionario.foto_base64
+    elif funcionario.foto:
+        return url_for('static', filename=funcionario.foto)
+    else:
+        # SVG padrão baseado no nome
+        iniciais = ''.join([nome[0].upper() for nome in funcionario.nome.split()[:2]])
+        cores = ['#007bff', '#28a745', '#dc3545', '#ffc107', '#17a2b8', '#6f42c1']
+        cor_fundo = cores[hash(funcionario.nome) % len(cores)]
+        
+        svg_avatar = f'''data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="80" height="80" viewBox="0 0 80 80">
+            <rect width="80" height="80" fill="{cor_fundo}"/>
+            <text x="40" y="45" font-family="Arial, sans-serif" font-size="24" font-weight="bold" 
+                  text-anchor="middle" fill="white">{iniciais}</text>
+        </svg>'''
+        return svg_avatar
+
 # Create tables and initialize
 with app.app_context():
     db.create_all()
