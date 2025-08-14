@@ -72,6 +72,18 @@
                             <a href="{{ url_for('main.controle_ponto') }}" class="btn btn-secondary">
                                 <i class="fas fa-times"></i> Limpar
                             </a>
+                            
+                            <!-- Botão de Exportação PDF com discriminação de faltas e DSR -->
+                            {% if filtros.data_inicio and filtros.data_fim %}
+                            <a href="{{ url_for('main.export_controle_ponto_pdf', 
+                                       funcionario_id=filtros.funcionario_id or '', 
+                                       data_inicio=filtros.data_inicio, 
+                                       data_fim=filtros.data_fim) }}" 
+                               class="btn btn-warning">
+                                <i class="fas fa-file-pdf"></i> Exportar PDF
+                            </a>
+                            {% endif %}
+                            
                             <button type="button" class="btn btn-success" data-bs-toggle="modal" data-bs-target="#pontoModal">
                                 <i class="fas fa-plus"></i> Novo Registro
                             </button>
@@ -99,14 +111,14 @@
             <div class="card bg-success text-white">
                 <div class="card-body">
                     <h5 class="card-title">Horas Trabalhadas</h5>
-                    <h3 class="mb-0">{{ '{:.1f}h'.format(registros|sum(attribute='horas_trabalhadas') or 0) }}</h3>
+                    <h3 class="mb-0">{{ '{:.1f}h'.format(total_horas_trabalhadas or 0) }}</h3>
                 </div>
             </div>
         </div>
         <div class="col-md-3">
             <div class="card bg-warning text-white">
                 <div class="card-body">
-                    <h3 class="mb-0">{{ '{:.1f}h'.format(registros|sum(attribute='horas_extras') or 0) }}</h3>
+                    <h3 class="mb-0">{{ '{:.1f}h'.format(total_horas_extras or 0) }}</h3>
                     <h6 class="mb-2">R$ {{ '{:,.2f}'.format(total_valor_extras or 0) }}</h6>
                     <h5 class="card-title mb-0">Horas Extras</h5>
                 </div>
@@ -116,7 +128,8 @@
             <div class="card bg-danger text-white">
                 <div class="card-body">
                     <h5 class="card-title">Faltas</h5>
-                    <h3 class="mb-0">{{ registros|selectattr('tipo_registro', 'equalto', 'falta')|list|length }}</h3>
+                    <h3 class="mb-0">{{ total_faltas or 0 }}</h3>
+                    <small>{{ total_faltas_justificadas or 0 }} justificadas</small>
                 </div>
             </div>
         </div>

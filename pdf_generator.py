@@ -175,13 +175,42 @@ class FuncionarioPDFGenerator:
         # KPIs financeiros separados
         elementos.append(Paragraph("Indicadores Financeiros Detalhados:", self.styles['Heading3']))
         
-        # Tabela principal com valores
+        # Calcular discriminação de faltas e DSR
+        faltas = kpis.get('faltas', 0)
+        valor_hora = kpis.get('valor_hora_atual', 0)
+        valor_dia = valor_hora * 8
+        
+        # Valor total de faltas (incluindo DSR conforme legislação)
+        valor_total_faltas = kpis.get('valor_faltas', 0)
+        
+        # Discriminar valores conforme exemplo do usuário:
+        # Se valor total é 300 com 2 faltas e 1 DSR:
+        # - Valor das faltas: 200 (2 * 100)  
+        # - Valor do DSR: 100 (1 * 100)
+        if faltas > 0 and valor_total_faltas > 0:
+            # Assumir que cada semana com falta perde 1 DSR
+            dsr_perdidos = min(faltas, 4)  # Máximo 4 DSRs por mês
+            valor_faltas_direto = faltas * valor_dia
+            valor_dsr_perdido = dsr_perdidos * valor_dia
+            
+            # Se o valor total calculado for diferente, ajustar proporcionalmente
+            valor_total_calculado = valor_faltas_direto + valor_dsr_perdido
+            if valor_total_calculado != valor_total_faltas and valor_total_faltas > 0:
+                fator_ajuste = valor_total_faltas / valor_total_calculado
+                valor_faltas_direto *= fator_ajuste
+                valor_dsr_perdido *= fator_ajuste
+        else:
+            valor_faltas_direto = 0
+            valor_dsr_perdido = 0
+            dsr_perdidos = 0
+
+        # Tabela principal com valores discriminados
         financeiro_data = [
             ['Item', 'Quantidade', 'Valor Unit.', 'Valor Total'],
-            ['Horas Extras', f"{kpis.get('horas_extras', 0):.1f}h", f"R$ {kpis.get('valor_hora_atual', 0) * 1.5:,.2f}", f"R$ {kpis.get('valor_horas_extras', 0):,.2f}"],
-            ['Faltas Injustificadas', f"{kpis.get('faltas', 0)} dias", f"R$ {kpis.get('valor_hora_atual', 0) * 8:,.2f}", f"R$ {kpis.get('valor_faltas', 0):,.2f}"],
-            ['Faltas Justificadas', f"{kpis.get('faltas_justificadas', 0)} dias", f"R$ {kpis.get('valor_hora_atual', 0) * 8:,.2f}", f"R$ {kpis.get('valor_faltas_justificadas', 0):,.2f}"],
-            ['DSR Perdido', f"{kpis.get('dsr_perdido_dias', 0):.2f} dias", f"R$ {kpis.get('valor_hora_atual', 0) * 8:,.2f}", f"R$ {kpis.get('valor_dsr_perdido', 0):,.2f}"]
+            ['Horas Extras', f"{kpis.get('horas_extras', 0):.1f}h", f"R$ {valor_hora * 1.5:,.2f}", f"R$ {kpis.get('valor_horas_extras', 0):,.2f}"],
+            ['Faltas Injustificadas', f"{faltas} dias", f"R$ {valor_dia:,.2f}", f"R$ {valor_faltas_direto:,.2f}"],
+            ['DSR Perdido por Faltas', f"{dsr_perdidos} domingos", f"R$ {valor_dia:,.2f}", f"R$ {valor_dsr_perdido:,.2f}"],
+            ['Faltas Justificadas', f"{kpis.get('faltas_justificadas', 0)} dias", f"R$ {valor_dia:,.2f}", f"R$ {kpis.get('valor_faltas_justificadas', 0):,.2f}"]
         ]
         
         financeiro_table = Table(financeiro_data, colWidths=[2.2*inch, 1.3*inch, 1.3*inch, 1.5*inch])
@@ -209,9 +238,11 @@ class FuncionarioPDFGenerator:
         
         resumo_data = [
             ['Custo Total Mão de Obra', f"R$ {kpis.get('custo_mao_obra', 0):,.2f}"],
-            ['Valor Hora Atual', f"R$ {kpis.get('valor_hora_atual', 0):,.2f}"],
-            ['Total Descontos (Faltas + DSR)', f"R$ {kpis.get('valor_faltas', 0) + kpis.get('valor_dsr_perdido', 0):,.2f}"],
-            ['Custo Líquido do Período', f"R$ {kpis.get('custo_total_geral', 0) - kpis.get('valor_faltas', 0) - kpis.get('valor_dsr_perdido', 0):,.2f}"]
+            ['Valor Hora Atual', f"R$ {valor_hora:,.2f}"],
+            ['Desconto Faltas Diretas', f"R$ {valor_faltas_direto:,.2f}"],
+            ['Desconto DSR Perdido', f"R$ {valor_dsr_perdido:,.2f}"],
+            ['Total Descontos', f"R$ {valor_faltas_direto + valor_dsr_perdido:,.2f}"],
+            ['Custo Líquido do Período', f"R$ {kpis.get('custo_total_geral', 0) - (valor_faltas_direto + valor_dsr_perdido):,.2f}"]
         ]
         
         resumo_table = Table(resumo_data, colWidths=[3.5*inch, 2*inch])

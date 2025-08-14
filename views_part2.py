@@ -315,11 +315,21 @@ def excluir_horario(id):
 @login_required
 def controle_ponto():
     """Página principal do controle de ponto"""
+    from models import RegistroPonto
+    from sqlalchemy.orm import joinedload
+    
     # Filtros
     funcionario_id = request.args.get('funcionario_id')
     data_inicio = request.args.get('data_inicio')
     data_fim = request.args.get('data_fim')
     tipo_registro = request.args.get('tipo_registro')
+    
+    # Valores padrão para data_inicio e data_fim se não fornecidos
+    from datetime import date
+    if not data_inicio:
+        data_inicio = date.today().replace(day=1).strftime('%Y-%m-%d')
+    if not data_fim:
+        data_fim = date.today().strftime('%Y-%m-%d')
     
     # Query base com filtro de tenant - CORREÇÃO CRÍTICA para multi-tenancy
     query = RegistroPonto.query.join(Funcionario).filter(
@@ -330,11 +340,23 @@ def controle_ponto():
     if funcionario_id:
         query = query.filter(RegistroPonto.funcionario_id == funcionario_id)
     
+    # Corrigir filtros de data - converter strings para objetos date  
+    data_inicio_obj = None
+    data_fim_obj = None
+    
     if data_inicio:
-        query = query.filter(RegistroPonto.data >= datetime.strptime(data_inicio, '%Y-%m-%d').date())
+        try:
+            data_inicio_obj = datetime.strptime(data_inicio, '%Y-%m-%d').date()
+            query = query.filter(RegistroPonto.data >= data_inicio_obj)
+        except ValueError:
+            pass
     
     if data_fim:
-        query = query.filter(RegistroPonto.data <= datetime.strptime(data_fim, '%Y-%m-%d').date())
+        try:
+            data_fim_obj = datetime.strptime(data_fim, '%Y-%m-%d').date()
+            query = query.filter(RegistroPonto.data <= data_fim_obj)
+        except ValueError:
+            pass
     
     if tipo_registro:
         query = query.filter(RegistroPonto.tipo_registro == tipo_registro)
@@ -356,39 +378,35 @@ def controle_ponto():
         status='Em andamento'
     ).order_by(Obra.nome).all()
     
-    # Calcular valor total das horas extras com base na legislação brasileira
-    from calendar import monthrange
+    # Calcular estatísticas corrigidas para o período filtrado
     total_valor_extras = 0.0
+    total_horas_trabalhadas = 0.0
+    total_horas_extras = 0.0
+    total_faltas = 0
+    total_faltas_justificadas = 0
     
     for registro in registros:
+        # Somar horas trabalhadas
+        if registro.horas_trabalhadas:
+            total_horas_trabalhadas += registro.horas_trabalhadas
+        
+        # Somar horas extras
+        if registro.horas_extras:
+            total_horas_extras += registro.horas_extras
+        
+        # Contar faltas
+        if registro.tipo_registro == 'falta':
+            total_faltas += 1
+        elif registro.tipo_registro == 'falta_justificada':
+            total_faltas_justificadas += 1
+        
+        # Calcular valor das horas extras
         if registro.horas_extras and registro.horas_extras > 0 and registro.funcionario:
             funcionario = registro.funcionario
             
             if funcionario.salario:
-                # Calcular dias úteis reais do mês do registro
-                ano = registro.data.year
-                mes = registro.data.month
-                
-                # Contar dias úteis (seg-sex) no mês específico
-                import calendar
-                dias_uteis = 0
-                primeiro_dia, ultimo_dia = monthrange(ano, mes)
-                
-                for dia in range(1, ultimo_dia + 1):
-                    data_check = registro.data.replace(day=dia)
-                    # 0=segunda, 1=terça, ..., 6=domingo
-                    if data_check.weekday() < 5:  # Segunda a sexta
-                        dias_uteis += 1
-                
-                # Usar horário específico do funcionário
-                if funcionario.horario_trabalho and funcionario.horario_trabalho.horas_diarias:
-                    horas_diarias = funcionario.horario_trabalho.horas_diarias
-                else:
-                    horas_diarias = 8.8  # Padrão Carlos Alberto
-                
-                # Horas mensais = horas/dia × dias úteis do mês
-                horas_mensais = horas_diarias * dias_uteis
-                valor_hora_normal = funcionario.salario / horas_mensais
+                from utils import calcular_valor_hora_funcionario
+                valor_hora_normal = calcular_valor_hora_funcionario(funcionario, registro.data)
                 
                 # Multiplicador conforme legislação brasileira (CLT)
                 if registro.tipo_registro in ['domingo_trabalhado', 'domingo_horas_extras', 'feriado_trabalhado']:
@@ -403,7 +421,105 @@ def controle_ponto():
                          registros=registros,
                          funcionarios=funcionarios,
                          obras=obras,
-                         total_valor_extras=total_valor_extras)
+                         total_valor_extras=total_valor_extras,
+                         total_horas_trabalhadas=total_horas_trabalhadas,
+                         total_horas_extras=total_horas_extras,
+                         total_faltas=total_faltas,
+                         total_faltas_justificadas=total_faltas_justificadas,
+                         filtros={'funcionario_id': funcionario_id, 'data_inicio': data_inicio, 'data_fim': data_fim, 'tipo_registro': tipo_registro})
+
+@main_bp.route('/controle-ponto/export-pdf', methods=['GET'])
+@login_required
+def export_controle_ponto_pdf():
+    """Exportar relatório de controle de ponto com discriminação de faltas e DSR"""
+    from flask import send_file
+    from pdf_generator import PDFGenerator
+    from kpis_engine import KPIsEngine
+    import io
+    
+    # Obter parâmetros de filtro
+    funcionario_id = request.args.get('funcionario_id')
+    data_inicio = request.args.get('data_inicio')
+    data_fim = request.args.get('data_fim')
+    
+    if not data_inicio or not data_fim:
+        flash('Período de data obrigatório para exportação', 'error')
+        return redirect(url_for('main.controle_ponto'))
+    
+    # Converter datas
+    try:
+        data_inicio_obj = datetime.strptime(data_inicio, '%Y-%m-%d').date()
+        data_fim_obj = datetime.strptime(data_fim, '%Y-%m-%d').date()
+    except ValueError:
+        flash('Formato de data inválido', 'error')
+        return redirect(url_for('main.controle_ponto'))
+    
+    if funcionario_id:
+        funcionario = Funcionario.query.filter(
+            Funcionario.id == funcionario_id,
+            Funcionario.admin_id == current_user.id
+        ).first()
+        
+        if not funcionario:
+            flash('Funcionário não encontrado', 'error')
+            return redirect(url_for('main.controle_ponto'))
+        
+        # Calcular KPIs detalhados do funcionário
+        kpis_engine = KPIsEngine()
+        kpis = kpis_engine.calcular_kpis_funcionario(funcionario_id, data_inicio_obj, data_fim_obj)
+        
+        # Gerar PDF com discriminação de faltas e DSR
+        pdf_generator = PDFGenerator()
+        buffer = io.BytesIO()
+        
+        # Título do relatório
+        titulo = f"Relatório de Ponto - {funcionario.nome}"
+        subtitulo = f"Período: {data_inicio} a {data_fim}"
+        
+        pdf_generator.gerar_relatorio_funcionario(buffer, funcionario, kpis, titulo, subtitulo)
+        
+        buffer.seek(0)
+        
+        return send_file(
+            buffer,
+            as_attachment=True,
+            download_name=f"controle_ponto_{funcionario.nome}_{data_inicio}_{data_fim}.pdf",
+            mimetype='application/pdf'
+        )
+    else:
+        # Exportar relatório geral de todos os funcionários
+        funcionarios = Funcionario.query.filter(
+            Funcionario.admin_id == current_user.id,
+            Funcionario.status == 'ativo'
+        ).all()
+        
+        pdf_generator = PDFGenerator()
+        buffer = io.BytesIO()
+        
+        titulo = "Relatório Geral de Controle de Ponto"
+        subtitulo = f"Período: {data_inicio} a {data_fim}"
+        
+        # Calcular resumo geral
+        kpis_engine = KPIsEngine()
+        dados_gerais = []
+        
+        for func in funcionarios:
+            kpis = kpis_engine.calcular_kpis_funcionario(func.id, data_inicio_obj, data_fim_obj)
+            dados_gerais.append({
+                'funcionario': func,
+                'kpis': kpis
+            })
+        
+        pdf_generator.gerar_relatorio_geral_ponto(buffer, dados_gerais, titulo, subtitulo)
+        
+        buffer.seek(0)
+        
+        return send_file(
+            buffer,
+            as_attachment=True,
+            download_name=f"controle_ponto_geral_{data_inicio}_{data_fim}.pdf",
+            mimetype='application/pdf'
+        )
 
 @main_bp.route('/ponto/registro', methods=['POST'])
 @login_required

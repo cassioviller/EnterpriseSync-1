@@ -4,8 +4,7 @@ from sqlalchemy import func
 from collections import defaultdict
 from decimal import Decimal, ROUND_HALF_UP
 import calendar
-    from models import RegistroPonto
-    import os
+import os
 import re
 from werkzeug.utils import secure_filename
 from flask import current_app
@@ -525,6 +524,46 @@ def calcular_custo_real_obra(obra_id, data_inicio, data_fim):
         'custos_veiculos': float(custos_veiculos),
         'outros_custos': float(outros_custos)
     }
+
+def calcular_valor_hora_funcionario(funcionario, data_referencia):
+    """
+    Calcular valor hora do funcionário baseado em dias úteis reais do mês
+    
+    Args:
+        funcionario: Instância do modelo Funcionario
+        data_referencia: datetime.date do mês de referência
+    
+    Returns:
+        float: Valor da hora normal do funcionário
+    """
+    from calendar import monthrange
+    
+    if not funcionario.salario:
+        return 0.0
+    
+    # Calcular dias úteis reais do mês
+    ano = data_referencia.year
+    mes = data_referencia.month
+    
+    dias_uteis = 0
+    primeiro_dia, ultimo_dia = monthrange(ano, mes)
+    
+    for dia in range(1, ultimo_dia + 1):
+        data_check = data_referencia.replace(day=dia)
+        # 0=segunda, 1=terça, ..., 6=domingo
+        if data_check.weekday() < 5:  # Segunda a sexta
+            dias_uteis += 1
+    
+    # Usar horário específico do funcionário
+    if funcionario.horario_trabalho and funcionario.horario_trabalho.horas_diarias:
+        horas_diarias = funcionario.horario_trabalho.horas_diarias
+    else:
+        horas_diarias = 8.8  # Padrão baseado no horário Carlos Alberto
+    
+    # Horas mensais = horas/dia × dias úteis do mês
+    horas_mensais = horas_diarias * dias_uteis
+    
+    return funcionario.salario / horas_mensais if horas_mensais > 0 else 0.0
 
 def calcular_custos_mes(admin_id, data_inicio, data_fim):
     """Calcula custos mensais por categoria para um admin"""
