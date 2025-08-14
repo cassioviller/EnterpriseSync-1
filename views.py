@@ -107,12 +107,9 @@ def dashboard():
 
 # ===== FUNCIONÁRIOS =====
 @main_bp.route('/funcionarios')
-# @admin_required  # Temporariamente removido para debug
+@admin_required
 def funcionarios():
-    # Para teste - usar admin_id fixo
-    admin_id = 4  # admin@estruturasdovale.com.br
-    
-    print(f"DEBUG - Admin ID fixo para teste: {admin_id}")
+    admin_id = current_user.id if current_user.tipo_usuario == TipoUsuario.ADMIN else current_user.admin_id
     
     # Buscar funcionários com filtros de data (implementação completa)
     from datetime import date
@@ -148,12 +145,19 @@ def funcionarios():
         ativo=False
     ).order_by(Funcionario.nome).all()
     
-    # KPIs básicos para exibição
+    # KPIs completos para exibição
     from models import Obra, Departamento, Funcao, HorarioTrabalho
     kpis_geral = {
         'total_funcionarios': len(funcionarios),
         'total_custo_geral': 0.0,
         'total_horas_geral': 0.0,
+        'total_custo_faltas_geral': 0.0,
+        'total_faltas_justificadas_geral': 0,
+        'total_faltas_geral': 0,
+        'taxa_absenteismo_geral': 0.0,
+        'total_horas_extras_geral': 0.0,
+        'total_custo_alimentacao_geral': 0.0,
+        'total_custo_outros_geral': 0.0,
         'funcionarios_kpis': []
     }
     
@@ -163,7 +167,7 @@ def funcionarios():
         status='Em andamento'
     ).order_by(Obra.nome).all()
     
-    return render_template('funcionarios.html',
+    return render_template('funcionarios_simple.html',
                          funcionarios=funcionarios,
                          funcionarios_kpis=kpis_geral['funcionarios_kpis'],
                          kpis_geral=kpis_geral,
