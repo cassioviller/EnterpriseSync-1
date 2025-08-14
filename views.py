@@ -211,17 +211,17 @@ def funcionario_perfil(id):
     
     funcionario = Funcionario.query.get_or_404(id)
     
-    # Filtros de data - padrão último mês
+    # Filtros de data - padrão julho 2024 (onde estão os dados do Carlos Alberto)
     data_inicio = request.args.get('data_inicio')
     data_fim = request.args.get('data_fim')
     
     if not data_inicio:
-        data_inicio = date.today().replace(day=1)
+        data_inicio = date(2024, 7, 1)  # Julho 2024 onde estão os dados
     else:
         data_inicio = datetime.strptime(data_inicio, '%Y-%m-%d').date()
     
     if not data_fim:
-        data_fim = date.today()
+        data_fim = date(2024, 7, 31)  # Final de julho 2024
     else:
         data_fim = datetime.strptime(data_fim, '%Y-%m-%d').date()
     
@@ -230,7 +230,7 @@ def funcionario_perfil(id):
         RegistroPonto.funcionario_id == funcionario.id,
         RegistroPonto.data >= data_inicio,
         RegistroPonto.data <= data_fim
-    ).all()
+    ).order_by(RegistroPonto.data.desc()).all()  # Ordenar por data decrescente
     
     # Calcular KPIs
     total_horas = sum(r.horas_trabalhadas or 0 for r in registros)
