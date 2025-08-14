@@ -104,7 +104,7 @@ class Obra(db.Model):
     cliente_nome = db.Column(db.String(100))
     cliente_email = db.Column(db.String(120))
     cliente_telefone = db.Column(db.String(20))
-    proposta_origem_id = db.Column(db.Integer, db.ForeignKey('proposta_comercial.id'))
+    proposta_origem_id = db.Column(db.Integer, db.ForeignKey('propostas_comerciais.id'))
     
     # Configurações do Portal
     portal_ativo = db.Column(db.Boolean, default=True)
@@ -116,9 +116,6 @@ class Obra(db.Model):
     
     registros_ponto = db.relationship('RegistroPonto', backref='obra_ref', lazy=True, overlaps="obra_ref")
     custos = db.relationship('CustoObra', backref='obra_ref', lazy=True, overlaps="obra_ref")
-    
-    # MÓDULO 2: Relacionamentos do Portal do Cliente
-    proposta_origem = db.relationship('PropostaComercialSIGE', backref='obra_gerada')
     servicos_obra = db.relationship('ServicoObra', backref='obra', cascade='all, delete-orphan', lazy=True)
 
 class ServicoObra(db.Model):
@@ -619,72 +616,10 @@ class OutroCusto(db.Model):
         return f'<OutroCusto {self.funcionario.nome} - {self.tipo} R$ {self.valor}>'
 
 # ================================
-# MÓDULO DE PROPOSTAS COMERCIAIS
+# MÓDULO DE PROPOSTAS COMERCIAIS (MOVIDO PARA models_propostas.py)
 # ================================
-
-class PropostaComercialSIGE(db.Model):
-    __tablename__ = 'proposta_comercial'
-    
-    id = db.Column(db.Integer, primary_key=True)
-    numero_proposta = db.Column(db.String(20), unique=True, nullable=False)
-    
-    # Dados do Cliente
-    cliente_nome = db.Column(db.String(100), nullable=False)
-    cliente_email = db.Column(db.String(120), nullable=False)
-    cliente_telefone = db.Column(db.String(20))
-    cliente_cpf_cnpj = db.Column(db.String(18))
-    
-    # Dados da Obra
-    endereco_obra = db.Column(db.Text, nullable=False)
-    descricao_obra = db.Column(db.Text, nullable=False)
-    area_total_m2 = db.Column(db.Float)
-    
-    # Valores
-    valor_proposta = db.Column(db.Float, nullable=False)
-    prazo_execucao = db.Column(db.Integer)  # dias
-    
-    # Status e Controle
-    status = db.Column(db.String(20), default='Enviada')
-    data_criacao = db.Column(db.DateTime, default=datetime.utcnow)
-    data_envio = db.Column(db.DateTime)
-    data_resposta = db.Column(db.DateTime)
-    data_expiracao = db.Column(db.DateTime)
-    
-    # Acesso do Cliente
-    token_acesso = db.Column(db.String(255), unique=True)
-    
-    # Resposta do Cliente
-    observacoes_cliente = db.Column(db.Text)
-    ip_assinatura = db.Column(db.String(45))
-    user_agent_assinatura = db.Column(db.Text)
-    
-    # Multi-tenant
-    admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False)
-    criado_por_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False)
-    
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
-    
-    # Relacionamentos
-    servicos = db.relationship('ServicoPropostaComercialSIGE', backref='proposta_ref', lazy=True, cascade='all, delete-orphan')
-    admin = db.relationship('Usuario', foreign_keys=[admin_id])
-    criado_por = db.relationship('Usuario', foreign_keys=[criado_por_id])
-
-class ServicoPropostaComercialSIGE(db.Model):
-    __tablename__ = 'servico_proposta_comercial'
-    
-    id = db.Column(db.Integer, primary_key=True)
-    proposta_id = db.Column(db.Integer, db.ForeignKey('proposta_comercial.id'), nullable=False)
-    descricao_servico = db.Column(db.String(200), nullable=False)
-    quantidade = db.Column(db.Float, nullable=False)
-    unidade = db.Column(db.String(10), nullable=False)
-    valor_unitario = db.Column(db.Float, nullable=False)
-    valor_total = db.Column(db.Float, nullable=False)
-    observacoes = db.Column(db.Text)
-    ordem = db.Column(db.Integer, default=1)
-    
-    def __repr__(self):
-        return f'<ServicoPropostaComercialSIGE {self.descricao_servico}>'
+# As definições das classes PropostaComercialSIGE e ServicoPropostaComercialSIGE
+# foram movidas para models_propostas.py para evitar conflitos de importação
 
 
 # ================================

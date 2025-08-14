@@ -8,7 +8,7 @@ import uuid
 import mimetypes
 
 from app import db
-from models_propostas import PropostaComercialSIGESIGE, PropostaItem, PropostaArquivo, PropostaTemplate
+from models_propostas import PropostaComercialSIGE, PropostaItem, PropostaArquivo, PropostaTemplate
 
 # Criar blueprint
 propostas_bp = Blueprint('propostas', __name__, url_prefix='/propostas')

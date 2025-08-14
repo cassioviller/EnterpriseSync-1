@@ -4,7 +4,7 @@ from sqlalchemy import JSON, func
 import uuid
 import secrets
 
-class PropostaComercialSIGESIGE(db.Model):
+class PropostaComercialSIGE(db.Model):
     __tablename__ = 'propostas_comerciais'
     
     id = db.Column(db.Integer, primary_key=True)
@@ -72,7 +72,7 @@ class PropostaComercialSIGESIGE(db.Model):
     valor_total = db.Column(db.Numeric(15,2), default=0)
     
     # Metadados
-    criado_por = db.Column(db.Integer, db.ForeignKey('usuarios.id'))
+    criado_por = db.Column(db.Integer, db.ForeignKey('users.id'))
     criado_em = db.Column(db.DateTime, default=datetime.utcnow)
     atualizado_em = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     
@@ -85,7 +85,7 @@ class PropostaComercialSIGESIGE(db.Model):
     arquivos = db.relationship('PropostaArquivo', backref='proposta', lazy=True, cascade='all, delete-orphan')
     
     def __init__(self, **kwargs):
-        super(Proposta, self).__init__(**kwargs)
+        super(PropostaComercialSIGE, self).__init__(**kwargs)
         if not self.numero_proposta:
             self.numero_proposta = self.gerar_numero_proposta()
         if not self.token_cliente:
@@ -95,8 +95,8 @@ class PropostaComercialSIGESIGE(db.Model):
         """Gera número sequencial da proposta"""
         ano_atual = date.today().year
         # Contar propostas do ano atual
-        count = db.session.query(func.count(PropostaComercialSIGESIGE.id)).filter(
-            func.extract('year', PropostaComercialSIGESIGE.data_proposta) == ano_atual
+        count = db.session.query(func.count(PropostaComercialSIGE.id)).filter(
+            func.extract('year', PropostaComercialSIGE.data_proposta) == ano_atual
         ).scalar() or 0
         
         proximo_numero = count + 1
