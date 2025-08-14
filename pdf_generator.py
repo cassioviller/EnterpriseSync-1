@@ -181,7 +181,7 @@ class FuncionarioPDFGenerator:
             ['Horas Extras', f"{kpis.get('horas_extras', 0):.1f}h", f"R$ {kpis.get('valor_hora_atual', 0) * 1.5:,.2f}", f"R$ {kpis.get('valor_horas_extras', 0):,.2f}"],
             ['Faltas Injustificadas', f"{kpis.get('faltas', 0)} dias", f"R$ {kpis.get('valor_hora_atual', 0) * 8:,.2f}", f"R$ {kpis.get('valor_faltas', 0):,.2f}"],
             ['Faltas Justificadas', f"{kpis.get('faltas_justificadas', 0)} dias", f"R$ {kpis.get('valor_hora_atual', 0) * 8:,.2f}", f"R$ {kpis.get('valor_faltas_justificadas', 0):,.2f}"],
-            ['DSR Perdido', f"{kpis.get('dsr_perdido_dias', 0):.2f} dias", f"R$ {kpis.get('valor_hora_atual', 0) * 8:,.2f}", f"R$ {kpis.get('valor_dsr_perdido', 0):,.2f}"]
+            ['DSR Perdido (Lei 605/49)', f"{kpis.get('dsr_perdido_dias', 0)} semana(s)", f"R$ {kpis.get('valor_hora_atual', 0) * 8:,.2f}", f"R$ {kpis.get('valor_dsr_perdido', 0):,.2f}"]
         ]
         
         financeiro_table = Table(financeiro_data, colWidths=[2.2*inch, 1.3*inch, 1.3*inch, 1.5*inch])

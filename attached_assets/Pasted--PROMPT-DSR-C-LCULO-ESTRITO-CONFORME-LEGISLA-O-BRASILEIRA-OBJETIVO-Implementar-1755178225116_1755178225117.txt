@@ -1,0 +1,487 @@
+# 🎯 PROMPT: DSR - CÁLCULO ESTRITO CONFORME LEGISLAÇÃO BRASILEIRA
+
+## 📋 **OBJETIVO**
+Implementar cálculo **estrito** de perda de DSR por faltas injustificadas, considerando as regras específicas da legislação brasileira sobre semanas de trabalho.
+
+---
+
+## 🇧🇷 **LEGISLAÇÃO BRASILEIRA - DSR ESTRITO**
+
+### **📚 Base Legal Específica:**
+- **Lei 605/49 Art. 6º:** "Não será devida a remuneração quando, sem motivo justificado, o empregado não tiver trabalhado durante toda a semana anterior"
+- **Decreto 27.048/49 Art. 11:** Regras específicas sobre perda do DSR
+- **CLT Art. 7º:** Repouso semanal remunerado
+
+### **⚖️ REGRAS ESTRITAS:**
+
+**🔍 CONCEITO DE SEMANA:**
+- **Semana de trabalho:** Segunda a Sábado (6 dias)
+- **DSR:** Domingo (1 dia)
+- **Período:** Domingo a Sábado
+
+**📊 LÓGICA ESTRITA:**
+```
+1 SEMANA = 1 DSR MÁXIMO
+
+EXEMPLOS:
+- 1 falta na semana = Perde 1 DSR
+- 2 faltas na mesma semana = Perde 1 DSR (não 2!)
+- 3 faltas na mesma semana = Perde 1 DSR (não 3!)
+
+SEMANAS DIFERENTES:
+- Falta na semana 1 = Perde DSR da semana 1
+- Falta na semana 2 = Perde DSR da semana 2
+- Total: 2 DSRs perdidos
+```
+
+**🚨 CASOS ESPECIAIS:**
+
+**FALTA NA SEXTA-FEIRA:**
+```
+Cenário: Falta na sexta-feira
+- Perde: 1 dia (sexta)
+- Perde: 1 DSR (domingo)
+- Total: 2 dias descontados
+
+NÃO perde 3 dias como alguns pensam!
+```
+
+**MÚLTIPLAS FALTAS:**
+```
+Semana 1: 2 faltas (terça e quinta)
+- Perde: 2 dias (terça + quinta)
+- Perde: 1 DSR (domingo)
+- Total: 3 dias descontados
+
+Semana 2: 1 falta (quarta)
+- Perde: 1 dia (quarta)  
+- Perde: 1 DSR (domingo)
+- Total: 2 dias descontados
+
+TOTAL GERAL: 5 dias descontados
+```
+
+---
+
+## 🧮 **ETAPA 1: IMPLEMENTAR CÁLCULO ESTRITO**
+
+```python
+# 1. Função de cálculo estrito de DSR
+def calcular_dsr_estrito(funcionario_id, data_inicio, data_fim):
+    """
+    Calcula perda de DSR de forma estrita conforme legislação
+    
+    Args:
+        funcionario_id: ID do funcionário
+        data_inicio: Data início do período
+        data_fim: Data fim do período
+    
+    Returns:
+        dict com detalhes do cálculo
+    """
+    from app import app, db
+    from models import Funcionario, RegistroPonto
+    from datetime import datetime, timedelta
+    import calendar
+    
+    with app.app_context():
+        funcionario = Funcionario.query.get(funcionario_id)
+        
+        # Buscar todas as faltas injustificadas no período
+        faltas = RegistroPonto.query.filter(
+            RegistroPonto.funcionario_id == funcionario_id,
+            RegistroPonto.data.between(data_inicio, data_fim),
+            RegistroPonto.tipo_registro == 'falta'
+        ).all()
+        
+        if not faltas:
+            return {
+                'faltas_total': 0,
+                'dsrs_perdidos': 0,
+                'semanas_afetadas': 0,
+                'desconto_total': 0,
+                'detalhes_semanas': []
+            }
+        
+        # Agrupar faltas por semana
+        semanas_com_faltas = {}
+        
+        for falta in faltas:
+            # Calcular início da semana (domingo)
+            dias_desde_domingo = falta.data.weekday() + 1  # Segunda = 0, Domingo = 6
+            if dias_desde_domingo == 7:  # Se for domingo
+                dias_desde_domingo = 0
+            
+            inicio_semana = falta.data - timedelta(days=dias_desde_domingo)
+            
+            # Chave da semana
+            chave_semana = inicio_semana.strftime('%Y-%W')
+            
+            if chave_semana not in semanas_com_faltas:
+                semanas_com_faltas[chave_semana] = {
+                    'inicio_semana': inicio_semana,
+                    'fim_semana': inicio_semana + timedelta(days=6),
+                    'faltas': [],
+                    'dsr_perdido': False
+                }
+            
+            semanas_com_faltas[chave_semana]['faltas'].append(falta)
+        
+        # Calcular DSRs perdidos (1 por semana máximo)
+        dsrs_perdidos = 0
+        detalhes_semanas = []
+        
+        for chave, dados_semana in semanas_com_faltas.items():
+            # Se há falta na semana, perde 1 DSR
+            if dados_semana['faltas']:
+                dsrs_perdidos += 1
+                dados_semana['dsr_perdido'] = True
+                
+                detalhes_semanas.append({
+                    'semana': f"{dados_semana['inicio_semana'].strftime('%d/%m')} a {dados_semana['fim_semana'].strftime('%d/%m')}",
+                    'quantidade_faltas': len(dados_semana['faltas']),
+                    'datas_faltas': [f.data.strftime('%d/%m') for f in dados_semana['faltas']],
+                    'dsr_perdido': True
+                })
+        
+        # Calcular valores financeiros
+        valor_dia = funcionario.salario / 30
+        desconto_faltas = len(faltas) * valor_dia
+        desconto_dsrs = dsrs_perdidos * valor_dia
+        desconto_total = desconto_faltas + desconto_dsrs
+        
+        resultado = {
+            'faltas_total': len(faltas),
+            'dsrs_perdidos': dsrs_perdidos,
+            'semanas_afetadas': len(semanas_com_faltas),
+            'desconto_faltas': desconto_faltas,
+            'desconto_dsrs': desconto_dsrs,
+            'desconto_total': desconto_total,
+            'valor_dia': valor_dia,
+            'detalhes_semanas': detalhes_semanas
+        }
+        
+        print(f"📊 CÁLCULO DSR ESTRITO - {funcionario.nome}:")
+        print(f"   - Período: {data_inicio.strftime('%d/%m/%Y')} a {data_fim.strftime('%d/%m/%Y')}")
+        print(f"   - Total de faltas: {len(faltas)}")
+        print(f"   - Semanas afetadas: {len(semanas_com_faltas)}")
+        print(f"   - DSRs perdidos: {dsrs_perdidos}")
+        print(f"   - Desconto faltas: R$ {desconto_faltas:.2f}")
+        print(f"   - Desconto DSRs: R$ {desconto_dsrs:.2f}")
+        print(f"   - Desconto total: R$ {desconto_total:.2f}")
+        
+        for detalhe in detalhes_semanas:
+            print(f"   - Semana {detalhe['semana']}: {detalhe['quantidade_faltas']} falta(s) → 1 DSR perdido")
+        
+        return resultado
+
+# Testar função
+def testar_calculo_estrito():
+    """Testa cálculo estrito com diferentes cenários"""
+    from datetime import date
+    
+    # Cenários de teste
+    cenarios = [
+        {
+            'nome': 'Carlos Alberto',
+            'periodo': (date(2025, 7, 1), date(2025, 7, 31)),
+            'descricao': 'Julho 2025 completo'
+        }
+    ]
+    
+    for cenario in cenarios:
+        print(f"\n🧪 TESTANDO: {cenario['descricao']}")
+        resultado = calcular_dsr_estrito(1, cenario['periodo'][0], cenario['periodo'][1])
+
+# EXECUTAR TESTE
+testar_calculo_estrito()
+```
+
+---
+
+## 🧪 **ETAPA 2: SIMULAR CENÁRIOS ESPECÍFICOS**
+
+```python
+# 2. Simular cenários específicos mencionados
+def simular_cenarios_especificos():
+    """Simula cenários específicos para validar lógica"""
+    
+    print("🧪 SIMULAÇÃO DE CENÁRIOS ESPECÍFICOS:")
+    
+    # Cenário 1: 2 faltas na mesma semana
+    print(f"\n📋 CENÁRIO 1: 2 faltas na mesma semana")
+    print(f"   - Faltas: Terça (14/07) e Quinta (16/07)")
+    print(f"   - Semana: 13/07 a 19/07")
+    print(f"   - Resultado: 2 faltas + 1 DSR = 3 dias descontados")
+    print(f"   - Lógica: Múltiplas faltas na mesma semana = 1 DSR apenas")
+    
+    # Cenário 2: Falta na sexta
+    print(f"\n📋 CENÁRIO 2: Falta na sexta-feira")
+    print(f"   - Falta: Sexta (18/07)")
+    print(f"   - Semana: 13/07 a 19/07")
+    print(f"   - Resultado: 1 falta + 1 DSR = 2 dias descontados")
+    print(f"   - Lógica: NÃO são 3 dias como alguns pensam")
+    
+    # Cenário 3: Faltas em semanas diferentes
+    print(f"\n📋 CENÁRIO 3: Faltas em semanas diferentes")
+    print(f"   - Falta 1: Terça (07/07) - Semana 1")
+    print(f"   - Falta 2: Quinta (16/07) - Semana 2")
+    print(f"   - Resultado: 2 faltas + 2 DSRs = 4 dias descontados")
+    print(f"   - Lógica: Cada semana com falta perde 1 DSR")
+    
+    # Cenário 4: 3 faltas na mesma semana
+    print(f"\n📋 CENÁRIO 4: 3 faltas na mesma semana")
+    print(f"   - Faltas: Segunda, Terça e Quarta")
+    print(f"   - Semana: 13/07 a 19/07")
+    print(f"   - Resultado: 3 faltas + 1 DSR = 4 dias descontados")
+    print(f"   - Lógica: Mesmo com 3 faltas, só perde 1 DSR da semana")
+
+# EXECUTAR SIMULAÇÃO
+simular_cenarios_especificos()
+```
+
+---
+
+## 🔧 **ETAPA 3: CRIAR FUNÇÃO PARA REGISTROS FICTÍCIOS**
+
+```python
+# 3. Criar registros fictícios para testar
+def criar_registros_teste_dsr():
+    """Cria registros fictícios para testar lógica de DSR"""
+    from app import app, db
+    from models import Funcionario, RegistroPonto
+    from datetime import date
+    
+    with app.app_context():
+        # Buscar Carlos
+        carlos = Funcionario.query.filter_by(
+            nome="Carlos Alberto Rigolin Junior"
+        ).first()
+        
+        if not carlos:
+            print("❌ Carlos não encontrado")
+            return
+        
+        # Limpar registros de teste anteriores
+        RegistroPonto.query.filter(
+            RegistroPonto.funcionario_id == carlos.id,
+            RegistroPonto.data.between(date(2025, 7, 1), date(2025, 7, 31))
+        ).delete()
+        
+        # Cenário de teste: Diferentes padrões de faltas
+        registros_teste = [
+            # Semana 1 (06/07 a 12/07): 2 faltas
+            {'data': date(2025, 7, 8), 'tipo': 'falta'},   # Terça
+            {'data': date(2025, 7, 10), 'tipo': 'falta'},  # Quinta
+            
+            # Semana 2 (13/07 a 19/07): 1 falta na sexta
+            {'data': date(2025, 7, 18), 'tipo': 'falta'},  # Sexta
+            
+            # Semana 3 (20/07 a 26/07): Sem faltas
+            
+            # Semana 4 (27/07 a 31/07): 1 falta
+            {'data': date(2025, 7, 29), 'tipo': 'falta'},  # Terça
+        ]
+        
+        # Criar registros
+        for registro_data in registros_teste:
+            registro = RegistroPonto(
+                funcionario_id=carlos.id,
+                data=registro_data['data'],
+                tipo_registro=registro_data['tipo'],
+                entrada=None,
+                saida=None,
+                created_at=datetime.now()
+            )
+            db.session.add(registro)
+        
+        db.session.commit()
+        
+        print(f"✅ REGISTROS DE TESTE CRIADOS:")
+        for registro_data in registros_teste:
+            print(f"   - {registro_data['data'].strftime('%d/%m/%Y')} ({registro_data['data'].strftime('%A')}): {registro_data['tipo']}")
+        
+        return len(registros_teste)
+
+# EXECUTAR CRIAÇÃO
+registros_criados = criar_registros_teste_dsr()
+```
+
+---
+
+## 📊 **ETAPA 4: TESTAR COM DADOS REAIS**
+
+```python
+# 4. Testar cálculo com dados criados
+def testar_com_dados_reais():
+    """Testa cálculo estrito com dados reais criados"""
+    from datetime import date
+    
+    print("📊 TESTANDO COM DADOS REAIS CRIADOS:")
+    
+    # Buscar Carlos
+    carlos = Funcionario.query.filter_by(
+        nome="Carlos Alberto Rigolin Junior"
+    ).first()
+    
+    if not carlos:
+        print("❌ Carlos não encontrado")
+        return
+    
+    # Calcular DSR estrito para julho
+    resultado = calcular_dsr_estrito(
+        carlos.id,
+        date(2025, 7, 1),
+        date(2025, 7, 31)
+    )
+    
+    print(f"\n📋 RESULTADO ESPERADO:")
+    print(f"   - 4 faltas total")
+    print(f"   - 3 semanas afetadas")
+    print(f"   - 3 DSRs perdidos")
+    print(f"   - Desconto: 4 faltas + 3 DSRs = 7 dias")
+    
+    print(f"\n📊 RESULTADO CALCULADO:")
+    print(f"   - {resultado['faltas_total']} faltas total")
+    print(f"   - {resultado['semanas_afetadas']} semanas afetadas")
+    print(f"   - {resultado['dsrs_perdidos']} DSRs perdidos")
+    print(f"   - Desconto total: R$ {resultado['desconto_total']:.2f}")
+    
+    # Validar resultado
+    if resultado['dsrs_perdidos'] == 3 and resultado['faltas_total'] == 4:
+        print("✅ CÁLCULO CORRETO!")
+    else:
+        print("❌ ERRO NO CÁLCULO!")
+    
+    return resultado
+
+# EXECUTAR TESTE
+resultado_teste = testar_com_dados_reais()
+```
+
+---
+
+## 🎨 **ETAPA 5: ATUALIZAR KPI COM LÓGICA ESTRITA**
+
+```python
+# 5. Atualizar KPI para usar cálculo estrito
+def atualizar_kpi_dsr_estrito():
+    """Atualiza KPI para usar cálculo estrito de DSR"""
+    
+    codigo_kpi_estrito = '''
+def calcular_kpis_funcionario_estrito(funcionario_id, data_inicio, data_fim):
+    """Calcula KPIs com lógica estrita de DSR"""
+    
+    # Calcular DSR estrito
+    dsr_info = calcular_dsr_estrito(funcionario_id, data_inicio, data_fim)
+    
+    # KPI de faltas com informação detalhada
+    kpi_faltas = {
+        'quantidade': dsr_info['faltas_total'],
+        'dsrs_perdidos': dsr_info['dsrs_perdidos'],
+        'semanas_afetadas': dsr_info['semanas_afetadas'],
+        'desconto_total': dsr_info['desconto_total'],
+        'desconto_faltas': dsr_info['desconto_faltas'],
+        'desconto_dsrs': dsr_info['desconto_dsrs'],
+        'valor_formatado': f"(-R$ {dsr_info['desconto_total']:.2f})" if dsr_info['desconto_total'] > 0 else "",
+        'detalhes_formatado': f"{dsr_info['faltas_total']}F + {dsr_info['dsrs_perdidos']}DSR" if dsr_info['dsrs_perdidos'] > 0 else f"{dsr_info['faltas_total']}"
+    }
+    
+    return {
+        'faltas': kpi_faltas,
+        'custo_mao_obra_ajustado': custo_base - dsr_info['desconto_total']
+    }
+'''
+    
+    print("✅ CÓDIGO KPI ESTRITO GERADO")
+    return codigo_kpi_estrito
+
+# EXECUTAR ATUALIZAÇÃO
+codigo_kpi_estrito = atualizar_kpi_dsr_estrito()
+```
+
+---
+
+## 🎨 **ETAPA 6: TEMPLATE HTML ATUALIZADO**
+
+```html
+<!-- 6. Template com exibição detalhada -->
+<div class="kpi-card faltas-card">
+    <div class="kpi-value">
+        {{ kpis.faltas.quantidade }}
+        {% if kpis.faltas.desconto_total > 0 %}
+            <div class="desconto-info">
+                <small class="desconto-valor">(-R$ {{ "%.2f"|format(kpis.faltas.desconto_total) }})</small>
+                <small class="desconto-detalhes">{{ kpis.faltas.detalhes_formatado }}</small>
+                <small class="desconto-label">{{ kpis.faltas.semanas_afetadas }} semana(s)</small>
+            </div>
+        {% endif %}
+    </div>
+    <div class="kpi-label">Faltas</div>
+</div>
+```
+
+---
+
+## 📋 **ETAPA 7: EXEMPLO VISUAL FINAL**
+
+```
+CENÁRIO: 4 faltas em 3 semanas diferentes
+
+ANTES (lógica simples):
+┌─────────────────┐
+│        4        │
+│  (-R$ 560,80)   │  ← 4F + 4DSR = 8 dias
+│   Falta + DSR   │
+│     Faltas      │
+└─────────────────┘
+
+DEPOIS (lógica estrita):
+┌─────────────────┐
+│        4        │
+│  (-R$ 490,70)   │  ← 4F + 3DSR = 7 dias
+│    4F + 3DSR    │  ← Detalhamento
+│   3 semana(s)   │  ← Semanas afetadas
+│     Faltas      │
+└─────────────────┘
+```
+
+---
+
+## 🎯 **INSTRUÇÕES DE EXECUÇÃO**
+
+**Execute na ordem:**
+
+```python
+# 1. Implementar cálculo estrito
+calcular_dsr_estrito()
+
+# 2. Simular cenários
+simular_cenarios_especificos()
+
+# 3. Criar dados de teste
+criar_registros_teste_dsr()
+
+# 4. Testar com dados reais
+testar_com_dados_reais()
+
+# 5. Atualizar KPI
+atualizar_kpi_dsr_estrito()
+```
+
+---
+
+## 📋 **CHECKLIST**
+
+```
+□ Lógica estrita implementada (1 DSR por semana máximo)
+□ Cenários específicos simulados
+□ Dados de teste criados
+□ Cálculo validado
+□ KPI atualizado
+□ Template modificado
+□ Documentação completa
+```
+
+**RESULTADO ESPERADO:** Cálculo **estrito** de DSR conforme legislação brasileira, onde múltiplas faltas na mesma semana resultam em apenas 1 DSR perdido, não múltiplos DSRs.
+

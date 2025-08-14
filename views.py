@@ -245,13 +245,27 @@ def funcionario_perfil(id):
     valor_faltas = total_faltas * valor_hora * 8  # Desconto de 8h por falta
     valor_faltas_justificadas = faltas_justificadas * valor_hora * 8  # Faltas justificadas
     
-    # Calcular DSR das faltas (Lei 605/49)
-    # DSR = Descanso Semanal Remunerado perdido por faltas injustificadas
-    # Para cada 6 dias trabalhados, 1 dia de DSR
-    # Faltas fazem perder proporcionalmente o DSR
-    dias_uteis_periodo = len([r for r in registros if r.data.weekday() < 5])  # Segunda a sexta
-    dsr_perdido_dias = total_faltas / 6 if total_faltas > 0 else 0  # Proporção de DSR perdido
-    valor_dsr_perdido = dsr_perdido_dias * valor_hora * 8  # Valor do DSR perdido
+    # Calcular DSR perdido conforme Lei 605/49 - LÓGICA CORRETA
+    # "Não será devida a remuneração quando, sem motivo justificado, 
+    # o empregado não tiver trabalhado durante toda a semana anterior"
+    
+    from datetime import timedelta
+    import math
+    
+    # Agrupar faltas por semana (domingo a sábado)
+    semanas_com_faltas = set()
+    
+    for registro in registros:
+        if registro.tipo_registro == 'falta':
+            # Calcular início da semana (domingo)
+            dias_desde_domingo = (registro.data.weekday() + 1) % 7
+            inicio_semana = registro.data - timedelta(days=dias_desde_domingo)
+            chave_semana = inicio_semana.strftime('%Y-%W')
+            semanas_com_faltas.add(chave_semana)
+    
+    # DSRs perdidos = número de semanas com pelo menos 1 falta
+    dsrs_perdidos = len(semanas_com_faltas)
+    valor_dsr_perdido = dsrs_perdidos * valor_hora * 8  # 8 horas por dia de DSR
     
     # Calcular estatísticas adicionais
     dias_trabalhados = len([r for r in registros if r.horas_trabalhadas and r.horas_trabalhadas > 0])
@@ -266,7 +280,7 @@ def funcionario_perfil(id):
         'valor_horas_extras': valor_horas_extras,
         'valor_faltas': valor_faltas,
         'valor_faltas_justificadas': valor_faltas_justificadas,
-        'dsr_perdido_dias': round(dsr_perdido_dias, 2),
+        'dsr_perdido_dias': dsrs_perdidos,
         'valor_dsr_perdido': valor_dsr_perdido,
         'taxa_eficiencia': (total_horas / (dias_trabalhados * 8) * 100) if dias_trabalhados > 0 else 0,
         'custo_total': (total_horas + total_extras * 1.5) * valor_hora,

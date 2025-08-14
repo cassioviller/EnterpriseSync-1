@@ -1,0 +1,436 @@
+# 🎯 PROMPT: FALTA + DSR - LEGISLAÇÃO BRASILEIRA
+
+## 📋 **OBJETIVO**
+Implementar lógica correta de desconto de faltas + DSR conforme legislação brasileira e exibir valor descontado no KPI de faltas (no mesmo quadrado, sem criar nova KPI).
+
+---
+
+## 🇧🇷 **LEGISLAÇÃO BRASILEIRA - FALTA E DSR**
+
+### **📚 Base Legal:**
+- **Lei 605/49 Art. 6º:** Perda do DSR por falta injustificada
+- **CLT Art. 64:** Desconto proporcional do salário
+- **Súmula 13 TST:** Sábado é dia útil para efeito de DSR
+- **Art. 7º CF:** Repouso semanal remunerado
+
+### **🧮 Lógica Correta:**
+```
+1 FALTA INJUSTIFICADA = PERDE:
+- 1 dia de trabalho
+- 1 DSR (Descanso Semanal Remunerado)
+
+CÁLCULO DO DESCONTO:
+Valor dia = Salário ÷ 30 dias
+Desconto total = Valor dia × 2 (falta + DSR)
+
+EXEMPLO:
+Salário: R$ 2.106,00
+Valor/dia: R$ 2.106 ÷ 30 = R$ 70,20
+1 falta = R$ 70,20 × 2 = R$ 140,40
+```
+
+### **⚖️ Tipos de Falta:**
+- **Injustificada:** Desconta falta + DSR
+- **Justificada:** Não desconta (atestado médico, etc.)
+- **Abonada:** Empresa decide não descontar
+
+---
+
+## 🔧 **ETAPA 1: IMPLEMENTAR CÁLCULO DE DESCONTO**
+
+```python
+# 1. Função para calcular desconto de falta + DSR
+def calcular_desconto_falta_dsr(funcionario, quantidade_faltas, tipo_falta="injustificada"):
+    """
+    Calcula desconto de falta + DSR conforme legislação brasileira
+    
+    Args:
+        funcionario: Objeto Funcionario
+        quantidade_faltas: Número de faltas
+        tipo_falta: "injustificada", "justificada", "abonada"
+    
+    Returns:
+        dict com valores de desconto
+    """
+    
+    if tipo_falta != "injustificada" or quantidade_faltas == 0:
+        return {
+            'valor_dia': 0,
+            'desconto_falta': 0,
+            'desconto_dsr': 0,
+            'desconto_total': 0,
+            'quantidade_faltas': quantidade_faltas,
+            'tipo_falta': tipo_falta
+        }
+    
+    # Cálculo conforme legislação
+    salario_mensal = funcionario.salario
+    valor_dia = salario_mensal / 30  # Base de 30 dias
+    
+    # Cada falta injustificada = falta + DSR
+    desconto_por_falta = valor_dia  # Dia da falta
+    desconto_por_dsr = valor_dia    # DSR perdido
+    desconto_unitario = desconto_por_falta + desconto_por_dsr
+    
+    # Total de descontos
+    desconto_total = desconto_unitario * quantidade_faltas
+    
+    resultado = {
+        'valor_dia': valor_dia,
+        'desconto_falta': desconto_por_falta * quantidade_faltas,
+        'desconto_dsr': desconto_por_dsr * quantidade_faltas,
+        'desconto_total': desconto_total,
+        'quantidade_faltas': quantidade_faltas,
+        'tipo_falta': tipo_falta,
+        'desconto_unitario': desconto_unitario
+    }
+    
+    print(f"📊 CÁLCULO DESCONTO FALTA + DSR:")
+    print(f"   - Funcionário: {funcionario.nome}")
+    print(f"   - Salário: R$ {salario_mensal:,.2f}")
+    print(f"   - Valor/dia: R$ {valor_dia:.2f}")
+    print(f"   - Faltas: {quantidade_faltas} ({tipo_falta})")
+    print(f"   - Desconto/falta: R$ {desconto_unitario:.2f}")
+    print(f"   - Desconto total: R$ {desconto_total:.2f}")
+    
+    return resultado
+
+# Testar com Carlos Alberto
+def testar_desconto_carlos():
+    """Testa cálculo de desconto com Carlos Alberto"""
+    from app import app, db
+    from models import Funcionario
+    
+    with app.app_context():
+        # Buscar Carlos
+        carlos = Funcionario.query.filter_by(
+            nome="Carlos Alberto Rigolin Junior"
+        ).first()
+        
+        if not carlos:
+            print("❌ Carlos não encontrado")
+            return
+        
+        # Simular diferentes cenários
+        cenarios = [
+            (1, "injustificada"),
+            (2, "injustificada"),
+            (1, "justificada"),
+            (3, "injustificada")
+        ]
+        
+        for faltas, tipo in cenarios:
+            print(f"\n🧪 CENÁRIO: {faltas} falta(s) {tipo}")
+            resultado = calcular_desconto_falta_dsr(carlos, faltas, tipo)
+
+# EXECUTAR TESTE
+testar_desconto_carlos()
+```
+
+---
+
+## 🎨 **ETAPA 2: ATUALIZAR KPI DE FALTAS**
+
+```python
+# 2. Atualizar função que calcula KPIs
+def atualizar_kpi_faltas_com_desconto():
+    """Atualiza KPI de faltas para incluir valor do desconto"""
+    
+    codigo_kpi_atualizado = '''
+def calcular_kpis_funcionario(funcionario_id, data_inicio, data_fim):
+    """Calcula KPIs incluindo desconto de falta + DSR"""
+    
+    # ... código existente ...
+    
+    # Calcular faltas injustificadas
+    faltas_injustificadas = RegistroPonto.query.filter(
+        RegistroPonto.funcionario_id == funcionario_id,
+        RegistroPonto.data.between(data_inicio, data_fim),
+        RegistroPonto.tipo_registro == 'falta'
+    ).count()
+    
+    # Calcular desconto de falta + DSR
+    funcionario = Funcionario.query.get(funcionario_id)
+    desconto_info = calcular_desconto_falta_dsr(
+        funcionario, 
+        faltas_injustificadas, 
+        "injustificada"
+    )
+    
+    # KPI de faltas com desconto
+    kpi_faltas = {
+        'quantidade': faltas_injustificadas,
+        'desconto_total': desconto_info['desconto_total'],
+        'desconto_unitario': desconto_info.get('desconto_unitario', 0),
+        'valor_formatado': f"(-R$ {desconto_info['desconto_total']:.2f})" if desconto_info['desconto_total'] > 0 else ""
+    }
+    
+    return {
+        # ... outros KPIs ...
+        'faltas': kpi_faltas,
+        'custo_mao_obra_ajustado': custo_mao_obra - desconto_info['desconto_total']
+    }
+'''
+    
+    print("✅ CÓDIGO KPI ATUALIZADO GERADO")
+    return codigo_kpi_atualizado
+
+# EXECUTAR ATUALIZAÇÃO
+codigo_kpi = atualizar_kpi_faltas_com_desconto()
+```
+
+---
+
+## 🎨 **ETAPA 3: ATUALIZAR INTERFACE (HTML/CSS)**
+
+```html
+<!-- 3. Template atualizado para exibir desconto no KPI de faltas -->
+<div class="kpi-card faltas-card">
+    <div class="kpi-value">
+        {{ kpis.faltas.quantidade }}
+        {% if kpis.faltas.desconto_total > 0 %}
+            <div class="desconto-info">
+                <small class="desconto-valor">(-R$ {{ "%.2f"|format(kpis.faltas.desconto_total) }})</small>
+                <small class="desconto-label">Falta + DSR</small>
+            </div>
+        {% endif %}
+    </div>
+    <div class="kpi-label">Faltas</div>
+</div>
+```
+
+```css
+/* CSS para estilizar o desconto no KPI */
+.kpi-card .desconto-info {
+    font-size: 0.75rem;
+    color: #dc3545;
+    margin-top: 2px;
+    line-height: 1.2;
+}
+
+.desconto-valor {
+    font-weight: 600;
+    display: block;
+}
+
+.desconto-label {
+    font-weight: 400;
+    color: #6c757d;
+    display: block;
+}
+
+.faltas-card .kpi-value {
+    position: relative;
+}
+
+/* Responsivo */
+@media (max-width: 768px) {
+    .desconto-info {
+        font-size: 0.65rem;
+    }
+}
+```
+
+---
+
+## 🔧 **ETAPA 4: ATUALIZAR CUSTO MÃO DE OBRA**
+
+```python
+# 4. Ajustar cálculo do custo mão de obra
+def atualizar_custo_mao_obra_com_descontos():
+    """Atualiza cálculo de custo mão de obra considerando descontos"""
+    
+    codigo_custo_atualizado = '''
+def calcular_custo_mao_obra_periodo(funcionario_id, data_inicio, data_fim):
+    """
+    Calcula custo de mão de obra com descontos de falta + DSR
+    """
+    
+    funcionario = Funcionario.query.get(funcionario_id)
+    
+    # Custo base (horas trabalhadas + extras)
+    custo_base = calcular_custo_horas_trabalhadas(funcionario_id, data_inicio, data_fim)
+    
+    # Descontos de faltas + DSR
+    faltas_injustificadas = contar_faltas_injustificadas(funcionario_id, data_inicio, data_fim)
+    desconto_faltas = calcular_desconto_falta_dsr(funcionario, faltas_injustificadas, "injustificada")
+    
+    # Outros custos (alimentação, transporte, etc.)
+    outros_custos = calcular_outros_custos(funcionario_id, data_inicio, data_fim)
+    
+    # Custo final
+    custo_final = custo_base - desconto_faltas['desconto_total'] + outros_custos
+    
+    return {
+        'custo_base': custo_base,
+        'desconto_faltas': desconto_faltas['desconto_total'],
+        'outros_custos': outros_custos,
+        'custo_final': custo_final,
+        'detalhes_desconto': desconto_faltas
+    }
+'''
+    
+    print("✅ CÓDIGO CUSTO MÃO DE OBRA ATUALIZADO")
+    return codigo_custo_atualizado
+
+# EXECUTAR ATUALIZAÇÃO
+codigo_custo = atualizar_custo_mao_obra_com_descontos()
+```
+
+---
+
+## 🧪 **ETAPA 5: TESTAR IMPLEMENTAÇÃO COMPLETA**
+
+```python
+# 5. Teste completo da implementação
+def testar_implementacao_completa():
+    """Testa toda a implementação de falta + DSR"""
+    from app import app, db
+    from models import Funcionario, RegistroPonto
+    from datetime import datetime, date
+    
+    with app.app_context():
+        print("🧪 TESTANDO IMPLEMENTAÇÃO COMPLETA...")
+        
+        # Buscar Carlos
+        carlos = Funcionario.query.filter_by(
+            nome="Carlos Alberto Rigolin Junior"
+        ).first()
+        
+        if not carlos:
+            print("❌ Carlos não encontrado")
+            return
+        
+        # Simular período de julho/2025
+        data_inicio = date(2025, 7, 1)
+        data_fim = date(2025, 7, 31)
+        
+        # Contar faltas reais no período
+        faltas_reais = RegistroPonto.query.filter(
+            RegistroPonto.funcionario_id == carlos.id,
+            RegistroPonto.data.between(data_inicio, data_fim),
+            RegistroPonto.tipo_registro == 'falta'
+        ).count()
+        
+        print(f"📊 DADOS DO PERÍODO (Jul/2025):")
+        print(f"   - Funcionário: {carlos.nome}")
+        print(f"   - Salário: R$ {carlos.salario:,.2f}")
+        print(f"   - Faltas encontradas: {faltas_reais}")
+        
+        # Calcular desconto
+        if faltas_reais > 0:
+            desconto = calcular_desconto_falta_dsr(carlos, faltas_reais, "injustificada")
+            
+            print(f"\n💰 IMPACTO NO CUSTO MÃO DE OBRA:")
+            print(f"   - Custo original: R$ 2.125,38")
+            print(f"   - Desconto falta+DSR: -R$ {desconto['desconto_total']:.2f}")
+            print(f"   - Custo ajustado: R$ {2125.38 - desconto['desconto_total']:.2f}")
+            
+            # Simular exibição no KPI
+            print(f"\n🎨 EXIBIÇÃO NO KPI:")
+            print(f"   Faltas: {faltas_reais}")
+            if desconto['desconto_total'] > 0:
+                print(f"   (-R$ {desconto['desconto_total']:.2f})")
+                print(f"   Falta + DSR")
+        else:
+            print("ℹ️  Nenhuma falta encontrada no período")
+        
+        # Testar com dados fictícios se não houver faltas
+        if faltas_reais == 0:
+            print(f"\n🧪 SIMULAÇÃO COM 2 FALTAS:")
+            desconto_sim = calcular_desconto_falta_dsr(carlos, 2, "injustificada")
+            
+            print(f"🎨 COMO APARECERIA NO KPI:")
+            print(f"   Faltas: 2")
+            print(f"   (-R$ {desconto_sim['desconto_total']:.2f})")
+            print(f"   Falta + DSR")
+
+# EXECUTAR TESTE COMPLETO
+testar_implementacao_completa()
+```
+
+---
+
+## 📱 **ETAPA 6: IMPLEMENTAR RESPONSIVIDADE**
+
+```javascript
+// 6. JavaScript para ajustar exibição em mobile
+function ajustarExibicaoFaltasMobile() {
+    const faltasCards = document.querySelectorAll('.faltas-card');
+    
+    faltasCards.forEach(card => {
+        const descontoInfo = card.querySelector('.desconto-info');
+        
+        if (descontoInfo && window.innerWidth < 768) {
+            // Ajustar para mobile
+            descontoInfo.style.fontSize = '0.65rem';
+            descontoInfo.style.marginTop = '1px';
+        }
+    });
+}
+
+// Executar ao carregar e redimensionar
+document.addEventListener('DOMContentLoaded', ajustarExibicaoFaltasMobile);
+window.addEventListener('resize', ajustarExibicaoFaltasMobile);
+```
+
+---
+
+## 🎯 **ETAPA 7: EXEMPLO VISUAL FINAL**
+
+```
+ANTES:
+┌─────────────────┐
+│        0        │
+│     Faltas      │
+└─────────────────┘
+
+DEPOIS (com 2 faltas):
+┌─────────────────┐
+│        2        │
+│  (-R$ 140,40)   │
+│   Falta + DSR   │
+│     Faltas      │
+└─────────────────┘
+```
+
+---
+
+## 📋 **CHECKLIST DE IMPLEMENTAÇÃO**
+
+```
+□ Função calcular_desconto_falta_dsr() criada
+□ KPI de faltas atualizado com desconto
+□ Template HTML modificado
+□ CSS para estilização adicionado
+□ Custo mão de obra ajustado
+□ Testes realizados
+□ Responsividade implementada
+□ Validação com legislação
+```
+
+---
+
+## 🎯 **INSTRUÇÕES DE EXECUÇÃO**
+
+**Execute na ordem:**
+
+```python
+# 1. Implementar função de cálculo
+calcular_desconto_falta_dsr()
+
+# 2. Testar com Carlos
+testar_desconto_carlos()
+
+# 3. Atualizar KPIs
+atualizar_kpi_faltas_com_desconto()
+
+# 4. Atualizar custo mão de obra
+atualizar_custo_mao_obra_com_descontos()
+
+# 5. Teste completo
+testar_implementacao_completa()
+```
+
+**RESULTADO ESPERADO:** KPI de faltas mostrando quantidade + valor do desconto (falta + DSR) no mesmo quadrado, sem criar nova KPI, conforme legislação brasileira.
+
