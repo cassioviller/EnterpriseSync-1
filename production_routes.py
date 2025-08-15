@@ -207,3 +207,54 @@ def debug_info():
             'error': str(e),
             'status': 'ERROR'
         }), 500
+
+@production_bp.route('/safe-obras')
+def safe_obras():
+    """Rota segura para obras sem erros de template"""
+    try:
+        logging.info("Acessando rota segura de obras...")
+        
+        # Detectar admin_id automaticamente
+        admin_id = get_safe_admin_id()
+        logging.info(f"Admin ID detectado: {admin_id}")
+        
+        # Buscar obras do admin
+        obras = Obra.query.filter_by(admin_id=admin_id).order_by(Obra.created_at.desc()).all()
+        
+        logging.info(f"Encontradas {len(obras)} obras para admin_id={admin_id}")
+        
+        return render_template('obras_safe.html', 
+                             obras=obras,
+                             total_obras=len(obras))
+                             
+    except Exception as e:
+        import traceback
+        from datetime import datetime
+        
+        error_traceback = traceback.format_exc()
+        error_timestamp = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
+        
+        logging.error(f"Erro na rota safe-obras: {e}")
+        logging.error(f"Traceback: {error_traceback}")
+        
+        full_error_details = f"""
+ERRO NA ROTA SAFE-OBRAS: {str(e)}
+
+ROTA: /prod/safe-obras
+TIMESTAMP: {error_timestamp}
+
+TRACEBACK COMPLETO:
+{error_traceback}
+
+DIAGNÓSTICO:
+- Tentando buscar obras para admin_id
+- Erro pode estar relacionado ao template ou dados
+- Verifique se models Obra estão carregados corretamente
+"""
+        
+        return render_template('error.html', 
+                             error_code=500,
+                             error_message=f"Erro ao carregar obras: {str(e)}",
+                             error_details=full_error_details,
+                             error_url="/prod/safe-obras",
+                             error_timestamp=error_timestamp), 500

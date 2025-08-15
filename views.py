@@ -490,9 +490,27 @@ def funcionario_perfil_pdf(id):
 def obras():
     admin_id = current_user.id if current_user.tipo_usuario == TipoUsuario.ADMIN else current_user.admin_id
     
-    obras = Obra.query.filter_by(admin_id=admin_id).order_by(desc(Obra.created_at)).all()
+    # Obter filtros da query string
+    filtros = {
+        'nome': request.args.get('nome', ''),
+        'status': request.args.get('status', ''),
+        'cliente': request.args.get('cliente', '')
+    }
     
-    return render_template('obras.html', obras=obras)
+    # Construir query base
+    query = Obra.query.filter_by(admin_id=admin_id)
+    
+    # Aplicar filtros se fornecidos
+    if filtros['nome']:
+        query = query.filter(Obra.nome.ilike(f"%{filtros['nome']}%"))
+    if filtros['status']:
+        query = query.filter(Obra.status == filtros['status'])
+    if filtros['cliente']:
+        query = query.filter(Obra.cliente.ilike(f"%{filtros['cliente']}%"))
+    
+    obras = query.order_by(desc(Obra.created_at)).all()
+    
+    return render_template('obras.html', obras=obras, filtros=filtros)
 
 # ===== SUPER ADMIN =====
 @main_bp.route('/super-admin')
