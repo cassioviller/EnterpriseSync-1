@@ -91,7 +91,7 @@
                     </div>
                     <div class="col-6 mb-3">
                         <div class="bg-light p-2 rounded">
-                            <h5 class="text-success mb-1">{{ kpis_veiculo.combustivel_gasto }}L</h5>
+                            <h5 class="text-success mb-1">R$ {{ "%.2f"|format(kpis_veiculo.combustivel_gasto) }}</h5>
                             <small class="text-muted">Combustível</small>
                         </div>
                     </div>
@@ -101,17 +101,17 @@
     </div>
 </div>
 
-<!-- Histórico de Manutenções -->
+<!-- Histórico de Custos -->
 <div class="row mb-4">
     <div class="col-12">
         <div class="card">
             <div class="card-header">
                 <div class="d-flex justify-content-between align-items-center">
                     <h5 class="mb-0">
-                        <i class="fas fa-wrench"></i> Histórico de Manutenções
+                        <i class="fas fa-dollar-sign"></i> Histórico de Custos
                     </h5>
-                    <button class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#manutencaoModal">
-                        <i class="fas fa-plus"></i> Nova Manutenção
+                    <button class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#custoModal">
+                        <i class="fas fa-plus"></i> Novo Custo
                     </button>
                 </div>
             </div>
@@ -152,7 +152,7 @@
                                 <tr>
                                     <td colspan="5" class="text-center text-muted">
                                         <i class="fas fa-info-circle"></i>
-                                        Nenhuma manutenção registrada
+                                        Nenhum custo registrado
                                     </td>
                                 </tr>
                             {% endif %}
@@ -221,46 +221,49 @@
     </div>
 </div>
 
-<!-- Modal Nova Manutenção -->
-<div class="modal fade" id="manutencaoModal" tabindex="-1">
+<!-- Modal Novo Custo -->
+<div class="modal fade" id="custoModal" tabindex="-1">
     <div class="modal-dialog">
         <div class="modal-content">
             <div class="modal-header">
                 <h5 class="modal-title">
-                    <i class="fas fa-wrench"></i> Nova Manutenção
+                    <i class="fas fa-dollar-sign"></i> Novo Custo
                 </h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
             <form action="#" method="POST">
                 <div class="modal-body">
                     <div class="mb-3">
-                        <label for="data_manutencao" class="form-label">Data da Manutenção</label>
-                        <input type="date" class="form-control" id="data_manutencao" name="data_manutencao" required>
+                        <label for="data_custo" class="form-label">Data do Custo</label>
+                        <input type="date" class="form-control" id="data_custo" name="data_custo" required>
                     </div>
                     <div class="mb-3">
-                        <label for="tipo_manutencao" class="form-label">Tipo</label>
-                        <select class="form-select" id="tipo_manutencao" name="tipo_manutencao" required>
+                        <label for="tipo_custo" class="form-label">Tipo de Custo</label>
+                        <select class="form-select" id="tipo_custo" name="tipo_custo" required>
                             <option value="">Selecione...</option>
-                            <option value="Preventiva">Preventiva</option>
-                            <option value="Corretiva">Corretiva</option>
-                            <option value="Troca de Óleo">Troca de Óleo</option>
-                            <option value="Pneus">Pneus</option>
-                            <option value="Freios">Freios</option>
-                            <option value="Elétrica">Elétrica</option>
-                            <option value="Outros">Outros</option>
+                            <option value="combustivel">Combustível</option>
+                            <option value="manutencao">Manutenção</option>
+                            <option value="seguro">Seguro</option>
+                            <option value="ipva">IPVA</option>
+                            <option value="multa">Multa</option>
+                            <option value="outros">Outros</option>
                         </select>
                     </div>
                     <div class="mb-3">
-                        <label for="descricao_manutencao" class="form-label">Descrição</label>
-                        <textarea class="form-control" id="descricao_manutencao" name="descricao_manutencao" rows="3"></textarea>
+                        <label for="valor_custo" class="form-label">Valor (R$)</label>
+                        <input type="number" class="form-control" id="valor_custo" name="valor_custo" step="0.01" min="0" required>
                     </div>
                     <div class="mb-3">
-                        <label for="custo_manutencao" class="form-label">Custo (R$)</label>
-                        <input type="number" class="form-control" id="custo_manutencao" name="custo_manutencao" step="0.01" min="0">
+                        <label for="descricao_custo" class="form-label">Descrição</label>
+                        <textarea class="form-control" id="descricao_custo" name="descricao_custo" rows="3" placeholder="Ex: Abastecimento Posto Shell, Troca de óleo..."></textarea>
                     </div>
                     <div class="mb-3">
-                        <label for="proxima_manutencao" class="form-label">Próxima Manutenção</label>
-                        <input type="date" class="form-control" id="proxima_manutencao" name="proxima_manutencao">
+                        <label for="fornecedor_custo" class="form-label">Fornecedor</label>
+                        <input type="text" class="form-control" id="fornecedor_custo" name="fornecedor_custo" placeholder="Ex: Posto Ipiranga, Oficina João...">
+                    </div>
+                    <div class="mb-3">
+                        <label for="km_atual" class="form-label">Quilometragem Atual</label>
+                        <input type="number" class="form-control" id="km_atual" name="km_atual" min="0" placeholder="Ex: 45000">
                     </div>
                 </div>
                 <div class="modal-footer">
@@ -268,7 +271,7 @@
                         <i class="fas fa-times"></i> Cancelar
                     </button>
                     <button type="submit" class="btn btn-primary">
-                        <i class="fas fa-save"></i> Salvar Manutenção
+                        <i class="fas fa-save"></i> Salvar Custo
                     </button>
                 </div>
             </form>
