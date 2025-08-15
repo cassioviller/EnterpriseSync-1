@@ -588,6 +588,49 @@ def obras():
     
     return render_template('obras.html', obras=obras, filtros=filtros)
 
+# Detalhes de uma obra específica
+@main_bp.route('/obras/<int:id>')
+@admin_required
+def detalhes_obra(id):
+    try:
+        admin_id = current_user.id if current_user.tipo_usuario == TipoUsuario.ADMIN else current_user.admin_id
+        
+        # Buscar a obra
+        obra = Obra.query.filter_by(id=id, admin_id=admin_id).first_or_404()
+        
+        # Filtros de data
+        data_inicio = request.args.get('data_inicio')
+        data_fim = request.args.get('data_fim')
+        
+        # Definir período padrão (último mês)
+        if not data_inicio:
+            data_inicio = date.today().replace(day=1)
+        else:
+            data_inicio = datetime.strptime(data_inicio, '%Y-%m-%d').date()
+        
+        if not data_fim:
+            data_fim = date.today()
+        else:
+            data_fim = datetime.strptime(data_fim, '%Y-%m-%d').date()
+        
+        # KPIs básicos da obra
+        kpis_obra = {
+            'total_funcionarios': 0,
+            'total_horas': 0,
+            'total_custos': 0,
+            'progresso': 0
+        }
+        
+        return render_template('obras/detalhes_obra.html', 
+                             obra=obra, 
+                             kpis_obra=kpis_obra,
+                             data_inicio=data_inicio,
+                             data_fim=data_fim)
+    except Exception as e:
+        print(f"ERRO DETALHES OBRA: {str(e)}")
+        # Redirecionar para lista de obras em caso de erro
+        return redirect(url_for('main.obras'))
+
 # ===== SUPER ADMIN =====
 @main_bp.route('/super-admin')
 @super_admin_required
