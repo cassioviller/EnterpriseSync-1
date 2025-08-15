@@ -736,7 +736,7 @@ function setDateRange(periodo) {
             // Julho de 2025 (mês anterior ao atual)
             dataInicio = new Date(hoje.getFullYear(), hoje.getMonth() - 1, 1);
             dataFim = new Date(hoje.getFullYear(), hoje.getMonth(), 0);
-            console.log('Filtro último mês:', dataInicio, 'até', dataFim);
+            console.log('Filtro último mês:', dataInicio.toISOString().split('T')[0], 'até', dataFim.toISOString().split('T')[0]);
             break;
         case 'ultimos_3_meses':
             dataInicio = new Date(hoje.getFullYear(), hoje.getMonth() - 2, 1);

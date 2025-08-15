@@ -887,20 +887,24 @@ def detalhes_obra(id):
         else:
             data_fim = datetime.strptime(data_fim, '%Y-%m-%d').date()
         
-        # KPIs básicos da obra
+        # KPIs básicos da obra com valores zero seguros
         kpis_obra = {
             'total_funcionarios': 0,
-            'total_horas': 0,
+            'total_horas': 0.0,
             'total_rdos': 0,
             'dias_trabalhados': 0,
-            'custo_total': 0,
+            'custo_total': 0.0,
             'funcionarios_ativos': 0,
-            'progresso_geral': 0
+            'progresso_geral': 0.0,
+            'funcionarios_periodo': 0,
+            'custo_transporte': 0.0,
+            'custo_alimentacao': 0.0,
+            'custo_mao_obra': 0.0
         }
         
         return render_template('obras/detalhes_obra.html', 
                              obra=obra, 
-                             kpis_obra=kpis_obra,
+                             kpis=kpis_obra,
                              data_inicio=data_inicio,
                              data_fim=data_fim)
     except Exception as e:
