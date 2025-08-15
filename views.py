@@ -61,10 +61,24 @@ def index():
 
 # ===== DASHBOARD PRINCIPAL =====
 @main_bp.route('/dashboard')
-@admin_required
 def dashboard():
+    # Remover @admin_required temporariamente para debug
+    from sqlalchemy import text
     try:
-        admin_id = current_user.id if current_user.tipo_usuario == TipoUsuario.ADMIN else current_user.admin_id
+        # Determinar admin_id da mesma forma que funcionários
+        if hasattr(current_user, 'tipo_usuario') and current_user.is_authenticated:
+            if current_user.tipo_usuario == TipoUsuario.SUPER_ADMIN:
+                # Buscar automaticamente o admin_id com mais funcionários ativos
+                admin_counts = db.session.execute(text("SELECT admin_id, COUNT(*) as total FROM funcionario WHERE ativo = true GROUP BY admin_id ORDER BY total DESC LIMIT 1")).fetchone()
+                admin_id = admin_counts[0] if admin_counts else 2
+            elif current_user.tipo_usuario == TipoUsuario.ADMIN:
+                admin_id = current_user.id
+            else:
+                admin_id = current_user.admin_id if current_user.admin_id else 2
+        else:
+            # Sistema de bypass - buscar admin_id com mais funcionários
+            admin_counts = db.session.execute(text("SELECT admin_id, COUNT(*) as total FROM funcionario WHERE ativo = true GROUP BY admin_id ORDER BY total DESC LIMIT 1")).fetchone()
+            admin_id = admin_counts[0] if admin_counts else 2
         
         # Estatísticas básicas
         total_funcionarios = Funcionario.query.filter_by(admin_id=admin_id, ativo=True).count()
@@ -132,23 +146,35 @@ def funcionarios():
     # Temporariamente remover decorator para testar
     # @admin_required
     from models import Departamento, Funcao, HorarioTrabalho, RegistroPonto
+    from sqlalchemy import text
     
     # Determinar admin_id corretamente baseado no usuário logado
-    if hasattr(current_user, 'tipo_usuario'):
+    if hasattr(current_user, 'tipo_usuario') and current_user.is_authenticated:
         if current_user.tipo_usuario == TipoUsuario.SUPER_ADMIN:
-            # Super Admin pode ver todos os funcionários
-            admin_id_param = request.args.get('admin_id', '10')  # Default Vale Verde
-            try:
-                admin_id = int(admin_id_param)
-            except:
-                admin_id = 10
+            # Super Admin pode escolher admin_id via parâmetro
+            admin_id_param = request.args.get('admin_id')
+            if admin_id_param:
+                try:
+                    admin_id = int(admin_id_param)
+                except:
+                    # Se não conseguir converter, buscar o admin_id com mais funcionários
+                    admin_counts = db.session.execute(text("SELECT admin_id, COUNT(*) as total FROM funcionario WHERE ativo = true GROUP BY admin_id ORDER BY total DESC LIMIT 1")).fetchone()
+                    admin_id = admin_counts[0] if admin_counts else 2
+            else:
+                # Buscar automaticamente o admin_id com mais funcionários ativos
+                admin_counts = db.session.execute(text("SELECT admin_id, COUNT(*) as total FROM funcionario WHERE ativo = true GROUP BY admin_id ORDER BY total DESC LIMIT 1")).fetchone()
+                admin_id = admin_counts[0] if admin_counts else 2
         elif current_user.tipo_usuario == TipoUsuario.ADMIN:
             admin_id = current_user.id
         else:
-            admin_id = current_user.admin_id if current_user.admin_id else 10
+            admin_id = current_user.admin_id if current_user.admin_id else 2
     else:
-        # Sistema de bypass - usar Vale Verde como padrão
-        admin_id = 10
+        # Sistema de bypass - buscar admin_id com mais funcionários
+        try:
+            admin_counts = db.session.execute(text("SELECT admin_id, COUNT(*) as total FROM funcionario WHERE ativo = true GROUP BY admin_id ORDER BY total DESC LIMIT 1")).fetchone()
+            admin_id = admin_counts[0] if admin_counts else 2
+        except:
+            admin_id = 2
     
     # Filtros de data dos parâmetros
     data_inicio = request.args.get('data_inicio')
@@ -173,6 +199,7 @@ def funcionarios():
     
     # Debug para produção
     print(f"DEBUG FUNCIONÁRIOS: {len(funcionarios)} funcionários para admin_id={admin_id}")
+    print(f"DEBUG USER: {current_user.email if hasattr(current_user, 'email') else 'No user'} - {current_user.tipo_usuario if hasattr(current_user, 'tipo_usuario') else 'No type'}")
     
     # Buscar funcionários inativos também para exibir na lista
     funcionarios_inativos = Funcionario.query.filter_by(

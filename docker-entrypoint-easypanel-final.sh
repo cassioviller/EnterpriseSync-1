@@ -117,7 +117,8 @@ VALUES
 ON CONFLICT (codigo) DO NOTHING;
 
 -- CORRIGIR FUNCIONÁRIOS EXISTENTES PARA O ADMIN CORRETO
-UPDATE funcionario SET admin_id = 10 WHERE admin_id = 4;
+-- Em produção, manter os admin_id existentes se já tiverem dados
+-- UPDATE funcionario SET admin_id = 10 WHERE admin_id = 4;
 
 -- OBRA DEMO
 INSERT INTO obra (codigo, nome, descricao, status, data_inicio, data_fim_prevista, admin_id, token_cliente, orcamento, valor_contrato, area_total_m2, cliente_nome, cliente_email, cliente_telefone, portal_ativo)
