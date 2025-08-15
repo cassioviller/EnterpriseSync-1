@@ -133,13 +133,22 @@ def funcionarios():
     # @admin_required
     from models import Departamento, Funcao, HorarioTrabalho, RegistroPonto
     
-    # Debug admin_id para multi-tenancy
-    # Para desenvolvimento, mostrar funcionários de todos os admins ou permitir alternar
-    admin_id_param = request.args.get('admin_id', '10')  # Default admin_id=10 (Vale Verde)
-    try:
-        admin_id = int(admin_id_param)
-    except:
-        admin_id = 10  # Fallback para Vale Verde
+    # Determinar admin_id corretamente baseado no usuário logado
+    if hasattr(current_user, 'tipo_usuario'):
+        if current_user.tipo_usuario == TipoUsuario.SUPER_ADMIN:
+            # Super Admin pode ver todos os funcionários
+            admin_id_param = request.args.get('admin_id', '10')  # Default Vale Verde
+            try:
+                admin_id = int(admin_id_param)
+            except:
+                admin_id = 10
+        elif current_user.tipo_usuario == TipoUsuario.ADMIN:
+            admin_id = current_user.id
+        else:
+            admin_id = current_user.admin_id if current_user.admin_id else 10
+    else:
+        # Sistema de bypass - usar Vale Verde como padrão
+        admin_id = 10
     
     # Filtros de data dos parâmetros
     data_inicio = request.args.get('data_inicio')
@@ -161,6 +170,9 @@ def funcionarios():
         admin_id=admin_id,
         ativo=True
     ).order_by(Funcionario.nome).all()
+    
+    # Debug para produção
+    print(f"DEBUG FUNCIONÁRIOS: {len(funcionarios)} funcionários para admin_id={admin_id}")
     
     # Buscar funcionários inativos também para exibir na lista
     funcionarios_inativos = Funcionario.query.filter_by(

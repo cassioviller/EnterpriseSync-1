@@ -106,9 +106,14 @@ VALUES
 ('valeverde', 'valeverde@sige.com', 'Vale Verde Admin', 'scrypt:32768:8:1$o8T5NlEWKHiEXE2Q$46c1dd2f6a3d0f0c3e2e8e1a1a9a5a7a8a8a9a5a7a8a8a9a5a7a8a8a9a5a7a8a8a9a5a7a8a8a9a5a7a8a8a9a5a7', 'admin', TRUE, 10)
 ON CONFLICT (email) DO NOTHING;
 
--- FUNCIONÁRIO DEMO
-INSERT INTO funcionario (codigo, nome, cpf, cargo, salario, data_admissao, admin_id)
-VALUES ('FUN001', 'Carlos Alberto Santos', '123.456.789-00', 'Operador', 2500.00, '2024-01-15', 10)
+-- FUNCIONÁRIOS DEMO PARA PRODUÇÃO
+INSERT INTO funcionario (codigo, nome, cpf, cargo, salario, data_admissao, admin_id, ativo)
+VALUES 
+('FUN001', 'Carlos Alberto Santos', '123.456.789-00', 'Operador', 2500.00, '2024-01-15', 10, TRUE),
+('FUN002', 'Maria Silva Costa', '234.567.890-11', 'Auxiliar Administrativo', 2200.00, '2024-02-01', 10, TRUE),
+('FUN003', 'João Oliveira Lima', '345.678.901-22', 'Soldador', 3200.00, '2024-03-10', 10, TRUE),
+('FUN004', 'Ana Paula Santos', '456.789.012-33', 'Ajudante Geral', 1800.00, '2024-04-05', 10, TRUE),
+('FUN005', 'Pedro Costa Alves', '567.890.123-44', 'Motorista', 2800.00, '2024-05-20', 10, TRUE)
 ON CONFLICT (codigo) DO NOTHING;
 
 -- OBRA DEMO
