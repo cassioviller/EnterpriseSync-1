@@ -663,7 +663,7 @@ function excluirObra(id) {
     if (confirm('Tem certeza que deseja excluir esta obra?\nEsta ação não pode ser desfeita.')) {
         const form = document.createElement('form');
         form.method = 'POST';
-        form.action = '{{ url_for("main.excluir_obra", id="OBRA_ID") }}'.replace('OBRA_ID', id);
+        form.action = '/obras/excluir/' + id;
         
         // Adicionar token CSRF se disponível
         const csrfToken = document.querySelector('meta[name=csrf-token]');
