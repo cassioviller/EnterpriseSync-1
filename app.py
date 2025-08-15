@@ -73,6 +73,14 @@ except ImportError:
 app.register_blueprint(main_bp)
 app.register_blueprint(production_bp, url_prefix='/prod')
 
+# Register test error route for debugging
+try:
+    from test_error_route import test_bp
+    app.register_blueprint(test_bp, url_prefix='/test')
+    logging.info("✅ Blueprint de teste de erro registrado")
+except ImportError:
+    logging.warning("⚠️ Blueprint de teste não encontrado")
+
 # Register error handlers
 register_error_handlers(app)
 

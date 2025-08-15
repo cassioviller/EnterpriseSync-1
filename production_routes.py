@@ -76,10 +76,36 @@ def safe_funcionarios():
                              data_fim=data_fim)
                              
     except Exception as e:
+        import traceback
+        from datetime import datetime
+        
+        error_traceback = traceback.format_exc()
+        error_timestamp = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
+        
         logging.error(f"Erro na rota safe-funcionarios: {e}")
+        logging.error(f"Traceback: {error_traceback}")
+        
+        full_error_details = f"""
+ERRO NA ROTA SAFE-FUNCIONÁRIOS: {str(e)}
+
+ROTA: /prod/safe-funcionarios
+TIMESTAMP: {error_timestamp}
+
+TRACEBACK COMPLETO:
+{error_traceback}
+
+DIAGNÓSTICO:
+- Tentando buscar funcionários para admin_id
+- Erro pode estar relacionado ao template ou dados
+- Verifique se models estão carregados corretamente
+"""
+        
         return render_template('error.html', 
                              error_code=500,
-                             error_message=f"Erro ao carregar funcionários: {str(e)}"), 500
+                             error_message=f"Erro ao carregar funcionários: {str(e)}",
+                             error_details=full_error_details,
+                             error_url="/prod/safe-funcionarios",
+                             error_timestamp=error_timestamp), 500
 
 @production_bp.route('/safe-dashboard')
 def safe_dashboard():
@@ -126,10 +152,36 @@ def safe_dashboard():
                              veiculos_disponiveis=3)
                              
     except Exception as e:
+        import traceback
+        from datetime import datetime
+        
+        error_traceback = traceback.format_exc()
+        error_timestamp = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
+        
         logging.error(f"Erro na rota safe-dashboard: {e}")
+        logging.error(f"Traceback: {error_traceback}")
+        
+        full_error_details = f"""
+ERRO NA ROTA SAFE-DASHBOARD: {str(e)}
+
+ROTA: /prod/safe-dashboard
+TIMESTAMP: {error_timestamp}
+
+TRACEBACK COMPLETO:
+{error_traceback}
+
+DIAGNÓSTICO:
+- Tentando carregar dashboard com dados básicos
+- Erro pode estar no template dashboard_safe.html
+- Verifique formatação de variáveis no template
+"""
+        
         return render_template('error.html', 
                              error_code=500,
-                             error_message=f"Erro ao carregar dashboard: {str(e)}"), 500
+                             error_message=f"Erro ao carregar dashboard: {str(e)}",
+                             error_details=full_error_details,
+                             error_url="/prod/safe-dashboard",
+                             error_timestamp=error_timestamp), 500
 
 @production_bp.route('/debug-info')
 def debug_info():

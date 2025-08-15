@@ -26,6 +26,35 @@
                             Algo deu errado. Tente novamente em alguns minutos.
                         {% endif %}
                     </p>
+                    
+                    {% if error_details %}
+                    <div class="mt-4">
+                        <h6 class="text-danger">
+                            <i class="fas fa-bug"></i> Detalhes Técnicos do Erro:
+                        </h6>
+                        <div class="alert alert-danger">
+                            <pre class="mb-0" style="white-space: pre-wrap; font-size: 0.9em;">{{ error_details }}</pre>
+                        </div>
+                    </div>
+                    {% endif %}
+                    
+                    {% if error_url %}
+                    <div class="mt-3">
+                        <h6 class="text-info">
+                            <i class="fas fa-link"></i> URL que causou o erro:
+                        </h6>
+                        <code class="text-muted">{{ error_url }}</code>
+                    </div>
+                    {% endif %}
+                    
+                    {% if error_timestamp %}
+                    <div class="mt-3">
+                        <h6 class="text-secondary">
+                            <i class="fas fa-clock"></i> Horário do erro:
+                        </h6>
+                        <small class="text-muted">{{ error_timestamp }}</small>
+                    </div>
+                    {% endif %}
                     <div class="mt-4">
                         <a href="{{ url_for('main.dashboard') }}" class="btn btn-primary">
                             <i class="fas fa-home"></i>
