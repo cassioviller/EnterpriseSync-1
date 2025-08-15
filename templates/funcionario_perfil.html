@@ -775,7 +775,7 @@
                 <h5 class="modal-title" id="pontoModalLabel">Novo Registro de Ponto</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
-            <form method="POST" id="pontoForm" action="#" onsubmit="return salvarPonto(event)">
+            <form method="POST" id="pontoForm" action="{{ url_for('main.novo_ponto') }}" onsubmit="return salvarPonto(event)">
                 <input type="hidden" id="registro_id_ponto" name="registro_id_ponto" value="">
                 <div class="modal-body">
                     <input type="hidden" id="funcionario_id" name="funcionario_id" value="{{ funcionario.id }}">
@@ -1673,7 +1673,8 @@ function salvarPonto(event) {
         }
         body = JSON.stringify(dados);
     } else {
-        url = form.action;
+        // Novo registro - usar POST com FormData para a rota correta
+        url = '/ponto/novo';
         method = 'POST';
         body = formData;
     }

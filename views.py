@@ -1042,6 +1042,118 @@ def nova_obra():
         db.session.rollback()
         return redirect(url_for('main.obras'))
 
+# ===== REGISTRO DE PONTO =====
+@main_bp.route('/ponto/novo', methods=['POST'])
+def novo_ponto():
+    """Criar novo registro de ponto"""
+    try:
+        # Detectar admin_id usando o sistema de bypass
+        admin_id = 10  # Default para admin com mais dados
+        
+        funcionario_id = request.form.get('funcionario_id')
+        tipo_lancamento = request.form.get('tipo_lancamento')
+        data = request.form.get('data')
+        obra_id = request.form.get('obra_id') or None
+        observacoes = request.form.get('observacoes', '')
+        
+        # Validações básicas
+        if not funcionario_id or not tipo_lancamento or not data:
+            return jsonify({'success': False, 'error': 'Campos obrigatórios não preenchidos'}), 400
+        
+        # Verificar se o funcionário existe
+        funcionario = Funcionario.query.filter_by(id=funcionario_id, admin_id=admin_id).first()
+        if not funcionario:
+            return jsonify({'success': False, 'error': 'Funcionário não encontrado'}), 404
+        
+        # Mapear tipo de lançamento para o banco
+        tipos_validos = {
+            'trabalho_normal': 'trabalho_normal',
+            'sabado_trabalhado': 'sabado_trabalhado', 
+            'domingo_trabalhado': 'domingo_trabalhado',
+            'feriado_trabalhado': 'feriado_trabalhado',
+            'meio_periodo': 'meio_periodo',
+            'falta': 'falta',
+            'falta_justificada': 'falta_justificada',
+            'ferias': 'ferias',
+            'feriado_folga': 'feriado',
+            'sabado_folga': 'sabado_folga',
+            'domingo_folga': 'domingo_folga'
+        }
+        
+        tipo_banco = tipos_validos.get(tipo_lancamento)
+        if not tipo_banco:
+            return jsonify({'success': False, 'error': 'Tipo de lançamento inválido'}), 400
+        
+        # Converter data
+        data_ponto = datetime.strptime(data, '%Y-%m-%d').date()
+        
+        # Verificar se já existe registro para esta data
+        registro_existente = RegistroPonto.query.filter_by(
+            funcionario_id=funcionario_id,
+            data=data_ponto
+        ).first()
+        
+        if registro_existente:
+            return jsonify({'success': False, 'error': 'Já existe registro para esta data'}), 400
+        
+        # Criar novo registro
+        novo_registro = RegistroPonto(
+            funcionario_id=funcionario_id,
+            data=data_ponto,
+            tipo_registro=tipo_banco,
+            obra_id=obra_id,
+            observacoes=observacoes,
+            horas_trabalhadas=0.0,
+            horas_extras=0.0
+        )
+        
+        # Para tipos que trabalham, pegar horários
+        tipos_com_horario = ['trabalho_normal', 'sabado_trabalhado', 'domingo_trabalhado', 'feriado_trabalhado', 'meio_periodo']
+        if tipo_banco in tipos_com_horario:
+            hora_entrada = request.form.get('hora_entrada')
+            hora_saida = request.form.get('hora_saida')
+            hora_almoco_saida = request.form.get('hora_almoco_saida')
+            hora_almoco_retorno = request.form.get('hora_almoco_retorno')
+            
+            if hora_entrada:
+                novo_registro.hora_entrada = datetime.strptime(hora_entrada, '%H:%M').time()
+            if hora_saida:
+                novo_registro.hora_saida = datetime.strptime(hora_saida, '%H:%M').time()
+            if hora_almoco_saida:
+                novo_registro.hora_almoco_saida = datetime.strptime(hora_almoco_saida, '%H:%M').time()
+            if hora_almoco_retorno:
+                novo_registro.hora_almoco_retorno = datetime.strptime(hora_almoco_retorno, '%H:%M').time()
+            
+            # Calcular horas se entrada e saída estão preenchidas
+            if novo_registro.hora_entrada and novo_registro.hora_saida:
+                entrada_minutos = novo_registro.hora_entrada.hour * 60 + novo_registro.hora_entrada.minute
+                saida_minutos = novo_registro.hora_saida.hour * 60 + novo_registro.hora_saida.minute
+                
+                if saida_minutos < entrada_minutos:
+                    saida_minutos += 24 * 60
+                
+                total_minutos = saida_minutos - entrada_minutos
+                
+                # Subtrair almoço se definido
+                if novo_registro.hora_almoco_saida and novo_registro.hora_almoco_retorno:
+                    almoco_saida_min = novo_registro.hora_almoco_saida.hour * 60 + novo_registro.hora_almoco_saida.minute
+                    almoco_retorno_min = novo_registro.hora_almoco_retorno.hour * 60 + novo_registro.hora_almoco_retorno.minute
+                    if almoco_retorno_min > almoco_saida_min:
+                        total_minutos -= (almoco_retorno_min - almoco_saida_min)
+                
+                novo_registro.horas_trabalhadas = total_minutos / 60.0
+        
+        db.session.add(novo_registro)
+        db.session.commit()
+        
+        print(f"✅ Registro de ponto criado: {funcionario.nome} - {data_ponto} - {tipo_banco}")
+        return jsonify({'success': True, 'message': 'Registro criado com sucesso!'}), 200
+        
+    except Exception as e:
+        db.session.rollback()
+        print(f"❌ Erro ao criar registro de ponto: {str(e)}")
+        return jsonify({'success': False, 'error': f'Erro interno: {str(e)}'}), 500
+
 # Rota para editar obra
 @main_bp.route('/obras/editar/<int:id>', methods=['POST'])
 @admin_required
