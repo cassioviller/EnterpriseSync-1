@@ -1014,7 +1014,7 @@ def detalhes_obra(id):
             custos_transporte = []
             custos_transporte_total = 0.0
         
-        # Filtros de data
+        # Filtros de data - definir ANTES dos cálculos
         data_inicio_param = request.args.get('data_inicio')
         data_fim_param = request.args.get('data_fim')
         
@@ -1028,6 +1028,8 @@ def detalhes_obra(id):
             data_fim = date.today()
         else:
             data_fim = datetime.strptime(data_fim_param, '%Y-%m-%d').date()
+        
+        print(f"DEBUG PERÍODO DETALHES: {data_inicio} até {data_fim}")
         
         # KPIs básicos da obra com valores zero seguros
         kpis_obra = {
