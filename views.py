@@ -213,45 +213,74 @@ def funcionarios():
         status='Em andamento'  
     ).order_by(Obra.nome).all()
     
-    # KPIs básicos por funcionário
-    funcionarios_kpis = []
-    for func in funcionarios:
-        registros = RegistroPonto.query.filter(
-            RegistroPonto.funcionario_id == func.id,
-            RegistroPonto.data >= data_inicio,
-            RegistroPonto.data <= data_fim
-        ).all()
+    # Tratamento de erro robusto para KPIs
+    try:
+        # KPIs básicos por funcionário
+        funcionarios_kpis = []
+        for func in funcionarios:
+            try:
+                registros = RegistroPonto.query.filter(
+                    RegistroPonto.funcionario_id == func.id,
+                    RegistroPonto.data >= data_inicio,
+                    RegistroPonto.data <= data_fim
+                ).all()
+                
+                total_horas = sum(r.horas_trabalhadas or 0 for r in registros)
+                total_extras = sum(r.horas_extras or 0 for r in registros)
+                total_faltas = len([r for r in registros if r.tipo_registro == 'falta'])
+                
+                funcionarios_kpis.append({
+                    'funcionario': func,
+                    'horas_trabalhadas': total_horas,
+                    'total_horas': total_horas,
+                    'total_extras': total_extras,
+                    'total_faltas': total_faltas,
+                    'custo_total': (total_horas + total_extras * 1.5) * (func.salario / 220 if func.salario else 0)
+                })
+            except Exception as e:
+                print(f"Erro KPI funcionário {func.nome}: {str(e)}")
+                funcionarios_kpis.append({
+                    'funcionario': func,
+                    'horas_trabalhadas': 0,
+                    'total_horas': 0,
+                    'total_extras': 0,
+                    'total_faltas': 0,
+                    'custo_total': 0
+                })
         
-        total_horas = sum(r.horas_trabalhadas or 0 for r in registros)
-        total_extras = sum(r.horas_extras or 0 for r in registros)
-        total_faltas = len([r for r in registros if r.tipo_registro == 'falta'])
+        # KPIs gerais
+        total_horas_geral = sum(k['total_horas'] for k in funcionarios_kpis)
+        total_extras_geral = sum(k['total_extras'] for k in funcionarios_kpis)
+        total_faltas_geral = sum(k['total_faltas'] for k in funcionarios_kpis)
+        total_custo_geral = sum(k['custo_total'] for k in funcionarios_kpis)
         
-        funcionarios_kpis.append({
-            'funcionario': func,
-            'horas_trabalhadas': total_horas,
-            'total_horas': total_horas,
-            'total_extras': total_extras,
-            'total_faltas': total_faltas,
-            'custo_total': (total_horas + total_extras * 1.5) * (func.salario / 220 if func.salario else 0)
-        })
+        kpis_geral = {
+            'total_funcionarios': len(funcionarios),
+            'funcionarios_ativos': len(funcionarios),
+            'total_horas_geral': total_horas_geral,
+            'total_extras_geral': total_extras_geral,
+            'total_faltas_geral': total_faltas_geral,
+            'total_faltas_justificadas_geral': 0,  # Para implementar depois
+            'total_custo_geral': total_custo_geral,
+            'total_custo_faltas_geral': 0,  # Para implementar depois
+            'taxa_absenteismo_geral': (total_faltas_geral / len(funcionarios) * 100) if funcionarios else 0
+        }
     
-    # KPIs gerais
-    total_horas_geral = sum(k['total_horas'] for k in funcionarios_kpis)
-    total_extras_geral = sum(k['total_extras'] for k in funcionarios_kpis)
-    total_faltas_geral = sum(k['total_faltas'] for k in funcionarios_kpis)
-    total_custo_geral = sum(k['custo_total'] for k in funcionarios_kpis)
-    
-    kpis_geral = {
-        'total_funcionarios': len(funcionarios),
-        'funcionarios_ativos': len(funcionarios),
-        'total_horas_geral': total_horas_geral,
-        'total_extras_geral': total_extras_geral,
-        'total_faltas_geral': total_faltas_geral,
-        'total_faltas_justificadas_geral': 0,  # Para implementar depois
-        'total_custo_geral': total_custo_geral,
-        'total_custo_faltas_geral': 0,  # Para implementar depois
-        'taxa_absenteismo_geral': (total_faltas_geral / len(funcionarios) * 100) if funcionarios else 0
-    }
+    except Exception as e:
+        print(f"ERRO CRÍTICO KPIs: {str(e)}")
+        # KPIs vazios em caso de erro
+        funcionarios_kpis = []
+        kpis_geral = {
+            'total_funcionarios': len(funcionarios),
+            'funcionarios_ativos': len(funcionarios),
+            'total_horas_geral': 0,
+            'total_extras_geral': 0,
+            'total_faltas_geral': 0,
+            'total_faltas_justificadas_geral': 0,
+            'total_custo_geral': 0,
+            'total_custo_faltas_geral': 0,
+            'taxa_absenteismo_geral': 0
+        }
     
     # Debug final antes do template
     print(f"DEBUG FUNCIONÁRIOS: {len(funcionarios)} funcionários, {len(funcionarios_kpis)} KPIs")
