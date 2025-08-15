@@ -1,0 +1,37 @@
+Erro inesperado no sistema
+Ocorreu um erro interno no servidor. Nossa equipe foi notificada.
+
+ Detalhes Técnicos do Erro:
+EXCEÇÃO NÃO TRATADA: cannot access local variable 'date' where it is not associated with a value
+
+URL: https://www.sige.cassioviller.tech/alimentacao
+MÉTODO: GET
+TIMESTAMP: 15/08/2025 12:24:42
+TIPO DO ERRO: UnboundLocalError
+
+TRACEBACK COMPLETO:
+Traceback (most recent call last):
+  File "/usr/local/lib/python3.11/site-packages/flask/app.py", line 917, in full_dispatch_request
+    rv = self.dispatch_request()
+         ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.11/site-packages/flask/app.py", line 902, in dispatch_request
+    return self.ensure_sync(self.view_functions[rule.endpoint])(**view_args)  # type: ignore[no-any-return]
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.11/site-packages/flask_login/utils.py", line 290, in decorated_view
+    return current_app.ensure_sync(func)(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/app/alimentacao_crud.py", line 43, in listar_alimentacao
+    data_inicio = date.today() - timedelta(days=30)
+                  ^^^^
+UnboundLocalError: cannot access local variable 'date' where it is not associated with a value
+
+
+CONTEXTO DA REQUISIÇÃO:
+- Headers: {'Host': 'www.sige.cassioviller.tech', 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Safari/537.36', 'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7', 'Accept-Encoding': 'gzip, deflate, br, zstd', 'Accept-Language': 'pt-BR,pt;q=0.9,en-US;q=0.8,en;q=0.7', 'Cookie': 'session=.eJwlzksKwzAMRdG9eNyBLNtynM0ES3qmmZV8CqV07w0E7uTOzjcsY8P-DPOxnXiEZfUwh1EHK3QgxsYVME1WKBNQusRsTKToA5x6s8JZYexKOqxepUxVOkOyZwjn5mitWKuRCULcQJNSLNyiS-pKrhOLGxURU_GEcEHOHdut4Wv18-r7vnQ71jdu7O8Pjds4Eg.aJ8m_Q.tWS0_Y0F1A1251oyHRVCr_cj1-4', 'Dnt': '1', 'Priority': 'u=0, i', 'Referer': 'https://www.sige.cassioviller.tech/veiculos', 'Sec-Ch-Ua': '"Not;A=Brand";v="99", "Google Chrome";v="139", "Chromium";v="139"', 'Sec-Ch-Ua-Mobile': '?0', 'Sec-Ch-Ua-Platform': '"Windows"', 'Sec-Fetch-Dest': 'document', 'Sec-Fetch-Mode': 'navigate', 'Sec-Fetch-Site': 'same-origin', 'Sec-Fetch-User': '?1', 'Upgrade-Insecure-Requests': '1', 'X-Forwarded-For': '177.94.254.22', 'X-Forwarded-Host': 'www.sige.cassioviller.tech', 'X-Forwarded-Port': '443', 'X-Forwarded-Proto': 'https', 'X-Forwarded-Server': '337e056cfbb6', 'X-Real-Ip': '177.94.254.22'}
+- Args: {}
+- Form: Nenhum
+- JSON: Não é JSON
+ URL que causou o erro:
+https://www.sige.cassioviller.tech/alimentacao
+ Horário do erro:
+15/08/2025 12:24:42

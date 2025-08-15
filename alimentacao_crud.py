@@ -38,6 +38,9 @@ def listar_alimentacao():
     if funcionario_id:
         query = query.filter(RegistroAlimentacao.funcionario_id == funcionario_id)
     
+    # Importar date no início da função
+    from datetime import date
+    
     # Se não há filtros, mostrar últimos 30 dias
     if not data_inicio and not data_fim:
         data_inicio = date.today() - timedelta(days=30)
@@ -50,9 +53,6 @@ def listar_alimentacao():
     funcionarios = Funcionario.query.order_by(Funcionario.nome).all()
     obras = Obra.query.filter_by(status='Em Andamento').order_by(Obra.nome).all()
     restaurantes = Restaurante.query.order_by(Restaurante.nome).all()
-    
-    # Importar date para o template
-    from datetime import date
     
     return render_template('alimentacao.html',
                          registros=registros,

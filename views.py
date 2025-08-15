@@ -705,6 +705,20 @@ def detalhes_veiculo(id):
         # Redirecionar para lista de veículos em caso de erro
         return redirect(url_for('main.veiculos'))
 
+# Rota para novo uso de veículo
+@main_bp.route('/veiculos/novo-uso', methods=['POST'])
+@admin_required
+def novo_uso_veiculo_lista():
+    # Implementação futura
+    return redirect(url_for('main.veiculos'))
+
+# Rota para novo RDO
+@main_bp.route('/rdo/novo')
+@admin_required
+def novo_rdo():
+    # Implementação futura
+    return redirect(url_for('main.obras'))
+
 @main_bp.route('/veiculos/novo', methods=['POST'])
 @admin_required
 def novo_veiculo():
