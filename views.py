@@ -180,16 +180,141 @@ def dashboard():
         print(f"DEBUG DASHBOARD: Horas totais: {total_horas_real}")
         print(f"DEBUG DASHBOARD: Extras totais: {total_extras_real}")
         
+        # Calcular KPIs específicos corretamente
+        # 1. Custos de Transporte (veículos) - usar campo data_custo para filtrar
+        custo_transporte_real = 0
+        try:
+            from models import CustoVeiculo
+            custos_veiculo = CustoVeiculo.query.filter(
+                CustoVeiculo.data_custo >= data_inicio,
+                CustoVeiculo.data_custo <= data_fim
+            ).all()
+            custo_transporte_real = sum(c.valor or 0 for c in custos_veiculo)
+            print(f"DEBUG Custos veículo: R$ {custo_transporte_real:.2f}")
+        except Exception as e:
+            print(f"Erro custos veículo: {e}")
+            # Fallback: usar todos os registros se filtro falhar
+            try:
+                custos_veiculo = CustoVeiculo.query.all()
+                custo_transporte_real = sum(c.valor or 0 for c in custos_veiculo)
+            except:
+                custo_transporte_real = 0
+        
+        # 2. Faltas Justificadas (valor em R$)
+        custo_faltas_justificadas = 0
+        try:
+            faltas_justificadas = RegistroPonto.query.filter(
+                RegistroPonto.data >= data_inicio,
+                RegistroPonto.data <= data_fim,
+                RegistroPonto.tipo_registro == 'falta_justificada'
+            ).all()
+            
+            for falta in faltas_justificadas:
+                funcionario = Funcionario.query.get(falta.funcionario_id)
+                if funcionario and funcionario.salario:
+                    valor_dia = (funcionario.salario / 30)  # Valor por dia
+                    custo_faltas_justificadas += valor_dia
+        except Exception as e:
+            print(f"Erro faltas justificadas: {e}")
+        
+        # 3. Outros Custos (não transporte nem alimentação)
+        custo_outros_real = 0
+        try:
+            from models import OutroCusto
+            outros_custos = OutroCusto.query.filter(
+                OutroCusto.data >= data_inicio,
+                OutroCusto.data <= data_fim,
+                ~OutroCusto.tipo.in_(['transporte', 'alimentacao'])
+            ).all()
+            custo_outros_real = sum(o.valor or 0 for o in outros_custos)
+        except Exception as e:
+            print(f"Erro outros custos: {e}")
+        
+        # 4. Funcionários por Departamento
+        funcionarios_por_departamento = {}
+        try:
+            from models import Departamento
+            departamentos = db.session.query(
+                Departamento.nome,
+                db.func.count(Funcionario.id).label('total')
+            ).outerjoin(Funcionario).filter(
+                Funcionario.ativo == True,
+                Funcionario.admin_id == admin_id
+            ).group_by(Departamento.nome).all()
+            
+            funcionarios_por_departamento = {
+                dept.nome: dept.total for dept in departamentos if dept.nome
+            }
+            
+            # Adicionar funcionários sem departamento
+            sem_dept = Funcionario.query.filter_by(
+                admin_id=admin_id, 
+                ativo=True, 
+                departamento_id=None
+            ).count()
+            if sem_dept > 0:
+                funcionarios_por_departamento['Sem Departamento'] = sem_dept
+                
+        except Exception as e:
+            print(f"Erro funcionários por departamento: {e}")
+        
+        # 5. Custos por Obra (agregação de diferentes fontes)
+        custos_por_obra = {}
+        try:
+            obras_admin = Obra.query.filter_by(admin_id=admin_id).all()
+            
+            for obra in obras_admin:
+                custo_total_obra = 0
+                
+                # Somar custos de mão de obra (registros de ponto)
+                registros_obra = RegistroPonto.query.filter(
+                    RegistroPonto.obra_id == obra.id,
+                    RegistroPonto.data >= data_inicio,
+                    RegistroPonto.data <= data_fim
+                ).all()
+                
+                for registro in registros_obra:
+                    funcionario = Funcionario.query.get(registro.funcionario_id)
+                    if funcionario and funcionario.salario:
+                        valor_hora = funcionario.salario / 220
+                        horas = (registro.horas_trabalhadas or 0) + (registro.horas_extras or 0) * 1.5
+                        custo_total_obra += horas * valor_hora
+                
+                # Somar custos de alimentação da obra
+                alimentacao_obra = RegistroAlimentacao.query.filter(
+                    RegistroAlimentacao.obra_id == obra.id,
+                    RegistroAlimentacao.data >= data_inicio,
+                    RegistroAlimentacao.data <= data_fim
+                ).all()
+                custo_total_obra += sum(a.valor or 0 for a in alimentacao_obra)
+                
+                # Somar custos de veículos da obra
+                try:
+                    veiculos_obra = CustoVeiculo.query.filter(
+                        CustoVeiculo.obra_id == obra.id,
+                        CustoVeiculo.data_custo >= data_inicio,
+                        CustoVeiculo.data_custo <= data_fim
+                    ).all()
+                    custo_total_obra += sum(v.valor or 0 for v in veiculos_obra)
+                except:
+                    pass
+                
+                if custo_total_obra > 0:
+                    custos_por_obra[obra.nome] = round(custo_total_obra, 2)
+                    
+        except Exception as e:
+            print(f"Erro custos por obra: {e}")
+        
         # Dados calculados reais
-        total_veiculos = 5  # Valor fixo para veículos
-        custos_mes = total_custo_real
+        total_veiculos = Veiculo.query.filter_by(admin_id=admin_id).count()
+        custos_mes = total_custo_real + custo_alimentacao_real + custo_transporte_real + custo_outros_real
         custos_detalhados = {
             'alimentacao': custo_alimentacao_real,
             'transporte': custo_transporte_real,
             'mao_obra': total_custo_real,
-            'outros': 0,
-            'faltas_justificadas': 0,
-            'total': total_custo_real
+            'outros': custo_outros_real,
+            'faltas_justificadas': custo_faltas_justificadas,
+            'total': custos_mes
         }
         
     except Exception as e:
@@ -205,6 +330,8 @@ def dashboard():
             'faltas_justificadas': 0,
             'total': 0
         }
+        funcionarios_por_departamento = {}
+        custos_por_obra = {}
     # Estatísticas calculadas
     eficiencia_geral = 85.5
     produtividade_obra = 92.3
@@ -230,6 +357,8 @@ def dashboard():
                          funcionarios_ativos=funcionarios_ativos,
                          obras_ativas_count=obras_ativas_count,
                          veiculos_disponiveis=veiculos_disponiveis,
+                         funcionarios_por_departamento=funcionarios_por_departamento,
+                         custos_por_obra=custos_por_obra,
                          data_inicio=data_inicio,
                          data_fim=data_fim)
 
