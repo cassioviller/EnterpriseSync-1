@@ -209,7 +209,7 @@
                 </h5>
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
             </div>
-            <form method="POST" action="{{ url_for('main.nova_alimentacao') }}" id="alimentacaoForm">
+            <form method="POST" action="{{ url_for('alimentacao.nova_alimentacao') }}" id="alimentacaoForm">
                 <div class="modal-body p-4">
                     <!-- Seção 1: Dados Básicos -->
                     <div class="card mb-4">
@@ -693,7 +693,7 @@ document.addEventListener('DOMContentLoaded', function() {
             btnSalvar.disabled = true;
             btnSalvar.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Salvando...';
             
-            fetch("{{ url_for('main.nova_alimentacao') }}", {
+            fetch("{{ url_for('alimentacao.nova_alimentacao') }}", {
                 method: 'POST',
                 body: formData
             })
