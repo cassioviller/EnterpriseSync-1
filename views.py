@@ -115,9 +115,19 @@ def dashboard():
         from datetime import date
         from models import RegistroPonto, RegistroAlimentacao
         
-        # Filtros de data - julho 2025 (onde estão os dados)
-        data_inicio = date(2025, 7, 1)  # Julho 2025 onde há dados
-        data_fim = date(2025, 7, 31)
+        # Filtros de data - usar filtros da query string ou padrão do mês atual
+        data_inicio_param = request.args.get('data_inicio')
+        data_fim_param = request.args.get('data_fim')
+        
+        if data_inicio_param:
+            data_inicio = datetime.strptime(data_inicio_param, '%Y-%m-%d').date()
+        else:
+            data_inicio = date(2025, 7, 1)  # Julho 2025 onde há dados
+            
+        if data_fim_param:
+            data_fim = datetime.strptime(data_fim_param, '%Y-%m-%d').date()
+        else:
+            data_fim = date(2025, 7, 31)  # Final de julho 2025
         
         # Buscar todos os funcionários ativos
         funcionarios_dashboard = Funcionario.query.filter_by(admin_id=admin_id, ativo=True).all()
@@ -219,7 +229,9 @@ def dashboard():
                          produtividade_obra=produtividade_obra,
                          funcionarios_ativos=funcionarios_ativos,
                          obras_ativas_count=obras_ativas_count,
-                         veiculos_disponiveis=veiculos_disponiveis)
+                         veiculos_disponiveis=veiculos_disponiveis,
+                         data_inicio=data_inicio,
+                         data_fim=data_fim)
 
 # ===== FUNCIONÁRIOS =====
 @main_bp.route('/funcionarios')
