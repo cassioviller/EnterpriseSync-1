@@ -902,11 +902,33 @@ def detalhes_obra(id):
             'custo_mao_obra': 0.0
         }
         
+        # Variáveis extras necessárias para o template
+        servicos_obra = []  # Lista vazia por enquanto
+        total_rdos = 0
+        rdos_finalizados = 0
+        rdos_periodo = []
+        rdos_recentes = []
+        custos_mao_obra = []
+        custos_obra = []
+        custos_transporte = []
+        custos_transporte_total = 0.0
+        funcionarios_obra = []
+        
         return render_template('obras/detalhes_obra.html', 
                              obra=obra, 
                              kpis=kpis_obra,
                              data_inicio=data_inicio,
-                             data_fim=data_fim)
+                             data_fim=data_fim,
+                             servicos_obra=servicos_obra,
+                             total_rdos=total_rdos,
+                             rdos_finalizados=rdos_finalizados,
+                             rdos_periodo=rdos_periodo,
+                             rdos_recentes=rdos_recentes,
+                             custos_mao_obra=custos_mao_obra,
+                             custos_obra=custos_obra,
+                             custos_transporte=custos_transporte,
+                             custos_transporte_total=custos_transporte_total,
+                             funcionarios_obra=funcionarios_obra)
     except Exception as e:
         print(f"ERRO DETALHES OBRA: {str(e)}")
         # Redirecionar para lista de obras em caso de erro

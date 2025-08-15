@@ -77,7 +77,7 @@
                 <div class="d-flex align-items-center justify-content-center mb-2">
                     <i class="fas fa-dollar-sign fa-2x text-success me-2"></i>
                     <div>
-                        <h3 class="text-success mb-0">R$ {{ '{:,.2f}'.format(kpis.custo_total).replace(',', ' ').replace('.', ',').replace(' ', '.') }}</h3>
+                        <h3 class="text-success mb-0">R$ {{ '{:,.2f}'.format(kpis.custo_total if kpis and kpis.custo_total else 0).replace(',', ' ').replace('.', ',').replace(' ', '.') }}</h3>
                         <small class="text-muted">Custo Total</small>
                     </div>
                 </div>
@@ -134,7 +134,7 @@
         <div class="card">
             <div class="card-body text-center">
                 <i class="fas fa-car fa-2x text-danger mb-2"></i>
-                <h5 class="text-danger">R$ {{ '{:,.2f}'.format(kpis.custo_transporte).replace(',', ' ').replace('.', ',').replace(' ', '.') }}</h5>
+                <h5 class="text-danger">R$ {{ '{:,.2f}'.format(kpis.custo_transporte if kpis and kpis.custo_transporte else 0).replace(',', ' ').replace('.', ',').replace(' ', '.') }}</h5>
                 <small class="text-muted">Transporte</small>
             </div>
         </div>
@@ -144,7 +144,7 @@
         <div class="card">
             <div class="card-body text-center">
                 <i class="fas fa-utensils fa-2x text-warning mb-2"></i>
-                <h5 class="text-warning">R$ {{ '{:,.2f}'.format(kpis.custo_alimentacao).replace(',', ' ').replace('.', ',').replace(' ', '.') }}</h5>
+                <h5 class="text-warning">R$ {{ '{:,.2f}'.format(kpis.custo_alimentacao if kpis and kpis.custo_alimentacao else 0).replace(',', ' ').replace('.', ',').replace(' ', '.') }}</h5>
                 <small class="text-muted">Alimentação</small>
             </div>
         </div>
@@ -154,7 +154,7 @@
         <div class="card">
             <div class="card-body text-center">
                 <i class="fas fa-hammer fa-2x text-info mb-2"></i>
-                <h5 class="text-info">R$ {{ '{:,.2f}'.format(kpis.custo_mao_obra).replace(',', ' ').replace('.', ',').replace(' ', '.') }}</h5>
+                <h5 class="text-info">R$ {{ '{:,.2f}'.format(kpis.custo_mao_obra if kpis and kpis.custo_mao_obra else 0).replace(',', ' ').replace('.', ',').replace(' ', '.') }}</h5>
                 <small class="text-muted">Mão de Obra</small>
             </div>
         </div>
@@ -200,7 +200,7 @@
                     </div>
                     <div class="col-md-6 mb-3">
                         <label class="form-label fw-bold">Orçamento:</label>
-                        <p class="mb-0">{{ "R$ {:,.2f}".format(obra.orcamento).replace(',', ' ').replace('.', ',').replace(' ', '.') if obra.orcamento else '-' }}</p>
+                        <p class="mb-0">{{ "R$ {:,.2f}".format(obra.orcamento if obra.orcamento else 0).replace(',', ' ').replace('.', ',').replace(' ', '.') }}</p>
                     </div>
                     <div class="col-md-6 mb-3">
                         <label class="form-label fw-bold">Responsável:</label>
@@ -472,7 +472,7 @@
             <i class="fas fa-dollar-sign"></i> Custos Detalhados por Tipo
         </h5>
         <span class="badge bg-info">
-            Total: R$ {{ '{:,.2f}'.format(kpis.custo_total).replace(',', ' ').replace('.', ',').replace(' ', '.') }}
+            Total: R$ {{ '{:,.2f}'.format(kpis.custo_total if kpis and kpis.custo_total else 0).replace(',', ' ').replace('.', ',').replace(' ', '.') }}
         </span>
     </div>
     <div class="card-body">
@@ -509,7 +509,7 @@
                             {% endif %}
                         </td>
                         <td>{{ custo.descricao }}</td>
-                        <td>R$ {{ '{:,.2f}'.format(custo.valor).replace(',', ' ').replace('.', ',').replace(' ', '.') }}</td>
+                        <td>R$ {{ '{:,.2f}'.format(custo.valor if custo.valor else 0).replace(',', ' ').replace('.', ',').replace(' ', '.') }}</td>
                         <td>{{ custo.data.strftime('%d/%m/%Y') }}</td>
                     </tr>
                     {% endfor %}
@@ -533,7 +533,7 @@
             <i class="fas fa-truck"></i> Custos de Transporte
         </h5>
         <span class="badge bg-danger">
-            Total: R$ {{ '{:,.2f}'.format(custos_transporte_total).replace(',', ' ').replace('.', ',').replace(' ', '.') }}
+            Total: R$ {{ '{:,.2f}'.format(custos_transporte_total if custos_transporte_total else 0).replace(',', ' ').replace('.', ',').replace(' ', '.') }}
         </span>
     </div>
     <div class="card-body">
@@ -551,7 +551,7 @@
                     {% for transporte in custos_transporte %}
                     <tr>
                         <td>{{ transporte.data_custo.strftime('%d/%m/%Y') }}</td>
-                        <td>R$ {{ '{:,.2f}'.format(transporte.valor).replace(',', ' ').replace('.', ',').replace(' ', '.') }}</td>
+                        <td>R$ {{ '{:,.2f}'.format(transporte.valor if transporte.valor else 0).replace(',', ' ').replace('.', ',').replace(' ', '.') }}</td>
                         <td>
                             <span class="badge bg-info">
                                 {{ transporte.tipo_custo.title() }}
@@ -580,7 +580,7 @@
             <i class="fas fa-hammer"></i> Custos de Mão de Obra
         </h5>
         <span class="badge bg-primary">
-            Total: R$ {{ '{:,.2f}'.format(kpis.custo_mao_obra).replace(',', ' ').replace('.', ',').replace(' ', '.') }}
+            Total: R$ {{ '{:,.2f}'.format(kpis.custo_mao_obra if kpis and kpis.custo_mao_obra else 0).replace(',', ' ').replace('.', ',').replace(' ', '.') }}
         </span>
     </div>
     <div class="card-body">
@@ -605,12 +605,12 @@
                         </td>
                         <td>
                             <span class="badge bg-info">
-                                {{ '{:.2f}'.format(custo_mao.horas_trabalhadas).replace('.', ',') }}h
+                                {{ '{:.2f}'.format(custo_mao.horas_trabalhadas if custo_mao.horas_trabalhadas else 0).replace('.', ',') }}h
                             </span>
                         </td>
-                        <td>R$ {{ '{:,.2f}'.format(custo_mao.salario_hora).replace(',', ' ').replace('.', ',').replace(' ', '.') }}</td>
+                        <td>R$ {{ '{:,.2f}'.format(custo_mao.salario_hora if custo_mao.salario_hora else 0).replace(',', ' ').replace('.', ',').replace(' ', '.') }}</td>
                         <td>
-                            <strong>R$ {{ '{:,.2f}'.format(custo_mao.total_dia).replace(',', ' ').replace('.', ',').replace(' ', '.') }}</strong>
+                            <strong>R$ {{ '{:,.2f}'.format(custo_mao.total_dia if custo_mao.total_dia else 0).replace(',', ' ').replace('.', ',').replace(' ', '.') }}</strong>
                         </td>
                     </tr>
                     {% endfor %}
