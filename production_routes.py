@@ -258,3 +258,59 @@ DIAGNÓSTICO:
                              error_details=full_error_details,
                              error_url="/prod/safe-obras",
                              error_timestamp=error_timestamp), 500
+
+@production_bp.route('/safe-veiculos')
+def safe_veiculos():
+    """Rota segura para veículos sem erros de template"""
+    try:
+        logging.info("Acessando rota segura de veículos...")
+        
+        # Detectar admin_id automaticamente
+        admin_id = get_safe_admin_id()
+        logging.info(f"Admin ID detectado: {admin_id}")
+        
+        # Buscar veículos do admin
+        try:
+            from models import Veiculo
+            veiculos = Veiculo.query.filter_by(admin_id=admin_id).all()
+        except:
+            # Se não existe tabela de veículos, criar lista vazia
+            veiculos = []
+        
+        logging.info(f"Encontrados {len(veiculos)} veículos para admin_id={admin_id}")
+        
+        return render_template('veiculos_safe.html', 
+                             veiculos=veiculos,
+                             total_veiculos=len(veiculos))
+                             
+    except Exception as e:
+        import traceback
+        from datetime import datetime
+        
+        error_traceback = traceback.format_exc()
+        error_timestamp = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
+        
+        logging.error(f"Erro na rota safe-veiculos: {e}")
+        logging.error(f"Traceback: {error_traceback}")
+        
+        full_error_details = f"""
+ERRO NA ROTA SAFE-VEÍCULOS: {str(e)}
+
+ROTA: /prod/safe-veiculos
+TIMESTAMP: {error_timestamp}
+
+TRACEBACK COMPLETO:
+{error_traceback}
+
+DIAGNÓSTICO:
+- Tentando buscar veículos para admin_id
+- Erro pode estar relacionado ao template ou modelo Veiculo
+- Verifique se tabela veiculos existe no banco
+"""
+        
+        return render_template('error.html', 
+                             error_code=500,
+                             error_message=f"Erro ao carregar veículos: {str(e)}",
+                             error_details=full_error_details,
+                             error_url="/prod/safe-veiculos",
+                             error_timestamp=error_timestamp), 500

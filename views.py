@@ -539,7 +539,42 @@ def test():
 @main_bp.route('/veiculos')
 @admin_required
 def veiculos():
-    return render_template('veiculos.html')
+    admin_id = current_user.id if current_user.tipo_usuario == TipoUsuario.ADMIN else current_user.admin_id
+    
+    # Buscar veículos do admin
+    from models import Veiculo
+    veiculos = Veiculo.query.filter_by(admin_id=admin_id).all()
+    
+    return render_template('veiculos.html', veiculos=veiculos)
+
+@main_bp.route('/veiculos/novo', methods=['POST'])
+@admin_required
+def novo_veiculo():
+    admin_id = current_user.id if current_user.tipo_usuario == TipoUsuario.ADMIN else current_user.admin_id
+    
+    try:
+        from models import Veiculo
+        
+        # Criar novo veículo
+        veiculo = Veiculo(
+            placa=request.form.get('placa'),
+            modelo=request.form.get('modelo'),
+            marca=request.form.get('marca'),
+            ano=request.form.get('ano'),
+            status=request.form.get('status', 'Disponível'),
+            admin_id=admin_id
+        )
+        
+        db.session.add(veiculo)
+        db.session.commit()
+        
+        flash('Veículo cadastrado com sucesso!', 'success')
+        
+    except Exception as e:
+        db.session.rollback()
+        flash(f'Erro ao cadastrar veículo: {str(e)}', 'error')
+    
+    return redirect(url_for('main.veiculos'))
 
 @main_bp.route('/financeiro')
 @admin_required
