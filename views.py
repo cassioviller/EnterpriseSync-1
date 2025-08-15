@@ -891,6 +891,23 @@ def obras():
 @main_bp.route('/obras/<int:id>')
 def detalhes_obra(id):
     try:
+        # DEFINIR DATAS PRIMEIRO - CRÍTICO
+        data_inicio_param = request.args.get('data_inicio')
+        data_fim_param = request.args.get('data_fim')
+        
+        if not data_inicio_param:
+            data_inicio = date.today().replace(day=1)
+        else:
+            data_inicio = datetime.strptime(data_inicio_param, '%Y-%m-%d').date()
+        
+        if not data_fim_param:
+            data_fim = date.today()
+        else:
+            data_fim = datetime.strptime(data_fim_param, '%Y-%m-%d').date()
+        
+        print(f"DEBUG PERÍODO DETALHES: {data_inicio} até {data_fim}")
+        obra_id = id
+        
         # Sistema robusto de detecção de admin_id (usar admin_id=10 que tem mais obras)
         admin_id = 10  # Default para admin com mais obras
         
@@ -926,137 +943,93 @@ def detalhes_obra(id):
         print(f"DEBUG OBRA DADOS: Status={obra.status}, Orçamento={obra.orcamento}")
         
         # Buscar funcionários associados à obra
-        try:
-            funcionarios_obra = Funcionario.query.filter_by(admin_id=admin_id).all()
-            print(f"DEBUG: {len(funcionarios_obra)} funcionários encontrados para admin_id {admin_id}")
-            
-            # Calcular KPIs reais da obra
-            # from kpis_engine import CalculadoraObra
-            # calculadora = CalculadoraObra()
-            
-            # Calcular custos de mão de obra para o período
-            total_custo_mao_obra = 0
-            custos_mao_obra = []
-            
-            for funcionario in funcionarios_obra[:5]:  # Limitar para performance
-                try:
-                    from models import RegistroPonto
-                    registros_ponto = RegistroPonto.query.filter(
-                        RegistroPonto.funcionario_id == funcionario.id,
-                        RegistroPonto.data >= data_inicio,
-                        RegistroPonto.data <= data_fim
-                    ).all()
+        funcionarios_obra = Funcionario.query.filter_by(admin_id=admin_id).all()
+        print(f"DEBUG: {len(funcionarios_obra)} funcionários encontrados para admin_id {admin_id}")
+        
+        # Calcular custos de mão de obra para o período
+        total_custo_mao_obra = 0.0
+        custos_mao_obra = []
+        total_horas_periodo = 0.0
+        
+        # Buscar registros de ponto da obra no período
+        from models import RegistroPonto
+        registros_periodo = RegistroPonto.query.filter(
+            RegistroPonto.data >= data_inicio,
+            RegistroPonto.data <= data_fim,
+            RegistroPonto.obra_id == obra_id
+        ).all()
+        
+        print(f"DEBUG: {len(registros_periodo)} registros de ponto no período para obra {obra_id}")
+        
+        for registro in registros_periodo:
+            if registro.horas_trabalhadas and registro.horas_trabalhadas > 0:
+                funcionario = Funcionario.query.get(registro.funcionario_id)
+                if funcionario and funcionario.admin_id == admin_id:
+                    salario_hora = funcionario.salario / 220 if funcionario.salario else 15.0
+                    custo_dia = registro.horas_trabalhadas * salario_hora
+                    total_custo_mao_obra += custo_dia
+                    total_horas_periodo += registro.horas_trabalhadas
                     
-                    for registro in registros_ponto:
-                        if registro.horas_trabalhadas and registro.horas_trabalhadas > 0:
-                            salario_hora = funcionario.salario / 220 if funcionario.salario else 15.0  # Média 220h/mês
-                            custo_dia = registro.horas_trabalhadas * salario_hora
-                            total_custo_mao_obra += custo_dia
-                            
-                            custos_mao_obra.append({
-                                'data': registro.data,
-                                'funcionario_nome': funcionario.nome,
-                                'horas_trabalhadas': registro.horas_trabalhadas,
-                                'salario_hora': salario_hora,
-                                'total_dia': custo_dia
-                            })
-                except Exception as e:
-                    print(f"Erro ao calcular custo para funcionário {funcionario.nome}: {e}")
-            
-            # Atualizar KPIs com dados reais
-            kpis_obra.update({
-                'total_funcionarios': len(funcionarios_obra),
-                'funcionarios_periodo': len([f for f in funcionarios_obra if f.data_admissao and f.data_admissao <= data_fim]),
-                'custo_mao_obra': total_custo_mao_obra,
-                'custo_total': total_custo_mao_obra,
-                'total_horas': sum([c['horas_trabalhadas'] for c in custos_mao_obra]),
-                'dias_trabalhados': len(set([c['data'] for c in custos_mao_obra]))
-            })
-            
-            print(f"DEBUG KPIs CALCULADOS: Funcionários={len(funcionarios_obra)}, Custo={total_custo_mao_obra}, Horas={len(custos_mao_obra)}")
-            
-        except Exception as e:
-            print(f"ERRO ao buscar funcionários: {e}")
-            funcionarios_obra = []
-            kpis_obra = {
-                'total_funcionarios': 0,
-                'funcionarios_periodo': 0,
-                'custo_mao_obra': 0.0,
-                'custo_total': 0.0,
-                'total_horas': 0.0,
-                'dias_trabalhados': 0
-            }
+                    custos_mao_obra.append({
+                        'data': registro.data,
+                        'funcionario_nome': funcionario.nome,
+                        'horas_trabalhadas': registro.horas_trabalhadas,
+                        'salario_hora': salario_hora,
+                        'total_dia': custo_dia
+                    })
+        
+        print(f"DEBUG KPIs: {total_custo_mao_obra:.2f} em custos, {total_horas_periodo}h trabalhadas")
             
         # Buscar custos da obra para o período
-        try:
-            from models import OutroCusto, CustoVeiculo
-            
-            # Custos diversos da obra
-            custos_obra = OutroCusto.query.filter(
-                OutroCusto.admin_id == admin_id,
-                OutroCusto.data >= data_inicio,
-                OutroCusto.data <= data_fim
-            ).all()
-            
-            # Custos de transporte/veículos
-            custos_transporte = CustoVeiculo.query.filter(
-                CustoVeiculo.data_custo >= data_inicio,
-                CustoVeiculo.data_custo <= data_fim
-            ).all()
-            
-            custos_transporte_total = sum(c.valor for c in custos_transporte if c.valor)
-            
-            print(f"DEBUG CUSTOS: Obra={len(custos_obra)}, Transporte={len(custos_transporte)}, Total Transporte={custos_transporte_total}")
-            
-        except Exception as e:
-            print(f"ERRO ao buscar custos: {e}")
-            custos_obra = []
-            custos_transporte = []
-            custos_transporte_total = 0.0
+        from models import OutroCusto, CustoVeiculo
         
-        # Filtros de data - definir ANTES dos cálculos
-        data_inicio_param = request.args.get('data_inicio')
-        data_fim_param = request.args.get('data_fim')
+        # Custos diversos da obra (filtrados por obra específica)
+        custos_obra = OutroCusto.query.filter(
+            OutroCusto.admin_id == admin_id,
+            OutroCusto.obra_id == obra_id,
+            OutroCusto.data >= data_inicio,
+            OutroCusto.data <= data_fim
+        ).all()
         
-        # Definir período padrão (último mês)
-        if not data_inicio_param:
-            data_inicio = date.today().replace(day=1)
-        else:
-            data_inicio = datetime.strptime(data_inicio_param, '%Y-%m-%d').date()
+        # Custos de transporte/veículos da obra
+        custos_transporte = CustoVeiculo.query.filter(
+            CustoVeiculo.obra_id == obra_id,
+            CustoVeiculo.data_custo >= data_inicio,
+            CustoVeiculo.data_custo <= data_fim
+        ).all()
         
-        if not data_fim_param:
-            data_fim = date.today()
-        else:
-            data_fim = datetime.strptime(data_fim_param, '%Y-%m-%d').date()
+        # Calcular totais por categoria
+        custo_alimentacao = sum(c.valor for c in custos_obra if c.kpi_associado == 'custo_alimentacao')
+        custo_transporte = sum(c.valor for c in custos_obra if c.kpi_associado == 'custo_transporte')
+        outros_custos = sum(c.valor for c in custos_obra if c.kpi_associado == 'outros_custos')
+        custos_transporte_total = sum(c.valor for c in custos_transporte if c.valor)
         
-        print(f"DEBUG PERÍODO DETALHES: {data_inicio} até {data_fim}")
+        print(f"DEBUG CUSTOS DETALHADOS: Alimentação={custo_alimentacao}, Transporte VT={custo_transporte}, Veículos={custos_transporte_total}, Outros={outros_custos}")
         
-        # KPIs básicos da obra com valores zero seguros
+        # Montar KPIs finais da obra
         kpis_obra = {
-            'total_funcionarios': 0,
-            'total_horas': 0.0,
+            'total_funcionarios': len(funcionarios_obra),
+            'funcionarios_periodo': len(set([r.funcionario_id for r in registros_periodo])),
+            'custo_mao_obra': total_custo_mao_obra,
+            'custo_alimentacao': custo_alimentacao,
+            'custo_transporte': custos_transporte_total + custo_transporte,
+            'custo_total': total_custo_mao_obra + custo_alimentacao + custo_transporte + outros_custos + custos_transporte_total,
+            'total_horas': total_horas_periodo,
+            'dias_trabalhados': len(set([r.data for r in registros_periodo])),
             'total_rdos': 0,
-            'dias_trabalhados': 0,
-            'custo_total': 0.0,
-            'funcionarios_ativos': 0,
-            'progresso_geral': 0.0,
-            'funcionarios_periodo': 0,
-            'custo_transporte': 0.0,
-            'custo_alimentacao': 0.0,
-            'custo_mao_obra': 0.0
+            'funcionarios_ativos': len(funcionarios_obra),
+            'progresso_geral': 0.0
         }
         
-        # Variáveis extras necessárias para o template
-        servicos_obra = []  # Lista vazia por enquanto
+        # Variáveis extras para o template
+        servicos_obra = []
         total_rdos = 0
         rdos_finalizados = 0
         rdos_periodo = []
         rdos_recentes = []
-        custos_mao_obra = []
-        custos_obra = []
-        custos_transporte = []
-        custos_transporte_total = 0.0
-        funcionarios_obra = []
+        
+        print(f"DEBUG KPIs FINAIS: Total={kpis_obra['custo_total']:.2f}, Mão Obra={kpis_obra['custo_mao_obra']:.2f}, Horas={kpis_obra['total_horas']:.1f}")
+        print(f"DEBUG FUNCIONÁRIOS: {kpis_obra['funcionarios_periodo']} no período, {kpis_obra['dias_trabalhados']} dias trabalhados")
         
         return render_template('obras/detalhes_obra.html', 
                              obra=obra, 
