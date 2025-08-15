@@ -518,6 +518,14 @@ def funcionarios():
                 custo_dia = func.salario / 22  # 22 dias úteis
                 total_custo_faltas_geral += k['total_faltas_justificadas'] * custo_dia
         
+        # Calcular taxa de absenteísmo correta
+        total_faltas_todas = total_faltas_geral + total_faltas_justificadas_geral
+        total_dias_trabalho_possivel = len(funcionarios) * 22  # 22 dias úteis por mês
+        taxa_absenteismo = (total_faltas_todas / total_dias_trabalho_possivel * 100) if total_dias_trabalho_possivel > 0 else 0
+        
+        # Debug do cálculo
+        print(f"DEBUG ABSENTEÍSMO: {total_faltas_todas} faltas / {total_dias_trabalho_possivel} dias possíveis = {taxa_absenteismo:.2f}%")
+        
         kpis_geral = {
             'total_funcionarios': len(funcionarios),
             'funcionarios_ativos': len(funcionarios),
@@ -527,7 +535,7 @@ def funcionarios():
             'total_faltas_justificadas_geral': total_faltas_justificadas_geral,
             'total_custo_geral': total_custo_geral,
             'total_custo_faltas_geral': total_custo_faltas_geral,
-            'taxa_absenteismo_geral': ((total_faltas_geral + total_faltas_justificadas_geral) / len(funcionarios) * 100) if funcionarios else 0
+            'taxa_absenteismo_geral': round(taxa_absenteismo, 2)
         }
     
     except Exception as e:
