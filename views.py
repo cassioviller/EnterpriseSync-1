@@ -712,6 +712,13 @@ def novo_uso_veiculo_lista():
     # Implementação futura
     return redirect(url_for('main.veiculos'))
 
+# Rota para novo custo de veículo
+@main_bp.route('/veiculos/novo-custo', methods=['POST'])
+@admin_required
+def novo_custo_veiculo_lista():
+    # Implementação futura
+    return redirect(url_for('main.veiculos'))
+
 # Rota para novo RDO
 @main_bp.route('/rdo/novo')
 @admin_required
