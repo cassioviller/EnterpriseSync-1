@@ -961,22 +961,47 @@ def detalhes_obra(id):
         
         print(f"DEBUG: {len(registros_periodo)} registros de ponto no período para obra {obra_id}")
         
-        for registro in registros_periodo:
-            if registro.horas_trabalhadas and registro.horas_trabalhadas > 0:
-                funcionario = Funcionario.query.get(registro.funcionario_id)
-                if funcionario and funcionario.admin_id == admin_id:
-                    salario_hora = funcionario.salario / 220 if funcionario.salario else 15.0
-                    custo_dia = registro.horas_trabalhadas * salario_hora
-                    total_custo_mao_obra += custo_dia
-                    total_horas_periodo += registro.horas_trabalhadas
-                    
-                    custos_mao_obra.append({
-                        'data': registro.data,
-                        'funcionario_nome': funcionario.nome,
-                        'horas_trabalhadas': registro.horas_trabalhadas,
-                        'salario_hora': salario_hora,
-                        'total_dia': custo_dia
-                    })
+        # Calcular custo por funcionário usando JOIN direto
+        from sqlalchemy import text
+        query_custo = text("""
+            SELECT 
+                rp.data,
+                rp.funcionario_id,
+                f.nome as funcionario_nome,
+                rp.horas_trabalhadas,
+                f.salario,
+                (COALESCE(f.salario, 1500) / 220.0 * rp.horas_trabalhadas) as custo_dia
+            FROM registro_ponto rp
+            JOIN funcionario f ON rp.funcionario_id = f.id
+            WHERE rp.obra_id = :obra_id 
+              AND rp.data >= :data_inicio
+              AND rp.data <= :data_fim
+              AND f.admin_id = :admin_id
+              AND rp.horas_trabalhadas > 0
+            ORDER BY rp.data DESC
+        """)
+        
+        resultado_custos = db.session.execute(query_custo, {
+            'obra_id': obra_id,
+            'data_inicio': data_inicio,
+            'data_fim': data_fim,
+            'admin_id': admin_id
+        }).fetchall()
+        
+        print(f"DEBUG SQL: {len(resultado_custos)} registros encontrados com JOIN")
+        
+        for row in resultado_custos:
+            data_reg, funcionario_id, funcionario_nome, horas, salario, custo_dia = row
+            total_custo_mao_obra += float(custo_dia)
+            total_horas_periodo += float(horas)
+            
+            custos_mao_obra.append({
+                'data': data_reg,
+                'funcionario_nome': funcionario_nome,
+                'horas_trabalhadas': float(horas),
+                'salario_hora': float(salario or 1500) / 220.0,
+                'total_dia': float(custo_dia)
+            })
         
         print(f"DEBUG KPIs: {total_custo_mao_obra:.2f} em custos, {total_horas_periodo}h trabalhadas")
             
