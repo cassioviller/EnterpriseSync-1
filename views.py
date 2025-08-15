@@ -812,10 +812,23 @@ def obras():
         except ValueError as e:
             print(f"DEBUG: Erro na data_fim: {e}")
     
-    obras = query.order_by(desc(Obra.created_at)).all()
+    obras = query.order_by(desc(Obra.data_inicio)).all()
     
     print(f"DEBUG FILTROS OBRAS: {filtros}")
     print(f"DEBUG TOTAL OBRAS ENCONTRADAS: {len(obras)}")
+    
+    # Calcular KPIs básicos para cada obra
+    for obra in obras:
+        try:
+            # KPIs básicos para exibição na lista
+            obra.kpis = {
+                'total_rdos': 0,
+                'dias_trabalhados': 0,
+                'custo_total': 0
+            }
+        except Exception as e:
+            print(f"Erro KPI obra {obra.nome}: {e}")
+            obra.kpis = {'total_rdos': 0, 'dias_trabalhados': 0, 'custo_total': 0}
     
     return render_template('obras.html', obras=obras, filtros=filtros)
 
@@ -873,8 +886,11 @@ def detalhes_obra(id):
         kpis_obra = {
             'total_funcionarios': 0,
             'total_horas': 0,
-            'total_custos': 0,
-            'progresso': 0
+            'total_rdos': 0,
+            'dias_trabalhados': 0,
+            'custo_total': 0,
+            'funcionarios_ativos': 0,
+            'progresso_geral': 0
         }
         
         return render_template('obras/detalhes_obra.html', 
