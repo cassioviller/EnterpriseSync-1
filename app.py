@@ -55,6 +55,8 @@ logging.info("✅ Todos os modelos importados do arquivo consolidado")
 
 # Import views
 from views import main_bp
+from production_routes import production_bp
+from error_handlers import register_error_handlers
 try:
     from relatorios_funcionais import relatorios_bp
     app.register_blueprint(relatorios_bp, url_prefix='/relatorios')
@@ -69,6 +71,10 @@ except ImportError:
 
 # Register main blueprint
 app.register_blueprint(main_bp)
+app.register_blueprint(production_bp, url_prefix='/prod')
+
+# Register error handlers
+register_error_handlers(app)
 
 @login_manager.user_loader
 def load_user(user_id):

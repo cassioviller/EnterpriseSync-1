@@ -62,10 +62,11 @@ def index():
 # ===== DASHBOARD PRINCIPAL =====
 @main_bp.route('/dashboard')
 def dashboard():
-    # Remover @admin_required temporariamente para debug
-    from sqlalchemy import text
+    # Sistema robusto de detecção de admin_id para produção
     try:
-        # Determinar admin_id da mesma forma que funcionários
+        # Determinar admin_id com fallback robusto
+        admin_id = 2  # Default fallback
+        
         if hasattr(current_user, 'tipo_usuario') and current_user.is_authenticated:
             if current_user.tipo_usuario == TipoUsuario.SUPER_ADMIN:
                 # Buscar automaticamente o admin_id com mais funcionários ativos
@@ -77,8 +78,12 @@ def dashboard():
                 admin_id = current_user.admin_id if current_user.admin_id else 2
         else:
             # Sistema de bypass - buscar admin_id com mais funcionários
-            admin_counts = db.session.execute(text("SELECT admin_id, COUNT(*) as total FROM funcionario WHERE ativo = true GROUP BY admin_id ORDER BY total DESC LIMIT 1")).fetchone()
-            admin_id = admin_counts[0] if admin_counts else 2
+            try:
+                admin_counts = db.session.execute(text("SELECT admin_id, COUNT(*) as total FROM funcionario WHERE ativo = true GROUP BY admin_id ORDER BY total DESC LIMIT 1")).fetchone()
+                admin_id = admin_counts[0] if admin_counts else 2
+            except Exception as e:
+                print(f"Erro ao detectar admin_id: {e}")
+                admin_id = 2
         
         # Estatísticas básicas
         total_funcionarios = Funcionario.query.filter_by(admin_id=admin_id, ativo=True).count()
@@ -98,11 +103,8 @@ def dashboard():
     except Exception as e:
         # Log do erro para debug
         print(f"ERRO NO DASHBOARD: {str(e)}")
-        # Valores padrão para evitar crash
-        total_funcionarios = 0
-        total_obras = 0
-        funcionarios_recentes = []
-        obras_ativas = []
+        # Em caso de erro, redirecionar para rota segura
+        return redirect(url_for('production.safe_dashboard'))
     
     # Dados adicionais para o template
     total_veiculos = 5
@@ -268,19 +270,8 @@ def funcionarios():
     
     except Exception as e:
         print(f"ERRO CRÍTICO KPIs: {str(e)}")
-        # KPIs vazios em caso de erro
-        funcionarios_kpis = []
-        kpis_geral = {
-            'total_funcionarios': len(funcionarios),
-            'funcionarios_ativos': len(funcionarios),
-            'total_horas_geral': 0,
-            'total_extras_geral': 0,
-            'total_faltas_geral': 0,
-            'total_faltas_justificadas_geral': 0,
-            'total_custo_geral': 0,
-            'total_custo_faltas_geral': 0,
-            'taxa_absenteismo_geral': 0
-        }
+        # Em caso de erro, redirecionar para rota segura
+        return redirect(url_for('production.safe_funcionarios'))
     
     # Debug final antes do template
     print(f"DEBUG FUNCIONÁRIOS: {len(funcionarios)} funcionários, {len(funcionarios_kpis)} KPIs")
