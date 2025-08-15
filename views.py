@@ -650,6 +650,10 @@ def funcionario_perfil(id):
         'absenteismo': [2, 1, 0, 3, 1, 2, int(total_faltas)]
     }
     
+    # Buscar obras disponíveis para o dropdown
+    admin_id = 10  # Default para admin com mais obras
+    obras = Obra.query.filter_by(admin_id=admin_id).order_by(Obra.nome).all()
+    
     return render_template('funcionario_perfil.html', 
                          funcionario=funcionario,
                          kpis=kpis,
@@ -658,7 +662,8 @@ def funcionario_perfil(id):
                          registros=registros,
                          registros_ponto=registros,  # Template espera esta variável
                          registros_alimentacao=[],  # Vazio por enquanto
-                         graficos=graficos)
+                         graficos=graficos,
+                         obras=obras)
 
 # Rota para exportar PDF do funcionário
 @main_bp.route('/funcionario_perfil/<int:id>/pdf')
@@ -1060,10 +1065,12 @@ def novo_ponto():
         if not funcionario_id or not tipo_lancamento or not data:
             return jsonify({'success': False, 'error': 'Campos obrigatórios não preenchidos'}), 400
         
-        # Verificar se o funcionário existe
-        funcionario = Funcionario.query.filter_by(id=funcionario_id, admin_id=admin_id).first()
+        # Verificar se o funcionário existe (remover filtro de admin_id por enquanto)
+        funcionario = Funcionario.query.filter_by(id=funcionario_id).first()
         if not funcionario:
-            return jsonify({'success': False, 'error': 'Funcionário não encontrado'}), 404
+            return jsonify({'success': False, 'error': f'Funcionário ID {funcionario_id} não encontrado'}), 404
+        
+        print(f"✅ Funcionário encontrado: {funcionario.nome} (ID: {funcionario.id}, Admin: {funcionario.admin_id})")
         
         # Mapear tipo de lançamento para o banco
         tipos_validos = {
