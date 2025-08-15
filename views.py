@@ -666,6 +666,33 @@ def veiculos():
     
     return render_template('veiculos.html', veiculos=veiculos)
 
+# Detalhes de um veículo específico
+@main_bp.route('/veiculos/<int:id>')
+@admin_required
+def detalhes_veiculo(id):
+    try:
+        admin_id = current_user.id if current_user.tipo_usuario == TipoUsuario.ADMIN else current_user.admin_id
+        
+        # Buscar o veículo
+        from models import Veiculo
+        veiculo = Veiculo.query.filter_by(id=id, admin_id=admin_id).first_or_404()
+        
+        # KPIs básicos do veículo
+        kpis_veiculo = {
+            'quilometragem_total': 0,
+            'custos_manutencao': 0,
+            'combustivel_gasto': 0,
+            'status_atual': veiculo.status if hasattr(veiculo, 'status') else 'Disponível'
+        }
+        
+        return render_template('veiculos/detalhes_veiculo.html', 
+                             veiculo=veiculo, 
+                             kpis_veiculo=kpis_veiculo)
+    except Exception as e:
+        print(f"ERRO DETALHES VEÍCULO: {str(e)}")
+        # Redirecionar para lista de veículos em caso de erro
+        return redirect(url_for('main.veiculos'))
+
 @main_bp.route('/veiculos/novo', methods=['POST'])
 @admin_required
 def novo_veiculo():

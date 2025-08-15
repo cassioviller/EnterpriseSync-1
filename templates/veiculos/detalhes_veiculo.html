@@ -3,260 +3,241 @@
 {% block title %}{{ veiculo.placa }} - Detalhes do Veículo - SIGE{% endblock %}
 
 {% block content %}
-<div class="container-fluid py-4">
-    <!-- Header -->
-    <div class="row mb-4">
-        <div class="col-12">
-            <div class="d-flex justify-content-between align-items-center">
-                <div>
-                    <h2 class="mb-1">
-                        <i class="fas fa-truck me-2 text-primary"></i>
-                        {{ veiculo.placa }} - {{ veiculo.marca }} {{ veiculo.modelo }}
-                    </h2>
-                    <p class="text-muted mb-0">Detalhes e histórico do veículo</p>
-                </div>
-                <div class="d-flex gap-2">
-                    <a href="{{ url_for('main.veiculos') }}" class="btn btn-outline-secondary">
-                        <i class="fas fa-arrow-left me-1"></i> Voltar
-                    </a>
-                    <a href="{{ url_for('main.novo_uso_veiculo', id=veiculo.id) }}" class="btn btn-success">
-                        <i class="fas fa-plus me-1"></i> Novo Uso
-                    </a>
-                    <a href="{{ url_for('main.novo_custo_veiculo', id=veiculo.id) }}" class="btn btn-warning">
-                        <i class="fas fa-plus me-1"></i> Novo Custo
-                    </a>
-                    <a href="{{ url_for('main.lista_custos_veiculo', id=veiculo.id) }}" class="btn btn-outline-warning">
-                        <i class="fas fa-list me-1"></i> Ver Custos
-                    </a>
-                </div>
+<div class="row">
+    <div class="col-12">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h1 class="h3">
+                <i class="fas fa-car"></i> {{ veiculo.placa }} - {{ veiculo.marca }} {{ veiculo.modelo }}
+            </h1>
+            <div class="btn-group">
+                <a href="{{ url_for('main.veiculos') }}" class="btn btn-outline-secondary">
+                    <i class="fas fa-arrow-left"></i> Voltar
+                </a>
+                <button class="btn btn-outline-warning" onclick="editarVeiculo({{ veiculo.id }})">
+                    <i class="fas fa-edit"></i> Editar
+                </button>
             </div>
         </div>
     </div>
+</div>
 
-    <!-- Informações do Veículo -->
-    <div class="row mb-4">
-        <div class="col-lg-8">
-            <div class="card">
-                <div class="card-header">
-                    <h5 class="mb-0">
-                        <i class="fas fa-info-circle me-2"></i>
-                        Informações do Veículo
-                    </h5>
-                </div>
-                <div class="card-body">
-                    <div class="row">
-                        <div class="col-md-6">
-                            <p><strong>Placa:</strong> {{ veiculo.placa }}</p>
-                            <p><strong>Marca:</strong> {{ veiculo.marca }}</p>
-                            <p><strong>Modelo:</strong> {{ veiculo.modelo }}</p>
-                            <p><strong>Ano:</strong> {{ veiculo.ano or 'N/A' }}</p>
-                        </div>
-                        <div class="col-md-6">
-                            <p><strong>Tipo:</strong> {{ veiculo.tipo }}</p>
-                            <p><strong>Status:</strong> 
-                                {% if veiculo.status == 'Disponível' %}
-                                    <span class="badge bg-success">{{ veiculo.status }}</span>
-                                {% elif veiculo.status == 'Em uso' %}
-                                    <span class="badge bg-primary">{{ veiculo.status }}</span>
-                                {% elif veiculo.status == 'Manutenção' %}
-                                    <span class="badge bg-warning">{{ veiculo.status }}</span>
-                                {% else %}
-                                    <span class="badge bg-secondary">{{ veiculo.status }}</span>
-                                {% endif %}
-                            </p>
-                            <p><strong>KM Atual:</strong> {{ '{:,}'.format(veiculo.km_atual or 0) }}</p>
-                            {% if veiculo.data_proxima_manutencao %}
-                            <p><strong>Próxima Manutenção:</strong> {{ veiculo.data_proxima_manutencao.strftime('%d/%m/%Y') }}</p>
-                            {% endif %}
-                        </div>
+<!-- Informações do Veículo -->
+<div class="row mb-4">
+    <div class="col-md-6">
+        <div class="card border-primary">
+            <div class="card-header bg-primary text-white">
+                <h5 class="mb-0">
+                    <i class="fas fa-info-circle"></i> Informações Básicas
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-6">
+                        <strong>Placa:</strong><br>
+                        <span class="text-primary">{{ veiculo.placa }}</span>
+                    </div>
+                    <div class="col-6">
+                        <strong>Marca/Modelo:</strong><br>
+                        {{ veiculo.marca }} {{ veiculo.modelo }}
                     </div>
                 </div>
-            </div>
-        </div>
-        
-        <!-- KPIs do Veículo -->
-        <div class="col-lg-4">
-            <div class="card">
-                <div class="card-header">
-                    <h5 class="mb-0">
-                        <i class="fas fa-chart-bar me-2"></i>
-                        KPIs do Veículo
-                    </h5>
+                <hr>
+                <div class="row">
+                    <div class="col-6">
+                        <strong>Ano:</strong><br>
+                        {{ veiculo.ano or 'N/A' }}
+                    </div>
+                    <div class="col-6">
+                        <strong>Tipo:</strong><br>
+                        {{ veiculo.tipo or 'N/A' }}
+                    </div>
                 </div>
-                <div class="card-body">
-                    <div class="row g-3">
-                        <div class="col-6">
-                            <div class="text-center p-3 bg-primary bg-opacity-10 rounded">
-                                <i class="fas fa-money-bill-wave text-primary fa-2x mb-2"></i>
-                                <h6 class="text-primary mb-1">Custo Total</h6>
-                                <h5 class="mb-0">R$ {{ "%.2f"|format(kpis.custo_total) }}</h5>
-                            </div>
-                        </div>
-                        <div class="col-6">
-                            <div class="text-center p-3 bg-success bg-opacity-10 rounded">
-                                <i class="fas fa-list text-success fa-2x mb-2"></i>
-                                <h6 class="text-success mb-1">Total Usos</h6>
-                                <h5 class="mb-0">{{ kpis.total_usos }}</h5>
-                            </div>
-                        </div>
-                        <div class="col-12">
-                            <div class="text-center p-3 bg-info bg-opacity-10 rounded">
-                                <i class="fas fa-tachometer-alt text-info fa-2x mb-2"></i>
-                                <h6 class="text-info mb-1">Média KM/Uso</h6>
-                                <h5 class="mb-0">{{ "%.0f"|format(kpis.media_km) }}</h5>
-                            </div>
-                        </div>
+                <hr>
+                <div class="row">
+                    <div class="col-12">
+                        <strong>Status:</strong><br>
+                        {% set status_class = 'success' if veiculo.status == 'Disponível' else 'warning' if veiculo.status == 'Manutenção' else 'danger' %}
+                        <span class="badge bg-{{ status_class }}">
+                            {{ veiculo.status or 'Disponível' }}
+                        </span>
                     </div>
                 </div>
             </div>
         </div>
     </div>
-
-    <!-- Históricos -->
-    <div class="row">
-        <!-- Histórico de Usos -->
-        <div class="col-lg-6 mb-4">
-            <div class="card">
-                <div class="card-header">
-                    <h5 class="mb-0">
-                        <i class="fas fa-road me-2"></i>
-                        Histórico de Usos
-                    </h5>
-                </div>
-                <div class="card-body">
-                    {% if usos %}
-                    <div class="table-responsive">
-                        <table class="table table-striped table-sm">
-                            <thead>
-                                <tr>
-                                    <th>Data</th>
-                                    <th>Funcionário</th>
-                                    <th>Obra</th>
-                                    <th>Horário Inicial</th>
-                                    <th>Horário Final</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {% for uso in usos %}
-                                <tr>
-                                    <td>{{ uso.data_uso.strftime('%d/%m/%Y') }}</td>
-                                    <td>{{ uso.funcionario.nome }}</td>
-                                    <td>{{ uso.obra.nome if uso.obra else '-' }}</td>
-                                    <td>{{ uso.horario_saida.strftime('%H:%M') if uso.horario_saida else '-' }}</td>
-                                    <td>{{ uso.horario_chegada.strftime('%H:%M') if uso.horario_chegada else '-' }}</td>
-                                </tr>
-                                {% endfor %}
-                            </tbody>
-                        </table>
-                    </div>
-                    {% else %}
-                    <div class="text-center py-4">
-                        <i class="fas fa-road fa-3x text-muted mb-3"></i>
-                        <h6 class="text-muted">Nenhum uso registrado</h6>
-                        <p class="text-muted small">Este veículo ainda não possui registros de uso.</p>
-                        <button type="button" class="btn btn-success btn-sm" data-bs-toggle="modal" data-bs-target="#modalNovoUso">
-                            <i class="fas fa-plus me-1"></i> Primeiro Uso
-                        </button>
-                    </div>
-                    {% endif %}
-                </div>
+    
+    <div class="col-md-6">
+        <div class="card border-info">
+            <div class="card-header bg-info text-white">
+                <h5 class="mb-0">
+                    <i class="fas fa-chart-bar"></i> KPIs do Veículo
+                </h5>
             </div>
-        </div>
-
-        <!-- Histórico de Custos -->
-        <div class="col-lg-6 mb-4">
-            <div class="card">
-                <div class="card-header">
-                    <h5 class="mb-0">
-                        <i class="fas fa-money-bill-wave me-2"></i>
-                        Histórico de Custos
-                    </h5>
+            <div class="card-body">
+                <div class="row text-center">
+                    <div class="col-12 mb-3">
+                        <div class="bg-light p-3 rounded">
+                            <h4 class="text-primary mb-1">{{ kpis_veiculo.quilometragem_total }}</h4>
+                            <small class="text-muted">Quilometragem Total</small>
+                        </div>
+                    </div>
                 </div>
-                <div class="card-body">
-                    {% if custos %}
-                    <div class="table-responsive">
-                        <table class="table table-striped table-sm">
-                            <thead>
-                                <tr>
-                                    <th>Data</th>
-                                    <th>Tipo</th>
-                                    <th>Valor</th>
-                                    <th>Descrição</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {% for custo in custos %}
-                                <tr>
-                                    <td>{{ custo.data_custo.strftime('%d/%m/%Y') }}</td>
-                                    <td><span class="badge bg-secondary">{{ custo.tipo_custo }}</span></td>
-                                    <td><strong class="text-danger">R$ {{ "%.2f"|format(custo.valor) }}</strong></td>
-                                    <td>{{ custo.descricao or '-' }}</td>
-                                </tr>
-                                {% endfor %}
-                            </tbody>
-                        </table>
+                <div class="row text-center">
+                    <div class="col-6 mb-3">
+                        <div class="bg-light p-2 rounded">
+                            <h5 class="text-warning mb-1">R$ {{ "%.2f"|format(kpis_veiculo.custos_manutencao) }}</h5>
+                            <small class="text-muted">Custos Manutenção</small>
+                        </div>
                     </div>
-                    {% else %}
-                    <div class="text-center py-4">
-                        <i class="fas fa-money-bill-wave fa-3x text-muted mb-3"></i>
-                        <h6 class="text-muted">Nenhum custo registrado</h6>
-                        <p class="text-muted small">Este veículo ainda não possui registros de custos.</p>
-                        <button type="button" class="btn btn-warning btn-sm" data-bs-toggle="modal" data-bs-target="#modalNovoCusto">
-                            <i class="fas fa-plus me-1"></i> Primeiro Custo
-                        </button>
+                    <div class="col-6 mb-3">
+                        <div class="bg-light p-2 rounded">
+                            <h5 class="text-success mb-1">{{ kpis_veiculo.combustivel_gasto }}L</h5>
+                            <small class="text-muted">Combustível</small>
+                        </div>
                     </div>
-                    {% endif %}
                 </div>
             </div>
         </div>
     </div>
 </div>
 
-<!-- Modal Novo Uso -->
-<div class="modal fade" id="modalNovoUso" tabindex="-1">
+<!-- Histórico de Manutenções -->
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <div class="d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">
+                        <i class="fas fa-wrench"></i> Histórico de Manutenções
+                    </h5>
+                    <button class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#manutencaoModal">
+                        <i class="fas fa-plus"></i> Nova Manutenção
+                    </button>
+                </div>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-striped">
+                        <thead>
+                            <tr>
+                                <th>Data</th>
+                                <th>Tipo</th>
+                                <th>Descrição</th>
+                                <th>Custo</th>
+                                <th>Próxima</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td colspan="5" class="text-center text-muted">
+                                    <i class="fas fa-info-circle"></i>
+                                    Nenhuma manutenção registrada
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Histórico de Uso -->
+<div class="row">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">
+                    <i class="fas fa-route"></i> Histórico de Uso
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-striped">
+                        <thead>
+                            <tr>
+                                <th>Data</th>
+                                <th>Obra</th>
+                                <th>Condutor</th>
+                                <th>Quilometragem</th>
+                                <th>Combustível</th>
+                                <th>Custo</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td colspan="6" class="text-center text-muted">
+                                    <i class="fas fa-info-circle"></i>
+                                    Nenhum registro de uso disponível
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Nova Manutenção -->
+<div class="modal fade" id="manutencaoModal" tabindex="-1">
     <div class="modal-dialog">
         <div class="modal-content">
             <div class="modal-header">
                 <h5 class="modal-title">
-                    <i class="fas fa-road me-2"></i>
-                    Registrar Uso - {{ veiculo.placa }}
+                    <i class="fas fa-wrench"></i> Nova Manutenção
                 </h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
-            <div class="modal-body">
-                <div class="alert alert-info">
-                    <i class="fas fa-info-circle me-2"></i>
-                    Funcionalidade em desenvolvimento. Será implementada na próxima fase do projeto.
+            <form action="#" method="POST">
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label for="data_manutencao" class="form-label">Data da Manutenção</label>
+                        <input type="date" class="form-control" id="data_manutencao" name="data_manutencao" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="tipo_manutencao" class="form-label">Tipo</label>
+                        <select class="form-select" id="tipo_manutencao" name="tipo_manutencao" required>
+                            <option value="">Selecione...</option>
+                            <option value="Preventiva">Preventiva</option>
+                            <option value="Corretiva">Corretiva</option>
+                            <option value="Troca de Óleo">Troca de Óleo</option>
+                            <option value="Pneus">Pneus</option>
+                            <option value="Freios">Freios</option>
+                            <option value="Elétrica">Elétrica</option>
+                            <option value="Outros">Outros</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label for="descricao_manutencao" class="form-label">Descrição</label>
+                        <textarea class="form-control" id="descricao_manutencao" name="descricao_manutencao" rows="3"></textarea>
+                    </div>
+                    <div class="mb-3">
+                        <label for="custo_manutencao" class="form-label">Custo (R$)</label>
+                        <input type="number" class="form-control" id="custo_manutencao" name="custo_manutencao" step="0.01" min="0">
+                    </div>
+                    <div class="mb-3">
+                        <label for="proxima_manutencao" class="form-label">Próxima Manutenção</label>
+                        <input type="date" class="form-control" id="proxima_manutencao" name="proxima_manutencao">
+                    </div>
                 </div>
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fechar</button>
-            </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                        <i class="fas fa-times"></i> Cancelar
+                    </button>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-save"></i> Salvar Manutenção
+                    </button>
+                </div>
+            </form>
         </div>
     </div>
 </div>
 
-<!-- Modal Novo Custo -->
-<div class="modal fade" id="modalNovoCusto" tabindex="-1">
-    <div class="modal-dialog">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title">
-                    <i class="fas fa-money-bill-wave me-2"></i>
-                    Registrar Custo - {{ veiculo.placa }}
-                </h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-            </div>
-            <div class="modal-body">
-                <div class="alert alert-info">
-                    <i class="fas fa-info-circle me-2"></i>
-                    Funcionalidade em desenvolvimento. Será implementada na próxima fase do projeto.
-                </div>
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fechar</button>
-            </div>
-        </div>
-    </div>
-</div>
+<script>
+function editarVeiculo(id) {
+    // Implementar modal de edição
+    alert('Edição de veículo a ser implementada para ID: ' + id);
+}
+</script>
 {% endblock %}
