@@ -255,9 +255,10 @@ html[data-bs-theme="dark"] .header-btn i {
                     </div>
                     <div class="col-md-2">
                         <div class="text-center">
-                            <i class="fas fa-exclamation-triangle fa-2x text-danger mb-2"></i>
+                            <i class="fas fa-exclamation-triangle fa-2x text-warning mb-2"></i>
                             <h6>Faltas Justificadas</h6>
-                            <h5 class="text-danger">R$ {{ '{:,.2f}'.format(custos_detalhados.faltas_justificadas).replace(',', '.') }}</h5>
+                            <h5 class="text-warning">{{ custos_detalhados.faltas_justificadas_qtd if custos_detalhados.faltas_justificadas_qtd is defined else 0 }} dias</h5>
+                            <small class="text-muted">R$ {{ '{:,.2f}'.format(custos_detalhados.faltas_justificadas if custos_detalhados.faltas_justificadas is defined else 0).replace(',', '.') }}</small>
                         </div>
                     </div>
                     <div class="col-md-2">

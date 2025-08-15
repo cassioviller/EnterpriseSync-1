@@ -200,20 +200,27 @@ def dashboard():
             except:
                 custo_transporte_real = 0
         
-        # 2. Faltas Justificadas (valor em R$)
+        # 2. Faltas Justificadas (quantidade e valor em R$)
+        quantidade_faltas_justificadas = 0
         custo_faltas_justificadas = 0
         try:
+            # Buscar todas as faltas justificadas no período
             faltas_justificadas = RegistroPonto.query.filter(
                 RegistroPonto.data >= data_inicio,
                 RegistroPonto.data <= data_fim,
                 RegistroPonto.tipo_registro == 'falta_justificada'
             ).all()
             
+            quantidade_faltas_justificadas = len(faltas_justificadas)
+            
             for falta in faltas_justificadas:
                 funcionario = Funcionario.query.get(falta.funcionario_id)
                 if funcionario and funcionario.salario:
-                    valor_dia = (funcionario.salario / 30)  # Valor por dia
+                    # Valor por dia baseado em 22 dias úteis
+                    valor_dia = (funcionario.salario / 22)
                     custo_faltas_justificadas += valor_dia
+            
+            print(f"DEBUG Faltas Justificadas: {quantidade_faltas_justificadas} faltas, R$ {custo_faltas_justificadas:.2f}")
         except Exception as e:
             print(f"Erro faltas justificadas: {e}")
         
@@ -314,6 +321,7 @@ def dashboard():
             'mao_obra': total_custo_real,
             'outros': custo_outros_real,
             'faltas_justificadas': custo_faltas_justificadas,
+            'faltas_justificadas_qtd': quantidade_faltas_justificadas,
             'total': custos_mes
         }
         
@@ -328,6 +336,7 @@ def dashboard():
             'mao_obra': 0,
             'outros': 0,
             'faltas_justificadas': 0,
+            'faltas_justificadas_qtd': 0,
             'total': 0
         }
         funcionarios_por_departamento = {}
