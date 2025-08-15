@@ -130,7 +130,7 @@
             <div class="card h-100 obra-card">
                 <div class="card-body">
                     <div class="d-flex justify-content-between align-items-start mb-3">
-                        <h5 class="card-title text-primary mb-0">{{ obra.nome }}</h5>
+                        <h5 class="card-title text-primary mb-0">{{ obra.id }} - {{ obra.nome }}</h5>
                         {% if obra.status == 'Em andamento' %}
                             <span class="badge bg-success">{{ obra.status }}</span>
                         {% elif obra.status == 'Concluída' %}
@@ -185,7 +185,7 @@
                 
                 <div class="card-footer bg-transparent">
                     <div class="btn-group btn-group-sm w-100">
-                        <a href="/obras/{{ obra.id }}" 
+                        <a href="{{ url_for('main.detalhes_obra', id=obra.id) }}" 
                            class="btn btn-outline-info"
                            data-bs-toggle="tooltip" 
                            title="Ver Detalhes">
@@ -733,8 +733,10 @@ function setDateRange(periodo) {
             dataFim = new Date(hoje.getFullYear(), hoje.getMonth() + 1, 0);
             break;
         case 'ultimo_mes':
+            // Julho de 2025 (mês anterior ao atual)
             dataInicio = new Date(hoje.getFullYear(), hoje.getMonth() - 1, 1);
             dataFim = new Date(hoje.getFullYear(), hoje.getMonth(), 0);
+            console.log('Filtro último mês:', dataInicio, 'até', dataFim);
             break;
         case 'ultimos_3_meses':
             dataInicio = new Date(hoje.getFullYear(), hoje.getMonth() - 2, 1);
