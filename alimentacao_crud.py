@@ -51,11 +51,17 @@ def listar_alimentacao():
     obras = Obra.query.filter_by(status='Em Andamento').order_by(Obra.nome).all()
     restaurantes = Restaurante.query.order_by(Restaurante.nome).all()
     
+    # Importar date para o template
+    from datetime import date
+    
     return render_template('alimentacao.html',
                          registros=registros,
                          funcionarios=funcionarios,
                          obras=obras,
-                         restaurantes=restaurantes)
+                         restaurantes=restaurantes,
+                         data_inicio=data_inicio,
+                         data_fim=data_fim,
+                         date=date)
 
 @alimentacao_bp.route('/alimentacao/nova', methods=['POST'])
 @login_required
