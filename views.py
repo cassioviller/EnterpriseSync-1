@@ -63,21 +63,32 @@ def index():
 @main_bp.route('/dashboard')
 @admin_required
 def dashboard():
-    admin_id = current_user.id if current_user.tipo_usuario == TipoUsuario.ADMIN else current_user.admin_id
-    
-    # Estatísticas básicas
-    total_funcionarios = Funcionario.query.filter_by(admin_id=admin_id, ativo=True).count()
-    total_obras = Obra.query.filter_by(admin_id=admin_id).count()
-    
-    # Funcionários recentes
-    funcionarios_recentes = Funcionario.query.filter_by(
-        admin_id=admin_id, ativo=True
-    ).order_by(desc(Funcionario.created_at)).limit(5).all()
-    
-    # Obras ativas
-    obras_ativas = Obra.query.filter_by(
-        admin_id=admin_id, status='ativa'
-    ).order_by(desc(Obra.created_at)).limit(5).all()
+    try:
+        admin_id = current_user.id if current_user.tipo_usuario == TipoUsuario.ADMIN else current_user.admin_id
+        
+        # Estatísticas básicas
+        total_funcionarios = Funcionario.query.filter_by(admin_id=admin_id, ativo=True).count()
+        total_obras = Obra.query.filter_by(admin_id=admin_id).count()
+        
+        # Funcionários recentes
+        funcionarios_recentes = Funcionario.query.filter_by(
+            admin_id=admin_id, ativo=True
+        ).order_by(desc(Funcionario.created_at)).limit(5).all()
+        
+        # Obras ativas - corrigido status
+        obras_ativas = Obra.query.filter_by(
+            admin_id=admin_id
+        ).filter(
+            Obra.status.in_(['andamento', 'Em andamento', 'ativa', 'planejamento'])
+        ).order_by(desc(Obra.created_at)).limit(5).all()
+    except Exception as e:
+        # Log do erro para debug
+        print(f"ERRO NO DASHBOARD: {str(e)}")
+        # Valores padrão para evitar crash
+        total_funcionarios = 0
+        total_obras = 0
+        funcionarios_recentes = []
+        obras_ativas = []
     
     # Dados adicionais para o template
     total_veiculos = 5

@@ -112,8 +112,8 @@ VALUES ('FUN001', 'Carlos Alberto Santos', '123.456.789-00', 'Operador', 2500.00
 ON CONFLICT (codigo) DO NOTHING;
 
 -- OBRA DEMO
-INSERT INTO obra (codigo, nome, descricao, status, data_inicio, data_fim_prevista, admin_id, token_cliente)
-VALUES ('OBR001', 'Jardim das Flores - Vargem Velha', 'Construção de galpão industrial 500m²', 'andamento', '2024-07-01', '2024-12-31', 10, 'demo_token_cliente_123')
+INSERT INTO obra (codigo, nome, descricao, status, data_inicio, data_fim_prevista, admin_id, token_cliente, orcamento, valor_contrato, area_total_m2, cliente_nome, cliente_email, cliente_telefone, portal_ativo)
+VALUES ('OBR001', 'Jardim das Flores - Vargem Velha', 'Construção de galpão industrial 500m²', 'andamento', '2024-07-01', '2024-12-31', 10, 'demo_token_cliente_123', 150000.00, 180000.00, 500.00, 'José Silva Santos', 'jose.silva@email.com', '(11) 99999-9999', TRUE)
 ON CONFLICT (codigo) DO NOTHING;
 
 EOSQL
@@ -135,6 +135,8 @@ ALTER TABLE obra ADD COLUMN IF NOT EXISTS data_previsao_fim DATE;
 ALTER TABLE obra ADD COLUMN IF NOT EXISTS orcamento DECIMAL(10,2) DEFAULT 0.0;
 ALTER TABLE obra ADD COLUMN IF NOT EXISTS valor_contrato DECIMAL(10,2) DEFAULT 0.0;
 ALTER TABLE obra ADD COLUMN IF NOT EXISTS area_total_m2 DECIMAL(10,2) DEFAULT 0.0;
+ALTER TABLE obra ADD COLUMN IF NOT EXISTS ultima_visualizacao_cliente TIMESTAMP;
+ALTER TABLE obra ADD COLUMN IF NOT EXISTS proposta_origem_id INTEGER;
 
 ALTER TABLE funcionario ADD COLUMN IF NOT EXISTS foto_base64 TEXT;
 ALTER TABLE funcionario ADD COLUMN IF NOT EXISTS departamento_id INTEGER;
