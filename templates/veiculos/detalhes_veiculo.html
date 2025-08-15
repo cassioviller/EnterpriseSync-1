@@ -124,16 +124,38 @@
                                 <th>Tipo</th>
                                 <th>Descrição</th>
                                 <th>Custo</th>
-                                <th>Próxima</th>
+                                <th>Fornecedor</th>
                             </tr>
                         </thead>
                         <tbody>
-                            <tr>
-                                <td colspan="5" class="text-center text-muted">
-                                    <i class="fas fa-info-circle"></i>
-                                    Nenhuma manutenção registrada
-                                </td>
-                            </tr>
+                            {% if custos_veiculo %}
+                                {% for custo in custos_veiculo %}
+                                <tr>
+                                    <td>{{ custo.data_custo.strftime('%d/%m/%Y') if custo.data_custo else '-' }}</td>
+                                    <td>
+                                        {% if custo.tipo_custo == 'combustivel' %}
+                                            <span class="badge bg-info">Combustível</span>
+                                        {% elif custo.tipo_custo == 'manutencao' %}
+                                            <span class="badge bg-warning">Manutenção</span>
+                                        {% elif custo.tipo_custo == 'seguro' %}
+                                            <span class="badge bg-success">Seguro</span>
+                                        {% else %}
+                                            <span class="badge bg-secondary">{{ custo.tipo_custo|title }}</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>{{ custo.descricao or '-' }}</td>
+                                    <td>R$ {{ "%.2f"|format(custo.valor) }}</td>
+                                    <td>{{ custo.fornecedor or '-' }}</td>
+                                </tr>
+                                {% endfor %}
+                            {% else %}
+                                <tr>
+                                    <td colspan="5" class="text-center text-muted">
+                                        <i class="fas fa-info-circle"></i>
+                                        Nenhuma manutenção registrada
+                                    </td>
+                                </tr>
+                            {% endif %}
                         </tbody>
                     </table>
                 </div>
@@ -161,16 +183,36 @@
                                 <th>Condutor</th>
                                 <th>Quilometragem</th>
                                 <th>Combustível</th>
-                                <th>Custo</th>
+                                <th>Finalidade</th>
                             </tr>
                         </thead>
                         <tbody>
-                            <tr>
-                                <td colspan="6" class="text-center text-muted">
-                                    <i class="fas fa-info-circle"></i>
-                                    Nenhum registro de uso disponível
-                                </td>
-                            </tr>
+                            {% if usos_veiculo %}
+                                {% for uso in usos_veiculo %}
+                                <tr>
+                                    <td>{{ uso.data_uso.strftime('%d/%m/%Y') if uso.data_uso else '-' }}</td>
+                                    <td>{{ uso.obra.nome if uso.obra else '-' }}</td>
+                                    <td>{{ uso.funcionario.nome if uso.funcionario else '-' }}</td>
+                                    <td>
+                                        {% if uso.km_inicial and uso.km_final %}
+                                            {{ uso.km_inicial }} - {{ uso.km_final }} km
+                                            <small class="text-muted">({{ uso.km_final - uso.km_inicial }} km)</small>
+                                        {% else %}
+                                            -
+                                        {% endif %}
+                                    </td>
+                                    <td>-</td>
+                                    <td>{{ uso.finalidade or '-' }}</td>
+                                </tr>
+                                {% endfor %}
+                            {% else %}
+                                <tr>
+                                    <td colspan="6" class="text-center text-muted">
+                                        <i class="fas fa-info-circle"></i>
+                                        Nenhum registro de uso disponível
+                                    </td>
+                                </tr>
+                            {% endif %}
                         </tbody>
                     </table>
                 </div>

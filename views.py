@@ -686,20 +686,46 @@ def detalhes_veiculo(id):
         admin_id = current_user.id if current_user.tipo_usuario == TipoUsuario.ADMIN else current_user.admin_id
         
         # Buscar o veículo
-        from models import Veiculo
+        from models import Veiculo, UsoVeiculo, CustoVeiculo
         veiculo = Veiculo.query.filter_by(id=id, admin_id=admin_id).first_or_404()
         
-        # KPIs básicos do veículo
+        # Buscar histórico de uso do veículo
+        usos_veiculo = UsoVeiculo.query.filter_by(veiculo_id=id).order_by(UsoVeiculo.data_uso.desc()).all()
+        
+        # Buscar custos/manutenções do veículo
+        custos_veiculo = CustoVeiculo.query.filter_by(veiculo_id=id).order_by(CustoVeiculo.data_custo.desc()).all()
+        
+        # Calcular KPIs do veículo
+        quilometragem_total = 0
+        custos_manutencao = 0
+        combustivel_gasto = 0
+        
+        # Calcular quilometragem total a partir dos usos
+        for uso in usos_veiculo:
+            if uso.km_inicial and uso.km_final:
+                quilometragem_total += (uso.km_final - uso.km_inicial)
+        
+        # Calcular custos por tipo
+        for custo in custos_veiculo:
+            if custo.tipo_custo == 'combustivel':
+                combustivel_gasto += custo.valor
+            elif custo.tipo_custo in ['manutencao', 'seguro', 'outros']:
+                custos_manutencao += custo.valor
+        
         kpis_veiculo = {
-            'quilometragem_total': 0,
-            'custos_manutencao': 0,
-            'combustivel_gasto': 0,
+            'quilometragem_total': quilometragem_total,
+            'custos_manutencao': custos_manutencao,
+            'combustivel_gasto': combustivel_gasto,
             'status_atual': veiculo.status if hasattr(veiculo, 'status') else 'Disponível'
         }
         
+        print(f"DEBUG VEÍCULO {id}: {len(usos_veiculo)} usos, {len(custos_veiculo)} custos")
+        
         return render_template('veiculos/detalhes_veiculo.html', 
                              veiculo=veiculo, 
-                             kpis_veiculo=kpis_veiculo)
+                             kpis_veiculo=kpis_veiculo,
+                             usos_veiculo=usos_veiculo,
+                             custos_veiculo=custos_veiculo)
     except Exception as e:
         print(f"ERRO DETALHES VEÍCULO: {str(e)}")
         # Redirecionar para lista de veículos em caso de erro
