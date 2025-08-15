@@ -314,3 +314,52 @@ DIAGNÓSTICO:
                              error_details=full_error_details,
                              error_url="/prod/safe-veiculos",
                              error_timestamp=error_timestamp), 500
+
+@production_bp.route('/safe-alimentacao')
+def safe_alimentacao():
+    """Rota segura para alimentação sem erros de template"""
+    try:
+        logging.info("Acessando rota segura de alimentação...")
+        
+        # Detectar admin_id automaticamente
+        admin_id = get_safe_admin_id()
+        logging.info(f"Admin ID detectado: {admin_id}")
+        
+        # Buscar registros de alimentação
+        try:
+            from models import RegistroAlimentacao, Funcionario, Obra, Restaurante
+            registros = RegistroAlimentacao.query.filter_by(admin_id=admin_id).limit(50).all()
+            funcionarios = Funcionario.query.filter_by(admin_id=admin_id, ativo=True).all()
+            obras = Obra.query.filter_by(admin_id=admin_id).all()
+            restaurantes = []  # Lista vazia por enquanto
+        except Exception as e:
+            logging.warning(f"Erro ao buscar dados de alimentação: {e}")
+            registros = []
+            funcionarios = []
+            obras = []
+            restaurantes = []
+        
+        logging.info(f"Encontrados {len(registros)} registros de alimentação para admin_id={admin_id}")
+        
+        return render_template('alimentacao_safe.html', 
+                             registros=registros,
+                             funcionarios=funcionarios,
+                             obras=obras,
+                             restaurantes=restaurantes,
+                             total_registros=len(registros))
+                             
+    except Exception as e:
+        import traceback
+        from datetime import datetime
+        
+        error_traceback = traceback.format_exc()
+        error_timestamp = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
+        
+        logging.error(f"Erro na rota safe-alimentacao: {e}")
+        logging.error(f"Traceback: {error_traceback}")
+        
+        return render_template('error.html', 
+                             error_code=500,
+                             error_message=f"Erro ao carregar alimentação: {str(e)}",
+                             error_url="/prod/safe-alimentacao",
+                             error_timestamp=error_timestamp), 500

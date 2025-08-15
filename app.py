@@ -139,6 +139,16 @@ with app.app_context():
     except Exception as e:
         logging.error(f"❌ Erro ao registrar blueprint serviços: {e}")
     
+    # Registrar blueprint de alimentação
+    try:
+        from alimentacao_crud import alimentacao_bp
+        app.register_blueprint(alimentacao_bp)
+        logging.info("✅ Blueprint alimentação registrado")
+    except ImportError as e:
+        logging.warning(f"⚠️ Blueprint alimentação não encontrado: {e}")
+    except Exception as e:
+        logging.error(f"❌ Erro ao registrar blueprint alimentação: {e}")
+    
     # Modelos de propostas já estão consolidados em models.py
     logging.info("✅ Modelos de propostas importados do arquivo consolidado")
     
