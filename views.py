@@ -241,16 +241,20 @@ def dashboard():
         funcionarios_por_departamento = {}
         try:
             from models import Departamento
-            departamentos = db.session.query(
-                Departamento.nome,
-                db.func.count(Funcionario.id).label('total')
-            ).outerjoin(Funcionario).filter(
-                Funcionario.ativo == True,
-                Funcionario.admin_id == admin_id
-            ).group_by(Departamento.nome).all()
+            
+            # Query corrigida com JOIN explícito
+            departamentos = db.session.execute(text("""
+                SELECT d.nome as nome, COALESCE(COUNT(f.id), 0) as total
+                FROM departamento d 
+                LEFT JOIN funcionario f ON f.departamento_id = d.id 
+                    AND f.ativo = true 
+                    AND f.admin_id = :admin_id
+                GROUP BY d.nome 
+                ORDER BY total DESC
+            """), {'admin_id': admin_id}).fetchall()
             
             funcionarios_por_departamento = {
-                dept.nome: dept.total for dept in departamentos if dept.nome
+                dept[0]: dept[1] for dept in departamentos if dept[1] > 0
             }
             
             # Adicionar funcionários sem departamento
@@ -261,6 +265,8 @@ def dashboard():
             ).count()
             if sem_dept > 0:
                 funcionarios_por_departamento['Sem Departamento'] = sem_dept
+                
+            print(f"DEBUG Funcionários por dept: {funcionarios_por_departamento}")
                 
         except Exception as e:
             print(f"Erro funcionários por departamento: {e}")
@@ -358,6 +364,14 @@ def dashboard():
         Obra.status.in_(['andamento', 'Em andamento', 'ativa', 'planejamento'])
     ).count()
     
+    # Converter dicionários para listas para os gráficos
+    funcionarios_dept = [{'nome': k, 'total': v} for k, v in funcionarios_por_departamento.items()]
+    custos_recentes = [{'nome': k, 'total_custo': v} for k, v in custos_por_obra.items()]
+    
+    # Debug final
+    print(f"DEBUG FINAL - Funcionários por dept: {funcionarios_dept}")
+    print(f"DEBUG FINAL - Custos por obra: {custos_recentes}")
+    
     return render_template('dashboard.html',
                          total_funcionarios=total_funcionarios,
                          total_obras=total_obras,
@@ -373,6 +387,8 @@ def dashboard():
                          veiculos_disponiveis=veiculos_disponiveis,
                          funcionarios_por_departamento=funcionarios_por_departamento,
                          custos_por_obra=custos_por_obra,
+                         funcionarios_dept=funcionarios_dept,
+                         custos_recentes=custos_recentes,
                          data_inicio=data_inicio,
                          data_fim=data_fim)
 
@@ -464,6 +480,7 @@ def funcionarios():
                 total_horas = sum(r.horas_trabalhadas or 0 for r in registros)
                 total_extras = sum(r.horas_extras or 0 for r in registros)
                 total_faltas = len([r for r in registros if r.tipo_registro == 'falta'])
+                total_faltas_justificadas = len([r for r in registros if r.tipo_registro == 'falta_justificada'])
                 
                 funcionarios_kpis.append({
                     'funcionario': func,
@@ -471,6 +488,7 @@ def funcionarios():
                     'total_horas': total_horas,
                     'total_extras': total_extras,
                     'total_faltas': total_faltas,
+                    'total_faltas_justificadas': total_faltas_justificadas,
                     'custo_total': (total_horas + total_extras * 1.5) * (func.salario / 220 if func.salario else 0)
                 })
             except Exception as e:
@@ -481,6 +499,7 @@ def funcionarios():
                     'total_horas': 0,
                     'total_extras': 0,
                     'total_faltas': 0,
+                    'total_faltas_justificadas': 0,
                     'custo_total': 0
                 })
         
@@ -488,7 +507,16 @@ def funcionarios():
         total_horas_geral = sum(k['total_horas'] for k in funcionarios_kpis)
         total_extras_geral = sum(k['total_extras'] for k in funcionarios_kpis)
         total_faltas_geral = sum(k['total_faltas'] for k in funcionarios_kpis)
+        total_faltas_justificadas_geral = sum(k.get('total_faltas_justificadas', 0) for k in funcionarios_kpis)
         total_custo_geral = sum(k['custo_total'] for k in funcionarios_kpis)
+        
+        # Calcular custo das faltas justificadas
+        total_custo_faltas_geral = 0
+        for k in funcionarios_kpis:
+            func = k['funcionario']
+            if func.salario and k.get('total_faltas_justificadas', 0) > 0:
+                custo_dia = func.salario / 22  # 22 dias úteis
+                total_custo_faltas_geral += k['total_faltas_justificadas'] * custo_dia
         
         kpis_geral = {
             'total_funcionarios': len(funcionarios),
@@ -496,10 +524,10 @@ def funcionarios():
             'total_horas_geral': total_horas_geral,
             'total_extras_geral': total_extras_geral,
             'total_faltas_geral': total_faltas_geral,
-            'total_faltas_justificadas_geral': 0,  # Para implementar depois
+            'total_faltas_justificadas_geral': total_faltas_justificadas_geral,
             'total_custo_geral': total_custo_geral,
-            'total_custo_faltas_geral': 0,  # Para implementar depois
-            'taxa_absenteismo_geral': (total_faltas_geral / len(funcionarios) * 100) if funcionarios else 0
+            'total_custo_faltas_geral': total_custo_faltas_geral,
+            'taxa_absenteismo_geral': ((total_faltas_geral + total_faltas_justificadas_geral) / len(funcionarios) * 100) if funcionarios else 0
         }
     
     except Exception as e:
