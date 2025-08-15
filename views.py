@@ -103,8 +103,11 @@ def dashboard():
     except Exception as e:
         # Log do erro para debug
         print(f"ERRO NO DASHBOARD: {str(e)}")
-        # Em caso de erro, redirecionar para rota segura
-        return redirect(url_for('production.safe_dashboard'))
+        # Em caso de erro, usar dados básicos seguros
+        total_funcionarios = 0
+        total_obras = 0
+        funcionarios_recentes = []
+        obras_ativas = []
     
     # Dados adicionais para o template
     total_veiculos = 5

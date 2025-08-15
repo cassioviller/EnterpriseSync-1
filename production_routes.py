@@ -111,7 +111,7 @@ def safe_dashboard():
             'total': 0
         }
         
-        return render_template('dashboard.html',
+        return render_template('dashboard_safe.html',
                              total_funcionarios=total_funcionarios,
                              total_obras=total_obras,
                              total_veiculos=5,
