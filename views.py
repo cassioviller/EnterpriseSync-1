@@ -719,6 +719,88 @@ def novo_rdo():
     # Implementação futura
     return redirect(url_for('main.obras'))
 
+# Rota para nova obra
+@main_bp.route('/obras/nova', methods=['POST'])
+@admin_required
+def nova_obra():
+    admin_id = current_user.id if current_user.tipo_usuario == TipoUsuario.ADMIN else current_user.admin_id
+    
+    try:
+        # Criar nova obra
+        obra = Obra(
+            nome=request.form.get('nome'),
+            descricao=request.form.get('descricao'),
+            cliente=request.form.get('cliente'),
+            endereco=request.form.get('endereco'),
+            valor_orcamento=float(request.form.get('valor_orcamento', 0)),
+            data_inicio=datetime.strptime(request.form.get('data_inicio'), '%Y-%m-%d').date() if request.form.get('data_inicio') else None,
+            data_prazo=datetime.strptime(request.form.get('data_prazo'), '%Y-%m-%d').date() if request.form.get('data_prazo') else None,
+            status=request.form.get('status', 'planejamento'),
+            admin_id=admin_id
+        )
+        
+        db.session.add(obra)
+        db.session.commit()
+        
+        return redirect(url_for('main.obras'))
+        
+    except Exception as e:
+        print(f"ERRO NOVA OBRA: {str(e)}")
+        db.session.rollback()
+        return redirect(url_for('main.obras'))
+
+# Rota para editar obra
+@main_bp.route('/obras/editar/<int:id>', methods=['POST'])
+@admin_required
+def editar_obra(id):
+    admin_id = current_user.id if current_user.tipo_usuario == TipoUsuario.ADMIN else current_user.admin_id
+    
+    try:
+        obra = Obra.query.filter_by(id=id, admin_id=admin_id).first_or_404()
+        
+        # Atualizar campos
+        obra.nome = request.form.get('nome', obra.nome)
+        obra.descricao = request.form.get('descricao', obra.descricao)
+        obra.cliente = request.form.get('cliente', obra.cliente)
+        obra.endereco = request.form.get('endereco', obra.endereco)
+        
+        if request.form.get('valor_orcamento'):
+            obra.valor_orcamento = float(request.form.get('valor_orcamento'))
+            
+        if request.form.get('data_inicio'):
+            obra.data_inicio = datetime.strptime(request.form.get('data_inicio'), '%Y-%m-%d').date()
+            
+        if request.form.get('data_prazo'):
+            obra.data_prazo = datetime.strptime(request.form.get('data_prazo'), '%Y-%m-%d').date()
+            
+        if request.form.get('status'):
+            obra.status = request.form.get('status')
+        
+        db.session.commit()
+        return redirect(url_for('main.obras'))
+        
+    except Exception as e:
+        print(f"ERRO EDITAR OBRA: {str(e)}")
+        db.session.rollback()
+        return redirect(url_for('main.obras'))
+
+# Rota para excluir obra
+@main_bp.route('/obras/excluir/<int:id>', methods=['POST'])
+@admin_required
+def excluir_obra(id):
+    admin_id = current_user.id if current_user.tipo_usuario == TipoUsuario.ADMIN else current_user.admin_id
+    
+    try:
+        obra = Obra.query.filter_by(id=id, admin_id=admin_id).first_or_404()
+        db.session.delete(obra)
+        db.session.commit()
+        return redirect(url_for('main.obras'))
+        
+    except Exception as e:
+        print(f"ERRO EXCLUIR OBRA: {str(e)}")
+        db.session.rollback()
+        return redirect(url_for('main.obras'))
+
 @main_bp.route('/veiculos/novo', methods=['POST'])
 @admin_required
 def novo_veiculo():

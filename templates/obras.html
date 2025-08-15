@@ -649,8 +649,9 @@ function alternarVisualizacao() {
 }
 
 function editarObra(id) {
-    // Implementar edição
-    alert('Funcionalidade de edição será implementada');
+    // Buscar dados da obra e preencher modal para edição futura
+    console.log('Editar obra:', id);
+    alert('Modal de edição será implementado em breve');
 }
 
 function verCustos(id) {
@@ -659,10 +660,21 @@ function verCustos(id) {
 }
 
 function excluirObra(id) {
-    if (confirm('Tem certeza que deseja excluir esta obra?')) {
+    if (confirm('Tem certeza que deseja excluir esta obra?\nEsta ação não pode ser desfeita.')) {
         const form = document.createElement('form');
         form.method = 'POST';
-        form.action = '/obras/' + id + '/excluir';
+        form.action = '{{ url_for("main.excluir_obra", id="OBRA_ID") }}'.replace('OBRA_ID', id);
+        
+        // Adicionar token CSRF se disponível
+        const csrfToken = document.querySelector('meta[name=csrf-token]');
+        if (csrfToken) {
+            const input = document.createElement('input');
+            input.type = 'hidden';
+            input.name = 'csrf_token';
+            input.value = csrfToken.getAttribute('content');
+            form.appendChild(input);
+        }
+        
         document.body.appendChild(form);
         form.submit();
     }
