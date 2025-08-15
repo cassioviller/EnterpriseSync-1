@@ -822,18 +822,68 @@ def obras():
     print(f"DEBUG FILTROS OBRAS: {filtros}")
     print(f"DEBUG TOTAL OBRAS ENCONTRADAS: {len(obras)}")
     
-    # Calcular KPIs básicos para cada obra
+    # Definir período para cálculos de custo
+    if filtros['data_inicio']:
+        try:
+            periodo_inicio = datetime.strptime(filtros['data_inicio'], '%Y-%m-%d').date()
+        except ValueError:
+            periodo_inicio = date.today().replace(day=1)
+    else:
+        periodo_inicio = date.today().replace(day=1)
+        
+    if filtros['data_fim']:
+        try:
+            periodo_fim = datetime.strptime(filtros['data_fim'], '%Y-%m-%d').date()
+        except ValueError:
+            periodo_fim = date.today()
+    else:
+        periodo_fim = date.today()
+    
+    print(f"DEBUG PERÍODO CUSTOS: {periodo_inicio} até {periodo_fim}")
+    
+    # Calcular custos reais para cada obra no período
     for obra in obras:
         try:
+            from models import OutroCusto, CustoVeiculo
+            
+            # Custos diretos da obra no período
+            custos_diversos = OutroCusto.query.filter(
+                OutroCusto.admin_id == admin_id,
+                OutroCusto.data >= periodo_inicio,
+                OutroCusto.data <= periodo_fim
+            ).all()
+            
+            # Custos de veículos (transporte) no período
+            custos_transporte = CustoVeiculo.query.filter(
+                CustoVeiculo.data_custo >= periodo_inicio,
+                CustoVeiculo.data_custo <= periodo_fim
+            ).all()
+            
+            # Calcular totais
+            custo_diversos_total = sum(c.valor for c in custos_diversos if c.valor)
+            custo_transporte_total = sum(c.valor for c in custos_transporte if c.valor)
+            custo_total = custo_diversos_total + custo_transporte_total
+            
             # KPIs básicos para exibição na lista
             obra.kpis = {
                 'total_rdos': 0,
                 'dias_trabalhados': 0,
-                'custo_total': 0
+                'custo_total': custo_total,
+                'custo_diversos': custo_diversos_total,
+                'custo_transporte': custo_transporte_total
             }
+            
+            print(f"DEBUG CUSTO OBRA {obra.nome}: Total=R${custo_total:.2f} (Diversos={custo_diversos_total:.2f} + Transporte={custo_transporte_total:.2f})")
+            
         except Exception as e:
-            print(f"Erro KPI obra {obra.nome}: {e}")
-            obra.kpis = {'total_rdos': 0, 'dias_trabalhados': 0, 'custo_total': 0}
+            print(f"ERRO ao calcular custos obra {obra.nome}: {e}")
+            obra.kpis = {
+                'total_rdos': 0,
+                'dias_trabalhados': 0,
+                'custo_total': 0,
+                'custo_diversos': 0,
+                'custo_transporte': 0
+            }
     
     return render_template('obras.html', obras=obras, filtros=filtros)
 
@@ -890,6 +940,7 @@ def detalhes_obra(id):
             
             for funcionario in funcionarios_obra[:5]:  # Limitar para performance
                 try:
+                    from models import RegistroPonto
                     registros_ponto = RegistroPonto.query.filter(
                         RegistroPonto.funcionario_id == funcionario.id,
                         RegistroPonto.data >= data_inicio,
@@ -915,33 +966,68 @@ def detalhes_obra(id):
             # Atualizar KPIs com dados reais
             kpis_obra.update({
                 'total_funcionarios': len(funcionarios_obra),
-                'funcionarios_periodo': len([f for f in funcionarios_obra if f.data_admissao <= data_fim]),
+                'funcionarios_periodo': len([f for f in funcionarios_obra if f.data_admissao and f.data_admissao <= data_fim]),
                 'custo_mao_obra': total_custo_mao_obra,
                 'custo_total': total_custo_mao_obra,
                 'total_horas': sum([c['horas_trabalhadas'] for c in custos_mao_obra]),
                 'dias_trabalhados': len(set([c['data'] for c in custos_mao_obra]))
             })
             
-            print(f"DEBUG KPIs CALCULADOS: {kpis_obra}")
+            print(f"DEBUG KPIs CALCULADOS: Funcionários={len(funcionarios_obra)}, Custo={total_custo_mao_obra}, Horas={len(custos_mao_obra)}")
             
         except Exception as e:
             print(f"ERRO ao buscar funcionários: {e}")
             funcionarios_obra = []
+            kpis_obra = {
+                'total_funcionarios': 0,
+                'funcionarios_periodo': 0,
+                'custo_mao_obra': 0.0,
+                'custo_total': 0.0,
+                'total_horas': 0.0,
+                'dias_trabalhados': 0
+            }
+            
+        # Buscar custos da obra para o período
+        try:
+            from models import OutroCusto, CustoVeiculo
+            
+            # Custos diversos da obra
+            custos_obra = OutroCusto.query.filter(
+                OutroCusto.admin_id == admin_id,
+                OutroCusto.data >= data_inicio,
+                OutroCusto.data <= data_fim
+            ).all()
+            
+            # Custos de transporte/veículos
+            custos_transporte = CustoVeiculo.query.filter(
+                CustoVeiculo.data_custo >= data_inicio,
+                CustoVeiculo.data_custo <= data_fim
+            ).all()
+            
+            custos_transporte_total = sum(c.valor for c in custos_transporte if c.valor)
+            
+            print(f"DEBUG CUSTOS: Obra={len(custos_obra)}, Transporte={len(custos_transporte)}, Total Transporte={custos_transporte_total}")
+            
+        except Exception as e:
+            print(f"ERRO ao buscar custos: {e}")
+            custos_obra = []
+            custos_transporte = []
+            custos_transporte_total = 0.0
         
         # Filtros de data
-        data_inicio = request.args.get('data_inicio')
-        data_fim = request.args.get('data_fim')
+        data_inicio_param = request.args.get('data_inicio')
+        data_fim_param = request.args.get('data_fim')
         
         # Definir período padrão (último mês)
-        if not data_inicio:
+        if not data_inicio_param:
             data_inicio = date.today().replace(day=1)
         else:
-            data_inicio = datetime.strptime(data_inicio, '%Y-%m-%d').date()
+            data_inicio = datetime.strptime(data_inicio_param, '%Y-%m-%d').date()
         
-        if not data_fim:
+        if not data_fim_param:
             data_fim = date.today()
         else:
-            data_fim = datetime.strptime(data_fim, '%Y-%m-%d').date()
+            data_fim = datetime.strptime(data_fim_param, '%Y-%m-%d').date()
         
         # KPIs básicos da obra com valores zero seguros
         kpis_obra = {
