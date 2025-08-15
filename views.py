@@ -872,6 +872,62 @@ def detalhes_obra(id):
                 print(f"DEBUG: Obra {id} existe mas com admin_id {obra_debug.admin_id}")
             return f"Obra não encontrada (ID: {id}, Admin: {admin_id})", 404
         
+        print(f"DEBUG OBRA ENCONTRADA: {obra.nome} - Admin: {obra.admin_id}")
+        print(f"DEBUG OBRA DADOS: Status={obra.status}, Orçamento={obra.orcamento}")
+        
+        # Buscar funcionários associados à obra
+        try:
+            funcionarios_obra = Funcionario.query.filter_by(admin_id=admin_id).all()
+            print(f"DEBUG: {len(funcionarios_obra)} funcionários encontrados para admin_id {admin_id}")
+            
+            # Calcular KPIs reais da obra
+            # from kpis_engine import CalculadoraObra
+            # calculadora = CalculadoraObra()
+            
+            # Calcular custos de mão de obra para o período
+            total_custo_mao_obra = 0
+            custos_mao_obra = []
+            
+            for funcionario in funcionarios_obra[:5]:  # Limitar para performance
+                try:
+                    registros_ponto = RegistroPonto.query.filter(
+                        RegistroPonto.funcionario_id == funcionario.id,
+                        RegistroPonto.data >= data_inicio,
+                        RegistroPonto.data <= data_fim
+                    ).all()
+                    
+                    for registro in registros_ponto:
+                        if registro.horas_trabalhadas and registro.horas_trabalhadas > 0:
+                            salario_hora = funcionario.salario / 220 if funcionario.salario else 15.0  # Média 220h/mês
+                            custo_dia = registro.horas_trabalhadas * salario_hora
+                            total_custo_mao_obra += custo_dia
+                            
+                            custos_mao_obra.append({
+                                'data': registro.data,
+                                'funcionario_nome': funcionario.nome,
+                                'horas_trabalhadas': registro.horas_trabalhadas,
+                                'salario_hora': salario_hora,
+                                'total_dia': custo_dia
+                            })
+                except Exception as e:
+                    print(f"Erro ao calcular custo para funcionário {funcionario.nome}: {e}")
+            
+            # Atualizar KPIs com dados reais
+            kpis_obra.update({
+                'total_funcionarios': len(funcionarios_obra),
+                'funcionarios_periodo': len([f for f in funcionarios_obra if f.data_admissao <= data_fim]),
+                'custo_mao_obra': total_custo_mao_obra,
+                'custo_total': total_custo_mao_obra,
+                'total_horas': sum([c['horas_trabalhadas'] for c in custos_mao_obra]),
+                'dias_trabalhados': len(set([c['data'] for c in custos_mao_obra]))
+            })
+            
+            print(f"DEBUG KPIs CALCULADOS: {kpis_obra}")
+            
+        except Exception as e:
+            print(f"ERRO ao buscar funcionários: {e}")
+            funcionarios_obra = []
+        
         # Filtros de data
         data_inicio = request.args.get('data_inicio')
         data_fim = request.args.get('data_fim')
