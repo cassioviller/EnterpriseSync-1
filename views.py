@@ -582,7 +582,9 @@ def obras():
     filtros = {
         'nome': request.args.get('nome', ''),
         'status': request.args.get('status', ''),
-        'cliente': request.args.get('cliente', '')
+        'cliente': request.args.get('cliente', ''),
+        'data_inicio': request.args.get('data_inicio', ''),
+        'data_fim': request.args.get('data_fim', '')
     }
     
     # Construir query base
@@ -596,7 +598,25 @@ def obras():
     if filtros['cliente']:
         query = query.filter(Obra.cliente.ilike(f"%{filtros['cliente']}%"))
     
+    # Aplicar filtros de data
+    if filtros['data_inicio']:
+        try:
+            data_inicio = datetime.strptime(filtros['data_inicio'], '%Y-%m-%d').date()
+            query = query.filter(Obra.data_inicio >= data_inicio)
+        except ValueError:
+            pass  # Ignora data inválida
+    
+    if filtros['data_fim']:
+        try:
+            data_fim = datetime.strptime(filtros['data_fim'], '%Y-%m-%d').date()
+            query = query.filter(Obra.data_inicio <= data_fim)
+        except ValueError:
+            pass  # Ignora data inválida
+    
     obras = query.order_by(desc(Obra.created_at)).all()
+    
+    print(f"DEBUG FILTROS OBRAS: {filtros}")
+    print(f"DEBUG TOTAL OBRAS ENCONTRADAS: {len(obras)}")
     
     return render_template('obras.html', obras=obras, filtros=filtros)
 
