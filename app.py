@@ -1,6 +1,6 @@
 import os
 import logging
-from flask import Flask
+from flask import Flask, url_for
 from flask_login import LoginManager
 from flask_migrate import Migrate
 from flask_wtf.csrf import CSRFProtect

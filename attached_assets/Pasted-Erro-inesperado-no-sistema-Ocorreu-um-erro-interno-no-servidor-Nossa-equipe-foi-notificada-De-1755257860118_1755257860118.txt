@@ -1,0 +1,55 @@
+Erro inesperado no sistema
+Ocorreu um erro interno no servidor. Nossa equipe foi notificada.
+
+ Detalhes Técnicos do Erro:
+EXCEÇÃO NÃO TRATADA: name 'url_for' is not defined
+
+URL: https://www.sige.cassioviller.tech/funcionarios
+MÉTODO: GET
+TIMESTAMP: 15/08/2025 11:36:57
+TIPO DO ERRO: NameError
+
+TRACEBACK COMPLETO:
+Traceback (most recent call last):
+  File "/usr/local/lib/python3.11/site-packages/flask/app.py", line 917, in full_dispatch_request
+    rv = self.dispatch_request()
+         ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.11/site-packages/flask/app.py", line 902, in dispatch_request
+    return self.ensure_sync(self.view_functions[rule.endpoint])(**view_args)  # type: ignore[no-any-return]
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/app/views.py", line 282, in funcionarios
+    return render_template('funcionarios.html',
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.11/site-packages/flask/templating.py", line 150, in render_template
+    return _render(app, template, context)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.11/site-packages/flask/templating.py", line 131, in _render
+    rv = template.render(context)
+         ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.11/site-packages/jinja2/environment.py", line 1295, in render
+    self.environment.handle_exception()
+  File "/usr/local/lib/python3.11/site-packages/jinja2/environment.py", line 942, in handle_exception
+    raise rewrite_traceback_stack(source=source)
+  File "/app/templates/funcionarios.html", line 1, in top-level template code
+    {% extends "base.html" %}
+  File "/app/templates/base.html", line 898, in top-level template code
+    {% block content %}{% endblock %}
+    ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/app/templates/funcionarios.html", line 248, in block 'content'
+    <img src="{{ obter_foto_funcionario(kpi.funcionario) }}"
+    ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/app/app.py", line 98, in obter_foto_funcionario
+    return url_for('static', filename=funcionario.foto)
+           ^^^^^^^
+NameError: name 'url_for' is not defined
+
+
+CONTEXTO DA REQUISIÇÃO:
+- Headers: {'Host': 'www.sige.cassioviller.tech', 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Safari/537.36', 'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7', 'Accept-Encoding': 'gzip, deflate, br, zstd', 'Accept-Language': 'pt-BR,pt;q=0.9,en-US;q=0.8,en;q=0.7', 'Cookie': 'session=.eJwlzksKwzAMRdG9eNyBLNtynM0ES3qmmZV8CqV07w0E7uTOzjcsY8P-DPOxnXiEZfUwh1EHK3QgxsYVME1WKBNQusRsTKToA5x6s8JZYexKOqxepUxVOkOyZwjn5mitWKuRCULcQJNSLNyiS-pKrhOLGxURU_GEcEHOHdut4Wv18-r7vnQ71jdu7O8Pjds4Eg.aJ8b2A.VpzmMIa-AW1NmJx1U0MMWO2mZtk', 'Dnt': '1', 'Priority': 'u=0, i', 'Referer': 'https://www.sige.cassioviller.tech/funcionarios', 'Sec-Ch-Ua': '"Not;A=Brand";v="99", "Google Chrome";v="139", "Chromium";v="139"', 'Sec-Ch-Ua-Mobile': '?0', 'Sec-Ch-Ua-Platform': '"Windows"', 'Sec-Fetch-Dest': 'document', 'Sec-Fetch-Mode': 'navigate', 'Sec-Fetch-Site': 'same-origin', 'Sec-Fetch-User': '?1', 'Upgrade-Insecure-Requests': '1', 'X-Forwarded-For': '177.94.254.22', 'X-Forwarded-Host': 'www.sige.cassioviller.tech', 'X-Forwarded-Port': '443', 'X-Forwarded-Proto': 'https', 'X-Forwarded-Server': '337e056cfbb6', 'X-Real-Ip': '177.94.254.22'}
+- Args: {}
+- Form: Nenhum
+- JSON: Não é JSON
+ URL que causou o erro:
+https://www.sige.cassioviller.tech/funcionarios
+ Horário do erro:
+15/08/2025 11:36:57
