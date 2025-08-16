@@ -2068,7 +2068,7 @@ def editar_usuario(usuario_id):
 @main_bp.route('/usuarios/<int:usuario_id>/excluir', methods=['POST'])
 @admin_required
 def excluir_usuario(usuario_id):
-    """Excluir usuário"""
+    """Excluir usuário com tratamento robusto de relacionamentos"""
     try:
         usuario = Usuario.query.get_or_404(usuario_id)
         
@@ -2076,6 +2076,26 @@ def excluir_usuario(usuario_id):
         if usuario.tipo_usuario == TipoUsuario.SUPER_ADMIN or usuario.id == current_user.id:
             flash('Não é possível excluir este usuário.', 'error')
         else:
+            # Primeiro, verificar se há registros dependentes críticos
+            from sqlalchemy import text
+            
+            # Verificar funcionários ativos
+            func_count = db.session.execute(text("SELECT COUNT(*) FROM funcionario WHERE admin_id = :admin_id AND ativo = true"), 
+                                          {'admin_id': usuario_id}).scalar()
+            
+            if func_count > 0:
+                flash(f'Não é possível excluir usuário com {func_count} funcionários ativos. Desative-os primeiro.', 'error')
+                return redirect(url_for('main.usuarios'))
+            
+            # Verificar obras ativas
+            obra_count = db.session.execute(text("SELECT COUNT(*) FROM obra WHERE admin_id = :admin_id AND status IN ('EM_ANDAMENTO', 'PLANEJADA')"), 
+                                          {'admin_id': usuario_id}).scalar()
+            
+            if obra_count > 0:
+                flash(f'Não é possível excluir usuário com {obra_count} obras ativas. Finalize-as primeiro.', 'error')
+                return redirect(url_for('main.usuarios'))
+            
+            # Se passou nas verificações, pode excluir
             db.session.delete(usuario)
             db.session.commit()
             flash('Usuário excluído com sucesso!', 'success')
