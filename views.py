@@ -1925,3 +1925,84 @@ def nova_proposta():
 @admin_required
 def equipes():
     return render_template('equipes/gestao_equipes.html')
+
+# ===== GESTÃO DE USUÁRIOS/ACESSOS =====
+@main_bp.route('/usuarios')
+@admin_required
+def usuarios():
+    """Lista todos os usuários do sistema"""
+    admin_id = current_user.id if current_user.tipo_usuario == TipoUsuario.ADMIN else current_user.admin_id
+    
+    try:
+        # Buscar usuários do admin atual
+        usuarios = Usuario.query.filter(
+            or_(Usuario.admin_id == admin_id, Usuario.id == admin_id)
+        ).order_by(Usuario.nome).all()
+        
+        return render_template('usuarios/lista_usuarios.html', usuarios=usuarios)
+    except Exception as e:
+        flash(f'Erro ao carregar usuários: {str(e)}', 'error')
+        return redirect(url_for('main.dashboard'))
+
+@main_bp.route('/usuarios/novo', methods=['GET', 'POST'])
+@admin_required
+def novo_usuario():
+    """Criar novo usuário"""
+    if request.method == 'POST':
+        admin_id = current_user.id if current_user.tipo_usuario == TipoUsuario.ADMIN else current_user.admin_id
+        
+        try:
+            # Criar novo usuário
+            usuario = Usuario(
+                nome=request.form.get('nome'),
+                email=request.form.get('email'),
+                username=request.form.get('username'),
+                password_hash=generate_password_hash(request.form.get('password')),
+                tipo_usuario=TipoUsuario[request.form.get('tipo_usuario')],
+                admin_id=admin_id,
+                ativo=True,
+                created_at=datetime.now()
+            )
+            
+            db.session.add(usuario)
+            db.session.commit()
+            
+            flash('Usuário criado com sucesso!', 'success')
+            return redirect(url_for('main.usuarios'))
+            
+        except Exception as e:
+            db.session.rollback()
+            flash(f'Erro ao criar usuário: {str(e)}', 'error')
+    
+    return render_template('usuarios/novo_usuario.html')
+
+# ===== CONFIGURAÇÕES =====
+@main_bp.route('/departamentos')
+@admin_required
+def departamentos():
+    """Gestão de departamentos"""
+    return render_template('configuracoes/departamentos.html')
+
+@main_bp.route('/funcoes')
+@admin_required
+def funcoes():
+    """Gestão de funções"""
+    return render_template('configuracoes/funcoes.html')
+
+@main_bp.route('/horarios')
+@admin_required
+def horarios():
+    """Gestão de horários de trabalho"""
+    return render_template('configuracoes/horarios.html')
+
+@main_bp.route('/servicos')
+@admin_required
+def servicos():
+    """Gestão de serviços"""
+    return render_template('configuracoes/servicos.html')
+
+@main_bp.route('/relatorios')
+@admin_required
+def relatorios():
+    """Sistema de relatórios"""
+    return render_template('relatorios/dashboard_relatorios.html')
