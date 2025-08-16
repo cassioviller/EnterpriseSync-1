@@ -1376,8 +1376,8 @@ def api_funcionarios():
                 'id': f.id,
                 'nome': f.nome,
                 'email': f.email or '',
-                'departamento': f.departamento.nome if f.departamento else '',
-                'cargo': f.funcao.nome if f.funcao else ''
+                'departamento': f.departamento_ref.nome if f.departamento_ref else 'Sem departamento',
+                'cargo': f.funcao_ref.nome if f.funcao_ref else 'Sem cargo'
             })
         
         return jsonify(funcionarios_json)
