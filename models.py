@@ -2039,22 +2039,150 @@ class PropostaArquivo(db.Model):
         }
 
 class PropostaTemplate(db.Model):
+    """Templates reutilizáveis para propostas com itens padrão pré-configurados"""
     __tablename__ = 'proposta_templates'
     
     id = db.Column(db.Integer, primary_key=True)
     nome = db.Column(db.String(100), nullable=False)
     descricao = db.Column(db.Text)
-    itens_padrao = db.Column(JSON)  # Array de itens padrão para este template
-    ativo = db.Column(db.Boolean, default=True)
+    categoria = db.Column(db.String(50), nullable=False)  # Ex: "Estrutura Metálica", "Mezanino", "Cobertura"
     
+    # Itens padrão do template (JSON)
+    itens_padrao = db.Column(JSON, default=[])  # Array de itens padrão para este template
+    
+    # Configurações padrão do template
+    prazo_entrega_dias = db.Column(db.Integer, default=90)
+    validade_dias = db.Column(db.Integer, default=7)
+    percentual_nota_fiscal = db.Column(db.Numeric(5,2), default=13.5)
+    
+    # Condições padrão
+    condicoes_pagamento = db.Column(db.Text, default="""10% de entrada na assinatura do contrato
+10% após projeto aprovado
+45% compra dos perfis
+25% no início da montagem in loco
+10% após a conclusão da montagem""")
+    
+    # Garantias padrão
+    garantias = db.Column(db.Text, default="""A Estruturas do Vale garante todos os materiais empregados nos serviços contra defeitos de fabricação pelo prazo de 12 (doze) meses contados a partir da data de conclusão da obra, conforme NBR 8800.""")
+    
+    # Status e controle
+    ativo = db.Column(db.Boolean, default=True)
+    publico = db.Column(db.Boolean, default=False)  # Se pode ser usado por outros usuários
+    uso_contador = db.Column(db.Integer, default=0)  # Quantas vezes foi usado
+    
+    # Relacionamentos
+    admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=True)
+    criado_por = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=True)
     criado_em = db.Column(db.DateTime, default=datetime.utcnow)
+    atualizado_em = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    def __repr__(self):
+        return f'<PropostaTemplate {self.nome}>'
+    
+    def incrementar_uso(self):
+        """Incrementa o contador de uso do template"""
+        self.uso_contador += 1
+        db.session.commit()
+    
+    def duplicar(self, nome_novo, admin_id, criado_por):
+        """Cria uma cópia do template"""
+        novo_template = PropostaTemplate(
+            nome=nome_novo,
+            descricao=f"Cópia de: {self.descricao}" if self.descricao else None,
+            categoria=self.categoria,
+            itens_padrao=self.itens_padrao.copy() if self.itens_padrao else [],
+            prazo_entrega_dias=self.prazo_entrega_dias,
+            validade_dias=self.validade_dias,
+            percentual_nota_fiscal=self.percentual_nota_fiscal,
+            condicoes_pagamento=self.condicoes_pagamento,
+            garantias=self.garantias,
+            admin_id=admin_id,
+            criado_por=criado_por
+        )
+        
+        db.session.add(novo_template)
+        return novo_template
     
     def to_dict(self):
         return {
             'id': self.id,
             'nome': self.nome,
             'descricao': self.descricao,
-            'itens_padrao': self.itens_padrao,
+            'categoria': self.categoria,
+            'itens_padrao': self.itens_padrao or [],
+            'prazo_entrega_dias': self.prazo_entrega_dias,
+            'validade_dias': self.validade_dias,
+            'percentual_nota_fiscal': float(self.percentual_nota_fiscal) if self.percentual_nota_fiscal else 0,
+            'ativo': self.ativo,
+            'publico': self.publico,
+            'uso_contador': self.uso_contador,
+            'total_itens': len(self.itens_padrao) if self.itens_padrao else 0,
+            'criado_em': self.criado_em.isoformat() if self.criado_em else None
+        }
+
+# Catálogo de Serviços para Templates
+class ServicoTemplate(db.Model):
+    """Catálogo de serviços/atividades para usar em templates"""
+    __tablename__ = 'servico_templates'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    codigo = db.Column(db.String(20), unique=True)  # Ex: EST-001, MEZ-002
+    nome = db.Column(db.String(200), nullable=False)
+    categoria = db.Column(db.String(50), nullable=False)
+    subcategoria = db.Column(db.String(50))
+    
+    # Especificações padrão
+    unidade_padrao = db.Column(db.String(10), nullable=False)  # m², kg, ton, m, un
+    preco_referencia = db.Column(db.Numeric(10,2))
+    
+    # Descrição técnica
+    descricao_tecnica = db.Column(db.Text)
+    especificacoes = db.Column(db.Text)
+    
+    # Tags para busca
+    tags = db.Column(db.String(500))  # palavras-chave separadas por vírgula
+    
+    # Status
+    ativo = db.Column(db.Boolean, default=True)
+    admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=True)
+    
+    criado_em = db.Column(db.DateTime, default=datetime.utcnow)
+    atualizado_em = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'codigo': self.codigo,
+            'nome': self.nome,
+            'categoria': self.categoria,
+            'subcategoria': self.subcategoria,
+            'unidade_padrao': self.unidade_padrao,
+            'preco_referencia': float(self.preco_referencia) if self.preco_referencia else 0,
+            'descricao_tecnica': self.descricao_tecnica,
+            'especificacoes': self.especificacoes,
+            'tags': self.tags.split(',') if self.tags else [],
             'ativo': self.ativo
         }
+    
+    @classmethod
+    def buscar_por_texto(cls, texto, admin_id):
+        """Busca serviços por texto em nome, descrição e tags"""
+        return cls.query.filter(
+            cls.admin_id == admin_id,
+            cls.ativo == True,
+            db.or_(
+                cls.nome.ilike(f'%{texto}%'),
+                cls.descricao_tecnica.ilike(f'%{texto}%'),
+                cls.tags.ilike(f'%{texto}%')
+            )
+        ).all()
+    
+    @classmethod
+    def por_categoria(cls, categoria, admin_id):
+        """Retorna serviços por categoria"""
+        return cls.query.filter(
+            cls.admin_id == admin_id,
+            cls.categoria == categoria,
+            cls.ativo == True
+        ).order_by(cls.nome).all()
 

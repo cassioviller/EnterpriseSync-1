@@ -129,6 +129,14 @@ with app.app_context():
     except Exception as e:
         logging.error(f"❌ Erro ao registrar blueprint contabilidade: {e}")
     
+    # Blueprint templates de propostas
+    try:
+        from templates_views import templates_bp
+        app.register_blueprint(templates_bp, url_prefix='/templates')
+        logging.info("✅ Blueprint templates registrado")
+    except Exception as e:
+        logging.error(f"❌ Erro ao registrar blueprint templates: {e}")
+    
     # Registrar blueprint de serviços
     try:
         from servicos_views import servicos_bp

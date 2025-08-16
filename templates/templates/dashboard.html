@@ -1,0 +1,241 @@
+{% extends "base.html" %}
+
+{% block title %}Templates de Propostas - Dashboard{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- Header -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h1 class="h3 mb-0">
+                <i class="fas fa-file-contract text-primary me-2"></i>
+                Templates de Propostas
+            </h1>
+            <p class="text-muted mb-0">Gerencie templates reutilizáveis para propostas comerciais</p>
+        </div>
+        <div>
+            <a href="{{ url_for('templates.novo_template') }}" class="btn btn-primary">
+                <i class="fas fa-plus"></i> Novo Template
+            </a>
+            <a href="{{ url_for('templates.listar_templates') }}" class="btn btn-outline-secondary">
+                <i class="fas fa-list"></i> Ver Todos
+            </a>
+        </div>
+    </div>
+
+    <!-- Cards de Estatísticas -->
+    <div class="row mb-4">
+        <div class="col-md-3">
+            <div class="card bg-primary text-white">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <h4 class="mb-0">{{ total_templates }}</h4>
+                            <p class="mb-0 small">Total de Templates</p>
+                        </div>
+                        <i class="fas fa-file-contract fa-2x opacity-75"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-3">
+            <div class="card bg-success text-white">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <h4 class="mb-0">{{ templates_ativos }}</h4>
+                            <p class="mb-0 small">Templates Ativos</p>
+                        </div>
+                        <i class="fas fa-check-circle fa-2x opacity-75"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-3">
+            <div class="card bg-info text-white">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <h4 class="mb-0">{{ categorias_stats|length }}</h4>
+                            <p class="mb-0 small">Categorias</p>
+                        </div>
+                        <i class="fas fa-layer-group fa-2x opacity-75"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-3">
+            <div class="card bg-warning text-white">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <h4 class="mb-0">{{ total_servicos }}</h4>
+                            <p class="mb-0 small">Serviços Disponíveis</p>
+                        </div>
+                        <i class="fas fa-cogs fa-2x opacity-75"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <!-- Templates Mais Utilizados -->
+        <div class="col-md-6 mb-4">
+            <div class="card h-100">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-star text-warning"></i> Templates Mais Utilizados
+                    </h5>
+                </div>
+                <div class="card-body">
+                    {% if templates_populares %}
+                        <div class="list-group list-group-flush">
+                            {% for template in templates_populares %}
+                            <div class="list-group-item d-flex justify-content-between align-items-center px-0">
+                                <div>
+                                    <strong>{{ template.nome }}</strong>
+                                    <br>
+                                    <small class="text-muted">{{ template.categoria }}</small>
+                                </div>
+                                <div class="text-end">
+                                    <span class="badge bg-primary">{{ template.uso_contador }}x</span>
+                                    <br>
+                                    <small class="text-muted">{{ template.total_itens }} itens</small>
+                                </div>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    {% else %}
+                        <p class="text-muted text-center py-4">
+                            <i class="fas fa-info-circle"></i>
+                            Nenhum template foi utilizado ainda
+                        </p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Templates por Categoria -->
+        <div class="col-md-6 mb-4">
+            <div class="card h-100">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-chart-pie text-info"></i> Templates por Categoria
+                    </h5>
+                </div>
+                <div class="card-body">
+                    {% if categorias_stats %}
+                        <div class="row">
+                            {% for categoria, total in categorias_stats %}
+                            <div class="col-6 mb-3">
+                                <div class="card border-0 bg-light">
+                                    <div class="card-body text-center py-3">
+                                        <h5 class="mb-1">{{ total }}</h5>
+                                        <small class="text-muted">{{ categoria }}</small>
+                                    </div>
+                                </div>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    {% else %}
+                        <p class="text-muted text-center py-4">
+                            <i class="fas fa-info-circle"></i>
+                            Nenhuma categoria disponível
+                        </p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Templates Recentes -->
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-clock text-secondary"></i> Templates Recentes
+                    </h5>
+                </div>
+                <div class="card-body">
+                    {% if templates_recentes %}
+                        <div class="table-responsive">
+                            <table class="table table-hover">
+                                <thead>
+                                    <tr>
+                                        <th>Template</th>
+                                        <th>Categoria</th>
+                                        <th>Itens</th>
+                                        <th>Status</th>
+                                        <th>Uso</th>
+                                        <th>Criado</th>
+                                        <th>Ações</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for template in templates_recentes %}
+                                    <tr>
+                                        <td>
+                                            <strong>{{ template.nome }}</strong>
+                                            {% if template.descricao %}
+                                            <br><small class="text-muted">{{ template.descricao[:50] }}...</small>
+                                            {% endif %}
+                                        </td>
+                                        <td>
+                                            <span class="badge bg-secondary">{{ template.categoria }}</span>
+                                        </td>
+                                        <td>
+                                            <span class="badge bg-info">{{ template.itens_padrao|length if template.itens_padrao else 0 }} itens</span>
+                                        </td>
+                                        <td>
+                                            {% if template.ativo %}
+                                                <span class="badge bg-success">Ativo</span>
+                                            {% else %}
+                                                <span class="badge bg-secondary">Inativo</span>
+                                            {% endif %}
+                                        </td>
+                                        <td>
+                                            <span class="text-muted">{{ template.uso_contador }}x</span>
+                                        </td>
+                                        <td>
+                                            <small class="text-muted">
+                                                {{ template.criado_em.strftime('%d/%m/%Y') }}
+                                            </small>
+                                        </td>
+                                        <td>
+                                            <div class="btn-group btn-group-sm" role="group">
+                                                <a href="{{ url_for('templates.ver_template', id=template.id) }}" 
+                                                   class="btn btn-outline-primary" title="Visualizar">
+                                                    <i class="fas fa-eye"></i>
+                                                </a>
+                                                <a href="{{ url_for('templates.editar_template', id=template.id) }}" 
+                                                   class="btn btn-outline-secondary" title="Editar">
+                                                    <i class="fas fa-edit"></i>
+                                                </a>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    {% else %}
+                        <div class="text-center py-5">
+                            <i class="fas fa-file-contract fa-3x text-muted mb-3"></i>
+                            <h5>Nenhum template encontrado</h5>
+                            <p class="text-muted">Crie seu primeiro template para começar</p>
+                            <a href="{{ url_for('templates.novo_template') }}" class="btn btn-primary">
+                                <i class="fas fa-plus"></i> Criar Template
+                            </a>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

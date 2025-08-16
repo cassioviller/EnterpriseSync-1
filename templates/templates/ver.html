@@ -1,0 +1,317 @@
+{% extends "base.html" %}
+
+{% block title %}{{ template.nome }} - Template{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- Header -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h1 class="h3 mb-0">
+                <i class="fas fa-file-contract text-primary me-2"></i>
+                {{ template.nome }}
+            </h1>
+            <div class="d-flex align-items-center mt-1">
+                <span class="badge {{ 'bg-success' if template.ativo else 'bg-secondary' }} me-2">
+                    {{ 'Ativo' if template.ativo else 'Inativo' }}
+                </span>
+                <span class="badge bg-primary me-2">{{ template.categoria }}</span>
+                {% if template.publico %}
+                <span class="badge bg-info me-2">Público</span>
+                {% endif %}
+                <small class="text-muted">Usado {{ template.uso_contador }}x</small>
+            </div>
+        </div>
+        <div>
+            <a href="{{ url_for('templates.editar_template', id=template.id) }}" class="btn btn-primary">
+                <i class="fas fa-edit"></i> Editar
+            </a>
+            <div class="btn-group" role="group">
+                <button type="button" class="btn btn-secondary dropdown-toggle" 
+                        data-bs-toggle="dropdown" aria-expanded="false">
+                    <i class="fas fa-ellipsis-v"></i>
+                </button>
+                <ul class="dropdown-menu">
+                    <li>
+                        <form method="POST" action="{{ url_for('templates.duplicar_template', id=template.id) }}" 
+                              style="display: inline;">
+                            <button type="submit" class="dropdown-item">
+                                <i class="fas fa-copy text-success"></i> Duplicar Template
+                            </button>
+                        </form>
+                    </li>
+                    <li>
+                        <form method="POST" action="{{ url_for('templates.toggle_status', id=template.id) }}" 
+                              style="display: inline;">
+                            <button type="submit" class="dropdown-item">
+                                {% if template.ativo %}
+                                <i class="fas fa-pause text-warning"></i> Desativar
+                                {% else %}
+                                <i class="fas fa-play text-success"></i> Ativar
+                                {% endif %}
+                            </button>
+                        </form>
+                    </li>
+                    <li><hr class="dropdown-divider"></li>
+                    <li>
+                        <a href="/propostas/nova?template={{ template.id }}" class="dropdown-item">
+                            <i class="fas fa-plus text-primary"></i> Criar Proposta com este Template
+                        </a>
+                    </li>
+                </ul>
+            </div>
+            <a href="{{ url_for('templates.listar_templates') }}" class="btn btn-outline-secondary">
+                <i class="fas fa-arrow-left"></i> Voltar
+            </a>
+        </div>
+    </div>
+
+    <div class="row">
+        <!-- Informações do Template -->
+        <div class="col-md-8 mb-4">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-info-circle text-primary"></i> Informações do Template
+                    </h5>
+                </div>
+                <div class="card-body">
+                    {% if template.descricao %}
+                    <div class="mb-4">
+                        <h6 class="text-muted">Descrição</h6>
+                        <p>{{ template.descricao }}</p>
+                    </div>
+                    {% endif %}
+
+                    <div class="row mb-4">
+                        <div class="col-md-3">
+                            <h6 class="text-muted">Categoria</h6>
+                            <p><span class="badge bg-primary">{{ template.categoria }}</span></p>
+                        </div>
+                        <div class="col-md-3">
+                            <h6 class="text-muted">Prazo de Entrega</h6>
+                            <p>{{ template.prazo_entrega_dias }} dias</p>
+                        </div>
+                        <div class="col-md-3">
+                            <h6 class="text-muted">Validade</h6>
+                            <p>{{ template.validade_dias }} dias</p>
+                        </div>
+                        <div class="col-md-3">
+                            <h6 class="text-muted">% Nota Fiscal</h6>
+                            <p>{{ template.percentual_nota_fiscal }}%</p>
+                        </div>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-6">
+                            <h6 class="text-muted">Condições de Pagamento</h6>
+                            <div class="bg-light p-3 rounded">
+                                <pre class="mb-0">{{ template.condicoes_pagamento }}</pre>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <h6 class="text-muted">Garantias</h6>
+                            <div class="bg-light p-3 rounded">
+                                <p class="mb-0">{{ template.garantias }}</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Itens do Template -->
+            <div class="card mt-4">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-list text-success"></i> 
+                        Itens do Template ({{ template.itens_padrao|length if template.itens_padrao else 0 }})
+                    </h5>
+                    <span class="badge bg-info">
+                        Total: R$ {% set total = 0 %}{% for item in template.itens_padrao %}{% set total = total + (item.quantidade * item.preco_unitario) %}{% endfor %}{{ "%.2f"|format(total) }}
+                    </span>
+                </div>
+                <div class="card-body">
+                    {% if template.itens_padrao %}
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead>
+                                <tr>
+                                    <th>Ordem</th>
+                                    <th>Descrição</th>
+                                    <th>Quantidade</th>
+                                    <th>Unidade</th>
+                                    <th>Preço Unitário</th>
+                                    <th>Subtotal</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for item in template.itens_padrao %}
+                                <tr>
+                                    <td><span class="badge bg-secondary">{{ item.ordem or loop.index }}</span></td>
+                                    <td>
+                                        <strong>{{ item.descricao }}</strong>
+                                        {% if item.especificacoes %}
+                                        <br><small class="text-muted">{{ item.especificacoes }}</small>
+                                        {% endif %}
+                                    </td>
+                                    <td>{{ item.quantidade }}</td>
+                                    <td><span class="badge bg-light text-dark">{{ item.unidade }}</span></td>
+                                    <td>R$ {{ "%.2f"|format(item.preco_unitario) }}</td>
+                                    <td><strong>R$ {{ "%.2f"|format(item.quantidade * item.preco_unitario) }}</strong></td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                            <tfoot>
+                                <tr class="table-info">
+                                    <th colspan="5">Total do Template</th>
+                                    <th>R$ {% set total = 0 %}{% for item in template.itens_padrao %}{% set total = total + (item.quantidade * item.preco_unitario) %}{% endfor %}{{ "%.2f"|format(total) }}</th>
+                                </tr>
+                            </tfoot>
+                        </table>
+                    </div>
+                    {% else %}
+                    <div class="text-center py-4">
+                        <i class="fas fa-inbox fa-3x text-muted mb-3"></i>
+                        <h6>Nenhum item adicionado</h6>
+                        <p class="text-muted">Este template ainda não possui itens configurados</p>
+                        <a href="{{ url_for('templates.editar_template', id=template.id) }}" class="btn btn-outline-primary">
+                            <i class="fas fa-plus"></i> Adicionar Itens
+                        </a>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Informações Laterais -->
+        <div class="col-md-4">
+            <!-- Estatísticas -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-chart-bar text-info"></i> Estatísticas
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="row text-center">
+                        <div class="col-6 border-end">
+                            <h4 class="text-primary mb-0">{{ template.uso_contador }}</h4>
+                            <small class="text-muted">Vezes Usado</small>
+                        </div>
+                        <div class="col-6">
+                            <h4 class="text-success mb-0">{{ template.itens_padrao|length if template.itens_padrao else 0 }}</h4>
+                            <small class="text-muted">Itens</small>
+                        </div>
+                    </div>
+                    
+                    <hr>
+                    
+                    <div class="mb-2">
+                        <strong>Status:</strong>
+                        <span class="float-end badge {{ 'bg-success' if template.ativo else 'bg-secondary' }}">
+                            {{ 'Ativo' if template.ativo else 'Inativo' }}
+                        </span>
+                    </div>
+                    
+                    <div class="mb-2">
+                        <strong>Visibilidade:</strong>
+                        <span class="float-end badge {{ 'bg-info' if template.publico else 'bg-secondary' }}">
+                            {{ 'Público' if template.publico else 'Privado' }}
+                        </span>
+                    </div>
+                    
+                    <div class="mb-2">
+                        <strong>Categoria:</strong>
+                        <span class="float-end badge bg-primary">{{ template.categoria }}</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Metadados -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-info text-secondary"></i> Metadados
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="mb-3">
+                        <strong>Criado em:</strong>
+                        <br><small class="text-muted">{{ template.criado_em.strftime('%d/%m/%Y às %H:%M') }}</small>
+                    </div>
+                    
+                    {% if template.atualizado_em and template.atualizado_em != template.criado_em %}
+                    <div class="mb-3">
+                        <strong>Última atualização:</strong>
+                        <br><small class="text-muted">{{ template.atualizado_em.strftime('%d/%m/%Y às %H:%M') }}</small>
+                    </div>
+                    {% endif %}
+
+                    <div class="mb-3">
+                        <strong>ID do Template:</strong>
+                        <br><code>#{{ template.id }}</code>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Ações Rápidas -->
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-bolt text-warning"></i> Ações Rápidas
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="d-grid gap-2">
+                        <a href="/propostas/nova?template={{ template.id }}" class="btn btn-success">
+                            <i class="fas fa-plus"></i> Criar Proposta
+                        </a>
+                        
+                        <form method="POST" action="{{ url_for('templates.duplicar_template', id=template.id) }}" 
+                              class="d-grid">
+                            <button type="submit" class="btn btn-outline-info">
+                                <i class="fas fa-copy"></i> Duplicar Template
+                            </button>
+                        </form>
+                        
+                        <button type="button" class="btn btn-outline-primary" onclick="exportarTemplate()">
+                            <i class="fas fa-download"></i> Exportar JSON
+                        </button>
+                        
+                        {% if template.uso_contador == 0 %}
+                        <form method="POST" action="{{ url_for('templates.deletar_template', id=template.id) }}" 
+                              class="d-grid"
+                              onsubmit="return confirm('Tem certeza que deseja deletar este template?')">
+                            <button type="submit" class="btn btn-outline-danger">
+                                <i class="fas fa-trash"></i> Deletar Template
+                            </button>
+                        </form>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function exportarTemplate() {
+    fetch(`/templates/api/template/{{ template.id }}`)
+        .then(response => response.json())
+        .then(data => {
+            const blob = new Blob([JSON.stringify(data, null, 2)], {type: 'application/json'});
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `template_{{ template.nome|replace(' ', '_') }}.json`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        })
+        .catch(error => {
+            alert('Erro ao exportar template: ' + error.message);
+        });
+}
+</script>
+{% endblock %}
