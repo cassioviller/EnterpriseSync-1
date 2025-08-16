@@ -1093,20 +1093,29 @@ def detalhes_obra(id):
         ).all()
         
         # Buscar custos de alimentação da tabela específica com detalhes
-        from models import Restaurante
         registros_alimentacao = RegistroAlimentacao.query.filter(
             RegistroAlimentacao.obra_id == obra_id,
             RegistroAlimentacao.data >= data_inicio,
             RegistroAlimentacao.data <= data_fim
-        ).join(Funcionario).outerjoin(Restaurante).order_by(RegistroAlimentacao.data.desc()).all()
+        ).order_by(RegistroAlimentacao.data.desc()).all()
         
         # Criar lista detalhada dos lançamentos de alimentação
         custos_alimentacao_detalhados = []
         for registro in registros_alimentacao:
+            # Buscar funcionário e restaurante separadamente para evitar erros de join
+            funcionario = Funcionario.query.get(registro.funcionario_id) if registro.funcionario_id else None
+            restaurante = None
+            if registro.restaurante_id:
+                try:
+                    from models import Restaurante
+                    restaurante = Restaurante.query.get(registro.restaurante_id)
+                except:
+                    restaurante = None
+            
             custos_alimentacao_detalhados.append({
                 'data': registro.data,
-                'funcionario_nome': registro.funcionario.nome,
-                'restaurante_nome': registro.restaurante.nome if registro.restaurante else 'Não informado',
+                'funcionario_nome': funcionario.nome if funcionario else 'Funcionário não encontrado',
+                'restaurante_nome': restaurante.nome if restaurante else 'Não informado',
                 'tipo': registro.tipo,
                 'valor': registro.valor,
                 'observacoes': registro.observacoes
