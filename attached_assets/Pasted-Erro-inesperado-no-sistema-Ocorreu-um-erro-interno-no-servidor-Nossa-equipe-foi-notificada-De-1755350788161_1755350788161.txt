@@ -1,0 +1,63 @@
+Erro inesperado no sistema
+Ocorreu um erro interno no servidor. Nossa equipe foi notificada.
+
+ Detalhes Técnicos do Erro:
+EXCEÇÃO NÃO TRATADA: Could not build url for endpoint 'servicos.dashboard'. Did you mean 'main.dashboard' instead?
+
+URL: https://a719a4a9-73c7-43ac-9f05-28b6e4b40780-00-1x2879rl5g3q1.riker.replit.dev/propostas
+MÉTODO: GET
+TIMESTAMP: 16/08/2025 13:26:29
+TIPO DO ERRO: BuildError
+
+TRACEBACK COMPLETO:
+Traceback (most recent call last):
+  File "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/flask/app.py", line 917, in full_dispatch_request
+    rv = self.dispatch_request()
+         ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/flask/app.py", line 902, in dispatch_request
+    return self.ensure_sync(self.view_functions[rule.endpoint])(**view_args)  # type: ignore[no-any-return]
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/workspace/auth.py", line 33, in decorated_function
+    return f(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^
+  File "/home/runner/workspace/views.py", line 1422, in propostas
+    return render_template('propostas/lista_propostas.html')
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/flask/templating.py", line 150, in render_template
+    return _render(app, template, context)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/flask/templating.py", line 131, in _render
+    rv = template.render(context)
+         ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/jinja2/environment.py", line 1295, in render
+    self.environment.handle_exception()
+  File "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/jinja2/environment.py", line 942, in handle_exception
+    raise rewrite_traceback_stack(source=source)
+  File "/home/runner/workspace/templates/propostas/lista_propostas.html", line 1, in top-level template code
+    {% extends "base.html" %}
+  File "/home/runner/workspace/templates/base.html", line 898, in top-level template code
+    {% block content %}{% endblock %}
+    ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/workspace/templates/propostas/lista_propostas.html", line 12, in block 'content'
+    <a href="{{ url_for('servicos.dashboard') }}" class="btn btn-outline-primary">
+    ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/flask/app.py", line 1121, in url_for
+    return self.handle_url_build_error(error, endpoint, values)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/flask/app.py", line 1110, in url_for
+    rv = url_adapter.build(  # type: ignore[union-attr]
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/werkzeug/routing/map.py", line 924, in build
+    raise BuildError(endpoint, values, method, self)
+werkzeug.routing.exceptions.BuildError: Could not build url for endpoint 'servicos.dashboard'. Did you mean 'main.dashboard' instead?
+
+
+CONTEXTO DA REQUISIÇÃO:
+- Headers: {'Host': 'a719a4a9-73c7-43ac-9f05-28b6e4b40780-00-1x2879rl5g3q1.riker.replit.dev', 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Safari/537.36', 'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7', 'Accept-Encoding': 'identity, gzip, deflate, br, zstd', 'Accept-Language': 'pt-BR,pt;q=0.9,en-US;q=0.8,en;q=0.7', 'Cookie': 'session=.eJwlzksKwzAMRdG9eNxBZMuSnc0E62OaWYmTQindew0ZPi4Pzjds_fDxDOt5XP4I225hDUZFKyi4ZC4lZxRxdiYiMETrks0SLRSxmZMXSinOQI6CGZIJNXBCMWUDV1AlZWpq8ycxaW66KCDXDtxqgwjZO0VOVdgteZiQa_hxa2CZWz6vNsbW9Nzffmt_f4IeOGM.aKCHBA.jGLme6DcFz-B5qaqX5dxRqUYUvg', 'Dnt': '1', 'Referer': 'https://a719a4a9-73c7-43ac-9f05-28b6e4b40780-00-1x2879rl5g3q1.riker.replit.dev/funcionarios', 'Sec-Ch-Ua': '"Not;A=Brand";v="99", "Google Chrome";v="139", "Chromium";v="139"', 'Sec-Ch-Ua-Mobile': '?0', 'Sec-Ch-Ua-Platform': '"Windows"', 'Sec-Fetch-Dest': 'iframe', 'Sec-Fetch-Mode': 'navigate', 'Sec-Fetch-Site': 'same-origin', 'Sec-Fetch-Storage-Access': 'active', 'Sec-Fetch-User': '?1', 'Upgrade-Insecure-Requests': '1', 'X-Forwarded-For': '191.8.196.203, 10.81.11.61', 'X-Forwarded-Proto': 'https', 'X-Replit-User-Bio': '', 'X-Replit-User-Id': '', 'X-Replit-User-Name': '', 'X-Replit-User-Profile-Image': '', 'X-Replit-User-Roles': '', 'X-Replit-User-Teams': '', 'X-Replit-User-Url': ''}
+- Args: {}
+- Form: Nenhum
+- JSON: Não é JSON
+ URL que causou o erro:
+https://a719a4a9-73c7-43ac-9f05-28b6e4b40780-00-1x2879rl5g3q1.riker.replit.dev/propostas
+ Horário do erro:
+16/08/2025 13:26:29

@@ -1419,7 +1419,9 @@ def financeiro():
 @main_bp.route('/propostas')
 @admin_required
 def propostas():
-    return render_template('propostas/lista_propostas.html')
+    # Buscar propostas básicas para exibição (por enquanto lista vazia)
+    propostas = []
+    return render_template('propostas/lista_propostas.html', propostas=propostas)
 
 @main_bp.route('/propostas/nova')
 @admin_required
