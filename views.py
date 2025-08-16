@@ -1934,10 +1934,13 @@ def usuarios():
     admin_id = current_user.id if current_user.tipo_usuario == TipoUsuario.ADMIN else current_user.admin_id
     
     try:
-        # Buscar usuários do admin atual
-        usuarios = Usuario.query.filter(
-            or_(Usuario.admin_id == admin_id, Usuario.id == admin_id)
-        ).order_by(Usuario.nome).all()
+        # Buscar todos os usuários se for super admin, caso contrário apenas do admin atual
+        if current_user.tipo_usuario == TipoUsuario.SUPER_ADMIN:
+            usuarios = Usuario.query.order_by(Usuario.nome).all()
+        else:
+            usuarios = Usuario.query.filter(
+                or_(Usuario.admin_id == admin_id, Usuario.id == admin_id)
+            ).order_by(Usuario.nome).all()
         
         return render_template('usuarios/lista_usuarios.html', usuarios=usuarios)
     except Exception as e:
@@ -1952,16 +1955,27 @@ def novo_usuario():
         admin_id = current_user.id if current_user.tipo_usuario == TipoUsuario.ADMIN else current_user.admin_id
         
         try:
+            # Verificar se username já existe
+            username = request.form.get('username')
+            email = request.form.get('email')
+            
+            if Usuario.query.filter_by(username=username).first():
+                flash(f'Username "{username}" já está em uso. Escolha outro.', 'error')
+                return render_template('usuarios/novo_usuario.html')
+                
+            if Usuario.query.filter_by(email=email).first():
+                flash(f'Email "{email}" já está em uso. Escolha outro.', 'error')
+                return render_template('usuarios/novo_usuario.html')
+            
             # Criar novo usuário
             usuario = Usuario(
                 nome=request.form.get('nome'),
-                email=request.form.get('email'),
-                username=request.form.get('username'),
+                email=email,
+                username=username,
                 password_hash=generate_password_hash(request.form.get('password')),
                 tipo_usuario=TipoUsuario[request.form.get('tipo_usuario')],
                 admin_id=admin_id,
-                ativo=True,
-                created_at=datetime.now()
+                ativo=True
             )
             
             db.session.add(usuario)
@@ -2015,9 +2029,24 @@ def editar_usuario(usuario_id):
     
     if request.method == 'POST':
         try:
+            new_username = request.form.get('username')
+            new_email = request.form.get('email')
+            
+            # Verificar se username já existe para outro usuário
+            if new_username != usuario.username:
+                if Usuario.query.filter_by(username=new_username).first():
+                    flash(f'Username "{new_username}" já está em uso.', 'error')
+                    return render_template('usuarios/editar_usuario.html', usuario=usuario)
+                    
+            # Verificar se email já existe para outro usuário
+            if new_email != usuario.email:
+                if Usuario.query.filter_by(email=new_email).first():
+                    flash(f'Email "{new_email}" já está em uso.', 'error')
+                    return render_template('usuarios/editar_usuario.html', usuario=usuario)
+            
             usuario.nome = request.form.get('nome')
-            usuario.email = request.form.get('email')
-            usuario.username = request.form.get('username')
+            usuario.email = new_email
+            usuario.username = new_username
             
             # Só atualiza senha se foi fornecida
             if request.form.get('password'):
