@@ -65,8 +65,46 @@
                     </div>
                 </div>
 
-                <!-- Serviços -->
+                <!-- Seleção de Template -->
                 <hr>
+                <div class="mb-4">
+                    <h6 class="text-primary mb-3">Template de Proposta</h6>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label">Selecionar Template (opcional)</label>
+                                <select class="form-select" id="templateSelect" onchange="carregarTemplate()">
+                                    <option value="">Criar proposta do zero</option>
+                                    {% for template in templates %}
+                                    <option value="{{ template.id }}" 
+                                            data-categoria="{{ template.categoria }}"
+                                            data-prazo="{{ template.prazo_entrega_padrao }}">
+                                        {{ template.nome }} ({{ template.categoria }})
+                                    </option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div id="templateInfo" class="alert alert-info" style="display: none;">
+                                <h6 class="mb-2">Template Selecionado:</h6>
+                                <p class="mb-1"><strong>Nome:</strong> <span id="templateNome"></span></p>
+                                <p class="mb-1"><strong>Categoria:</strong> <span id="templateCategoria"></span></p>
+                                <p class="mb-0"><strong>Prazo Padrão:</strong> <span id="templatePrazo"></span> dias</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="d-flex gap-2 mb-3">
+                        <button type="button" class="btn btn-outline-success btn-sm" onclick="carregarTemplate()" id="btnCarregarTemplate" disabled>
+                            <i class="fas fa-download"></i> Carregar Serviços do Template
+                        </button>
+                        <button type="button" class="btn btn-outline-warning btn-sm" onclick="limparServicos()">
+                            <i class="fas fa-broom"></i> Limpar Todos os Serviços
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Serviços -->
                 <h6 class="text-primary mb-3">Serviços</h6>
                 <div id="servicosContainer">
                     <div class="servico-item border rounded p-3 mb-3">
@@ -215,5 +253,134 @@ function coletarServicos() {
 document.getElementById('formNovaProposta').addEventListener('submit', function(e) {
     coletarServicos();
 });
+
+// Funções para templates
+function carregarTemplate() {
+    const select = document.getElementById('templateSelect');
+    const templateId = select.value;
+    const btnCarregar = document.getElementById('btnCarregarTemplate');
+    const info = document.getElementById('templateInfo');
+    
+    if (!templateId) {
+        info.style.display = 'none';
+        btnCarregar.disabled = true;
+        return;
+    }
+    
+    // Mostrar informações do template
+    const option = select.selectedOptions[0];
+    document.getElementById('templateNome').textContent = option.text.split(' (')[0];
+    document.getElementById('templateCategoria').textContent = option.dataset.categoria;
+    document.getElementById('templatePrazo').textContent = option.dataset.prazo;
+    info.style.display = 'block';
+    btnCarregar.disabled = false;
+    
+    // Carregar serviços do template
+    carregarServicosTemplate(templateId);
+}
+
+function carregarServicosTemplate(templateId) {
+    fetch(`/templates/api/template/${templateId}`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                // Limpar serviços existentes
+                limparServicos();
+                
+                // Carregar serviços do template
+                const itens = data.template.itens_padrao || [];
+                if (itens.length > 0) {
+                    itens.forEach((item, index) => {
+                        if (index > 0) {
+                            adicionarServico();
+                        }
+                        
+                        const servicoItems = document.querySelectorAll('.servico-item');
+                        const servicoAtual = servicoItems[index];
+                        
+                        servicoAtual.querySelector('.servico-descricao').value = item.descricao;
+                        servicoAtual.querySelector('.servico-quantidade').value = item.quantidade;
+                        servicoAtual.querySelector('.servico-unidade').value = item.unidade;
+                        servicoAtual.querySelector('.servico-valor-unitario').value = item.preco_unitario;
+                        
+                        calcularServico(servicoAtual.querySelector('.servico-quantidade'));
+                    });
+                    
+                    // Atualizar prazo se disponível
+                    const prazo = data.template.prazo_entrega_padrao;
+                    if (prazo) {
+                        document.querySelector('input[name="prazo_execucao"]').value = prazo;
+                    }
+                    
+                    alert(`${itens.length} serviços carregados do template "${data.template.nome}"`);
+                } else {
+                    alert('Template não possui serviços cadastrados.');
+                }
+            } else {
+                alert('Erro ao carregar template: ' + data.message);
+            }
+        })
+        .catch(error => {
+            console.error('Erro:', error);
+            alert('Erro ao carregar template.');
+        });
+}
+
+function limparServicos() {
+    const container = document.getElementById('servicosContainer');
+    container.innerHTML = `
+        <div class="servico-item border rounded p-3 mb-3">
+            <div class="row">
+                <div class="col-md-4">
+                    <div class="mb-3">
+                        <label class="form-label">Descrição do Serviço</label>
+                        <input type="text" class="form-control servico-descricao" 
+                               placeholder="Ex: Estrutura metálica">
+                    </div>
+                </div>
+                <div class="col-md-2">
+                    <div class="mb-3">
+                        <label class="form-label">Quantidade</label>
+                        <input type="number" class="form-control servico-quantidade" 
+                               step="0.01" onchange="calcularServico(this)">
+                    </div>
+                </div>
+                <div class="col-md-2">
+                    <div class="mb-3">
+                        <label class="form-label">Unidade</label>
+                        <select class="form-select servico-unidade">
+                            <option value="m²">m²</option>
+                            <option value="m³">m³</option>
+                            <option value="un">Unidade</option>
+                            <option value="kg">kg</option>
+                            <option value="t">Tonelada</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="col-md-2">
+                    <div class="mb-3">
+                        <label class="form-label">Valor Unitário</label>
+                        <input type="number" class="form-control servico-valor-unitario" 
+                               step="0.01" onchange="calcularServico(this)">
+                    </div>
+                </div>
+                <div class="col-md-2">
+                    <div class="mb-3">
+                        <label class="form-label">Total</label>
+                        <input type="text" class="form-control servico-total" readonly>
+                    </div>
+                </div>
+            </div>
+            <div class="mb-3">
+                <label class="form-label">Observações</label>
+                <textarea class="form-control servico-observacoes" rows="2"></textarea>
+            </div>
+            <button type="button" class="btn btn-sm btn-outline-danger" onclick="removerServico(this)">
+                <i class="fas fa-trash"></i> Remover
+            </button>
+        </div>
+    `;
+    calcularTotal();
+}
 </script>
 {% endblock %}

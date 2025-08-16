@@ -73,8 +73,18 @@ def listar_propostas():
 @admin_required
 def nova_proposta():
     """Formulário para criar nova proposta"""
-    templates = PropostaTemplate.query.filter_by(ativo=True).all()
-    return render_template('propostas/nova.html', templates=templates)
+    # Buscar templates disponíveis baseado no tipo de usuário
+    if current_user.tipo_usuario.name == 'SUPER_ADMIN':
+        # Super Admin vê todos os templates
+        templates = PropostaTemplate.query.filter_by(ativo=True).all()
+    else:
+        # Admin vê apenas seus templates
+        templates = PropostaTemplate.query.filter_by(
+            admin_id=current_user.id, 
+            ativo=True
+        ).all()
+    
+    return render_template('propostas/nova_proposta.html', templates=templates)
 
 @propostas_bp.route('/criar', methods=['POST'])
 @login_required

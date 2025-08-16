@@ -442,15 +442,34 @@ def api_servicos():
 @login_required
 @admin_required
 def api_template(id):
-    """API para obter dados de um template em JSON"""
-    
-    admin_id = current_user.id if current_user.tipo_usuario == TipoUsuario.ADMIN else 2
-    
-    template = PropostaTemplate.query.filter_by(
-        id=id, admin_id=admin_id
-    ).first_or_404()
-    
-    return jsonify(template.to_dict())
+    """API para obter dados de um template em JSON - para propostas"""
+    try:
+        # Para Super Admin, buscar todos os templates
+        # Para Admin, buscar apenas os seus
+        if current_user.tipo_usuario.name == 'SUPER_ADMIN':
+            template = PropostaTemplate.query.get_or_404(id)
+        else:
+            admin_id = current_user.id
+            template = PropostaTemplate.query.filter_by(
+                id=id, admin_id=admin_id
+            ).first_or_404()
+        
+        return jsonify({
+            'success': True,
+            'template': {
+                'id': template.id,
+                'nome': template.nome,
+                'categoria': template.categoria,
+                'descricao': template.descricao,
+                'prazo_entrega_padrao': template.prazo_entrega_padrao,
+                'itens_padrao': template.itens_padrao or [],
+                'criado_em': template.criado_em.isoformat() if template.criado_em else None
+            }
+        })
+        
+    except Exception as e:
+        logger.error(f"Erro ao buscar template {id}: {e}")
+        return jsonify({'success': False, 'message': str(e)}), 500
 
 @templates_bp.route('/api/categorias')
 @login_required
