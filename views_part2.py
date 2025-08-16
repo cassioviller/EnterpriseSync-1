@@ -1,16 +1,28 @@
-                    
-                    if descricao and percentual:
-                        from models import RDOAtividade
-                        atividade = RDOAtividade(
-                            rdo_id=rdo.id,
-                            descricao_atividade=descricao,
-                            percentual_conclusao=float(percentual),
-                            observacoes_tecnicas=observacoes if observacoes else None
-                        )
-                        db.session.add(atividade)
+# VIEWS PART 2 - Funções auxiliares para RDO e outras operações
+
+from flask import request, redirect, url_for, flash, jsonify, render_template
+from flask_login import login_required
+from models import db, RDO, RDOAtividade, Obra, Funcionario
+from datetime import datetime
+
+def processar_atividades_rdo(rdo, atividades_data):
+    """Processa atividades do RDO de forma segura"""
+    try:
+        for atividade_info in atividades_data:
+            descricao = atividade_info.get('descricao', '').strip()
+            percentual = atividade_info.get('percentual', '')
+            observacoes = atividade_info.get('observacoes', '').strip()
+            
+            if descricao and percentual:
+                atividade = RDOAtividade(
+                    rdo_id=rdo.id,
+                    descricao_atividade=descricao,
+                    percentual_conclusao=float(percentual),
+                    observacoes_tecnicas=observacoes if observacoes else None
+                )
+                db.session.add(atividade)
         
         db.session.commit()
-        
         flash('RDO criado com sucesso!', 'success')
         return redirect(url_for('main.visualizar_rdo', id=rdo.id))
         

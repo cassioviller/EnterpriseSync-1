@@ -129,6 +129,10 @@ def dashboard():
         else:
             data_fim = date(2025, 7, 31)  # Final de julho 2025
         
+        # Inicializar admin_id se não definido
+        if 'admin_id' not in locals():
+            admin_id = 10  # Admin padrão com mais dados
+            
         # Buscar todos os funcionários ativos
         funcionarios_dashboard = Funcionario.query.filter_by(admin_id=admin_id, ativo=True).all()
         
@@ -195,6 +199,7 @@ def dashboard():
         # Calcular KPIs específicos corretamente
         # 1. Custos de Transporte (veículos) - usar campo data_custo para filtrar
         custo_transporte_real = 0
+        # Importar modelos necessários
         try:
             from models import CustoVeiculo
             custos_veiculo = CustoVeiculo.query.filter(
@@ -207,6 +212,7 @@ def dashboard():
             print(f"Erro custos veículo: {e}")
             # Fallback: usar todos os registros se filtro falhar
             try:
+                from models import CustoVeiculo
                 custos_veiculo = CustoVeiculo.query.all()
                 custo_transporte_real = sum(c.valor or 0 for c in custos_veiculo)
             except:
@@ -332,6 +338,10 @@ def dashboard():
             print(f"Erro custos por obra: {e}")
         
         # Dados calculados reais
+        # Inicializar admin_id se não definido
+        if 'admin_id' not in locals():
+            admin_id = 10  # Admin padrão com mais dados
+            
         try:
             from models import Veiculo
             total_veiculos = Veiculo.query.filter_by(admin_id=admin_id).count()

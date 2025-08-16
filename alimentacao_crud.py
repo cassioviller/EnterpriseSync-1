@@ -23,8 +23,8 @@ def listar_alimentacao():
     data_fim = request.args.get('data_fim') 
     funcionario_id = request.args.get('funcionario_id')
     
-    # Query base
-    query = RegistroAlimentacao.query
+    # Query base com validação de integridade
+    query = RegistroAlimentacao.query.join(Funcionario).filter(Funcionario.ativo == True)
     
     # Aplicar filtros
     if data_inicio:
@@ -49,10 +49,17 @@ def listar_alimentacao():
     # Buscar registros ordenados por data
     registros = query.order_by(RegistroAlimentacao.data.desc()).all()
     
-    # Dados para o template
-    funcionarios = Funcionario.query.order_by(Funcionario.nome).all()
-    obras = Obra.query.filter_by(status='Em Andamento').order_by(Obra.nome).all()
+    # Dados para o template com validações
+    funcionarios = Funcionario.query.filter_by(ativo=True).order_by(Funcionario.nome).all()
+    obras = Obra.query.filter(Obra.status.in_(['Em Andamento', 'Planejada'])).order_by(Obra.nome).all()
     restaurantes = Restaurante.query.order_by(Restaurante.nome).all()
+    
+    # Calcular estatísticas dos registros
+    total_valor = sum(r.valor or 0 for r in registros)
+    total_registros = len(registros)
+    funcionarios_atendidos = len(set(r.funcionario_id for r in registros))
+    
+    print(f"DEBUG ALIMENTAÇÃO: {total_registros} registros, {funcionarios_atendidos} funcionários, R$ {total_valor:.2f}")
     
     return render_template('alimentacao.html',
                          registros=registros,
@@ -98,21 +105,42 @@ def nova_alimentacao():
         
         total_registros = 0
         
+        # Validar dados antes de criar registros
+        if not funcionarios_ids:
+            raise ValueError("Pelo menos um funcionário deve ser selecionado")
+        if not obra_id:
+            raise ValueError("Obra deve ser selecionada")
+        if not restaurante_id:
+            raise ValueError("Restaurante deve ser selecionado")
+        if valor <= 0:
+            raise ValueError("Valor deve ser maior que zero")
+            
         # Criar registros para cada funcionário e cada data
         for data_registro in datas:
             for funcionario_id in funcionarios_ids:
-                registro = RegistroAlimentacao(
+                # Verificar se já existe registro para esta combinação
+                existe = RegistroAlimentacao.query.filter_by(
                     funcionario_id=funcionario_id,
                     obra_id=obra_id,
-                    restaurante_id=restaurante_id,
                     data=data_registro,
-                    tipo=tipo,
-                    valor=valor,
-                    observacoes=observacoes
-                )
+                    tipo=tipo
+                ).first()
                 
-                db.session.add(registro)
-                total_registros += 1
+                if not existe:
+                    registro = RegistroAlimentacao(
+                        funcionario_id=funcionario_id,
+                        obra_id=obra_id,
+                        restaurante_id=restaurante_id,
+                        data=data_registro,
+                        tipo=tipo,
+                        valor=valor,
+                        observacoes=observacoes
+                    )
+                    
+                    db.session.add(registro)
+                    total_registros += 1
+                else:
+                    print(f"⚠️ Registro já existe: Funcionário {funcionario_id}, Data {data_registro}, Tipo {tipo}")
         
         db.session.commit()
         
