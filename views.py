@@ -1046,7 +1046,7 @@ def detalhes_obra(id):
         print(f"DEBUG KPIs: {total_custo_mao_obra:.2f} em custos, {total_horas_periodo}h trabalhadas")
             
         # Buscar custos da obra para o período
-        from models import OutroCusto, CustoVeiculo
+        from models import OutroCusto, CustoVeiculo, RegistroAlimentacao
         
         # Custos diversos da obra - adaptado para produção
         if admin_id is not None:
@@ -1069,14 +1069,28 @@ def detalhes_obra(id):
             CustoVeiculo.data_custo <= data_fim
         ).all()
         
-        # Calcular totais por categoria - busca flexível PRODUÇÃO
-        custo_alimentacao = sum(c.valor for c in custos_obra if any([
+        # Buscar custos de alimentação da tabela específica
+        registros_alimentacao = RegistroAlimentacao.query.filter(
+            RegistroAlimentacao.obra_id == obra_id,
+            RegistroAlimentacao.data >= data_inicio,
+            RegistroAlimentacao.data <= data_fim
+        ).all()
+        
+        custo_alimentacao_tabela = sum(r.valor for r in registros_alimentacao if r.valor)
+        
+        # Também buscar em outro_custo como fallback
+        custo_alimentacao_outros = sum(c.valor for c in custos_obra if any([
             c.kpi_associado == 'custo_alimentacao',
             'vale_alimentacao' in (c.tipo or '').lower(),
             'alimentacao' in (c.tipo or '').lower(),
             'va' in (c.tipo or '').lower(),
             'refeicao' in (c.tipo or '').lower()
         ]))
+        
+        # Total de alimentação (tabela específica + outros custos)
+        custo_alimentacao = custo_alimentacao_tabela + custo_alimentacao_outros
+        
+        print(f"DEBUG ALIMENTAÇÃO: Tabela específica={custo_alimentacao_tabela}, Outros custos={custo_alimentacao_outros}, Total={custo_alimentacao}")
         
         custo_transporte = sum(c.valor for c in custos_obra if any([
             c.kpi_associado == 'custo_transporte',
@@ -1094,7 +1108,7 @@ def detalhes_obra(id):
         
         custos_transporte_total = sum(c.valor for c in custos_transporte if c.valor)
         
-        print(f"DEBUG CUSTOS DETALHADOS: Alimentação={custo_alimentacao}, Transporte VT={custo_transporte}, Veículos={custos_transporte_total}, Outros={outros_custos}")
+        print(f"DEBUG CUSTOS DETALHADOS: Alimentação={custo_alimentacao} (tabela={custo_alimentacao_tabela}, outros={custo_alimentacao_outros}), Transporte VT={custo_transporte}, Veículos={custos_transporte_total}, Outros={outros_custos}")
         
         # Montar KPIs finais da obra
         kpis_obra = {
