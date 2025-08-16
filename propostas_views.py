@@ -73,16 +73,23 @@ def listar_propostas():
 @admin_required
 def nova_proposta():
     """Formulário para criar nova proposta"""
+    print(f"DEBUG: Usuario atual: {current_user.id} - {current_user.nome} - {current_user.tipo_usuario.name}")
+    
     # Buscar templates disponíveis baseado no tipo de usuário
     if current_user.tipo_usuario.name == 'SUPER_ADMIN':
         # Super Admin vê todos os templates
         templates = PropostaTemplate.query.filter_by(ativo=True).all()
+        print(f"DEBUG: Super Admin - encontrou {len(templates)} templates")
     else:
         # Admin vê apenas seus templates
         templates = PropostaTemplate.query.filter_by(
             admin_id=current_user.id, 
             ativo=True
         ).all()
+        print(f"DEBUG: Admin - encontrou {len(templates)} templates para admin_id={current_user.id}")
+    
+    for t in templates:
+        print(f"DEBUG: Template {t.id}: {t.nome} (admin_id={t.admin_id})")
     
     return render_template('propostas/nova_proposta.html', templates=templates)
 
