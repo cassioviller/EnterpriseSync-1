@@ -461,7 +461,7 @@ def api_template(id):
                 'nome': template.nome,
                 'categoria': template.categoria,
                 'descricao': template.descricao,
-                'prazo_entrega_padrao': template.prazo_entrega_padrao,
+                'prazo_entrega_dias': template.prazo_entrega_dias,
                 'itens_padrao': template.itens_padrao or [],
                 'criado_em': template.criado_em.isoformat() if template.criado_em else None
             }

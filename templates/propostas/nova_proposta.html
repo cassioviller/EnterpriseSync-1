@@ -78,7 +78,7 @@
                                     {% for template in templates %}
                                     <option value="{{ template.id }}" 
                                             data-categoria="{{ template.categoria }}"
-                                            data-prazo="{{ template.prazo_entrega_padrao }}">
+                                            data-prazo="{{ template.prazo_entrega_dias }}">
                                         {{ template.nome }} ({{ template.categoria }})
                                     </option>
                                     {% endfor %}
@@ -307,7 +307,7 @@ function carregarServicosTemplate(templateId) {
                     });
                     
                     // Atualizar prazo se disponível
-                    const prazo = data.template.prazo_entrega_padrao;
+                    const prazo = data.template.prazo_entrega_dias;
                     if (prazo) {
                         document.querySelector('input[name="prazo_execucao"]').value = prazo;
                     }
