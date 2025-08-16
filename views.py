@@ -137,7 +137,6 @@ def dashboard():
         total_horas_real = 0
         total_extras_real = 0
         total_faltas_real = 0
-        custo_alimentacao_real = 0
         custo_transporte_real = 0
         
         for func in funcionarios_dashboard:
@@ -162,17 +161,30 @@ def dashboard():
             total_horas_real += horas_func
             total_extras_real += extras_func
             total_faltas_real += faltas_func
+        
+        # Buscar custos de alimentação TOTAL para o período (não por funcionário para evitar duplicação)
+        custo_alimentacao_real = 0
+        try:
+            # Tabela registro_alimentacao
+            alimentacao_registros = RegistroAlimentacao.query.filter(
+                RegistroAlimentacao.data >= data_inicio,
+                RegistroAlimentacao.data <= data_fim
+            ).all()
+            custo_alimentacao_real += sum(a.valor or 0 for a in alimentacao_registros)
             
-            # Buscar custos de alimentação (se existir)
-            try:
-                alimentacao_func = RegistroAlimentacao.query.filter(
-                    RegistroAlimentacao.funcionario_id == func.id,
-                    RegistroAlimentacao.data >= data_inicio,
-                    RegistroAlimentacao.data <= data_fim
-                ).all()
-                custo_alimentacao_real += sum(a.valor or 0 for a in alimentacao_func)
-            except:
-                pass
+            # Também buscar em outro_custo
+            from models import OutroCusto
+            outros_alimentacao = OutroCusto.query.filter(
+                OutroCusto.data >= data_inicio,
+                OutroCusto.data <= data_fim,
+                OutroCusto.kpi_associado == 'custo_alimentacao'
+            ).all()
+            custo_alimentacao_real += sum(o.valor or 0 for o in outros_alimentacao)
+            
+            print(f"DEBUG ALIMENTAÇÃO DASHBOARD: Registros={sum(a.valor or 0 for a in alimentacao_registros):.2f}, Outros={sum(o.valor or 0 for o in outros_alimentacao):.2f}, Total={custo_alimentacao_real:.2f}")
+        except Exception as e:
+            print(f"Erro cálculo alimentação: {e}")
+            custo_alimentacao_real = 0
         
         # Debug dos valores calculados
         print(f"DEBUG DASHBOARD: {len(funcionarios_dashboard)} funcionários")
@@ -293,13 +305,14 @@ def dashboard():
                         horas = (registro.horas_trabalhadas or 0) + (registro.horas_extras or 0) * 1.5
                         custo_total_obra += horas * valor_hora
                 
-                # Somar custos de alimentação da obra
-                alimentacao_obra = RegistroAlimentacao.query.filter(
-                    RegistroAlimentacao.obra_id == obra.id,
-                    RegistroAlimentacao.data >= data_inicio,
-                    RegistroAlimentacao.data <= data_fim
-                ).all()
-                custo_total_obra += sum(a.valor or 0 for a in alimentacao_obra)
+                # NÃO somar custos de alimentação por obra para evitar contar duas vezes
+                # (já contamos no total geral de alimentação acima)
+                # alimentacao_obra = RegistroAlimentacao.query.filter(
+                #     RegistroAlimentacao.obra_id == obra.id,
+                #     RegistroAlimentacao.data >= data_inicio,
+                #     RegistroAlimentacao.data <= data_fim
+                # ).all()
+                # custo_total_obra += sum(a.valor or 0 for a in alimentacao_obra)
                 
                 # Somar custos de veículos da obra
                 try:
