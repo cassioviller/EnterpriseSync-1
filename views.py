@@ -1092,12 +1092,25 @@ def detalhes_obra(id):
             CustoVeiculo.data_custo <= data_fim
         ).all()
         
-        # Buscar custos de alimentação da tabela específica
+        # Buscar custos de alimentação da tabela específica com detalhes
+        from models import Restaurante
         registros_alimentacao = RegistroAlimentacao.query.filter(
             RegistroAlimentacao.obra_id == obra_id,
             RegistroAlimentacao.data >= data_inicio,
             RegistroAlimentacao.data <= data_fim
-        ).all()
+        ).join(Funcionario).outerjoin(Restaurante).order_by(RegistroAlimentacao.data.desc()).all()
+        
+        # Criar lista detalhada dos lançamentos de alimentação
+        custos_alimentacao_detalhados = []
+        for registro in registros_alimentacao:
+            custos_alimentacao_detalhados.append({
+                'data': registro.data,
+                'funcionario_nome': registro.funcionario.nome,
+                'restaurante_nome': registro.restaurante.nome if registro.restaurante else 'Não informado',
+                'tipo': registro.tipo,
+                'valor': registro.valor,
+                'observacoes': registro.observacoes
+            })
         
         custo_alimentacao_tabela = sum(r.valor for r in registros_alimentacao if r.valor)
         
@@ -1169,6 +1182,7 @@ def detalhes_obra(id):
                              rdos_periodo=rdos_periodo,
                              rdos_recentes=rdos_recentes,
                              custos_mao_obra=custos_mao_obra,
+                             custos_alimentacao_detalhados=custos_alimentacao_detalhados,
                              custos_obra=custos_obra,
                              custos_transporte=custos_transporte,
                              custos_transporte_total=custos_transporte_total,
