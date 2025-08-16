@@ -70,7 +70,6 @@ def listar_propostas():
 
 @propostas_bp.route('/nova')
 @login_required
-@admin_required
 def nova_proposta():
     """Formulário para criar nova proposta"""
     print(f"DEBUG: ACESSANDO NOVA PROPOSTA - Usuario atual: {current_user.id} - {current_user.nome} - {current_user.tipo_usuario.name}")
