@@ -910,42 +910,54 @@ def detalhes_obra(id):
         print(f"DEBUG PERÍODO DETALHES: {data_inicio} até {data_fim}")
         obra_id = id
         
-        # Sistema robusto de detecção de admin_id (usar admin_id=10 que tem mais obras)
-        admin_id = 10  # Default para admin com mais obras
+        # Sistema robusto de detecção de admin_id - PRODUÇÃO
+        admin_id = None  # Inicialmente sem filtro
         
         if hasattr(current_user, 'tipo_usuario') and current_user.is_authenticated:
             if current_user.tipo_usuario == TipoUsuario.SUPER_ADMIN:
-                # Buscar admin_id com mais obras (admin_id=10 tem 9 obras)
-                obra_counts = db.session.execute(text("SELECT admin_id, COUNT(*) as total FROM obra GROUP BY admin_id ORDER BY total DESC LIMIT 1")).fetchone()
-                admin_id = obra_counts[0] if obra_counts else 10
+                # Super Admin vê todas as obras - não filtrar por admin_id
+                admin_id = None
             elif current_user.tipo_usuario == TipoUsuario.ADMIN:
                 admin_id = current_user.id
             else:
-                admin_id = current_user.admin_id if current_user.admin_id else 10
+                admin_id = current_user.admin_id
         else:
-            # Sistema de bypass - usar admin_id com mais obras
+            # Sistema de bypass - usar admin_id com mais obras OU null para ver todas
             try:
                 obra_counts = db.session.execute(text("SELECT admin_id, COUNT(*) as total FROM obra GROUP BY admin_id ORDER BY total DESC LIMIT 1")).fetchone()
-                admin_id = obra_counts[0] if obra_counts else 10
+                # Em produção, pode não ter filtro de admin_id - usar o que tem mais dados
+                admin_id = obra_counts[0] if obra_counts else None
+                print(f"DEBUG: Admin_id detectado automaticamente: {admin_id}")
             except Exception as e:
                 print(f"Erro ao detectar admin_id: {e}")
-                admin_id = 10
+                admin_id = None  # Ver todas as obras
         
-        # Buscar a obra
-        obra = Obra.query.filter_by(id=id, admin_id=admin_id).first()
+        # Buscar a obra - usar filtro de admin_id apenas se especificado
+        if admin_id is not None:
+            obra = Obra.query.filter_by(id=id, admin_id=admin_id).first()
+        else:
+            obra = Obra.query.filter_by(id=id).first()
+        
         if not obra:
-            print(f"ERRO: Obra {id} não encontrada para admin_id {admin_id}")
+            print(f"ERRO: Obra {id} não encontrada (admin_id: {admin_id})")
             # Tentar buscar obra sem filtro de admin_id (para debug)
             obra_debug = Obra.query.filter_by(id=id).first()
             if obra_debug:
                 print(f"DEBUG: Obra {id} existe mas com admin_id {obra_debug.admin_id}")
-            return f"Obra não encontrada (ID: {id}, Admin: {admin_id})", 404
+                # Se encontrou sem filtro, usar essa obra
+                obra = obra_debug
+                admin_id = obra.admin_id  # Ajustar admin_id para as próximas consultas
+            else:
+                return f"Obra não encontrada (ID: {id})", 404
         
         print(f"DEBUG OBRA ENCONTRADA: {obra.nome} - Admin: {obra.admin_id}")
         print(f"DEBUG OBRA DADOS: Status={obra.status}, Orçamento={obra.orcamento}")
         
-        # Buscar funcionários associados à obra
-        funcionarios_obra = Funcionario.query.filter_by(admin_id=admin_id).all()
+        # Buscar funcionários associados à obra - usar admin_id da obra encontrada
+        if admin_id is not None:
+            funcionarios_obra = Funcionario.query.filter_by(admin_id=admin_id).all()
+        else:
+            funcionarios_obra = Funcionario.query.all()
         print(f"DEBUG: {len(funcionarios_obra)} funcionários encontrados para admin_id {admin_id}")
         
         # Calcular custos de mão de obra para o período
@@ -963,32 +975,58 @@ def detalhes_obra(id):
         
         print(f"DEBUG: {len(registros_periodo)} registros de ponto no período para obra {obra_id}")
         
-        # Calcular custo por funcionário usando JOIN direto
+        # Calcular custo por funcionário usando JOIN direto - PRODUÇÃO
         from sqlalchemy import text
-        query_custo = text("""
-            SELECT 
-                rp.data,
-                rp.funcionario_id,
-                f.nome as funcionario_nome,
-                rp.horas_trabalhadas,
-                f.salario,
-                (COALESCE(f.salario, 1500) / 220.0 * rp.horas_trabalhadas) as custo_dia
-            FROM registro_ponto rp
-            JOIN funcionario f ON rp.funcionario_id = f.id
-            WHERE rp.obra_id = :obra_id 
-              AND rp.data >= :data_inicio
-              AND rp.data <= :data_fim
-              AND f.admin_id = :admin_id
-              AND rp.horas_trabalhadas > 0
-            ORDER BY rp.data DESC
-        """)
         
-        resultado_custos = db.session.execute(query_custo, {
-            'obra_id': obra_id,
-            'data_inicio': data_inicio,
-            'data_fim': data_fim,
-            'admin_id': admin_id
-        }).fetchall()
+        if admin_id is not None:
+            query_custo = text("""
+                SELECT 
+                    rp.data,
+                    rp.funcionario_id,
+                    f.nome as funcionario_nome,
+                    rp.horas_trabalhadas,
+                    f.salario,
+                    (COALESCE(f.salario, 1500) / 220.0 * rp.horas_trabalhadas) as custo_dia
+                FROM registro_ponto rp
+                JOIN funcionario f ON rp.funcionario_id = f.id
+                WHERE rp.obra_id = :obra_id 
+                  AND rp.data >= :data_inicio
+                  AND rp.data <= :data_fim
+                  AND f.admin_id = :admin_id
+                  AND rp.horas_trabalhadas > 0
+                ORDER BY rp.data DESC
+            """)
+            
+            resultado_custos = db.session.execute(query_custo, {
+                'obra_id': obra_id,
+                'data_inicio': data_inicio,
+                'data_fim': data_fim,
+                'admin_id': admin_id
+            }).fetchall()
+        else:
+            # Query sem filtro de admin_id para produção
+            query_custo = text("""
+                SELECT 
+                    rp.data,
+                    rp.funcionario_id,
+                    f.nome as funcionario_nome,
+                    rp.horas_trabalhadas,
+                    f.salario,
+                    (COALESCE(f.salario, 1500) / 220.0 * rp.horas_trabalhadas) as custo_dia
+                FROM registro_ponto rp
+                JOIN funcionario f ON rp.funcionario_id = f.id
+                WHERE rp.obra_id = :obra_id 
+                  AND rp.data >= :data_inicio
+                  AND rp.data <= :data_fim
+                  AND rp.horas_trabalhadas > 0
+                ORDER BY rp.data DESC
+            """)
+            
+            resultado_custos = db.session.execute(query_custo, {
+                'obra_id': obra_id,
+                'data_inicio': data_inicio,
+                'data_fim': data_fim
+            }).fetchall()
         
         print(f"DEBUG SQL: {len(resultado_custos)} registros encontrados com JOIN")
         
