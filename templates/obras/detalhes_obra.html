@@ -912,13 +912,33 @@ $(document).ready(function() {
         }
     });
     
+    // Initialize DataTable for Lançamentos de Alimentação
+    {% if custos_alimentacao_detalhados %}
+    $('#alimentacaoTable').DataTable({
+        language: {
+            url: '//cdn.datatables.net/plug-ins/1.13.6/i18n/pt-BR.json'
+        },
+        order: [[0, 'desc']], // Ordenar por data (mais recente primeiro)
+        pageLength: 5, // Exibir 5 resultados por página como padrão
+        lengthMenu: [[5, 10, 25, 50, -1], [5, 10, 25, 50, "Todos"]],
+        responsive: true,
+        dom: '<"row"<"col-sm-12 col-md-6"l><"col-sm-12 col-md-6"f>>' +
+             '<"row"<"col-sm-12"tr>>' +
+             '<"row"<"col-sm-12 col-md-5"i><"col-sm-12 col-md-7"p>>',
+        columnDefs: [
+            { targets: [4], className: "text-end" }, // Alinhar coluna de valor à direita
+            { targets: [3], className: "text-center" } // Centralizar badges de tipo
+        ]
+    });
+    {% endif %}
+    
     // Initialize DataTable for Custos de Transporte
     {% if custos_transporte %}
     $('#transporteTable').DataTable({
         language: {
             url: '//cdn.datatables.net/plug-ins/1.13.6/i18n/pt-BR.json'
         },
-        order: [[0, 'desc']], // Ordenar por data (mais recente primeiro)
+        order: [[0, 'desc']], // Ordenar por data (mais recente primeira)
         pageLength: 6,
         responsive: true
     });
