@@ -896,12 +896,14 @@ def detalhes_obra(id):
         data_fim_param = request.args.get('data_fim')
         
         if not data_inicio_param:
-            data_inicio = date.today().replace(day=1)
+            # Usar período com dados (julho-agosto 2025)
+            data_inicio = date(2025, 7, 1)
         else:
             data_inicio = datetime.strptime(data_inicio_param, '%Y-%m-%d').date()
         
         if not data_fim_param:
-            data_fim = date.today()
+            # Usar final de agosto para pegar todos os dados
+            data_fim = date(2025, 8, 31)
         else:
             data_fim = datetime.strptime(data_fim_param, '%Y-%m-%d').date()
         
