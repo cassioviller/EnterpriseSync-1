@@ -1,0 +1,198 @@
+{% extends "base.html" %}
+
+{% block title %}RDOs - SIGE{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">
+                        <i class="fas fa-file-alt me-2"></i>
+                        Relatórios Diários de Obra (RDO)
+                    </h5>
+                    <a href="{{ url_for('main.novo_rdo') }}" class="btn btn-primary">
+                        <i class="fas fa-plus me-1"></i>Novo RDO
+                    </a>
+                </div>
+                
+                <!-- Filtros -->
+                <div class="card-body border-bottom">
+                    <form method="GET" class="row g-3">
+                        <div class="col-md-3">
+                            <label for="obra_id" class="form-label">Obra</label>
+                            <select class="form-select" id="obra_id" name="obra_id">
+                                <option value="">Todas as obras</option>
+                                {% for obra in obras %}
+                                <option value="{{ obra.id }}" 
+                                        {% if filters.obra_id == obra.id %}selected{% endif %}>
+                                    {{ obra.nome }}
+                                </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        
+                        <div class="col-md-2">
+                            <label for="status" class="form-label">Status</label>
+                            <select class="form-select" id="status" name="status">
+                                <option value="">Todos</option>
+                                <option value="Rascunho" {% if filters.status == 'Rascunho' %}selected{% endif %}>
+                                    Rascunho
+                                </option>
+                                <option value="Finalizado" {% if filters.status == 'Finalizado' %}selected{% endif %}>
+                                    Finalizado
+                                </option>
+                            </select>
+                        </div>
+                        
+                        <div class="col-md-2">
+                            <label for="data_inicio" class="form-label">Data Início</label>
+                            <input type="date" class="form-control" id="data_inicio" name="data_inicio" 
+                                   value="{{ filters.data_inicio }}">
+                        </div>
+                        
+                        <div class="col-md-2">
+                            <label for="data_fim" class="form-label">Data Fim</label>
+                            <input type="date" class="form-control" id="data_fim" name="data_fim" 
+                                   value="{{ filters.data_fim }}">
+                        </div>
+                        
+                        <div class="col-md-3 d-flex align-items-end">
+                            <button type="submit" class="btn btn-outline-primary me-2">
+                                <i class="fas fa-search me-1"></i>Filtrar
+                            </button>
+                            <a href="{{ url_for('main.lista_rdos') }}" class="btn btn-outline-secondary">
+                                <i class="fas fa-times me-1"></i>Limpar
+                            </a>
+                        </div>
+                    </form>
+                </div>
+                
+                <div class="card-body">
+                    {% if rdos.items %}
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead>
+                                <tr>
+                                    <th>Número RDO</th>
+                                    <th>Obra</th>
+                                    <th>Data</th>
+                                    <th>Status</th>
+                                    <th>Criado por</th>
+                                    <th>Atividades</th>
+                                    <th>Funcionários</th>
+                                    <th>Ações</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for rdo in rdos.items %}
+                                <tr>
+                                    <td>
+                                        <a href="{{ url_for('main.visualizar_rdo', id=rdo.id) }}" 
+                                           class="text-decoration-none">
+                                            <strong>{{ rdo.numero_rdo }}</strong>
+                                        </a>
+                                    </td>
+                                    <td>{{ rdo.obra.nome }}</td>
+                                    <td>{{ rdo.data_relatorio.strftime('%d/%m/%Y') }}</td>
+                                    <td>
+                                        {% if rdo.status == 'Finalizado' %}
+                                        <span class="badge bg-success">Finalizado</span>
+                                        {% else %}
+                                        <span class="badge bg-warning">Rascunho</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>{{ rdo.criado_por.nome if rdo.criado_por else 'N/A' }}</td>
+                                    <td>
+                                        <span class="badge bg-info">{{ rdo.atividades|length }}</span>
+                                    </td>
+                                    <td>
+                                        <span class="badge bg-secondary">{{ rdo.mao_obra|length }}</span>
+                                    </td>
+                                    <td>
+                                        <div class="btn-group btn-group-sm">
+                                            <a href="{{ url_for('main.visualizar_rdo', id=rdo.id) }}" 
+                                               class="btn btn-outline-primary" title="Visualizar">
+                                                <i class="fas fa-eye"></i>
+                                            </a>
+                                            {% if rdo.status == 'Rascunho' %}
+                                            <a href="{{ url_for('main.editar_rdo', id=rdo.id) }}" 
+                                               class="btn btn-outline-warning" title="Editar">
+                                                <i class="fas fa-edit"></i>
+                                            </a>
+                                            {% endif %}
+                                        </div>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    
+                    <!-- Paginação -->
+                    {% if rdos.pages > 1 %}
+                    <nav aria-label="Paginação RDOs">
+                        <ul class="pagination justify-content-center">
+                            {% if rdos.has_prev %}
+                            <li class="page-item">
+                                <a class="page-link" href="{{ url_for('main.lista_rdos', page=rdos.prev_num, **filters) }}">
+                                    Anterior
+                                </a>
+                            </li>
+                            {% endif %}
+                            
+                            {% for page_num in rdos.iter_pages() %}
+                                {% if page_num %}
+                                    {% if page_num != rdos.page %}
+                                    <li class="page-item">
+                                        <a class="page-link" href="{{ url_for('main.lista_rdos', page=page_num, **filters) }}">
+                                            {{ page_num }}
+                                        </a>
+                                    </li>
+                                    {% else %}
+                                    <li class="page-item active">
+                                        <span class="page-link">{{ page_num }}</span>
+                                    </li>
+                                    {% endif %}
+                                {% else %}
+                                <li class="page-item disabled">
+                                    <span class="page-link">...</span>
+                                </li>
+                                {% endif %}
+                            {% endfor %}
+                            
+                            {% if rdos.has_next %}
+                            <li class="page-item">
+                                <a class="page-link" href="{{ url_for('main.lista_rdos', page=rdos.next_num, **filters) }}">
+                                    Próximo
+                                </a>
+                            </li>
+                            {% endif %}
+                        </ul>
+                    </nav>
+                    {% endif %}
+                    
+                    {% else %}
+                    <div class="text-center py-5">
+                        <i class="fas fa-file-alt fa-3x text-muted mb-3"></i>
+                        <h5 class="text-muted">Nenhum RDO encontrado</h5>
+                        <p class="text-muted">
+                            {% if filters.obra_id or filters.status or filters.data_inicio or filters.data_fim %}
+                            Tente ajustar os filtros ou 
+                            <a href="{{ url_for('main.lista_rdos') }}">limpar todos os filtros</a>.
+                            {% else %}
+                            Comece criando seu primeiro RDO.
+                            {% endif %}
+                        </p>
+                        <a href="{{ url_for('main.novo_rdo') }}" class="btn btn-primary">
+                            <i class="fas fa-plus me-1"></i>Criar Primeiro RDO
+                        </a>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

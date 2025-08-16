@@ -1,0 +1,295 @@
+{% extends "base.html" %}
+
+{% block title %}Novo RDO - SIGE{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">
+                        <i class="fas fa-file-alt me-2"></i>
+                        Novo Relatório Diário de Obra (RDO)
+                    </h5>
+                    <a href="{{ url_for('main.lista_rdos') }}" class="btn btn-outline-secondary">
+                        <i class="fas fa-arrow-left me-1"></i>Voltar à Lista
+                    </a>
+                </div>
+                
+                <div class="card-body">
+                    <form action="{{ url_for('main.criar_rdo') }}" method="POST" id="form-rdo">
+                        <!-- Dados Básicos -->
+                        <div class="row mb-4">
+                            <div class="col-md-6">
+                                <label for="obra_id" class="form-label">Obra *</label>
+                                <select class="form-select" id="obra_id" name="obra_id" required>
+                                    <option value="">Selecione uma obra...</option>
+                                    {% for obra in obras %}
+                                    <option value="{{ obra.id }}">{{ obra.nome }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            
+                            <div class="col-md-6">
+                                <label for="data_relatorio" class="form-label">Data do Relatório *</label>
+                                <input type="date" class="form-control" id="data_relatorio" name="data_relatorio" 
+                                       value="{{ moment().format('YYYY-MM-DD') }}" required>
+                            </div>
+                        </div>
+
+                        <!-- Condições Climáticas -->
+                        <h6 class="mb-3">Condições Climáticas</h6>
+                        <div class="row mb-4">
+                            <div class="col-md-4">
+                                <label for="tempo_manha" class="form-label">Manhã</label>
+                                <select class="form-select" id="tempo_manha" name="tempo_manha">
+                                    <option value="Bom">Bom</option>
+                                    <option value="Nublado">Nublado</option>
+                                    <option value="Chuvoso">Chuvoso</option>
+                                    <option value="Ensolarado">Ensolarado</option>
+                                </select>
+                            </div>
+                            
+                            <div class="col-md-4">
+                                <label for="tempo_tarde" class="form-label">Tarde</label>
+                                <select class="form-select" id="tempo_tarde" name="tempo_tarde">
+                                    <option value="Bom">Bom</option>
+                                    <option value="Nublado">Nublado</option>
+                                    <option value="Chuvoso">Chuvoso</option>
+                                    <option value="Ensolarado">Ensolarado</option>
+                                </select>
+                            </div>
+                            
+                            <div class="col-md-4">
+                                <label for="tempo_noite" class="form-label">Noite</label>
+                                <select class="form-select" id="tempo_noite" name="tempo_noite">
+                                    <option value="Bom">Bom</option>
+                                    <option value="Nublado">Nublado</option>
+                                    <option value="Chuvoso">Chuvoso</option>
+                                    <option value="Ensolarado">Ensolarado</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="row mb-4">
+                            <div class="col-12">
+                                <label for="observacoes_meteorologicas" class="form-label">Observações Meteorológicas</label>
+                                <textarea class="form-control" id="observacoes_meteorologicas" name="observacoes_meteorologicas" 
+                                          rows="2" placeholder="Detalhes sobre o clima..."></textarea>
+                            </div>
+                        </div>
+
+                        <!-- Atividades Executadas -->
+                        <h6 class="mb-3">Atividades Executadas</h6>
+                        <div class="mb-4">
+                            <div id="atividades-container">
+                                <div class="atividade-item border rounded p-3 mb-3">
+                                    <div class="row">
+                                        <div class="col-md-6">
+                                            <label class="form-label">Descrição da Atividade</label>
+                                            <input type="text" class="form-control atividade-descricao" 
+                                                   placeholder="Ex: Concretagem da laje...">
+                                        </div>
+                                        <div class="col-md-3">
+                                            <label class="form-label">% Conclusão</label>
+                                            <input type="number" class="form-control atividade-percentual" 
+                                                   min="0" max="100" placeholder="0">
+                                        </div>
+                                        <div class="col-md-3">
+                                            <label class="form-label">Ações</label>
+                                            <div>
+                                                <button type="button" class="btn btn-sm btn-danger remover-atividade">
+                                                    <i class="fas fa-trash"></i>
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="row mt-2">
+                                        <div class="col-12">
+                                            <label class="form-label">Observações Técnicas</label>
+                                            <textarea class="form-control atividade-observacoes" rows="2" 
+                                                      placeholder="Observações técnicas..."></textarea>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <button type="button" class="btn btn-outline-primary" id="adicionar-atividade">
+                                <i class="fas fa-plus me-1"></i>Adicionar Atividade
+                            </button>
+                        </div>
+
+                        <!-- Mão de Obra -->
+                        <h6 class="mb-3">Mão de Obra</h6>
+                        <div class="mb-4">
+                            <div id="mao-obra-container">
+                                <div class="mao-obra-item border rounded p-3 mb-3">
+                                    <div class="row">
+                                        <div class="col-md-4">
+                                            <label class="form-label">Funcionário</label>
+                                            <select class="form-select mao-obra-funcionario">
+                                                <option value="">Selecione...</option>
+                                                {% for funcionario in funcionarios %}
+                                                <option value="{{ funcionario.id }}">{{ funcionario.nome }}</option>
+                                                {% endfor %}
+                                            </select>
+                                        </div>
+                                        <div class="col-md-3">
+                                            <label class="form-label">Função Exercida</label>
+                                            <input type="text" class="form-control mao-obra-funcao" 
+                                                   placeholder="Ex: Pedreiro">
+                                        </div>
+                                        <div class="col-md-2">
+                                            <label class="form-label">Horas</label>
+                                            <input type="number" class="form-control mao-obra-horas" 
+                                                   step="0.5" min="0" max="24" value="8">
+                                        </div>
+                                        <div class="col-md-3">
+                                            <label class="form-label">Ações</label>
+                                            <div>
+                                                <button type="button" class="btn btn-sm btn-danger remover-mao-obra">
+                                                    <i class="fas fa-trash"></i>
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <button type="button" class="btn btn-outline-primary" id="adicionar-mao-obra">
+                                <i class="fas fa-plus me-1"></i>Adicionar Funcionário
+                            </button>
+                        </div>
+
+                        <!-- Comentário Geral -->
+                        <div class="row mb-4">
+                            <div class="col-12">
+                                <label for="comentario_geral" class="form-label">Comentário Geral</label>
+                                <textarea class="form-control" id="comentario_geral" name="comentario_geral" 
+                                          rows="4" placeholder="Observações gerais sobre o andamento da obra..."></textarea>
+                            </div>
+                        </div>
+
+                        <!-- Hidden inputs para dados JSON -->
+                        <input type="hidden" id="atividades-json" name="atividades">
+                        <input type="hidden" id="mao-obra-json" name="mao_obra">
+
+                        <!-- Botões -->
+                        <div class="d-flex justify-content-end gap-2">
+                            <a href="{{ url_for('main.lista_rdos') }}" class="btn btn-secondary">Cancelar</a>
+                            <button type="submit" class="btn btn-primary">
+                                <i class="fas fa-save me-1"></i>Criar RDO
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Adicionar atividade
+    document.getElementById('adicionar-atividade').addEventListener('click', function() {
+        const container = document.getElementById('atividades-container');
+        const newItem = container.querySelector('.atividade-item').cloneNode(true);
+        
+        // Limpar campos
+        newItem.querySelectorAll('input, textarea').forEach(input => input.value = '');
+        
+        container.appendChild(newItem);
+        
+        // Adicionar event listener para remoção
+        newItem.querySelector('.remover-atividade').addEventListener('click', function() {
+            if (container.children.length > 1) {
+                newItem.remove();
+            }
+        });
+    });
+
+    // Adicionar mão de obra
+    document.getElementById('adicionar-mao-obra').addEventListener('click', function() {
+        const container = document.getElementById('mao-obra-container');
+        const newItem = container.querySelector('.mao-obra-item').cloneNode(true);
+        
+        // Limpar campos
+        newItem.querySelectorAll('input, select').forEach(input => {
+            if (input.type === 'number') {
+                input.value = '8';
+            } else {
+                input.value = '';
+            }
+        });
+        
+        container.appendChild(newItem);
+        
+        // Adicionar event listener para remoção
+        newItem.querySelector('.remover-mao-obra').addEventListener('click', function() {
+            if (container.children.length > 1) {
+                newItem.remove();
+            }
+        });
+    });
+
+    // Event listeners para remoção inicial
+    document.querySelectorAll('.remover-atividade').forEach(btn => {
+        btn.addEventListener('click', function() {
+            const container = document.getElementById('atividades-container');
+            if (container.children.length > 1) {
+                btn.closest('.atividade-item').remove();
+            }
+        });
+    });
+
+    document.querySelectorAll('.remover-mao-obra').forEach(btn => {
+        btn.addEventListener('click', function() {
+            const container = document.getElementById('mao-obra-container');
+            if (container.children.length > 1) {
+                btn.closest('.mao-obra-item').remove();
+            }
+        });
+    });
+
+    // Processar dados antes do envio
+    document.getElementById('form-rdo').addEventListener('submit', function(e) {
+        // Processar atividades
+        const atividades = [];
+        document.querySelectorAll('.atividade-item').forEach(item => {
+            const descricao = item.querySelector('.atividade-descricao').value;
+            const percentual = item.querySelector('.atividade-percentual').value;
+            const observacoes = item.querySelector('.atividade-observacoes').value;
+            
+            if (descricao.trim()) {
+                atividades.push({
+                    descricao: descricao,
+                    percentual: percentual || 0,
+                    observacoes: observacoes
+                });
+            }
+        });
+        
+        // Processar mão de obra
+        const maoObra = [];
+        document.querySelectorAll('.mao-obra-item').forEach(item => {
+            const funcionarioId = item.querySelector('.mao-obra-funcionario').value;
+            const funcao = item.querySelector('.mao-obra-funcao').value;
+            const horas = item.querySelector('.mao-obra-horas').value;
+            
+            if (funcionarioId && funcao.trim()) {
+                maoObra.push({
+                    funcionario_id: funcionarioId,
+                    funcao: funcao,
+                    horas: horas || 8
+                });
+            }
+        });
+        
+        // Definir valores nos campos hidden
+        document.getElementById('atividades-json').value = JSON.stringify(atividades);
+        document.getElementById('mao-obra-json').value = JSON.stringify(maoObra);
+    });
+});
+</script>
+{% endblock %}

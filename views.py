@@ -1,7 +1,7 @@
 from flask import Blueprint, render_template, request, redirect, url_for, flash, jsonify, make_response, send_file, session
 from flask_login import login_required, current_user, login_user, logout_user
 from werkzeug.security import check_password_hash, generate_password_hash
-from models import db, Usuario, TipoUsuario, Funcionario, Obra
+from models import db, Usuario, TipoUsuario, Funcionario, Obra, RDO, RDOAtividade, RDOMaoObra, RDOEquipamento, RDOOcorrencia, RDOFoto
 from auth import super_admin_required, admin_required, funcionario_required
 from datetime import datetime, date, timedelta
 from sqlalchemy import func, desc, or_, and_, text
@@ -1435,12 +1435,247 @@ def api_servicos():
         print(f"ERRO API SERVIÇOS: {str(e)}")
         return jsonify([]), 500
 
-# Rota para novo RDO
+# ===== SISTEMA COMPLETO DE RDO =====
+
+@main_bp.route('/rdo')
+@admin_required
+def lista_rdos():
+    """Lista RDOs com controle de acesso por obra"""
+    try:
+        # Determinar admin_id
+        admin_id = current_user.id if current_user.tipo_usuario == TipoUsuario.ADMIN else current_user.admin_id
+        
+        # Filtros
+        obra_filter = request.args.get('obra_id', type=int)
+        status_filter = request.args.get('status', '')
+        data_inicio = request.args.get('data_inicio', '')
+        data_fim = request.args.get('data_fim', '')
+        
+        # Base query
+        query = RDO.query.join(Obra).filter(Obra.admin_id == admin_id)
+        
+        # Aplicar filtros
+        if obra_filter:
+            query = query.filter(RDO.obra_id == obra_filter)
+        if status_filter:
+            query = query.filter(RDO.status == status_filter)
+        if data_inicio:
+            query = query.filter(RDO.data_relatorio >= datetime.strptime(data_inicio, '%Y-%m-%d').date())
+        if data_fim:
+            query = query.filter(RDO.data_relatorio <= datetime.strptime(data_fim, '%Y-%m-%d').date())
+        
+        # Paginação
+        page = request.args.get('page', 1, type=int)
+        rdos = query.order_by(RDO.data_relatorio.desc()).paginate(
+            page=page, per_page=20, error_out=False
+        )
+        
+        # Obras disponíveis para filtro
+        obras = Obra.query.filter_by(admin_id=admin_id).order_by(Obra.nome).all()
+        
+        return render_template('rdo/lista.html', 
+                             rdos=rdos,
+                             obras=obras,
+                             filters={
+                                 'obra_id': obra_filter,
+                                 'status': status_filter,
+                                 'data_inicio': data_inicio,
+                                 'data_fim': data_fim
+                             })
+        
+    except Exception as e:
+        print(f"ERRO LISTA RDO: {str(e)}")
+        return redirect(url_for('main.dashboard'))
+
 @main_bp.route('/rdo/novo')
 @admin_required
 def novo_rdo():
-    # Implementação futura
-    return redirect(url_for('main.obras'))
+    """Formulário para criar novo RDO"""
+    try:
+        admin_id = current_user.id if current_user.tipo_usuario == TipoUsuario.ADMIN else current_user.admin_id
+        
+        # Buscar obras disponíveis
+        obras = Obra.query.filter_by(admin_id=admin_id).order_by(Obra.nome).all()
+        
+        # Buscar funcionários
+        funcionarios = Funcionario.query.filter_by(admin_id=admin_id, ativo=True).order_by(Funcionario.nome).all()
+        
+        # Verificar se há obras disponíveis
+        if not obras:
+            flash('É necessário ter pelo menos uma obra cadastrada para criar um RDO.', 'warning')
+            return redirect(url_for('main.obras'))
+        
+        return render_template('rdo/novo.html', 
+                             obras=obras,
+                             funcionarios=funcionarios)
+        
+    except Exception as e:
+        print(f"ERRO NOVO RDO: {str(e)}")
+        return redirect(url_for('main.lista_rdos'))
+
+@main_bp.route('/rdo/criar', methods=['POST'])
+@admin_required
+def criar_rdo():
+    """Cria um novo RDO"""
+    try:
+        admin_id = current_user.id if current_user.tipo_usuario == TipoUsuario.ADMIN else current_user.admin_id
+        
+        # Dados básicos
+        obra_id = request.form.get('obra_id', type=int)
+        data_relatorio = datetime.strptime(request.form.get('data_relatorio'), '%Y-%m-%d').date()
+        
+        # Verificar se obra pertence ao admin
+        obra = Obra.query.filter_by(id=obra_id, admin_id=admin_id).first()
+        if not obra:
+            flash('Obra não encontrada ou sem permissão de acesso.', 'error')
+            return redirect(url_for('main.novo_rdo'))
+        
+        # Verificar se já existe RDO para esta obra/data
+        rdo_existente = RDO.query.filter_by(obra_id=obra_id, data_relatorio=data_relatorio).first()
+        if rdo_existente:
+            flash(f'Já existe um RDO para esta obra na data {data_relatorio.strftime("%d/%m/%Y")}.', 'warning')
+            return redirect(url_for('main.editar_rdo', id=rdo_existente.id))
+        
+        # Gerar número do RDO
+        numero_rdo = gerar_numero_rdo(obra_id, data_relatorio)
+        
+        # Criar RDO
+        rdo = RDO()
+        rdo.numero_rdo = numero_rdo
+        rdo.obra_id = obra_id
+        rdo.data_relatorio = data_relatorio
+        rdo.criado_por_id = current_user.id
+        rdo.tempo_manha = request.form.get('tempo_manha', 'Bom')
+        rdo.tempo_tarde = request.form.get('tempo_tarde', 'Bom')
+        rdo.tempo_noite = request.form.get('tempo_noite', 'Bom')
+        rdo.observacoes_meteorologicas = request.form.get('observacoes_meteorologicas', '')
+        rdo.comentario_geral = request.form.get('comentario_geral', '')
+        rdo.status = 'Rascunho'
+        
+        db.session.add(rdo)
+        db.session.flush()  # Para obter o ID
+        
+        # Processar atividades
+        atividades_json = request.form.get('atividades', '[]')
+        if atividades_json:
+            try:
+                atividades = json.loads(atividades_json)
+                for ativ_data in atividades:
+                    atividade = RDOAtividade()
+                    atividade.rdo_id = rdo.id
+                    atividade.descricao_atividade = ativ_data.get('descricao', '')
+                    atividade.percentual_conclusao = float(ativ_data.get('percentual', 0))
+                    atividade.observacoes_tecnicas = ativ_data.get('observacoes', '')
+                    db.session.add(atividade)
+            except (json.JSONDecodeError, ValueError) as e:
+                print(f"Erro ao processar atividades: {e}")
+        
+        # Processar mão de obra
+        mao_obra_json = request.form.get('mao_obra', '[]')
+        if mao_obra_json:
+            try:
+                mao_obra_list = json.loads(mao_obra_json)
+                for mo_data in mao_obra_list:
+                    mao_obra = RDOMaoObra()
+                    mao_obra.rdo_id = rdo.id
+                    mao_obra.funcionario_id = int(mo_data.get('funcionario_id'))
+                    mao_obra.funcao_exercida = mo_data.get('funcao', '')
+                    mao_obra.horas_trabalhadas = float(mo_data.get('horas', 8))
+                    db.session.add(mao_obra)
+            except (json.JSONDecodeError, ValueError) as e:
+                print(f"Erro ao processar mão de obra: {e}")
+        
+        db.session.commit()
+        
+        flash(f'RDO {numero_rdo} criado com sucesso!', 'success')
+        return redirect(url_for('main.visualizar_rdo', id=rdo.id))
+        
+    except Exception as e:
+        db.session.rollback()
+        print(f"ERRO CRIAR RDO: {str(e)}")
+        flash(f'Erro ao criar RDO: {str(e)}', 'error')
+        return redirect(url_for('main.novo_rdo'))
+
+@main_bp.route('/rdo/<int:id>')
+@admin_required
+def visualizar_rdo(id):
+    """Visualizar RDO específico com controle de acesso"""
+    try:
+        admin_id = current_user.id if current_user.tipo_usuario == TipoUsuario.ADMIN else current_user.admin_id
+        
+        # Buscar RDO com verificação de acesso
+        rdo = RDO.query.join(Obra).filter(
+            RDO.id == id,
+            Obra.admin_id == admin_id
+        ).first_or_404()
+        
+        return render_template('rdo/visualizar.html', rdo=rdo)
+        
+    except Exception as e:
+        print(f"ERRO VISUALIZAR RDO: {str(e)}")
+        flash('RDO não encontrado ou sem permissão de acesso.', 'error')
+        return redirect(url_for('main.lista_rdos'))
+
+@main_bp.route('/rdo/<int:id>/editar')
+@admin_required
+def editar_rdo(id):
+    """Editar RDO com controle de acesso"""
+    try:
+        admin_id = current_user.id if current_user.tipo_usuario == TipoUsuario.ADMIN else current_user.admin_id
+        
+        # Buscar RDO com verificação de acesso
+        rdo = RDO.query.join(Obra).filter(
+            RDO.id == id,
+            Obra.admin_id == admin_id
+        ).first_or_404()
+        
+        # Verificar se pode editar (só rascunhos)
+        if rdo.status == 'Finalizado':
+            flash('RDO finalizado não pode ser editado.', 'warning')
+            return redirect(url_for('main.visualizar_rdo', id=id))
+        
+        # Buscar dados para edição
+        funcionarios = Funcionario.query.filter_by(admin_id=admin_id, ativo=True).order_by(Funcionario.nome).all()
+        
+        return render_template('rdo/editar.html', 
+                             rdo=rdo,
+                             funcionarios=funcionarios)
+        
+    except Exception as e:
+        print(f"ERRO EDITAR RDO: {str(e)}")
+        flash('RDO não encontrado ou sem permissão de acesso.', 'error')
+        return redirect(url_for('main.lista_rdos'))
+
+def gerar_numero_rdo(obra_id, data_relatorio):
+    """Gera número sequencial do RDO"""
+    try:
+        obra = Obra.query.get(obra_id)
+        if not obra:
+            return None
+        
+        data_str = data_relatorio.strftime('%Y%m%d')
+        codigo_obra = obra.codigo or f'OBR{obra.id:03d}'
+        
+        # Buscar último RDO do dia para esta obra
+        ultimo_rdo = RDO.query.filter(
+            RDO.obra_id == obra_id,
+            RDO.numero_rdo.like(f'RDO-{codigo_obra}-{data_str}%')
+        ).order_by(RDO.numero_rdo.desc()).first()
+        
+        if ultimo_rdo:
+            try:
+                ultimo_numero = int(ultimo_rdo.numero_rdo.split('-')[-1])
+                novo_numero = ultimo_numero + 1
+            except:
+                novo_numero = 1
+        else:
+            novo_numero = 1
+        
+        return f"RDO-{codigo_obra}-{data_str}-{novo_numero:03d}"
+        
+    except Exception as e:
+        print(f"Erro ao gerar número RDO: {str(e)}")
+        return f"RDO-{datetime.now().strftime('%Y%m%d%H%M%S')}"
 
 # Rota para nova obra
 @main_bp.route('/obras/nova', methods=['POST'])
