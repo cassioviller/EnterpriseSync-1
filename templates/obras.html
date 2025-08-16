@@ -122,6 +122,77 @@
     </div>
 </div>
 
+<script>
+function setDateRange(period) {
+    const today = new Date();
+    let startDate, endDate;
+    
+    switch(period) {
+        case 'mes_atual':
+            startDate = new Date(today.getFullYear(), today.getMonth(), 1);
+            endDate = today;
+            break;
+        case 'ultimo_mes':
+            startDate = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+            endDate = new Date(today.getFullYear(), today.getMonth(), 0);
+            break;
+        case 'ultimos_3_meses':
+            startDate = new Date(today.getFullYear(), today.getMonth() - 3, 1);
+            endDate = today;
+            break;
+        case 'ano_atual':
+            startDate = new Date(today.getFullYear(), 0, 1);
+            endDate = today;
+            break;
+        case 'ultimo_ano':
+            startDate = new Date(today.getFullYear() - 1, 0, 1);
+            endDate = new Date(today.getFullYear() - 1, 11, 31);
+            break;
+    }
+    
+    // Formatar datas para yyyy-mm-dd
+    const formatDate = (date) => {
+        return date.getFullYear() + '-' + 
+               String(date.getMonth() + 1).padStart(2, '0') + '-' + 
+               String(date.getDate()).padStart(2, '0');
+    };
+    
+    document.getElementById('data_inicio').value = formatDate(startDate);
+    document.getElementById('data_fim').value = formatDate(endDate);
+    
+    // Auto-submit o formulário
+    document.getElementById('filtroForm').submit();
+}
+
+function alternarVisualizacao() {
+    const cardsView = document.getElementById('cardsView');
+    const tableView = document.getElementById('tableView');
+    const toggleIcon = document.getElementById('viewToggleIcon');
+    const toggleText = document.getElementById('viewToggleText');
+    
+    if (cardsView.style.display === 'none') {
+        // Mostrar cards, esconder tabela
+        cardsView.style.display = 'block';
+        tableView.style.display = 'none';
+        toggleIcon.className = 'fas fa-table';
+        toggleText.textContent = 'Visualização Tabela';
+    } else {
+        // Mostrar tabela, esconder cards
+        cardsView.style.display = 'none';
+        tableView.style.display = 'block';
+        toggleIcon.className = 'fas fa-th-large';
+        toggleText.textContent = 'Visualização Cards';
+    }
+}
+
+// Inicializar visualização
+document.addEventListener('DOMContentLoaded', function() {
+    // Por padrão mostrar cards
+    document.getElementById('cardsView').style.display = 'block';
+    document.getElementById('tableView').style.display = 'none';
+});
+</script>
+
 <!-- Visualização em Cards -->
 <div id="cardsView">
     <div class="row">
@@ -150,15 +221,21 @@
                     </div>
                     
                     <div class="row text-center mb-3">
-                        <div class="col-6">
+                        <div class="col-4">
                             <div class="border-end">
                                 <h6 class="text-primary mb-0">{{ obra.kpis.total_rdos if obra.kpis else 0 }}</h6>
                                 <small class="text-muted">RDOs</small>
                             </div>
                         </div>
-                        <div class="col-6">
-                            <h6 class="text-success mb-0">{{ obra.kpis.dias_trabalhados if obra.kpis else 0 }}</h6>
-                            <small class="text-muted">Dias</small>
+                        <div class="col-4">
+                            <div class="border-end">
+                                <h6 class="text-success mb-0">{{ obra.kpis.dias_trabalhados if obra.kpis else 0 }}</h6>
+                                <small class="text-muted">Dias</small>
+                            </div>
+                        </div>
+                        <div class="col-4">
+                            <h6 class="text-info mb-0">{{ obra.kpis.total_funcionarios if obra.kpis else 0 }}</h6>
+                            <small class="text-muted">Funcionários</small>
                         </div>
                     </div>
                     
@@ -228,27 +305,26 @@
     <div class="card">
         <div class="card-body">
             <div class="table-responsive">
-                <table class="table table-striped" id="obrasTable">
-                    <thead>
+                <table class="table table-hover" id="obrasTable">
+                    <thead class="table-dark">
                         <tr>
+                            <th>ID</th>
                             <th>Nome</th>
-                            <th>Endereço</th>
-                            <th>Início</th>
-                            <th>Previsão Fim</th>
-                            <th>Orçamento</th>
+                            <th>Cliente</th>
                             <th>Status</th>
-                            <th>Responsável</th>
+                            <th>Data Início</th>
+                            <th>Funcionários</th>
+                            <th>Dias Trabalhados</th>
+                            <th>Custo Total</th>
                             <th>Ações</th>
                         </tr>
                     </thead>
                     <tbody>
                         {% for obra in obras %}
                         <tr>
+                            <td><strong>{{ obra.id }}</strong></td>
                             <td>{{ obra.nome }}</td>
-                            <td>{{ obra.endereco or '-' }}</td>
-                            <td>{{ obra.data_inicio.strftime('%d/%m/%Y') if obra.data_inicio else '-' }}</td>
-                            <td>{{ obra.data_previsao_fim.strftime('%d/%m/%Y') if obra.data_previsao_fim else '-' }}</td>
-                            <td>R$ {{ '{:,.2f}'.format(obra.orcamento) if obra.orcamento else '-' }}</td>
+                            <td>{{ obra.cliente or '-' }}</td>
                             <td>
                                 {% if obra.status == 'Em andamento' %}
                                     <span class="badge bg-success">{{ obra.status }}</span>
@@ -260,37 +336,38 @@
                                     <span class="badge bg-secondary">{{ obra.status }}</span>
                                 {% endif %}
                             </td>
-                            <td>{{ obra.responsavel.nome if obra.responsavel else '-' }}</td>
+                            <td>{{ obra.data_inicio.strftime('%d/%m/%Y') if obra.data_inicio else '-' }}</td>
+                            <td class="text-center">
+                                <span class="badge bg-info">{{ obra.kpis.total_funcionarios if obra.kpis else 0 }}</span>
+                            </td>
+                            <td class="text-center">
+                                <span class="badge bg-success">{{ obra.kpis.dias_trabalhados if obra.kpis else 0 }}</span>
+                            </td>
+                            <td class="text-end">
+                                <strong class="text-info">
+                                    R$ {{ '{:,.2f}'.format(obra.kpis.custo_total if obra.kpis and obra.kpis.custo_total else 0).replace(',', ' ').replace('.', ',').replace(' ', '.') }}
+                                </strong>
+                            </td>
                             <td>
                                 <div class="btn-group btn-group-sm">
                                     <a href="{{ url_for('main.detalhes_obra', id=obra.id) }}" 
-                                       class="btn btn-outline-info"
-                                       data-bs-toggle="tooltip" 
-                                       title="Ver Detalhes">
+                                       class="btn btn-outline-info btn-sm">
                                         <i class="fas fa-eye"></i>
                                     </a>
-                                    <button class="btn btn-outline-primary" 
-                                            onclick="editarObra({{ obra.id }})"
-                                            data-bs-toggle="tooltip" 
-                                            title="Editar">
+                                    <button class="btn btn-outline-primary btn-sm" 
+                                            onclick="editarObra({{ obra.id }})">
                                         <i class="fas fa-edit"></i>
-                                    </button>
-                                    <button class="btn btn-outline-success" 
-                                            onclick="window.location.href='{{ url_for('main.novo_rdo') }}?obra_id={{ obra.id }}'"
-                                            data-bs-toggle="tooltip" 
-                                            title="Novo RDO">
-                                        <i class="fas fa-plus"></i>
-                                    </button>
-                                    <button class="btn btn-outline-danger" 
-                                            onclick="excluirObra({{ obra.id }})"
-                                            data-bs-toggle="tooltip" 
-                                            title="Excluir">
-                                        <i class="fas fa-trash"></i>
                                     </button>
                                 </div>
                             </td>
                         </tr>
                         {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
                     </tbody>
                 </table>
             </div>
@@ -480,24 +557,55 @@ document.addEventListener('DOMContentLoaded', function() {
 
 function carregarFuncionarios() {
     fetch('/api/funcionarios')
-        .then(response => response.json())
+        .then(response => {
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            return response.json();
+        })
         .then(data => {
             const select = document.getElementById('responsavel_id');
-            select.innerHTML = '<option value="">Selecione...</option>';
-            data.forEach(funcionario => {
-                select.innerHTML += `<option value="${funcionario.id}">${funcionario.nome}</option>`;
-            });
+            if (select) {
+                select.innerHTML = '<option value="">Selecione...</option>';
+                data.forEach(funcionario => {
+                    select.innerHTML += `<option value="${funcionario.id}">${funcionario.nome}</option>`;
+                });
+            }
         })
-        .catch(error => console.error('Erro ao carregar funcionários:', error));
+        .catch(error => {
+            console.error('Erro ao carregar funcionários:', error);
+            // Fallback - não quebrar a página se API falhar
+            const select = document.getElementById('responsavel_id');
+            if (select) {
+                select.innerHTML = '<option value="">Nenhum funcionário encontrado</option>';
+            }
+        });
 }
 
 function carregarServicos() {
     fetch('/api/servicos')
-        .then(response => response.json())
+        .then(response => {
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            return response.json();
+        })
         .then(data => {
             servicosDisponiveis = data;
         })
-        .catch(error => console.error('Erro ao carregar serviços:', error));
+        .catch(error => {
+            console.error('Erro ao carregar serviços:', error);
+            // Fallback - não quebrar a página se API falhar
+            servicosDisponiveis = [
+                {
+                    id: 1,
+                    nome: 'Concretagem',
+                    categoria: 'Estrutural',
+                    unidade_medida: 'Metro Cúbico',
+                    unidade_simbolo: 'm³'
+                }
+            ];
+        });
 }
 
 // Função para adicionar linha de serviço
