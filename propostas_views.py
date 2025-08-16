@@ -73,7 +73,9 @@ def listar_propostas():
 @admin_required
 def nova_proposta():
     """Formulário para criar nova proposta"""
-    print(f"DEBUG: Usuario atual: {current_user.id} - {current_user.nome} - {current_user.tipo_usuario.name}")
+    print(f"DEBUG: ACESSANDO NOVA PROPOSTA - Usuario atual: {current_user.id} - {current_user.nome} - {current_user.tipo_usuario.name}")
+    print(f"DEBUG: Usuario autenticado? {current_user.is_authenticated}")
+    print(f"DEBUG: Tipo de usuario: {current_user.tipo_usuario.name if current_user.is_authenticated else 'N/A'}")
     
     # Buscar templates disponíveis baseado no tipo de usuário
     if current_user.tipo_usuario.name == 'SUPER_ADMIN':
