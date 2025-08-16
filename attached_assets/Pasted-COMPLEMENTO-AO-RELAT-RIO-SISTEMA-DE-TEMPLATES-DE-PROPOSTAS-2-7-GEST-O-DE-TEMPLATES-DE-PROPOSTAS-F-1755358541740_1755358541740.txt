@@ -1,0 +1,115 @@
+COMPLEMENTO AO RELATÓRIO: SISTEMA DE TEMPLATES DE PROPOSTAS
+2.7 GESTÃO DE TEMPLATES DE PROPOSTAS
+FUNCIONALIDADES DO SISTEMA DE TEMPLATES
+Criação e Gestão de Templates (CRUD)
+Criar templates personalizados com nome e descrição
+Definir itens padrão para cada template
+Controle de status (ativo/inativo)
+Organização por categoria de projeto
+Versionamento com data de criação
+Exclusão lógica (manter histórico)
+Estrutura de Templates
+proposal_templates:
+- id (identificador único)
+- name (nome do template)
+- description (descrição/uso)
+- defaultItems (JSON com itens padrão)
+- itemsPadrao (compatibilidade)
+- active (ativo/inativo)
+- adminId (proprietário)
+- createdAt (data de criação)
+Aplicação de Templates
+Seleção rápida durante criação de proposta
+Carregamento automático de itens pré-definidos
+Personalização posterior dos itens carregados
+Múltiplos templates por usuário/empresa
+Preview da quantidade de itens do template
+Exemplos de Templates Implementados
+Template 1 - MEZANINO:
+
+Estrutura para projetos de mezanino
+Itens específicos: vigas, pilares, escadas
+Unidades padrão: metro, tonelada, metro²
+Template 2 - ESTRUTURA METÁLICA:
+
+Projetos de estruturas industriais
+Itens: vigas W, soldas, parafusos
+Cálculos específicos de peso e área
+Template 3 - COBERTURA ÁREA GOURMET:
+
+Coberturas residenciais
+Itens: telhas, estrutura, acabamentos
+Medidas em metro² e unidades
+APIs do Sistema de Templates
+Backend (server/routes.ts)
+// Listar templates ativos
+GET /api/proposal-templates
+- Retorna templates do usuário logado
+- Filtro por status ativo
+- Ordenação por data de criação
+// Criar novo template
+POST /api/proposal-templates
+- Validação de dados obrigatórios
+- Associação ao usuário logado
+- Salvamento dos itens padrão
+Frontend (client/pages/propostas/nova.tsx)
+// Buscar templates disponíveis
+useQuery<ProposalTemplate[]>({
+  queryKey: ['/api/proposal-templates']
+})
+// Aplicar template selecionado
+const applyTemplate = (templateId) => {
+  // Carrega itens padrão do template
+  // Substitui itens atuais da proposta
+  // Notifica sucesso da aplicação
+}
+Interface do Usuario
+Seleção de Templates
+Cards visuais com nome e descrição
+Badge mostrando quantidade de itens
+Botão "Aplicar" para carregamento rápido
+Layout responsivo em grid
+Hover effects para melhor UX
+Gestão de Templates (Necessário Implementar)
+Página dedicada para CRUD completo
+Formulário de criação com:
+Nome do template
+Descrição/categoria
+Editor de itens padrão
+Preview do template
+Lista de templates criados
+Ações: editar, duplicar, ativar/desativar, excluir
+Benefícios dos Templates
+Para o Usuario
+Agilidade na criação de propostas
+Padronização de itens por tipo de projeto
+Redução de erros de digitação
+Reutilização de estruturas aprovadas
+Consistência entre propostas similares
+Para a Empresa
+Padronização comercial da empresa
+Controle de preços padrão
+Treinamento facilitado de novos usuários
+Qualidade uniforme das propostas
+Análise de itens mais utilizados
+Funcionalidades Complementares Necessárias
+CRUD Completo de Templates
+Página de Gestão (/templates ou /propostas/templates)
+Formulário de Criação/Edição
+Lista com Filtros (ativo, categoria, data)
+Preview de templates antes da aplicação
+Duplicação de templates existentes
+Importação/Exportação entre sistemas
+Recursos Avançados
+Categorização por tipo de projeto
+Compartilhamento entre usuários da empresa
+Versionamento de templates
+Estatísticas de uso
+Templates públicos vs privados
+Backup/Restauração de templates
+Integrações
+Catálogo de serviços integrado
+Preços atualizados automaticamente
+Fornecedores associados aos itens
+Histórico de alterações
+Auditoria de uso dos templates

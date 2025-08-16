@@ -1,0 +1,95 @@
+RELATÓRIO: MÓDULO DE PROPOSTAS DIGITAIS - SIGE v8.0
+1. VISÃO GERAL DO MÓDULO
+O módulo de propostas é um sistema completo de gestão de propostas comerciais digitais, projetado para automatizar todo o ciclo de vida de uma proposta - desde a criação até a resposta do cliente. É parte integrante do sistema SIGE v8.0 e funciona como uma ferramenta de automação de vendas.
+
+2. PRINCIPAIS FUNCIONALIDADES
+2.1 GESTÃO DE PROPOSTAS
+Criação automática de propostas com numeração sequencial (formato: PROP-YYYY-XXXXX)
+Controle de status (rascunho, enviada, aprovada, rejeitada, expirada)
+Gestão de validade com expiração automática
+Cálculo automático de valores totais
+Sistema de templates para reutilização de estruturas padrão
+2.2 DADOS DA PROPOSTA
+Informações do cliente: nome, telefone, email, endereço
+Detalhes da proposta: assunto, objeto, documentos de referência
+Condições comerciais: prazo de entrega, condições de pagamento, garantias
+Itens inclusos/exclusos configuráveis
+Observações gerais personalizáveis
+2.3 GESTÃO DE ITENS
+Catálogo de serviços para adição rápida de itens
+Tabela de itens com descrição, quantidade, unidade e preço
+Cálculo automático de subtotais e total geral
+Reordenação e edição dinâmica de itens
+Múltiplas unidades (metro, metro², quilograma, hora, etc.)
+2.4 GESTÃO DE ARQUIVOS
+Upload de documentos (PDF, DWG, imagens, etc.)
+Categorização por tipo (documento, desenho, foto)
+Controle de tamanho (limite de 10MB por arquivo)
+Associação com propostas específicas
+2.5 PORTAL DO CLIENTE
+Acesso via token único (sem necessidade de cadastro/login)
+Visualização completa da proposta
+Interface responsiva e intuitiva
+Aprovação/rejeição online com observações
+Feedback em tempo real do status
+2.6 AUTOMATIZAÇÃO DE PROCESSOS
+Geração automática de PDF profissional
+Envio por email com anexo da proposta
+Link do portal incluído automaticamente
+Notificações de status e respostas
+Controle de validade automático
+3. COMPONENTES TÉCNICOS NECESSÁRIOS
+3.1 BANCO DE DADOS
+-- Tabelas principais
+proposals (dados principais da proposta)
+proposal_items (itens da proposta)
+proposal_files (arquivos anexos)
+proposal_templates (templates reutilizáveis)
+service_items (catálogo de serviços)
+3.2 BACKEND/API
+CRUD completo para propostas, itens e arquivos
+Sistema de autenticação para usuários administrativos
+Geração de PDF com template HTML/CSS
+Envio de emails com attachments
+Upload de arquivos com validação
+Portal público sem autenticação (acesso por token)
+3.3 FRONTEND
+Dashboard administrativo com listagem e filtros
+Formulário de criação com validação (React Hook Form + Zod)
+Editor de itens dinâmico
+Gestão de arquivos com drag & drop
+Portal do cliente responsivo
+Componentes reutilizáveis (cards, tabelas, modais)
+3.4 INTEGRAÇÕES
+Serviço de email (Nodemailer/SendGrid)
+Geração de PDF (Puppeteer + Handlebars)
+Upload de arquivos (Multer + validação)
+Banco de dados (PostgreSQL + Drizzle ORM)
+4. FLUXO OPERACIONAL
+4.1 CRIAÇÃO DE PROPOSTA
+Preenchimento dos dados do cliente
+Definição do escopo e condições
+Adição de itens (manual ou via catálogo)
+Aplicação de template (opcional)
+Upload de arquivos de apoio
+Salvamento como rascunho
+4.2 ENVIO E ACOMPANHAMENTO
+Geração automática do PDF
+Envio por email com portal do cliente
+Mudança de status para "enviada"
+Acompanhamento via dashboard
+Controle automático de validade
+4.3 RESPOSTA DO CLIENTE
+Acesso via link único (sem login)
+Visualização completa da proposta
+Aprovação ou rejeição com observações
+Atualização automática do status
+Notificação para o vendedor
+5. BENEFÍCIOS IMPLEMENTADOS
+Automatização completa do processo de vendas
+Padronização de propostas profissionais
+Agilidade na criação e envio
+Rastreabilidade completa do processo
+Interface amigável para o cliente
+Redução de erros manuais
+Melhoria na conversão de propostas
