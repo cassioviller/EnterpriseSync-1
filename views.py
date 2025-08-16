@@ -2006,3 +2006,53 @@ def servicos():
 def relatorios():
     """Sistema de relatórios"""
     return render_template('relatorios/dashboard_relatorios.html')
+
+@main_bp.route('/usuarios/<int:usuario_id>/editar', methods=['GET', 'POST'])
+@admin_required
+def editar_usuario(usuario_id):
+    """Editar usuário existente"""
+    usuario = Usuario.query.get_or_404(usuario_id)
+    
+    if request.method == 'POST':
+        try:
+            usuario.nome = request.form.get('nome')
+            usuario.email = request.form.get('email')
+            usuario.username = request.form.get('username')
+            
+            # Só atualiza senha se foi fornecida
+            if request.form.get('password'):
+                usuario.password_hash = generate_password_hash(request.form.get('password'))
+            
+            usuario.tipo_usuario = TipoUsuario[request.form.get('tipo_usuario')]
+            usuario.ativo = request.form.get('ativo') == 'on'
+            
+            db.session.commit()
+            flash('Usuário atualizado com sucesso!', 'success')
+            return redirect(url_for('main.usuarios'))
+            
+        except Exception as e:
+            db.session.rollback()
+            flash(f'Erro ao atualizar usuário: {str(e)}', 'error')
+    
+    return render_template('usuarios/editar_usuario.html', usuario=usuario)
+
+@main_bp.route('/usuarios/<int:usuario_id>/excluir', methods=['POST'])
+@admin_required
+def excluir_usuario(usuario_id):
+    """Excluir usuário"""
+    try:
+        usuario = Usuario.query.get_or_404(usuario_id)
+        
+        # Não permitir excluir super admin ou o próprio usuário
+        if usuario.tipo_usuario == TipoUsuario.SUPER_ADMIN or usuario.id == current_user.id:
+            flash('Não é possível excluir este usuário.', 'error')
+        else:
+            db.session.delete(usuario)
+            db.session.commit()
+            flash('Usuário excluído com sucesso!', 'success')
+            
+    except Exception as e:
+        db.session.rollback()
+        flash(f'Erro ao excluir usuário: {str(e)}', 'error')
+    
+    return redirect(url_for('main.usuarios'))

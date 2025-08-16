@@ -57,12 +57,14 @@
                                         <td>{{ usuario.created_at.strftime('%d/%m/%Y') if usuario.created_at else '-' }}</td>
                                         <td>
                                             <div class="btn-group btn-group-sm">
-                                                <button class="btn btn-outline-primary" title="Editar">
+                                                <a href="{{ url_for('main.editar_usuario', usuario_id=usuario.id) }}" class="btn btn-outline-primary" title="Editar">
                                                     <i class="fas fa-edit"></i>
-                                                </button>
-                                                <button class="btn btn-outline-danger" title="Excluir">
+                                                </a>
+                                                {% if usuario.tipo_usuario.name != 'SUPER_ADMIN' and usuario.id != current_user.id %}
+                                                <button class="btn btn-outline-danger" title="Excluir" onclick="confirmarExclusao({{ usuario.id }}, '{{ usuario.nome }}')">
                                                     <i class="fas fa-trash"></i>
                                                 </button>
+                                                {% endif %}
                                             </div>
                                         </td>
                                     </tr>
@@ -96,5 +98,16 @@ $(document).ready(function() {
         "order": [[0, "asc"]]
     });
 });
+
+function confirmarExclusao(usuarioId, nomeUsuario) {
+    if (confirm('Tem certeza que deseja excluir o usuário "' + nomeUsuario + '"?')) {
+        // Criar form para enviar POST
+        const form = document.createElement('form');
+        form.method = 'POST';
+        form.action = '/usuarios/' + usuarioId + '/excluir';
+        document.body.appendChild(form);
+        form.submit();
+    }
+}
 </script>
 {% endblock %}
