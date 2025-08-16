@@ -395,6 +395,11 @@ def dashboard():
     print(f"DEBUG FINAL - Funcionários por dept: {funcionarios_dept}")
     print(f"DEBUG FINAL - Custos por obra: {custos_recentes}")
     
+    # Buscar obras em andamento para a tabela
+    obras_andamento = Obra.query.filter_by(admin_id=admin_id).filter(
+        Obra.status.in_(['andamento', 'Em andamento', 'ativa', 'planejamento'])
+    ).order_by(Obra.data_inicio.desc()).limit(5).all()
+    
     return render_template('dashboard.html',
                          total_funcionarios=total_funcionarios,
                          total_obras=total_obras,
@@ -412,6 +417,7 @@ def dashboard():
                          custos_por_obra=custos_por_obra,
                          funcionarios_dept=funcionarios_dept,
                          custos_recentes=custos_recentes,
+                         obras_andamento=obras_andamento,
                          data_inicio=data_inicio,
                          data_fim=data_fim)
 
