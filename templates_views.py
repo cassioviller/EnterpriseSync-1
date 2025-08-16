@@ -34,35 +34,70 @@ def admin_required(f):
 def dashboard():
     """Dashboard principal de templates"""
     
-    # Determinar admin_id
-    admin_id = current_user.id if current_user.tipo_usuario == TipoUsuario.ADMIN else 2
+    logger.debug(f"Dashboard acessado por usuário: {current_user.id} - {current_user.nome}")
     
-    # Estatísticas gerais
-    total_templates = PropostaTemplate.query.filter_by(admin_id=admin_id).count()
-    templates_ativos = PropostaTemplate.query.filter_by(admin_id=admin_id, ativo=True).count()
+    # Para Super Admin, mostrar todos os templates
+    # Para Admin, mostrar apenas os seus templates
+    if current_user.tipo_usuario.name == 'SUPER_ADMIN':
+        # Super Admin vê todos os templates
+        total_templates = PropostaTemplate.query.count()
+        templates_ativos = PropostaTemplate.query.filter_by(ativo=True).count()
+        
+        # Templates por categoria
+        categorias_stats = db.session.query(
+            PropostaTemplate.categoria,
+            db.func.count(PropostaTemplate.id).label('total')
+        ).filter(
+            PropostaTemplate.ativo == True
+        ).group_by(PropostaTemplate.categoria).all()
+        
+        # Templates mais utilizados
+        templates_populares = PropostaTemplate.query.filter_by(
+            ativo=True
+        ).order_by(PropostaTemplate.uso_contador.desc()).limit(5).all()
+        
+        # Templates recentes
+        templates_recentes = PropostaTemplate.query.order_by(
+            PropostaTemplate.criado_em.desc()
+        ).limit(5).all()
+        
+    else:
+        # Admin comum vê apenas seus templates
+        admin_id = current_user.id
+        
+        total_templates = PropostaTemplate.query.filter_by(admin_id=admin_id).count()
+        templates_ativos = PropostaTemplate.query.filter_by(admin_id=admin_id, ativo=True).count()
+        
+        # Templates por categoria
+        categorias_stats = db.session.query(
+            PropostaTemplate.categoria,
+            db.func.count(PropostaTemplate.id).label('total')
+        ).filter(
+            PropostaTemplate.admin_id == admin_id,
+            PropostaTemplate.ativo == True
+        ).group_by(PropostaTemplate.categoria).all()
+        
+        # Templates mais utilizados
+        templates_populares = PropostaTemplate.query.filter_by(
+            admin_id=admin_id,
+            ativo=True
+        ).order_by(PropostaTemplate.uso_contador.desc()).limit(5).all()
+        
+        # Templates recentes
+        templates_recentes = PropostaTemplate.query.filter_by(
+            admin_id=admin_id
+        ).order_by(PropostaTemplate.criado_em.desc()).limit(5).all()
     
-    # Templates por categoria
-    categorias_stats = db.session.query(
-        PropostaTemplate.categoria,
-        db.func.count(PropostaTemplate.id).label('total')
-    ).filter(
-        PropostaTemplate.admin_id == admin_id,
-        PropostaTemplate.ativo == True
-    ).group_by(PropostaTemplate.categoria).all()
+    # Total de serviços disponíveis para templates (tentar buscar, se não existir modelo, retornar 0)
+    try:
+        total_servicos = Servico.query.filter_by(ativo=True).count()
+    except Exception as e:
+        logger.warning(f"Erro ao buscar serviços: {e}")
+        total_servicos = 0
     
-    # Templates mais utilizados
-    templates_populares = PropostaTemplate.query.filter_by(
-        admin_id=admin_id,
-        ativo=True
-    ).order_by(PropostaTemplate.uso_contador.desc()).limit(5).all()
-    
-    # Templates recentes
-    templates_recentes = PropostaTemplate.query.filter_by(
-        admin_id=admin_id
-    ).order_by(PropostaTemplate.criado_em.desc()).limit(5).all()
-    
-    # Total de serviços disponíveis para templates
-    total_servicos = Servico.query.filter_by(ativo=True).count()
+    logger.debug(f"Total templates: {total_templates}, Ativos: {templates_ativos}")
+    logger.debug(f"Templates recentes: {len(templates_recentes)}")
+    logger.debug(f"Categorias: {len(categorias_stats)}")
     
     return render_template('templates/dashboard.html',
                          total_templates=total_templates,
@@ -82,16 +117,18 @@ def dashboard():
 def listar_templates():
     """Lista todos os templates com filtros"""
     
-    admin_id = current_user.id if current_user.tipo_usuario == TipoUsuario.ADMIN else 2
-    
     # Parâmetros de filtro
     page = request.args.get('page', 1, type=int)
     categoria = request.args.get('categoria', '')
     busca = request.args.get('busca', '')
     status = request.args.get('status', '')
     
-    # Query base
-    query = PropostaTemplate.query.filter_by(admin_id=admin_id)
+    # Query base - Super Admin vê todos, Admin vê apenas os seus
+    if current_user.tipo_usuario.name == 'SUPER_ADMIN':
+        query = PropostaTemplate.query
+    else:
+        admin_id = current_user.id
+        query = PropostaTemplate.query.filter_by(admin_id=admin_id)
     
     # Aplicar filtros
     if categoria:
