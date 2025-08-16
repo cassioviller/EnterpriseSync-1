@@ -415,28 +415,77 @@ function setDateRange(period) {
 
 // Gráficos
 document.addEventListener('DOMContentLoaded', function() {
-    // Gráfico de funcionários por departamento
+    // Gráfico de funcionários por departamento usando ChartConfigs
     const ctxFuncionarios = document.getElementById('funcionariosDeptChart').getContext('2d');
-    new Chart(ctxFuncionarios, {
-        type: 'pie',
-        data: {
-            labels: [{% for dept in funcionarios_dept %}'{{ dept.nome }}'{% if not loop.last %},{% endif %}{% endfor %}],
-            datasets: [{
-                data: [{% for dept in funcionarios_dept %}{{ dept.total }}{% if not loop.last %},{% endif %}{% endfor %}],
-                backgroundColor: [
-                    '#0d6efd', '#198754', '#ffc107', '#dc3545', '#6610f2', '#fd7e14'
-                ]
-            }]
-        },
-        options: {
-            responsive: true,
-            plugins: {
-                legend: {
-                    position: 'bottom'
+    const funcionariosLabels = [{% for dept in funcionarios_dept %}'{{ dept.nome }}'{% if not loop.last %},{% endif %}{% endfor %}];
+    const funcionariosData = [{% for dept in funcionarios_dept %}{{ dept.total }}{% if not loop.last %},{% endif %}{% endfor %}];
+    
+    if (typeof ChartConfigs !== 'undefined') {
+        const funcionariosConfig = ChartConfigs.funcionariosPorDepartamento(funcionariosLabels, funcionariosData);
+        new Chart(ctxFuncionarios, funcionariosConfig);
+    } else {
+        // Fallback se ChartConfigs não estiver disponível
+        new Chart(ctxFuncionarios, {
+            type: 'doughnut',
+            data: {
+                labels: funcionariosLabels,
+                datasets: [{
+                    data: funcionariosData,
+                    backgroundColor: ['#0d6efd', '#198754', '#ffc107', '#dc3545', '#6610f2', '#fd7e14', '#20c997', '#e83e8c'],
+                    borderWidth: 2,
+                    borderColor: '#212529'
+                }]
+            },
+            options: {
+                responsive: true,
+                cutout: '50%',
+                plugins: {
+                    legend: {
+                        position: 'bottom',
+                        labels: {
+                            usePointStyle: true,
+                            padding: 20,
+                            generateLabels: function(chart) {
+                                const data = chart.data;
+                                if (data.labels.length && data.datasets.length) {
+                                    return data.labels.map(function(label, i) {
+                                        const style = {
+                                            backgroundColor: data.datasets[0].backgroundColor[i],
+                                            borderColor: data.datasets[0].borderColor
+                                        };
+                                        return {
+                                            text: label + ' (' + data.datasets[0].data[i] + ')',
+                                            fillStyle: style.backgroundColor,
+                                            strokeStyle: style.borderColor,
+                                            lineWidth: 2,
+                                            pointStyle: 'circle',
+                                            hidden: false,
+                                            index: i
+                                        };
+                                    });
+                                }
+                                return [];
+                            }
+                        }
+                    },
+                    tooltip: {
+                        callbacks: {
+                            title: function(context) {
+                                return context[0].label;
+                            },
+                            label: function(context) {
+                                const label = context.label || '';
+                                const value = context.parsed;
+                                const total = context.dataset.data.reduce((sum, val) => sum + val, 0);
+                                const percentage = ((value / total) * 100).toFixed(1);
+                                return `${label}: ${value} funcionários (${percentage}%)`;
+                            }
+                        }
+                    }
                 }
             }
-        }
-    });
+        });
+    }
     
     // Gráfico de custos por obra
     const ctxCustos = document.getElementById('custosObraChart').getContext('2d');
