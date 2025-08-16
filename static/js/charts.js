@@ -138,15 +138,6 @@ const ChartConfigs = {
                 },
                 cutout: '50%'
             }
-            options: {
-                ...ChartUtils.getResponsiveOptions(1),
-                plugins: {
-                    ...ChartUtils.getResponsiveOptions().plugins,
-                    legend: {
-                        position: 'right'
-                    }
-                }
-            }
         };
     },
     
