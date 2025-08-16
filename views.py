@@ -1048,13 +1048,19 @@ def detalhes_obra(id):
         # Buscar custos da obra para o período
         from models import OutroCusto, CustoVeiculo
         
-        # Custos diversos da obra (filtrados por obra específica)
-        custos_obra = OutroCusto.query.filter(
-            OutroCusto.admin_id == admin_id,
-            OutroCusto.obra_id == obra_id,
-            OutroCusto.data >= data_inicio,
-            OutroCusto.data <= data_fim
-        ).all()
+        # Custos diversos da obra - adaptado para produção
+        if admin_id is not None:
+            custos_obra = OutroCusto.query.filter(
+                OutroCusto.obra_id == obra_id,
+                OutroCusto.data >= data_inicio,
+                OutroCusto.data <= data_fim
+            ).all()
+        else:
+            custos_obra = OutroCusto.query.filter(
+                OutroCusto.obra_id == obra_id,
+                OutroCusto.data >= data_inicio,
+                OutroCusto.data <= data_fim
+            ).all()
         
         # Custos de transporte/veículos da obra
         custos_transporte = CustoVeiculo.query.filter(
@@ -1063,10 +1069,29 @@ def detalhes_obra(id):
             CustoVeiculo.data_custo <= data_fim
         ).all()
         
-        # Calcular totais por categoria
-        custo_alimentacao = sum(c.valor for c in custos_obra if c.kpi_associado == 'custo_alimentacao')
-        custo_transporte = sum(c.valor for c in custos_obra if c.kpi_associado == 'custo_transporte')
-        outros_custos = sum(c.valor for c in custos_obra if c.kpi_associado == 'outros_custos')
+        # Calcular totais por categoria - busca flexível PRODUÇÃO
+        custo_alimentacao = sum(c.valor for c in custos_obra if any([
+            c.kpi_associado == 'custo_alimentacao',
+            'vale_alimentacao' in (c.tipo or '').lower(),
+            'alimentacao' in (c.tipo or '').lower(),
+            'va' in (c.tipo or '').lower(),
+            'refeicao' in (c.tipo or '').lower()
+        ]))
+        
+        custo_transporte = sum(c.valor for c in custos_obra if any([
+            c.kpi_associado == 'custo_transporte',
+            'vale_transporte' in (c.tipo or '').lower(),
+            'transporte' in (c.tipo or '').lower(),
+            'vt' in (c.tipo or '').lower()
+        ]))
+        
+        outros_custos = sum(c.valor for c in custos_obra if any([
+            c.kpi_associado == 'outros_custos',
+            'outros' in (c.tipo or '').lower(),
+            'epi' in (c.tipo or '').lower(),
+            'desconto' in (c.tipo or '').lower()
+        ]))
+        
         custos_transporte_total = sum(c.valor for c in custos_transporte if c.valor)
         
         print(f"DEBUG CUSTOS DETALHADOS: Alimentação={custo_alimentacao}, Transporte VT={custo_transporte}, Veículos={custos_transporte_total}, Outros={outros_custos}")
