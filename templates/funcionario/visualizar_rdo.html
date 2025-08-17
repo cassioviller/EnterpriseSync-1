@@ -1,0 +1,205 @@
+{% extends "base.html" %}
+
+{% block title %}RDO {{ rdo.numero_rdo }} - Funcionário - SIGE{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">
+                        <i class="fas fa-file-alt me-2"></i>
+                        RDO {{ rdo.numero_rdo }}
+                        {% if rdo.status == 'Finalizado' %}
+                        <span class="badge bg-success ms-2">Finalizado</span>
+                        {% else %}
+                        <span class="badge bg-warning ms-2">Rascunho</span>
+                        {% endif %}
+                    </h5>
+                    <div>
+                        <a href="{{ url_for('main.funcionario_lista_rdos') }}" class="btn btn-outline-secondary">
+                            <i class="fas fa-arrow-left me-1"></i>Voltar à Lista
+                        </a>
+                    </div>
+                </div>
+                
+                <div class="card-body">
+                    <!-- Informações Gerais -->
+                    <div class="row mb-4">
+                        <div class="col-md-6">
+                            <h6 class="text-muted">Informações Gerais</h6>
+                            <table class="table table-borderless table-sm">
+                                <tr>
+                                    <td><strong>Obra:</strong></td>
+                                    <td>{{ rdo.obra.nome }}</td>
+                                </tr>
+                                <tr>
+                                    <td><strong>Data:</strong></td>
+                                    <td>{{ rdo.data_relatorio.strftime('%d/%m/%Y') }}</td>
+                                </tr>
+                                <tr>
+                                    <td><strong>Criado por:</strong></td>
+                                    <td>{{ rdo.criado_por.nome if rdo.criado_por else 'N/A' }}</td>
+                                </tr>
+                                <tr>
+                                    <td><strong>Criado em:</strong></td>
+                                    <td>{{ rdo.created_at.strftime('%d/%m/%Y %H:%M') if rdo.created_at else 'N/A' }}</td>
+                                </tr>
+                            </table>
+                        </div>
+                        
+                        <div class="col-md-6">
+                            <h6 class="text-muted">Condições Climáticas</h6>
+                            <table class="table table-borderless table-sm">
+                                <tr>
+                                    <td><strong>Clima:</strong></td>
+                                    <td>{{ rdo.clima or 'N/A' }}</td>
+                                </tr>
+                                <tr>
+                                    <td><strong>Temperatura:</strong></td>
+                                    <td>{{ rdo.temperatura or 'N/A' }}</td>
+                                </tr>
+                                <tr>
+                                    <td><strong>Observações:</strong></td>
+                                    <td>{{ rdo.condicoes_climaticas or 'N/A' }}</td>
+                                </tr>
+                            </table>
+                        </div>
+                    </div>
+
+                    <!-- Atividades Executadas -->
+                    {% if rdo.atividades %}
+                    <div class="mb-4">
+                        <h6 class="text-muted mb-3">Atividades Executadas</h6>
+                        <div class="table-responsive">
+                            <table class="table table-striped">
+                                <thead>
+                                    <tr>
+                                        <th>Descrição</th>
+                                        <th width="120">% Conclusão</th>
+                                        <th>Observações</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for atividade in rdo.atividades %}
+                                    <tr>
+                                        <td>{{ atividade.descricao_atividade }}</td>
+                                        <td>
+                                            <div class="progress" style="height: 25px;">
+                                                <div class="progress-bar" role="progressbar" 
+                                                     style="width: {{ atividade.percentual_conclusao }}%">
+                                                    {{ atividade.percentual_conclusao }}%
+                                                </div>
+                                            </div>
+                                        </td>
+                                        <td>{{ atividade.observacoes_tecnicas or '-' }}</td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                    {% endif %}
+
+                    <!-- Mão de Obra -->
+                    {% if rdo.mao_obra %}
+                    <div class="mb-4">
+                        <h6 class="text-muted mb-3">Mão de Obra Utilizada</h6>
+                        <div class="table-responsive">
+                            <table class="table table-striped">
+                                <thead>
+                                    <tr>
+                                        <th>Funcionário</th>
+                                        <th>Função</th>
+                                        <th>Horas Trabalhadas</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for mao_obra in rdo.mao_obra %}
+                                    <tr>
+                                        <td>{{ mao_obra.funcionario.nome if mao_obra.funcionario else 'N/A' }}</td>
+                                        <td>{{ mao_obra.funcao_exercida }}</td>
+                                        <td>{{ mao_obra.horas_trabalhadas }}h</td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                    {% endif %}
+
+                    <!-- Equipamentos -->
+                    {% if rdo.equipamentos %}
+                    <div class="mb-4">
+                        <h6 class="text-muted mb-3">Equipamentos Utilizados</h6>
+                        <div class="table-responsive">
+                            <table class="table table-striped">
+                                <thead>
+                                    <tr>
+                                        <th>Nome</th>
+                                        <th>Quantidade</th>
+                                        <th>Horas de Uso</th>
+                                        <th>Estado</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for equipamento in rdo.equipamentos %}
+                                    <tr>
+                                        <td>{{ equipamento.nome_equipamento }}</td>
+                                        <td>{{ equipamento.quantidade }}</td>
+                                        <td>{{ equipamento.horas_uso }}h</td>
+                                        <td>
+                                            {% if equipamento.estado_conservacao == 'Bom' %}
+                                            <span class="badge bg-success">{{ equipamento.estado_conservacao }}</span>
+                                            {% elif equipamento.estado_conservacao == 'Regular' %}
+                                            <span class="badge bg-warning">{{ equipamento.estado_conservacao }}</span>
+                                            {% else %}
+                                            <span class="badge bg-danger">{{ equipamento.estado_conservacao }}</span>
+                                            {% endif %}
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                    {% endif %}
+
+                    <!-- Ocorrências -->
+                    {% if rdo.ocorrencias %}
+                    <div class="mb-4">
+                        <h6 class="text-muted mb-3">Ocorrências e Problemas</h6>
+                        {% for ocorrencia in rdo.ocorrencias %}
+                        <div class="card mb-3">
+                            <div class="card-body">
+                                <h6 class="card-title">{{ ocorrencia.descricao_ocorrencia }}</h6>
+                                {% if ocorrencia.problemas_identificados %}
+                                <p class="card-text"><strong>Problemas:</strong> {{ ocorrencia.problemas_identificados }}</p>
+                                {% endif %}
+                                {% if ocorrencia.acoes_corretivas %}
+                                <p class="card-text"><strong>Ações Corretivas:</strong> {{ ocorrencia.acoes_corretivas }}</p>
+                                {% endif %}
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    {% endif %}
+
+                    <!-- Comentário Geral -->
+                    {% if rdo.comentario_geral %}
+                    <div class="mb-4">
+                        <h6 class="text-muted mb-3">Observações Gerais</h6>
+                        <div class="card">
+                            <div class="card-body">
+                                {{ rdo.comentario_geral }}
+                            </div>
+                        </div>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

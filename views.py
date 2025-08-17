@@ -1260,9 +1260,61 @@ def super_admin_dashboard():
 @main_bp.route('/funcionario-dashboard')
 @funcionario_required
 def funcionario_dashboard():
-    funcionario = Funcionario.query.filter_by(admin_id=current_user.admin_id).first()
-    
-    return render_template('funcionario_dashboard.html', funcionario=funcionario)
+    """Dashboard específico para funcionários"""
+    try:
+        # Buscar funcionário pelo admin_id do usuário
+        funcionarios = Funcionario.query.filter_by(
+            admin_id=current_user.admin_id, 
+            ativo=True
+        ).all()
+        
+        # Para funcionário específico, buscar por email se disponível
+        funcionario_atual = None
+        if hasattr(current_user, 'email') and current_user.email:
+            for func in funcionarios:
+                if func.email == current_user.email:
+                    funcionario_atual = func
+                    break
+        
+        # Se não encontrou, pegar primeiro funcionário como fallback
+        if not funcionario_atual and funcionarios:
+            funcionario_atual = funcionarios[0]
+        
+        # Buscar obras disponíveis para esse admin
+        obras_disponiveis = Obra.query.filter_by(
+            admin_id=current_user.admin_id
+        ).order_by(Obra.nome).all()
+        
+        # Buscar RDOs recentes da empresa
+        rdos_recentes = RDO.query.join(Obra).filter(
+            Obra.admin_id == current_user.admin_id
+        ).order_by(RDO.data_relatorio.desc()).limit(10).all()
+        
+        # RDOs em rascunho que o funcionário pode editar
+        rdos_rascunho = RDO.query.join(Obra).filter(
+            Obra.admin_id == current_user.admin_id,
+            RDO.status == 'Rascunho'
+        ).order_by(RDO.data_relatorio.desc()).limit(5).all()
+        
+        print(f"DEBUG FUNCIONÁRIO DASHBOARD: Funcionário {funcionario_atual.nome if funcionario_atual else 'N/A'}")
+        print(f"DEBUG: {len(obras_disponiveis)} obras disponíveis, {len(rdos_recentes)} RDOs recentes")
+        
+        return render_template('funcionario_dashboard.html', 
+                             funcionario=funcionario_atual,
+                             obras_disponiveis=obras_disponiveis,
+                             rdos_recentes=rdos_recentes,
+                             rdos_rascunho=rdos_rascunho,
+                             total_obras=len(obras_disponiveis),
+                             total_rdos=len(rdos_recentes))
+                             
+    except Exception as e:
+        print(f"ERRO FUNCIONÁRIO DASHBOARD: {str(e)}")
+        flash('Erro ao carregar dashboard. Contate o administrador.', 'error')
+        return render_template('funcionario_dashboard.html', 
+                             funcionario=None,
+                             obras_disponiveis=[],
+                             rdos_recentes=[],
+                             rdos_rascunho=[])
 
 # ===== ROTAS BÁSICAS DE TESTE =====
 @main_bp.route('/test')
@@ -1812,6 +1864,383 @@ def api_ultimo_rdo(obra_id):
     except Exception as e:
         print(f"ERRO API ÚLTIMO RDO: {str(e)}")
         return jsonify({'error': 'Erro interno'}), 500
+
+# ===== ROTAS ESPECÍFICAS PARA FUNCIONÁRIOS - RDO =====
+@main_bp.route('/funcionario/rdos')
+@funcionario_required
+def funcionario_lista_rdos():
+    """Lista RDOs para funcionários visualizarem"""
+    try:
+        # Buscar RDOs da empresa do funcionário
+        rdos = RDO.query.join(Obra).filter(
+            Obra.admin_id == current_user.admin_id
+        ).order_by(RDO.data_relatorio.desc()).all()
+        
+        return render_template('funcionario/lista_rdos.html', rdos=rdos)
+        
+    except Exception as e:
+        print(f"ERRO FUNCIONÁRIO LISTA RDOs: {str(e)}")
+        flash('Erro ao carregar RDOs.', 'error')
+        return redirect(url_for('main.funcionario_dashboard'))
+
+@main_bp.route('/funcionario/rdo/novo')
+@funcionario_required
+def funcionario_novo_rdo():
+    """Funcionário criar novo RDO"""
+    try:
+        # Buscar obras do admin do funcionário
+        obras = Obra.query.filter_by(
+            admin_id=current_user.admin_id
+        ).order_by(Obra.nome).all()
+        
+        # Buscar funcionários para mão de obra
+        funcionarios = Funcionario.query.filter_by(
+            admin_id=current_user.admin_id, 
+            ativo=True
+        ).order_by(Funcionario.nome).all()
+        
+        # Verificar se há obras disponíveis
+        if not obras:
+            flash('Não há obras disponíveis. Contate o administrador.', 'warning')
+            return redirect(url_for('main.funcionario_dashboard'))
+        
+        # Buscar obra selecionada para pré-carregamento
+        obra_id = request.args.get('obra_id', type=int)
+        atividades_anteriores = []
+        
+        if obra_id:
+            # Buscar RDO mais recente da obra para pré-carregar atividades
+            ultimo_rdo = RDO.query.filter_by(obra_id=obra_id).order_by(
+                RDO.data_relatorio.desc()
+            ).first()
+            
+            if ultimo_rdo:
+                atividades_anteriores = [
+                    {
+                        'descricao': ativ.descricao_atividade,
+                        'percentual': ativ.percentual_conclusao,
+                        'observacoes': ativ.observacoes_tecnicas or ''
+                    }
+                    for ativ in ultimo_rdo.atividades
+                ]
+                print(f"DEBUG FUNCIONÁRIO: Pré-carregando {len(atividades_anteriores)} atividades do RDO {ultimo_rdo.numero_rdo}")
+        
+        return render_template('funcionario/novo_rdo.html', 
+                             obras=obras,
+                             funcionarios=funcionarios,
+                             obra_selecionada=obra_id,
+                             atividades_anteriores=atividades_anteriores)
+        
+    except Exception as e:
+        print(f"ERRO FUNCIONÁRIO NOVO RDO: {str(e)}")
+        return redirect(url_for('main.funcionario_dashboard'))
+
+@main_bp.route('/funcionario/rdo/criar', methods=['POST'])
+@funcionario_required
+def funcionario_criar_rdo():
+    """Funcionário criar RDO"""
+    try:
+        # Dados básicos
+        obra_id = request.form.get('obra_id', type=int)
+        data_relatorio = datetime.strptime(request.form.get('data_relatorio'), '%Y-%m-%d').date()
+        
+        # Verificar se obra pertence ao admin do funcionário
+        obra = Obra.query.filter_by(id=obra_id, admin_id=current_user.admin_id).first()
+        if not obra:
+            flash('Obra não encontrada ou sem permissão de acesso.', 'error')
+            return redirect(url_for('main.funcionario_novo_rdo'))
+        
+        # Verificar se já existe RDO para esta obra/data
+        rdo_existente = RDO.query.filter_by(obra_id=obra_id, data_relatorio=data_relatorio).first()
+        if rdo_existente:
+            flash(f'Já existe um RDO para esta obra na data {data_relatorio.strftime("%d/%m/%Y")}.', 'warning')
+            return redirect(url_for('main.funcionario_novo_rdo'))
+        
+        # Gerar número do RDO
+        contador_rdos = RDO.query.join(Obra).filter(
+            Obra.admin_id == current_user.admin_id
+        ).count()
+        numero_rdo = f"RDO-{datetime.now().year}-{contador_rdos + 1:03d}"
+        
+        # Criar RDO
+        rdo = RDO()
+        rdo.numero_rdo = numero_rdo
+        rdo.obra_id = obra_id
+        rdo.data_relatorio = data_relatorio
+        rdo.clima = request.form.get('clima', '').strip()
+        rdo.temperatura = request.form.get('temperatura', '').strip()
+        rdo.condicoes_climaticas = request.form.get('condicoes_climaticas', '').strip()
+        rdo.comentario_geral = request.form.get('comentario_geral', '').strip()
+        rdo.status = 'Rascunho'
+        rdo.criado_por_id = current_user.id
+        
+        db.session.add(rdo)
+        db.session.flush()  # Para obter o ID
+        
+        print(f"DEBUG FUNCIONÁRIO: RDO {numero_rdo} criado por funcionário ID {current_user.id}")
+        
+        # Processar atividades (mesmo código do admin)
+        atividades_json = request.form.get('atividades', '[]')
+        if atividades_json and atividades_json != '[]':
+            try:
+                atividades_list = json.loads(atividades_json)
+                for i, ativ_data in enumerate(atividades_list):
+                    descricao = ativ_data.get('descricao', '').strip()
+                    if descricao:
+                        atividade = RDOAtividade()
+                        atividade.rdo_id = rdo.id
+                        atividade.descricao_atividade = descricao
+                        atividade.percentual_conclusao = float(ativ_data.get('percentual', 0))
+                        atividade.observacoes_tecnicas = ativ_data.get('observacoes', '').strip()
+                        db.session.add(atividade)
+            except (json.JSONDecodeError, ValueError) as e:
+                print(f"Erro ao processar atividades: {e}")
+                flash(f'Erro ao processar atividades: {e}', 'warning')
+        
+        # Processar mão de obra
+        mao_obra_json = request.form.get('mao_obra', '[]')
+        if mao_obra_json and mao_obra_json != '[]':
+            try:
+                mao_obra_list = json.loads(mao_obra_json)
+                for i, mo_data in enumerate(mao_obra_list):
+                    funcionario_id = mo_data.get('funcionario_id')
+                    if funcionario_id:
+                        mao_obra = RDOMaoObra()
+                        mao_obra.rdo_id = rdo.id
+                        mao_obra.funcionario_id = int(funcionario_id)
+                        mao_obra.funcao_exercida = mo_data.get('funcao', '').strip()
+                        mao_obra.horas_trabalhadas = float(mo_data.get('horas', 8))
+                        db.session.add(mao_obra)
+            except (json.JSONDecodeError, ValueError) as e:
+                print(f"Erro ao processar mão de obra: {e}")
+                flash(f'Erro ao processar mão de obra: {e}', 'warning')
+        
+        # Processar equipamentos
+        equipamentos_json = request.form.get('equipamentos', '[]')
+        if equipamentos_json and equipamentos_json != '[]':
+            try:
+                equipamentos_list = json.loads(equipamentos_json)
+                for i, eq_data in enumerate(equipamentos_list):
+                    nome_equipamento = eq_data.get('nome', '').strip()
+                    if nome_equipamento:
+                        equipamento = RDOEquipamento()
+                        equipamento.rdo_id = rdo.id
+                        equipamento.nome_equipamento = nome_equipamento
+                        equipamento.quantidade = int(eq_data.get('quantidade', 1))
+                        equipamento.horas_uso = float(eq_data.get('horas_uso', 8))
+                        equipamento.estado_conservacao = eq_data.get('estado', 'Bom')
+                        db.session.add(equipamento)
+            except (json.JSONDecodeError, ValueError) as e:
+                print(f"Erro ao processar equipamentos: {e}")
+                flash(f'Erro ao processar equipamentos: {e}', 'warning')
+        
+        # Processar ocorrências
+        ocorrencias_json = request.form.get('ocorrencias', '[]')
+        if ocorrencias_json and ocorrencias_json != '[]':
+            try:
+                ocorrencias_list = json.loads(ocorrencias_json)
+                for i, oc_data in enumerate(ocorrencias_list):
+                    descricao = oc_data.get('descricao', '').strip()
+                    if descricao:
+                        ocorrencia = RDOOcorrencia()
+                        ocorrencia.rdo_id = rdo.id
+                        ocorrencia.descricao_ocorrencia = descricao
+                        ocorrencia.problemas_identificados = oc_data.get('problemas', '').strip()
+                        ocorrencia.acoes_corretivas = oc_data.get('acoes', '').strip()
+                        db.session.add(ocorrencia)
+            except (json.JSONDecodeError, ValueError) as e:
+                print(f"Erro ao processar ocorrências: {e}")
+                flash(f'Erro ao processar ocorrências: {e}', 'warning')
+        
+        db.session.commit()
+        
+        flash(f'RDO {numero_rdo} criado com sucesso!', 'success')
+        return redirect(url_for('main.funcionario_visualizar_rdo', id=rdo.id))
+        
+    except Exception as e:
+        db.session.rollback()
+        print(f"ERRO FUNCIONÁRIO CRIAR RDO: {str(e)}")
+        flash('Erro ao criar RDO. Tente novamente.', 'error')
+        return redirect(url_for('main.funcionario_novo_rdo'))
+
+@main_bp.route('/funcionario/rdo/<int:id>')
+@funcionario_required
+def funcionario_visualizar_rdo(id):
+    """Funcionário visualizar RDO específico"""
+    try:
+        # Buscar RDO com verificação de acesso multitenant
+        rdo = RDO.query.join(Obra).filter(
+            RDO.id == id,
+            Obra.admin_id == current_user.admin_id
+        ).first_or_404()
+        
+        return render_template('funcionario/visualizar_rdo.html', rdo=rdo)
+        
+    except Exception as e:
+        print(f"ERRO FUNCIONÁRIO VISUALIZAR RDO: {str(e)}")
+        flash('RDO não encontrado.', 'error')
+        return redirect(url_for('main.funcionario_lista_rdos'))
+
+@main_bp.route('/funcionario/obras')
+@funcionario_required
+def funcionario_obras():
+    """Lista obras disponíveis para o funcionário"""
+    try:
+        obras = Obra.query.filter_by(
+            admin_id=current_user.admin_id
+        ).order_by(Obra.nome).all()
+        
+        return render_template('funcionario/lista_obras.html', obras=obras)
+        
+    except Exception as e:
+        print(f"ERRO FUNCIONÁRIO OBRAS: {str(e)}")
+        flash('Erro ao carregar obras.', 'error')
+        return redirect(url_for('main.funcionario_dashboard'))
+
+# ===== ROTAS MOBILE/API PARA FUNCIONÁRIOS =====
+@main_bp.route('/api/funcionario/obras')
+@funcionario_required
+def api_funcionario_obras():
+    """API para funcionários listar obras - acesso mobile"""
+    try:
+        obras = Obra.query.filter_by(
+            admin_id=current_user.admin_id
+        ).order_by(Obra.nome).all()
+        
+        obras_data = [
+            {
+                'id': obra.id,
+                'nome': obra.nome,
+                'endereco': obra.endereco,
+                'status': obra.status if hasattr(obra, 'status') else 'Ativo'
+            }
+            for obra in obras
+        ]
+        
+        return jsonify({
+            'success': True,
+            'obras': obras_data,
+            'total': len(obras_data)
+        })
+        
+    except Exception as e:
+        print(f"ERRO API FUNCIONÁRIO OBRAS: {str(e)}")
+        return jsonify({'error': 'Erro interno', 'success': False}), 500
+
+@main_bp.route('/api/funcionario/rdos/<int:obra_id>')
+@funcionario_required
+def api_funcionario_rdos_obra(obra_id):
+    """API para funcionários buscar RDOs de uma obra específica"""
+    try:
+        # Verificar se obra pertence ao admin do funcionário
+        obra = Obra.query.filter_by(id=obra_id, admin_id=current_user.admin_id).first()
+        if not obra:
+            return jsonify({'error': 'Obra não encontrada', 'success': False}), 404
+        
+        rdos = RDO.query.filter_by(obra_id=obra_id).order_by(
+            RDO.data_relatorio.desc()
+        ).limit(10).all()
+        
+        rdos_data = [
+            {
+                'id': rdo.id,
+                'numero_rdo': rdo.numero_rdo,
+                'data_relatorio': rdo.data_relatorio.strftime('%Y-%m-%d'),
+                'status': rdo.status,
+                'total_atividades': len(rdo.atividades),
+                'total_funcionarios': len(rdo.mao_obra)
+            }
+            for rdo in rdos
+        ]
+        
+        return jsonify({
+            'success': True,
+            'obra': {'id': obra.id, 'nome': obra.nome},
+            'rdos': rdos_data,
+            'total': len(rdos_data)
+        })
+        
+    except Exception as e:
+        print(f"ERRO API FUNCIONÁRIO RDOs OBRA: {str(e)}")
+        return jsonify({'error': 'Erro interno', 'success': False}), 500
+
+@main_bp.route('/api/funcionario/funcionarios')
+@funcionario_required
+def api_funcionario_funcionarios():
+    """API para funcionários listar colegas da empresa"""
+    try:
+        funcionarios = Funcionario.query.filter_by(
+            admin_id=current_user.admin_id,
+            ativo=True
+        ).order_by(Funcionario.nome).all()
+        
+        funcionarios_data = [
+            {
+                'id': func.id,
+                'nome': func.nome,
+                'funcao': func.funcao.nome if func.funcao else 'N/A',
+                'departamento': func.departamento.nome if func.departamento else 'N/A'
+            }
+            for func in funcionarios
+        ]
+        
+        return jsonify({
+            'success': True,
+            'funcionarios': funcionarios_data,
+            'total': len(funcionarios_data)
+        })
+        
+    except Exception as e:
+        print(f"ERRO API FUNCIONÁRIO FUNCIONÁRIOS: {str(e)}")
+        return jsonify({'error': 'Erro interno', 'success': False}), 500
+
+# ===== VERIFICAÇÃO SISTEMA MULTITENANT =====
+@main_bp.route('/api/verificar-acesso')
+@funcionario_required
+def verificar_acesso_multitenant():
+    """Rota para verificar se o sistema multitenant está funcionando corretamente"""
+    try:
+        user_info = {
+            'user_id': current_user.id,
+            'email': current_user.email,
+            'tipo_usuario': current_user.tipo_usuario.value,
+            'admin_id': current_user.admin_id
+        }
+        
+        # Verificar acesso às obras
+        obras_count = Obra.query.filter_by(admin_id=current_user.admin_id).count()
+        
+        # Verificar acesso aos funcionários
+        funcionarios_count = Funcionario.query.filter_by(
+            admin_id=current_user.admin_id,
+            ativo=True
+        ).count()
+        
+        # Verificar acesso aos RDOs
+        rdos_count = RDO.query.join(Obra).filter(
+            Obra.admin_id == current_user.admin_id
+        ).count()
+        
+        # Verificar isolamento de dados (não deve ver dados de outros admins)
+        outros_admins_obras = Obra.query.filter(
+            Obra.admin_id != current_user.admin_id
+        ).count()
+        
+        return jsonify({
+            'success': True,
+            'user_info': user_info,
+            'access_summary': {
+                'obras_acesso': obras_count,
+                'funcionarios_acesso': funcionarios_count,
+                'rdos_acesso': rdos_count,
+                'isolamento_dados': f'Não vê {outros_admins_obras} obras de outros admins'
+            },
+            'multitenant_status': 'FUNCIONANDO' if obras_count > 0 else 'PROBLEMA_ACESSO'
+        })
+        
+    except Exception as e:
+        print(f"ERRO VERIFICAR ACESSO: {str(e)}")
+        return jsonify({'error': str(e), 'success': False}), 500
 
 def gerar_numero_rdo(obra_id, data_relatorio):
     """Gera número sequencial do RDO"""

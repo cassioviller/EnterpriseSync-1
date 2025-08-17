@@ -1,0 +1,63 @@
+{% extends "base.html" %}
+
+{% block title %}Obras - Funcionário - SIGE{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">
+                        <i class="fas fa-building me-2"></i>Obras Disponíveis
+                    </h5>
+                    <div>
+                        <a href="{{ url_for('main.funcionario_dashboard') }}" class="btn btn-outline-secondary">
+                            <i class="fas fa-arrow-left me-1"></i>Voltar ao Dashboard
+                        </a>
+                    </div>
+                </div>
+                
+                <div class="card-body">
+                    {% if obras %}
+                    <div class="row">
+                        {% for obra in obras %}
+                        <div class="col-md-6 col-lg-4 mb-4">
+                            <div class="card">
+                                <div class="card-body">
+                                    <h6 class="card-title">{{ obra.nome }}</h6>
+                                    <p class="card-text text-muted small">
+                                        <i class="fas fa-map-marker-alt me-1"></i>
+                                        {{ obra.endereco[:80] }}{% if obra.endereco|length > 80 %}...{% endif %}
+                                    </p>
+                                    <div class="d-flex justify-content-between align-items-center">
+                                        <small class="text-muted">
+                                            {% if obra.data_inicio %}
+                                            Início: {{ obra.data_inicio.strftime('%d/%m/%Y') }}
+                                            {% else %}
+                                            Data não informada
+                                            {% endif %}
+                                        </small>
+                                        <a href="{{ url_for('main.funcionario_novo_rdo', obra_id=obra.id) }}" 
+                                           class="btn btn-sm btn-primary">
+                                            <i class="fas fa-plus"></i> Criar RDO
+                                        </a>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    {% else %}
+                    <div class="text-center py-5">
+                        <i class="fas fa-building fa-4x text-muted mb-3"></i>
+                        <h5 class="text-muted">Nenhuma obra encontrada</h5>
+                        <p class="text-muted">Contate o administrador para adicionar obras.</p>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
