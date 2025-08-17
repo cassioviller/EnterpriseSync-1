@@ -1981,14 +1981,26 @@ def funcionario_criar_rdo():
         ).count()
         numero_rdo = f"RDO-{datetime.now().year}-{contador_rdos + 1:03d}"
         
-        # Criar RDO
+        # Criar RDO com campos padronizados
         rdo = RDO()
         rdo.numero_rdo = numero_rdo
         rdo.obra_id = obra_id
         rdo.data_relatorio = data_relatorio
-        rdo.clima = request.form.get('clima', '').strip()
-        rdo.temperatura = request.form.get('temperatura', '').strip()
-        rdo.condicoes_climaticas = request.form.get('condicoes_climaticas', '').strip()
+        
+        # Campos climáticos padronizados
+        rdo.clima_geral = request.form.get('clima_geral', '').strip()
+        rdo.temperatura_media = request.form.get('temperatura_media', '').strip()
+        rdo.umidade_relativa = request.form.get('umidade_relativa', type=int)
+        rdo.vento_velocidade = request.form.get('vento_velocidade', '').strip()
+        rdo.precipitacao = request.form.get('precipitacao', '').strip()
+        rdo.condicoes_trabalho = request.form.get('condicoes_trabalho', '').strip()
+        rdo.observacoes_climaticas = request.form.get('observacoes_climaticas', '').strip()
+        
+        # Campos legados (manter compatibilidade)
+        rdo.tempo_manha = request.form.get('clima', '').strip()  # Backup
+        rdo.temperatura = request.form.get('temperatura', '').strip()  # Backup
+        rdo.condicoes_climaticas = request.form.get('condicoes_climaticas', '').strip()  # Backup
+        
         rdo.comentario_geral = request.form.get('comentario_geral', '').strip()
         rdo.status = 'Rascunho'
         rdo.criado_por_id = current_user.id
