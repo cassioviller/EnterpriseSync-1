@@ -5,6 +5,7 @@ SIGE (Sistema Integrado de Gestão Empresarial) is a comprehensive business mana
 
 ## User Preferences
 Preferred communication style: Simple, everyday language.
+Template system: Show only user's own templates, no public templates from other users.
 
 ## System Architecture
 

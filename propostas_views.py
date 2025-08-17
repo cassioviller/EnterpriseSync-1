@@ -113,12 +113,9 @@ def test_nova_proposta():
     # Simular usuário Vale Verde (ID 10)
     admin_id = 10
     
-    # Buscar templates como o usuário Vale Verde veria
+    # Buscar apenas templates próprios do usuário (sem públicos)
     templates = PropostaTemplate.query.filter(
-        db.or_(
-            PropostaTemplate.admin_id == admin_id,
-            PropostaTemplate.publico == True
-        ),
+        PropostaTemplate.admin_id == admin_id,
         PropostaTemplate.ativo == True
     ).all()
     
@@ -138,12 +135,9 @@ def nova_proposta_funcionando():
     # Simular usuário Vale Verde (ID 10) - mesmo que o bypass
     admin_id = 10
     
-    # Buscar templates disponíveis
+    # Buscar apenas templates próprios do usuário (sem públicos)
     templates = PropostaTemplate.query.filter(
-        db.or_(
-            PropostaTemplate.admin_id == admin_id,
-            PropostaTemplate.publico == True
-        ),
+        PropostaTemplate.admin_id == admin_id,
         PropostaTemplate.ativo == True
     ).all()
     
@@ -242,15 +236,12 @@ def nova_proposta():
         templates = PropostaTemplate.query.filter_by(ativo=True).all()
         print(f"DEBUG: Super Admin - encontrou {len(templates)} templates")
     else:
-        # Admin vê apenas seus templates OU templates públicos
+        # Admin vê apenas seus próprios templates
         templates = PropostaTemplate.query.filter(
-            db.or_(
-                PropostaTemplate.admin_id == current_user.id,
-                PropostaTemplate.publico == True
-            ),
+            PropostaTemplate.admin_id == current_user.id,
             PropostaTemplate.ativo == True
         ).all()
-        print(f"DEBUG: Admin - encontrou {len(templates)} templates para admin_id={current_user.id} (incluindo públicos)")
+        print(f"DEBUG: Admin - encontrou {len(templates)} templates próprios para admin_id={current_user.id}")
     
     for t in templates:
         print(f"DEBUG: Template {t.id}: {t.nome} (admin_id={t.admin_id}, publico={t.publico})")
