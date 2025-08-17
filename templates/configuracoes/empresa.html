@@ -1,0 +1,193 @@
+{% extends "base.html" %}
+
+{% block title %}Configurações da Empresa{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h1 class="h3 mb-0">
+                    <i class="fas fa-cog me-2"></i>
+                    Configurações da Empresa
+                </h1>
+                <nav aria-label="breadcrumb">
+                    <ol class="breadcrumb mb-0">
+                        <li class="breadcrumb-item"><a href="{{ url_for('main.dashboard') }}">Dashboard</a></li>
+                        <li class="breadcrumb-item"><a href="{{ url_for('configuracoes.configuracoes') }}">Configurações</a></li>
+                        <li class="breadcrumb-item active">Empresa</li>
+                    </ol>
+                </nav>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-lg-8 mx-auto">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-building me-2"></i>
+                        Dados da Empresa
+                    </h5>
+                    <small class="text-muted">Configure as informações que aparecerão nas propostas</small>
+                </div>
+                <div class="card-body">
+                    <form method="POST" action="{{ url_for('configuracoes.salvar_empresa') }}">
+                        <!-- Dados Básicos -->
+                        <div class="row">
+                            <div class="col-md-8">
+                                <div class="mb-3">
+                                    <label for="nome_empresa" class="form-label">Nome da Empresa *</label>
+                                    <input type="text" class="form-control" id="nome_empresa" name="nome_empresa" 
+                                           value="{{ config.nome_empresa if config else '' }}" required>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="mb-3">
+                                    <label for="cnpj" class="form-label">CNPJ</label>
+                                    <input type="text" class="form-control" id="cnpj" name="cnpj" 
+                                           value="{{ config.cnpj if config else '' }}" placeholder="00.000.000/0001-00">
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="endereco" class="form-label">Endereço</label>
+                            <textarea class="form-control" id="endereco" name="endereco" rows="2" 
+                                      placeholder="Rua, número, bairro, cidade - estado">{{ config.endereco if config else '' }}</textarea>
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-4">
+                                <div class="mb-3">
+                                    <label for="telefone" class="form-label">Telefone</label>
+                                    <input type="tel" class="form-control" id="telefone" name="telefone" 
+                                           value="{{ config.telefone if config else '' }}" placeholder="(00) 0000-0000">
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="mb-3">
+                                    <label for="email" class="form-label">E-mail</label>
+                                    <input type="email" class="form-control" id="email" name="email" 
+                                           value="{{ config.email if config else '' }}" placeholder="contato@empresa.com">
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="mb-3">
+                                    <label for="website" class="form-label">Website</label>
+                                    <input type="url" class="form-control" id="website" name="website" 
+                                           value="{{ config.website if config else '' }}" placeholder="https://www.empresa.com">
+                                </div>
+                            </div>
+                        </div>
+
+                        <hr class="my-4">
+
+                        <!-- Configurações Padrão -->
+                        <h6 class="mb-3">
+                            <i class="fas fa-sliders-h me-2"></i>
+                            Configurações Padrão para Propostas
+                        </h6>
+
+                        <div class="row">
+                            <div class="col-md-4">
+                                <div class="mb-3">
+                                    <label for="prazo_entrega_padrao" class="form-label">Prazo de Entrega (dias)</label>
+                                    <input type="number" class="form-control" id="prazo_entrega_padrao" name="prazo_entrega_padrao" 
+                                           value="{{ config.prazo_entrega_padrao if config else 90 }}" min="1">
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="mb-3">
+                                    <label for="validade_padrao" class="form-label">Validade (dias)</label>
+                                    <input type="number" class="form-control" id="validade_padrao" name="validade_padrao" 
+                                           value="{{ config.validade_padrao if config else 7 }}" min="1">
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="mb-3">
+                                    <label for="percentual_nota_fiscal_padrao" class="form-label">% Nota Fiscal</label>
+                                    <input type="number" class="form-control" id="percentual_nota_fiscal_padrao" name="percentual_nota_fiscal_padrao" 
+                                           value="{{ config.percentual_nota_fiscal_padrao if config else 13.5 }}" step="0.1" min="0">
+                                </div>
+                            </div>
+                        </div>
+
+                        <hr class="my-4">
+
+                        <!-- Textos Padrão -->
+                        <h6 class="mb-3">
+                            <i class="fas fa-file-text me-2"></i>
+                            Textos Padrão para Propostas
+                        </h6>
+
+                        <div class="mb-3">
+                            <label for="itens_inclusos_padrao" class="form-label">Itens Inclusos</label>
+                            <textarea class="form-control" id="itens_inclusos_padrao" name="itens_inclusos_padrao" rows="4" 
+                                      placeholder="Liste os itens que geralmente estão inclusos nos serviços...">{{ config.itens_inclusos_padrao if config else '' }}</textarea>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="itens_exclusos_padrao" class="form-label">Itens Exclusos</label>
+                            <textarea class="form-control" id="itens_exclusos_padrao" name="itens_exclusos_padrao" rows="4" 
+                                      placeholder="Liste os itens que geralmente NÃO estão inclusos...">{{ config.itens_exclusos_padrao if config else '' }}</textarea>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="condicoes_pagamento_padrao" class="form-label">Condições de Pagamento</label>
+                            <textarea class="form-control" id="condicoes_pagamento_padrao" name="condicoes_pagamento_padrao" rows="3" 
+                                      placeholder="Descreva as condições de pagamento padrão...">{{ config.condicoes_pagamento_padrao if config else '' }}</textarea>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="garantias_padrao" class="form-label">Garantias</label>
+                            <textarea class="form-control" id="garantias_padrao" name="garantias_padrao" rows="3" 
+                                      placeholder="Descreva as garantias oferecidas...">{{ config.garantias_padrao if config else '' }}</textarea>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="condicoes_padrao" class="form-label">Condições Gerais</label>
+                            <textarea class="form-control" id="condicoes_padrao" name="condicoes_padrao" rows="3" 
+                                      placeholder="Condições gerais do serviço...">{{ config.condicoes_padrao if config else '' }}</textarea>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="observacoes_gerais_padrao" class="form-label">Observações Gerais</label>
+                            <textarea class="form-control" id="observacoes_gerais_padrao" name="observacoes_gerais_padrao" rows="3" 
+                                      placeholder="Observações que aparecem no final das propostas...">{{ config.observacoes_gerais_padrao if config else '' }}</textarea>
+                        </div>
+
+                        <div class="d-flex justify-content-end gap-2 mt-4">
+                            <a href="{{ url_for('configuracoes.configuracoes') }}" class="btn btn-secondary">Cancelar</a>
+                            <button type="submit" class="btn btn-success">
+                                <i class="fas fa-save me-2"></i>
+                                Salvar Configurações
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// Máscaras para campos
+document.getElementById('cnpj').addEventListener('input', function(e) {
+    let value = e.target.value.replace(/\D/g, '');
+    value = value.replace(/^(\d{2})(\d)/, '$1.$2');
+    value = value.replace(/^(\d{2})\.(\d{3})(\d)/, '$1.$2.$3');
+    value = value.replace(/\.(\d{3})(\d)/, '.$1/$2');
+    value = value.replace(/(\d{4})(\d)/, '$1-$2');
+    e.target.value = value;
+});
+
+document.getElementById('telefone').addEventListener('input', function(e) {
+    let value = e.target.value.replace(/\D/g, '');
+    value = value.replace(/^(\d{2})(\d)/, '($1) $2');
+    value = value.replace(/(\d{4})(\d)/, '$1-$2');
+    e.target.value = value;
+});
+</script>
+{% endblock %}

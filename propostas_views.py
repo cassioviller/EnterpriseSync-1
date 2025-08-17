@@ -13,7 +13,7 @@ import uuid
 import mimetypes
 
 from app import db
-from models import PropostaComercialSIGE, PropostaItem, PropostaArquivo, PropostaTemplate
+from models import PropostaComercialSIGE, PropostaItem, PropostaArquivo, PropostaTemplate, ConfiguracaoEmpresa
 
 # Criar blueprint
 propostas_bp = Blueprint('propostas', __name__, url_prefix='/propostas')
@@ -237,7 +237,13 @@ def nova_proposta():
         print(f"DEBUG: Template {t.id}: {t.nome} (admin_id={t.admin_id}, publico={t.publico})")
     
     print(f"DEBUG: Enviando {len(templates)} templates para o template HTML")
-    return render_template('propostas/nova_proposta.html', templates=templates)
+    
+    # Obter configurações da empresa
+    config_empresa = ConfiguracaoEmpresa.query.filter_by(admin_id=admin_id).first()
+    
+    return render_template('propostas/nova_proposta.html', 
+                         templates=templates, 
+                         config_empresa=config_empresa)
 
 @propostas_bp.route('/criar', methods=['POST'])
 @login_required
@@ -478,8 +484,14 @@ def gerar_pdf(id):
     """Gera PDF da proposta"""
     proposta = PropostaComercialSIGE.query.get_or_404(id)
     
+    # Buscar configurações da empresa
+    admin_id = getattr(current_user, 'admin_id', 10)
+    config_empresa = ConfiguracaoEmpresa.query.filter_by(admin_id=admin_id).first()
+    
     # Renderizar HTML da proposta
-    html_content = render_template('propostas/pdf.html', proposta=proposta)
+    html_content = render_template('propostas/pdf.html', 
+                                 proposta=proposta, 
+                                 config_empresa=config_empresa)
     
     # Aqui seria implementada a geração de PDF
     # Por enquanto, retorna o HTML para visualização

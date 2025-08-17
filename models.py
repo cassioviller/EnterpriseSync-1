@@ -2158,6 +2158,63 @@ class ServicoTemplate(db.Model):
     
     criado_em = db.Column(db.DateTime, default=datetime.utcnow)
     atualizado_em = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+# Configurações da Empresa
+class ConfiguracaoEmpresa(db.Model):
+    """Configurações centrais da empresa para reutilização em propostas"""
+    __tablename__ = 'configuracao_empresa'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False)
+    
+    # Dados da empresa
+    nome_empresa = db.Column(db.String(200), nullable=False)
+    cnpj = db.Column(db.String(20))
+    endereco = db.Column(db.Text)
+    telefone = db.Column(db.String(20))
+    email = db.Column(db.String(120))
+    website = db.Column(db.String(200))
+    logo_url = db.Column(db.String(500))
+    
+    # Dados padrão para propostas
+    itens_inclusos_padrao = db.Column(db.Text)
+    itens_exclusos_padrao = db.Column(db.Text)
+    condicoes_padrao = db.Column(db.Text)
+    condicoes_pagamento_padrao = db.Column(db.Text)
+    garantias_padrao = db.Column(db.Text)
+    observacoes_gerais_padrao = db.Column(db.Text)
+    
+    # Configurações padrão
+    prazo_entrega_padrao = db.Column(db.Integer, default=90)
+    validade_padrao = db.Column(db.Integer, default=7)
+    percentual_nota_fiscal_padrao = db.Column(db.Numeric(5,2), default=13.5)
+    
+    criado_em = db.Column(db.DateTime, default=datetime.utcnow)
+    atualizado_em = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    def __repr__(self):
+        return f'<ConfiguracaoEmpresa {self.nome_empresa}>'
+    
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'nome_empresa': self.nome_empresa,
+            'cnpj': self.cnpj,
+            'endereco': self.endereco,
+            'telefone': self.telefone,
+            'email': self.email,
+            'website': self.website,
+            'logo_url': self.logo_url,
+            'itens_inclusos_padrao': self.itens_inclusos_padrao,
+            'itens_exclusos_padrao': self.itens_exclusos_padrao,
+            'condicoes_padrao': self.condicoes_padrao,
+            'condicoes_pagamento_padrao': self.condicoes_pagamento_padrao,
+            'garantias_padrao': self.garantias_padrao,
+            'observacoes_gerais_padrao': self.observacoes_gerais_padrao,
+            'prazo_entrega_padrao': self.prazo_entrega_padrao,
+            'validade_padrao': self.validade_padrao,
+            'percentual_nota_fiscal_padrao': float(self.percentual_nota_fiscal_padrao) if self.percentual_nota_fiscal_padrao else 13.5
+        }
     
     def to_dict(self):
         return {

@@ -5,7 +5,19 @@
 <div class="container-fluid">
     <div class="card">
         <div class="card-header">
-            <h5 class="mb-0"><i class="fas fa-plus me-2"></i> Nova Proposta Comercial</h5>
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <h5 class="mb-0"><i class="fas fa-plus me-2"></i> Nova Proposta Comercial</h5>
+                    {% if config_empresa %}
+                    <small class="text-muted">{{ config_empresa.nome_empresa }}</small>
+                    {% else %}
+                    <small class="text-warning">⚠️ Configure os dados da empresa em <a href="{{ url_for('configuracoes.empresa') }}">Configurações</a></small>
+                    {% endif %}
+                </div>
+                <a href="{{ url_for('configuracoes.empresa') }}" class="btn btn-outline-secondary btn-sm">
+                    <i class="fas fa-cog me-1"></i> Configurar Empresa
+                </a>
+            </div>
         </div>
         <div class="card-body">
             <form method="POST" id="formNovaProposta">
@@ -384,47 +396,72 @@ function carregarServicosTemplate(templateId) {
                         calcularServico(servicoAtual.querySelector('.servico-quantidade'));
                     });
                     
+                    // Recalcular total após carregar todos os serviços
+                    calcularTotal();
+                    
                     // Carregar campos adicionais do template
                     const template = data.template;
                     
-                    // Atualizar prazo se disponível
-                    if (template.prazo_entrega_dias) {
-                        document.querySelector('input[name="prazo_entrega_dias"]').value = template.prazo_entrega_dias;
+                    // Carregar dados da empresa se disponível (prioridade)
+                    {% if config_empresa %}
+                    const configEmpresa = {
+                        prazo_entrega_padrao: {{ config_empresa.prazo_entrega_padrao or 'null' }},
+                        validade_padrao: {{ config_empresa.validade_padrao or 'null' }},
+                        percentual_nota_fiscal_padrao: {{ config_empresa.percentual_nota_fiscal_padrao or 'null' }},
+                        itens_inclusos_padrao: `{{ config_empresa.itens_inclusos_padrao or '' }}`,
+                        itens_exclusos_padrao: `{{ config_empresa.itens_exclusos_padrao or '' }}`,
+                        condicoes_padrao: `{{ config_empresa.condicoes_padrao or '' }}`,
+                        condicoes_pagamento_padrao: `{{ config_empresa.condicoes_pagamento_padrao or '' }}`,
+                        garantias_padrao: `{{ config_empresa.garantias_padrao or '' }}`
+                    };
+                    {% endif %}
+                    
+                    // Atualizar prazo (template ou config empresa)
+                    const prazo = template.prazo_entrega_dias || {% if config_empresa %}configEmpresa.prazo_entrega_padrao{% else %}90{% endif %};
+                    if (prazo) {
+                        document.querySelector('input[name="prazo_entrega_dias"]').value = prazo;
                     }
                     
-                    // Carregar itens inclusos
-                    if (template.itens_inclusos) {
-                        document.querySelector('textarea[name="itens_inclusos"]').value = template.itens_inclusos;
+                    // Carregar itens inclusos (template ou config empresa)
+                    const itensInclusos = template.itens_inclusos || {% if config_empresa %}`${configEmpresa.itens_inclusos_padrao}`{% else %}''{% endif %};
+                    if (itensInclusos) {
+                        document.querySelector('textarea[name="itens_inclusos"]').value = itensInclusos;
                     }
                     
-                    // Carregar itens exclusos
-                    if (template.itens_exclusos) {
-                        document.querySelector('textarea[name="itens_exclusos"]').value = template.itens_exclusos;
+                    // Carregar itens exclusos (template ou config empresa)
+                    const itensExclusos = template.itens_exclusos || {% if config_empresa %}`${configEmpresa.itens_exclusos_padrao}`{% else %}''{% endif %};
+                    if (itensExclusos) {
+                        document.querySelector('textarea[name="itens_exclusos"]').value = itensExclusos;
                     }
                     
-                    // Carregar condições
-                    if (template.condicoes) {
-                        document.querySelector('textarea[name="condicoes"]').value = template.condicoes;
+                    // Carregar condições (template ou config empresa)
+                    const condicoes = template.condicoes || {% if config_empresa %}`${configEmpresa.condicoes_padrao}`{% else %}''{% endif %};
+                    if (condicoes) {
+                        document.querySelector('textarea[name="condicoes"]').value = condicoes;
                     }
                     
-                    // Carregar condições de pagamento
-                    if (template.condicoes_pagamento) {
-                        document.querySelector('textarea[name="condicoes_pagamento"]').value = template.condicoes_pagamento;
+                    // Carregar condições de pagamento (template ou config empresa)
+                    const condicoesPagamento = template.condicoes_pagamento || {% if config_empresa %}`${configEmpresa.condicoes_pagamento_padrao}`{% else %}''{% endif %};
+                    if (condicoesPagamento) {
+                        document.querySelector('textarea[name="condicoes_pagamento"]').value = condicoesPagamento;
                     }
                     
-                    // Carregar garantias
-                    if (template.garantias) {
-                        document.querySelector('textarea[name="garantias"]').value = template.garantias;
+                    // Carregar garantias (template ou config empresa)
+                    const garantias = template.garantias || {% if config_empresa %}`${configEmpresa.garantias_padrao}`{% else %}''{% endif %};
+                    if (garantias) {
+                        document.querySelector('textarea[name="garantias"]').value = garantias;
                     }
                     
-                    // Carregar validade
-                    if (template.validade_dias) {
-                        document.querySelector('input[name="validade_dias"]').value = template.validade_dias;
+                    // Carregar validade (template ou config empresa)
+                    const validade = template.validade_dias || {% if config_empresa %}configEmpresa.validade_padrao{% else %}7{% endif %};
+                    if (validade) {
+                        document.querySelector('input[name="validade_dias"]').value = validade;
                     }
                     
-                    // Carregar percentual nota fiscal
-                    if (template.percentual_nota_fiscal) {
-                        document.querySelector('input[name="percentual_nota_fiscal"]').value = template.percentual_nota_fiscal;
+                    // Carregar percentual nota fiscal (template ou config empresa)
+                    const percentualNF = template.percentual_nota_fiscal || {% if config_empresa %}configEmpresa.percentual_nota_fiscal_padrao{% else %}13.5{% endif %};
+                    if (percentualNF) {
+                        document.querySelector('input[name="percentual_nota_fiscal"]').value = percentualNF;
                     }
                     
                     alert(`Template "${template.nome}" carregado com ${itens.length} serviços e campos preenchidos!`);

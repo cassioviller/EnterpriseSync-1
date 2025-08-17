@@ -170,6 +170,16 @@ with app.app_context():
     except Exception as e:
         logging.error(f"❌ Erro ao registrar blueprint propostas: {e}")
     
+    # Registrar blueprint de configurações
+    try:
+        from configuracoes_views import configuracoes_bp
+        app.register_blueprint(configuracoes_bp)
+        logging.info("✅ Blueprint configurações registrado")
+    except ImportError as e:
+        logging.warning(f"⚠️ Blueprint configurações não encontrado: {e}")
+    except Exception as e:
+        logging.error(f"❌ Erro ao registrar blueprint configurações: {e}")
+    
     # Migrate photos if necessary
     try:
         import base64

@@ -114,10 +114,16 @@
     <!-- Cabeçalho da Empresa -->
     <div class="header">
         <div class="company-info">
-            <h1>ESTRUTURAS DO VALE</h1>
+            {% if config_empresa %}
+            <h1>{{ config_empresa.nome_empresa.upper() }}</h1>
             <p>Estruturas Metálicas e Construção Civil</p>
-            <p>CNPJ: XX.XXX.XXX/XXXX-XX | Telefone: (XX) XXXXX-XXXX</p>
-            <p>Email: contato@estruturasdovale.com.br</p>
+            {% if config_empresa.cnpj %}<p>CNPJ: {{ config_empresa.cnpj }}{% endif %}{% if config_empresa.telefone %} | Telefone: {{ config_empresa.telefone }}{% endif %}</p>
+            {% if config_empresa.email %}<p>Email: {{ config_empresa.email }}{% endif %}{% if config_empresa.website %} | Website: {{ config_empresa.website }}{% endif %}</p>
+            {% else %}
+            <h1>NOME DA EMPRESA</h1>
+            <p>Configure os dados da empresa nas configurações</p>
+            <p>Telefone: (00) 0000-0000 | Email: contato@empresa.com</p>
+            {% endif %}
         </div>
         
         <div class="proposal-title">
