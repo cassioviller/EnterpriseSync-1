@@ -1,0 +1,511 @@
+{% extends "base.html" %}
+
+{% block title %}RDO Mobile - {{ funcionario.nome if funcionario else 'Funcionário' }}{% endblock %}
+
+{% block head %}
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<style>
+/* Mobile-first CSS optimizations */
+.mobile-container {
+    padding: 10px;
+    max-width: 100%;
+}
+
+.mobile-card {
+    border-radius: 12px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    margin-bottom: 15px;
+    border: none;
+}
+
+.mobile-btn {
+    font-size: 16px;
+    padding: 12px 20px;
+    border-radius: 8px;
+    font-weight: 500;
+    width: 100%;
+    margin-bottom: 10px;
+}
+
+.mobile-input {
+    font-size: 16px;
+    padding: 12px;
+    border-radius: 8px;
+    border: 2px solid #e9ecef;
+    margin-bottom: 15px;
+}
+
+.mobile-input:focus {
+    border-color: #0d6efd;
+    box-shadow: 0 0 0 0.2rem rgba(13,110,253,0.25);
+}
+
+.section-header {
+    background: linear-gradient(135deg, #0d6efd 0%, #0056b3 100%);
+    color: white;
+    padding: 15px;
+    border-radius: 8px 8px 0 0;
+    font-weight: 600;
+}
+
+.form-section {
+    background: #f8f9fa;
+    border-radius: 8px;
+    margin-bottom: 20px;
+    overflow: hidden;
+}
+
+.form-section-body {
+    padding: 20px;
+}
+
+.quick-add-btn {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    width: 60px;
+    height: 60px;
+    border-radius: 50%;
+    background: #28a745;
+    color: white;
+    border: none;
+    font-size: 24px;
+    box-shadow: 0 4px 12px rgba(40,167,69,0.3);
+    z-index: 1000;
+}
+
+.item-card {
+    background: white;
+    border-radius: 8px;
+    padding: 15px;
+    margin-bottom: 10px;
+    border-left: 4px solid #0d6efd;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+}
+
+.remove-btn {
+    background: #dc3545;
+    color: white;
+    border: none;
+    border-radius: 50%;
+    width: 30px;
+    height: 30px;
+    font-size: 14px;
+    line-height: 1;
+}
+
+.progress-bar-mobile {
+    height: 30px;
+    font-size: 14px;
+    font-weight: bold;
+}
+
+/* Touch-friendly spacing */
+.touch-spacing {
+    margin: 20px 0;
+}
+
+/* Keyboard optimization */
+.numeric-input {
+    -webkit-appearance: none;
+    -moz-appearance: textfield;
+}
+
+.numeric-input::-webkit-outer-spin-button,
+.numeric-input::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+}
+
+/* Loading states */
+.loading {
+    opacity: 0.6;
+    pointer-events: none;
+}
+
+.loading::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    margin: -12px 0 0 -12px;
+    width: 24px;
+    height: 24px;
+    border: 2px solid #f3f3f3;
+    border-top: 2px solid #0d6efd;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+/* Dark mode support */
+@media (prefers-color-scheme: dark) {
+    .mobile-card {
+        background-color: #2d3748;
+        color: white;
+    }
+    
+    .mobile-input {
+        background-color: #4a5568;
+        color: white;
+        border-color: #718096;
+    }
+    
+    .item-card {
+        background-color: #4a5568;
+        color: white;
+    }
+}
+
+/* Responsive adjustments */
+@media (max-width: 576px) {
+    .mobile-container {
+        padding: 5px;
+    }
+    
+    .mobile-card {
+        margin-bottom: 10px;
+    }
+    
+    .section-header {
+        padding: 12px;
+        font-size: 14px;
+    }
+    
+    .form-section-body {
+        padding: 15px;
+    }
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="mobile-container">
+    <!-- Header Mobile -->
+    <div class="mobile-card">
+        <div class="section-header">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <i class="fas fa-mobile-alt me-2"></i>
+                    RDO Mobile
+                </div>
+                <button class="btn btn-sm btn-outline-light" onclick="toggleFullscreen()">
+                    <i class="fas fa-expand"></i>
+                </button>
+            </div>
+        </div>
+        <div class="card-body p-3">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <small class="text-muted">Bem-vindo</small>
+                    <h6 class="mb-0">{{ funcionario.nome if funcionario else 'Funcionário' }}</h6>
+                </div>
+                <div class="text-end">
+                    <small class="text-muted" id="current-date"></small>
+                    <br>
+                    <small class="badge bg-primary" id="status-badge">Online</small>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Quick Actions -->
+    <div class="mobile-card">
+        <div class="card-body p-3">
+            <div class="row g-2">
+                <div class="col-6">
+                    <button class="mobile-btn btn btn-primary" onclick="window.location.href='{{ url_for('main.funcionario_novo_rdo') }}'">
+                        <i class="fas fa-plus mb-1 d-block"></i>
+                        Novo RDO
+                    </button>
+                </div>
+                <div class="col-6">
+                    <button class="mobile-btn btn btn-outline-primary" onclick="window.location.href='{{ url_for('main.funcionario_lista_rdos') }}'">
+                        <i class="fas fa-list mb-1 d-block"></i>
+                        Meus RDOs
+                    </button>
+                </div>
+                <div class="col-6">
+                    <button class="mobile-btn btn btn-outline-secondary" onclick="loadObras()">
+                        <i class="fas fa-building mb-1 d-block"></i>
+                        Obras
+                    </button>
+                </div>
+                <div class="col-6">
+                    <button class="mobile-btn btn btn-outline-success" onclick="criarRdoTeste()">
+                        <i class="fas fa-flask mb-1 d-block"></i>
+                        RDO Teste
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Status Cards -->
+    <div class="row g-2">
+        <div class="col-6">
+            <div class="mobile-card">
+                <div class="card-body text-center p-3">
+                    <i class="fas fa-file-alt fa-2x text-primary mb-2"></i>
+                    <h6 class="mb-1">{{ total_rdos or 0 }}</h6>
+                    <small class="text-muted">RDOs</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-6">
+            <div class="mobile-card">
+                <div class="card-body text-center p-3">
+                    <i class="fas fa-building fa-2x text-success mb-2"></i>
+                    <h6 class="mb-1">{{ total_obras or 0 }}</h6>
+                    <small class="text-muted">Obras</small>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- RDOs Recentes -->
+    <div class="mobile-card">
+        <div class="section-header">
+            <i class="fas fa-clock me-2"></i>RDOs Recentes
+        </div>
+        <div class="card-body p-0">
+            {% if rdos_recentes %}
+                {% for rdo in rdos_recentes[:3] %}
+                <div class="item-card m-3">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <strong>{{ rdo.numero_rdo }}</strong>
+                            <br>
+                            <small class="text-muted">{{ rdo.obra.nome }}</small>
+                            <br>
+                            <small class="text-muted">{{ rdo.data_relatorio.strftime('%d/%m/%Y') }}</small>
+                        </div>
+                        <div class="text-end">
+                            {% if rdo.status == 'Finalizado' %}
+                            <span class="badge bg-success mb-2">Finalizado</span>
+                            {% else %}
+                            <span class="badge bg-warning mb-2">Rascunho</span>
+                            {% endif %}
+                            <br>
+                            <a href="{{ url_for('main.funcionario_visualizar_rdo', id=rdo.id) }}" 
+                               class="btn btn-sm btn-outline-primary">
+                                <i class="fas fa-eye"></i>
+                            </a>
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            {% else %}
+            <div class="text-center p-4">
+                <i class="fas fa-file-alt fa-3x text-muted mb-3"></i>
+                <p class="text-muted">Nenhum RDO encontrado</p>
+                <button class="btn btn-primary" onclick="window.location.href='{{ url_for('main.funcionario_novo_rdo') }}'">
+                    Criar Primeiro RDO
+                </button>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<!-- Floating Action Button -->
+<button class="quick-add-btn" onclick="quickCreateRDO()" title="Criar RDO Rápido">
+    <i class="fas fa-plus"></i>
+</button>
+
+<!-- Modals para mobile -->
+<div class="modal fade" id="obraModal" tabindex="-1">
+    <div class="modal-dialog modal-fullscreen-sm-down">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Selecionar Obra</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" id="obrasContainer">
+                <div class="text-center">
+                    <div class="spinner-border" role="status">
+                        <span class="visually-hidden">Carregando...</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// Mobile-optimized JavaScript
+let isOnline = navigator.onLine;
+let cachedData = JSON.parse(localStorage.getItem('rdoMobileData') || '{}');
+
+// PWA-like functionality
+if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('/sw.js').catch(console.error);
+}
+
+// Network status
+window.addEventListener('online', () => {
+    isOnline = true;
+    document.querySelector('.badge').textContent = 'Online';
+    document.querySelector('.badge').className = 'badge bg-success';
+    syncData();
+});
+
+window.addEventListener('offline', () => {
+    isOnline = false;
+    document.querySelector('.badge').textContent = 'Offline';
+    document.querySelector('.badge').className = 'badge bg-danger';
+});
+
+// Touch-friendly functions
+function toggleFullscreen() {
+    if (!document.fullscreenElement) {
+        document.documentElement.requestFullscreen().catch(console.error);
+    } else {
+        document.exitFullscreen();
+    }
+}
+
+function loadObras() {
+    const modal = new bootstrap.Modal(document.getElementById('obraModal'));
+    modal.show();
+    
+    fetch('/api/funcionario/obras')
+        .then(response => response.json())
+        .then(data => {
+            const container = document.getElementById('obrasContainer');
+            if (data.success && data.obras.length > 0) {
+                container.innerHTML = data.obras.map(obra => `
+                    <div class="item-card" onclick="selectObra(${obra.id}, '${obra.nome}')">
+                        <strong>${obra.nome}</strong>
+                        <br>
+                        <small class="text-muted">${obra.endereco}</small>
+                    </div>
+                `).join('');
+            } else {
+                container.innerHTML = '<p class="text-center text-muted">Nenhuma obra disponível</p>';
+            }
+        })
+        .catch(error => {
+            console.error('Erro ao carregar obras:', error);
+            document.getElementById('obrasContainer').innerHTML = 
+                '<p class="text-center text-danger">Erro ao carregar obras</p>';
+        });
+}
+
+function selectObra(obraId, obraNome) {
+    bootstrap.Modal.getInstance(document.getElementById('obraModal')).hide();
+    window.location.href = `{{ url_for('main.funcionario_novo_rdo') }}?obra_id=${obraId}`;
+}
+
+function quickCreateRDO() {
+    // Vibração haptic para dispositivos móveis
+    if (navigator.vibrate) {
+        navigator.vibrate(50);
+    }
+    
+    window.location.href = '{{ url_for("main.funcionario_novo_rdo") }}';
+}
+
+function syncData() {
+    if (!isOnline) {
+        alert('Sem conexão com a internet');
+        return;
+    }
+    
+    const syncBtn = document.querySelector('[onclick="syncData()"]');
+    syncBtn.classList.add('loading');
+    
+    Promise.all([
+        fetch('/api/funcionario/obras'),
+        fetch('/api/funcionario/funcionarios'),
+        fetch('/api/verificar-acesso')
+    ])
+    .then(responses => Promise.all(responses.map(r => r.json())))
+    .then(([obras, funcionarios, acesso]) => {
+        cachedData = { obras, funcionarios, acesso, timestamp: Date.now() };
+        localStorage.setItem('rdoMobileData', JSON.stringify(cachedData));
+        
+        // Feedback visual
+        syncBtn.innerHTML = '<i class="fas fa-check mb-1 d-block"></i>Sincronizado';
+        setTimeout(() => {
+            syncBtn.innerHTML = '<i class="fas fa-sync mb-1 d-block"></i>Sincronizar';
+            syncBtn.classList.remove('loading');
+        }, 2000);
+    })
+    .catch(error => {
+        console.error('Erro na sincronização:', error);
+        syncBtn.classList.remove('loading');
+        alert('Erro na sincronização');
+    });
+}
+
+// Atualizar data atual
+function updateCurrentDate() {
+    const now = new Date();
+    const dateStr = now.toLocaleDateString('pt-BR');
+    document.getElementById('current-date').textContent = dateStr;
+}
+
+// Criar RDO de teste
+function criarRdoTeste() {
+    if (navigator.vibrate) {
+        navigator.vibrate(100);
+    }
+    
+    const btn = event.target;
+    btn.innerHTML = '<div class="spinner-border spinner-border-sm"></div> Criando...';
+    btn.disabled = true;
+    
+    fetch('/funcionario/criar-rdo-teste', {
+        method: 'GET',
+        headers: {
+            'X-Requested-With': 'XMLHttpRequest'
+        }
+    })
+    .then(response => {
+        if (response.redirected) {
+            window.location.href = response.url;
+        } else {
+            return response.text();
+        }
+    })
+    .catch(error => {
+        console.error('Erro ao criar RDO teste:', error);
+        alert('Erro ao criar RDO de teste');
+        btn.innerHTML = '<i class="fas fa-flask mb-1 d-block"></i>RDO Teste';
+        btn.disabled = false;
+    });
+}
+
+// Auto-sync on page load
+document.addEventListener('DOMContentLoaded', () => {
+    updateCurrentDate();
+    setInterval(updateCurrentDate, 60000); // Atualizar a cada minuto
+    
+    if (isOnline && (!cachedData.timestamp || Date.now() - cachedData.timestamp > 300000)) {
+        syncData();
+    }
+});
+
+// Prevent zoom on input focus
+document.addEventListener('touchstart', function(e) {
+    if (e.touches.length > 1) {
+        e.preventDefault();
+    }
+});
+
+// Double-tap prevention
+let lastTouchEnd = 0;
+document.addEventListener('touchend', function(event) {
+    const now = (new Date()).getTime();
+    if (now - lastTouchEnd <= 300) {
+        event.preventDefault();
+    }
+    lastTouchEnd = now;
+}, false);
+</script>
+{% endblock %}

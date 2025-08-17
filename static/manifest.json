@@ -1,0 +1,22 @@
+{
+    "name": "SIGE Mobile - RDO",
+    "short_name": "SIGE RDO",
+    "description": "Sistema Integrado de Gestão Empresarial - Relatórios Diários de Obra",
+    "start_url": "/funcionario-mobile",
+    "display": "standalone",
+    "background_color": "#ffffff",
+    "theme_color": "#0d6efd",
+    "orientation": "portrait",
+    "icons": [
+        {
+            "src": "data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTkyIiBoZWlnaHQ9IjE5MiIgdmlld0JveD0iMCAwIDE5MiAxOTIiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxwYXRoIGQ9Ik05NiAwQzQzIDAgMCA0MyAwIDk2UzQzIDE5MiA5NiAxOTJTMTkyIDE0OSAxOTIgOTZTMTQ5IDAgOTYgMFoiIGZpbGw9IiMwZDZlZmQiLz4KPHN2ZyB3aWR0aD0iMTIwIiBoZWlnaHQ9IjEyMCIgeD0iMzYiIHk9IjM2IiB2aWV3Qm94PSIwIDAgMjQgMjQiIGZpbGw9Im5vbmUiIHN0cm9rZT0iI2ZmZmZmZiIgc3Ryb2tlLXdpZHRoPSIyIiBzdHJva2UtbGluZWNhcD0icm91bmQiIHN0cm9rZS1saW5lam9pbj0icm91bmQiPgo8cGF0aCBkPSJNMTQgMnY0YTIgMiAwIDAgMCAyIDJoNCIvPgo8cGF0aCBkPSJtMTUgMTUtNy03Ii8+CjxwYXRoIGQ9Im04IDE1IDctNyIvPgo8cGF0aCBkPSJNMjAgNi41VjE4YTIgMiAwIDAgMS0yIDJINmEyIDIgMCAwIDEtMi0yVjZhMiAyIDAgMCAxIDItMmgxMS41eiIvPgo8L3N2Zz4K",
+            "sizes": "192x192",
+            "type": "image/svg+xml"
+        },
+        {
+            "src": "data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNTEyIiBoZWlnaHQ9IjUxMiIgdmlld0JveD0iMCAwIDUxMiA1MTIiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxwYXRoIGQ9Ik0yNTYgMEMxMTQuNiAwIDAgMTE0LjYgMCAyNTZTMTE0LjYgNTEyIDI1NiA1MTJTNTL" fill="#0d6efd"/>
+            "sizes": "512x512",
+            "type": "image/svg+xml"
+        }
+    ]
+}

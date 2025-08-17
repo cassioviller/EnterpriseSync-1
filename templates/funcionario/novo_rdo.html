@@ -2,6 +2,146 @@
 
 {% block title %}Novo RDO - Funcionário - SIGE{% endblock %}
 
+{% block head %}
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<style>
+/* Mobile-first optimizations */
+.mobile-optimized {
+    font-size: 16px; /* Prevent zoom on iOS */
+}
+
+.form-control, .form-select {
+    font-size: 16px;
+    padding: 12px;
+    border-radius: 8px;
+    touch-action: manipulation;
+}
+
+.btn {
+    padding: 12px 20px;
+    font-size: 16px;
+    border-radius: 8px;
+    touch-action: manipulation;
+}
+
+.mobile-section {
+    background: #f8f9fa;
+    border-radius: 12px;
+    margin-bottom: 20px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+
+.mobile-section-header {
+    background: linear-gradient(135deg, #0d6efd 0%, #0056b3 100%);
+    color: white;
+    padding: 15px 20px;
+    border-radius: 12px 12px 0 0;
+    font-weight: 600;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+}
+
+.mobile-section-body {
+    padding: 20px;
+}
+
+.floating-save {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    z-index: 1000;
+    border-radius: 50px;
+    padding: 15px 25px;
+    box-shadow: 0 4px 12px rgba(13,110,253,0.3);
+}
+
+.item-container {
+    background: white;
+    border-radius: 8px;
+    padding: 15px;
+    margin-bottom: 15px;
+    border-left: 4px solid #0d6efd;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+}
+
+.add-item-btn {
+    width: 100%;
+    padding: 15px;
+    border: 2px dashed #0d6efd;
+    background: transparent;
+    color: #0d6efd;
+    border-radius: 8px;
+    font-weight: 500;
+}
+
+.add-item-btn:hover {
+    background: #0d6efd;
+    color: white;
+}
+
+.progress-display {
+    background: #e9ecef;
+    border-radius: 8px;
+    padding: 8px;
+    text-align: center;
+    font-weight: bold;
+    margin-top: 5px;
+}
+
+/* Haptic feedback simulation */
+.btn:active {
+    transform: scale(0.98);
+    transition: transform 0.1s;
+}
+
+/* Loading states */
+.loading-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0,0,0,0.5);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 9999;
+}
+
+.spinner {
+    width: 50px;
+    height: 50px;
+    border: 5px solid #f3f3f3;
+    border-top: 5px solid #0d6efd;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+/* Responsive improvements */
+@media (max-width: 768px) {
+    .container-fluid {
+        padding: 10px;
+    }
+    
+    .mobile-section-body {
+        padding: 15px;
+    }
+    
+    .floating-save {
+        bottom: 15px;
+        right: 15px;
+        padding: 12px 20px;
+    }
+}
+</style>
+{% endblock %}
+
 {% block content %}
 <div class="container-fluid">
     <div class="row">

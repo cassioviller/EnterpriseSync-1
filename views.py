@@ -40,7 +40,14 @@ def login():
             elif user.tipo_usuario == TipoUsuario.ADMIN:
                 return redirect(url_for('main.dashboard'))
             else:
-                return redirect(url_for('main.funcionario_dashboard'))
+                # Verificar se é mobile para redirecionar adequadamente
+                user_agent = request.headers.get('User-Agent', '').lower()
+                is_mobile = any(device in user_agent for device in ['mobile', 'android', 'iphone', 'ipad'])
+                
+                if is_mobile:
+                    return redirect(url_for('main.funcionario_mobile_dashboard'))
+                else:
+                    return redirect(url_for('main.funcionario_dashboard'))
         else:
             flash('Email/Username ou senha inválidos.', 'danger')
     
@@ -1260,6 +1267,18 @@ def super_admin_dashboard():
 @main_bp.route('/funcionario-dashboard')
 @funcionario_required
 def funcionario_dashboard():
+    """Dashboard principal para funcionários"""
+    # Detectar se é acesso mobile
+    user_agent = request.headers.get('User-Agent', '').lower()
+    is_mobile = any(device in user_agent for device in ['mobile', 'android', 'iphone', 'ipad'])
+    
+    # Se for mobile, redirecionar para interface otimizada
+    if is_mobile or request.args.get('mobile') == '1':
+        return redirect(url_for('main.funcionario_mobile_dashboard'))
+    
+    return funcionario_dashboard_desktop()
+
+def funcionario_dashboard_desktop():
     """Dashboard específico para funcionários"""
     try:
         # Buscar funcionário pelo admin_id do usuário
@@ -2241,6 +2260,246 @@ def verificar_acesso_multitenant():
     except Exception as e:
         print(f"ERRO VERIFICAR ACESSO: {str(e)}")
         return jsonify({'error': str(e), 'success': False}), 500
+
+@main_bp.route('/test-login-funcionario')
+def test_login_funcionario():
+    """Login de teste para funcionário - APENAS PARA DEMONSTRAÇÃO"""
+    try:
+        # Buscar usuário funcionário teste
+        usuario_teste = Usuario.query.filter_by(
+            email='funcionario.teste@valeverde.com'
+        ).first()
+        
+        if not usuario_teste:
+            flash('Usuário teste não encontrado. Criando...', 'info')
+            return redirect(url_for('main.criar_usuario_teste'))
+        
+        # Fazer login do usuário teste
+        login_user(usuario_teste, remember=True)
+        flash(f'Login de teste realizado como {usuario_teste.nome}!', 'success')
+        
+        # Redirecionar para dashboard mobile se for mobile
+        user_agent = request.headers.get('User-Agent', '').lower()
+        is_mobile = any(device in user_agent for device in ['mobile', 'android', 'iphone', 'ipad'])
+        
+        if is_mobile:
+            return redirect(url_for('main.funcionario_mobile_dashboard'))
+        else:
+            return redirect(url_for('main.funcionario_dashboard'))
+            
+    except Exception as e:
+        print(f"ERRO LOGIN TESTE: {str(e)}")
+        flash('Erro no login de teste.', 'error')
+        return redirect(url_for('main.index'))
+
+@main_bp.route('/criar-usuario-teste')
+def criar_usuario_teste():
+    """Criar usuário funcionário para teste"""
+    try:
+        # Verificar se já existe
+        usuario_existente = Usuario.query.filter_by(
+            email='funcionario.teste@valeverde.com'
+        ).first()
+        
+        if usuario_existente:
+            flash('Usuário teste já existe!', 'info')
+            return redirect(url_for('main.test_login_funcionario'))
+        
+        # Criar usuário teste
+        usuario_teste = Usuario()
+        usuario_teste.username = 'funcionario.teste'
+        usuario_teste.email = 'funcionario.teste@valeverde.com'
+        usuario_teste.password_hash = generate_password_hash('123456')
+        usuario_teste.nome = 'Funcionário Teste Mobile'
+        usuario_teste.ativo = True
+        usuario_teste.tipo_usuario = TipoUsuario.FUNCIONARIO
+        usuario_teste.admin_id = 10  # Vale Verde admin
+        usuario_teste.created_at = datetime.now()
+        
+        db.session.add(usuario_teste)
+        db.session.commit()
+        
+        flash('Usuário teste criado com sucesso!', 'success')
+        return redirect(url_for('main.test_login_funcionario'))
+        
+    except Exception as e:
+        db.session.rollback()
+        print(f"ERRO CRIAR USUÁRIO TESTE: {str(e)}")
+        flash('Erro ao criar usuário teste.', 'error')
+        return redirect(url_for('main.index'))
+
+@main_bp.route('/debug-funcionario')
+def debug_funcionario():
+    """Página de debug para testar sistema funcionário"""
+    return render_template('debug_funcionario.html')
+
+@main_bp.route('/funcionario-mobile')
+@funcionario_required
+def funcionario_mobile_dashboard():
+    """Dashboard mobile otimizado para funcionários"""
+    try:
+        # Buscar funcionário pelo admin_id do usuário
+        funcionarios = Funcionario.query.filter_by(
+            admin_id=current_user.admin_id, 
+            ativo=True
+        ).all()
+        
+        # Para funcionário específico, buscar por email se disponível
+        funcionario_atual = None
+        if hasattr(current_user, 'email') and current_user.email:
+            for func in funcionarios:
+                if func.email == current_user.email:
+                    funcionario_atual = func
+                    break
+        
+        # Se não encontrou, pegar primeiro funcionário como fallback
+        if not funcionario_atual and funcionarios:
+            funcionario_atual = funcionarios[0]
+        
+        # Buscar obras disponíveis para esse admin
+        obras_disponiveis = Obra.query.filter_by(
+            admin_id=current_user.admin_id
+        ).order_by(Obra.nome).all()
+        
+        # Buscar RDOs recentes da empresa
+        rdos_recentes = RDO.query.join(Obra).filter(
+            Obra.admin_id == current_user.admin_id
+        ).order_by(RDO.data_relatorio.desc()).limit(5).all()
+        
+        # RDOs em rascunho que o funcionário pode editar
+        rdos_rascunho = RDO.query.join(Obra).filter(
+            Obra.admin_id == current_user.admin_id,
+            RDO.status == 'Rascunho'
+        ).order_by(RDO.data_relatorio.desc()).limit(3).all()
+        
+        print(f"DEBUG MOBILE DASHBOARD: Funcionário {funcionario_atual.nome if funcionario_atual else 'N/A'}")
+        print(f"DEBUG MOBILE: {len(obras_disponiveis)} obras, {len(rdos_recentes)} RDOs")
+        
+        return render_template('funcionario/mobile_rdo.html', 
+                             funcionario=funcionario_atual,
+                             obras_disponiveis=obras_disponiveis,
+                             rdos_recentes=rdos_recentes,
+                             rdos_rascunho=rdos_rascunho,
+                             total_obras=len(obras_disponiveis),
+                             total_rdos=len(rdos_recentes))
+                             
+    except Exception as e:
+        print(f"ERRO FUNCIONÁRIO MOBILE DASHBOARD: {str(e)}")
+        flash('Erro ao carregar dashboard mobile. Contate o administrador.', 'error')
+        return render_template('funcionario/mobile_rdo.html', 
+                             funcionario=None,
+                             obras_disponiveis=[],
+                             rdos_recentes=[],
+                             rdos_rascunho=[],
+                             total_obras=0,
+                             total_rdos=0)
+
+@main_bp.route('/funcionario/criar-rdo-teste')
+@funcionario_required  
+def criar_rdo_teste():
+    """Criar RDO de teste para demonstração"""
+    try:
+        # Buscar primeira obra disponível
+        obra = Obra.query.filter_by(admin_id=current_user.admin_id).first()
+        if not obra:
+            flash('Nenhuma obra disponível para teste.', 'error')
+            return redirect(url_for('main.funcionario_dashboard'))
+        
+        # Verificar se já existe RDO hoje
+        hoje = date.today()
+        rdo_existente = RDO.query.filter_by(
+            obra_id=obra.id, 
+            data_relatorio=hoje
+        ).first()
+        
+        if rdo_existente:
+            flash(f'Já existe RDO para hoje na obra {obra.nome}. Redirecionando para visualização.', 'info')
+            return redirect(url_for('main.funcionario_visualizar_rdo', id=rdo_existente.id))
+        
+        # Gerar número do RDO
+        contador_rdos = RDO.query.join(Obra).filter(
+            Obra.admin_id == current_user.admin_id
+        ).count()
+        numero_rdo = f"RDO-{datetime.now().year}-{contador_rdos + 1:03d}"
+        
+        # Criar RDO de teste
+        rdo = RDO()
+        rdo.numero_rdo = numero_rdo
+        rdo.obra_id = obra.id
+        rdo.data_relatorio = hoje
+        rdo.clima = 'Ensolarado'
+        rdo.temperatura = '25°C'
+        rdo.condicoes_climaticas = 'Condições ideais para trabalho'
+        rdo.comentario_geral = f'RDO de teste criado via mobile em {datetime.now().strftime("%d/%m/%Y %H:%M")}'
+        rdo.status = 'Rascunho'
+        rdo.criado_por_id = current_user.id
+        
+        db.session.add(rdo)
+        db.session.flush()
+        
+        # Criar atividades de teste
+        atividades_teste = [
+            {'descricao': 'Preparação do canteiro de obras', 'percentual': 85, 'observacoes': 'Área limpa e organizada'},
+            {'descricao': 'Armação de ferragem', 'percentual': 60, 'observacoes': 'Aguardando material adicional'},
+            {'descricao': 'Verificação de qualidade', 'percentual': 40, 'observacoes': 'Inspeção em andamento'}
+        ]
+        
+        for ativ_data in atividades_teste:
+            atividade = RDOAtividade()
+            atividade.rdo_id = rdo.id
+            atividade.descricao_atividade = ativ_data['descricao']
+            atividade.percentual_conclusao = ativ_data['percentual']
+            atividade.observacoes_tecnicas = ativ_data['observacoes']
+            db.session.add(atividade)
+        
+        # Criar mão de obra de teste
+        funcionarios_disponiveis = Funcionario.query.filter_by(
+            admin_id=current_user.admin_id, 
+            ativo=True
+        ).limit(3).all()
+        
+        for i, func in enumerate(funcionarios_disponiveis):
+            mao_obra = RDOMaoObra()
+            mao_obra.rdo_id = rdo.id
+            mao_obra.funcionario_id = func.id
+            mao_obra.funcao_exercida = ['Pedreiro', 'Servente', 'Encarregado'][i % 3]
+            mao_obra.horas_trabalhadas = 8.0
+            db.session.add(mao_obra)
+        
+        # Criar equipamento de teste
+        equipamentos_teste = [
+            {'nome': 'Betoneira', 'quantidade': 1, 'horas': 6, 'estado': 'Bom'},
+            {'nome': 'Furadeira', 'quantidade': 2, 'horas': 4, 'estado': 'Bom'}
+        ]
+        
+        for eq_data in equipamentos_teste:
+            equipamento = RDOEquipamento()
+            equipamento.rdo_id = rdo.id
+            equipamento.nome_equipamento = eq_data['nome']
+            equipamento.quantidade = eq_data['quantidade']
+            equipamento.horas_uso = eq_data['horas']
+            equipamento.estado_conservacao = eq_data['estado']
+            db.session.add(equipamento)
+        
+        # Criar ocorrência de teste
+        ocorrencia = RDOOcorrencia()
+        ocorrencia.rdo_id = rdo.id
+        ocorrencia.descricao_ocorrencia = 'Teste de funcionalidade mobile'
+        ocorrencia.problemas_identificados = 'Nenhum problema identificado'
+        ocorrencia.acoes_corretivas = 'Sistema funcionando corretamente'
+        db.session.add(ocorrencia)
+        
+        db.session.commit()
+        
+        print(f"DEBUG TESTE: RDO {numero_rdo} criado com sucesso para teste mobile")
+        flash(f'RDO de teste {numero_rdo} criado com sucesso!', 'success')
+        return redirect(url_for('main.funcionario_visualizar_rdo', id=rdo.id))
+        
+    except Exception as e:
+        db.session.rollback()
+        print(f"ERRO CRIAR RDO TESTE: {str(e)}")
+        flash('Erro ao criar RDO de teste.', 'error')
+        return redirect(url_for('main.funcionario_dashboard'))
 
 def gerar_numero_rdo(obra_id, data_relatorio):
     """Gera número sequencial do RDO"""
