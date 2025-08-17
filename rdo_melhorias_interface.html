@@ -1,0 +1,690 @@
+<!-- INTERFACE MELHORADA PARA RDO - WIZARD MULTI-STEP -->
+{% extends "base.html" %}
+
+{% block title %}Novo RDO - Interface Melhorada{% endblock %}
+
+{% block head %}
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<style>
+/* Wizard Steps */
+.rdo-wizard {
+    max-width: 1200px;
+    margin: 0 auto;
+}
+
+.wizard-steps {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 30px;
+    background: #f8f9fa;
+    border-radius: 10px;
+    padding: 20px;
+    overflow-x: auto;
+}
+
+.wizard-step {
+    flex: 1;
+    text-align: center;
+    padding: 15px;
+    border-radius: 8px;
+    transition: all 0.3s ease;
+    cursor: pointer;
+    min-width: 120px;
+    position: relative;
+}
+
+.wizard-step:not(:last-child)::after {
+    content: '';
+    position: absolute;
+    right: -10px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 20px;
+    height: 2px;
+    background: #dee2e6;
+    z-index: 1;
+}
+
+.wizard-step.completed {
+    background: #d4edda;
+    color: #155724;
+}
+
+.wizard-step.completed::after {
+    background: #28a745;
+}
+
+.wizard-step.active {
+    background: #0d6efd;
+    color: white;
+    transform: scale(1.05);
+}
+
+.wizard-step.active::after {
+    background: #0d6efd;
+}
+
+.wizard-step-number {
+    display: inline-block;
+    width: 30px;
+    height: 30px;
+    border-radius: 50%;
+    background: rgba(255,255,255,0.3);
+    line-height: 30px;
+    margin-bottom: 8px;
+    font-weight: bold;
+}
+
+.wizard-step.active .wizard-step-number {
+    background: rgba(255,255,255,0.9);
+    color: #0d6efd;
+}
+
+.wizard-step.completed .wizard-step-number {
+    background: #28a745;
+    color: white;
+}
+
+/* Wizard Content */
+.wizard-content {
+    background: white;
+    border-radius: 12px;
+    padding: 30px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+    margin-bottom: 20px;
+    min-height: 500px;
+}
+
+.wizard-section {
+    display: none;
+}
+
+.wizard-section.active {
+    display: block;
+    animation: fadeIn 0.3s ease-in;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(20px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+/* Form Improvements */
+.form-group-enhanced {
+    margin-bottom: 25px;
+}
+
+.form-label-enhanced {
+    font-weight: 600;
+    color: #495057;
+    margin-bottom: 8px;
+    display: block;
+}
+
+.form-control-enhanced {
+    border: 2px solid #e9ecef;
+    border-radius: 8px;
+    padding: 12px 16px;
+    font-size: 16px;
+    transition: border-color 0.3s ease, box-shadow 0.3s ease;
+}
+
+.form-control-enhanced:focus {
+    border-color: #0d6efd;
+    box-shadow: 0 0 0 0.2rem rgba(13,110,253,0.15);
+    outline: none;
+}
+
+/* Dynamic Items */
+.dynamic-item {
+    background: #f8f9fa;
+    border: 2px solid #e9ecef;
+    border-radius: 10px;
+    padding: 20px;
+    margin-bottom: 15px;
+    position: relative;
+    transition: all 0.3s ease;
+}
+
+.dynamic-item:hover {
+    border-color: #0d6efd;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(13,110,253,0.1);
+}
+
+.dynamic-item-header {
+    display: flex;
+    justify-content: between;
+    align-items: center;
+    margin-bottom: 15px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid #dee2e6;
+}
+
+.dynamic-item-number {
+    background: #0d6efd;
+    color: white;
+    width: 30px;
+    height: 30px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: bold;
+    margin-right: 15px;
+}
+
+.remove-item-btn {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    background: #dc3545;
+    color: white;
+    border: none;
+    border-radius: 50%;
+    width: 30px;
+    height: 30px;
+    cursor: pointer;
+    opacity: 0.8;
+    transition: opacity 0.3s ease;
+}
+
+.remove-item-btn:hover {
+    opacity: 1;
+    transform: scale(1.1);
+}
+
+.add-item-btn {
+    width: 100%;
+    padding: 20px;
+    border: 3px dashed #0d6efd;
+    background: transparent;
+    color: #0d6efd;
+    border-radius: 10px;
+    font-size: 16px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.add-item-btn:hover {
+    background: #0d6efd;
+    color: white;
+    transform: translateY(-2px);
+}
+
+/* Progress Bar */
+.progress-container {
+    margin: 20px 0;
+}
+
+.progress-bar-custom {
+    background: linear-gradient(90deg, #0d6efd, #6610f2);
+    height: 8px;
+    border-radius: 4px;
+    transition: width 0.5s ease;
+}
+
+/* Navigation */
+.wizard-navigation {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 20px 0;
+}
+
+.wizard-nav-btn {
+    padding: 12px 30px;
+    border-radius: 25px;
+    font-weight: 600;
+    transition: all 0.3s ease;
+    border: none;
+    cursor: pointer;
+}
+
+.wizard-nav-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.wizard-nav-btn.btn-previous {
+    background: #6c757d;
+    color: white;
+}
+
+.wizard-nav-btn.btn-next {
+    background: #0d6efd;
+    color: white;
+}
+
+.wizard-nav-btn.btn-finish {
+    background: #28a745;
+    color: white;
+}
+
+.wizard-nav-btn:hover:not(:disabled) {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+}
+
+/* Save Indicator */
+.save-indicator {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    z-index: 1050;
+    min-width: 250px;
+    border-radius: 8px;
+    font-size: 14px;
+    animation: slideIn 0.3s ease;
+}
+
+@keyframes slideIn {
+    from { transform: translateX(100%); }
+    to { transform: translateX(0); }
+}
+
+/* Photo Upload */
+.photo-upload-area {
+    border: 3px dashed #0d6efd;
+    border-radius: 10px;
+    padding: 40px;
+    text-align: center;
+    background: #f8f9fa;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.photo-upload-area:hover {
+    background: #e3f2fd;
+    border-color: #1976d2;
+}
+
+.photo-upload-area.dragover {
+    background: #e8f5e8;
+    border-color: #28a745;
+}
+
+.photo-preview {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 15px;
+    margin-top: 20px;
+}
+
+.photo-preview-item {
+    position: relative;
+    width: 150px;
+    height: 150px;
+    border-radius: 8px;
+    overflow: hidden;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+
+.photo-preview-item img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.photo-remove-btn {
+    position: absolute;
+    top: 5px;
+    right: 5px;
+    background: rgba(220,53,69,0.9);
+    color: white;
+    border: none;
+    border-radius: 50%;
+    width: 25px;
+    height: 25px;
+    cursor: pointer;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    .wizard-steps {
+        flex-direction: column;
+        gap: 10px;
+    }
+    
+    .wizard-step:not(:last-child)::after {
+        display: none;
+    }
+    
+    .wizard-content {
+        padding: 20px;
+    }
+    
+    .wizard-navigation {
+        flex-direction: column;
+        gap: 15px;
+    }
+    
+    .wizard-nav-btn {
+        width: 100%;
+    }
+}
+
+/* Validation States */
+.form-control-enhanced.is-invalid {
+    border-color: #dc3545;
+}
+
+.form-control-enhanced.is-valid {
+    border-color: #28a745;
+}
+
+.invalid-feedback {
+    color: #dc3545;
+    font-size: 14px;
+    margin-top: 5px;
+}
+
+.valid-feedback {
+    color: #28a745;
+    font-size: 14px;
+    margin-top: 5px;
+}
+
+/* Loading States */
+.loading-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0,0,0,0.7);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 9999;
+}
+
+.loading-spinner {
+    width: 60px;
+    height: 60px;
+    border: 4px solid #f3f3f3;
+    border-top: 4px solid #0d6efd;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- Save Indicator -->
+    <div id="save-indicator" class="save-indicator"></div>
+    
+    <!-- RDO Wizard -->
+    <div class="rdo-wizard">
+        <!-- Wizard Steps -->
+        <div class="wizard-steps">
+            <div class="wizard-step active" data-step="1">
+                <div class="wizard-step-number">1</div>
+                <div>Informações Gerais</div>
+            </div>
+            <div class="wizard-step" data-step="2">
+                <div class="wizard-step-number">2</div>
+                <div>Condições Climáticas</div>
+            </div>
+            <div class="wizard-step" data-step="3">
+                <div class="wizard-step-number">3</div>
+                <div>Atividades</div>
+            </div>
+            <div class="wizard-step" data-step="4">
+                <div class="wizard-step-number">4</div>
+                <div>Mão de Obra</div>
+            </div>
+            <div class="wizard-step" data-step="5">
+                <div class="wizard-step-number">5</div>
+                <div>Equipamentos</div>
+            </div>
+            <div class="wizard-step" data-step="6">
+                <div class="wizard-step-number">6</div>
+                <div>Ocorrências</div>
+            </div>
+            <div class="wizard-step" data-step="7">
+                <div class="wizard-step-number">7</div>
+                <div>Fotos</div>
+            </div>
+            <div class="wizard-step" data-step="8">
+                <div class="wizard-step-number">8</div>
+                <div>Revisão</div>
+            </div>
+        </div>
+        
+        <!-- Progress Bar -->
+        <div class="progress-container">
+            <div class="progress">
+                <div class="progress-bar progress-bar-custom" style="width: 12.5%"></div>
+            </div>
+            <small class="text-muted">Progresso: <span id="progress-text">1 de 8 etapas</span></small>
+        </div>
+        
+        <!-- Wizard Content -->
+        <form id="rdo-form" method="POST" enctype="multipart/form-data">
+            <div class="wizard-content">
+                
+                <!-- Etapa 1: Informações Gerais -->
+                <div class="wizard-section active" data-section="1">
+                    <h3 class="mb-4">📋 Informações Gerais do RDO</h3>
+                    
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="form-group-enhanced">
+                                <label class="form-label-enhanced" for="obra_id">Obra *</label>
+                                <select name="obra_id" id="obra_id" class="form-control-enhanced" required>
+                                    <option value="">Selecione uma obra</option>
+                                    {% for obra in obras %}
+                                    <option value="{{ obra.id }}" {% if obra.id|string == request.args.get('obra_id') %}selected{% endif %}>
+                                        {{ obra.nome }}
+                                    </option>
+                                    {% endfor %}
+                                </select>
+                                <div class="invalid-feedback"></div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="form-group-enhanced">
+                                <label class="form-label-enhanced" for="data_relatorio">Data do Relatório *</label>
+                                <input type="date" name="data_relatorio" id="data_relatorio" 
+                                       class="form-control-enhanced" required 
+                                       value="{{ date.today().strftime('%Y-%m-%d') }}">
+                                <div class="invalid-feedback"></div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="form-group-enhanced">
+                        <label class="form-label-enhanced" for="comentario_geral">Comentário Geral</label>
+                        <textarea name="comentario_geral" id="comentario_geral" 
+                                  class="form-control-enhanced" rows="4"
+                                  placeholder="Observações gerais sobre o dia de trabalho..."></textarea>
+                    </div>
+                </div>
+                
+                <!-- Etapa 2: Condições Climáticas -->
+                <div class="wizard-section" data-section="2">
+                    <h3 class="mb-4">🌤️ Condições Climáticas</h3>
+                    
+                    <div class="row">
+                        <div class="col-md-4">
+                            <div class="form-group-enhanced">
+                                <label class="form-label-enhanced" for="clima_geral">Clima Geral</label>
+                                <select name="clima_geral" id="clima_geral" class="form-control-enhanced">
+                                    <option value="">Selecione</option>
+                                    <option value="Ensolarado">☀️ Ensolarado</option>
+                                    <option value="Parcialmente Nublado">⛅ Parcialmente Nublado</option>
+                                    <option value="Nublado">☁️ Nublado</option>
+                                    <option value="Chuvoso">🌧️ Chuvoso</option>
+                                    <option value="Tempestade">⛈️ Tempestade</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="form-group-enhanced">
+                                <label class="form-label-enhanced" for="temperatura_media">Temperatura</label>
+                                <input type="text" name="temperatura_media" id="temperatura_media" 
+                                       class="form-control-enhanced" placeholder="Ex: 25°C">
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="form-group-enhanced">
+                                <label class="form-label-enhanced" for="umidade_relativa">Umidade (%)</label>
+                                <input type="number" name="umidade_relativa" id="umidade_relativa" 
+                                       class="form-control-enhanced" min="0" max="100" placeholder="Ex: 65">
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="form-group-enhanced">
+                                <label class="form-label-enhanced" for="vento_velocidade">Intensidade do Vento</label>
+                                <select name="vento_velocidade" id="vento_velocidade" class="form-control-enhanced">
+                                    <option value="">Selecione</option>
+                                    <option value="Sem vento">Sem vento</option>
+                                    <option value="Fraco">Fraco</option>
+                                    <option value="Moderado">Moderado</option>
+                                    <option value="Forte">Forte</option>
+                                    <option value="Muito forte">Muito forte</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="form-group-enhanced">
+                                <label class="form-label-enhanced" for="condicoes_trabalho">Condições para Trabalho</label>
+                                <select name="condicoes_trabalho" id="condicoes_trabalho" class="form-control-enhanced">
+                                    <option value="">Selecione</option>
+                                    <option value="Ideais">✅ Ideais</option>
+                                    <option value="Adequadas">✔️ Adequadas</option>
+                                    <option value="Limitadas">⚠️ Limitadas</option>
+                                    <option value="Inadequadas">❌ Inadequadas</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="form-group-enhanced">
+                        <label class="form-label-enhanced" for="observacoes_climaticas">Observações Climáticas</label>
+                        <textarea name="observacoes_climaticas" id="observacoes_climaticas" 
+                                  class="form-control-enhanced" rows="3"
+                                  placeholder="Observações adicionais sobre o clima e impacto no trabalho..."></textarea>
+                    </div>
+                </div>
+                
+                <!-- Etapa 3: Atividades -->
+                <div class="wizard-section" data-section="3">
+                    <h3 class="mb-4">🏗️ Atividades Executadas</h3>
+                    
+                    <div id="atividades-container">
+                        <!-- Atividades serão inseridas aqui via JavaScript -->
+                    </div>
+                    
+                    <button type="button" class="add-item-btn" onclick="adicionarAtividade()">
+                        <i class="fas fa-plus me-2"></i>Adicionar Atividade
+                    </button>
+                </div>
+                
+                <!-- Etapa 4: Mão de Obra -->
+                <div class="wizard-section" data-section="4">
+                    <h3 class="mb-4">👷 Mão de Obra</h3>
+                    
+                    <div id="mao-obra-container">
+                        <!-- Mão de obra será inserida aqui via JavaScript -->
+                    </div>
+                    
+                    <button type="button" class="add-item-btn" onclick="adicionarMaoObra()">
+                        <i class="fas fa-plus me-2"></i>Adicionar Funcionário
+                    </button>
+                </div>
+                
+                <!-- Etapa 5: Equipamentos -->
+                <div class="wizard-section" data-section="5">
+                    <h3 class="mb-4">🔧 Equipamentos Utilizados</h3>
+                    
+                    <div id="equipamentos-container">
+                        <!-- Equipamentos serão inseridos aqui via JavaScript -->
+                    </div>
+                    
+                    <button type="button" class="add-item-btn" onclick="adicionarEquipamento()">
+                        <i class="fas fa-plus me-2"></i>Adicionar Equipamento
+                    </button>
+                </div>
+                
+                <!-- Etapa 6: Ocorrências -->
+                <div class="wizard-section" data-section="6">
+                    <h3 class="mb-4">📝 Ocorrências e Observações</h3>
+                    
+                    <div id="ocorrencias-container">
+                        <!-- Ocorrências serão inseridas aqui via JavaScript -->
+                    </div>
+                    
+                    <button type="button" class="add-item-btn" onclick="adicionarOcorrencia()">
+                        <i class="fas fa-plus me-2"></i>Adicionar Ocorrência
+                    </button>
+                </div>
+                
+                <!-- Etapa 7: Fotos -->
+                <div class="wizard-section" data-section="7">
+                    <h3 class="mb-4">📸 Documentação Fotográfica</h3>
+                    
+                    <div class="photo-upload-area" onclick="document.getElementById('fotos-input').click()">
+                        <i class="fas fa-camera fa-3x mb-3 text-primary"></i>
+                        <h5>Clique ou arraste fotos para enviar</h5>
+                        <p class="text-muted">Formatos aceitos: JPG, PNG, HEIC (máx. 10MB cada)</p>
+                        <input type="file" id="fotos-input" name="fotos[]" multiple accept="image/*" style="display: none;">
+                    </div>
+                    
+                    <div class="photo-preview" id="photo-preview"></div>
+                </div>
+                
+                <!-- Etapa 8: Revisão -->
+                <div class="wizard-section" data-section="8">
+                    <h3 class="mb-4">✅ Revisão e Confirmação</h3>
+                    
+                    <div id="review-content">
+                        <!-- Conteúdo de revisão será gerado via JavaScript -->
+                    </div>
+                </div>
+                
+            </div>
+            
+            <!-- Navigation -->
+            <div class="wizard-navigation">
+                <button type="button" class="wizard-nav-btn btn-previous" id="btn-previous" onclick="previousStep()" disabled>
+                    <i class="fas fa-arrow-left me-2"></i>Anterior
+                </button>
+                
+                <div class="d-flex gap-2">
+                    <button type="button" class="btn btn-outline-secondary" onclick="salvarRascunho()">
+                        <i class="fas fa-save me-2"></i>Salvar Rascunho
+                    </button>
+                    <button type="button" class="wizard-nav-btn btn-next" id="btn-next" onclick="nextStep()">
+                        Próximo<i class="fas fa-arrow-right ms-2"></i>
+                    </button>
+                    <button type="submit" class="wizard-nav-btn btn-finish" id="btn-finish" style="display: none;">
+                        <i class="fas fa-check me-2"></i>Finalizar RDO
+                    </button>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Loading Overlay -->
+<div class="loading-overlay" id="loading-overlay" style="display: none;">
+    <div class="loading-spinner"></div>
+</div>
+
+<script>
+// JavaScript para o wizard será implementado aqui
+// Incluindo validações, navegação entre etapas, auto-save, etc.
+</script>
+{% endblock %}

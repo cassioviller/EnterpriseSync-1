@@ -2333,6 +2333,285 @@ def debug_funcionario():
     """Página de debug para testar sistema funcionário"""
     return render_template('debug_funcionario.html')
 
+# ===== MELHORIAS RDO - IMPLEMENTAÇÃO =====
+
+def validar_rdo_funcionario(form_data, rdo_id=None):
+    """Sistema de validações robusto para RDO"""
+    errors = []
+    
+    # Validar se RDO já existe para a data/obra
+    obra_id = form_data.get('obra_id')
+    data_relatorio = form_data.get('data_relatorio')
+    
+    if obra_id and data_relatorio:
+        try:
+            data_obj = datetime.strptime(data_relatorio, '%Y-%m-%d').date()
+            
+            # Verificar RDO duplicado
+            query = RDO.query.filter_by(obra_id=obra_id, data_relatorio=data_obj)
+            if rdo_id:
+                query = query.filter(RDO.id != rdo_id)
+            
+            rdo_existente = query.first()
+            if rdo_existente:
+                errors.append(f"Já existe RDO {rdo_existente.numero_rdo} para esta obra na data {data_obj.strftime('%d/%m/%Y')}")
+            
+            # Validar data não futura
+            if data_obj > date.today():
+                errors.append("Data do relatório não pode ser futura")
+            
+            # Validar data não muito antiga (mais de 30 dias)
+            limite_passado = date.today() - timedelta(days=30)
+            if data_obj < limite_passado:
+                errors.append(f"Data do relatório muito antiga. Limite: {limite_passado.strftime('%d/%m/%Y')}")
+                
+        except ValueError:
+            errors.append("Data do relatório inválida")
+    
+    # Validar atividades
+    atividades = form_data.get('atividades', [])
+    if isinstance(atividades, str):
+        atividades = [atividades]
+    
+    for i, atividade in enumerate(atividades):
+        if atividade:
+            percentual_key = f'percentual_atividade_{i}' if i > 0 else 'percentual_atividade'
+            percentual = form_data.get(percentual_key)
+            if percentual:
+                try:
+                    percentual_float = float(percentual)
+                    if not (0 <= percentual_float <= 100):
+                        errors.append(f"Percentual da atividade {i+1} deve estar entre 0% e 100%. Valor: {percentual_float}%")
+                except (ValueError, TypeError):
+                    errors.append(f"Percentual da atividade {i+1} deve ser um número válido")
+    
+    # Validar horas de funcionários
+    funcionarios = form_data.getlist('funcionario_ids') if hasattr(form_data, 'getlist') else form_data.get('funcionario_ids', [])
+    if isinstance(funcionarios, str):
+        funcionarios = [funcionarios]
+    
+    for i, funcionario_id in enumerate(funcionarios):
+        if funcionario_id:
+            horas_key = f'horas_trabalhadas_{i}' if i > 0 else 'horas_trabalhadas'
+            horas = form_data.get(horas_key)
+            if horas:
+                try:
+                    horas_float = float(horas)
+                    if horas_float > 12:
+                        errors.append(f"Funcionário não pode trabalhar mais que 12h por dia. Valor: {horas_float}h")
+                    if horas_float < 0:
+                        errors.append(f"Horas trabalhadas não pode ser negativa")
+                        
+                    # Verificar se funcionário já tem horas registradas na data
+                    if obra_id and data_relatorio and funcionario_id:
+                        data_obj = datetime.strptime(data_relatorio, '%Y-%m-%d').date()
+                        total_existente = db.session.query(
+                            db.func.sum(RDOMaoObra.horas_trabalhadas)
+                        ).join(RDO).filter(
+                            RDOMaoObra.funcionario_id == funcionario_id,
+                            RDO.data_relatorio == data_obj,
+                            RDO.id != rdo_id if rdo_id else True
+                        ).scalar() or 0
+                        
+                        if total_existente + horas_float > 12:
+                            funcionario = Funcionario.query.get(funcionario_id)
+                            nome = funcionario.nome if funcionario else f"ID {funcionario_id}"
+                            errors.append(f"Funcionário {nome} excederia {total_existente + horas_float}h (máximo 12h/dia). Já possui {total_existente}h registradas.")
+                            
+                except (ValueError, TypeError):
+                    errors.append(f"Horas trabalhadas do funcionário {i+1} deve ser um número válido")
+    
+    return errors
+
+@main_bp.route('/api/rdo/validar', methods=['POST'])
+@funcionario_required
+def api_validar_rdo():
+    """API para validar dados do RDO em tempo real"""
+    try:
+        data = request.get_json()
+        rdo_id = data.get('rdo_id')
+        
+        errors = validar_rdo_funcionario(data, rdo_id)
+        
+        return jsonify({
+            'success': len(errors) == 0,
+            'errors': errors,
+            'total_errors': len(errors)
+        })
+        
+    except Exception as e:
+        print(f"ERRO VALIDAR RDO: {str(e)}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@main_bp.route('/api/rdo/save-draft', methods=['POST'])
+@funcionario_required
+def api_save_rdo_draft():
+    """API para salvar rascunho do RDO"""
+    try:
+        data = request.get_json()
+        obra_id = data.get('obra_id')
+        form_data = data.get('form_data', {})
+        
+        if not obra_id:
+            return jsonify({'success': False, 'error': 'obra_id obrigatório'}), 400
+        
+        # Verificar se usuário tem acesso à obra
+        obra = Obra.query.filter_by(id=obra_id, admin_id=current_user.admin_id).first()
+        if not obra:
+            return jsonify({'success': False, 'error': 'Obra não encontrada'}), 404
+        
+        # Salvar no cache (simulando com session por enquanto)
+        draft_key = f'rdo_draft_{current_user.id}_{obra_id}'
+        session[draft_key] = {
+            'form_data': form_data,
+            'timestamp': datetime.now().isoformat(),
+            'obra_id': obra_id
+        }
+        
+        return jsonify({
+            'success': True,
+            'message': 'Rascunho salvo com sucesso',
+            'timestamp': datetime.now().isoformat()
+        })
+        
+    except Exception as e:
+        print(f"ERRO SALVAR RASCUNHO: {str(e)}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@main_bp.route('/api/rdo/load-draft/<int:obra_id>')
+@funcionario_required
+def api_load_rdo_draft(obra_id):
+    """API para carregar rascunho do RDO"""
+    try:
+        # Verificar acesso à obra
+        obra = Obra.query.filter_by(id=obra_id, admin_id=current_user.admin_id).first()
+        if not obra:
+            return jsonify({'success': False, 'error': 'Obra não encontrada'}), 404
+        
+        # Carregar do cache
+        draft_key = f'rdo_draft_{current_user.id}_{obra_id}'
+        draft = session.get(draft_key)
+        
+        if draft:
+            return jsonify({
+                'success': True,
+                'draft': draft
+            })
+        else:
+            return jsonify({
+                'success': False,
+                'message': 'Nenhum rascunho encontrado'
+            })
+        
+    except Exception as e:
+        print(f"ERRO CARREGAR RASCUNHO: {str(e)}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@main_bp.route('/api/rdo/clear-draft/<int:obra_id>', methods=['DELETE'])
+@funcionario_required
+def api_clear_rdo_draft(obra_id):
+    """API para limpar rascunho do RDO"""
+    try:
+        draft_key = f'rdo_draft_{current_user.id}_{obra_id}'
+        if draft_key in session:
+            del session[draft_key]
+        
+        return jsonify({'success': True, 'message': 'Rascunho removido'})
+        
+    except Exception as e:
+        print(f"ERRO LIMPAR RASCUNHO: {str(e)}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@main_bp.route('/funcionario/rdo/novo-melhorado')
+@funcionario_required
+def funcionario_rdo_novo_melhorado():
+    """Interface melhorada de criação de RDO com wizard"""
+    try:
+        # Buscar obras do funcionário
+        obras = Obra.query.filter_by(admin_id=current_user.admin_id).all()
+        
+        # Buscar funcionários ativos da empresa
+        funcionarios = Funcionario.query.filter_by(
+            admin_id=current_user.admin_id, 
+            ativo=True
+        ).order_by(Funcionario.nome).all()
+        
+        # Buscar último RDO para pré-carregar atividades
+        ultimo_rdo = None
+        obra_id = request.args.get('obra_id')
+        if obra_id:
+            ultimo_rdo = RDO.query.join(Obra).filter(
+                RDO.obra_id == obra_id,
+                RDO.status == 'Finalizado',
+                Obra.admin_id == current_user.admin_id
+            ).order_by(RDO.data_relatorio.desc()).first()
+        
+        return render_template('funcionario/rdo_novo_melhorado.html',
+                             obras=obras,
+                             funcionarios=funcionarios,
+                             ultimo_rdo=ultimo_rdo)
+                             
+    except Exception as e:
+        print(f"ERRO RDO NOVO MELHORADO: {str(e)}")
+        flash('Erro ao carregar página de RDO.', 'error')
+        return redirect(url_for('main.funcionario_dashboard'))
+
+@main_bp.route('/funcionario/rdo/progresso/<int:obra_id>')
+@funcionario_required
+def api_rdo_progresso_obra(obra_id):
+    """API para buscar progresso da obra baseado nos RDOs"""
+    try:
+        # Verificar acesso à obra
+        obra = Obra.query.filter_by(id=obra_id, admin_id=current_user.admin_id).first()
+        if not obra:
+            return jsonify({'success': False, 'error': 'Obra não encontrada'}), 404
+        
+        # Calcular progresso baseado nas atividades dos RDOs
+        atividades = db.session.query(RDOAtividade).join(RDO).filter(
+            RDO.obra_id == obra_id,
+            RDO.status == 'Finalizado'
+        ).all()
+        
+        if not atividades:
+            return jsonify({
+                'success': True,
+                'progresso_geral': 0,
+                'total_atividades': 0,
+                'atividades_detalhes': {}
+            })
+        
+        # Agrupar por tipo de atividade e pegar maior percentual
+        atividades_max = {}
+        for atividade in atividades:
+            desc = atividade.descricao_atividade.lower().strip()
+            if desc not in atividades_max:
+                atividades_max[desc] = {
+                    'percentual': atividade.percentual_conclusao,
+                    'descricao_original': atividade.descricao_atividade,
+                    'ultima_atualizacao': atividade.rdo_ref.data_relatorio.isoformat()
+                }
+            else:
+                if atividade.percentual_conclusao > atividades_max[desc]['percentual']:
+                    atividades_max[desc] = {
+                        'percentual': atividade.percentual_conclusao,
+                        'descricao_original': atividade.descricao_atividade,
+                        'ultima_atualizacao': atividade.rdo_ref.data_relatorio.isoformat()
+                    }
+        
+        # Calcular média ponderada
+        progresso_medio = sum(item['percentual'] for item in atividades_max.values()) / len(atividades_max)
+        
+        return jsonify({
+            'success': True,
+            'progresso_geral': round(progresso_medio, 2),
+            'total_atividades': len(atividades_max),
+            'atividades_detalhes': atividades_max
+        })
+        
+    except Exception as e:
+        print(f"ERRO PROGRESSO OBRA: {str(e)}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
 @main_bp.route('/funcionario-mobile')
 @funcionario_required
 def funcionario_mobile_dashboard():

@@ -441,11 +441,14 @@ class RDO(db.Model):
     obra_id = db.Column(db.Integer, db.ForeignKey('obra.id'), nullable=False)
     criado_por_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False)
     
-    # Condições climáticas
-    tempo_manha = db.Column(db.String(50))
-    tempo_tarde = db.Column(db.String(50))
-    tempo_noite = db.Column(db.String(50))
-    observacoes_meteorologicas = db.Column(db.Text)
+    # Condições climáticas padronizadas
+    clima_geral = db.Column(db.String(50))  # Ensolarado, Nublado, Chuvoso, etc.
+    temperatura_media = db.Column(db.String(10))  # "25°C"
+    umidade_relativa = db.Column(db.Integer)  # 0-100%
+    vento_velocidade = db.Column(db.String(20))  # "Fraco", "Moderado", "Forte"
+    precipitacao = db.Column(db.String(20))  # "Sem chuva", "Garoa", "Chuva forte"
+    condicoes_trabalho = db.Column(db.String(50))  # "Ideais", "Adequadas", "Limitadas", "Inadequadas"
+    observacoes_climaticas = db.Column(db.Text)
     
     # Comentários gerais
     comentario_geral = db.Column(db.Text)
@@ -463,6 +466,45 @@ class RDO(db.Model):
     atividades = db.relationship('RDOAtividade', backref='rdo_ref', cascade='all, delete-orphan', overlaps="rdo_ref")
     ocorrencias_rdo = db.relationship('RDOOcorrencia', backref='rdo_ref', cascade='all, delete-orphan', overlaps="rdo_ref")
     fotos = db.relationship('RDOFoto', backref='rdo_ref', cascade='all, delete-orphan', overlaps="rdo_ref")
+    
+    def __repr__(self):
+        return f'<RDO {self.numero_rdo}>'
+    
+    @property
+    def progresso_geral(self):
+        """Calcula progresso geral baseado nas atividades"""
+        if not self.atividades:
+            return 0
+        return round(sum(a.percentual_conclusao for a in self.atividades) / len(self.atividades), 2)
+    
+    @property
+    def total_horas_trabalhadas(self):
+        """Calcula total de horas trabalhadas no RDO"""
+        return sum(m.horas_trabalhadas for m in self.mao_obra)
+    
+    @property
+    def total_funcionarios(self):
+        """Conta funcionários únicos no RDO"""
+        return len(set(m.funcionario_id for m in self.mao_obra))
+    
+    def validar_rdo_unico_por_dia(self):
+        """Valida se já existe outro RDO para a mesma obra/data"""
+        rdo_existente = RDO.query.filter(
+            RDO.obra_id == self.obra_id,
+            RDO.data_relatorio == self.data_relatorio,
+            RDO.id != self.id if self.id else True
+        ).first()
+        return rdo_existente is None, rdo_existente
+    
+    def gerar_numero_rdo(self):
+        """Gera número único para RDO"""
+        if not self.numero_rdo:
+            ano = self.data_relatorio.year
+            count = db.session.query(func.count(RDO.id)).filter(
+                func.extract('year', RDO.data_relatorio) == ano,
+                RDO.obra_id == self.obra_id
+            ).scalar() or 0
+            self.numero_rdo = f"RDO-{ano}-{count + 1:03d}"
     
     def __repr__(self):
         return f'<RDO {self.numero_rdo}>'
@@ -507,9 +549,16 @@ class RDOOcorrencia(db.Model):
     
     id = db.Column(db.Integer, primary_key=True)
     rdo_id = db.Column(db.Integer, db.ForeignKey('rdo.id'), nullable=False)
+    tipo_ocorrencia = db.Column(db.String(50), nullable=False)  # "Problema", "Observação", "Melhoria", "Segurança"
+    severidade = db.Column(db.String(20), default='Baixa')  # "Baixa", "Média", "Alta", "Crítica"
     descricao_ocorrencia = db.Column(db.Text, nullable=False)
     problemas_identificados = db.Column(db.Text)
     acoes_corretivas = db.Column(db.Text)
+    responsavel_acao = db.Column(db.String(100))  # Quem deve resolver
+    prazo_resolucao = db.Column(db.Date)  # Prazo para resolver
+    status_resolucao = db.Column(db.String(20), default='Pendente')  # "Pendente", "Em Andamento", "Resolvido"
+    observacoes_resolucao = db.Column(db.Text)
+    criado_em = db.Column(db.DateTime, default=datetime.utcnow)
 
 
 class RDOFoto(db.Model):
