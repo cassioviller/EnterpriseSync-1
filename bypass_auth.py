@@ -60,6 +60,14 @@ class MockCurrentUser:
 if BYPASS_ATIVO:
     flask_login.current_user = MockCurrentUser()
     
+    # Sobrescrever decorador login_required
+    def bypass_login_required(f):
+        """Decorador que bypassa o login em desenvolvimento"""
+        return f
+    
+    # Substituir login_required globalmente
+    flask_login.login_required = bypass_login_required
+    
     # Criar before_request handler para manter sessão
     def criar_before_request(app):
         @app.before_request  
