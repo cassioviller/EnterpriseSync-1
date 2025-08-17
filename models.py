@@ -2055,6 +2055,11 @@ class PropostaTemplate(db.Model):
     validade_dias = db.Column(db.Integer, default=7)
     percentual_nota_fiscal = db.Column(db.Numeric(5,2), default=13.5)
     
+    # Itens inclusos e exclusos
+    itens_inclusos = db.Column(db.Text)
+    itens_exclusos = db.Column(db.Text)
+    condicoes = db.Column(db.Text)
+    
     # Condições padrão
     condicoes_pagamento = db.Column(db.Text, default="""10% de entrada na assinatura do contrato
 10% após projeto aprovado
@@ -2113,6 +2118,11 @@ class PropostaTemplate(db.Model):
             'prazo_entrega_dias': self.prazo_entrega_dias,
             'validade_dias': self.validade_dias,
             'percentual_nota_fiscal': float(self.percentual_nota_fiscal) if self.percentual_nota_fiscal else 0,
+            'itens_inclusos': self.itens_inclusos,
+            'itens_exclusos': self.itens_exclusos,
+            'condicoes': self.condicoes,
+            'condicoes_pagamento': self.condicoes_pagamento,
+            'garantias': self.garantias,
             'ativo': self.ativo,
             'publico': self.publico,
             'uso_contador': self.uso_contador,

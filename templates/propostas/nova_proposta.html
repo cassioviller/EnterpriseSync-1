@@ -384,15 +384,52 @@ function carregarServicosTemplate(templateId) {
                         calcularServico(servicoAtual.querySelector('.servico-quantidade'));
                     });
                     
+                    // Carregar campos adicionais do template
+                    const template = data.template;
+                    
                     // Atualizar prazo se disponível
-                    const prazo = data.template.prazo_entrega_dias;
-                    if (prazo) {
-                        document.querySelector('input[name="prazo_execucao"]').value = prazo;
+                    if (template.prazo_entrega_dias) {
+                        document.querySelector('input[name="prazo_entrega_dias"]').value = template.prazo_entrega_dias;
                     }
                     
-                    alert(`${itens.length} serviços carregados do template "${data.template.nome}"`);
+                    // Carregar itens inclusos
+                    if (template.itens_inclusos) {
+                        document.querySelector('textarea[name="itens_inclusos"]').value = template.itens_inclusos;
+                    }
+                    
+                    // Carregar itens exclusos
+                    if (template.itens_exclusos) {
+                        document.querySelector('textarea[name="itens_exclusos"]').value = template.itens_exclusos;
+                    }
+                    
+                    // Carregar condições
+                    if (template.condicoes) {
+                        document.querySelector('textarea[name="condicoes"]').value = template.condicoes;
+                    }
+                    
+                    // Carregar condições de pagamento
+                    if (template.condicoes_pagamento) {
+                        document.querySelector('textarea[name="condicoes_pagamento"]').value = template.condicoes_pagamento;
+                    }
+                    
+                    // Carregar garantias
+                    if (template.garantias) {
+                        document.querySelector('textarea[name="garantias"]').value = template.garantias;
+                    }
+                    
+                    // Carregar validade
+                    if (template.validade_dias) {
+                        document.querySelector('input[name="validade_dias"]').value = template.validade_dias;
+                    }
+                    
+                    // Carregar percentual nota fiscal
+                    if (template.percentual_nota_fiscal) {
+                        document.querySelector('input[name="percentual_nota_fiscal"]').value = template.percentual_nota_fiscal;
+                    }
+                    
+                    alert(`Template "${template.nome}" carregado com ${itens.length} serviços e campos preenchidos!`);
                 } else {
-                    alert('Template não possui serviços cadastrados.');
+                    alert('Template carregado mas não possui serviços cadastrados.');
                 }
             } else {
                 alert('Erro ao carregar template: ' + data.message);
