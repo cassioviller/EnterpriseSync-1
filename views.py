@@ -1490,7 +1490,7 @@ def lista_rdos():
 @main_bp.route('/rdo/novo')
 @admin_required
 def novo_rdo():
-    """Formulário para criar novo RDO"""
+    """Formulário para criar novo RDO com pré-carregamento de atividades"""
     try:
         admin_id = current_user.id if current_user.tipo_usuario == TipoUsuario.ADMIN else current_user.admin_id
         
@@ -1505,9 +1505,32 @@ def novo_rdo():
             flash('É necessário ter pelo menos uma obra cadastrada para criar um RDO.', 'warning')
             return redirect(url_for('main.obras'))
         
+        # Buscar obra selecionada para pré-carregamento
+        obra_id = request.args.get('obra_id', type=int)
+        atividades_anteriores = []
+        
+        if obra_id:
+            # Buscar RDO mais recente da obra para pré-carregar atividades
+            ultimo_rdo = RDO.query.filter_by(obra_id=obra_id).order_by(
+                RDO.data_relatorio.desc()
+            ).first()
+            
+            if ultimo_rdo:
+                atividades_anteriores = [
+                    {
+                        'descricao': ativ.descricao_atividade,
+                        'percentual': ativ.percentual_conclusao,
+                        'observacoes': ativ.observacoes_tecnicas or ''
+                    }
+                    for ativ in ultimo_rdo.atividades
+                ]
+                print(f"DEBUG: Pré-carregando {len(atividades_anteriores)} atividades do RDO {ultimo_rdo.numero_rdo}")
+        
         return render_template('rdo/novo.html', 
                              obras=obras,
-                             funcionarios=funcionarios)
+                             funcionarios=funcionarios,
+                             obra_selecionada=obra_id,
+                             atividades_anteriores=atividades_anteriores)
         
     except Exception as e:
         print(f"ERRO NOVO RDO: {str(e)}")
@@ -1555,35 +1578,109 @@ def criar_rdo():
         db.session.add(rdo)
         db.session.flush()  # Para obter o ID
         
-        # Processar atividades
+        # Processar atividades (corrigido para funcionar corretamente)
         atividades_json = request.form.get('atividades', '[]')
-        if atividades_json:
+        print(f"DEBUG: Atividades JSON recebido: {atividades_json}")
+        
+        if atividades_json and atividades_json != '[]':
             try:
                 atividades = json.loads(atividades_json)
-                for ativ_data in atividades:
-                    atividade = RDOAtividade()
-                    atividade.rdo_id = rdo.id
-                    atividade.descricao_atividade = ativ_data.get('descricao', '')
-                    atividade.percentual_conclusao = float(ativ_data.get('percentual', 0))
-                    atividade.observacoes_tecnicas = ativ_data.get('observacoes', '')
-                    db.session.add(atividade)
+                print(f"DEBUG: Processando {len(atividades)} atividades")
+                
+                for i, ativ_data in enumerate(atividades):
+                    if ativ_data.get('descricao', '').strip():  # Só processar se tiver descrição
+                        atividade = RDOAtividade()
+                        atividade.rdo_id = rdo.id
+                        atividade.descricao_atividade = ativ_data.get('descricao', '').strip()
+                        atividade.percentual_conclusao = float(ativ_data.get('percentual', 0))
+                        atividade.observacoes_tecnicas = ativ_data.get('observacoes', '').strip()
+                        db.session.add(atividade)
+                        print(f"DEBUG: Atividade {i+1} adicionada: {atividade.descricao_atividade} - {atividade.percentual_conclusao}%")
+                        
             except (json.JSONDecodeError, ValueError) as e:
                 print(f"Erro ao processar atividades: {e}")
+                flash(f'Erro ao processar atividades: {e}', 'warning')
+        else:
+            print("DEBUG: Nenhuma atividade para processar")
         
-        # Processar mão de obra
+        # Processar mão de obra (corrigido para funcionar corretamente)
         mao_obra_json = request.form.get('mao_obra', '[]')
-        if mao_obra_json:
+        print(f"DEBUG: Mão de obra JSON recebido: {mao_obra_json}")
+        
+        if mao_obra_json and mao_obra_json != '[]':
             try:
                 mao_obra_list = json.loads(mao_obra_json)
-                for mo_data in mao_obra_list:
-                    mao_obra = RDOMaoObra()
-                    mao_obra.rdo_id = rdo.id
-                    mao_obra.funcionario_id = int(mo_data.get('funcionario_id'))
-                    mao_obra.funcao_exercida = mo_data.get('funcao', '')
-                    mao_obra.horas_trabalhadas = float(mo_data.get('horas', 8))
-                    db.session.add(mao_obra)
+                print(f"DEBUG: Processando {len(mao_obra_list)} registros de mão de obra")
+                
+                for i, mo_data in enumerate(mao_obra_list):
+                    funcionario_id = mo_data.get('funcionario_id')
+                    if funcionario_id and funcionario_id != '':
+                        mao_obra = RDOMaoObra()
+                        mao_obra.rdo_id = rdo.id
+                        mao_obra.funcionario_id = int(funcionario_id)
+                        mao_obra.funcao_exercida = mo_data.get('funcao', '').strip()
+                        mao_obra.horas_trabalhadas = float(mo_data.get('horas', 8))
+                        db.session.add(mao_obra)
+                        print(f"DEBUG: Mão de obra {i+1} adicionada: Funcionário {funcionario_id} - {mao_obra.horas_trabalhadas}h")
+                        
             except (json.JSONDecodeError, ValueError) as e:
                 print(f"Erro ao processar mão de obra: {e}")
+                flash(f'Erro ao processar mão de obra: {e}', 'warning')
+        else:
+            print("DEBUG: Nenhuma mão de obra para processar")
+            
+        # Processar equipamentos
+        equipamentos_json = request.form.get('equipamentos', '[]')
+        print(f"DEBUG: Equipamentos JSON recebido: {equipamentos_json}")
+        
+        if equipamentos_json and equipamentos_json != '[]':
+            try:
+                equipamentos_list = json.loads(equipamentos_json)
+                print(f"DEBUG: Processando {len(equipamentos_list)} equipamentos")
+                
+                for i, eq_data in enumerate(equipamentos_list):
+                    nome_equipamento = eq_data.get('nome', '').strip()
+                    if nome_equipamento:
+                        equipamento = RDOEquipamento()
+                        equipamento.rdo_id = rdo.id
+                        equipamento.nome_equipamento = nome_equipamento
+                        equipamento.quantidade = int(eq_data.get('quantidade', 1))
+                        equipamento.horas_uso = float(eq_data.get('horas_uso', 8))
+                        equipamento.estado_conservacao = eq_data.get('estado', 'Bom')
+                        db.session.add(equipamento)
+                        print(f"DEBUG: Equipamento {i+1} adicionado: {equipamento.nome_equipamento}")
+                        
+            except (json.JSONDecodeError, ValueError) as e:
+                print(f"Erro ao processar equipamentos: {e}")
+                flash(f'Erro ao processar equipamentos: {e}', 'warning')
+        else:
+            print("DEBUG: Nenhum equipamento para processar")
+            
+        # Processar ocorrências
+        ocorrencias_json = request.form.get('ocorrencias', '[]')
+        print(f"DEBUG: Ocorrências JSON recebido: {ocorrencias_json}")
+        
+        if ocorrencias_json and ocorrencias_json != '[]':
+            try:
+                ocorrencias_list = json.loads(ocorrencias_json)
+                print(f"DEBUG: Processando {len(ocorrencias_list)} ocorrências")
+                
+                for i, oc_data in enumerate(ocorrencias_list):
+                    descricao = oc_data.get('descricao', '').strip()
+                    if descricao:
+                        ocorrencia = RDOOcorrencia()
+                        ocorrencia.rdo_id = rdo.id
+                        ocorrencia.descricao_ocorrencia = descricao
+                        ocorrencia.problemas_identificados = oc_data.get('problemas', '').strip()
+                        ocorrencia.acoes_corretivas = oc_data.get('acoes', '').strip()
+                        db.session.add(ocorrencia)
+                        print(f"DEBUG: Ocorrência {i+1} adicionada: {ocorrencia.descricao_ocorrencia}")
+                        
+            except (json.JSONDecodeError, ValueError) as e:
+                print(f"Erro ao processar ocorrências: {e}")
+                flash(f'Erro ao processar ocorrências: {e}', 'warning')
+        else:
+            print("DEBUG: Nenhuma ocorrência para processar")
         
         db.session.commit()
         
@@ -1645,6 +1742,76 @@ def editar_rdo(id):
         print(f"ERRO EDITAR RDO: {str(e)}")
         flash('RDO não encontrado ou sem permissão de acesso.', 'error')
         return redirect(url_for('main.lista_rdos'))
+
+@main_bp.route('/rdo/<int:id>/finalizar', methods=['POST'])
+@admin_required
+def finalizar_rdo(id):
+    """Finalizar RDO - mudança de status"""
+    try:
+        admin_id = current_user.id if current_user.tipo_usuario == TipoUsuario.ADMIN else current_user.admin_id
+        
+        # Buscar RDO com verificação de acesso
+        rdo = RDO.query.join(Obra).filter(
+            RDO.id == id,
+            Obra.admin_id == admin_id
+        ).first_or_404()
+        
+        # Verificar se pode finalizar (só rascunhos)
+        if rdo.status == 'Finalizado':
+            flash('RDO já está finalizado.', 'warning')
+            return redirect(url_for('main.visualizar_rdo', id=id))
+        
+        # Finalizar RDO
+        rdo.status = 'Finalizado'
+        db.session.commit()
+        
+        flash(f'RDO {rdo.numero_rdo} finalizado com sucesso!', 'success')
+        return redirect(url_for('main.visualizar_rdo', id=id))
+        
+    except Exception as e:
+        db.session.rollback()
+        print(f"ERRO FINALIZAR RDO: {str(e)}")
+        flash('Erro ao finalizar RDO.', 'error')
+        return redirect(url_for('main.lista_rdos'))
+
+@main_bp.route('/rdo/api/ultimo-rdo/<int:obra_id>')
+@admin_required
+def api_ultimo_rdo(obra_id):
+    """API para buscar atividades do último RDO de uma obra"""
+    try:
+        admin_id = current_user.id if current_user.tipo_usuario == TipoUsuario.ADMIN else current_user.admin_id
+        
+        # Verificar se obra pertence ao admin
+        obra = Obra.query.filter_by(id=obra_id, admin_id=admin_id).first()
+        if not obra:
+            return jsonify({'error': 'Obra não encontrada'}), 404
+        
+        # Buscar último RDO da obra
+        ultimo_rdo = RDO.query.filter_by(obra_id=obra_id).order_by(
+            RDO.data_relatorio.desc()
+        ).first()
+        
+        if not ultimo_rdo:
+            return jsonify({'atividades': []})
+        
+        atividades = [
+            {
+                'descricao': ativ.descricao_atividade,
+                'percentual': ativ.percentual_conclusao,
+                'observacoes': ativ.observacoes_tecnicas or ''
+            }
+            for ativ in ultimo_rdo.atividades
+        ]
+        
+        return jsonify({
+            'atividades': atividades,
+            'ultimo_rdo': ultimo_rdo.numero_rdo,
+            'data_anterior': ultimo_rdo.data_relatorio.strftime('%d/%m/%Y')
+        })
+        
+    except Exception as e:
+        print(f"ERRO API ÚLTIMO RDO: {str(e)}")
+        return jsonify({'error': 'Erro interno'}), 500
 
 def gerar_numero_rdo(obra_id, data_relatorio):
     """Gera número sequencial do RDO"""

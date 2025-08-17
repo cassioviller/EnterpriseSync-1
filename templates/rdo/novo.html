@@ -26,15 +26,23 @@
                                 <select class="form-select" id="obra_id" name="obra_id" required>
                                     <option value="">Selecione uma obra...</option>
                                     {% for obra in obras %}
-                                    <option value="{{ obra.id }}">{{ obra.nome }}</option>
+                                    <option value="{{ obra.id }}" {% if obra_selecionada == obra.id %}selected{% endif %}>
+                                        {{ obra.nome }}
+                                    </option>
                                     {% endfor %}
                                 </select>
+                                {% if atividades_anteriores %}
+                                <small class="text-success">
+                                    <i class="fas fa-info-circle"></i> 
+                                    Atividades do RDO anterior pré-carregadas ({{ atividades_anteriores|length }} itens)
+                                </small>
+                                {% endif %}
                             </div>
                             
                             <div class="col-md-6">
                                 <label for="data_relatorio" class="form-label">Data do Relatório *</label>
                                 <input type="date" class="form-control" id="data_relatorio" name="data_relatorio" 
-                                       value="{{ moment().format('YYYY-MM-DD') }}" required>
+                                       value="" required>
                             </div>
                         </div>
 
@@ -81,38 +89,81 @@
                         </div>
 
                         <!-- Atividades Executadas -->
-                        <h6 class="mb-3">Atividades Executadas</h6>
+                        <h6 class="mb-3">
+                            Atividades Executadas
+                            {% if atividades_anteriores %}
+                            <span class="badge bg-info ms-2">Pré-carregadas do RDO anterior</span>
+                            {% endif %}
+                        </h6>
                         <div class="mb-4">
                             <div id="atividades-container">
-                                <div class="atividade-item border rounded p-3 mb-3">
-                                    <div class="row">
-                                        <div class="col-md-6">
-                                            <label class="form-label">Descrição da Atividade</label>
-                                            <input type="text" class="form-control atividade-descricao" 
-                                                   placeholder="Ex: Concretagem da laje...">
+                                {% if atividades_anteriores %}
+                                    {% for atividade in atividades_anteriores %}
+                                    <div class="atividade-item border rounded p-3 mb-3 bg-light">
+                                        <div class="row">
+                                            <div class="col-md-6">
+                                                <label class="form-label">Descrição da Atividade</label>
+                                                <input type="text" class="form-control atividade-descricao" 
+                                                       value="{{ atividade.descricao }}" 
+                                                       placeholder="Ex: Concretagem da laje...">
+                                                <small class="text-muted">Pré-carregado do RDO anterior</small>
+                                            </div>
+                                            <div class="col-md-3">
+                                                <label class="form-label">% Conclusão</label>
+                                                <input type="number" class="form-control atividade-percentual" 
+                                                       value="{{ atividade.percentual }}"
+                                                       min="0" max="100" placeholder="0">
+                                                <small class="text-info">Anterior: {{ atividade.percentual }}%</small>
+                                            </div>
+                                            <div class="col-md-3">
+                                                <label class="form-label">Ações</label>
+                                                <div>
+                                                    <button type="button" class="btn btn-sm btn-danger remover-atividade">
+                                                        <i class="fas fa-trash"></i>
+                                                    </button>
+                                                </div>
+                                            </div>
                                         </div>
-                                        <div class="col-md-3">
-                                            <label class="form-label">% Conclusão</label>
-                                            <input type="number" class="form-control atividade-percentual" 
-                                                   min="0" max="100" placeholder="0">
-                                        </div>
-                                        <div class="col-md-3">
-                                            <label class="form-label">Ações</label>
-                                            <div>
-                                                <button type="button" class="btn btn-sm btn-danger remover-atividade">
-                                                    <i class="fas fa-trash"></i>
-                                                </button>
+                                        <div class="row mt-2">
+                                            <div class="col-12">
+                                                <label class="form-label">Observações Técnicas</label>
+                                                <textarea class="form-control atividade-observacoes" rows="2" 
+                                                          placeholder="Observações técnicas...">{{ atividade.observacoes }}</textarea>
                                             </div>
                                         </div>
                                     </div>
-                                    <div class="row mt-2">
-                                        <div class="col-12">
-                                            <label class="form-label">Observações Técnicas</label>
-                                            <textarea class="form-control atividade-observacoes" rows="2" 
-                                                      placeholder="Observações técnicas..."></textarea>
+                                    {% endfor %}
+                                {% else %}
+                                    <div class="atividade-item border rounded p-3 mb-3">
+                                        <div class="row">
+                                            <div class="col-md-6">
+                                                <label class="form-label">Descrição da Atividade</label>
+                                                <input type="text" class="form-control atividade-descricao" 
+                                                       placeholder="Ex: Concretagem da laje...">
+                                            </div>
+                                            <div class="col-md-3">
+                                                <label class="form-label">% Conclusão</label>
+                                                <input type="number" class="form-control atividade-percentual" 
+                                                       min="0" max="100" placeholder="0">
+                                            </div>
+                                            <div class="col-md-3">
+                                                <label class="form-label">Ações</label>
+                                                <div>
+                                                    <button type="button" class="btn btn-sm btn-danger remover-atividade">
+                                                        <i class="fas fa-trash"></i>
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div class="row mt-2">
+                                            <div class="col-12">
+                                                <label class="form-label">Observações Técnicas</label>
+                                                <textarea class="form-control atividade-observacoes" rows="2" 
+                                                          placeholder="Observações técnicas..."></textarea>
+                                            </div>
                                         </div>
                                     </div>
-                                </div>
+                                {% endif %}
                             </div>
                             
                             <button type="button" class="btn btn-outline-primary" id="adicionar-atividade">
@@ -171,9 +222,96 @@
                             </div>
                         </div>
 
+                        <!-- Equipamentos -->
+                        <h6 class="mb-3">Equipamentos Utilizados</h6>
+                        <div class="mb-4">
+                            <div id="equipamentos-container">
+                                <div class="equipamento-item border rounded p-3 mb-3">
+                                    <div class="row">
+                                        <div class="col-md-4">
+                                            <label class="form-label">Nome do Equipamento</label>
+                                            <input type="text" class="form-control equipamento-nome" 
+                                                   placeholder="Ex: Betoneira, Guincho...">
+                                        </div>
+                                        <div class="col-md-2">
+                                            <label class="form-label">Quantidade</label>
+                                            <input type="number" class="form-control equipamento-quantidade" 
+                                                   min="1" value="1">
+                                        </div>
+                                        <div class="col-md-2">
+                                            <label class="form-label">Horas de Uso</label>
+                                            <input type="number" class="form-control equipamento-horas" 
+                                                   step="0.5" min="0" value="8">
+                                        </div>
+                                        <div class="col-md-2">
+                                            <label class="form-label">Estado</label>
+                                            <select class="form-select equipamento-estado">
+                                                <option value="Bom">Bom</option>
+                                                <option value="Regular">Regular</option>
+                                                <option value="Ruim">Ruim</option>
+                                            </select>
+                                        </div>
+                                        <div class="col-md-2">
+                                            <label class="form-label">Ações</label>
+                                            <div>
+                                                <button type="button" class="btn btn-sm btn-danger remover-equipamento">
+                                                    <i class="fas fa-trash"></i>
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <button type="button" class="btn btn-outline-primary" id="adicionar-equipamento">
+                                <i class="fas fa-plus me-1"></i>Adicionar Equipamento
+                            </button>
+                        </div>
+
+                        <!-- Ocorrências -->
+                        <h6 class="mb-3">Ocorrências e Problemas</h6>
+                        <div class="mb-4">
+                            <div id="ocorrencias-container">
+                                <div class="ocorrencia-item border rounded p-3 mb-3">
+                                    <div class="row">
+                                        <div class="col-12 mb-2">
+                                            <label class="form-label">Descrição da Ocorrência</label>
+                                            <textarea class="form-control ocorrencia-descricao" rows="2" 
+                                                      placeholder="Descreva a ocorrência ou problema identificado..."></textarea>
+                                        </div>
+                                    </div>
+                                    <div class="row">
+                                        <div class="col-md-6">
+                                            <label class="form-label">Problemas Identificados</label>
+                                            <textarea class="form-control ocorrencia-problemas" rows="2" 
+                                                      placeholder="Detalhe os problemas..."></textarea>
+                                        </div>
+                                        <div class="col-md-6">
+                                            <label class="form-label">Ações Corretivas</label>
+                                            <textarea class="form-control ocorrencia-acoes" rows="2" 
+                                                      placeholder="Ações tomadas ou necessárias..."></textarea>
+                                        </div>
+                                    </div>
+                                    <div class="row mt-2">
+                                        <div class="col-12 text-end">
+                                            <button type="button" class="btn btn-sm btn-danger remover-ocorrencia">
+                                                <i class="fas fa-trash"></i> Remover
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <button type="button" class="btn btn-outline-primary" id="adicionar-ocorrencia">
+                                <i class="fas fa-plus me-1"></i>Adicionar Ocorrência
+                            </button>
+                        </div>
+
                         <!-- Hidden inputs para dados JSON -->
                         <input type="hidden" id="atividades-json" name="atividades">
                         <input type="hidden" id="mao-obra-json" name="mao_obra">
+                        <input type="hidden" id="equipamentos-json" name="equipamentos">
+                        <input type="hidden" id="ocorrencias-json" name="ocorrencias">
 
                         <!-- Botões -->
                         <div class="d-flex justify-content-end gap-2">
@@ -191,13 +329,24 @@
 
 <script>
 document.addEventListener('DOMContentLoaded', function() {
+    // Função para recarregar atividades quando obra muda
+    document.getElementById('obra_id').addEventListener('change', function() {
+        const obraId = this.value;
+        if (obraId) {
+            // Recarregar página com obra selecionada para pré-carregar atividades
+            window.location.href = '{{ url_for("main.novo_rdo") }}?obra_id=' + obraId;
+        }
+    });
+
     // Adicionar atividade
     document.getElementById('adicionar-atividade').addEventListener('click', function() {
         const container = document.getElementById('atividades-container');
         const newItem = container.querySelector('.atividade-item').cloneNode(true);
         
-        // Limpar campos
+        // Limpar campos e remover classe de pré-carregado
+        newItem.classList.remove('bg-light');
         newItem.querySelectorAll('input, textarea').forEach(input => input.value = '');
+        newItem.querySelectorAll('small').forEach(small => small.remove());
         
         container.appendChild(newItem);
         
@@ -233,7 +382,49 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     });
 
-    // Event listeners para remoção inicial
+    // Adicionar equipamento
+    document.getElementById('adicionar-equipamento').addEventListener('click', function() {
+        const container = document.getElementById('equipamentos-container');
+        const newItem = container.querySelector('.equipamento-item').cloneNode(true);
+        
+        // Limpar campos
+        newItem.querySelectorAll('input, select').forEach(input => {
+            if (input.classList.contains('equipamento-quantidade') || input.classList.contains('equipamento-horas')) {
+                input.value = input.classList.contains('equipamento-quantidade') ? '1' : '8';
+            } else if (input.type !== 'select-one') {
+                input.value = '';
+            }
+        });
+        
+        container.appendChild(newItem);
+        
+        // Adicionar event listener para remoção
+        newItem.querySelector('.remover-equipamento').addEventListener('click', function() {
+            if (container.children.length > 1) {
+                newItem.remove();
+            }
+        });
+    });
+
+    // Adicionar ocorrência
+    document.getElementById('adicionar-ocorrencia').addEventListener('click', function() {
+        const container = document.getElementById('ocorrencias-container');
+        const newItem = container.querySelector('.ocorrencia-item').cloneNode(true);
+        
+        // Limpar campos
+        newItem.querySelectorAll('textarea').forEach(textarea => textarea.value = '');
+        
+        container.appendChild(newItem);
+        
+        // Adicionar event listener para remoção
+        newItem.querySelector('.remover-ocorrencia').addEventListener('click', function() {
+            if (container.children.length > 1) {
+                newItem.remove();
+            }
+        });
+    });
+
+    // Event listeners para remoção inicial de todos os elementos
     document.querySelectorAll('.remover-atividade').forEach(btn => {
         btn.addEventListener('click', function() {
             const container = document.getElementById('atividades-container');
@@ -242,6 +433,109 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         });
     });
+
+    document.querySelectorAll('.remover-mao-obra').forEach(btn => {
+        btn.addEventListener('click', function() {
+            const container = document.getElementById('mao-obra-container');
+            if (container.children.length > 1) {
+                btn.closest('.mao-obra-item').remove();
+            }
+        });
+    });
+
+    document.querySelectorAll('.remover-equipamento').forEach(btn => {
+        btn.addEventListener('click', function() {
+            const container = document.getElementById('equipamentos-container');
+            if (container.children.length > 1) {
+                btn.closest('.equipamento-item').remove();
+            }
+        });
+    });
+
+    document.querySelectorAll('.remover-ocorrencia').forEach(btn => {
+        btn.addEventListener('click', function() {
+            const container = document.getElementById('ocorrencias-container');
+            if (container.children.length > 1) {
+                btn.closest('.ocorrencia-item').remove();
+            }
+        });
+    });
+
+    // Processar dados antes do envio
+    document.getElementById('form-rdo').addEventListener('submit', function(e) {
+        // Processar atividades
+        const atividades = [];
+        document.querySelectorAll('.atividade-item').forEach(item => {
+            const descricao = item.querySelector('.atividade-descricao').value.trim();
+            const percentual = item.querySelector('.atividade-percentual').value;
+            const observacoes = item.querySelector('.atividade-observacoes').value.trim();
+            
+            if (descricao) {
+                atividades.push({
+                    descricao: descricao,
+                    percentual: parseFloat(percentual) || 0,
+                    observacoes: observacoes
+                });
+            }
+        });
+        document.getElementById('atividades-json').value = JSON.stringify(atividades);
+
+        // Processar mão de obra
+        const maoObra = [];
+        document.querySelectorAll('.mao-obra-item').forEach(item => {
+            const funcionarioId = item.querySelector('.mao-obra-funcionario').value;
+            const funcao = item.querySelector('.mao-obra-funcao').value.trim();
+            const horas = item.querySelector('.mao-obra-horas').value;
+            
+            if (funcionarioId) {
+                maoObra.push({
+                    funcionario_id: funcionarioId,
+                    funcao: funcao,
+                    horas: parseFloat(horas) || 8
+                });
+            }
+        });
+        document.getElementById('mao-obra-json').value = JSON.stringify(maoObra);
+
+        // Processar equipamentos
+        const equipamentos = [];
+        document.querySelectorAll('.equipamento-item').forEach(item => {
+            const nome = item.querySelector('.equipamento-nome').value.trim();
+            const quantidade = item.querySelector('.equipamento-quantidade').value;
+            const horas = item.querySelector('.equipamento-horas').value;
+            const estado = item.querySelector('.equipamento-estado').value;
+            
+            if (nome) {
+                equipamentos.push({
+                    nome: nome,
+                    quantidade: parseInt(quantidade) || 1,
+                    horas_uso: parseFloat(horas) || 8,
+                    estado: estado
+                });
+            }
+        });
+        document.getElementById('equipamentos-json').value = JSON.stringify(equipamentos);
+
+        // Processar ocorrências
+        const ocorrencias = [];
+        document.querySelectorAll('.ocorrencia-item').forEach(item => {
+            const descricao = item.querySelector('.ocorrencia-descricao').value.trim();
+            const problemas = item.querySelector('.ocorrencia-problemas').value.trim();
+            const acoes = item.querySelector('.ocorrencia-acoes').value.trim();
+            
+            if (descricao) {
+                ocorrencias.push({
+                    descricao: descricao,
+                    problemas: problemas,
+                    acoes: acoes
+                });
+            }
+        });
+        document.getElementById('ocorrencias-json').value = JSON.stringify(ocorrencias);
+    });
+
+    // Definir data atual por padrão
+    document.getElementById('data_relatorio').value = new Date().toISOString().split('T')[0];
 
     document.querySelectorAll('.remover-mao-obra').forEach(btn => {
         btn.addEventListener('click', function() {
