@@ -82,16 +82,20 @@ def nova_proposta():
         templates = PropostaTemplate.query.filter_by(ativo=True).all()
         print(f"DEBUG: Super Admin - encontrou {len(templates)} templates")
     else:
-        # Admin vê apenas seus templates
-        templates = PropostaTemplate.query.filter_by(
-            admin_id=current_user.id, 
-            ativo=True
+        # Admin vê apenas seus templates OU templates públicos
+        templates = PropostaTemplate.query.filter(
+            db.or_(
+                PropostaTemplate.admin_id == current_user.id,
+                PropostaTemplate.publico == True
+            ),
+            PropostaTemplate.ativo == True
         ).all()
-        print(f"DEBUG: Admin - encontrou {len(templates)} templates para admin_id={current_user.id}")
+        print(f"DEBUG: Admin - encontrou {len(templates)} templates para admin_id={current_user.id} (incluindo públicos)")
     
     for t in templates:
-        print(f"DEBUG: Template {t.id}: {t.nome} (admin_id={t.admin_id})")
+        print(f"DEBUG: Template {t.id}: {t.nome} (admin_id={t.admin_id}, publico={t.publico})")
     
+    print(f"DEBUG: Enviando {len(templates)} templates para o template HTML")
     return render_template('propostas/nova_proposta.html', templates=templates)
 
 @propostas_bp.route('/criar', methods=['POST'])
