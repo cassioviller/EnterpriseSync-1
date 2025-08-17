@@ -1915,10 +1915,11 @@ def propostas():
     propostas = []
     return render_template('propostas/lista_propostas.html', propostas=propostas)
 
-@main_bp.route('/propostas/nova')
-@admin_required
-def nova_proposta():
-    return render_template('propostas/nova_proposta.html')
+# Rota movida para propostas_views.py blueprint
+# @main_bp.route('/propostas/nova')
+# @admin_required
+# def nova_proposta():
+#     return render_template('propostas/nova_proposta.html')
 
 # ===== GESTÃO DE EQUIPES =====
 @main_bp.route('/equipes')

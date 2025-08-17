@@ -168,6 +168,84 @@
                     </div>
                 </div>
 
+                <!-- Campos Adicionais da Proposta -->
+                <hr>
+                <h6 class="text-primary mb-3">Detalhes da Proposta</h6>
+                
+                <div class="row">
+                    <!-- Itens Inclusos -->
+                    <div class="col-md-6">
+                        <div class="mb-3">
+                            <label class="form-label">Itens Inclusos</label>
+                            <textarea class="form-control" name="itens_inclusos" rows="4" 
+                                      placeholder="Ex: Material, Mão de obra, Projeto, etc."></textarea>
+                        </div>
+                    </div>
+                    
+                    <!-- Itens Exclusos -->
+                    <div class="col-md-6">
+                        <div class="mb-3">
+                            <label class="form-label">Itens Exclusos</label>
+                            <textarea class="form-control" name="itens_exclusos" rows="4" 
+                                      placeholder="Ex: Fundação, Instalações elétricas, etc."></textarea>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="row">
+                    <!-- Condições -->
+                    <div class="col-md-6">
+                        <div class="mb-3">
+                            <label class="form-label">Condições</label>
+                            <textarea class="form-control" name="condicoes" rows="3" 
+                                      placeholder="Ex: Terreno nivelado, acesso facilitado, etc."></textarea>
+                        </div>
+                    </div>
+                    
+                    <!-- Condições de Pagamento -->
+                    <div class="col-md-6">
+                        <div class="mb-3">
+                            <label class="form-label">Condições de Pagamento</label>
+                            <textarea class="form-control" name="condicoes_pagamento" rows="3" 
+                                      placeholder="Ex: 30% entrada, 70% na entrega"></textarea>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="row">
+                    <!-- Garantias -->
+                    <div class="col-md-6">
+                        <div class="mb-3">
+                            <label class="form-label">Garantias</label>
+                            <textarea class="form-control" name="garantias" rows="3" 
+                                      placeholder="Ex: 1 ano contra defeitos de fabricação"></textarea>
+                        </div>
+                    </div>
+                    
+                    <!-- Prazo e Validade -->
+                    <div class="col-md-6">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label class="form-label">Prazo Entrega (dias)</label>
+                                    <input type="number" class="form-control" name="prazo_entrega_dias" value="90">
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label class="form-label">Validade (dias)</label>
+                                    <input type="number" class="form-control" name="validade_dias" value="7">
+                                </div>
+                            </div>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">% Nota Fiscal</label>
+                            <input type="number" class="form-control" name="percentual_nota_fiscal" 
+                                   step="0.1" value="13.5">
+                        </div>
+                    </div>
+                </div>
+
                 <!-- Valor Manual (alternativo) -->
                 <div class="mb-3">
                     <label class="form-label">Valor Total Manual (opcional)</label>
