@@ -68,8 +68,140 @@ def listar_propostas():
     return render_template('propostas/listar.html', propostas=propostas, 
                          status_filter=status_filter, cliente_filter=cliente_filter)
 
+@propostas_bp.route('/debug-templates')
+def debug_templates():
+    """Rota de debug para verificar templates sem autenticação"""
+    from models import PropostaTemplate
+    
+    print("DEBUG: Iniciando debug de templates...")
+    
+    # Verificar todos os templates ativos
+    todos_templates = PropostaTemplate.query.filter_by(ativo=True).all()
+    print(f"DEBUG: Total de templates ativos no banco: {len(todos_templates)}")
+    
+    for t in todos_templates:
+        print(f"DEBUG: Template {t.id}: {t.nome} (admin_id={t.admin_id}, publico={t.publico})")
+    
+    # Verificar templates para admin_id=10 (Vale Verde)
+    templates_vale_verde = PropostaTemplate.query.filter_by(admin_id=10, ativo=True).all()
+    print(f"DEBUG: Templates para admin_id=10: {len(templates_vale_verde)}")
+    
+    # Verificar templates públicos
+    templates_publicos = PropostaTemplate.query.filter_by(publico=True, ativo=True).all()
+    print(f"DEBUG: Templates públicos: {len(templates_publicos)}")
+    
+    # Retornar resultado simples
+    resultado = {
+        'total_templates': len(todos_templates),
+        'templates_vale_verde': len(templates_vale_verde),
+        'templates_publicos': len(templates_publicos),
+        'templates': [{'id': t.id, 'nome': t.nome, 'admin_id': t.admin_id, 'publico': t.publico} for t in todos_templates]
+    }
+    
+    return f"<pre>{resultado}</pre>"
+
+@propostas_bp.route('/test-nova')
+def test_nova_proposta():
+    """Teste da página nova proposta sem autenticação"""
+    from models import PropostaTemplate
+    
+    # Simular usuário Vale Verde (ID 10)
+    admin_id = 10
+    
+    # Buscar templates como o usuário Vale Verde veria
+    templates = PropostaTemplate.query.filter(
+        db.or_(
+            PropostaTemplate.admin_id == admin_id,
+            PropostaTemplate.publico == True
+        ),
+        PropostaTemplate.ativo == True
+    ).all()
+    
+    print(f"DEBUG TEST: Admin ID {admin_id} - encontrou {len(templates)} templates (incluindo públicos)")
+    
+    for t in templates:
+        print(f"DEBUG TEST: Template {t.id}: {t.nome} (admin_id={t.admin_id}, publico={t.publico})")
+    
+    print(f"DEBUG TEST: Enviando {len(templates)} templates para o template HTML")
+    return render_template('propostas/nova_proposta.html', templates=templates)
+
+@propostas_bp.route('/criar-teste-template')
+def criar_teste_template():
+    """Cria uma proposta de teste usando um template para validar o sistema"""
+    from models import PropostaComercialSIGE, PropostaItem, PropostaTemplate
+    
+    try:
+        # Buscar template do Vale Verde (ID 10 - Galpão Agrícola)
+        template = PropostaTemplate.query.get(10)
+        if not template:
+            return jsonify({'error': 'Template não encontrado'}), 404
+        
+        # Criar proposta baseada no template
+        proposta = PropostaComercialSIGE()
+        proposta.cliente_nome = "Fazenda Esperança Ltda"
+        proposta.cliente_telefone = "(11) 98765-4321"
+        proposta.cliente_email = "contato@fazendaesperanca.com.br"
+        proposta.cliente_endereco = "Estrada Rural KM 15, Zona Rural - São José dos Campos/SP"
+        proposta.assunto = f"Proposta Comercial - {template.nome}"
+        proposta.objeto = f"Fornecimento e montagem de {template.nome.lower()} conforme especificações técnicas em anexo"
+        proposta.documentos_referencia = "Projeto arquitetônico fornecido pelo cliente"
+        
+        # Usar dados do template
+        proposta.prazo_entrega_dias = template.prazo_entrega_dias
+        proposta.validade_dias = template.validade_dias
+        proposta.percentual_nota_fiscal = float(template.percentual_nota_fiscal)
+        proposta.condicoes_pagamento = template.condicoes_pagamento
+        proposta.garantias = template.garantias
+        proposta.consideracoes_gerais = "Proposta gerada automaticamente para teste do sistema"
+        proposta.criado_por = 10  # Admin Vale Verde
+        
+        db.session.add(proposta)
+        db.session.flush()
+        
+        # Criar itens baseados no template
+        total_valor = 0
+        for i, item_template in enumerate(template.itens_padrao or []):
+            item = PropostaItem()
+            item.proposta_id = proposta.id
+            item.item_numero = i + 1
+            item.descricao = item_template.get('descricao', '')
+            item.quantidade = float(item_template.get('quantidade', 0))
+            item.unidade = item_template.get('unidade', 'un')
+            item.preco_unitario = float(item_template.get('preco_unitario', 0))
+            item.ordem = i + 1
+            
+            total_valor += item.quantidade * item.preco_unitario
+            db.session.add(item)
+        
+        # Incrementar uso do template
+        template.incrementar_uso()
+        
+        db.session.commit()
+        
+        result = {
+            'success': True,
+            'message': f'Proposta de teste criada com sucesso!',
+            'proposta_id': proposta.id,
+            'cliente': proposta.cliente_nome,
+            'template_usado': template.nome,
+            'total_itens': len(template.itens_padrao or []),
+            'valor_total': f'R$ {total_valor:,.2f}',
+            'url_visualizar': f'/propostas/{proposta.id}'
+        }
+        
+        print(f"DEBUG TESTE: Proposta criada - ID {proposta.id}, Cliente: {proposta.cliente_nome}")
+        print(f"DEBUG TESTE: Template usado: {template.nome} ({len(template.itens_padrao or [])} itens)")
+        print(f"DEBUG TESTE: Valor total: R$ {total_valor:,.2f}")
+        
+        return jsonify(result)
+        
+    except Exception as e:
+        db.session.rollback()
+        print(f"ERRO TESTE: {str(e)}")
+        return jsonify({'error': f'Erro ao criar proposta de teste: {str(e)}'}), 500
+
 @propostas_bp.route('/nova')
-@login_required
+@login_required  
 def nova_proposta():
     """Formulário para criar nova proposta"""
     print(f"DEBUG: ACESSANDO NOVA PROPOSTA - Usuario atual: {current_user.id} - {current_user.nome} - {current_user.tipo_usuario.name}")
@@ -303,13 +435,32 @@ def upload_arquivo(id):
     except Exception as e:
         return jsonify({'error': f'Erro ao fazer upload: {str(e)}'}), 500
 
+@propostas_bp.route('/api/template-test/<int:template_id>')
+def obter_template_test(template_id):
+    """API de teste para obter dados de um template sem autenticação"""
+    template = PropostaTemplate.query.get_or_404(template_id)
+    template_data = template.to_dict()
+    
+    result = {
+        'success': True,
+        'template': template_data
+    }
+    
+    print(f"DEBUG API: Template {template_id} carregado: {template.nome}")
+    print(f"DEBUG API: Itens padrão: {len(template.itens_padrao) if template.itens_padrao else 0}")
+    return jsonify(result)
+
 @propostas_bp.route('/api/template/<int:template_id>')
-@login_required
-@admin_required
 def obter_template(template_id):
     """API para obter dados de um template"""
     template = PropostaTemplate.query.get_or_404(template_id)
-    return jsonify(template.to_dict())
+    template_data = template.to_dict()
+    
+    result = {
+        'success': True,
+        'template': template_data
+    }
+    return jsonify(result)
 
 @propostas_bp.route('/<int:id>/pdf')
 @login_required

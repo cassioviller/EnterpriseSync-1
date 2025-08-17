@@ -280,7 +280,7 @@ function carregarTemplate() {
 }
 
 function carregarServicosTemplate(templateId) {
-    fetch(`/templates/api/template/${templateId}`)
+    fetch(`/propostas/api/template/${templateId}`)
         .then(response => response.json())
         .then(data => {
             if (data.success) {
