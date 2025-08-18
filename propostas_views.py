@@ -284,7 +284,7 @@ def criar_proposta():
         proposta.garantias = request.form.get('garantias')
         proposta.consideracoes_gerais = request.form.get('consideracoes_gerais')
         proposta.criado_por = getattr(current_user, 'id', 10)
-        proposta.admin_id = getattr(current_user, 'admin_id', None) or getattr(current_user, 'id', 10)
+        # admin_id será setado automaticamente via SQL ou modelo
         
         # Itens inclusos/exclusos
         itens_inclusos = request.form.getlist('itens_inclusos')
@@ -335,11 +335,6 @@ def criar_proposta():
         # Atualizar valor total da proposta
         proposta.valor_total = valor_total_proposta
         print(f"DEBUG PROPOSTA: Valor total calculado: R$ {valor_total_proposta}")
-                item.ordem = i + 1
-                db.session.add(item)
-        
-        # Calcular valor total
-        proposta.calcular_valor_total()
         
         db.session.commit()
         flash('Proposta criada com sucesso!', 'success')
