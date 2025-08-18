@@ -64,6 +64,16 @@ INFO:migrations:✅ Migrações automáticas concluídas com sucesso!
 
 ## Recent Changes (18/08/2025)
 
+### Sistema de Numeração Customizável - IMPLEMENTADO ✅
+- **Campo editável na criação**: Usuários podem definir números personalizados para propostas
+- **Campo editável na edição**: Possibilidade de alterar números existentes
+- **Backend atualizado**: Processamento correto do campo numero_proposta
+- **Validação implementada**: Campo obrigatório com orientações claras
+- **Interface intuitiva**: Placeholders e textos de ajuda para facilitar uso
+- **Status**: Funcional em desenvolvimento, pronto para produção
+
+## Recent Changes (18/08/2025)
+
 ### Sistema de Personalização da Empresa - FUNCIONAL EM PRODUÇÃO ✅
 - **Configurações visuais completas**: Upload de logo e seleção de cores personalizadas
 - **Portal do cliente personalizado**: Cores e logo aplicadas dinamicamente nas propostas públicas
