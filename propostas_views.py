@@ -613,7 +613,11 @@ def portal_cliente(token):
     if proposta.criado_por:
         usuario = Usuario.query.get(proposta.criado_por)
         if usuario:
-            admin_id = usuario.admin_id
+            admin_id = usuario.admin_id or usuario.id  # Se admin_id for null, usa o próprio id
+    
+    # Fallback: se não conseguir admin_id, usar ID padrão (assumindo que admin principal é 10)
+    if not admin_id:
+        admin_id = 10
     
     # Carregar configurações da empresa para personalização
     config_empresa = None
