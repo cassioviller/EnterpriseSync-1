@@ -2042,7 +2042,7 @@ class PropostaItem(db.Model):
     quantidade = db.Column(db.Numeric(10,3), nullable=False)
     unidade = db.Column(db.String(10), nullable=False)
     preco_unitario = db.Column(db.Numeric(10,2), nullable=False)
-    ordem = db.Column(db.Integer, nullable=False)
+    ordem = db.Column(db.Integer, nullable=False, default=1)
     
     criado_em = db.Column(db.DateTime, default=datetime.utcnow)
     

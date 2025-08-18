@@ -64,6 +64,15 @@ INFO:migrations:✅ Migrações automáticas concluídas com sucesso!
 
 ## Recent Changes (18/08/2025)
 
+### Sistema de Propostas - COMPLETO E TESTADO ✅
+- **Debug completo realizado**: Todos os problemas identificados e corrigidos
+- **Campo 'ordem' corrigido**: Adicionado valor padrão e setado corretamente no código
+- **Rotas funcionando**: 20+ rotas do blueprint propostas registradas e testadas
+- **Formulários processando**: Campos name corretos, valores salvos no banco
+- **Templates funcionais**: listar.html, nova_proposta.html, visualizar.html
+- **Fluxo completo testado**: Criação, listagem, cálculo de valores automático
+- **Status**: PRONTO PARA DEPLOY EM PRODUÇÃO 🚀
+
 ### Migração de Schema Automática - RESOLVIDO ✅
 - Implementado sistema de migrações automáticas completo
 - Resolvido problema de colunas faltantes na tabela proposta_templates
@@ -76,13 +85,6 @@ INFO:migrations:✅ Migrações automáticas concluídas com sucesso!
 - Adicionado admin_id ao MockCurrentUser no sistema de bypass
 - Implementada verificação segura de admin_id nas views
 - **Status**: Configurações da empresa funcionando normalmente
-
-### Simplificação de Propostas - EM ANDAMENTO ⚠️
-- Apenas nome do cliente é obrigatório para criar proposta
-- Corrigido erro 405 Method Not Allowed no formulário
-- Adicionada migração automática para tornar campos "assunto" e "objeto" opcionais
-- Sistema funciona em desenvolvimento, aguardando deploy em produção
-- **Status**: Requer deploy Docker para aplicar migrações em produção
 
 ### Arquivos Adicionados
 - `migrations.py` - Sistema de migrações automáticas

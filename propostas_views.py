@@ -323,6 +323,7 @@ def criar_proposta():
                 item.quantidade = float(quantidades[i]) if i < len(quantidades) and quantidades[i] else 0
                 item.unidade = unidades[i] if i < len(unidades) else 'un'
                 item.preco_unitario = float(precos[i]) if i < len(precos) and precos[i] else 0
+                item.ordem = i + 1  # Campo obrigatório
                 
                 # Calcular valor total do item
                 valor_item = item.quantidade * item.preco_unitario
