@@ -270,6 +270,7 @@ def criar_proposta():
         # Dados básicos da proposta
         proposta = PropostaComercialSIGE()
         proposta.cliente_nome = cliente_nome.strip()
+        proposta.numero_proposta = request.form.get('numero_proposta', '').strip()
         proposta.cliente_telefone = request.form.get('cliente_telefone')
         proposta.cliente_email = request.form.get('cliente_email')
         proposta.cliente_endereco = request.form.get('cliente_endereco')
@@ -373,6 +374,7 @@ def atualizar_proposta(id):
     try:
         # Atualizar dados da proposta
         proposta.cliente_nome = request.form.get('cliente_nome')
+        proposta.numero_proposta = request.form.get('numero_proposta', '').strip()
         proposta.cliente_email = request.form.get('cliente_email')
         proposta.cliente_telefone = request.form.get('cliente_telefone')
         proposta.cliente_cpf_cnpj = request.form.get('cliente_cpf_cnpj')
