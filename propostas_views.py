@@ -604,12 +604,21 @@ def excluir_proposta(id):
 @propostas_bp.route('/cliente/<token>')
 def portal_cliente(token):
     """Portal para o cliente visualizar e aprovar proposta"""
-    from models import ConfiguracaoEmpresa
+    from models import ConfiguracaoEmpresa, Usuario
     
     proposta = PropostaComercialSIGE.query.filter_by(token_cliente=token).first_or_404()
     
+    # Buscar admin_id através do usuário que criou a proposta
+    admin_id = None
+    if proposta.criado_por:
+        usuario = Usuario.query.get(proposta.criado_por)
+        if usuario:
+            admin_id = usuario.admin_id
+    
     # Carregar configurações da empresa para personalização
-    config_empresa = ConfiguracaoEmpresa.query.filter_by(admin_id=proposta.admin_id).first()
+    config_empresa = None
+    if admin_id:
+        config_empresa = ConfiguracaoEmpresa.query.filter_by(admin_id=admin_id).first()
     
     # Configurar cores personalizadas
     cores_empresa = {
