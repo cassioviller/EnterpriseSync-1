@@ -1928,8 +1928,8 @@ class PropostaComercialSIGE(db.Model):
     cliente_endereco = db.Column(db.Text)
     
     # Dados da Proposta
-    assunto = db.Column(db.String(255), nullable=False)
-    objeto = db.Column(db.Text, nullable=False)
+    assunto = db.Column(db.String(255), nullable=True)
+    objeto = db.Column(db.Text, nullable=True)
     documentos_referencia = db.Column(db.Text)
     
     # Condições
