@@ -15,7 +15,8 @@ configuracoes_bp = Blueprint('configuracoes', __name__, url_prefix='/configuraco
 @admin_required
 def configuracoes():
     """Página principal de configurações da empresa"""
-    config = ConfiguracaoEmpresa.query.filter_by(admin_id=current_user.admin_id).first()
+    admin_id = getattr(current_user, 'admin_id', None) or current_user.id
+    config = ConfiguracaoEmpresa.query.filter_by(admin_id=admin_id).first()
     return render_template('configuracoes/index.html', config=config)
 
 @configuracoes_bp.route('/empresa')
@@ -23,7 +24,8 @@ def configuracoes():
 @admin_required
 def empresa():
     """Configurações da empresa"""
-    config = ConfiguracaoEmpresa.query.filter_by(admin_id=current_user.admin_id).first()
+    admin_id = getattr(current_user, 'admin_id', None) or current_user.id
+    config = ConfiguracaoEmpresa.query.filter_by(admin_id=admin_id).first()
     return render_template('configuracoes/empresa.html', config=config)
 
 @configuracoes_bp.route('/empresa/salvar', methods=['POST'])
@@ -32,11 +34,14 @@ def empresa():
 def salvar_empresa():
     """Salva configurações da empresa"""
     try:
-        config = ConfiguracaoEmpresa.query.filter_by(admin_id=current_user.admin_id).first()
+        # Obter admin_id corretamente (para ADMIN usa o próprio ID, para SUPER_ADMIN pode ser diferente)
+        admin_id = getattr(current_user, 'admin_id', None) or current_user.id
+        
+        config = ConfiguracaoEmpresa.query.filter_by(admin_id=admin_id).first()
         
         if not config:
             config = ConfiguracaoEmpresa()
-            config.admin_id = current_user.admin_id
+            config.admin_id = admin_id
             db.session.add(config)
         
         # Dados básicos da empresa

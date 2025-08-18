@@ -36,6 +36,10 @@ class MockCurrentUser:
         return 10  # ID do usuário Vale Verde
     
     @property
+    def admin_id(self):
+        return 10  # Para usuários ADMIN, admin_id é o próprio ID
+    
+    @property
     def email(self):
         return 'admin@valeverde.com'
     
