@@ -3059,7 +3059,7 @@ def financeiro():
 def propostas():
     # Buscar propostas básicas para exibição (por enquanto lista vazia)
     propostas = []
-    return render_template('propostas/lista_propostas.html', propostas=propostas)
+    return redirect(url_for('propostas.index'))
 
 # Rota movida para propostas_views.py blueprint
 # @main_bp.route('/propostas/nova')
