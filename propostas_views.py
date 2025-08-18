@@ -371,37 +371,33 @@ def atualizar_proposta(id):
     proposta = PropostaComercialSIGE.query.get_or_404(id)
     
     try:
-        # Validação obrigatória: apenas nome do cliente
-        cliente_nome = request.form.get('cliente_nome')
-        if not cliente_nome or not cliente_nome.strip():
-            flash('Nome do cliente é obrigatório!', 'error')
-            return redirect(url_for('propostas.editar_proposta', id=id))
-        
-        # Atualizar dados básicos
-        proposta.cliente_nome = cliente_nome.strip()
-        proposta.cliente_telefone = request.form.get('cliente_telefone')
+        # Atualizar dados da proposta
+        proposta.cliente_nome = request.form.get('cliente_nome')
         proposta.cliente_email = request.form.get('cliente_email')
+        proposta.cliente_telefone = request.form.get('cliente_telefone')
+        proposta.cliente_cpf_cnpj = request.form.get('cliente_cpf_cnpj')
         proposta.cliente_endereco = request.form.get('cliente_endereco')
-        proposta.assunto = request.form.get('assunto')
-        proposta.objeto = request.form.get('objeto')
-        proposta.documentos_referencia = request.form.get('documentos_referencia')
+        proposta.assunto = request.form.get('assunto') or None
+        proposta.objeto = request.form.get('objeto') or None
         proposta.prazo_entrega_dias = int(request.form.get('prazo_entrega_dias', 90))
-        proposta.observacoes_entrega = request.form.get('observacoes_entrega')
-        proposta.validade_dias = int(request.form.get('validade_dias', 7))
         proposta.percentual_nota_fiscal = float(request.form.get('percentual_nota_fiscal', 13.5))
         proposta.condicoes_pagamento = request.form.get('condicoes_pagamento')
         proposta.garantias = request.form.get('garantias')
         proposta.consideracoes_gerais = request.form.get('consideracoes_gerais')
-        proposta.atualizado_em = datetime.utcnow()
         
-        # Atualizar itens inclusos/exclusos
-        itens_inclusos = request.form.getlist('itens_inclusos')
-        itens_exclusos = request.form.getlist('itens_exclusos')
+        # Processar itens inclusos/exclusos
+        itens_inclusos_text = request.form.get('itens_inclusos', '')
+        itens_exclusos_text = request.form.get('itens_exclusos', '')
         
-        if itens_inclusos:
-            proposta.itens_inclusos = itens_inclusos
-        if itens_exclusos:
-            proposta.itens_exclusos = itens_exclusos
+        if itens_inclusos_text:
+            proposta.itens_inclusos = [item.strip() for item in itens_inclusos_text.split(';') if item.strip()]
+        else:
+            proposta.itens_inclusos = []
+            
+        if itens_exclusos_text:
+            proposta.itens_exclusos = [item.strip() for item in itens_exclusos_text.split(';') if item.strip()]
+        else:
+            proposta.itens_exclusos = []
         
         # Remover itens existentes
         PropostaItem.query.filter_by(proposta_id=proposta.id).delete()
@@ -412,20 +408,35 @@ def atualizar_proposta(id):
         unidades = request.form.getlist('item_unidade')
         precos = request.form.getlist('item_preco')
         
+        valor_total_proposta = 0
+        
         for i, descricao in enumerate(descricoes):
-            if descricao.strip():
+            if descricao and descricao.strip():
                 item = PropostaItem()
                 item.proposta_id = proposta.id
                 item.item_numero = i + 1
-                item.descricao = descricao
-                item.quantidade = float(quantidades[i]) if quantidades[i] else 0
+                item.descricao = descricao.strip()
+                item.quantidade = float(quantidades[i]) if i < len(quantidades) and quantidades[i] else 0
                 item.unidade = unidades[i] if i < len(unidades) else 'un'
-                item.preco_unitario = float(precos[i]) if precos[i] else 0
+                item.preco_unitario = float(precos[i]) if i < len(precos) and precos[i] else 0
                 item.ordem = i + 1
+                
+                valor_item = item.quantidade * item.preco_unitario
+                valor_total_proposta += valor_item
+                
                 db.session.add(item)
         
-        # Recalcular valor total
-        db.session.flush()
+        proposta.valor_total = valor_total_proposta
+        proposta.atualizado_em = datetime.utcnow()
+        
+        db.session.commit()
+        flash('Proposta atualizada com sucesso!', 'success')
+        return redirect(url_for('propostas.visualizar_proposta', id=proposta.id))
+        
+    except Exception as e:
+        db.session.rollback()
+        flash(f'Erro ao atualizar proposta: {str(e)}', 'error')
+        return redirect(url_for('propostas.editar_proposta', id=id))
         proposta.calcular_valor_total()
         
         db.session.commit()

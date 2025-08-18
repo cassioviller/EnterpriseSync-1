@@ -1,0 +1,287 @@
+{% extends "base.html" %}
+{% block title %}Editar Proposta - SIGE{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="card">
+        <div class="card-header">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <h5 class="mb-0"><i class="fas fa-edit me-2"></i> Editar Proposta {{ proposta.numero_proposta }}</h5>
+                    <small class="text-muted">Cliente: {{ proposta.cliente_nome }}</small>
+                </div>
+                <div>
+                    <a href="{{ url_for('propostas.visualizar_proposta', id=proposta.id) }}" class="btn btn-outline-secondary btn-sm">
+                        <i class="fas fa-eye me-1"></i> Visualizar
+                    </a>
+                    <a href="{{ url_for('propostas.index') }}" class="btn btn-outline-primary btn-sm">
+                        <i class="fas fa-arrow-left me-1"></i> Voltar
+                    </a>
+                </div>
+            </div>
+        </div>
+        <div class="card-body">
+            <form method="POST" action="{{ url_for('propostas.atualizar_proposta', id=proposta.id) }}" id="formEditarProposta">
+                <div class="row">
+                    <!-- Dados do Cliente -->
+                    <div class="col-md-6">
+                        <h6 class="text-primary mb-3">Dados do Cliente</h6>
+                        <div class="mb-3">
+                            <label class="form-label">Nome do Cliente *</label>
+                            <input type="text" class="form-control" name="cliente_nome" value="{{ proposta.cliente_nome }}" required>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Email</label>
+                            <input type="email" class="form-control" name="cliente_email" value="{{ proposta.cliente_email or '' }}">
+                        </div>
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label class="form-label">Telefone</label>
+                                    <input type="text" class="form-control" name="cliente_telefone" value="{{ proposta.cliente_telefone or '' }}">
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label class="form-label">CPF/CNPJ</label>
+                                    <input type="text" class="form-control" name="cliente_cpf_cnpj" value="{{ proposta.cliente_cpf_cnpj or '' }}">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Dados da Obra -->
+                    <div class="col-md-6">
+                        <h6 class="text-primary mb-3">Dados da Obra</h6>
+                        <div class="mb-3">
+                            <label class="form-label">Assunto da Proposta</label>
+                            <input type="text" class="form-control" name="assunto" value="{{ proposta.assunto or '' }}" placeholder="Ex: Estrutura Metálica Residencial">
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Objeto/Descrição da Obra</label>
+                            <textarea class="form-control" name="objeto" rows="3" placeholder="Descreva os serviços a serem executados...">{{ proposta.objeto or '' }}</textarea>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Endereço da Obra</label>
+                            <textarea class="form-control" name="cliente_endereco" rows="2">{{ proposta.cliente_endereco or '' }}</textarea>
+                        </div>
+                    </div>
+                </div>
+
+                <hr class="my-4">
+
+                <!-- Serviços Existentes -->
+                <h6 class="text-primary mb-3">Serviços</h6>
+                <div id="servicosContainer">
+                    {% for item in proposta.itens %}
+                    <div class="servico-item border rounded p-3 mb-3">
+                        <input type="hidden" name="item_id" value="{{ item.id }}">
+                        <div class="row">
+                            <div class="col-md-4">
+                                <div class="mb-3">
+                                    <label class="form-label">Descrição do Serviço</label>
+                                    <input type="text" class="form-control servico-descricao" 
+                                           name="item_descricao" value="{{ item.descricao }}" placeholder="Ex: Estrutura metálica">
+                                </div>
+                            </div>
+                            <div class="col-md-2">
+                                <div class="mb-3">
+                                    <label class="form-label">Quantidade</label>
+                                    <input type="number" class="form-control servico-quantidade" 
+                                           name="item_quantidade" value="{{ item.quantidade }}" step="0.01" onchange="calcularServico(this)">
+                                </div>
+                            </div>
+                            <div class="col-md-2">
+                                <div class="mb-3">
+                                    <label class="form-label">Unidade</label>
+                                    <select class="form-select servico-unidade" name="item_unidade">
+                                        <option value="m²" {% if item.unidade == 'm²' %}selected{% endif %}>m²</option>
+                                        <option value="m³" {% if item.unidade == 'm³' %}selected{% endif %}>m³</option>
+                                        <option value="un" {% if item.unidade == 'un' %}selected{% endif %}>Unidade</option>
+                                        <option value="kg" {% if item.unidade == 'kg' %}selected{% endif %}>kg</option>
+                                        <option value="t" {% if item.unidade == 't' %}selected{% endif %}>Tonelada</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="col-md-2">
+                                <div class="mb-3">
+                                    <label class="form-label">Valor Unitário</label>
+                                    <input type="number" class="form-control servico-valor-unitario" 
+                                           name="item_preco" value="{{ item.preco_unitario }}" step="0.01" onchange="calcularServico(this)">
+                                </div>
+                            </div>
+                            <div class="col-md-2">
+                                <div class="mb-3">
+                                    <label class="form-label">Total</label>
+                                    <input type="text" class="form-control servico-total" readonly 
+                                           value="R$ {{ '{:,.2f}'.format(item.quantidade * item.preco_unitario).replace(',', 'X').replace('.', ',').replace('X', '.') }}">
+                                </div>
+                            </div>
+                        </div>
+                        <button type="button" class="btn btn-sm btn-outline-danger" onclick="removerServico(this)">
+                            <i class="fas fa-trash"></i> Remover
+                        </button>
+                    </div>
+                    {% endfor %}
+                </div>
+                
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <button type="button" class="btn btn-outline-primary" onclick="adicionarServico()">
+                        <i class="fas fa-plus"></i> Adicionar Serviço
+                    </button>
+                    <div class="text-end">
+                        <h5>Total da Proposta: <span id="totalProposta">R$ {{ '{:,.2f}'.format(proposta.valor_total or 0).replace(',', 'X').replace('.', ',').replace('X', '.') }}</span></h5>
+                    </div>
+                </div>
+
+                <hr class="my-4">
+
+                <!-- Configurações Adicionais -->
+                <div class="row">
+                    <div class="col-md-6">
+                        <h6 class="text-primary mb-3">Condições</h6>
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label class="form-label">Prazo de Entrega (dias)</label>
+                                    <input type="number" class="form-control" name="prazo_entrega_dias" value="{{ proposta.prazo_entrega_dias }}" min="1">
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label class="form-label">Percentual Nota Fiscal (%)</label>
+                                    <input type="number" class="form-control" name="percentual_nota_fiscal" value="{{ proposta.percentual_nota_fiscal }}" step="0.01" min="0" max="100">
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label class="form-label">Condições de Pagamento</label>
+                            <textarea class="form-control" name="condicoes_pagamento" rows="3">{{ proposta.condicoes_pagamento or '' }}</textarea>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label class="form-label">Garantias</label>
+                            <textarea class="form-control" name="garantias" rows="3">{{ proposta.garantias or '' }}</textarea>
+                        </div>
+                    </div>
+                    
+                    <div class="col-md-6">
+                        <h6 class="text-primary mb-3">Itens Inclusos/Exclusos</h6>
+                        <div class="mb-3">
+                            <label class="form-label">Itens Inclusos</label>
+                            <textarea class="form-control" name="itens_inclusos" rows="4" placeholder="Separe os itens com ponto e vírgula (;)">{{ proposta.itens_inclusos|join(';') if proposta.itens_inclusos else '' }}</textarea>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label class="form-label">Itens Exclusos</label>
+                            <textarea class="form-control" name="itens_exclusos" rows="4" placeholder="Separe os itens com ponto e vírgula (;)">{{ proposta.itens_exclusos|join(';') if proposta.itens_exclusos else '' }}</textarea>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label class="form-label">Considerações Gerais</label>
+                            <textarea class="form-control" name="consideracoes_gerais" rows="3">{{ proposta.consideracoes_gerais or '' }}</textarea>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="text-end">
+                    <button type="button" class="btn btn-secondary me-2" onclick="history.back()">Cancelar</button>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-save me-2"></i>Salvar Alterações
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+function adicionarServico() {
+    const container = document.getElementById('servicosContainer');
+    const novoServico = document.createElement('div');
+    novoServico.className = 'servico-item border rounded p-3 mb-3';
+    novoServico.innerHTML = `
+        <div class="row">
+            <div class="col-md-4">
+                <div class="mb-3">
+                    <label class="form-label">Descrição do Serviço</label>
+                    <input type="text" class="form-control servico-descricao" 
+                           name="item_descricao" placeholder="Ex: Estrutura metálica">
+                </div>
+            </div>
+            <div class="col-md-2">
+                <div class="mb-3">
+                    <label class="form-label">Quantidade</label>
+                    <input type="number" class="form-control servico-quantidade" 
+                           name="item_quantidade" step="0.01" onchange="calcularServico(this)">
+                </div>
+            </div>
+            <div class="col-md-2">
+                <div class="mb-3">
+                    <label class="form-label">Unidade</label>
+                    <select class="form-select servico-unidade" name="item_unidade">
+                        <option value="m²">m²</option>
+                        <option value="m³">m³</option>
+                        <option value="un" selected>Unidade</option>
+                        <option value="kg">kg</option>
+                        <option value="t">Tonelada</option>
+                    </select>
+                </div>
+            </div>
+            <div class="col-md-2">
+                <div class="mb-3">
+                    <label class="form-label">Valor Unitário</label>
+                    <input type="number" class="form-control servico-valor-unitario" 
+                           name="item_preco" step="0.01" onchange="calcularServico(this)">
+                </div>
+            </div>
+            <div class="col-md-2">
+                <div class="mb-3">
+                    <label class="form-label">Total</label>
+                    <input type="text" class="form-control servico-total" readonly>
+                </div>
+            </div>
+        </div>
+        <button type="button" class="btn btn-sm btn-outline-danger" onclick="removerServico(this)">
+            <i class="fas fa-trash"></i> Remover
+        </button>
+    `;
+    container.appendChild(novoServico);
+}
+
+function removerServico(btn) {
+    const container = document.getElementById('servicosContainer');
+    if (container.children.length > 1) {
+        btn.closest('.servico-item').remove();
+        calcularTotal();
+    }
+}
+
+function calcularServico(input) {
+    const servicoItem = input.closest('.servico-item');
+    const quantidade = parseFloat(servicoItem.querySelector('.servico-quantidade').value) || 0;
+    const valorUnitario = parseFloat(servicoItem.querySelector('.servico-valor-unitario').value) || 0;
+    const total = quantidade * valorUnitario;
+    
+    servicoItem.querySelector('.servico-total').value = 'R$ ' + total.toFixed(2).replace('.', ',');
+    calcularTotal();
+}
+
+function calcularTotal() {
+    let total = 0;
+    document.querySelectorAll('.servico-item').forEach(item => {
+        const quantidade = parseFloat(item.querySelector('.servico-quantidade').value) || 0;
+        const valorUnitario = parseFloat(item.querySelector('.servico-valor-unitario').value) || 0;
+        total += quantidade * valorUnitario;
+    });
+    
+    document.getElementById('totalProposta').textContent = 'R$ ' + total.toFixed(2).replace('.', ',');
+}
+
+// Calcular total inicial
+document.addEventListener('DOMContentLoaded', function() {
+    calcularTotal();
+});
+</script>
+{% endblock %}
