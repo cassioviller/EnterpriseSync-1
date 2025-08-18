@@ -64,16 +64,23 @@ INFO:migrations:✅ Migrações automáticas concluídas com sucesso!
 
 ## Recent Changes (18/08/2025)
 
-### Migração de Schema Automática
-- Implementado sistema de migrações automáticas
+### Migração de Schema Automática - RESOLVIDO ✅
+- Implementado sistema de migrações automáticas completo
 - Resolvido problema de colunas faltantes na tabela proposta_templates
-- Sistema agora funciona tanto em desenvolvimento quanto em produção
-- Migrações são executadas automaticamente no deploy via Docker
+- Sistema detecta e cria automaticamente tabela completa se necessário
+- Migrações executadas automaticamente no deploy via Docker
+- **Status**: Funcionando em produção
+
+### Correção Admin ID - RESOLVIDO ✅
+- Corrigido erro "null value in column admin_id" na tabela configuracao_empresa
+- Adicionado admin_id ao MockCurrentUser no sistema de bypass
+- Implementada verificação segura de admin_id nas views
+- **Status**: Configurações da empresa funcionando normalmente
 
 ### Arquivos Adicionados
 - `migrations.py` - Sistema de migrações automáticas
-- `INSTRUCOES_PRODUCAO.md` - Instruções para banco de produção (depreciado)
-- `migration_production.sql` - Script SQL direto (depreciado)
+- `bypass_auth.py` - Atualizado com admin_id para desenvolvimento
+- `configuracoes_views.py` - Corrigido para tratar admin_id adequadamente
 
 ## User Preferences
 - Priorizar soluções automáticas que funcionem no deploy
