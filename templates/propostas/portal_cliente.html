@@ -163,8 +163,7 @@
             
             <div class="d-flex justify-content-between align-items-center">
                 <div>
-                    <h2 class="text-primary mb-0">Proposta {{ proposta.numero_proposta }}</h2>
-                    <p class="text-muted">{{ proposta.assunto }}</p>
+                    <h2 class="text-primary mb-0">Proposta {{ proposta.numero_proposta }} - {{ proposta.assunto }}</h2>
                 </div>
                 <div class="text-end">
                     {% if proposta.status == 'enviada' %}
@@ -217,7 +216,7 @@
 
         <!-- Tabela de Serviços -->
         <div class="proposal-card">
-            <h4 class="section-title">Tabela de Serviços</h4>
+            <h4 class="section-title">Tabela de Serviços - {{ proposta.assunto }}</h4>
             <div class="service-table">
                 <div class="table-responsive">
                     <table class="table table-hover">
