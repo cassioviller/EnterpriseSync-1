@@ -2224,6 +2224,12 @@ class ConfiguracaoEmpresa(db.Model):
     email = db.Column(db.String(120))
     website = db.Column(db.String(200))
     logo_url = db.Column(db.String(500))
+    logo_base64 = db.Column(db.Text)  # Logo em base64 para upload direto
+    
+    # Personalização visual
+    cor_primaria = db.Column(db.String(7), default='#007bff')  # Cor primária em hexadecimal
+    cor_secundaria = db.Column(db.String(7), default='#6c757d')  # Cor secundária
+    cor_fundo_proposta = db.Column(db.String(7), default='#f8f9fa')  # Cor de fundo das propostas
     
     # Dados padrão para propostas
     itens_inclusos_padrao = db.Column(db.Text)
@@ -2254,6 +2260,10 @@ class ConfiguracaoEmpresa(db.Model):
             'email': self.email,
             'website': self.website,
             'logo_url': self.logo_url,
+            'logo_base64': self.logo_base64,
+            'cor_primaria': self.cor_primaria,
+            'cor_secundaria': self.cor_secundaria,
+            'cor_fundo_proposta': self.cor_fundo_proposta,
             'itens_inclusos_padrao': self.itens_inclusos_padrao,
             'itens_exclusos_padrao': self.itens_exclusos_padrao,
             'condicoes_padrao': self.condicoes_padrao,

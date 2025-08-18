@@ -46,6 +46,48 @@ login_manager.init_app(app)
 login_manager.login_view = 'main.login'
 login_manager.login_message = 'Por favor, faça login para acessar esta página.'
 
+# Context processor para configurações da empresa
+@app.context_processor
+def inject_company_config():
+    """Injeta configurações da empresa em todos os templates"""
+    try:
+        from flask_login import current_user
+        from models import ConfiguracaoEmpresa
+        
+        if current_user and current_user.is_authenticated:
+            admin_id = getattr(current_user, 'admin_id', None) or current_user.id
+            config_empresa = ConfiguracaoEmpresa.query.filter_by(admin_id=admin_id).first()
+            
+            if config_empresa:
+                return {
+                    'config_empresa': config_empresa,
+                    'empresa_cores': {
+                        'primaria': config_empresa.cor_primaria or '#007bff',
+                        'secundaria': config_empresa.cor_secundaria or '#6c757d',
+                        'fundo_proposta': config_empresa.cor_fundo_proposta or '#f8f9fa'
+                    }
+                }
+        
+        # Valores padrão se não houver configuração
+        return {
+            'config_empresa': None,
+            'empresa_cores': {
+                'primaria': '#007bff',
+                'secundaria': '#6c757d', 
+                'fundo_proposta': '#f8f9fa'
+            }
+        }
+    except Exception:
+        # Fallback em caso de erro
+        return {
+            'config_empresa': None,
+            'empresa_cores': {
+                'primaria': '#007bff',
+                'secundaria': '#6c757d',
+                'fundo_proposta': '#f8f9fa'
+            }
+        }
+
 csrf = CSRFProtect()
 csrf.init_app(app)
 

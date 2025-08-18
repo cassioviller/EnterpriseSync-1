@@ -27,6 +27,9 @@ def executar_migracoes():
         # Migração 3: Tornar campos assunto e objeto opcionais em propostas_comerciais
         migrar_campos_opcionais_propostas()
         
+        # Migração 4: Adicionar campos de personalização visual na configuração da empresa
+        migrar_personalizacao_visual_empresa()
+        
         
     except Exception as e:
         logger.error(f"❌ Erro durante migrações automáticas: {e}")
@@ -73,8 +76,51 @@ def migrar_campos_opcionais_propostas():
             
     except Exception as e:
         logger.error(f"❌ Erro ao atualizar campos opcionais: {str(e)}")
+
+def migrar_personalizacao_visual_empresa():
+    """
+    Adiciona colunas de personalização visual na tabela configuracao_empresa
+    """
+    try:
+        connection = db.engine.raw_connection()
+        cursor = connection.cursor()
+        
+        # Lista de colunas para adicionar
+        colunas_novas = [
+            ('logo_base64', 'TEXT'),
+            ('cor_primaria', 'VARCHAR(7) DEFAULT \'#007bff\''),
+            ('cor_secundaria', 'VARCHAR(7) DEFAULT \'#6c757d\''),
+            ('cor_fundo_proposta', 'VARCHAR(7) DEFAULT \'#f8f9fa\'')
+        ]
+        
+        for nome_coluna, tipo_coluna in colunas_novas:
+            # Verificar se a coluna já existe
+            cursor.execute("""
+                SELECT column_name 
+                FROM information_schema.columns 
+                WHERE table_name = 'configuracao_empresa' 
+                AND column_name = %s
+            """, (nome_coluna,))
+            
+            exists = cursor.fetchone()
+            
+            if not exists:
+                logger.info(f"🔄 Adicionando coluna '{nome_coluna}' na tabela configuracao_empresa...")
+                cursor.execute(f"ALTER TABLE configuracao_empresa ADD COLUMN {nome_coluna} {tipo_coluna}")
+                logger.info(f"✅ Coluna '{nome_coluna}' adicionada com sucesso")
+            else:
+                logger.info(f"✅ Coluna '{nome_coluna}' já existe na tabela configuracao_empresa")
+        
+        connection.commit()
+        cursor.close()
+        connection.close()
+        
+    except Exception as e:
+        logger.error(f"❌ Erro ao adicionar colunas de personalização visual: {str(e)}")
         if 'connection' in locals():
             connection.rollback()
+            cursor.close()
+            connection.close()
             cursor.close()
             connection.close()
 

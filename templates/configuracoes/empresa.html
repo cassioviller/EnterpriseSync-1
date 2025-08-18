@@ -84,6 +84,65 @@
 
                         <hr class="my-4">
 
+                        <!-- Personalização Visual -->
+                        <h6 class="mb-3">
+                            <i class="fas fa-palette me-2"></i>
+                            Personalização Visual
+                        </h6>
+
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="logo_upload" class="form-label">Logo da Empresa</label>
+                                    <div class="d-flex align-items-center gap-3">
+                                        {% if config and config.logo_base64 %}
+                                            <img id="logo_preview" src="data:image/png;base64,{{ config.logo_base64 }}" 
+                                                 alt="Logo atual" style="width: 60px; height: 60px; object-fit: contain; border: 1px solid #ddd; border-radius: 4px;">
+                                        {% else %}
+                                            <div id="logo_preview" style="width: 60px; height: 60px; border: 2px dashed #ddd; border-radius: 4px; display: flex; align-items: center; justify-content: center;">
+                                                <i class="fas fa-image text-muted"></i>
+                                            </div>
+                                        {% endif %}
+                                        <div class="flex-grow-1">
+                                            <input type="file" class="form-control" id="logo_upload" accept="image/*">
+                                            <small class="text-muted">Formatos: PNG, JPG. Tamanho máximo: 2MB</small>
+                                        </div>
+                                    </div>
+                                    <input type="hidden" id="logo_base64" name="logo_base64" value="{{ config.logo_base64 if config else '' }}">
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="row">
+                                    <div class="col-12">
+                                        <div class="mb-3">
+                                            <label for="cor_primaria" class="form-label">Cor Primária</label>
+                                            <div class="d-flex align-items-center gap-2">
+                                                <input type="color" class="form-control form-control-color" id="cor_primaria" name="cor_primaria" 
+                                                       value="{{ config.cor_primaria if config else '#007bff' }}" style="width: 50px;">
+                                                <input type="text" class="form-control" id="cor_primaria_text" readonly 
+                                                       value="{{ config.cor_primaria if config else '#007bff' }}">
+                                            </div>
+                                            <small class="text-muted">Cor principal dos botões e elementos</small>
+                                        </div>
+                                    </div>
+                                    <div class="col-12">
+                                        <div class="mb-3">
+                                            <label for="cor_fundo_proposta" class="form-label">Cor de Fundo das Propostas</label>
+                                            <div class="d-flex align-items-center gap-2">
+                                                <input type="color" class="form-control form-control-color" id="cor_fundo_proposta" name="cor_fundo_proposta" 
+                                                       value="{{ config.cor_fundo_proposta if config else '#f8f9fa' }}" style="width: 50px;">
+                                                <input type="text" class="form-control" id="cor_fundo_proposta_text" readonly 
+                                                       value="{{ config.cor_fundo_proposta if config else '#f8f9fa' }}">
+                                            </div>
+                                            <small class="text-muted">Cor de fundo das propostas PDF</small>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <hr class="my-4">
+
                         <!-- Configurações Padrão -->
                         <h6 class="mb-3">
                             <i class="fas fa-sliders-h me-2"></i>
@@ -188,6 +247,66 @@ document.getElementById('telefone').addEventListener('input', function(e) {
     value = value.replace(/^(\d{2})(\d)/, '($1) $2');
     value = value.replace(/(\d{4})(\d)/, '$1-$2');
     e.target.value = value;
+});
+
+// Upload de logo
+document.getElementById('logo_upload').addEventListener('change', function(e) {
+    const file = e.target.files[0];
+    if (file) {
+        // Verificar tamanho do arquivo (max 2MB)
+        if (file.size > 2 * 1024 * 1024) {
+            alert('O arquivo é muito grande. O tamanho máximo é 2MB.');
+            e.target.value = '';
+            return;
+        }
+        
+        // Verificar tipo do arquivo
+        if (!file.type.startsWith('image/')) {
+            alert('Por favor, selecione apenas arquivos de imagem.');
+            e.target.value = '';
+            return;
+        }
+        
+        const reader = new FileReader();
+        reader.onload = function(event) {
+            const base64String = event.target.result.split(',')[1]; // Remove o prefixo data:image/...;base64,
+            document.getElementById('logo_base64').value = base64String;
+            
+            // Atualizar preview
+            const preview = document.getElementById('logo_preview');
+            if (preview.tagName === 'IMG') {
+                preview.src = event.target.result;
+            } else {
+                // Substituir div por img
+                const img = document.createElement('img');
+                img.id = 'logo_preview';
+                img.src = event.target.result;
+                img.alt = 'Preview da logo';
+                img.style.cssText = 'width: 60px; height: 60px; object-fit: contain; border: 1px solid #ddd; border-radius: 4px;';
+                preview.parentNode.replaceChild(img, preview);
+            }
+        };
+        reader.readAsDataURL(file);
+    }
+});
+
+// Sincronização dos campos de cor
+document.getElementById('cor_primaria').addEventListener('input', function(e) {
+    document.getElementById('cor_primaria_text').value = e.target.value;
+});
+
+document.getElementById('cor_fundo_proposta').addEventListener('input', function(e) {
+    document.getElementById('cor_fundo_proposta_text').value = e.target.value;
+});
+
+// Aplicar cores em tempo real para preview
+document.getElementById('cor_primaria').addEventListener('change', function(e) {
+    // Aplicar cor primária aos botões para preview
+    const buttons = document.querySelectorAll('.btn-success');
+    buttons.forEach(btn => {
+        btn.style.backgroundColor = e.target.value;
+        btn.style.borderColor = e.target.value;
+    });
 });
 </script>
 {% endblock %}

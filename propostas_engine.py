@@ -297,7 +297,7 @@ class PropostasEngine:
     
     def gerar_pdf_proposta(self, proposta_id):
         """
-        Gera PDF profissional da proposta
+        Gera PDF profissional da proposta com personalização visual da empresa
         
         Args:
             proposta_id: ID da proposta
@@ -308,6 +308,10 @@ class PropostasEngine:
         proposta = Proposta.query.get(proposta_id)
         if not proposta:
             return None
+        
+        # Carregar configurações da empresa
+        from models import ConfiguracaoEmpresa
+        config_empresa = ConfiguracaoEmpresa.query.filter_by(admin_id=proposta.admin_id).first()
         
         # Cria arquivo temporário
         temp_file = tempfile.NamedTemporaryFile(delete=False, suffix='.pdf')
@@ -325,15 +329,21 @@ class PropostasEngine:
                 bottomMargin=2*cm
             )
             
-            # Estilos
+            # Estilos personalizados baseados na configuração da empresa
             styles = getSampleStyleSheet()
+            
+            # Cores padrão (fallback se não houver configuração)
+            cor_primaria = colors.HexColor(config_empresa.cor_primaria if config_empresa and config_empresa.cor_primaria else '#007bff')
+            cor_fundo = colors.HexColor(config_empresa.cor_fundo_proposta if config_empresa and config_empresa.cor_fundo_proposta else '#f8f9fa')
+            
             title_style = ParagraphStyle(
                 'CustomTitle',
                 parent=styles['Heading1'],
                 fontSize=18,
                 spaceAfter=30,
                 alignment=TA_CENTER,
-                textColor=colors.darkblue
+                textColor=cor_primaria,
+                backColor=cor_fundo
             )
             
             heading_style = ParagraphStyle(
@@ -341,7 +351,7 @@ class PropostasEngine:
                 parent=styles['Heading2'],
                 fontSize=14,
                 spaceAfter=12,
-                textColor=colors.darkblue
+                textColor=cor_primaria
             )
             
             normal_style = styles['Normal']
@@ -355,20 +365,69 @@ class PropostasEngine:
             story.append(Paragraph(f"Nº {proposta.numero_proposta}", styles['Heading3']))
             story.append(Spacer(1, 20))
             
-            # Dados da empresa (você pode personalizar)
-            empresa_data = [
-                ['ESTRUTURAS DO VALE LTDA'],
-                ['CNPJ: 00.000.000/0001-00'],
-                ['Endereço: Sua cidade, Estado'],
-                ['Telefone: (00) 0000-0000'],
-                ['Email: contato@estruturasdovale.com.br']
-            ]
+            # Seção da empresa com logo (se disponível)
+            if config_empresa and config_empresa.logo_base64:
+                # Adicionar logo da empresa
+                try:
+                    import base64
+                    logo_data = base64.b64decode(config_empresa.logo_base64)
+                    logo_img = Image(BytesIO(logo_data))
+                    logo_img.drawHeight = 1*cm
+                    logo_img.drawWidth = 2*cm
+                    
+                    # Tabela com logo e dados da empresa
+                    empresa_data = [
+                        [logo_img, Paragraph(config_empresa.nome_empresa or 'NOME DA EMPRESA', heading_style)],
+                        ['', f"CNPJ: {config_empresa.cnpj or 'Não informado'}"],
+                        ['', config_empresa.endereco or 'Endereço não informado'],
+                        ['', f"Telefone: {config_empresa.telefone or 'Não informado'}"],
+                        ['', f"Email: {config_empresa.email or 'Não informado'}"]
+                    ]
+                    empresa_table = Table(empresa_data, colWidths=[3*cm, 10*cm])
+                    empresa_table.setStyle(TableStyle([
+                        ('FONTSIZE', (0, 0), (-1, -1), 10),
+                        ('ALIGN', (0, 0), (0, -1), 'CENTER'),
+                        ('ALIGN', (1, 0), (-1, -1), 'LEFT'),
+                        ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+                        ('ROWBACKGROUNDS', (0, 0), (-1, -1), [cor_fundo, colors.white]),
+                    ]))
+                except Exception as e:
+                    # Se erro com logo, usar apenas dados textuais
+                    empresa_data = [
+                        [config_empresa.nome_empresa or 'NOME DA EMPRESA'],
+                        [f"CNPJ: {config_empresa.cnpj or 'Não informado'}"],
+                        [config_empresa.endereco or 'Endereço não informado'],
+                        [f"Telefone: {config_empresa.telefone or 'Não informado'}"],
+                        [f"Email: {config_empresa.email or 'Não informado'}"]
+                    ]
+                    empresa_table = Table(empresa_data, colWidths=[13*cm])
+                    empresa_table.setStyle(TableStyle([
+                        ('FONTSIZE', (0, 0), (-1, -1), 10),
+                        ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+                        ('ROWBACKGROUNDS', (0, 0), (-1, -1), [cor_fundo, colors.white]),
+                    ]))
+            else:
+                # Dados da empresa sem logo
+                nome_empresa = config_empresa.nome_empresa if config_empresa else 'NOME DA EMPRESA'
+                cnpj = config_empresa.cnpj if config_empresa else 'Configure os dados da empresa'
+                endereco = config_empresa.endereco if config_empresa else 'Configure os dados da empresa nas configurações'
+                telefone = config_empresa.telefone if config_empresa else '(00) 0000-0000'
+                email = config_empresa.email if config_empresa else 'contato@empresa.com'
+                
+                empresa_data = [
+                    [nome_empresa],
+                    [f"CNPJ: {cnpj}"],
+                    [endereco],
+                    [f"Telefone: {telefone}"],
+                    [f"Email: {email}"]
+                ]
+                empresa_table = Table(empresa_data, colWidths=[13*cm])
+                empresa_table.setStyle(TableStyle([
+                    ('FONTSIZE', (0, 0), (-1, -1), 10),
+                    ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+                    ('ROWBACKGROUNDS', (0, 0), (-1, -1), [cor_fundo, colors.white]),
+                ]))
             
-            empresa_table = Table(empresa_data, colWidths=[10*cm])
-            empresa_table.setStyle(TableStyle([
-                ('FONTSIZE', (0, 0), (-1, -1), 10),
-                ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
-            ]))
             story.append(empresa_table)
             story.append(Spacer(1, 20))
             

@@ -52,6 +52,16 @@ def salvar_empresa():
         config.email = request.form.get('email')
         config.website = request.form.get('website')
         
+        # Upload de logo em base64
+        logo_base64 = request.form.get('logo_base64')
+        if logo_base64:
+            config.logo_base64 = logo_base64
+        
+        # Personalização visual
+        config.cor_primaria = request.form.get('cor_primaria', '#007bff')
+        config.cor_secundaria = request.form.get('cor_secundaria', '#6c757d')
+        config.cor_fundo_proposta = request.form.get('cor_fundo_proposta', '#f8f9fa')
+        
         # Dados para propostas
         config.itens_inclusos_padrao = request.form.get('itens_inclusos_padrao')
         config.itens_exclusos_padrao = request.form.get('itens_exclusos_padrao')
