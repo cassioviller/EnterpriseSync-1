@@ -82,7 +82,7 @@
                                         {% endif %}
                                     </div>
                                 </td>
-                                <td>{{ proposta.assunto[:50] }}{% if proposta.assunto|length > 50 %}...{% endif %}</td>
+                                <td>{% if proposta.assunto %}{{ proposta.assunto[:50] }}{% if proposta.assunto|length > 50 %}...{% endif %}{% else %}-{% endif %}</td>
                                 <td>
                                     <strong class="text-success">R$ {{ "{:,.2f}".format(proposta.valor_total or 0).replace(',', 'X').replace('.', ',').replace('X', '.') }}</strong>
                                 </td>

@@ -273,8 +273,8 @@ def criar_proposta():
         proposta.cliente_telefone = request.form.get('cliente_telefone')
         proposta.cliente_email = request.form.get('cliente_email')
         proposta.cliente_endereco = request.form.get('cliente_endereco')
-        proposta.assunto = request.form.get('assunto')
-        proposta.objeto = request.form.get('objeto')
+        proposta.assunto = request.form.get('assunto') or None
+        proposta.objeto = request.form.get('objeto') or None
         proposta.documentos_referencia = request.form.get('documentos_referencia')
         proposta.prazo_entrega_dias = int(request.form.get('prazo_entrega_dias', 90))
         proposta.observacoes_entrega = request.form.get('observacoes_entrega')
