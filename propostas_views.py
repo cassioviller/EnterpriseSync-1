@@ -219,24 +219,34 @@ def criar_teste_template(template_id):
         return jsonify({'error': f'Erro ao criar proposta de teste: {str(e)}'}), 500
 
 @propostas_bp.route('/nova')
+@login_required
+@admin_required
 def nova_proposta():
     """Formulário para criar nova proposta"""
-    # Simular usuário Vale Verde (ID 10) - mesmo que o bypass
-    admin_id = 10
+    # Obter admin_id do usuário atual com fallback seguro
+    try:
+        admin_id = getattr(current_user, 'admin_id', None) or getattr(current_user, 'id', 10)
+        user_id = getattr(current_user, 'id', 10)
+        print(f"DEBUG: NOVA PROPOSTA - Admin ID {admin_id} (user_id: {user_id})")
+    except Exception as e:
+        print(f"DEBUG: Erro ao obter user info: {e}")
+        admin_id = 10  # Fallback para desenvolvimento
+        user_id = 10
+        print(f"DEBUG: Usando fallback - Admin ID {admin_id}")
     
-    print(f"DEBUG: NOVA PROPOSTA - Admin ID {admin_id}")
-    
-    # Buscar apenas templates próprios do usuário (sem públicos)
+    # Buscar templates próprios e públicos
     templates = PropostaTemplate.query.filter(
-        PropostaTemplate.admin_id == admin_id,
+        db.or_(
+            PropostaTemplate.admin_id == admin_id,  # Templates próprios
+            PropostaTemplate.publico == True        # Templates públicos
+        ),
         PropostaTemplate.ativo == True
-    ).all()
+    ).order_by(PropostaTemplate.nome).all()
     
-    print(f"DEBUG: Admin ID {admin_id} - encontrou {len(templates)} templates próprios")
+    print(f"DEBUG: Admin ID {admin_id} - encontrou {len(templates)} templates (próprios + públicos)")
     for t in templates:
-        print(f"DEBUG: Template {t.id}: {t.nome} (admin_id={t.admin_id}, publico={t.publico})")
-    
-    print(f"DEBUG: Enviando {len(templates)} templates para o template HTML")
+        tipo = "próprio" if t.admin_id == admin_id else "público"
+        print(f"DEBUG: Template {t.id}: {t.nome} ({tipo}, admin_id={t.admin_id})")
     
     # Obter configurações da empresa
     config_empresa = ConfiguracaoEmpresa.query.filter_by(admin_id=admin_id).first()
@@ -273,7 +283,8 @@ def criar_proposta():
         proposta.condicoes_pagamento = request.form.get('condicoes_pagamento')
         proposta.garantias = request.form.get('garantias')
         proposta.consideracoes_gerais = request.form.get('consideracoes_gerais')
-        proposta.criado_por = current_user.id
+        proposta.criado_por = getattr(current_user, 'id', 10)
+        proposta.admin_id = getattr(current_user, 'admin_id', None) or getattr(current_user, 'id', 10)
         
         # Itens inclusos/exclusos
         itens_inclusos = request.form.getlist('itens_inclusos')
