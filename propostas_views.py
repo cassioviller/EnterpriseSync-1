@@ -604,8 +604,24 @@ def excluir_proposta(id):
 @propostas_bp.route('/cliente/<token>')
 def portal_cliente(token):
     """Portal para o cliente visualizar e aprovar proposta"""
+    from models import ConfiguracaoEmpresa
+    
     proposta = PropostaComercialSIGE.query.filter_by(token_cliente=token).first_or_404()
-    return render_template('propostas/portal_cliente.html', proposta=proposta)
+    
+    # Carregar configurações da empresa para personalização
+    config_empresa = ConfiguracaoEmpresa.query.filter_by(admin_id=proposta.admin_id).first()
+    
+    # Configurar cores personalizadas
+    cores_empresa = {
+        'primaria': config_empresa.cor_primaria if config_empresa and config_empresa.cor_primaria else '#007bff',
+        'secundaria': config_empresa.cor_secundaria if config_empresa and config_empresa.cor_secundaria else '#6c757d',
+        'fundo_proposta': config_empresa.cor_fundo_proposta if config_empresa and config_empresa.cor_fundo_proposta else '#f8f9fa'
+    }
+    
+    return render_template('propostas/portal_cliente.html', 
+                         proposta=proposta, 
+                         config_empresa=config_empresa,
+                         empresa_cores=cores_empresa)
 
 @propostas_bp.route('/cliente/<token>/aprovar', methods=['POST'])
 def aprovar_proposta(token):
