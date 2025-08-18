@@ -1,0 +1,110 @@
+ Erro 500
+Erro inesperado no sistema
+Ocorreu um erro interno no servidor. Nossa equipe foi notificada.
+
+ Detalhes Técnicos do Erro:
+EXCEÇÃO NÃO TRATADA: (psycopg2.errors.UndefinedColumn) column proposta_templates.categoria does not exist
+LINE 2: ...plates.descricao AS proposta_templates_descricao, proposta_t...
+                                                             ^
+
+[SQL: SELECT count(*) AS count_1 
+FROM (SELECT proposta_templates.id AS proposta_templates_id, proposta_templates.nome AS proposta_templates_nome, proposta_templates.descricao AS proposta_templates_descricao, proposta_templates.categoria AS proposta_templates_categoria, proposta_templates.itens_padrao AS proposta_templates_itens_padrao, proposta_templates.prazo_entrega_dias AS proposta_templates_prazo_entrega_dias, proposta_templates.validade_dias AS proposta_templates_validade_dias, proposta_templates.percentual_nota_fiscal AS proposta_templates_percentual_nota_fiscal, proposta_templates.itens_inclusos AS proposta_templates_itens_inclusos, proposta_templates.itens_exclusos AS proposta_templates_itens_exclusos, proposta_templates.condicoes AS proposta_templates_condicoes, proposta_templates.condicoes_pagamento AS proposta_templates_condicoes_pagamento, proposta_templates.garantias AS proposta_templates_garantias, proposta_templates.ativo AS proposta_templates_ativo, proposta_templates.publico AS proposta_templates_publico, proposta_templates.uso_contador AS proposta_templates_uso_contador, proposta_templates.admin_id AS proposta_templates_admin_id, proposta_templates.criado_por AS proposta_templates_criado_por, proposta_templates.criado_em AS proposta_templates_criado_em, proposta_templates.atualizado_em AS proposta_templates_atualizado_em 
+FROM proposta_templates 
+WHERE proposta_templates.admin_id = %(admin_id_1)s) AS anon_1]
+[parameters: {'admin_id_1': 2}]
+(Background on this error at: https://sqlalche.me/e/20/f405)
+
+URL: https://www.sige.cassioviller.tech/templates/
+MÉTODO: GET
+TIMESTAMP: 18/08/2025 10:55:34
+TIPO DO ERRO: ProgrammingError
+
+TRACEBACK COMPLETO:
+Traceback (most recent call last):
+  File "/usr/local/lib/python3.11/site-packages/sqlalchemy/engine/base.py", line 1967, in _exec_single_context
+    self.dialect.do_execute(
+  File "/usr/local/lib/python3.11/site-packages/sqlalchemy/engine/default.py", line 951, in do_execute
+    cursor.execute(statement, parameters)
+psycopg2.errors.UndefinedColumn: column proposta_templates.categoria does not exist
+LINE 2: ...plates.descricao AS proposta_templates_descricao, proposta_t...
+                                                             ^
+
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/usr/local/lib/python3.11/site-packages/flask/app.py", line 917, in full_dispatch_request
+    rv = self.dispatch_request()
+         ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.11/site-packages/flask/app.py", line 902, in dispatch_request
+    return self.ensure_sync(self.view_functions[rule.endpoint])(**view_args)  # type: ignore[no-any-return]
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.11/site-packages/flask_login/utils.py", line 290, in decorated_view
+    return current_app.ensure_sync(func)(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/app/templates_views.py", line 24, in decorated_function
+    return f(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^
+  File "/app/templates_views.py", line 68, in dashboard
+    total_templates = PropostaTemplate.query.filter_by(admin_id=admin_id).count()
+                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.11/site-packages/sqlalchemy/orm/query.py", line 3146, in count
+    self._legacy_from_self(col).enable_eagerloads(False).scalar()
+  File "/usr/local/lib/python3.11/site-packages/sqlalchemy/orm/query.py", line 2835, in scalar
+    ret = self.one()
+          ^^^^^^^^^^
+  File "/usr/local/lib/python3.11/site-packages/sqlalchemy/orm/query.py", line 2808, in one
+    return self._iter().one()  # type: ignore
+           ^^^^^^^^^^^^
+  File "/usr/local/lib/python3.11/site-packages/sqlalchemy/orm/query.py", line 2857, in _iter
+    result: Union[ScalarResult[_T], Result[_T]] = self.session.execute(
+                                                  ^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.11/site-packages/sqlalchemy/orm/session.py", line 2365, in execute
+    return self._execute_internal(
+           ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.11/site-packages/sqlalchemy/orm/session.py", line 2251, in _execute_internal
+    result: Result[Any] = compile_state_cls.orm_execute_statement(
+                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.11/site-packages/sqlalchemy/orm/context.py", line 306, in orm_execute_statement
+    result = conn.execute(
+             ^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.11/site-packages/sqlalchemy/engine/base.py", line 1419, in execute
+    return meth(
+           ^^^^^
+  File "/usr/local/lib/python3.11/site-packages/sqlalchemy/sql/elements.py", line 526, in _execute_on_connection
+    return connection._execute_clauseelement(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.11/site-packages/sqlalchemy/engine/base.py", line 1641, in _execute_clauseelement
+    ret = self._execute_context(
+          ^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.11/site-packages/sqlalchemy/engine/base.py", line 1846, in _execute_context
+    return self._exec_single_context(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.11/site-packages/sqlalchemy/engine/base.py", line 1986, in _exec_single_context
+    self._handle_dbapi_exception(
+  File "/usr/local/lib/python3.11/site-packages/sqlalchemy/engine/base.py", line 2355, in _handle_dbapi_exception
+    raise sqlalchemy_exception.with_traceback(exc_info[2]) from e
+  File "/usr/local/lib/python3.11/site-packages/sqlalchemy/engine/base.py", line 1967, in _exec_single_context
+    self.dialect.do_execute(
+  File "/usr/local/lib/python3.11/site-packages/sqlalchemy/engine/default.py", line 951, in do_execute
+    cursor.execute(statement, parameters)
+sqlalchemy.exc.ProgrammingError: (psycopg2.errors.UndefinedColumn) column proposta_templates.categoria does not exist
+LINE 2: ...plates.descricao AS proposta_templates_descricao, proposta_t...
+                                                             ^
+
+[SQL: SELECT count(*) AS count_1 
+FROM (SELECT proposta_templates.id AS proposta_templates_id, proposta_templates.nome AS proposta_templates_nome, proposta_templates.descricao AS proposta_templates_descricao, proposta_templates.categoria AS proposta_templates_categoria, proposta_templates.itens_padrao AS proposta_templates_itens_padrao, proposta_templates.prazo_entrega_dias AS proposta_templates_prazo_entrega_dias, proposta_templates.validade_dias AS proposta_templates_validade_dias, proposta_templates.percentual_nota_fiscal AS proposta_templates_percentual_nota_fiscal, proposta_templates.itens_inclusos AS proposta_templates_itens_inclusos, proposta_templates.itens_exclusos AS proposta_templates_itens_exclusos, proposta_templates.condicoes AS proposta_templates_condicoes, proposta_templates.condicoes_pagamento AS proposta_templates_condicoes_pagamento, proposta_templates.garantias AS proposta_templates_garantias, proposta_templates.ativo AS proposta_templates_ativo, proposta_templates.publico AS proposta_templates_publico, proposta_templates.uso_contador AS proposta_templates_uso_contador, proposta_templates.admin_id AS proposta_templates_admin_id, proposta_templates.criado_por AS proposta_templates_criado_por, proposta_templates.criado_em AS proposta_templates_criado_em, proposta_templates.atualizado_em AS proposta_templates_atualizado_em 
+FROM proposta_templates 
+WHERE proposta_templates.admin_id = %(admin_id_1)s) AS anon_1]
+[parameters: {'admin_id_1': 2}]
+(Background on this error at: https://sqlalche.me/e/20/f405)
+
+
+CONTEXTO DA REQUISIÇÃO:
+- Headers: {'Host': 'www.sige.cassioviller.tech', 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Safari/537.36', 'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7', 'Accept-Encoding': 'gzip, deflate, br, zstd', 'Accept-Language': 'pt-BR,pt;q=0.9,en-US;q=0.8,en;q=0.7', 'Cookie': 'session=.eJwlzksKAjEQRdG9ZOygUqlUEjfT1C_oTPojiLh3Wxw-uA_OOy1zje2Wrvt6xCUtd0_XJM1popBjK1PMSHLmAuqt5ugyjCHIybkGB1KrCFOxcDUiiAEwUTVL53m-IWoF0j7Yzs5toBVoFiA6WLk5lBBkopg9u3JnTCfk2GL9a35TXw_ZtkVsvz_jj_18ARjeN1I.aKMGnw.sNuIktGscHg7YpBvPN_Rw5arutU', 'Dnt': '1', 'Priority': 'u=0, i', 'Referer': 'https://www.sige.cassioviller.tech/dashboard', 'Sec-Ch-Ua': '"Not;A=Brand";v="99", "Google Chrome";v="139", "Chromium";v="139"', 'Sec-Ch-Ua-Mobile': '?0', 'Sec-Ch-Ua-Platform': '"Windows"', 'Sec-Fetch-Dest': 'document', 'Sec-Fetch-Mode': 'navigate', 'Sec-Fetch-Site': 'same-origin', 'Sec-Fetch-User': '?1', 'Upgrade-Insecure-Requests': '1', 'X-Forwarded-For': '177.62.67.196', 'X-Forwarded-Host': 'www.sige.cassioviller.tech', 'X-Forwarded-Port': '443', 'X-Forwarded-Proto': 'https', 'X-Forwarded-Server': '337e056cfbb6', 'X-Real-Ip': '177.62.67.196'}
+- Args: {}
+- Form: Nenhum
+- JSON: Não é JSON
+ URL que causou o erro:
+https://www.sige.cassioviller.tech/templates/
+ Horário do erro:
