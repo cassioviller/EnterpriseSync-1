@@ -47,7 +47,7 @@ def get_file_category(filename):
 @propostas_bp.route('/')
 @login_required
 @admin_required
-def listar_propostas():
+def index():
     """Lista todas as propostas"""
     page = request.args.get('page', 1, type=int)
     status_filter = request.args.get('status', '')

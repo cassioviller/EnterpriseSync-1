@@ -134,7 +134,7 @@
                     <ul class="pagination justify-content-center">
                         {% if propostas.has_prev %}
                             <li class="page-item">
-                                <a class="page-link" href="{{ url_for('propostas.listar_propostas', page=propostas.prev_num, status=status_filter, cliente=cliente_filter) }}">Anterior</a>
+                                <a class="page-link" href="{{ url_for('propostas.index', page=propostas.prev_num, status=status_filter, cliente=cliente_filter) }}">Anterior</a>
                             </li>
                         {% endif %}
                         
