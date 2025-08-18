@@ -14,7 +14,7 @@
             <p class="text-muted mb-0">{{ proposta.cliente_nome }} - {{ proposta.assunto }}</p>
         </div>
         <div class="btn-group">
-            <a href="{{ url_for('propostas.listar_propostas') }}" class="btn btn-secondary">
+            <a href="{{ url_for('propostas.index') }}" class="btn btn-secondary">
                 <i class="fas fa-arrow-left me-2"></i>Voltar
             </a>
             <a href="{{ url_for('propostas.editar_proposta', id=proposta.id) }}" class="btn btn-warning">
