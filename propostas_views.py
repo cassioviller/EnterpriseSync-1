@@ -582,7 +582,7 @@ def excluir_proposta(id):
         db.session.commit()
         
         flash('Proposta excluída com sucesso!', 'success')
-        return redirect(url_for('propostas.listar_propostas'))
+        return redirect(url_for('propostas.index'))
         
     except Exception as e:
         db.session.rollback()

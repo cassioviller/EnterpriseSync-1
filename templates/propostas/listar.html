@@ -114,12 +114,11 @@
                                            class="btn btn-outline-success" title="PDF" target="_blank">
                                             <i class="fas fa-file-pdf"></i>
                                         </a>
-                                        {% if proposta.status == 'rascunho' %}
                                         <button type="button" class="btn btn-outline-danger" 
-                                                onclick="excluirProposta({{ proposta.id }})" title="Excluir">
+                                                onclick="confirmarExclusao({{ proposta.id }}, '{{ proposta.numero_proposta }}', '{{ proposta.cliente_nome }}')" 
+                                                title="Excluir">
                                             <i class="fas fa-trash"></i>
                                         </button>
-                                        {% endif %}
                                     </div>
                                 </td>
                             </tr>
@@ -201,9 +200,19 @@
 </div>
 
 <script>
+function confirmarExclusao(id, numero, cliente) {
+    if (confirm(`Tem certeza que deseja excluir a proposta ${numero} do cliente ${cliente}?\n\nEsta ação não pode ser desfeita.`)) {
+        excluirProposta(id);
+    }
+}
+
 function excluirProposta(id) {
-    document.getElementById('formExcluir').action = '/propostas/' + id + '/excluir';
-    new bootstrap.Modal(document.getElementById('modalExcluir')).show();
+    // Criar formulário e submeter via POST tradicional (não AJAX)
+    const form = document.createElement('form');
+    form.method = 'POST';
+    form.action = `/propostas/${id}/excluir`;
+    document.body.appendChild(form);
+    form.submit();
 }
 </script>
 {% endblock %}
