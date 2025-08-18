@@ -1,72 +1,88 @@
-# SIGE - Sistema Integrado de Gestão Empresarial
+# SIGE - Sistema de Gestão Empresarial
 
 ## Overview
-SIGE (Sistema Integrado de Gestão Empresarial) is a comprehensive business management system designed for construction companies, specifically "Estruturas do Vale". It provides integrated management for employees, projects, vehicles, timekeeping, and food expenses. The system aims to streamline operations, enhance decision-making through advanced analytics and data visualization, and offer detailed financial insights. The long-term vision for SIGE is to evolve into a specialized solution for metallic structures.
+Sistema multi-tenant de gestão empresarial com foco em propostas comerciais, gestão de funcionários, controle de obras e folha de pagamento automatizada.
+
+## Arquitetura
+- **Backend**: Flask + SQLAlchemy + PostgreSQL
+- **Frontend**: Templates Jinja2 + Bootstrap
+- **Deploy**: Docker via Replit
+- **Database**: PostgreSQL com migrações automáticas
+
+## Migrações Automáticas
+Sistema implementado para resolver problemas de schema entre ambientes de desenvolvimento e produção:
+
+### Como Funciona
+- Arquivo `migrations.py` contém todas as migrações automáticas
+- Executado automaticamente na inicialização da aplicação (app.py)
+- Verifica se tabelas/colunas existem antes de criar
+- Logs detalhados de todas as operações
+
+### Problema Resolvido
+- Ambiente de produção tinha tabela `proposta_templates` incompleta
+- Sistema agora detecta e cria automaticamente todas as colunas necessárias:
+  - categoria, itens_padrao, prazo_entrega_dias, validade_dias
+  - percentual_nota_fiscal, itens_inclusos, itens_exclusos
+  - condicoes, condicoes_pagamento, garantias
+  - ativo, publico, uso_contador, admin_id, criado_por
+  - criado_em, atualizado_em
+
+### Logs de Migração
+```
+INFO:migrations:🔄 Iniciando migrações automáticas do banco de dados...
+INFO:migrations:✅ Tabela proposta_templates já existe
+INFO:migrations:✅ Coluna 'categoria' já existe na tabela proposta_templates
+INFO:migrations:✅ Migrações automáticas concluídas com sucesso!
+```
+
+## Módulos Principais
+
+### 1. Gestão de Propostas
+- Templates reutilizáveis (`PropostaTemplate`)
+- Propostas comerciais com itens e cálculos automáticos
+- Sistema de categorização e filtros
+
+### 2. Gestão de Funcionários
+- Cadastro completo com fotos (base64)
+- Controle de ponto automatizado
+- Cálculo de horas extras e atrasos
+
+### 3. Gestão de Obras
+- Controle de obras e projetos
+- RDO (Relatório Diário de Obra)
+- Alocação de funcionários e equipamentos
+
+### 4. Folha de Pagamento
+- Cálculo automático baseado em registros de ponto
+- Configuração salarial por funcionário
+- Relatórios mensais detalhados
+
+### 5. Sistema Multi-tenant
+- Isolamento de dados por admin_id
+- Controle de acesso baseado em roles
+- Bypass de autenticação para desenvolvimento
+
+## Recent Changes (18/08/2025)
+
+### Migração de Schema Automática
+- Implementado sistema de migrações automáticas
+- Resolvido problema de colunas faltantes na tabela proposta_templates
+- Sistema agora funciona tanto em desenvolvimento quanto em produção
+- Migrações são executadas automaticamente no deploy via Docker
+
+### Arquivos Adicionados
+- `migrations.py` - Sistema de migrações automáticas
+- `INSTRUCOES_PRODUCAO.md` - Instruções para banco de produção (depreciado)
+- `migration_production.sql` - Script SQL direto (depreciado)
 
 ## User Preferences
-Preferred communication style: Simple, everyday language.
-Template system: Show only user's own templates, no public templates from other users.
+- Priorizar soluções automáticas que funcionem no deploy
+- Evitar intervenção manual no banco de produção
+- Implementar logs detalhados para debugging
+- Sistema deve ser resiliente a diferenças entre ambientes
 
-## System Architecture
-
-### Core Design Principles
-- **Modular Design**: Utilizes Flask Blueprints for distinct functional areas.
-- **Data-Driven**: Emphasizes comprehensive data collection and visualization for KPIs and reporting.
-- **Multi-Tenant**: Supports hierarchical access levels (Super Admin, Admin, Employee) with data isolation.
-- **Scalable**: Designed for potential expansion with new modules and integration capabilities.
-- **User-Centric UI**: Responsive web interface with a professional aesthetic, including dark/light mode themes.
-
-### Backend
-- **Framework**: Flask (Python)
-- **Database ORM**: SQLAlchemy with Flask-SQLAlchemy
-- **Authentication**: Flask-Login for session management and role-based access control.
-- **Security**: Werkzeug for password hashing.
-- **Data Processing**: Custom KPI engine for detailed calculations, including a unified `CalculadoraObra` class for consistent financial metrics.
-- **Advanced Capabilities**: Integration of AI/Analytics for cost prediction, anomaly detection, resource optimization, and sentiment analysis. Smart notification system for critical KPIs.
-- **Key Technical Implementations**:
-    - Overtime calculation based on each employee's registered standard work schedule, compliant with Brazilian labor legislation (CLT).
-    - Automatic pre-filling of RDO activities with percentages from previous entries for the same project.
-    - Period-based food registration.
-    - Comprehensive labor cost calculation logic, including DSR (weekly paid rest) calculation compliant with Lei 605/49.
-
-### Frontend
-- **UI Framework**: Bootstrap 5 (dark theme by default, with toggle for light mode).
-- **Interactivity**: DataTables.js for enhanced tables, Chart.js for data visualization, and jQuery/Vanilla JavaScript for dynamic elements.
-- **Visuals**: Font Awesome 6 for icons, SVG avatars for employees.
-
-### Key Modules & Features
-- **Employee Management**: Comprehensive profiles, time tracking (Ponto), KPI dashboard, food expense tracking (Alimentação), and other costs management. Includes custom work schedules, detailed labor cost calculations, and employee activation/deactivation.
-- **Project Management (Obras)**: Tracking construction projects, budget management, timeline, status, and integrated financial KPIs (e.g., Cost/m², Profit Margin, Budget Deviation). Includes Daily Work Report (RDO) system.
-- **Commercial Management**: Complete proposal system with client portal integration, automatic conversion to projects, and professional proposal generation.
-- **Client Portal**: Dedicated client dashboard for project progress tracking, RDO viewing, photo galleries, and automatic notifications.
-- **Team Management**: Advanced allocation system with Kanban/Calendar interface, automatic RDO generation, conflict prevention, and comprehensive reporting.
-- **Warehouse Management**: Complete inventory control with material tracking, movement history, RDO integration, stock level monitoring, barcode scanning, and XML NFe import processing.
-- **Vehicle Management**: Fleet tracking, status, and maintenance.
-- **Financial Management**: Includes `CentroCusto`, `Receita`, `OrcamentoObra`, `FluxoCaixa` models, and a dedicated financial calculation engine with strategic KPIs. Integrates a complete accounting system with Brazilian chart of accounts.
-- **Multi-Tenant System**: Differentiated dashboards and functionalities based on user roles (Super Admin, Admin, Employee).
-- **Reporting & Dashboards**: Functional reporting system with multi-format export (CSV, Excel, PDF). Interactive dashboards with drill-down and filtering.
-- **Smart Features**: AI-powered predictions and anomaly detection, intelligent alerts, persistent photo management, and automated error diagnostics.
-
-## External Dependencies
-
-### Python Packages
-- `Flask`: Web framework
-- `Flask-SQLAlchemy`: Database ORM
-- `Flask-Login`: User session management
-- `Flask-WTF`: Form handling
-- `WTForms`: Form validation
-- `Werkzeug`: WSGI utilities and security
-- `openpyxl`: Excel file generation
-- `reportlab`: PDF generation
-- `Flask-Migrate`: Database migrations
-
-### Frontend Libraries
-- `Bootstrap 5`: UI framework
-- `Font Awesome 6`: Icon library
-- `DataTables.js`: Enhanced table functionality
-- `Chart.js`: Data visualization
-- `jQuery`: DOM manipulation
-
-### Database
-- **SQLite**: Default for development.
-- **PostgreSQL**: Recommended for production.
+## Development Guidelines
+- Usar sistema de migrações automáticas para mudanças de schema
+- Testar localmente antes do deploy
+- Manter logs informativos
+- Implementar verificações de segurança antes de alterações no banco
