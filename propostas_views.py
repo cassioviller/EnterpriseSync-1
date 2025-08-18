@@ -298,21 +298,43 @@ def criar_proposta():
         db.session.add(proposta)
         db.session.flush()  # Para obter o ID da proposta
         
+        # Debug dos dados recebidos
+        print(f"DEBUG ITENS: Form data keys: {list(request.form.keys())}")
+        
         # Itens da tabela de serviços
         descricoes = request.form.getlist('item_descricao')
         quantidades = request.form.getlist('item_quantidade')
         unidades = request.form.getlist('item_unidade')
         precos = request.form.getlist('item_preco')
         
+        print(f"DEBUG ITENS: Descrições: {descricoes}")
+        print(f"DEBUG ITENS: Quantidades: {quantidades}")
+        print(f"DEBUG ITENS: Unidades: {unidades}")
+        print(f"DEBUG ITENS: Preços: {precos}")
+        
+        valor_total_proposta = 0
+        
         for i, descricao in enumerate(descricoes):
-            if descricao.strip():
+            if descricao and descricao.strip():
                 item = PropostaItem()
                 item.proposta_id = proposta.id
                 item.item_numero = i + 1
-                item.descricao = descricao
-                item.quantidade = float(quantidades[i]) if quantidades[i] else 0
+                item.descricao = descricao.strip()
+                item.quantidade = float(quantidades[i]) if i < len(quantidades) and quantidades[i] else 0
                 item.unidade = unidades[i] if i < len(unidades) else 'un'
-                item.preco_unitario = float(precos[i]) if precos[i] else 0
+                item.preco_unitario = float(precos[i]) if i < len(precos) and precos[i] else 0
+                
+                # Calcular valor total do item
+                valor_item = item.quantidade * item.preco_unitario
+                valor_total_proposta += valor_item
+                
+                print(f"DEBUG ITEM {i+1}: {item.descricao} - {item.quantidade} {item.unidade} x R$ {item.preco_unitario} = R$ {valor_item}")
+                
+                db.session.add(item)
+        
+        # Atualizar valor total da proposta
+        proposta.valor_total = valor_total_proposta
+        print(f"DEBUG PROPOSTA: Valor total calculado: R$ {valor_total_proposta}")
                 item.ordem = i + 1
                 db.session.add(item)
         

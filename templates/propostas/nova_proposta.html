@@ -129,20 +129,20 @@
                                 <div class="mb-3">
                                     <label class="form-label">Descrição do Serviço</label>
                                     <input type="text" class="form-control servico-descricao" 
-                                           placeholder="Ex: Estrutura metálica">
+                                           name="item_descricao" placeholder="Ex: Estrutura metálica">
                                 </div>
                             </div>
                             <div class="col-md-2">
                                 <div class="mb-3">
                                     <label class="form-label">Quantidade</label>
                                     <input type="number" class="form-control servico-quantidade" 
-                                           step="0.01" onchange="calcularServico(this)">
+                                           name="item_quantidade" step="0.01" onchange="calcularServico(this)">
                                 </div>
                             </div>
                             <div class="col-md-2">
                                 <div class="mb-3">
                                     <label class="form-label">Unidade</label>
-                                    <select class="form-select servico-unidade">
+                                    <select class="form-select servico-unidade" name="item_unidade">
                                         <option value="m²">m²</option>
                                         <option value="m³">m³</option>
                                         <option value="un">Unidade</option>
@@ -155,7 +155,7 @@
                                 <div class="mb-3">
                                     <label class="form-label">Valor Unitário</label>
                                     <input type="number" class="form-control servico-valor-unitario" 
-                                           step="0.01" onchange="calcularServico(this)">
+                                           name="item_preco" step="0.01" onchange="calcularServico(this)">
                                 </div>
                             </div>
                             <div class="col-md-2">
