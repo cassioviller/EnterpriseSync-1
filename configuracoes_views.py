@@ -36,8 +36,10 @@ def salvar_empresa():
     try:
         # Obter admin_id corretamente (para ADMIN usa o próprio ID, para SUPER_ADMIN pode ser diferente)
         admin_id = getattr(current_user, 'admin_id', None) or current_user.id
+        print(f"DEBUG SALVAR: admin_id = {admin_id}, user.id = {current_user.id}")
         
         config = ConfiguracaoEmpresa.query.filter_by(admin_id=admin_id).first()
+        print(f"DEBUG SALVAR: config existente = {config is not None}")
         
         if not config:
             config = ConfiguracaoEmpresa()
@@ -58,9 +60,15 @@ def salvar_empresa():
             config.logo_base64 = logo_base64
         
         # Personalização visual
-        config.cor_primaria = request.form.get('cor_primaria', '#007bff')
-        config.cor_secundaria = request.form.get('cor_secundaria', '#6c757d')
-        config.cor_fundo_proposta = request.form.get('cor_fundo_proposta', '#f8f9fa')
+        cor_primaria = request.form.get('cor_primaria', '#007bff')
+        cor_secundaria = request.form.get('cor_secundaria', '#6c757d') 
+        cor_fundo = request.form.get('cor_fundo_proposta', '#f8f9fa')
+        
+        config.cor_primaria = cor_primaria
+        config.cor_secundaria = cor_secundaria
+        config.cor_fundo_proposta = cor_fundo
+        
+        print(f"DEBUG CORES: primaria={cor_primaria}, secundaria={cor_secundaria}, fundo={cor_fundo}")
         
         # Dados para propostas
         config.itens_inclusos_padrao = request.form.get('itens_inclusos_padrao')
@@ -77,7 +85,9 @@ def salvar_empresa():
         
         config.atualizado_em = datetime.utcnow()
         
+        print(f"DEBUG: Salvando config para admin_id {admin_id}")
         db.session.commit()
+        print("DEBUG: Commit realizado com sucesso")
         flash('Configurações da empresa salvas com sucesso!', 'success')
         
     except Exception as e:
