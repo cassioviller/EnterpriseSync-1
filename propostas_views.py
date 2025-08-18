@@ -251,9 +251,15 @@ def nova_proposta():
 def criar_proposta():
     """Cria uma nova proposta"""
     try:
+        # Validação obrigatória: apenas nome do cliente
+        cliente_nome = request.form.get('cliente_nome')
+        if not cliente_nome or not cliente_nome.strip():
+            flash('Nome do cliente é obrigatório!', 'error')
+            return redirect(url_for('propostas.nova_proposta'))
+        
         # Dados básicos da proposta
         proposta = PropostaComercialSIGE()
-        proposta.cliente_nome = request.form.get('cliente_nome')
+        proposta.cliente_nome = cliente_nome.strip()
         proposta.cliente_telefone = request.form.get('cliente_telefone')
         proposta.cliente_email = request.form.get('cliente_email')
         proposta.cliente_endereco = request.form.get('cliente_endereco')
@@ -336,8 +342,14 @@ def atualizar_proposta(id):
     proposta = PropostaComercialSIGE.query.get_or_404(id)
     
     try:
+        # Validação obrigatória: apenas nome do cliente
+        cliente_nome = request.form.get('cliente_nome')
+        if not cliente_nome or not cliente_nome.strip():
+            flash('Nome do cliente é obrigatório!', 'error')
+            return redirect(url_for('propostas.editar_proposta', id=id))
+        
         # Atualizar dados básicos
-        proposta.cliente_nome = request.form.get('cliente_nome')
+        proposta.cliente_nome = cliente_nome.strip()
         proposta.cliente_telefone = request.form.get('cliente_telefone')
         proposta.cliente_email = request.form.get('cliente_email')
         proposta.cliente_endereco = request.form.get('cliente_endereco')
