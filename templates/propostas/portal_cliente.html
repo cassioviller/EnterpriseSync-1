@@ -70,11 +70,11 @@
             position: sticky;
             bottom: 20px;
             background: white;
-            padding: 20px;
+            padding: 15px;
             border-radius: 15px;
             box-shadow: 0 -5px 20px rgba(0,0,0,0.1);
             text-align: center;
-            margin-top: 30px;
+            margin-top: 20px;
         }
         .btn-approve {
             background: linear-gradient(45deg, #28a745, #20c997);
@@ -325,10 +325,7 @@
 
         <!-- Ações do Cliente -->
         {% if proposta.status == 'enviada' %}
-        <div class="action-buttons">
-            <h4 class="mb-4">O que você deseja fazer com esta proposta?</h4>
-            <p class="text-muted mb-4">Sua decisão é importante para nós. Analise todos os detalhes e escolha uma opção:</p>
-            
+        <div class="action-buttons text-center py-3">
             <div class="d-flex justify-content-center flex-wrap">
                 <button type="button" class="btn btn-approve" onclick="aprovarProposta()">
                     <i class="fas fa-thumbs-up me-2"></i>Aprovar Proposta
@@ -338,7 +335,7 @@
                 </button>
             </div>
             
-            <p class="text-muted mt-3 small">
+            <p class="text-muted mt-2 small">
                 <i class="fas fa-info-circle me-1"></i>
                 Após sua decisão, nossa equipe será notificada automaticamente.
             </p>

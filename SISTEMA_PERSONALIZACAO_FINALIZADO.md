@@ -70,10 +70,11 @@ Implementar sistema completo de personalização visual para empresas, permitind
 ## 🚀 MELHORIAS IMPLEMENTADAS
 
 ### Versão Final (18/08/2025)
-1. **Logo otimizada:** Tamanho aumentado para 120px x 300px
+1. **Logo otimizada:** Tamanho aumentado para 160px x 400px (altura x largura)
 2. **CSS responsivo:** object-fit: contain para melhor exibição
-3. **Fallbacks robustos:** Sistema funciona mesmo com admin_id null
-4. **Migração automática:** Script para correção em produção
+3. **Módulo de ação compacto:** Removido texto desnecessário, apenas botões e aviso
+4. **Fallbacks robustos:** Sistema funciona mesmo com admin_id null
+5. **Migração automática:** Script para correção em produção
 
 ### Configurações Aplicadas
 - **Cor primária:** #008B3A (Verde)
