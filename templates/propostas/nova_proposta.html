@@ -285,9 +285,20 @@ function adicionarServico() {
     const container = document.getElementById('servicosContainer');
     const novoServico = container.firstElementChild.cloneNode(true);
     
-    // Limpar valores
+    // Limpar valores e garantir que os campos tenham os nomes corretos
     novoServico.querySelectorAll('input, textarea, select').forEach(field => {
         if (field.type !== 'hidden') field.value = '';
+        
+        // Garantir que os campos tenham os nomes corretos
+        if (field.classList.contains('servico-descricao')) {
+            field.name = 'item_descricao';
+        } else if (field.classList.contains('servico-quantidade')) {
+            field.name = 'item_quantidade';
+        } else if (field.classList.contains('servico-unidade')) {
+            field.name = 'item_unidade';
+        } else if (field.classList.contains('servico-valor-unitario')) {
+            field.name = 'item_preco';
+        }
     });
     
     container.appendChild(novoServico);
@@ -498,13 +509,13 @@ function limparServicos() {
                     <div class="mb-3">
                         <label class="form-label">Quantidade</label>
                         <input type="number" class="form-control servico-quantidade" 
-                               step="0.01" onchange="calcularServico(this)">
+                               name="item_quantidade" step="0.01" onchange="calcularServico(this)">
                     </div>
                 </div>
                 <div class="col-md-2">
                     <div class="mb-3">
                         <label class="form-label">Unidade</label>
-                        <select class="form-select servico-unidade">
+                        <select class="form-select servico-unidade" name="item_unidade">
                             <option value="m²">m²</option>
                             <option value="m³">m³</option>
                             <option value="un">Unidade</option>
@@ -517,7 +528,7 @@ function limparServicos() {
                     <div class="mb-3">
                         <label class="form-label">Valor Unitário</label>
                         <input type="number" class="form-control servico-valor-unitario" 
-                               step="0.01" onchange="calcularServico(this)">
+                               name="item_preco" step="0.01" onchange="calcularServico(this)">
                     </div>
                 </div>
                 <div class="col-md-2">
