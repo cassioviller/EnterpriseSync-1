@@ -168,7 +168,12 @@
                             {% if proposta.itens_inclusos %}
                                 <ul class="list-unstyled mb-0">
                                     {% for item in proposta.itens_inclusos %}
-                                    <li><i class="fas fa-check text-success me-2"></i>{{ item }}</li>
+                                        {% set subitems = item.split(';') %}
+                                        {% for subitem in subitems %}
+                                            {% if subitem.strip() %}
+                                                <li><i class="fas fa-check text-success me-2"></i>{{ subitem.strip() }}</li>
+                                            {% endif %}
+                                        {% endfor %}
                                     {% endfor %}
                                 </ul>
                             {% else %}
@@ -187,7 +192,12 @@
                             {% if proposta.itens_exclusos %}
                                 <ul class="list-unstyled mb-0">
                                     {% for item in proposta.itens_exclusos %}
-                                    <li><i class="fas fa-times text-danger me-2"></i>{{ item }}</li>
+                                        {% set subitems = item.split(';') %}
+                                        {% for subitem in subitems %}
+                                            {% if subitem.strip() %}
+                                                <li><i class="fas fa-times text-danger me-2"></i>{{ subitem.strip() }}</li>
+                                            {% endif %}
+                                        {% endfor %}
                                     {% endfor %}
                                 </ul>
                             {% else %}
