@@ -24,12 +24,59 @@ def executar_migracoes():
         # Migração 2: Adicionar outras colunas faltantes se necessário
         migrar_colunas_faltantes_proposta_templates()
         
-        logger.info("✅ Migrações automáticas concluídas com sucesso!")
+        # Migração 3: Tornar campos assunto e objeto opcionais em propostas_comerciais
+        migrar_campos_opcionais_propostas()
+        
         
     except Exception as e:
         logger.error(f"❌ Erro durante migrações automáticas: {e}")
         # Não interromper a aplicação, apenas logar o erro
         pass
+
+def migrar_campos_opcionais_propostas():
+    """
+    Torna os campos assunto e objeto opcionais na tabela propostas_comerciais
+    """
+    try:
+        # Usar conexão direta para verificar constraints
+        connection = db.engine.raw_connection()
+        cursor = connection.cursor()
+        
+        # Verificar se os campos ainda são NOT NULL
+        cursor.execute("""
+            SELECT column_name, is_nullable 
+            FROM information_schema.columns 
+            WHERE table_name = 'propostas_comerciais' 
+            AND column_name IN ('assunto', 'objeto')
+            AND is_nullable = 'NO'
+        """)
+        campos_nao_null = cursor.fetchall()
+        
+        if campos_nao_null:
+            logger.info("🔄 Removendo constraints NOT NULL dos campos assunto e objeto...")
+            
+            # Remover constraint NOT NULL do campo assunto
+            cursor.execute("ALTER TABLE propostas_comerciais ALTER COLUMN assunto DROP NOT NULL")
+            logger.info("✅ Campo 'assunto' agora é opcional")
+            
+            # Remover constraint NOT NULL do campo objeto
+            cursor.execute("ALTER TABLE propostas_comerciais ALTER COLUMN objeto DROP NOT NULL")
+            logger.info("✅ Campo 'objeto' agora é opcional")
+            
+            connection.commit()
+            logger.info("✅ Campos de proposta atualizados para serem opcionais")
+        else:
+            logger.info("✅ Campos assunto e objeto já são opcionais")
+            
+        cursor.close()
+        connection.close()
+            
+    except Exception as e:
+        logger.error(f"❌ Erro ao atualizar campos opcionais: {str(e)}")
+        if 'connection' in locals():
+            connection.rollback()
+            cursor.close()
+            connection.close()
 
 def garantir_tabela_proposta_templates_existe():
     """

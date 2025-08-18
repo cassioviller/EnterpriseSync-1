@@ -77,6 +77,13 @@ INFO:migrations:✅ Migrações automáticas concluídas com sucesso!
 - Implementada verificação segura de admin_id nas views
 - **Status**: Configurações da empresa funcionando normalmente
 
+### Simplificação de Propostas - EM ANDAMENTO ⚠️
+- Apenas nome do cliente é obrigatório para criar proposta
+- Corrigido erro 405 Method Not Allowed no formulário
+- Adicionada migração automática para tornar campos "assunto" e "objeto" opcionais
+- Sistema funciona em desenvolvimento, aguardando deploy em produção
+- **Status**: Requer deploy Docker para aplicar migrações em produção
+
 ### Arquivos Adicionados
 - `migrations.py` - Sistema de migrações automáticas
 - `bypass_auth.py` - Atualizado com admin_id para desenvolvimento
