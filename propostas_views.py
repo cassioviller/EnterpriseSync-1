@@ -553,6 +553,7 @@ def gerar_pdf(id):
     # Renderizar HTML da proposta
     html_content = render_template(template_name, 
                                  proposta=proposta, 
+                                 config=config_empresa,
                                  config_empresa=config_empresa)
     
     # Aqui seria implementada a geração de PDF

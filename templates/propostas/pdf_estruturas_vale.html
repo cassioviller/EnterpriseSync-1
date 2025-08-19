@@ -284,18 +284,18 @@
     <!-- Página 1: Carta de Apresentação -->
     <div class="page">
         <div class="header">
-        {% if config_empresa and config_empresa.header_pdf_base64 %}
+        {% if config and config.header_pdf_base64 %}
             <!-- Header completo personalizado -->
-            <img src="data:image/png;base64,{{ config_empresa.header_pdf_base64 }}" alt="Header" class="header-image">
+            <img src="data:image/png;base64,{{ config.header_pdf_base64 }}" alt="Header" class="header-image">
         {% else %}
             <!-- Header padrão com logo e texto -->
-            {% if config_empresa and config_empresa.logo_pdf_base64 %}
-                <img src="data:image/png;base64,{{ config_empresa.logo_pdf_base64 }}" alt="Logo" class="logo">
-            {% elif config_empresa and config_empresa.logo_base64 %}
-                <img src="data:image/png;base64,{{ config_empresa.logo_base64 }}" alt="Logo" class="logo">
+            {% if config and config.logo_pdf_base64 %}
+                <img src="data:image/png;base64,{{ config.logo_pdf_base64 }}" alt="Logo" class="logo">
+            {% elif config and config.logo_base64 %}
+                <img src="data:image/png;base64,{{ config.logo_base64 }}" alt="Logo" class="logo">
             {% endif %}
             <div>
-                <div class="company-name">{{ config_empresa.nome_empresa if config_empresa else 'Estruturas do Vale' }}</div>
+                <div class="company-name">{{ config.nome_empresa if config else 'Estruturas do Vale' }}</div>
                 <div class="company-tagline">ESTRUTURAS METÁLICAS</div>
             </div>
         {% endif %}
@@ -361,16 +361,18 @@
     <!-- Página 2: Sumário -->
     <div class="page">
         <div class="header">
-        {% if config_empresa and config_empresa.header_pdf_base64 %}
+        {% if config and config.header_pdf_base64 %}
             <!-- Header completo personalizado -->
-            <img src="data:image/png;base64,{{ config_empresa.header_pdf_base64 }}" alt="Header" class="header-image">
+            <img src="data:image/png;base64,{{ config.header_pdf_base64 }}" alt="Header" class="header-image">
         {% else %}
             <!-- Header padrão com logo e texto -->
-            {% if config_empresa and config_empresa.logo_base64 %}
-                <img src="data:image/png;base64,{{ config_empresa.logo_base64 }}" alt="Logo" class="logo">
+            {% if config and config.logo_pdf_base64 %}
+                <img src="data:image/png;base64,{{ config.logo_pdf_base64 }}" alt="Logo" class="logo">
+            {% elif config and config.logo_base64 %}
+                <img src="data:image/png;base64,{{ config.logo_base64 }}" alt="Logo" class="logo">
             {% endif %}
             <div>
-                <div class="company-name">{{ config_empresa.nome_empresa if config_empresa else 'Estruturas do Vale' }}</div>
+                <div class="company-name">{{ config.nome_empresa if config else 'Estruturas do Vale' }}</div>
                 <div class="company-tagline">ESTRUTURAS METÁLICAS</div>
             </div>
         {% endif %}
@@ -425,16 +427,18 @@
     <!-- Página 3: Conteúdo Técnico -->
     <div class="page">
         <div class="header">
-        {% if config_empresa and config_empresa.header_pdf_base64 %}
+        {% if config and config.header_pdf_base64 %}
             <!-- Header completo personalizado -->
-            <img src="data:image/png;base64,{{ config_empresa.header_pdf_base64 }}" alt="Header" class="header-image">
+            <img src="data:image/png;base64,{{ config.header_pdf_base64 }}" alt="Header" class="header-image">
         {% else %}
             <!-- Header padrão com logo e texto -->
-            {% if config_empresa and config_empresa.logo_base64 %}
-                <img src="data:image/png;base64,{{ config_empresa.logo_base64 }}" alt="Logo" class="logo">
+            {% if config and config.logo_pdf_base64 %}
+                <img src="data:image/png;base64,{{ config.logo_pdf_base64 }}" alt="Logo" class="logo">
+            {% elif config and config.logo_base64 %}
+                <img src="data:image/png;base64,{{ config.logo_base64 }}" alt="Logo" class="logo">
             {% endif %}
             <div>
-                <div class="company-name">{{ config_empresa.nome_empresa if config_empresa else 'Estruturas do Vale' }}</div>
+                <div class="company-name">{{ config.nome_empresa if config else 'Estruturas do Vale' }}</div>
                 <div class="company-tagline">ESTRUTURAS METÁLICAS</div>
             </div>
         {% endif %}
