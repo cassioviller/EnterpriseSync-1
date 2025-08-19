@@ -130,7 +130,7 @@
     <div class="portal-container">
         <!-- Botão PDF no canto superior direito -->
         <div class="position-fixed" style="top: 20px; right: 20px; z-index: 1000;">
-            <a href="{{ url_for('propostas.gerar_pdf_estruturas_vale', id=proposta.id) }}" 
+            <a href="{{ url_for('propostas.gerar_pdf', id=proposta.id, formato='estruturas_vale') }}" 
                class="btn btn-danger btn-lg shadow" target="_blank" 
                title="Baixar PDF da Proposta">
                 <i class="fas fa-file-pdf me-2"></i>PDF
