@@ -1,0 +1,50 @@
+Erro inesperado no sistema
+Ocorreu um erro interno no servidor. Nossa equipe foi notificada.
+
+ Detalhes Técnicos do Erro:
+EXCEÇÃO NÃO TRATADA: 'models.PropostaItem object' has no attribute 'valor_total'
+
+URL: https://www.sige.cassioviller.tech/propostas/8/pdf
+MÉTODO: GET
+TIMESTAMP: 19/08/2025 12:03:04
+TIPO DO ERRO: UndefinedError
+
+TRACEBACK COMPLETO:
+Traceback (most recent call last):
+  File "/usr/local/lib/python3.11/site-packages/flask/app.py", line 917, in full_dispatch_request
+    rv = self.dispatch_request()
+         ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.11/site-packages/flask/app.py", line 902, in dispatch_request
+    return self.ensure_sync(self.view_functions[rule.endpoint])(**view_args)  # type: ignore[no-any-return]
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/app/propostas_views.py", line 554, in gerar_pdf
+    html_content = render_template(template_name,
+                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.11/site-packages/flask/templating.py", line 150, in render_template
+    return _render(app, template, context)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.11/site-packages/flask/templating.py", line 131, in _render
+    rv = template.render(context)
+         ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.11/site-packages/jinja2/environment.py", line 1295, in render
+    self.environment.handle_exception()
+  File "/usr/local/lib/python3.11/site-packages/jinja2/environment.py", line 942, in handle_exception
+    raise rewrite_traceback_stack(source=source)
+  File "/app/templates/propostas/pdf_estruturas_vale.html", line 409, in top-level template code
+    <td class="price"><strong>{{ "R$ %.2f"|format(item.valor_total) }}</strong></td>
+    ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.11/site-packages/jinja2/filters.py", line 1043, in do_format
+    return soft_str(value) % (kwargs or args)
+           ~~~~~~~~~~~~~~~~^~~~~~~~~~~~~~~~~~
+jinja2.exceptions.UndefinedError: 'models.PropostaItem object' has no attribute 'valor_total'
+
+
+CONTEXTO DA REQUISIÇÃO:
+- Headers: {'Host': 'www.sige.cassioviller.tech', 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Safari/537.36', 'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7', 'Accept-Encoding': 'gzip, deflate, br, zstd', 'Accept-Language': 'pt-BR,pt;q=0.9,en-US;q=0.8,en;q=0.7', 'Cookie': 'rl_anonymous_id=RudderEncrypt%3AU2FsdGVkX1%2BkvLgUlIRO5ZaCJOkS72BblpJKm%2FvtiN1%2FGXRJoYRKdcKAxcBbpN2O6dd48UPNP17Ywh9wWkSR%2Fg%3D%3D; rl_page_init_referrer=RudderEncrypt%3AU2FsdGVkX19qjN7mSQc2tAnRE%2FSDraKS9KmO%2BTHECAMPgcjmGXLauUoidICPvrx4tc0tdZPeIoN4e6aWhRHUwQ%3D%3D; rl_page_init_referring_domain=RudderEncrypt%3AU2FsdGVkX19VCH%2Fwn%2FoJEw4bWKCDk08fuicEyApUdduFndUfYFB8%2BV80VKaZZR5w; rl_user_id=RudderEncrypt%3AU2FsdGVkX186LU9jp0wzwZTlIjZBeVa2Lzn7O7QV21YuJWw%2FNTySJA5%2FpI7iN5%2BVSB192bNM5b%2FMIc0f%2BeRXPDwUIu0%2BoeUpVDYvCQlBZxWUbj7%2BQnlmzjA%2B6b%2FJa7qbycz2EJA%2FpbwE1kioqyhjVaJc%2BbdnHfGYKnSwJh071wE%3D; rl_trait=RudderEncrypt%3AU2FsdGVkX1%2FFN6BUX4p%2B%2FNofC0IaFDXGQwvS3crogElzpmXL5RN1fN8lwljrnLH6UUxkePzwh27BZEuXOFP6HY1nTcodF0pR8VDu7F5FhjhN9GlYmr0t%2F55oElqVBWFEPebK0%2FFw5UlhFhszaGwZcA%3D%3D; rl_session=RudderEncrypt%3AU2FsdGVkX19a8UXHm%2B1qUXkTMCUOvIC9Fn4nuwnmmh3s3%2FhiH22NJmP5rPU%2BVkqBBdYu2X29TzD6EyknaS2BnbjuGzsSGfYAMYAAVcbmQzmaXgKSftBR6Bx5I3KP64vemFUt%2FRBWBWaYHUCpbkT4FQ%3D%3D; ph_phc_4URIAm1uYfJO7j8kWSe0J8lc8IqnstRLS7Jx8NcakHo_posthog=%7B%22distinct_id%22%3A%222216df120291d2866957c78a265affade5afc8d41f028c3d5d129d77623b8b47%230f49456f-bda4-4676-ba36-8eba13d89337%22%2C%22%24sesid%22%3A%5B1755519783015%2C%220198bd19-7d77-7eba-8b27-8249c3ae1a0e%22%2C1755519221111%5D%2C%22%24epp%22%3Atrue%2C%22%24initial_person_info%22%3A%7B%22r%22%3A%22https%3A%2F%2Feasypanel.cassioviller.tech%2F%22%2C%22u%22%3A%22https%3A%2F%2Fwww.n8n.cassioviller.tech%2Fsignin%3Fredirect%3D%25252F%22%7D%7D; session=.eJwlzksKAjEQRdG9ZOygUqlUEjfT1C_oTPojiLh3Wxw-uA_OOy1zje2Wrvt6xCUtd0_XJM1popBjK1PMSHLmAuqt5ugyjCHIybkGB1KrCFOxcDUiiAEwUTVL53m-IWoF0j7Yzs5toBVoFiA6WLk5lBBkopg9u3JnTCfk2GL9a35TXw_ZtkVsvz_jj_18ARjeN1I.aKRkXQ.evNKgPeXecAgbQ48DUeaJWfJdjg', 'Dnt': '1', 'Priority': 'u=0, i', 'Referer': 'https://www.sige.cassioviller.tech/propostas/', 'Sec-Ch-Ua': '"Not;A=Brand";v="99", "Google Chrome";v="139", "Chromium";v="139"', 'Sec-Ch-Ua-Mobile': '?0', 'Sec-Ch-Ua-Platform': '"Windows"', 'Sec-Fetch-Dest': 'document', 'Sec-Fetch-Mode': 'navigate', 'Sec-Fetch-Site': 'same-origin', 'Sec-Fetch-User': '?1', 'Upgrade-Insecure-Requests': '1', 'X-Forwarded-For': '177.62.67.196', 'X-Forwarded-Host': 'www.sige.cassioviller.tech', 'X-Forwarded-Port': '443', 'X-Forwarded-Proto': 'https', 'X-Forwarded-Server': '337e056cfbb6', 'X-Real-Ip': '177.62.67.196'}
+- Args: {}
+- Form: Nenhum
+- JSON: Não é JSON
+ URL que causou o erro:
+https://www.sige.cassioviller.tech/propostas/8/pdf
+ Horário do erro:
+19/08/2025 12:03:04

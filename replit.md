@@ -72,6 +72,16 @@ INFO:migrations:✅ Migrações automáticas concluídas com sucesso!
 - **Interface intuitiva**: Placeholders e textos de ajuda para facilitar uso
 - **Status**: Funcional em desenvolvimento, pronto para produção
 
+### Sistema de PDF Personalizado Estruturas do Vale - IMPLEMENTADO ✅
+- **Novo formato profissional**: Template PDF seguindo exatamente modelo da Estruturas do Vale
+- **Design corporativo**: Header verde/cinza, logo personalizado, layout formal
+- **Carta de apresentação**: Página inicial com dados formais do cliente
+- **Sumário numerado**: Página com índice e numeração das seções
+- **Estrutura completa**: 9 seções numeradas conforme padrão da empresa
+- **Sistema de alternância**: Dropdown para escolher entre formato Estruturas do Vale e formato simples
+- **Correção de bugs**: Corrigido erro de atributo 'valor_total' para 'subtotal'
+- **Status**: Funcional em produção, testado e aprovado
+
 ## Recent Changes (18/08/2025)
 
 ### Sistema de Personalização da Empresa - FUNCIONAL EM PRODUÇÃO ✅

@@ -406,12 +406,12 @@
                             <td>{{ item.unidade }}</td>
                             <td>{{ "%.2f"|format(item.quantidade) }}</td>
                             <td class="price">{{ "R$ %.2f"|format(item.preco_unitario) }}</td>
-                            <td class="price"><strong>{{ "R$ %.2f"|format(item.valor_total) }}</strong></td>
+                            <td class="price"><strong>{{ "R$ %.2f"|format(item.subtotal) }}</strong></td>
                         </tr>
                         {% endfor %}
                         <tr>
                             <td colspan="5"><strong>VALOR TOTAL DA PROPOSTA:</strong></td>
-                            <td class="price"><strong>{{ "R$ %.2f"|format(proposta.valor_total) }}</strong></td>
+                            <td class="price"><strong>{{ "R$ %.2f"|format(proposta.valor_total or 0) }}</strong></td>
                         </tr>
                     </tbody>
                 </table>
