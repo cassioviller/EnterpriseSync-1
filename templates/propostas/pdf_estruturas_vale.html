@@ -279,7 +279,6 @@
             <div class="company-name">{{ config_empresa.nome_empresa if config_empresa else 'Estruturas do Vale' }}</div>
             <div class="company-tagline">ESTRUTURAS METÁLICAS</div>
         </div>
-        <div class="decorative-buildings">🏢🏢</div>
     </div>
 
     <div class="date-location">
@@ -349,7 +348,6 @@
                 <div class="company-name">{{ config_empresa.nome_empresa if config_empresa else 'Estruturas do Vale' }}</div>
                 <div class="company-tagline">ESTRUTURAS METÁLICAS</div>
             </div>
-            <div class="decorative-buildings">🏢🏢</div>
         </div>
 
         <div class="summary">Sumário</div>
@@ -408,7 +406,6 @@
                 <div class="company-name">{{ config_empresa.nome_empresa if config_empresa else 'Estruturas do Vale' }}</div>
                 <div class="company-tagline">ESTRUTURAS METÁLICAS</div>
             </div>
-            <div class="decorative-buildings">🏢🏢</div>
         </div>
 
         <div class="section">
@@ -502,7 +499,7 @@
         <div class="section">
             <div class="section-title">5. CONDIÇÕES DE PAGAMENTO</div>
             {% if proposta.condicoes_pagamento %}
-                <p>{{ proposta.condicoes_pagamento }}</p>
+                <p>{{ proposta.condicoes_pagamento|replace('\n', '<br>')|safe }}</p>
             {% else %}
                 <ul class="payment-conditions">
                     <li><strong>A)</strong> 10% de entrada na assinatura do contrato;</li>
@@ -526,7 +523,6 @@
                 <div class="company-name">{{ config_empresa.nome_empresa if config_empresa else 'Estruturas do Vale' }}</div>
                 <div class="company-tagline">ESTRUTURAS METÁLICAS</div>
             </div>
-            <div class="decorative-buildings">🏢🏢</div>
         </div>
 
         <div class="section">
