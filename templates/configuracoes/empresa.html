@@ -131,6 +131,44 @@
                                     <input type="hidden" id="logo_pdf_base64" name="logo_pdf_base64" value="{{ config.logo_pdf_base64 if config else '' }}">
                                 </div>
                             </div>
+                            
+                            <!-- Header PDF -->
+                            <div class="col-12">
+                                <div class="mb-3">
+                                    <label class="form-label">
+                                        <i class="fas fa-image me-2"></i>
+                                        Header do PDF (Cabeçalho Completo)
+                                    </label>
+                                    <div class="d-flex align-items-center gap-3">
+                                        {% if config and config.header_pdf_base64 %}
+                                        <img src="data:image/png;base64,{{ config.header_pdf_base64 }}" alt="Header PDF" style="height: 60px; max-width: 200px; object-fit: contain; border: 1px solid #ddd; border-radius: 4px;">
+                                        {% else %}
+                                        <div class="bg-light border rounded d-flex align-items-center justify-content-center" style="height: 60px; width: 200px;">
+                                            <i class="fas fa-image text-muted"></i>
+                                        </div>
+                                        {% endif %}
+                                        <div class="flex-grow-1">
+                                            <input type="file" class="form-control" id="header_pdf_upload" accept="image/*">
+                                            <small class="text-muted">
+                                                <strong>Tamanho recomendado:</strong> 800-1200px (largura) x 80-120px (altura)<br>
+                                                Substitui a logo no cabeçalho do PDF - ideal para headers com design específico
+                                            </small>
+                                        </div>
+                                    </div>
+                                    <input type="hidden" id="header_pdf_base64" name="header_pdf_base64" value="{{ config.header_pdf_base64 if config else '' }}">
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <hr class="my-4">
+                        
+                        <!-- Seção de Cores -->
+                        <h6 class="mb-3">
+                            <i class="fas fa-palette me-2"></i>
+                            Personalização Visual
+                        </h6>
+                        
+                        <div class="row">
                             <div class="col-md-6">
                                 <div class="row">
                                     <div class="col-12">
@@ -341,6 +379,57 @@ document.getElementById('logo_pdf_upload').addEventListener('change', function(e
                 img.style.cssText = 'width: 60px; height: 60px; object-fit: contain; border: 1px solid #ddd; border-radius: 4px;';
                 preview.parentNode.replaceChild(img, preview);
             }
+        };
+        reader.readAsDataURL(file);
+    }
+});
+
+// Upload do header PDF
+document.getElementById('header_pdf_upload').addEventListener('change', function(e) {
+    const file = e.target.files[0];
+    if (file) {
+        // Validar tamanho (2MB max)
+        if (file.size > 2 * 1024 * 1024) {
+            alert('Arquivo muito grande! Máximo 2MB.');
+            e.target.value = '';
+            return;
+        }
+        
+        // Validar dimensões recomendadas
+        const img = new Image();
+        img.onload = function() {
+            const ratio = this.width / this.height;
+            if (ratio < 6 || ratio > 15) {
+                const confirm = window.confirm(
+                    'As dimensões não seguem o formato recomendado para header PDF (proporção 10:1).\n' +
+                    `Dimensões do arquivo: ${this.width}x${this.height}\n` +
+                    'Recomendado: 800-1200px (largura) x 80-120px (altura)\n\n' +
+                    'Deseja continuar mesmo assim?'
+                );
+                if (!confirm) {
+                    document.getElementById('header_pdf_upload').value = '';
+                    return;
+                }
+            }
+        };
+        
+        // Converter para base64
+        const reader = new FileReader();
+        reader.onload = function(event) {
+            const base64 = event.target.result.split(',')[1];
+            document.getElementById('header_pdf_base64').value = base64;
+            
+            // Atualizar preview
+            const currentPreview = document.querySelector('img[alt="Header PDF"], .bg-light.border.rounded');
+            if (currentPreview) {
+                const img = document.createElement('img');
+                img.src = event.target.result;
+                img.alt = 'Header PDF';
+                img.style.cssText = 'height: 60px; max-width: 200px; object-fit: contain; border: 1px solid #ddd; border-radius: 4px;';
+                currentPreview.replaceWith(img);
+            }
+            
+            img.src = event.target.result; // Para validação de dimensões
         };
         reader.readAsDataURL(file);
     }

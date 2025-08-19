@@ -82,12 +82,22 @@ INFO:migrations:✅ Migrações automáticas concluídas com sucesso!
 - **Correção de bugs**: Corrigido erro de atributo 'valor_total' para 'subtotal'
 - **Status**: Funcional em produção, testado e aprovado
 
-## Recent Changes (18/08/2025)
+## Recent Changes (19/08/2025)
+
+### Sistema de Header PDF Personalizado - IMPLEMENTADO ✅
+- **Campo header_pdf_base64**: Novo campo para upload de header completo do PDF
+- **Substituição inteligente**: Header personalizado substitui logo+texto quando configurado
+- **Dimensões recomendadas**: 800-1200px × 80-120px (proporção 10:1)
+- **Validação JavaScript**: Alerta sobre dimensões ideais durante upload
+- **Preview dinâmico**: Visualização em tempo real do header carregado
+- **Aplicação automática**: Header aplicado em todas as páginas do PDF estruturado
+- **Migração automática**: Campo adicionado via sistema de migrações
+- **Status**: FUNCIONANDO EM DESENVOLVIMENTO 🚀
 
 ### Sistema de Personalização da Empresa - FUNCIONAL EM PRODUÇÃO ✅
 - **Configurações visuais completas**: Upload de logo e seleção de cores personalizadas
 - **Portal do cliente personalizado**: Cores e logo aplicadas dinamicamente nas propostas públicas
-- **Campos implementados**: logo_base64, cor_primaria, cor_secundaria, cor_fundo_proposta
+- **Campos implementados**: logo_base64, logo_pdf_base64, header_pdf_base64, cor_primaria, cor_secundaria, cor_fundo_proposta
 - **Interface atualizada**: Link "Empresa" adicionado no dropdown Configurações
 - **Carregamento dinâmico**: Configurações aplicadas em tempo real, inclusive em propostas existentes
 - **Fallbacks implementados**: Sistema robusto para ambientes de produção
