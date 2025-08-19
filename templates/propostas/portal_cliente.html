@@ -124,6 +124,150 @@
             font-size: 0.9rem;
             margin-bottom: 5px;
         }
+        
+        /* Melhorias Mobile */
+        @media (max-width: 768px) {
+            .portal-container {
+                padding: 10px;
+            }
+            
+            .proposal-card {
+                padding: 20px 15px;
+                margin-bottom: 15px;
+            }
+            
+            .portal-header {
+                padding: 20px 15px;
+            }
+            
+            .company-logo {
+                font-size: 2rem;
+            }
+            
+            .company-logo img {
+                max-height: 100px;
+                max-width: 300px;
+            }
+            
+            .value-display {
+                font-size: 1.8rem;
+            }
+            
+            /* Grid de informações adaptivo para mobile */
+            .info-grid {
+                grid-template-columns: 1fr;
+                gap: 10px;
+                margin: 15px 0;
+            }
+            
+            /* Tabela responsiva melhorada */
+            .service-table {
+                padding: 10px;
+                margin: 10px 0;
+                overflow-x: auto;
+            }
+            
+            .table-responsive {
+                border-radius: 8px;
+            }
+            
+            .table {
+                font-size: 0.9rem;
+                min-width: 100%;
+            }
+            
+            .table th, .table td {
+                padding: 8px 4px;
+                vertical-align: middle;
+            }
+            
+            /* Tabela mobile com layout compacto */
+            .table th:nth-child(3), .table td:nth-child(3) { /* Qtd */
+                width: 60px;
+                text-align: center !important;
+            }
+            
+            .table th:nth-child(4), .table td:nth-child(4) { /* Unid */
+                width: 50px;
+                text-align: center !important;
+            }
+            
+            .table th:nth-child(5), .table td:nth-child(5) { /* Preço Unit */
+                width: 80px;
+            }
+            
+            .table th:nth-child(6), .table td:nth-child(6) { /* Subtotal */
+                width: 90px;
+                font-weight: bold !important;
+            }
+            
+            /* Botões de ação mobile */
+            .action-buttons {
+                position: static;
+                padding: 20px 10px;
+                margin: 15px 0;
+            }
+            
+            .btn-approve, .btn-reject {
+                width: 100%;
+                margin: 5px 0;
+                min-width: auto;
+                font-size: 1rem;
+                padding: 12px 20px;
+            }
+            
+            /* Botão PDF mobile */
+            .position-fixed {
+                position: fixed !important;
+                top: 10px !important;
+                right: 10px !important;
+            }
+            
+            .btn-danger.btn-lg {
+                padding: 8px 12px;
+                font-size: 0.9rem;
+            }
+            
+            /* Layout de colunas mobile */
+            .row.align-items-center .col-md-8,
+            .row.align-items-center .col-md-4 {
+                text-align: center;
+                margin-bottom: 20px;
+            }
+            
+            /* Seções side-by-side em mobile ficam empilhadas */
+            .col-md-6 {
+                margin-bottom: 20px;
+            }
+            
+            /* Ajuste do badge de status */
+            .status-badge {
+                font-size: 0.9rem;
+                padding: 8px 16px;
+                display: inline-block;
+                margin-top: 10px;
+            }
+        }
+        
+        /* Melhorias extras para telas muito pequenas */
+        @media (max-width: 480px) {
+            .table {
+                font-size: 0.8rem;
+            }
+            
+            .table th, .table td {
+                padding: 6px 2px;
+            }
+            
+            .value-display {
+                font-size: 1.5rem;
+            }
+            
+            .section-title {
+                font-size: 1.1rem;
+                margin: 20px 0 10px 0;
+            }
+        }
     </style>
 </head>
 <body>
@@ -228,33 +372,33 @@
             <h4 class="section-title">Tabela de Serviços - {{ proposta.assunto }}</h4>
             <div class="service-table">
                 <div class="table-responsive">
-                    <table class="table table-hover">
+                    <table class="table table-hover table-sm">
                         <thead class="table-primary">
                             <tr>
-                                <th>Item</th>
-                                <th>Descrição</th>
-                                <th class="text-center">Qtd</th>
-                                <th class="text-center">Unid.</th>
-                                <th class="text-end">Preço Unit.</th>
-                                <th class="text-end">Subtotal</th>
+                                <th style="width: 40px; text-align: center;">Item</th>
+                                <th style="min-width: 120px;">Descrição</th>
+                                <th style="width: 60px; text-align: center;">Qtd</th>
+                                <th style="width: 50px; text-align: center;">Un.</th>
+                                <th style="width: 80px; text-align: right;">Preço Unit.</th>
+                                <th style="width: 90px; text-align: right;">Subtotal</th>
                             </tr>
                         </thead>
                         <tbody>
                             {% for item in proposta.itens %}
                             <tr>
                                 <td class="text-center fw-bold">{{ item.item_numero }}</td>
-                                <td>{{ item.descricao }}</td>
-                                <td class="text-center">{{ "{:,.3f}".format(item.quantidade).replace(',', 'X').replace('.', ',').replace('X', '.') }}</td>
+                                <td style="word-break: break-word;">{{ item.descricao }}</td>
+                                <td class="text-center">{{ "{:,.1f}".format(item.quantidade).replace(',', 'X').replace('.', ',').replace('X', '.') }}</td>
                                 <td class="text-center">{{ item.unidade }}</td>
                                 <td class="text-end">R$ {{ "{:,.2f}".format(item.preco_unitario).replace(',', 'X').replace('.', ',').replace('X', '.') }}</td>
-                                <td class="text-end fw-bold">R$ {{ "{:,.2f}".format(item.subtotal).replace(',', 'X').replace('.', ',').replace('X', '.') }}</td>
+                                <td class="text-end fw-bold text-success">R$ {{ "{:,.2f}".format(item.subtotal).replace(',', 'X').replace('.', ',').replace('X', '.') }}</td>
                             </tr>
                             {% endfor %}
                         </tbody>
                         <tfoot class="table-success">
-                            <tr>
-                                <td colspan="5" class="text-end fw-bold fs-5">VALOR TOTAL:</td>
-                                <td class="text-end fw-bold fs-5">R$ {{ "{:,.2f}".format(proposta.valor_total or 0).replace(',', 'X').replace('.', ',').replace('X', '.') }}</td>
+                            <tr class="fw-bold">
+                                <td colspan="5" class="text-end fs-6 py-3">VALOR TOTAL:</td>
+                                <td class="text-end fs-5 py-3">R$ {{ "{:,.2f}".format(proposta.valor_total or 0).replace(',', 'X').replace('.', ',').replace('X', '.') }}</td>
                             </tr>
                         </tfoot>
                     </table>
@@ -334,7 +478,7 @@
         <!-- Ações do Cliente -->
         {% if proposta.status == 'enviada' %}
         <div class="action-buttons text-center py-3">
-            <div class="d-flex justify-content-center flex-wrap">
+            <div class="d-grid gap-2 d-md-flex justify-content-md-center">
                 <button type="button" class="btn btn-approve" onclick="aprovarProposta()">
                     <i class="fas fa-thumbs-up me-2"></i>Aprovar Proposta
                 </button>
@@ -343,7 +487,7 @@
                 </button>
             </div>
             
-            <p class="text-muted mt-2 small">
+            <p class="text-muted mt-3 small">
                 <i class="fas fa-info-circle me-1"></i>
                 Após sua decisão, nossa equipe será notificada automaticamente.
             </p>
