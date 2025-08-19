@@ -568,10 +568,7 @@
             <div class="p-3 bg-light rounded mb-3">
                 <div style="white-space: pre-line; line-height: 1.5;">{{ proposta.condicoes_pagamento }}</div>
                 <hr>
-                <div class="d-flex justify-content-between align-items-center">
-                    <span><strong>Percentual de Nota Fiscal:</strong></span>
-                    <span class="badge bg-primary fs-6">{{ proposta.percentual_nota_fiscal }}%</span>
-                </div>
+                <p class="mb-0">Considerar {{ proposta.percentual_nota_fiscal }}% para emissão de nota fiscal.</p>
             </div>
             
             <h4 class="section-title">
@@ -592,15 +589,15 @@
 
         <!-- Itens Inclusos/Exclusos -->
         <div class="proposal-card">
+            {% if proposta.itens_inclusos %}
             <h4 class="section-title">
                 <i class="fas fa-check-circle text-success me-2"></i>Itens Inclusos
             </h4>
-            {% if proposta.itens_inclusos %}
                 <div class="row g-2 mb-4">
                     {% for item in proposta.itens_inclusos %}
-                    <div class="col-12 col-sm-6">
-                        <div class="d-flex align-items-center p-2 bg-success bg-opacity-10 rounded">
-                            <i class="fas fa-check-circle text-success me-2"></i>
+                    <div class="col-12">
+                        <div class="d-flex align-items-start p-3 bg-success bg-opacity-10 rounded">
+                            <i class="fas fa-check-circle text-success me-3 mt-1"></i>
                             <span class="flex-grow-1">{{ item }}</span>
                         </div>
                     </div>
@@ -614,9 +611,9 @@
             </h4>
                 <div class="row g-2">
                     {% for item in proposta.itens_exclusos %}
-                    <div class="col-12 col-sm-6">
-                        <div class="d-flex align-items-center p-2 bg-danger bg-opacity-10 rounded">
-                            <i class="fas fa-times-circle text-danger me-2"></i>
+                    <div class="col-12">
+                        <div class="d-flex align-items-start p-3 bg-danger bg-opacity-10 rounded">
+                            <i class="fas fa-times-circle text-danger me-3 mt-1"></i>
                             <span class="flex-grow-1">{{ item }}</span>
                         </div>
                     </div>
