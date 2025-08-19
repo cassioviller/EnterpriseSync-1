@@ -10,7 +10,7 @@ import logging
 BYPASS_ATIVO = True
 
 print("🔓 Sistema de bypass de autenticação ativado")
-print("👤 Usuário mock: admin@valeverde.com (ADMIN)")
+print("👤 Usuário mock: funcionario@valeverde.com (FUNCIONÁRIO)")
 
 # Sobrescrever flask_login.current_user para desenvolvimento
 import flask_login
@@ -33,29 +33,29 @@ class MockCurrentUser:
     
     @property
     def id(self):
-        return 10  # ID do usuário Vale Verde
+        return 15  # ID do funcionário teste
     
     @property
     def admin_id(self):
-        return 10  # Para usuários ADMIN, admin_id é o próprio ID
+        return 10  # Para funcionário, admin_id aponta para o admin responsável
     
     @property
     def email(self):
-        return 'admin@valeverde.com'
+        return 'funcionario@valeverde.com'
     
     @property
     def nome(self):
-        return 'Administrador Vale Verde'
+        return 'Funcionário Teste Vale Verde'
     
     @property
     def tipo_usuario(self):
-        # Simular TipoUsuario.ADMIN
+        # Simular TipoUsuario.FUNCIONARIO para testar
         tipo = SimpleNamespace()
-        tipo.value = 'admin'
-        tipo.name = 'ADMIN'
+        tipo.value = 'funcionario'
+        tipo.name = 'FUNCIONARIO'
         # Para compatibilidade com enum
         from models import TipoUsuario
-        return TipoUsuario.ADMIN
+        return TipoUsuario.FUNCIONARIO
     
     def get_id(self):
         return str(self.id)

@@ -1509,7 +1509,7 @@ def api_servicos():
 # ===== SISTEMA COMPLETO DE RDO =====
 
 @main_bp.route('/rdo')
-@admin_required
+@funcionario_required
 def lista_rdos():
     """Lista RDOs com controle de acesso por obra"""
     try:
@@ -1559,7 +1559,7 @@ def lista_rdos():
         return redirect(url_for('main.dashboard'))
 
 @main_bp.route('/rdo/novo')
-@admin_required
+@funcionario_required
 def novo_rdo():
     """Formulário para criar novo RDO com pré-carregamento de atividades"""
     try:
@@ -1608,7 +1608,7 @@ def novo_rdo():
         return redirect(url_for('main.lista_rdos'))
 
 @main_bp.route('/rdo/criar', methods=['POST'])
-@admin_required
+@funcionario_required
 def criar_rdo():
     """Cria um novo RDO"""
     try:
