@@ -125,127 +125,252 @@
             margin-bottom: 5px;
         }
         
-        /* Melhorias Mobile */
+        /* Design Mobile-First UX Otimizado */
         @media (max-width: 768px) {
+            body {
+                background: linear-gradient(180deg, var(--cor-primaria) 0%, var(--cor-secundaria) 30%, #f8f9fa 60%);
+            }
+            
             .portal-container {
-                padding: 10px;
+                padding: 8px;
+                max-width: 100vw;
+                overflow-x: hidden;
             }
             
-            .proposal-card {
-                padding: 20px 15px;
-                margin-bottom: 15px;
-            }
-            
+            /* Header mobile otimizado */
             .portal-header {
-                padding: 20px 15px;
+                padding: 16px 12px;
+                margin-bottom: 16px;
+                position: relative;
             }
             
             .company-logo {
-                font-size: 2rem;
+                font-size: 1.6rem;
+                line-height: 1.3;
             }
             
             .company-logo img {
-                max-height: 100px;
-                max-width: 300px;
+                max-height: 80px;
+                max-width: 280px;
+                margin-bottom: 12px;
             }
             
+            /* Cards com melhor hierarquia visual */
+            .proposal-card {
+                padding: 16px 14px;
+                margin-bottom: 12px;
+                border-radius: 12px;
+                box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+            }
+            
+            /* Cabeçalho da proposta mobile */
+            .proposal-card h2 {
+                font-size: 1.4rem;
+                line-height: 1.3;
+                margin-bottom: 16px;
+                text-align: center;
+                word-break: break-word;
+            }
+            
+            /* Status badge mobile */
+            .status-badge {
+                font-size: 0.85rem;
+                padding: 6px 14px;
+                display: block;
+                text-align: center;
+                margin: 12px auto 0;
+                width: fit-content;
+            }
+            
+            /* Valor em destaque mobile */
             .value-display {
-                font-size: 1.8rem;
+                font-size: 2.2rem;
+                margin: 16px 0;
+                text-align: center;
+                color: #28a745;
+                font-weight: 900;
+                text-shadow: 0 2px 4px rgba(40,167,69,0.2);
             }
             
-            /* Grid de informações adaptivo para mobile */
+            /* Grid de informações otimizado */
             .info-grid {
-                grid-template-columns: 1fr;
-                gap: 10px;
-                margin: 15px 0;
+                display: flex;
+                flex-direction: column;
+                gap: 8px;
+                margin: 12px 0;
             }
             
-            /* Tabela responsiva melhorada */
+            .info-item {
+                padding: 12px;
+                background: rgba(var(--cor-primaria), 0.05);
+                border-radius: 8px;
+                border-left: 3px solid var(--cor-primaria);
+            }
+            
+            .info-label {
+                font-size: 0.8rem;
+                text-transform: uppercase;
+                letter-spacing: 0.5px;
+                margin-bottom: 4px;
+                opacity: 0.8;
+            }
+            
+            /* Tabela mobile card-style */
             .service-table {
-                padding: 10px;
-                margin: 10px 0;
-                overflow-x: auto;
+                padding: 0;
+                margin: 12px 0;
+                background: transparent;
             }
             
             .table-responsive {
+                border-radius: 12px;
+                box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+                overflow: hidden;
+            }
+            
+            /* Estilo card para itens da tabela mobile */
+            .mobile-service-item {
+                background: white;
                 border-radius: 8px;
+                padding: 14px;
+                margin-bottom: 8px;
+                border-left: 4px solid var(--cor-primaria);
+                box-shadow: 0 2px 6px rgba(0,0,0,0.05);
             }
             
-            .table {
+            .mobile-service-header {
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                margin-bottom: 8px;
+            }
+            
+            .mobile-service-title {
+                font-weight: bold;
                 font-size: 0.9rem;
-                min-width: 100%;
+                color: var(--cor-primaria);
             }
             
-            .table th, .table td {
-                padding: 8px 4px;
-                vertical-align: middle;
+            .mobile-service-price {
+                font-weight: bold;
+                color: #28a745;
+                font-size: 1rem;
             }
             
-            /* Tabela mobile com layout compacto */
-            .table th:nth-child(3), .table td:nth-child(3) { /* Qtd */
-                width: 60px;
-                text-align: center !important;
+            .mobile-service-details {
+                display: flex;
+                justify-content: space-between;
+                font-size: 0.85rem;
+                color: #666;
             }
             
-            .table th:nth-child(4), .table td:nth-child(4) { /* Unid */
-                width: 50px;
-                text-align: center !important;
+            /* Esconder tabela tradicional no mobile */
+            .table-responsive table {
+                display: none;
             }
             
-            .table th:nth-child(5), .table td:nth-child(5) { /* Preço Unit */
-                width: 80px;
+            /* Total em destaque mobile */
+            .mobile-total-card {
+                background: linear-gradient(135deg, #28a745, #20c997);
+                color: white;
+                padding: 16px;
+                border-radius: 12px;
+                text-align: center;
+                margin-top: 12px;
             }
             
-            .table th:nth-child(6), .table td:nth-child(6) { /* Subtotal */
-                width: 90px;
-                font-weight: bold !important;
+            /* Seções colapsáveis mobile */
+            .section-title {
+                font-size: 1.1rem;
+                margin: 20px 0 12px 0;
+                padding: 12px 16px;
+                background: rgba(var(--cor-primaria), 0.1);
+                border-radius: 8px;
+                border-left: 4px solid var(--cor-primaria);
+                cursor: pointer;
+                position: relative;
             }
             
-            /* Botões de ação mobile */
+            .section-title::after {
+                content: '▼';
+                position: absolute;
+                right: 16px;
+                transition: transform 0.3s ease;
+            }
+            
+            .section-title.collapsed::after {
+                transform: rotate(-90deg);
+            }
+            
+            /* Botões de ação flutuantes */
             .action-buttons {
-                position: static;
-                padding: 20px 10px;
-                margin: 15px 0;
+                position: fixed;
+                bottom: 0;
+                left: 0;
+                right: 0;
+                background: white;
+                padding: 16px 12px 20px;
+                border-top: 1px solid #eee;
+                box-shadow: 0 -4px 12px rgba(0,0,0,0.1);
+                z-index: 1000;
             }
             
             .btn-approve, .btn-reject {
                 width: 100%;
-                margin: 5px 0;
-                min-width: auto;
+                margin: 4px 0;
+                padding: 14px 20px;
                 font-size: 1rem;
-                padding: 12px 20px;
+                font-weight: 600;
+                border-radius: 12px;
+                box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+                transition: all 0.2s ease;
             }
             
-            /* Botão PDF mobile */
+            .btn-approve:active, .btn-reject:active {
+                transform: translateY(2px);
+                box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+            }
+            
+            /* Botão PDF otimizado */
             .position-fixed {
-                position: fixed !important;
-                top: 10px !important;
-                right: 10px !important;
+                top: 12px !important;
+                right: 12px !important;
+                z-index: 1001;
             }
             
             .btn-danger.btn-lg {
-                padding: 8px 12px;
-                font-size: 0.9rem;
+                padding: 10px 14px;
+                font-size: 0.85rem;
+                border-radius: 12px;
+                box-shadow: 0 3px 8px rgba(220,53,69,0.3);
             }
             
-            /* Layout de colunas mobile */
-            .row.align-items-center .col-md-8,
-            .row.align-items-center .col-md-4 {
+            /* Layout responsivo melhorado */
+            .row.align-items-center {
+                flex-direction: column;
                 text-align: center;
-                margin-bottom: 20px;
             }
             
-            /* Seções side-by-side em mobile ficam empilhadas */
-            .col-md-6 {
-                margin-bottom: 20px;
+            .row.align-items-center > div {
+                width: 100%;
+                margin-bottom: 16px;
             }
             
-            /* Ajuste do badge de status */
-            .status-badge {
-                font-size: 0.9rem;
-                padding: 8px 16px;
-                display: inline-block;
-                margin-top: 10px;
+            /* Espaçamento inferior para botões flutuantes */
+            body {
+                padding-bottom: 100px;
+            }
+            
+            /* Melhorias de texto */
+            p.lead {
+                font-size: 1rem;
+                line-height: 1.5;
+                margin-bottom: 16px;
+            }
+            
+            /* Otimizações de scroll */
+            .portal-container {
+                -webkit-overflow-scrolling: touch;
             }
         }
         
@@ -371,7 +496,8 @@
         <div class="proposal-card">
             <h4 class="section-title">Tabela de Serviços - {{ proposta.assunto }}</h4>
             <div class="service-table">
-                <div class="table-responsive">
+                <!-- Layout Desktop (Tabela) -->
+                <div class="table-responsive d-none d-md-block">
                     <table class="table table-hover table-sm">
                         <thead class="table-primary">
                             <tr>
@@ -403,64 +529,100 @@
                         </tfoot>
                     </table>
                 </div>
+
+                <!-- Layout Mobile (Cards) -->
+                <div class="d-block d-md-none">
+                    {% for item in proposta.itens %}
+                    <div class="mobile-service-item">
+                        <div class="mobile-service-header">
+                            <div class="mobile-service-title">
+                                {{ item.item_numero }}. {{ item.descricao }}
+                            </div>
+                            <div class="mobile-service-price">
+                                R$ {{ "{:,.2f}".format(item.subtotal).replace(',', 'X').replace('.', ',').replace('X', '.') }}
+                            </div>
+                        </div>
+                        <div class="mobile-service-details">
+                            <span>{{ "{:,.1f}".format(item.quantidade).replace(',', 'X').replace('.', ',').replace('X', '.') }} {{ item.unidade }}</span>
+                            <span>R$ {{ "{:,.2f}".format(item.preco_unitario).replace(',', 'X').replace('.', ',').replace('X', '.') }}/{{ item.unidade }}</span>
+                        </div>
+                    </div>
+                    {% endfor %}
+                    
+                    <!-- Total Mobile -->
+                    <div class="mobile-total-card">
+                        <div style="font-size: 1.1rem; font-weight: 600; margin-bottom: 4px;">VALOR TOTAL</div>
+                        <div style="font-size: 1.8rem; font-weight: 900;">
+                            R$ {{ "{:,.2f}".format(proposta.valor_total or 0).replace(',', 'X').replace('.', ',').replace('X', '.') }}
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
 
         <!-- Condições -->
         <div class="proposal-card">
-            <div class="row">
-                <div class="col-md-6">
-                    <h4 class="section-title">Condições de Pagamento</h4>
-                    <div class="p-3 bg-light rounded">
-                        <div style="white-space: pre-line;">{{ proposta.condicoes_pagamento }}</div>
-                        <hr>
-                        <p class="mb-0"><strong>Percentual de Nota Fiscal:</strong> {{ proposta.percentual_nota_fiscal }}%</p>
-                    </div>
+            <h4 class="section-title">
+                <i class="fas fa-credit-card me-2"></i>Condições de Pagamento
+            </h4>
+            <div class="p-3 bg-light rounded mb-3">
+                <div style="white-space: pre-line; line-height: 1.5;">{{ proposta.condicoes_pagamento }}</div>
+                <hr>
+                <div class="d-flex justify-content-between align-items-center">
+                    <span><strong>Percentual de Nota Fiscal:</strong></span>
+                    <span class="badge bg-primary fs-6">{{ proposta.percentual_nota_fiscal }}%</span>
                 </div>
-                <div class="col-md-6">
-                    <h4 class="section-title">Prazo de Execução</h4>
-                    <div class="p-3 bg-light rounded">
-                        <p><strong>{{ proposta.prazo_entrega_dias }} dias</strong> após confirmação do pedido e aprovação do projeto.</p>
-                        {% if proposta.observacoes_entrega %}
-                        <div style="white-space: pre-line;">{{ proposta.observacoes_entrega }}</div>
-                        {% endif %}
-                    </div>
+            </div>
+            
+            <h4 class="section-title">
+                <i class="fas fa-calendar-alt me-2"></i>Prazo de Execução
+            </h4>
+            <div class="p-3 bg-light rounded">
+                <div class="text-center mb-3">
+                    <div class="display-6 fw-bold text-primary">{{ proposta.prazo_entrega_dias }}</div>
+                    <div class="text-muted">dias úteis</div>
                 </div>
+                <p class="text-center mb-2">após confirmação do pedido e aprovação do projeto</p>
+                {% if proposta.observacoes_entrega %}
+                <hr>
+                <div style="white-space: pre-line; font-size: 0.9rem;">{{ proposta.observacoes_entrega }}</div>
+                {% endif %}
             </div>
         </div>
 
         <!-- Itens Inclusos/Exclusos -->
         <div class="proposal-card">
-            <div class="row">
-                <div class="col-md-6">
-                    <h4 class="section-title">
-                        <i class="fas fa-check-circle text-success"></i> Itens Inclusos
-                    </h4>
-                    {% if proposta.itens_inclusos %}
-                        <ul class="list-group list-group-flush">
-                            {% for item in proposta.itens_inclusos %}
-                            <li class="list-group-item">
-                                <i class="fas fa-check text-success me-2"></i>{{ item }}
-                            </li>
-                            {% endfor %}
-                        </ul>
-                    {% endif %}
+            <h4 class="section-title">
+                <i class="fas fa-check-circle text-success me-2"></i>Itens Inclusos
+            </h4>
+            {% if proposta.itens_inclusos %}
+                <div class="row g-2 mb-4">
+                    {% for item in proposta.itens_inclusos %}
+                    <div class="col-12 col-sm-6">
+                        <div class="d-flex align-items-center p-2 bg-success bg-opacity-10 rounded">
+                            <i class="fas fa-check-circle text-success me-2"></i>
+                            <span class="flex-grow-1">{{ item }}</span>
+                        </div>
+                    </div>
+                    {% endfor %}
                 </div>
-                <div class="col-md-6">
-                    <h4 class="section-title">
-                        <i class="fas fa-times-circle text-danger"></i> Itens Exclusos
-                    </h4>
-                    {% if proposta.itens_exclusos %}
-                        <ul class="list-group list-group-flush">
-                            {% for item in proposta.itens_exclusos %}
-                            <li class="list-group-item">
-                                <i class="fas fa-times text-danger me-2"></i>{{ item }}
-                            </li>
-                            {% endfor %}
-                        </ul>
-                    {% endif %}
+            {% endif %}
+            
+            {% if proposta.itens_exclusos %}
+            <h4 class="section-title">
+                <i class="fas fa-times-circle text-danger me-2"></i>Itens Exclusos
+            </h4>
+                <div class="row g-2">
+                    {% for item in proposta.itens_exclusos %}
+                    <div class="col-12 col-sm-6">
+                        <div class="d-flex align-items-center p-2 bg-danger bg-opacity-10 rounded">
+                            <i class="fas fa-times-circle text-danger me-2"></i>
+                            <span class="flex-grow-1">{{ item }}</span>
+                        </div>
+                    </div>
+                    {% endfor %}
                 </div>
-            </div>
+            {% endif %}
         </div>
 
         <!-- Garantias -->
@@ -575,6 +737,90 @@
         function rejeitarProposta() {
             new bootstrap.Modal(document.getElementById('modalRejeitar')).show();
         }
+        
+        // Funcionalidade mobile otimizada
+        document.addEventListener('DOMContentLoaded', function() {
+            // Detectar dispositivo mobile
+            const isMobile = window.innerWidth <= 768;
+            
+            if (isMobile) {
+                // Adicionar funcionalidade de seções colapsáveis
+                const sectionTitles = document.querySelectorAll('.section-title');
+                sectionTitles.forEach((title, index) => {
+                    // Pular a primeira seção (sempre aberta)
+                    if (index === 0) return;
+                    
+                    title.style.cursor = 'pointer';
+                    title.addEventListener('click', function() {
+                        const nextElement = this.nextElementSibling;
+                        if (nextElement) {
+                            if (nextElement.style.display === 'none') {
+                                nextElement.style.display = 'block';
+                                this.classList.remove('collapsed');
+                            } else {
+                                nextElement.style.display = 'none';
+                                this.classList.add('collapsed');
+                            }
+                        }
+                    });
+                    
+                    // Inicialmente colapsadas (exceto tabela de serviços)
+                    if (index > 1) {
+                        const nextElement = title.nextElementSibling;
+                        if (nextElement) {
+                            nextElement.style.display = 'none';
+                            title.classList.add('collapsed');
+                        }
+                    }
+                });
+                
+                // Smooth scroll para melhor UX
+                const cards = document.querySelectorAll('.proposal-card');
+                cards.forEach(card => {
+                    card.style.scrollMarginTop = '20px';
+                });
+                
+                // Otimizar botões flutuantes
+                const actionButtons = document.querySelector('.action-buttons');
+                if (actionButtons) {
+                    // Adicionar backdrop blur
+                    actionButtons.style.backdropFilter = 'blur(10px)';
+                    actionButtons.style.background = 'rgba(255, 255, 255, 0.95)';
+                }
+                
+                // Melhorar feedback tátil nos botões
+                const buttons = document.querySelectorAll('.btn-approve, .btn-reject');
+                buttons.forEach(btn => {
+                    btn.addEventListener('touchstart', function() {
+                        this.style.transform = 'translateY(2px)';
+                    });
+                    btn.addEventListener('touchend', function() {
+                        setTimeout(() => {
+                            this.style.transform = 'translateY(0)';
+                        }, 100);
+                    });
+                });
+            }
+            
+            // Otimização de performance
+            const observer = new IntersectionObserver((entries) => {
+                entries.forEach(entry => {
+                    if (entry.isIntersecting) {
+                        entry.target.style.opacity = '1';
+                        entry.target.style.transform = 'translateY(0)';
+                    }
+                });
+            }, { threshold: 0.1 });
+            
+            // Aplicar animação de entrada suave
+            document.querySelectorAll('.proposal-card').forEach((card, index) => {
+                card.style.opacity = '0';
+                card.style.transform = 'translateY(20px)';
+                card.style.transition = 'opacity 0.6s ease, transform 0.6s ease';
+                card.style.transitionDelay = `${index * 0.1}s`;
+                observer.observe(card);
+            });
+        });
     </script>
 </body>
 </html>
