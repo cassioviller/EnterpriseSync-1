@@ -20,9 +20,22 @@
             <a href="{{ url_for('propostas.editar_proposta', id=proposta.id) }}" class="btn btn-warning">
                 <i class="fas fa-edit me-2"></i>Editar
             </a>
-            <a href="{{ url_for('propostas.gerar_pdf', id=proposta.id) }}" class="btn btn-success" target="_blank">
-                <i class="fas fa-file-pdf me-2"></i>PDF
-            </a>
+            <div class="btn-group">
+                <a href="{{ url_for('propostas.gerar_pdf', id=proposta.id) }}" class="btn btn-success" target="_blank">
+                    <i class="fas fa-file-pdf me-2"></i>PDF Estruturas do Vale
+                </a>
+                <button type="button" class="btn btn-success dropdown-toggle dropdown-toggle-split" data-bs-toggle="dropdown" aria-expanded="false">
+                    <span class="visually-hidden">Toggle Dropdown</span>
+                </button>
+                <ul class="dropdown-menu">
+                    <li><a class="dropdown-item" href="{{ url_for('propostas.gerar_pdf', id=proposta.id, formato='estruturas_vale') }}" target="_blank">
+                        <i class="fas fa-file-pdf me-2"></i>Formato Estruturas do Vale
+                    </a></li>
+                    <li><a class="dropdown-item" href="{{ url_for('propostas.gerar_pdf', id=proposta.id, formato='simples') }}" target="_blank">
+                        <i class="fas fa-file-pdf me-2"></i>Formato Simples
+                    </a></li>
+                </ul>
+            </div>
             {% if proposta.status == 'rascunho' %}
             <button type="button" class="btn btn-primary" onclick="enviarProposta()">
                 <i class="fas fa-paper-plane me-2"></i>Enviar

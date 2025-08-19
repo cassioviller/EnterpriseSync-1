@@ -542,8 +542,16 @@ def gerar_pdf(id):
     admin_id = getattr(current_user, 'admin_id', 10)
     config_empresa = ConfiguracaoEmpresa.query.filter_by(admin_id=admin_id).first()
     
+    # Verificar se deve usar formato Estruturas do Vale (padrão)
+    formato = request.args.get('formato', 'estruturas_vale')
+    
+    if formato == 'estruturas_vale':
+        template_name = 'propostas/pdf_estruturas_vale.html'
+    else:
+        template_name = 'propostas/pdf.html'
+    
     # Renderizar HTML da proposta
-    html_content = render_template('propostas/pdf.html', 
+    html_content = render_template(template_name, 
                                  proposta=proposta, 
                                  config_empresa=config_empresa)
     
