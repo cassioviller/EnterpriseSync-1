@@ -40,14 +40,8 @@ def login():
             elif user.tipo_usuario == TipoUsuario.ADMIN:
                 return redirect(url_for('main.dashboard'))
             else:
-                # Verificar se é mobile para redirecionar adequadamente
-                user_agent = request.headers.get('User-Agent', '').lower()
-                is_mobile = any(device in user_agent for device in ['mobile', 'android', 'iphone', 'ipad'])
-                
-                if is_mobile:
-                    return redirect(url_for('main.funcionario_mobile_dashboard'))
-                else:
-                    return redirect(url_for('main.funcionario_dashboard'))
+                # Funcionários são redirecionados para dashboard de RDO
+                return redirect(url_for('main.lista_rdos'))
         else:
             flash('Email/Username ou senha inválidos.', 'danger')
     
@@ -63,7 +57,10 @@ def logout():
 @main_bp.route('/')
 def index():
     if current_user.is_authenticated:
-        return redirect(url_for('main.dashboard'))
+        if current_user.tipo_usuario == TipoUsuario.FUNCIONARIO:
+            return redirect(url_for('main.lista_rdos'))
+        else:
+            return redirect(url_for('main.dashboard'))
     return redirect(url_for('main.login'))
 
 # ===== DASHBOARD PRINCIPAL =====

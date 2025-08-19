@@ -1,16 +1,85 @@
 {% extends "base.html" %}
 
-{% block title %}RDOs - SIGE{% endblock %}
+{% block title %}Dashboard do Funcionário - RDO{% endblock %}
 
 {% block content %}
 <div class="container-fluid">
+    <!-- Header do Dashboard do Funcionário -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <h2 class="mb-1">Dashboard do Funcionário</h2>
+                    <p class="text-muted mb-0">
+                        <i class="fas fa-user me-1"></i>
+                        Bem-vindo, {{ current_user.nome if current_user.nome else 'Funcionário' }}
+                    </p>
+                </div>
+                <div>
+                    <a href="{{ url_for('main.novo_rdo') }}" class="btn btn-primary btn-lg">
+                        <i class="fas fa-plus me-2"></i>Novo RDO
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Cards de Estatísticas Rápidas -->
+    <div class="row mb-4">
+        <div class="col-md-4">
+            <div class="card bg-primary text-white">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between">
+                        <div>
+                            <h6 class="card-title">RDOs Registrados</h6>
+                            <h3 class="mb-0">{{ rdos.total if rdos else 0 }}</h3>
+                        </div>
+                        <div class="align-self-center">
+                            <i class="fas fa-file-alt fa-2x opacity-50"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card bg-success text-white">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between">
+                        <div>
+                            <h6 class="card-title">Obras Disponíveis</h6>
+                            <h3 class="mb-0">{{ obras|length if obras else 0 }}</h3>
+                        </div>
+                        <div class="align-self-center">
+                            <i class="fas fa-building fa-2x opacity-50"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card bg-info text-white">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between">
+                        <div>
+                            <h6 class="card-title">Acesso</h6>
+                            <h5 class="mb-0">Funcionário</h5>
+                        </div>
+                        <div class="align-self-center">
+                            <i class="fas fa-user-shield fa-2x opacity-50"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <div class="row">
         <div class="col-12">
             <div class="card">
                 <div class="card-header d-flex justify-content-between align-items-center">
                     <h5 class="mb-0">
                         <i class="fas fa-file-alt me-2"></i>
-                        Relatórios Diários de Obra (RDO)
+                        Meus Relatórios Diários de Obra
                     </h5>
                     <a href="{{ url_for('main.novo_rdo') }}" class="btn btn-primary">
                         <i class="fas fa-plus me-1"></i>Novo RDO
