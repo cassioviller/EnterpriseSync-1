@@ -93,7 +93,7 @@
                         <div class="row">
                             <div class="col-md-6">
                                 <div class="mb-3">
-                                    <label for="logo_upload" class="form-label">Logo da Empresa</label>
+                                    <label for="logo_upload" class="form-label">Logo da Empresa (Geral)</label>
                                     <div class="d-flex align-items-center gap-3">
                                         {% if config and config.logo_base64 %}
                                             <img id="logo_preview" src="data:image/png;base64,{{ config.logo_base64 }}" 
@@ -105,10 +105,30 @@
                                         {% endif %}
                                         <div class="flex-grow-1">
                                             <input type="file" class="form-control" id="logo_upload" accept="image/*">
-                                            <small class="text-muted">Formatos: PNG, JPG. Tamanho máximo: 2MB</small>
+                                            <small class="text-muted">Para portal do cliente e propostas online</small>
                                         </div>
                                     </div>
                                     <input type="hidden" id="logo_base64" name="logo_base64" value="{{ config.logo_base64 if config else '' }}">
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="logo_pdf_upload" class="form-label">Logo para PDF</label>
+                                    <div class="d-flex align-items-center gap-3">
+                                        {% if config and config.logo_pdf_base64 %}
+                                            <img id="logo_pdf_preview" src="data:image/png;base64,{{ config.logo_pdf_base64 }}" 
+                                                 alt="Logo PDF atual" style="width: 60px; height: 60px; object-fit: contain; border: 1px solid #ddd; border-radius: 4px;">
+                                        {% else %}
+                                            <div id="logo_pdf_preview" style="width: 60px; height: 60px; border: 2px dashed #ddd; border-radius: 4px; display: flex; align-items: center; justify-content: center;">
+                                                <i class="fas fa-file-pdf text-muted"></i>
+                                            </div>
+                                        {% endif %}
+                                        <div class="flex-grow-1">
+                                            <input type="file" class="form-control" id="logo_pdf_upload" accept="image/*">
+                                            <small class="text-muted">Específica para documentos PDF (formato Estruturas do Vale)</small>
+                                        </div>
+                                    </div>
+                                    <input type="hidden" id="logo_pdf_base64" name="logo_pdf_base64" value="{{ config.logo_pdf_base64 if config else '' }}">
                                 </div>
                             </div>
                             <div class="col-md-6">
@@ -282,6 +302,42 @@ document.getElementById('logo_upload').addEventListener('change', function(e) {
                 img.id = 'logo_preview';
                 img.src = event.target.result;
                 img.alt = 'Preview da logo';
+                img.style.cssText = 'width: 60px; height: 60px; object-fit: contain; border: 1px solid #ddd; border-radius: 4px;';
+                preview.parentNode.replaceChild(img, preview);
+            }
+        };
+        reader.readAsDataURL(file);
+    }
+});
+
+// Upload da logo PDF
+document.getElementById('logo_pdf_upload').addEventListener('change', function(e) {
+    const file = e.target.files[0];
+    if (file) {
+        // Validar tamanho (2MB max)
+        if (file.size > 2 * 1024 * 1024) {
+            alert('Arquivo muito grande! Máximo 2MB.');
+            e.target.value = '';
+            return;
+        }
+        
+        // Converter para base64
+        const reader = new FileReader();
+        reader.onload = function(event) {
+            // Remover prefixo "data:image/...;base64,"
+            const base64 = event.target.result.split(',')[1];
+            document.getElementById('logo_pdf_base64').value = base64;
+            
+            // Atualizar preview
+            const preview = document.getElementById('logo_pdf_preview');
+            if (preview.tagName === 'IMG') {
+                preview.src = event.target.result;
+            } else {
+                // Substituir div por img
+                const img = document.createElement('img');
+                img.id = 'logo_pdf_preview';
+                img.src = event.target.result;
+                img.alt = 'Preview da logo PDF';
                 img.style.cssText = 'width: 60px; height: 60px; object-fit: contain; border: 1px solid #ddd; border-radius: 4px;';
                 preview.parentNode.replaceChild(img, preview);
             }

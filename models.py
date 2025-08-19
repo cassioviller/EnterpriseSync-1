@@ -2225,6 +2225,7 @@ class ConfiguracaoEmpresa(db.Model):
     website = db.Column(db.String(200))
     logo_url = db.Column(db.String(500))
     logo_base64 = db.Column(db.Text)  # Logo em base64 para upload direto
+    logo_pdf_base64 = db.Column(db.Text)  # Logo específica para PDFs (formato Estruturas do Vale)
     
     # Personalização visual
     cor_primaria = db.Column(db.String(7), default='#007bff')  # Cor primária em hexadecimal

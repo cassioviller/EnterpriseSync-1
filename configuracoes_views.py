@@ -58,6 +58,11 @@ def salvar_empresa():
         logo_base64 = request.form.get('logo_base64')
         if logo_base64:
             config.logo_base64 = logo_base64
+            
+        # Upload de logo PDF em base64
+        logo_pdf_base64 = request.form.get('logo_pdf_base64')
+        if logo_pdf_base64:
+            config.logo_pdf_base64 = logo_pdf_base64
         
         # Personalização visual
         cor_primaria = request.form.get('cor_primaria', '#007bff')

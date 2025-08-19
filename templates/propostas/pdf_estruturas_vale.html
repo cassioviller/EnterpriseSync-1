@@ -272,7 +272,9 @@
     <!-- Página 1: Carta de Apresentação -->
     <div class="page">
         <div class="header">
-        {% if config_empresa and config_empresa.logo_base64 %}
+        {% if config_empresa and config_empresa.logo_pdf_base64 %}
+            <img src="data:image/png;base64,{{ config_empresa.logo_pdf_base64 }}" alt="Logo" class="logo">
+        {% elif config_empresa and config_empresa.logo_base64 %}
             <img src="data:image/png;base64,{{ config_empresa.logo_base64 }}" alt="Logo" class="logo">
         {% endif %}
         <div>

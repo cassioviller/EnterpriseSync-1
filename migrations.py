@@ -88,6 +88,7 @@ def migrar_personalizacao_visual_empresa():
         # Lista de colunas para adicionar
         colunas_novas = [
             ('logo_base64', 'TEXT'),
+            ('logo_pdf_base64', 'TEXT'),
             ('cor_primaria', 'VARCHAR(7) DEFAULT \'#007bff\''),
             ('cor_secundaria', 'VARCHAR(7) DEFAULT \'#6c757d\''),
             ('cor_fundo_proposta', 'VARCHAR(7) DEFAULT \'#f8f9fa\'')
