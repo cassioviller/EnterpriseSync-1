@@ -212,6 +212,34 @@ def nova_proposta():
                          padrao_validade=7,
                          padrao_percentual_nf=13.5)
 
+@propostas_bp.route('/api/template/<int:template_id>')
+def api_template_detalhes(template_id):
+    """API para retornar detalhes de um template"""
+    from models import PropostaTemplate
+    
+    try:
+        # Buscar template
+        template = PropostaTemplate.query.get(template_id)
+        if not template:
+            return jsonify({'error': 'Template não encontrado'}), 404
+        
+        # Retornar dados do template
+        return jsonify({
+            'id': template.id,
+            'nome': template.nome,
+            'categoria': template.categoria,
+            'itens_inclusos': template.itens_inclusos,
+            'itens_exclusos': template.itens_exclusos,
+            'condicoes': template.condicoes,
+            'condicoes_pagamento': template.condicoes_pagamento,
+            'garantias': template.garantias,
+            'prazo_entrega_dias': template.prazo_entrega_dias,
+            'validade_dias': template.validade_dias,
+            'percentual_nota_fiscal': float(template.percentual_nota_fiscal) if template.percentual_nota_fiscal else 13.5
+        })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
 @propostas_bp.route('/nova-funcionando-backup')
 def nova_proposta_funcionando():
     """Página nova proposta funcionando - versão sem autenticação"""
