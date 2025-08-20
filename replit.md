@@ -82,17 +82,22 @@ INFO:migrations:✅ Migrações automáticas concluídas com sucesso!
 - **Correção de bugs**: Corrigido erro de atributo 'valor_total' para 'subtotal'
 - **Status**: Funcional em produção, testado e aprovado
 
-## Recent Changes (19/08/2025)
+## Recent Changes (20/08/2025)
+
+### Sistema de Header PDF Personalizado - CORREÇÃO PRODUÇÃO ✅
+- **Problema identificado**: Header personalizado não substituía header padrão em produção
+- **Correção implementada**: Template PDF agora usa lógica condicional exclusiva
+- **Lógica**: OU header personalizado OU header padrão (nunca ambos)
+- **Template corrigido**: `pdf_estruturas_vale.html` com estrutura condicional limpa
+- **Deploy automático**: Correção aplicada automaticamente via Docker
+- **Status**: PRONTO PARA DEPLOY EM PRODUÇÃO 🚀
 
 ### Sistema de Header PDF Personalizado - IMPLEMENTADO ✅
-- **Campo header_pdf_base64**: Novo campo para upload de header completo do PDF
-- **Substituição inteligente**: Header personalizado substitui logo+texto quando configurado
+- **Campo header_pdf_base64**: Campo para upload de header completo do PDF
+- **Substituição completa**: Header personalizado substitui totalmente header verde
 - **Dimensões recomendadas**: 800-1200px × 80-120px (proporção 10:1)
-- **Validação JavaScript**: Alerta sobre dimensões ideais durante upload
-- **Preview dinâmico**: Visualização em tempo real do header carregado
 - **Aplicação automática**: Header aplicado em todas as páginas do PDF estruturado
 - **Migração automática**: Campo adicionado via sistema de migrações
-- **Status**: FUNCIONANDO EM DESENVOLVIMENTO 🚀
 
 ### Sistema de Personalização da Empresa - FUNCIONAL EM PRODUÇÃO ✅
 - **Configurações visuais completas**: Upload de logo e seleção de cores personalizadas
