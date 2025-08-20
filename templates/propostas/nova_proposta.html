@@ -193,22 +193,44 @@
                 <hr>
                 <h6 class="text-primary mb-3">Detalhes da Proposta</h6>
                 
+                <!-- Seletor de Template -->
+                <div class="row mb-4">
+                    <div class="col-md-12">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <h6 class="text-primary mb-0">Pré-carregar Campos do Template</h6>
+                            <div class="d-flex gap-2">
+                                <select class="form-select" id="seletorTemplate" style="width: 300px;">
+                                    <option value="">Selecione um template para pré-carregar...</option>
+                                    {% for template in templates %}
+                                    <option value="{{ template.id }}">{{ template.nome }} ({{ template.categoria }})</option>
+                                    {% endfor %}
+                                </select>
+                                <button type="button" class="btn btn-outline-primary" onclick="carregarTemplate()">
+                                    <i class="fas fa-download me-1"></i> Carregar
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
                 <div class="row">
                     <!-- Itens Inclusos -->
                     <div class="col-md-6">
                         <div class="mb-3">
-                            <label class="form-label">Itens Inclusos</label>
-                            <textarea class="form-control" name="itens_inclusos" rows="4" 
-                                      placeholder="Ex: Material, Mão de obra, Projeto, etc."></textarea>
+                            <label class="form-label">Itens Inclusos no Fornecimento</label>
+                            <textarea class="form-control" name="itens_inclusos" id="itensInclusos" rows="5" 
+                                      placeholder="Mão de obra para execução dos serviços; Todos os equipamentos de segurança necessários; Transporte e alimentação da equipe">{{ padrao_itens_inclusos or '' }}</textarea>
+                            <small class="text-muted">Separe os itens com ponto e vírgula (;) ou vírgula (,)</small>
                         </div>
                     </div>
                     
                     <!-- Itens Exclusos -->
                     <div class="col-md-6">
                         <div class="mb-3">
-                            <label class="form-label">Itens Exclusos</label>
-                            <textarea class="form-control" name="itens_exclusos" rows="4" 
-                                      placeholder="Ex: Fundação, Instalações elétricas, etc."></textarea>
+                            <label class="form-label">Itens Exclusos do Fornecimento</label>
+                            <textarea class="form-control" name="itens_exclusos" id="itensExclusos" rows="5" 
+                                      placeholder="Projeto e execução de qualquer obra civil; Fornecimento de local para armazenagem; Pintura final">{{ padrao_itens_exclusos or '' }}</textarea>
+                            <small class="text-muted">Separe os itens com ponto e vírgula (;) ou vírgula (,)</small>
                         </div>
                     </div>
                 </div>
@@ -217,9 +239,9 @@
                     <!-- Condições -->
                     <div class="col-md-6">
                         <div class="mb-3">
-                            <label class="form-label">Condições</label>
-                            <textarea class="form-control" name="condicoes" rows="3" 
-                                      placeholder="Ex: Terreno nivelado, acesso facilitado, etc."></textarea>
+                            <label class="form-label">Considerações Gerais</label>
+                            <textarea class="form-control" name="condicoes" id="condicoes" rows="4" 
+                                      placeholder="Proposta válida por X dias; Valores não incluem impostos; Execução conforme normas técnicas">{{ padrao_condicoes or '' }}</textarea>
                         </div>
                     </div>
                     
@@ -227,8 +249,8 @@
                     <div class="col-md-6">
                         <div class="mb-3">
                             <label class="form-label">Condições de Pagamento</label>
-                            <textarea class="form-control" name="condicoes_pagamento" rows="3" 
-                                      placeholder="Ex: 30% entrada, 70% na entrega"></textarea>
+                            <textarea class="form-control" name="condicoes_pagamento" id="condicoesPagamento" rows="4" 
+                                      placeholder="10% entrada; 45% compra dos perfis; 35% montagem; 10% conclusão">{{ padrao_condicoes_pagamento or '' }}</textarea>
                         </div>
                     </div>
                 </div>
@@ -238,8 +260,8 @@
                     <div class="col-md-6">
                         <div class="mb-3">
                             <label class="form-label">Garantias</label>
-                            <textarea class="form-control" name="garantias" rows="3" 
-                                      placeholder="Ex: 1 ano contra defeitos de fabricação"></textarea>
+                            <textarea class="form-control" name="garantias" id="garantias" rows="3" 
+                                      placeholder="12 meses contra defeitos de fabricação conforme NBR 8800">{{ padrao_garantias or '' }}</textarea>
                         </div>
                     </div>
                     
@@ -249,20 +271,20 @@
                             <div class="col-md-6">
                                 <div class="mb-3">
                                     <label class="form-label">Prazo Entrega (dias)</label>
-                                    <input type="number" class="form-control" name="prazo_entrega_dias" value="90">
+                                    <input type="number" class="form-control" name="prazo_entrega_dias" id="prazoEntrega" value="{{ padrao_prazo_entrega or 90 }}">
                                 </div>
                             </div>
                             <div class="col-md-6">
                                 <div class="mb-3">
                                     <label class="form-label">Validade (dias)</label>
-                                    <input type="number" class="form-control" name="validade_dias" value="7">
+                                    <input type="number" class="form-control" name="validade_dias" id="validade" value="{{ padrao_validade or 7 }}">
                                 </div>
                             </div>
                         </div>
                         <div class="mb-3">
                             <label class="form-label">% Nota Fiscal</label>
-                            <input type="number" class="form-control" name="percentual_nota_fiscal" 
-                                   step="0.1" value="13.5">
+                            <input type="number" class="form-control" name="percentual_nota_fiscal" id="percentualNF"
+                                   step="0.1" value="{{ padrao_percentual_nf or 13.5 }}">
                         </div>
                     </div>
                 </div>
@@ -364,29 +386,39 @@ document.getElementById('formNovaProposta').addEventListener('submit', function(
     coletarServicos();
 });
 
-// Funções para templates
+// Função para carregar template
 function carregarTemplate() {
-    const select = document.getElementById('templateSelect');
+    const select = document.getElementById('seletorTemplate');
     const templateId = select.value;
-    const btnCarregar = document.getElementById('btnCarregarTemplate');
-    const info = document.getElementById('templateInfo');
     
     if (!templateId) {
-        info.style.display = 'none';
-        btnCarregar.disabled = true;
+        alert('Selecione um template primeiro.');
         return;
     }
     
-    // Mostrar informações do template
-    const option = select.selectedOptions[0];
-    document.getElementById('templateNome').textContent = option.text.split(' (')[0];
-    document.getElementById('templateCategoria').textContent = option.dataset.categoria;
-    document.getElementById('templatePrazo').textContent = option.dataset.prazo;
-    info.style.display = 'block';
-    btnCarregar.disabled = false;
-    
-    // Carregar serviços do template
-    carregarServicosTemplate(templateId);
+    fetch(`/propostas/api/template/${templateId}`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.id) {
+                // Carregar campos do template
+                document.getElementById('itensInclusos').value = data.itens_inclusos || '';
+                document.getElementById('itensExclusos').value = data.itens_exclusos || '';
+                document.getElementById('condicoes').value = data.condicoes || '';
+                document.getElementById('condicoesPagamento').value = data.condicoes_pagamento || '';
+                document.getElementById('garantias').value = data.garantias || '';
+                document.getElementById('prazoEntrega').value = data.prazo_entrega_dias || 90;
+                document.getElementById('validade').value = data.validade_dias || 7;
+                document.getElementById('percentualNF').value = data.percentual_nota_fiscal || 13.5;
+                
+                alert(`Template "${data.nome}" carregado com sucesso!`);
+            } else {
+                alert('Erro ao carregar template: ' + (data.error || 'Erro desconhecido'));
+            }
+        })
+        .catch(error => {
+            console.error('Erro:', error);
+            alert('Erro ao carregar template.');
+        });
 }
 
 function carregarServicosTemplate(templateId) {

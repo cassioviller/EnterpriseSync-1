@@ -68,6 +68,34 @@ def index():
     return render_template('propostas/listar.html', propostas=propostas, 
                          status_filter=status_filter, cliente_filter=cliente_filter)
 
+@propostas_bp.route('/api/template/<int:template_id>')
+@login_required
+def get_template_data(template_id):
+    """API para obter dados de um template específico"""
+    from bypass_auth import MockCurrentUser
+    current_user = MockCurrentUser()
+    admin_id = getattr(current_user, 'admin_id', None) or getattr(current_user, 'id', None)
+    
+    template = PropostaTemplate.query.filter_by(id=template_id, admin_id=admin_id, ativo=True).first()
+    
+    if not template:
+        return jsonify({'error': 'Template não encontrado'}), 404
+    
+    return jsonify({
+        'id': template.id,
+        'nome': template.nome,
+        'categoria': template.categoria,
+        'itens_inclusos': template.itens_inclusos or '',
+        'itens_exclusos': template.itens_exclusos or '',
+        'condicoes': template.condicoes or '',
+        'condicoes_pagamento': template.condicoes_pagamento or '',
+        'garantias': template.garantias or '',
+        'prazo_entrega_dias': template.prazo_entrega_dias or 90,
+        'validade_dias': template.validade_dias or 7,
+        'percentual_nota_fiscal': float(template.percentual_nota_fiscal) if template.percentual_nota_fiscal else 13.5,
+        'itens_padrao': template.itens_padrao or []
+    })
+
 @propostas_bp.route('/<int:proposta_id>/organizar')
 @login_required
 def organizar_proposta(proposta_id):
@@ -139,7 +167,52 @@ def test_nova_proposta():
     print(f"DEBUG TEST: Enviando {len(templates)} templates para o template HTML")
     return render_template('propostas/nova_proposta.html', templates=templates)
 
-@propostas_bp.route('/nova-funcionando')
+@propostas_bp.route('/nova')
+@login_required
+@admin_required
+def nova_proposta():
+    """Exibe formulário para criar nova proposta"""
+    from bypass_auth import MockCurrentUser
+    current_user = MockCurrentUser()
+    admin_id = getattr(current_user, 'admin_id', None) or getattr(current_user, 'id', None)
+    
+    # Buscar configuração da empresa
+    config_empresa = ConfiguracaoEmpresa.query.filter_by(admin_id=admin_id).first()
+    
+    # Buscar templates disponíveis
+    templates = PropostaTemplate.query.filter_by(
+        admin_id=admin_id, 
+        ativo=True
+    ).order_by(PropostaTemplate.categoria, PropostaTemplate.nome).all()
+    
+    # Definir valores padrão da empresa ou usar padrões do sistema
+    padrao_itens_inclusos = "Mão de obra para execução dos serviços; Todos os equipamentos de segurança necessários; Transporte e alimentação da equipe; Container para guarda de ferramentas; Movimentação de carga (Munck); Transporte dos materiais"
+    
+    padrao_itens_exclusos = "Projeto e execução de qualquer obra civil, fundações, alvenarias, elétrica, automação, tubulações etc.; Execução de ensaios destrutivos e radiográficos; Fornecimento de local para armazenagem das peças; Fornecimento e/ou serviços não especificados claramente nesta proposta; Fornecimento de escoramento temporário; Fornecimento de andaimes e plataformas; Técnico de segurança; Pintura final de acabamento; Calhas, rufos, condutores e pingadeiras"
+    
+    padrao_condicoes_pagamento = """10% de entrada na assinatura do contrato
+10% após projeto aprovado
+45% compra dos perfis
+25% no início da montagem in loco
+10% após a conclusão da montagem"""
+    
+    padrao_garantias = "A Estruturas do Vale garante todos os materiais empregados nos serviços contra defeitos de fabricação pelo prazo de 12 (doze) meses contados a partir da data de conclusão da obra, conforme NBR 8800."
+    
+    padrao_condicoes = "Proposta válida por 7 dias a partir da data de emissão; Valores não incluem impostos (13,5% de nota fiscal); Execução conforme normas técnicas brasileiras (NBR 8800, NBR 14762); Projeto executivo detalhado incluído no escopo de fornecimento"
+    
+    return render_template('propostas/nova_proposta.html', 
+                         config_empresa=config_empresa,
+                         templates=templates,
+                         padrao_itens_inclusos=padrao_itens_inclusos,
+                         padrao_itens_exclusos=padrao_itens_exclusos,
+                         padrao_condicoes_pagamento=padrao_condicoes_pagamento,
+                         padrao_garantias=padrao_garantias,
+                         padrao_condicoes=padrao_condicoes,
+                         padrao_prazo_entrega=90,
+                         padrao_validade=7,
+                         padrao_percentual_nf=13.5)
+
+@propostas_bp.route('/nova-funcionando-backup')
 def nova_proposta_funcionando():
     """Página nova proposta funcionando - versão sem autenticação"""
     from models import PropostaTemplate
@@ -187,8 +260,9 @@ def criar_teste_template(template_id):
         proposta.percentual_nota_fiscal = float(template.percentual_nota_fiscal)
         proposta.condicoes_pagamento = template.condicoes_pagamento
         proposta.garantias = template.garantias
-        proposta.consideracoes_gerais = "Proposta gerada automaticamente para teste do sistema"
+        proposta.condicoes = template.condicoes or "Proposta gerada automaticamente para teste do sistema"
         proposta.criado_por = 10  # Admin Vale Verde
+        proposta.admin_id = 10  # Admin ID
         
         db.session.add(proposta)
         db.session.flush()
@@ -235,42 +309,7 @@ def criar_teste_template(template_id):
         print(f"ERRO TESTE: {str(e)}")
         return jsonify({'error': f'Erro ao criar proposta de teste: {str(e)}'}), 500
 
-@propostas_bp.route('/nova')
-@login_required
-@admin_required
-def nova_proposta():
-    """Formulário para criar nova proposta"""
-    # Obter admin_id do usuário atual com fallback seguro
-    try:
-        admin_id = getattr(current_user, 'admin_id', None) or getattr(current_user, 'id', 10)
-        user_id = getattr(current_user, 'id', 10)
-        print(f"DEBUG: NOVA PROPOSTA - Admin ID {admin_id} (user_id: {user_id})")
-    except Exception as e:
-        print(f"DEBUG: Erro ao obter user info: {e}")
-        admin_id = 10  # Fallback para desenvolvimento
-        user_id = 10
-        print(f"DEBUG: Usando fallback - Admin ID {admin_id}")
-    
-    # Buscar templates próprios e públicos
-    templates = PropostaTemplate.query.filter(
-        db.or_(
-            PropostaTemplate.admin_id == admin_id,  # Templates próprios
-            PropostaTemplate.publico == True        # Templates públicos
-        ),
-        PropostaTemplate.ativo == True
-    ).order_by(PropostaTemplate.nome).all()
-    
-    print(f"DEBUG: Admin ID {admin_id} - encontrou {len(templates)} templates (próprios + públicos)")
-    for t in templates:
-        tipo = "próprio" if t.admin_id == admin_id else "público"
-        print(f"DEBUG: Template {t.id}: {t.nome} ({tipo}, admin_id={t.admin_id})")
-    
-    # Obter configurações da empresa
-    config_empresa = ConfiguracaoEmpresa.query.filter_by(admin_id=admin_id).first()
-    
-    return render_template('propostas/nova_proposta.html', 
-                         templates=templates, 
-                         config_empresa=config_empresa)
+
 
 @propostas_bp.route('/criar', methods=['POST'])
 @login_required
@@ -298,20 +337,15 @@ def criar_proposta():
         proposta.observacoes_entrega = request.form.get('observacoes_entrega')
         proposta.validade_dias = int(request.form.get('validade_dias', 7))
         proposta.percentual_nota_fiscal = float(request.form.get('percentual_nota_fiscal', 13.5))
-        proposta.condicoes_pagamento = request.form.get('condicoes_pagamento')
-        proposta.garantias = request.form.get('garantias')
-        proposta.consideracoes_gerais = request.form.get('consideracoes_gerais')
+        # Campos editáveis do PDF - agora totalmente customizáveis
+        proposta.itens_inclusos = request.form.get('itens_inclusos', '')
+        proposta.itens_exclusos = request.form.get('itens_exclusos', '')
+        proposta.condicoes = request.form.get('condicoes', '')
+        proposta.condicoes_pagamento = request.form.get('condicoes_pagamento', '')
+        proposta.garantias = request.form.get('garantias', '')
+        
         proposta.criado_por = getattr(current_user, 'id', 10)
         # admin_id será setado automaticamente via SQL ou modelo
-        
-        # Itens inclusos/exclusos
-        itens_inclusos = request.form.getlist('itens_inclusos')
-        itens_exclusos = request.form.getlist('itens_exclusos')
-        
-        if itens_inclusos:
-            proposta.itens_inclusos = itens_inclusos
-        if itens_exclusos:
-            proposta.itens_exclusos = itens_exclusos
         
         db.session.add(proposta)
         db.session.flush()  # Para obter o ID da proposta
