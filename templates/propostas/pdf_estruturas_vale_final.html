@@ -188,6 +188,22 @@
         /* Seções técnicas */
         .section {
             margin: 30px 0;
+            page-break-inside: avoid;
+        }
+        
+        /* Quebras de página para seções */
+        .section:nth-of-type(3),  /* Seção 1 */
+        .section:nth-of-type(5),  /* Seção 3 */
+        .section:nth-of-type(7),  /* Seção 5 */
+        .section:nth-of-type(9) { /* Seção 7 */
+            page-break-before: auto;
+        }
+        
+        .section:nth-of-type(4),  /* Seção 2 */
+        .section:nth-of-type(6),  /* Seção 4 */
+        .section:nth-of-type(8),  /* Seção 6 */
+        .section:nth-of-type(10) { /* Seção 8 */
+            page-break-after: auto;
         }
         
         .section-title {
@@ -228,7 +244,7 @@
         }
         
         .valor-total-final {
-            margin-top: 30px;
+            margin-top: 10px;
         }
         
         /* Tabela de itens */
@@ -495,9 +511,9 @@
                                 <td style="text-align: center;">{{ "%.0f"|format(item.quantidade) if item.quantidade == item.quantidade|int else "%.2f"|format(item.quantidade) }}</td>
                                 <td style="text-align: center;">{{ item.unidade }}</td>
                                 <td style="text-align: right;">R$ {{ "%.2f"|format(item.preco_unitario) }}</td>
-                                <td style="text-align: right;">R$ {{ "%.2f"|format(item.quantidade * item.preco_unitario) }}</td>
+                                <td style="text-align: right;">R$ {{ "%.2f"|format(item.subtotal) }}</td>
                             </tr>
-                            {% set subtotal_categoria = subtotal_categoria + (item.quantidade * item.preco_unitario) %}
+                            {% set subtotal_categoria = subtotal_categoria + item.subtotal %}
                             {% endfor %}
                             <tr class="subtotal-row">
                                 <td colspan="5" style="text-align: right; font-weight: bold; background-color: #f0f0f0;">SUBTOTAL</td>
@@ -509,9 +525,9 @@
                 {% endfor %}
                 
                 <div class="valor-total-final">
-                    <table style="width: 100%; margin-top: 20px;">
+                    <table style="width: 100%; margin-top: 5px;">
                         <tr>
-                            <td style="text-align: right; font-size: 14pt; font-weight: bold; padding: 15px; background: linear-gradient(135deg, #28a745 0%, #20c997 100%); color: white; border-radius: 5px;">
+                            <td style="text-align: right; font-size: 14pt; font-weight: bold; padding: 12px; background: linear-gradient(135deg, #28a745 0%, #20c997 100%); color: white; border-radius: 5px;">
                                 VALOR TOTAL: &nbsp;&nbsp; R$ {{ "%.2f"|format(proposta.valor_total) }}
                             </td>
                         </tr>
