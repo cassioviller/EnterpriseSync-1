@@ -526,29 +526,52 @@ def obter_template(template_id):
 @admin_required
 def gerar_pdf(id):
     """Gera PDF da proposta"""
-    proposta = PropostaComercialSIGE.query.get_or_404(id)
-    
-    # Buscar configurações da empresa
-    admin_id = getattr(current_user, 'admin_id', 10)
-    config_empresa = ConfiguracaoEmpresa.query.filter_by(admin_id=admin_id).first()
-    
-    # Verificar se deve usar formato Estruturas do Vale (padrão)
-    formato = request.args.get('formato', 'estruturas_vale')
-    
-    if formato == 'estruturas_vale':
-        template_name = 'propostas/pdf_estruturas_vale_final.html'
-    else:
-        template_name = 'propostas/pdf.html'
-    
-    # Renderizar HTML da proposta
-    html_content = render_template(template_name, 
-                                 proposta=proposta, 
-                                 config=config_empresa,
-                                 config_empresa=config_empresa)
-    
-    # Aqui seria implementada a geração de PDF
-    # Por enquanto, retorna o HTML para visualização
-    return html_content
+    try:
+        proposta = PropostaComercialSIGE.query.get_or_404(id)
+        
+        # Debug da proposta
+        print(f"DEBUG PDF: Proposta {proposta.numero_proposta}")
+        print(f"DEBUG PDF: Cliente: {proposta.cliente_nome}")
+        print(f"DEBUG PDF: Valor total: {proposta.valor_total}")
+        print(f"DEBUG PDF: Número de itens: {len(proposta.itens) if proposta.itens else 0}")
+        
+        # Buscar configurações da empresa
+        admin_id = getattr(current_user, 'admin_id', 10)
+        config_empresa = ConfiguracaoEmpresa.query.filter_by(admin_id=admin_id).first()
+        
+        # Debug da configuração
+        if config_empresa:
+            print(f"DEBUG PDF: Config empresa: {config_empresa.nome_empresa}")
+            print(f"DEBUG PDF: Header PDF presente: {'SIM' if config_empresa.header_pdf_base64 else 'NÃO'}")
+            if config_empresa.header_pdf_base64:
+                print(f"DEBUG PDF: Tamanho header: {len(config_empresa.header_pdf_base64)} chars")
+        else:
+            print("DEBUG PDF: Nenhuma configuração encontrada")
+        
+        # Verificar se deve usar formato Estruturas do Vale (padrão)
+        formato = request.args.get('formato', 'estruturas_vale')
+        
+        if formato == 'estruturas_vale':
+            template_name = 'propostas/pdf_estruturas_vale_final.html'
+        else:
+            template_name = 'propostas/pdf.html'
+        
+        print(f"DEBUG PDF: Usando template: {template_name}")
+        
+        # Renderizar HTML da proposta
+        html_content = render_template(template_name, 
+                                     proposta=proposta, 
+                                     config=config_empresa,
+                                     config_empresa=config_empresa)
+        
+        print("DEBUG PDF: Template renderizado com sucesso")
+        return html_content
+        
+    except Exception as e:
+        print(f"ERRO PDF: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return f"Erro ao gerar PDF: {str(e)}", 500
 
 @propostas_bp.route('/<int:id>/enviar', methods=['POST'])
 @login_required
