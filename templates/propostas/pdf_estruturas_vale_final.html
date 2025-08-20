@@ -463,33 +463,22 @@
         <div class="section">
             <div class="section-title">3. ITENS INCLUSOS NO FORNECIMENTO</div>
             {% if proposta.itens_inclusos %}
-                <div style="text-align: justify; line-height: 1.7;">{{ proposta.itens_inclusos | replace('\n', '<br>')|safe }}</div>
+                <div style="text-align: justify; line-height: 1.7;">{{ proposta.itens_inclusos | replace(';', ';<br>') | replace('\n', '<br>')|safe }}</div>
             {% else %}
-                <ul class="bullet-list">
-                    <li>Fornecimento de mão de obra especializada para execução dos serviços</li>
-                    <li>Materiais conforme especificação técnica e normas brasileiras</li>
-                    <li>Montagem e instalação completa no local designado</li>
-                    <li>Supervisão técnica especializada durante toda a execução</li>
-                </ul>
+                <div style="text-align: justify; line-height: 1.7;">
+                    Mão de obra para execução dos serviços; Todos os equipamentos de segurança necessários; Transporte e alimentação da equipe; Container para guarda de ferramentas; Movimentação de carga (Munck); Transporte dos materiais.
+                </div>
             {% endif %}
         </div>
 
         <div class="section">
             <div class="section-title">4. ITENS EXCLUSOS DO FORNECIMENTO</div>
             {% if proposta.itens_exclusos %}
-                <div style="text-align: justify; line-height: 1.7;">{{ proposta.itens_exclusos | replace('\n', '<br>')|safe }}</div>
+                <div style="text-align: justify; line-height: 1.7;">{{ proposta.itens_exclusos | replace(';', ';<br>') | replace('\n', '<br>')|safe }}</div>
             {% else %}
-                <ul class="bullet-list">
-                    <li>Projeto e execução de qualquer obra civil, fundações, alvenarias, elétrica, automação, tubulações etc.</li>
-                    <li>Execução de ensaios destrutivos e radiográficos</li>
-                    <li>Fornecimento de local para armazenagem das peças</li>
-                    <li>Fornecimento e/ou serviços não especificados claramente nesta proposta</li>
-                    <li>Fornecimento de escoramento temporário</li>
-                    <li>Fornecimento de andaimes e plataformas</li>
-                    <li>Técnico de segurança</li>
-                    <li>Pintura final de acabamento</li>
-                    <li>Calhas, rufos, condutores e pingadeiras</li>
-                </ul>
+                <div style="text-align: justify; line-height: 1.7;">
+                    Projeto e execução de qualquer obra civil, fundações, alvenarias, elétrica, automação, tubulações etc.; Execução de ensaios destrutivos e radiográficos; Fornecimento de local para armazenagem das peças; Fornecimento e/ou serviços não especificados claramente nesta proposta; Fornecimento de escoramento temporário; Fornecimento de andaimes e plataformas; Técnico de segurança; Pintura final de acabamento; Calhas, rufos, condutores e pingadeiras.
+                </div>
             {% endif %}
         </div>
 
