@@ -464,68 +464,44 @@ function carregarTemplateMultiplo() {
             
             try {
                 const data = JSON.parse(text);
-                console.log('Dados parseados:', data);
+                console.log('Dados do template parseados:', data);
                 
-                if (data && data.id) {
-                    console.log('Template válido encontrado:', data.nome);
-                    
-                    // Verificar se campos existem na página
-                    const campos = [
-                        { field: 'itensInclusos', api: 'itens_inclusos' },
-                        { field: 'itensExclusos', api: 'itens_exclusos' },
-                        { field: 'condicoes', api: 'condicoes' },
-                        { field: 'condicoesPagamento', api: 'condicoes_pagamento' },
-                        { field: 'garantias', api: 'garantias' },
-                        { field: 'prazoEntrega', api: 'prazo_entrega_dias' },
-                        { field: 'validadeDias', api: 'validade_dias' }
-                    ];
-                    
-                    let camposPreenchidos = 0;
-                    let camposNaoEncontrados = [];
-                    
-                    campos.forEach(campo => {
-                        const elemento = document.getElementById(campo.field);
-                        console.log(`Verificando campo ${campo.field}:`, elemento ? 'EXISTE' : 'NÃO EXISTE');
-                        
-                        if (elemento) {
-                            if (data[campo.api]) {
-                                elemento.value = data[campo.api];
-                                camposPreenchidos++;
-                                console.log(`✅ Campo ${campo.field} preenchido:`, data[campo.api]);
-                            } else {
-                                console.log(`⚠️ Campo ${campo.field} existe mas sem dados no template`);
-                            }
-                        } else {
-                            camposNaoEncontrados.push(campo.field);
-                        }
-                    });
-                    
-                    if (camposNaoEncontrados.length > 0) {
-                        console.error('Campos não encontrados na página:', camposNaoEncontrados);
-                    }
-                    
-                    console.log(`Total de campos preenchidos: ${camposPreenchidos}`);
-                    alert(`Template "${data.nome}" carregado!\nCampos preenchidos: ${camposPreenchidos}\nVerifique o console para detalhes.`);
-                    
-                } else {
-                    console.error('Estrutura de dados inválida:', data);
-                    alert(`Erro: Template não possui ID válido\nEstrutura: ${JSON.stringify(data, null, 2)}`);
+                // Verificar se template já foi carregado
+                if (templatesCarregadosData.find(t => t.id == templateId)) {
+                    alert('Este template já foi carregado!');
+                    return;
                 }
                 
+                if (data && data.id) {
+                    // Adicionar template aos carregados
+                    templatesCarregadosData.push(data);
+                    
+                    // Criar tabela para este template
+                    criarTabelaTemplate(data);
+                    
+                    // Atualizar totais
+                    atualizarTotalGeral();
+                    
+                    // Reset select
+                    document.getElementById('seletorTemplate').value = '';
+                    
+                    alert(`✅ Template "${data.nome}" carregado!\n\n` +
+                          `🔧 Serviços: ${data.itens_padrao ? data.itens_padrao.length : 0}\n` +
+                          `📊 Templates carregados: ${templatesCarregadosData.length}\n\n` +
+                          `Você pode carregar mais templates!`);
+                    
+                } else {
+                    alert('Erro: Dados do template inválidos');
+                }
             } catch (parseError) {
                 console.error('Erro ao fazer parse do JSON:', parseError);
                 console.error('Texto recebido:', text);
-                alert(`Erro ao interpretar resposta do servidor\nTexto: ${text.substring(0, 200)}...`);
+                alert(`Erro ao processar resposta: ${parseError.message}`);
             }
         })
         .catch(error => {
-            console.error('=== ERRO DETALHADO ===');
-            console.error('Tipo do erro:', error.name);
-            console.error('Mensagem:', error.message);
-            console.error('Stack:', error.stack);
-            console.error('URL tentada:', url);
-            
-            alert(`ERRO DETALHADO:\nTipo: ${error.name}\nMensagem: ${error.message}\nURL: ${url}\n\nVerifique o console para stack trace completo.`);
+            console.error('Erro na requisição:', error);
+            alert(`Erro: ${error.message}`);
         });
 }
 
