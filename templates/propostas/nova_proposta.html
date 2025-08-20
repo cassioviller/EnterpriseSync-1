@@ -273,6 +273,181 @@
                                     <label class="form-label">Prazo Entrega (dias)</label>
                                     <input type="number" class="form-control" name="prazo_entrega_dias" id="prazoEntrega" value="{{ padrao_prazo_entrega or 90 }}">
                                 </div>
+
+                <!-- NOVOS CAMPOS EDITÁVEIS - PRIMEIRA E SEGUNDA PÁGINA DO PDF -->
+                <hr class="my-4">
+                <h6 class="text-primary mb-3">Conteúdo da Carta de Apresentação (Página 1)</h6>
+                
+                <div class="row">
+                    <!-- Abertura da carta -->
+                    <div class="col-md-6">
+                        <div class="mb-3">
+                            <label class="form-label">Abertura da Carta</label>
+                            <textarea class="form-control" name="carta_abertura" id="cartaAbertura" rows="4" 
+                                      placeholder="Prezado(a) cliente, apresentamos nossa proposta comercial...">Prezado(a) cliente,
+
+Apresentamos nossa proposta comercial para o fornecimento e montagem de estrutura metálica conforme solicitação.</textarea>
+                        </div>
+                    </div>
+                    
+                    <!-- Apresentação da empresa -->
+                    <div class="col-md-6">
+                        <div class="mb-3">
+                            <label class="form-label">Apresentação da Empresa</label>
+                            <textarea class="form-control" name="apresentacao_empresa" id="apresentacaoEmpresa" rows="4" 
+                                      placeholder="A Estruturas do Vale atua há X anos no mercado...">A Estruturas do Vale atua no mercado de estruturas metálicas com tradição em qualidade e pontualidade, oferecendo soluções completas em engenharia estrutural.</textarea>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="row">
+                    <!-- Descrição do projeto -->
+                    <div class="col-md-6">
+                        <div class="mb-3">
+                            <label class="form-label">Descrição do Projeto</label>
+                            <textarea class="form-control" name="descricao_projeto" id="descricaoProjeto" rows="4" 
+                                      placeholder="O projeto contempla a execução de...">O projeto contempla a execução de estrutura metálica conforme projeto anexo, incluindo todos os detalhes construtivos e especificações técnicas necessárias.</textarea>
+                        </div>
+                    </div>
+                    
+                    <!-- Fechamento da carta -->
+                    <div class="col-md-6">
+                        <div class="mb-3">
+                            <label class="form-label">Fechamento da Carta</label>
+                            <textarea class="form-control" name="carta_fechamento" id="cartaFechamento" rows="4" 
+                                      placeholder="Permanecemos à disposição para esclarecimentos...">Permanecemos à disposição para esclarecimentos adicionais e aguardamos sua aprovação.
+
+Atenciosamente,
+Equipe Estruturas do Vale</textarea>
+                        </div>
+                    </div>
+                </div>
+
+                <hr class="my-4">
+                <h6 class="text-primary mb-3">Conteúdo Técnico das Seções (Páginas 3-9)</h6>
+                
+                <div class="row">
+                    <!-- Seção 1: Especificações Técnicas -->
+                    <div class="col-md-6">
+                        <div class="mb-3">
+                            <label class="form-label">1. Especificações Técnicas</label>
+                            <textarea class="form-control" name="secao_especificacoes" id="secaoEspecificacoes" rows="5" 
+                                      placeholder="Estrutura em aço carbono conforme NBR 8800...">• Estrutura em aço carbono ASTM A36 ou similar
+• Soldas executadas conforme AWS D1.1
+• Parafusos de alta resistência ASTM A325
+• Tratamento superficial: jateamento SA 2½
+• Pintura de proteção: primer + esmalte sintético</textarea>
+                        </div>
+                    </div>
+                    
+                    <!-- Seção 2: Materiais e Componentes -->
+                    <div class="col-md-6">
+                        <div class="mb-3">
+                            <label class="form-label">2. Materiais e Componentes</label>
+                            <textarea class="form-control" name="secao_materiais" id="secaoMateriais" rows="5" 
+                                      placeholder="Perfis laminados, chapas, conectores...">• Perfis laminados conforme catálogo Gerdau
+• Chapas de aço carbono SAE 1020
+• Conectores e parafusos galvanizados
+• Eletrodos AWS E70XX para soldagem
+• Tintas e primers de primeira qualidade</textarea>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="row">
+                    <!-- Seção 3: Processo de Fabricação -->
+                    <div class="col-md-6">
+                        <div class="mb-3">
+                            <label class="form-label">3. Processo de Fabricação</label>
+                            <textarea class="form-control" name="secao_fabricacao" id="secaoFabricacao" rows="5" 
+                                      placeholder="Corte, dobra, soldagem e montagem...">• Corte em guilhotina e plasma CNC
+• Dobra em prensa hidráulica
+• Soldagem com processo MIG/MAG
+• Montagem e pré-montagem em fábrica
+• Controle de qualidade em todas as etapas</textarea>
+                        </div>
+                    </div>
+                    
+                    <!-- Seção 4: Logística e Transporte -->
+                    <div class="col-md-6">
+                        <div class="mb-3">
+                            <label class="form-label">4. Logística e Transporte</label>
+                            <textarea class="form-control" name="secao_logistica" id="secaoLogistica" rows="5" 
+                                      placeholder="Transporte especializado, equipamentos...">• Transporte com veículos especializados
+• Equipamentos de movimentação (Munck)
+• Cronograma de entregas programadas
+• Armazenamento temporário se necessário
+• Coordenação com cronograma da obra</textarea>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="row">
+                    <!-- Seção 5: Montagem e Instalação -->
+                    <div class="col-md-6">
+                        <div class="mb-3">
+                            <label class="form-label">5. Montagem e Instalação</label>
+                            <textarea class="form-control" name="secao_montagem" id="secaoMontagem" rows="5" 
+                                      placeholder="Equipe especializada, equipamentos de içamento...">• Equipe técnica especializada
+• Equipamentos de içamento adequados
+• Procedimentos de segurança rigorosos
+• Supervisão técnica permanente
+• Relatórios diários de progresso</textarea>
+                        </div>
+                    </div>
+                    
+                    <!-- Seção 6: Controle de Qualidade -->
+                    <div class="col-md-6">
+                        <div class="mb-3">
+                            <label class="form-label">6. Controle de Qualidade</label>
+                            <textarea class="form-control" name="secao_qualidade" id="secaoQualidade" rows="5" 
+                                      placeholder="Inspeções, testes, certificações...">• Inspeção dimensional rigorosa
+• Testes de soldagem conforme norma
+• Verificação de prumo e nível
+• Documentação fotográfica completa
+• Certificados de conformidade</textarea>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="row">
+                    <!-- Seção 7: Segurança e Meio Ambiente -->
+                    <div class="col-md-6">
+                        <div class="mb-3">
+                            <label class="form-label">7. Segurança e Meio Ambiente</label>
+                            <textarea class="form-control" name="secao_seguranca" id="secaoSeguranca" rows="5" 
+                                      placeholder="EPIs, procedimentos de segurança...">• Fornecimento de EPIs completos
+• Procedimentos de segurança rigorosos
+• Gestão de resíduos responsável
+• Treinamentos de segurança da equipe
+• Cumprimento das NRs aplicáveis</textarea>
+                        </div>
+                    </div>
+                    
+                    <!-- Seção 8: Assistência Técnica -->
+                    <div class="col-md-6">
+                        <div class="mb-3">
+                            <label class="form-label">8. Assistência Técnica</label>
+                            <textarea class="form-control" name="secao_assistencia" id="secaoAssistencia" rows="5" 
+                                      placeholder="Suporte pós-entrega, manutenção...">• Suporte técnico pós-entrega
+• Manual de manutenção detalhado
+• Atendimento para dúvidas técnicas
+• Garantia de 12 meses
+• Visitas de acompanhamento</textarea>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="row">
+                    <!-- Seção 9: Considerações Finais -->
+                    <div class="col-md-12">
+                        <div class="mb-3">
+                            <label class="form-label">9. Considerações Finais</label>
+                            <textarea class="form-control" name="secao_consideracoes" id="secaoConsideracoes" rows="4" 
+                                      placeholder="Agradecimentos, disponibilidade para esclarecimentos...">Agradecemos a oportunidade de apresentar nossa proposta e reafirmamos nosso compromisso com a qualidade e pontualidade na execução dos serviços. Nossa equipe permanece à disposição para esclarecimentos adicionais e adequações que se fizerem necessárias.</textarea>
+                        </div>
+                    </div>
+                </div>
                             </div>
                             <div class="col-md-6">
                                 <div class="mb-3">

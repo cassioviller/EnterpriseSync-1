@@ -338,11 +338,31 @@
         </div>
 
         <div class="intro-text">
-            Atendendo à solicitação de V.Sas., apresentamos nossas <strong>"Condições Comerciais"</strong>, para o fornecimento em referência.
+            {% if proposta.carta_abertura %}
+                {{ proposta.carta_abertura|nl2br|safe }}
+            {% else %}
+                Atendendo à solicitação de V.Sas., apresentamos nossas <strong>"Condições Comerciais"</strong>, para o fornecimento em referência.
+            {% endif %}
         </div>
 
+        {% if proposta.apresentacao_empresa %}
         <div class="intro-text">
-            Na expectativa de ter atendido às condições especificadas, aproveitamos para expressar os nossos votos de estima e consideração.
+            {{ proposta.apresentacao_empresa|nl2br|safe }}
+        </div>
+        {% endif %}
+
+        {% if proposta.descricao_projeto %}
+        <div class="intro-text">
+            {{ proposta.descricao_projeto|nl2br|safe }}
+        </div>
+        {% endif %}
+
+        <div class="intro-text">
+            {% if proposta.carta_fechamento %}
+                {{ proposta.carta_fechamento|nl2br|safe }}
+            {% else %}
+                Na expectativa de ter atendido às condições especificadas, aproveitamos para expressar os nossos votos de estima e consideração.
+            {% endif %}
         </div>
 
         <div class="signature">

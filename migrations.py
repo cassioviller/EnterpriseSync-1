@@ -33,6 +33,38 @@ def executar_migracoes():
         # Migração 5: Adicionar campos de organização para proposta_itens
         migrar_campos_organizacao_propostas()
         
+        # Migração 6: Adicionar campos editáveis para páginas do PDF
+        logger.info("🔄 Verificando campos editáveis das páginas do PDF...")
+        
+        campos_pdf_extras = [
+            ('carta_abertura', 'TEXT'),
+            ('apresentacao_empresa', 'TEXT'),
+            ('descricao_projeto', 'TEXT'),
+            ('carta_fechamento', 'TEXT'),
+            ('secao_especificacoes', 'TEXT'),
+            ('secao_materiais', 'TEXT'),
+            ('secao_fabricacao', 'TEXT'),
+            ('secao_logistica', 'TEXT'),
+            ('secao_montagem', 'TEXT'),
+            ('secao_qualidade', 'TEXT'),
+            ('secao_seguranca', 'TEXT'),
+            ('secao_assistencia', 'TEXT'),
+            ('secao_consideracoes', 'TEXT')
+        ]
+        
+        for campo, tipo in campos_pdf_extras:
+            if not verificar_coluna_existe('propostas_comerciais', campo):
+                logger.info(f"➕ Adicionando coluna '{campo}' na tabela propostas_comerciais")
+                try:
+                    cursor.execute(f"ALTER TABLE propostas_comerciais ADD COLUMN {campo} {tipo}")
+                    conn.commit()
+                    logger.info(f"✅ Coluna '{campo}' adicionada com sucesso")
+                except Exception as e:
+                    logger.warning(f"⚠️ Erro ao adicionar coluna '{campo}': {e}")
+                    conn.rollback()
+            else:
+                logger.info(f"✅ Coluna '{campo}' já existe na tabela propostas_comerciais")
+
         logger.info("✅ Migrações automáticas concluídas com sucesso!")
         
     except Exception as e:

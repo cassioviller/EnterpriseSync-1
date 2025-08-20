@@ -344,6 +344,23 @@ def criar_proposta():
         proposta.condicoes_pagamento = request.form.get('condicoes_pagamento', '')
         proposta.garantias = request.form.get('garantias', '')
         
+        # Novos campos editáveis - primeira e segunda página PDF
+        proposta.carta_abertura = request.form.get('carta_abertura', '')
+        proposta.apresentacao_empresa = request.form.get('apresentacao_empresa', '')
+        proposta.descricao_projeto = request.form.get('descricao_projeto', '')
+        proposta.carta_fechamento = request.form.get('carta_fechamento', '')
+        
+        # Seções técnicas editáveis
+        proposta.secao_especificacoes = request.form.get('secao_especificacoes', '')
+        proposta.secao_materiais = request.form.get('secao_materiais', '')
+        proposta.secao_fabricacao = request.form.get('secao_fabricacao', '')
+        proposta.secao_logistica = request.form.get('secao_logistica', '')
+        proposta.secao_montagem = request.form.get('secao_montagem', '')
+        proposta.secao_qualidade = request.form.get('secao_qualidade', '')
+        proposta.secao_seguranca = request.form.get('secao_seguranca', '')
+        proposta.secao_assistencia = request.form.get('secao_assistencia', '')
+        proposta.secao_consideracoes = request.form.get('secao_consideracoes', '')
+        
         proposta.criado_por = getattr(current_user, 'id', 10)
         # admin_id será setado automaticamente via SQL ou modelo
         
