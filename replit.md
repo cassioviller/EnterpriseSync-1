@@ -84,6 +84,22 @@ INFO:migrations:✅ Migrações automáticas concluídas com sucesso!
 
 ## Recent Changes (20/08/2025)
 
+### Sistema de Organização Drag-and-Drop - IMPLEMENTADO ✅
+- **Interface completa**: Sistema avançado para organizar propostas por arrastar e soltar
+- **Múltiplos templates**: Carregamento de vários templates onde cada um vira uma categoria separada
+- **Campos de banco**: categoria_titulo, template_origem_id/nome, grupo_ordem, item_ordem_no_grupo
+- **API completa**: Endpoints para listar templates, carregar múltiplos e salvar organização
+- **PDF dinâmico**: Template atualizado para exibir múltiplas categorias com subtotais
+- **Interface moderna**: Design profissional com Sortable.js e Bootstrap
+- **Botão na listagem**: Link "Organizar" adicionado na lista de propostas
+- **Status**: FUNCIONAL - Sistema completo implementado
+
+### Correção de Quebras de Linha PDF - IMPLEMENTADO ✅
+- **Problema identificado**: PDF não quebrava linhas com vírgulas como separador
+- **Solução aplicada**: Template atualizado para quebrar tanto ; quanto , seguidos de <br>
+- **Seções corrigidas**: Itens inclusos e exclusos agora quebram corretamente
+- **Status**: CORRIGIDO
+
 ### Sistema de Header PDF Personalizado - LÓGICA FINAL ✅
 - **Especificação do cliente**: APENAS header da imagem cadastrada, sem header fixo verde
 - **Lógica implementada**: SE existe header_pdf_base64 MOSTRA ele, SENÃO fica vazio

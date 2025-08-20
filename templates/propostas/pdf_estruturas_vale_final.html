@@ -507,7 +507,9 @@
         <div class="section">
             <div class="section-title">3. ITENS INCLUSOS NO FORNECIMENTO</div>
             {% if proposta.itens_inclusos %}
-                <div style="text-align: justify; line-height: 1.7;">{{ proposta.itens_inclusos | replace(';', ';<br>') | replace('\n', '<br>')|safe }}</div>
+                <div style="text-align: justify; line-height: 1.7;">
+                    {{ proposta.itens_inclusos | replace(';', ';<br>') | replace(',', ',<br>') | replace('\n', '<br>') | safe }}
+                </div>
             {% else %}
                 <div style="text-align: justify; line-height: 1.7;">
                     Mão de obra para execução dos serviços;<br>
@@ -523,7 +525,9 @@
         <div class="section">
             <div class="section-title">4. ITENS EXCLUSOS DO FORNECIMENTO</div>
             {% if proposta.itens_exclusos %}
-                <div style="text-align: justify; line-height: 1.7;">{{ proposta.itens_exclusos | replace(';', ';<br>') | replace('\n', '<br>')|safe }}</div>
+                <div style="text-align: justify; line-height: 1.7;">
+                    {{ proposta.itens_exclusos | replace(';', ';<br>') | replace(',', ',<br>') | replace('\n', '<br>') | safe }}
+                </div>
             {% else %}
                 <div style="text-align: justify; line-height: 1.7;">
                     Projeto e execução de qualquer obra civil, fundações, alvenarias, elétrica, automação, tubulações etc.;<br>
