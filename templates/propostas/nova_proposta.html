@@ -623,7 +623,144 @@ function carregarTemplateComValor(templateId) {
         })
         .then(data => {
             console.log('Dados recebidos:', data);
-            alert(`Template "${data.nome}" carregado com sucesso!\nDados: ${JSON.stringify(data, null, 2)}`);
+            
+            if (data && data.id) {
+                console.log('=== PREENCHENDO CAMPOS DO FORMULÁRIO ===');
+                
+                // Mapear campos por nome correto (usando name, não id)
+                const campos = [
+                    { name: 'itens_inclusos', value: data.itens_inclusos },
+                    { name: 'itens_exclusos', value: data.itens_exclusos },
+                    { name: 'condicoes', value: data.condicoes },
+                    { name: 'condicoes_pagamento', value: data.condicoes_pagamento },
+                    { name: 'garantias', value: data.garantias },
+                    { name: 'prazo_entrega_dias', value: data.prazo_entrega_dias },
+                    { name: 'validade_dias', value: data.validade_dias },
+                    { name: 'percentual_nota_fiscal', value: data.percentual_nota_fiscal }
+                ];
+                
+                let camposPreenchidos = 0;
+                campos.forEach(campo => {
+                    const elemento = document.querySelector(`[name="${campo.name}"]`);
+                    console.log(`Procurando campo [name="${campo.name}"]:`, elemento ? 'ENCONTRADO' : 'NÃO ENCONTRADO');
+                    
+                    if (elemento && campo.value) {
+                        elemento.value = campo.value;
+                        camposPreenchidos++;
+                        console.log(`✅ Campo ${campo.name} preenchido com:`, campo.value);
+                    }
+                });
+                
+                // Preencher seções técnicas também
+                const secoes = [
+                    { name: 'secao_especificacoes', value: data.secao_especificacoes },
+                    { name: 'secao_materiais', value: data.secao_materiais },
+                    { name: 'secao_fabricacao', value: data.secao_fabricacao },
+                    { name: 'secao_logistica', value: data.secao_logistica },
+                    { name: 'secao_montagem', value: data.secao_montagem },
+                    { name: 'secao_qualidade', value: data.secao_qualidade },
+                    { name: 'secao_seguranca', value: data.secao_seguranca },
+                    { name: 'secao_assistencia', value: data.secao_assistencia },
+                    { name: 'secao_consideracoes', value: data.secao_consideracoes }
+                ];
+                
+                secoes.forEach(secao => {
+                    const elemento = document.querySelector(`[name="${secao.name}"]`);
+                    if (elemento && secao.value) {
+                        elemento.value = secao.value;
+                        camposPreenchidos++;
+                        console.log(`✅ Seção ${secao.name} preenchida`);
+                    }
+                });
+                
+                // Preencher itens de serviços
+                if (data.itens_padrao && data.itens_padrao.length > 0) {
+                    console.log('=== PREENCHENDO SERVIÇOS DO TEMPLATE ===');
+                    
+                    // Limpar serviços existentes primeiro
+                    const container = document.getElementById('servicosContainer');
+                    container.innerHTML = '';
+                    
+                    // Adicionar cada item do template
+                    data.itens_padrao.forEach((item, index) => {
+                        console.log(`Adicionando serviço ${index + 1}:`, item);
+                        
+                        // Criar elemento de serviço
+                        const servicoDiv = document.createElement('div');
+                        servicoDiv.className = 'servico-item border rounded p-3 mb-3';
+                        servicoDiv.innerHTML = `
+                            <div class="row">
+                                <div class="col-md-4">
+                                    <div class="mb-3">
+                                        <label class="form-label">Descrição do Serviço</label>
+                                        <input type="text" class="form-control servico-descricao" 
+                                               name="item_descricao" value="${item.descricao || ''}" 
+                                               placeholder="Ex: Estrutura metálica">
+                                    </div>
+                                </div>
+                                <div class="col-md-2">
+                                    <div class="mb-3">
+                                        <label class="form-label">Quantidade</label>
+                                        <input type="number" class="form-control servico-quantidade" 
+                                               name="item_quantidade" value="${item.quantidade || ''}" 
+                                               step="0.01" onchange="calcularServico(this)">
+                                    </div>
+                                </div>
+                                <div class="col-md-2">
+                                    <div class="mb-3">
+                                        <label class="form-label">Unidade</label>
+                                        <select class="form-select servico-unidade" name="item_unidade">
+                                            <option value="m²" ${item.unidade === 'm²' ? 'selected' : ''}>m²</option>
+                                            <option value="m³" ${item.unidade === 'm³' ? 'selected' : ''}>m³</option>
+                                            <option value="un" ${item.unidade === 'un' ? 'selected' : ''}>Unidade</option>
+                                            <option value="kg" ${item.unidade === 'kg' ? 'selected' : ''}>kg</option>
+                                            <option value="t" ${item.unidade === 't' ? 'selected' : ''}>Tonelada</option>
+                                        </select>
+                                    </div>
+                                </div>
+                                <div class="col-md-2">
+                                    <div class="mb-3">
+                                        <label class="form-label">Valor Unitário</label>
+                                        <input type="number" class="form-control servico-valor-unitario" 
+                                               name="item_preco" value="${item.preco_unitario || ''}" 
+                                               step="0.01" onchange="calcularServico(this)">
+                                    </div>
+                                </div>
+                                <div class="col-md-2">
+                                    <div class="mb-3">
+                                        <label class="form-label">Total</label>
+                                        <input type="text" class="form-control servico-total" readonly>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">Observações</label>
+                                <textarea class="form-control servico-observacoes" rows="2"></textarea>
+                            </div>
+                            <button type="button" class="btn btn-sm btn-outline-danger" onclick="removerServico(this)">
+                                <i class="fas fa-trash"></i> Remover
+                            </button>
+                        `;
+                        
+                        container.appendChild(servicoDiv);
+                        
+                        // Calcular total do serviço
+                        const quantidadeInput = servicoDiv.querySelector('.servico-quantidade');
+                        calcularServico(quantidadeInput);
+                    });
+                    
+                    // Calcular total geral
+                    calcularTotal();
+                    
+                    console.log(`✅ ${data.itens_padrao.length} serviços adicionados do template`);
+                }
+                
+                console.log(`Total de campos preenchidos: ${camposPreenchidos}`);
+                alert(`Template "${data.nome}" carregado com sucesso!\n\n✅ Campos preenchidos: ${camposPreenchidos}\n✅ Serviços adicionados: ${data.itens_padrao ? data.itens_padrao.length : 0}\n\nO formulário está pronto para edição!`);
+                
+            } else {
+                alert('Erro: Dados do template inválidos');
+            }
         })
         .catch(error => {
             console.error('Erro:', error);
