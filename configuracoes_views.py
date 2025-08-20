@@ -67,9 +67,12 @@ def salvar_empresa():
         # Upload de header PDF em base64
         header_pdf_base64 = request.form.get('header_pdf_base64')
         print(f"DEBUG HEADER: header_pdf_base64 recebido = {bool(header_pdf_base64)} (tamanho: {len(header_pdf_base64) if header_pdf_base64 else 0})")
+        print(f"DEBUG HEADER: Conteúdo do form header: {header_pdf_base64[:100] if header_pdf_base64 else 'None'}...")
         if header_pdf_base64:
             config.header_pdf_base64 = header_pdf_base64
             print("DEBUG HEADER: Header PDF salvo na config")
+        else:
+            print("DEBUG HEADER: Nenhum header recebido no form")
         
         # Personalização visual
         cor_primaria = request.form.get('cor_primaria', '#007bff')
