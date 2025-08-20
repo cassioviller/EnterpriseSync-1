@@ -379,8 +379,8 @@
 
         <div class="section">
             <div class="section-title">1. OBJETO:</div>
-            <p>{{ proposta.objeto or 'Esta proposta descreve as condições comerciais a serem atendidas para o fornecimento de mão de obra especializada para fabricação e montagem de estruturas conforme segue.' }}</p>
-            <p><strong>Documentos de referência:</strong> {{ proposta.documentos_referencia or "'Medidas enviadas pelo cliente'" }}</p>
+            <p>{{ proposta.objeto or proposta.assunto or 'Esta proposta descreve as condições comerciais a serem atendidas para o fornecimento de mão de obra especializada para fabricação e montagem de estruturas conforme segue.' }}</p>
+            <p><strong>Documentos de referência:</strong> {{ proposta.documentos_referencia or "Medidas enviadas pelo cliente" }}</p>
         </div>
 
         <div class="section">
@@ -426,56 +426,68 @@
 
         <div class="section">
             <div class="section-title">3. ITENS INCLUSOS NO FORNECIMENTO</div>
-            <div class="bullet-list">
-                <li>Fornecimento de mão de obra especializada</li>
-                <li>Materiais conforme especificação técnica</li>
-                <li>Montagem e instalação no local</li>
-                <li>Supervisão técnica especializada</li>
-            </div>
+            {% if proposta.itens_inclusos %}
+                <p>{{ proposta.itens_inclusos | nl2br }}</p>
+            {% else %}
+                <div class="bullet-list">
+                    <li>Fornecimento de mão de obra especializada</li>
+                    <li>Materiais conforme especificação técnica</li>
+                    <li>Montagem e instalação no local</li>
+                    <li>Supervisão técnica especializada</li>
+                </div>
+            {% endif %}
         </div>
 
         <div class="section">
             <div class="section-title">4. ITENS EXCLUSOS DO FORNECIMENTO</div>
-            <div class="bullet-list">
-                <li>Fundações e base civil</li>
-                <li>Energia elétrica no local</li>
-                <li>Hospedagem e alimentação da equipe</li>
-                <li>Licenças e aprovações junto aos órgãos competentes</li>
-            </div>
+            {% if proposta.itens_exclusos %}
+                <p>{{ proposta.itens_exclusos | nl2br }}</p>
+            {% else %}
+                <div class="bullet-list">
+                    <li>Fundações e base civil</li>
+                    <li>Energia elétrica no local</li>
+                    <li>Hospedagem e alimentação da equipe</li>
+                    <li>Licenças e aprovações junto aos órgãos competentes</li>
+                </div>
+            {% endif %}
         </div>
 
         <div class="section">
             <div class="section-title">5. CONDIÇÕES DE PAGAMENTO</div>
-            <p>10% de entrada na assinatura do contrato<br>
-            10% após projeto aprovado<br>
-            45% compra dos perfis<br>
-            25% no início da montagem in loco<br>
-            10% após a conclusão da montagem</p>
+            <p>{{ proposta.condicoes_pagamento | nl2br | default("10% de entrada na assinatura do contrato<br>10% após projeto aprovado<br>45% compra dos perfis<br>25% no início da montagem in loco<br>10% após a conclusão da montagem", true) }}</p>
         </div>
 
         <div class="section">
             <div class="section-title">6. CONDIÇÕES DE ENTREGA</div>
-            <p>Prazo de execução: {{ proposta.prazo_entrega or '90 dias' }} após aprovação do projeto e liberação do cliente.</p>
+            {% if proposta.prazo_entrega_dias %}
+                <p>Prazo de execução: {{ proposta.prazo_entrega_dias }} dias após aprovação do projeto e liberação do cliente.</p>
+            {% else %}
+                <p>Prazo de execução: 90 dias após aprovação do projeto e liberação do cliente.</p>
+            {% endif %}
         </div>
 
         <div class="section">
             <div class="section-title">7. GARANTIAS</div>
-            <p>A Estruturas do Vale garante todos os materiais empregados nos serviços contra defeitos de fabricação pelo prazo de 12 (doze) meses contados a partir da data de conclusão da obra, conforme NBR 8800.</p>
+            <p>{{ proposta.garantias | nl2br | default("A Estruturas do Vale garante todos os materiais empregados nos serviços contra defeitos de fabricação pelo prazo de 12 (doze) meses contados a partir da data de conclusão da obra, conforme NBR 8800.", true) }}</p>
         </div>
 
         <div class="section">
             <div class="section-title">8. CONSIDERAÇÕES GERAIS</div>
-            <div class="bullet-list">
-                <li>Proposta válida por {{ proposta.validade or '7 dias' }}</li>
-                <li>Valores não incluem impostos (13,5% de nota fiscal)</li>
-                <li>Execução conforme normas técnicas brasileiras</li>
-                <li>Projeto executivo incluído no escopo</li>
-            </div>
+            {% if proposta.condicoes %}
+                <p>{{ proposta.condicoes | nl2br }}</p>
+            {% else %}
+                <div class="bullet-list">
+                    <li>Proposta válida por {{ proposta.validade_dias or '7' }} dias</li>
+                    <li>Valores não incluem impostos ({{ proposta.percentual_nota_fiscal or '13,5' }}% de nota fiscal)</li>
+                    <li>Execução conforme normas técnicas brasileiras</li>
+                    <li>Projeto executivo incluído no escopo</li>
+                </div>
+            {% endif %}
         </div>
 
         <div class="section">
             <div class="section-title">9. VALIDADE DA PROPOSTA:</div>
-            <p>Esta proposta tem validade de {{ proposta.validade or '7 dias' }} a partir da data de emissão.</p>
+            <p>Esta proposta tem validade de {{ proposta.validade_dias or '7' }} dias a partir da data de emissão.</p>
         </div>
     </div>
 </body>
