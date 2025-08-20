@@ -53,25 +53,26 @@
             }
         }
         
-        /* APENAS Header personalizado da imagem cadastrada */
+        /* Header personalizado ocupando toda largura da página */
         .header-personalizado {
-            width: 100%;
+            width: calc(100% + 3cm);
             height: auto;
-            margin: -2cm -1.5cm 20px -1.5cm;
+            margin: -2cm -1.5cm 25px -1.5cm;
             display: flex;
             align-items: center;
             justify-content: center;
             overflow: hidden;
             background: white;
-            border-bottom: 1px solid #ddd;
-            padding-bottom: 10px;
+            border-bottom: 2px solid #e0e0e0;
+            padding: 0 0 15px 0;
         }
         
         .header-personalizado img {
             width: 100%;
             height: auto;
-            max-height: 100px;
-            object-fit: contain;
+            max-height: 120px;
+            object-fit: cover;
+            object-position: center;
         }
         
         /* Conteúdo da página */
@@ -83,19 +84,24 @@
         }
         
         .recipient {
-            margin: 20px 0;
-            line-height: 1.6;
+            margin: 25px 0;
+            line-height: 1.8;
+            font-size: 11pt;
         }
         
         .subject {
-            margin: 20px 0;
+            margin: 25px 0;
             font-weight: bold;
+            font-size: 11pt;
+            line-height: 1.6;
         }
         
         .reference {
-            margin: 20px 0;
-            border-bottom: 1px solid #333;
-            padding-bottom: 10px;
+            margin: 25px 0;
+            border-bottom: 2px solid #333;
+            padding-bottom: 12px;
+            font-weight: bold;
+            font-size: 11pt;
         }
         
         .greeting {
@@ -103,8 +109,10 @@
         }
         
         .intro-text {
-            margin: 20px 0;
+            margin: 25px 0;
             text-align: justify;
+            line-height: 1.8;
+            font-size: 11pt;
         }
         
         .signature {
@@ -128,12 +136,12 @@
         }
         
         .contact-info {
-            background-color: #f8f9fa;
-            padding: 20px;
-            margin: 30px 0;
-            border-left: 4px solid #28a745;
-            border-radius: 5px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+            padding: 25px;
+            margin: 35px 0;
+            border-left: 5px solid #28a745;
+            border-radius: 8px;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.15);
         }
         
         .contact-title {
@@ -179,14 +187,22 @@
         
         /* Seções técnicas */
         .section {
-            margin: 25px 0;
+            margin: 30px 0;
         }
         
         .section-title {
-            font-size: 12pt;
+            font-size: 13pt;
             font-weight: bold;
-            margin-bottom: 10px;
+            margin-bottom: 15px;
             color: #28a745;
+            border-bottom: 1px solid #28a745;
+            padding-bottom: 5px;
+        }
+        
+        .section p {
+            text-align: justify;
+            line-height: 1.7;
+            margin-bottom: 10px;
         }
         
         .subsection-title {
@@ -200,21 +216,24 @@
         .items-table {
             width: 100%;
             border-collapse: collapse;
-            margin: 20px 0;
+            margin: 25px 0;
             font-size: 10pt;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
         }
         
         .items-table th,
         .items-table td {
             border: 1px solid #ddd;
-            padding: 8px;
+            padding: 12px 8px;
             text-align: left;
+            vertical-align: top;
         }
         
         .items-table th {
-            background-color: #f8f9fa;
+            background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
             font-weight: bold;
-            color: #333;
+            color: white;
+            text-align: center;
         }
         
         .items-table .price {
@@ -226,18 +245,26 @@
         }
         
         .items-table tbody tr:last-child {
-            background-color: #e8f5e8;
+            background: linear-gradient(135deg, #e8f5e8 0%, #d4edda 100%);
             font-weight: bold;
+            border-top: 3px solid #28a745;
+        }
+        
+        .items-table tbody tr:last-child td {
+            font-size: 11pt;
+            padding: 15px 8px;
         }
         
         /* Lista com bullets */
         .bullet-list {
-            margin: 10px 0;
-            padding-left: 20px;
+            margin: 15px 0;
+            padding-left: 25px;
         }
         
         .bullet-list li {
-            margin: 5px 0;
+            margin: 8px 0;
+            line-height: 1.6;
+            text-align: justify;
         }
         
         /* Valores destacados */
@@ -268,7 +295,7 @@
         <!-- Se não houver header_pdf_base64, fica vazio (sem header verde) -->
 
         <div class="date-location">
-            São José dos Campos, {% if proposta.criado_em %}{{ proposta.criado_em.strftime('%d de %B de %Y') }}{% else %}19 de Agosto de 2025{% endif %}.
+            São José dos Campos, {% if proposta.criado_em %}{{ proposta.criado_em.strftime('%d de %B de %Y')|replace('January', 'janeiro')|replace('February', 'fevereiro')|replace('March', 'março')|replace('April', 'abril')|replace('May', 'maio')|replace('June', 'junho')|replace('July', 'julho')|replace('August', 'agosto')|replace('September', 'setembro')|replace('October', 'outubro')|replace('November', 'novembro')|replace('December', 'dezembro') }}{% else %}19 de agosto de 2025{% endif %}.
         </div>
 
         <div class="recipient">
@@ -436,41 +463,48 @@
         <div class="section">
             <div class="section-title">3. ITENS INCLUSOS NO FORNECIMENTO</div>
             {% if proposta.itens_inclusos %}
-                <p>{{ proposta.itens_inclusos | replace('\n', '<br>')|safe }}</p>
+                <div style="text-align: justify; line-height: 1.7;">{{ proposta.itens_inclusos | replace('\n', '<br>')|safe }}</div>
             {% else %}
-                <div class="bullet-list">
-                    <li>Fornecimento de mão de obra especializada</li>
-                    <li>Materiais conforme especificação técnica</li>
-                    <li>Montagem e instalação no local</li>
-                    <li>Supervisão técnica especializada</li>
-                </div>
+                <ul class="bullet-list">
+                    <li>Fornecimento de mão de obra especializada para execução dos serviços</li>
+                    <li>Materiais conforme especificação técnica e normas brasileiras</li>
+                    <li>Montagem e instalação completa no local designado</li>
+                    <li>Supervisão técnica especializada durante toda a execução</li>
+                </ul>
             {% endif %}
         </div>
 
         <div class="section">
             <div class="section-title">4. ITENS EXCLUSOS DO FORNECIMENTO</div>
             {% if proposta.itens_exclusos %}
-                <p>{{ proposta.itens_exclusos | replace('\n', '<br>')|safe }}</p>
+                <div style="text-align: justify; line-height: 1.7;">{{ proposta.itens_exclusos | replace('\n', '<br>')|safe }}</div>
             {% else %}
-                <div class="bullet-list">
-                    <li>Fundações e base civil</li>
-                    <li>Energia elétrica no local</li>
-                    <li>Hospedagem e alimentação da equipe</li>
-                    <li>Licenças e aprovações junto aos órgãos competentes</li>
-                </div>
+                <ul class="bullet-list">
+                    <li>Projeto e execução de qualquer obra civil, fundações, alvenarias, elétrica, automação, tubulações etc.</li>
+                    <li>Execução de ensaios destrutivos e radiográficos</li>
+                    <li>Fornecimento de local para armazenagem das peças</li>
+                    <li>Fornecimento e/ou serviços não especificados claramente nesta proposta</li>
+                    <li>Fornecimento de escoramento temporário</li>
+                    <li>Fornecimento de andaimes e plataformas</li>
+                    <li>Técnico de segurança</li>
+                    <li>Pintura final de acabamento</li>
+                    <li>Calhas, rufos, condutores e pingadeiras</li>
+                </ul>
             {% endif %}
         </div>
 
         <div class="section">
             <div class="section-title">5. CONDIÇÕES DE PAGAMENTO</div>
             {% if proposta.condicoes_pagamento %}
-                <p>{{ proposta.condicoes_pagamento | replace('\n', '<br>')|safe }}</p>
+                <div style="text-align: justify; line-height: 1.7;">{{ proposta.condicoes_pagamento | replace('\n', '<br>')|safe }}</div>
             {% else %}
-                <p>10% de entrada na assinatura do contrato<br>
-                10% após projeto aprovado<br>
-                45% compra dos perfis<br>
-                25% no início da montagem in loco<br>
-                10% após a conclusão da montagem</p>
+                <div style="line-height: 1.8; padding-left: 15px;">
+                    <strong>• 10%</strong> de entrada na assinatura do contrato<br>
+                    <strong>• 10%</strong> após projeto aprovado<br>
+                    <strong>• 45%</strong> compra dos perfis<br>
+                    <strong>• 25%</strong> no início da montagem in loco<br>
+                    <strong>• 10%</strong> após a conclusão da montagem
+                </div>
             {% endif %}
         </div>
 
@@ -495,14 +529,14 @@
         <div class="section">
             <div class="section-title">8. CONSIDERAÇÕES GERAIS</div>
             {% if proposta.condicoes %}
-                <p>{{ proposta.condicoes | replace('\n', '<br>')|safe }}</p>
+                <div style="text-align: justify; line-height: 1.7;">{{ proposta.condicoes | replace('\n', '<br>')|safe }}</div>
             {% else %}
-                <div class="bullet-list">
-                    <li>Proposta válida por {{ proposta.validade_dias or '7' }} dias</li>
-                    <li>Valores não incluem impostos ({{ proposta.percentual_nota_fiscal or '13,5' }}% de nota fiscal)</li>
-                    <li>Execução conforme normas técnicas brasileiras</li>
-                    <li>Projeto executivo incluído no escopo</li>
-                </div>
+                <ul class="bullet-list">
+                    <li>Proposta válida por <strong>{{ proposta.validade_dias or '7' }} dias</strong> a partir da data de emissão</li>
+                    <li>Valores não incluem impostos (<strong>{{ proposta.percentual_nota_fiscal or '13,5' }}% de nota fiscal</strong>)</li>
+                    <li>Execução conforme <strong>normas técnicas brasileiras</strong> (NBR 8800, NBR 14762)</li>
+                    <li>Projeto executivo detalhado incluído no escopo de fornecimento</li>
+                </ul>
             {% endif %}
         </div>
 
