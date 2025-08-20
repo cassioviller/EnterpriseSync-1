@@ -505,7 +505,7 @@ function carregarTemplateMultiplo() {
         });
 }
 
-// Função debug específica para testar
+// Função para criar tabela de template com edição inline
 function criarTabelaTemplate(template) {
     const container = document.getElementById('templatesCarregados');
     
@@ -523,15 +523,37 @@ function criarTabelaTemplate(template) {
     
     let itensHtml = '';
     if (template.itens_padrao && template.itens_padrao.length > 0) {
-        template.itens_padrao.forEach(item => {
+        template.itens_padrao.forEach((item, index) => {
             const total = (item.quantidade || 0) * (item.preco_unitario || 0);
             itensHtml += `
                 <tr>
                     <td>${item.descricao}</td>
-                    <td class="text-center">${item.quantidade}</td>
+                    <td class="text-center">
+                        <input type="number" 
+                               class="form-control form-control-sm text-center template-quantidade" 
+                               value="${item.quantidade}" 
+                               min="0" 
+                               step="0.1"
+                               data-template-id="${template.id}" 
+                               data-item-index="${index}"
+                               onchange="atualizarItemTemplate(${template.id}, ${index}, 'quantidade', this.value)"
+                               style="width: 80px; margin: 0 auto;">
+                    </td>
                     <td class="text-center">${item.unidade}</td>
-                    <td class="text-end">R$ ${(item.preco_unitario || 0).toFixed(2)}</td>
-                    <td class="text-end"><strong>R$ ${total.toFixed(2)}</strong></td>
+                    <td class="text-end">
+                        <input type="number" 
+                               class="form-control form-control-sm text-end template-preco" 
+                               value="${(item.preco_unitario || 0).toFixed(2)}" 
+                               min="0" 
+                               step="0.01"
+                               data-template-id="${template.id}" 
+                               data-item-index="${index}"
+                               onchange="atualizarItemTemplate(${template.id}, ${index}, 'preco_unitario', this.value)"
+                               style="width: 120px; margin-left: auto;">
+                    </td>
+                    <td class="text-end">
+                        <strong id="total-item-${template.id}-${index}">R$ ${total.toFixed(2)}</strong>
+                    </td>
                 </tr>
             `;
         });
@@ -561,7 +583,7 @@ function criarTabelaTemplate(template) {
                 <tfoot>
                     <tr class="table-warning">
                         <th colspan="4" class="text-end">Subtotal ${template.nome}:</th>
-                        <th class="text-end">R$ ${subtotal.toFixed(2)}</th>
+                        <th class="text-end" id="subtotal-template-${template.id}">R$ ${subtotal.toFixed(2)}</th>
                     </tr>
                 </tfoot>
             </table>
@@ -588,6 +610,49 @@ function removerTemplate(templateId) {
     atualizarTotalGeral();
     
     alert('Template removido com sucesso!');
+}
+
+// Função para atualizar item específico de template
+function atualizarItemTemplate(templateId, itemIndex, campo, valor) {
+    console.log(`Atualizando template ${templateId}, item ${itemIndex}, campo ${campo} = ${valor}`);
+    
+    // Encontrar o template no array
+    const template = templatesCarregadosData.find(t => t.id == templateId);
+    if (!template || !template.itens_padrao || !template.itens_padrao[itemIndex]) {
+        console.error('Template ou item não encontrado');
+        return;
+    }
+    
+    // Atualizar o valor no array
+    const valorNumerico = parseFloat(valor) || 0;
+    template.itens_padrao[itemIndex][campo] = valorNumerico;
+    
+    // Recalcular total do item
+    const item = template.itens_padrao[itemIndex];
+    const novoTotal = (item.quantidade || 0) * (item.preco_unitario || 0);
+    
+    // Atualizar total do item na interface
+    const totalElement = document.getElementById(`total-item-${templateId}-${itemIndex}`);
+    if (totalElement) {
+        totalElement.textContent = `R$ ${novoTotal.toFixed(2)}`;
+    }
+    
+    // Recalcular subtotal do template
+    let novoSubtotal = 0;
+    template.itens_padrao.forEach(item => {
+        novoSubtotal += (item.quantidade || 0) * (item.preco_unitario || 0);
+    });
+    
+    // Atualizar subtotal na interface
+    const subtotalElement = document.getElementById(`subtotal-template-${templateId}`);
+    if (subtotalElement) {
+        subtotalElement.textContent = `R$ ${novoSubtotal.toFixed(2)}`;
+    }
+    
+    // Atualizar total geral
+    atualizarTotalGeral();
+    
+    console.log(`Item atualizado: ${campo} = ${valorNumerico}, novo total do item: R$ ${novoTotal.toFixed(2)}, novo subtotal do template: R$ ${novoSubtotal.toFixed(2)}`);
 }
 
 function atualizarTotalGeral() {
