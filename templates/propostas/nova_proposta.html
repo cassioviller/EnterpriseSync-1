@@ -193,18 +193,27 @@
                 <hr>
                 <div class="row mb-4">
                     <div class="col-md-12">
-                        <div class="d-flex justify-content-between align-items-center">
-                            <h6 class="text-primary mb-0">Pré-carregar Template</h6>
-                            <div class="d-flex gap-2">
-                                <select class="form-select" id="seletorTemplate" style="width: 300px;">
-                                    <option value="">Selecione um template para pré-carregar...</option>
-                                    {% for template in templates %}
-                                    <option value="{{ template.id }}">{{ template.nome }} ({{ template.categoria }})</option>
-                                    {% endfor %}
-                                </select>
-                                <button type="button" class="btn btn-outline-primary" onclick="carregarTemplate()">
-                                    <i class="fas fa-download me-1"></i> Carregar
-                                </button>
+                        <div class="card">
+                            <div class="card-header">
+                                <h6 class="text-primary mb-0">Pré-carregar Template</h6>
+                            </div>
+                            <div class="card-body">
+                                <div class="row">
+                                    <div class="col-md-8">
+                                        <select class="form-select" id="seletorTemplate">
+                                            <option value="">Selecione um template para pré-carregar...</option>
+                                            {% for template in templates %}
+                                            <option value="{{ template.id }}">{{ template.nome }} ({{ template.categoria }})</option>
+                                            {% endfor %}
+                                        </select>
+                                        <small class="text-muted">Total de templates disponíveis: {{ templates|length }}</small>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <button type="button" class="btn btn-primary w-100" onclick="carregarTemplate()">
+                                            <i class="fas fa-download me-1"></i> Carregar Template
+                                        </button>
+                                    </div>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -453,28 +462,62 @@ function carregarTemplate() {
         return;
     }
     
+    console.log('Carregando template ID:', templateId);
+    
     fetch(`/propostas/api/template/${templateId}`)
-        .then(response => response.json())
+        .then(response => {
+            console.log('Response status:', response.status);
+            return response.json();
+        })
         .then(data => {
-            if (data.id) {
-                // Carregar campos do template
-                document.getElementById('itensInclusos').value = data.itens_inclusos || '';
-                document.getElementById('itensExclusos').value = data.itens_exclusos || '';
-                document.getElementById('condicoes').value = data.condicoes || '';
-                document.getElementById('condicoesPagamento').value = data.condicoes_pagamento || '';
-                document.getElementById('garantias').value = data.garantias || '';
-                document.getElementById('prazoEntrega').value = data.prazo_entrega_dias || 90;
-                document.getElementById('validadeDias').value = data.validade_dias || 7;
-                document.getElementById('percentualNF').value = data.percentual_nota_fiscal || 13.5;
+            console.log('Template data:', data);
+            
+            if (data && data.id) {
+                // Preencher campos básicos
+                const campos = [
+                    { field: 'itensInclusos', api: 'itens_inclusos' },
+                    { field: 'itensExclusos', api: 'itens_exclusos' },
+                    { field: 'condicoes', api: 'condicoes' },
+                    { field: 'condicoesPagamento', api: 'condicoes_pagamento' },
+                    { field: 'garantias', api: 'garantias' },
+                    { field: 'prazoEntrega', api: 'prazo_entrega_dias' },
+                    { field: 'validadeDias', api: 'validade_dias' }
+                ];
                 
-                alert(`Template "${data.nome}" carregado com sucesso!`);
+                let camposPreenchidos = 0;
+                campos.forEach(campo => {
+                    const elemento = document.getElementById(campo.field);
+                    if (elemento && data[campo.api]) {
+                        elemento.value = data[campo.api];
+                        camposPreenchidos++;
+                        console.log(`Campo ${campo.field} preenchido com:`, data[campo.api]);
+                    }
+                });
+                
+                // Preencher campos técnicos das seções se existirem
+                const secoes = [
+                    'secaoEspecificacoes', 'secaoMateriais', 'secaoFabricacao',
+                    'secaoLogistica', 'secaoMontagem', 'secaoQualidade',
+                    'secaoSeguranca', 'secaoAssistencia', 'secaoConsideracoes'
+                ];
+                
+                secoes.forEach(secao => {
+                    const elemento = document.getElementById(secao);
+                    const apiField = secao.replace('secao', 'secao_').toLowerCase();
+                    if (elemento && data[apiField]) {
+                        elemento.value = data[apiField];
+                        camposPreenchidos++;
+                    }
+                });
+                
+                alert(`Template "${data.nome}" carregado com sucesso!\nCampos preenchidos: ${camposPreenchidos}`);
             } else {
-                alert('Erro ao carregar template: ' + (data.error || 'Erro desconhecido'));
+                alert('Erro ao carregar template: ' + (data.error || 'Resposta inválida'));
             }
         })
         .catch(error => {
-            console.error('Erro:', error);
-            alert('Erro ao carregar template.');
+            console.error('Erro ao carregar template:', error);
+            alert('Erro ao carregar template. Verifique o console para mais detalhes.');
         });
 }
 
