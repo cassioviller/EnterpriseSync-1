@@ -56,26 +56,30 @@
         /* APENAS Header personalizado da imagem cadastrada */
         .header-personalizado {
             width: 100%;
-            height: 120px;
-            margin: -2cm -1.5cm 30px -1.5cm;
+            height: auto;
+            margin: -2cm -1.5cm 20px -1.5cm;
             display: flex;
             align-items: center;
             justify-content: center;
             overflow: hidden;
             background: white;
+            border-bottom: 1px solid #ddd;
+            padding-bottom: 10px;
         }
         
         .header-personalizado img {
-            max-width: 100%;
-            max-height: 120px;
+            width: 100%;
+            height: auto;
+            max-height: 100px;
             object-fit: contain;
         }
         
         /* Conteúdo da página */
         .date-location {
-            text-align: left;
+            text-align: right;
             margin: 20px 0;
             font-size: 11pt;
+            font-style: italic;
         }
         
         .recipient {
@@ -104,13 +108,16 @@
         }
         
         .signature {
-            margin: 30px 0;
+            margin: 40px 0;
             text-align: left;
         }
         
         .signature-name {
             font-weight: bold;
-            margin-top: 40px;
+            margin-top: 50px;
+            border-top: 1px solid #333;
+            padding-top: 5px;
+            width: 300px;
         }
         
         .website {
@@ -125,6 +132,8 @@
             padding: 20px;
             margin: 30px 0;
             border-left: 4px solid #28a745;
+            border-radius: 5px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
         }
         
         .contact-title {
@@ -259,7 +268,7 @@
         <!-- Se não houver header_pdf_base64, fica vazio (sem header verde) -->
 
         <div class="date-location">
-            São José dos Campos, {{ proposta.criado_em.strftime('%d de %B de %Y') if proposta.criado_em else 'data da proposta' }}.
+            São José dos Campos, {% if proposta.criado_em %}{{ proposta.criado_em.strftime('%d de %B de %Y') }}{% else %}19 de Agosto de 2025{% endif %}.
         </div>
 
         <div class="recipient">
@@ -271,11 +280,11 @@
         </div>
 
         <div class="subject">
-            <strong>Ass.:</strong> {{ proposta.assunto or 'Fabricação e montagem de estrutura metálica.' }}
+            <strong>Ass.:</strong> {{ proposta.assunto if proposta.assunto else 'Fabricação e montagem de estrutura metálica.' }}
         </div>
 
         <div class="reference">
-            <strong>N. Ref.:</strong> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Proposta Comercial {{ proposta.numero_proposta }} –
+            <strong>N. Ref.:</strong> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Proposta Comercial {{ proposta.numero_proposta }}
         </div>
 
         <div class="greeting">
@@ -379,8 +388,8 @@
 
         <div class="section">
             <div class="section-title">1. OBJETO:</div>
-            <p>{{ proposta.objeto or proposta.assunto or 'Esta proposta descreve as condições comerciais a serem atendidas para o fornecimento de mão de obra especializada para fabricação e montagem de estruturas conforme segue.' }}</p>
-            <p><strong>Documentos de referência:</strong> {{ proposta.documentos_referencia or "Medidas enviadas pelo cliente" }}</p>
+            <p>{% if proposta.objeto %}{{ proposta.objeto }}{% elif proposta.assunto %}{{ proposta.assunto }}{% else %}Esta proposta descreve as condições comerciais a serem atendidas para o fornecimento de mão de obra especializada para fabricação e montagem de estruturas conforme segue.{% endif %}</p>
+            <p><strong>Documentos de referência:</strong> {% if proposta.documentos_referencia %}{{ proposta.documentos_referencia }}{% else %}Medidas enviadas pelo cliente{% endif %}</p>
         </div>
 
         <div class="section">
