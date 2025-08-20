@@ -101,16 +101,21 @@
                             <small class="text-muted">Total de templates disponíveis: {{ templates|length }}</small>
                         </div>
                         <div class="col-md-4">
-                            <button type="button" class="btn btn-primary w-100" onclick="carregarTemplateDebug()">
+                            <button type="button" class="btn btn-primary w-100" onclick="carregarTemplateMultiplo()">
                                 <i class="fas fa-download me-1"></i> Pré-carregar Template
                             </button>
                         </div>
                     </div>
                 </div>
 
-                <!-- Serviços -->
+                <!-- Serviços Organizados por Template -->
                 <h6 class="text-primary mb-3">Serviços</h6>
-                <div id="servicosContainer">
+                <div id="templatesCarregados"></div>
+                
+                <!-- Serviços Adicionais -->
+                <div class="mt-4">
+                    <h6 class="text-secondary mb-3">Serviços Adicionais</h6>
+                    <div id="servicosContainer">
                     <div class="servico-item border rounded p-3 mb-3">
                         <div class="row">
                             <div class="col-md-4">
@@ -371,15 +376,8 @@ function calcularServico(input) {
 }
 
 function calcularTotal() {
-    let total = 0;
-    document.querySelectorAll('.servico-item').forEach(item => {
-        const quantidade = parseFloat(item.querySelector('.servico-quantidade').value) || 0;
-        const valorUnitario = parseFloat(item.querySelector('.servico-valor-unitario').value) || 0;
-        total += quantidade * valorUnitario;
-    });
-    
-    document.getElementById('totalProposta').textContent = 'R$ ' + total.toFixed(2).replace('.', ',');
-    document.querySelector('input[name="valor_proposta"]').value = total.toFixed(2);
+    // Chamar a função de atualização geral que considera templates + serviços adicionais
+    atualizarTotalGeral();
 }
 
 function coletarServicos() {
@@ -407,12 +405,19 @@ document.getElementById('formNovaProposta').addEventListener('submit', function(
     coletarServicos();
 });
 
-// Função para carregar template
-function carregarTemplate() {
+// Sistema de carregamento múltiplo de templates
+let templatesCarregadosData = [];
+
+function carregarTemplateMultiplo() {
     const select = document.getElementById('seletorTemplate');
     const templateId = select.value;
     
-    console.log('=== DEBUG CARREGAR TEMPLATE ===');
+    if (!templateId) {
+        alert('Selecione um template primeiro!');
+        return;
+    }
+    
+    console.log('=== CARREGANDO TEMPLATE MÚLTIPLO ===');
     console.log('Elemento select encontrado:', select);
     console.log('Template ID selecionado:', templateId);
     console.log('Selected index:', select ? select.selectedIndex : 'N/A');
@@ -525,6 +530,124 @@ function carregarTemplate() {
 }
 
 // Função debug específica para testar
+function criarTabelaTemplate(template) {
+    const container = document.getElementById('templatesCarregados');
+    
+    // Calcular subtotal do template
+    let subtotal = 0;
+    if (template.itens_padrao) {
+        template.itens_padrao.forEach(item => {
+            subtotal += (item.quantidade || 0) * (item.preco_unitario || 0);
+        });
+    }
+    
+    const templateDiv = document.createElement('div');
+    templateDiv.className = 'template-carregado border rounded p-3 mb-4';
+    templateDiv.dataset.templateId = template.id;
+    
+    let itensHtml = '';
+    if (template.itens_padrao && template.itens_padrao.length > 0) {
+        template.itens_padrao.forEach(item => {
+            const total = (item.quantidade || 0) * (item.preco_unitario || 0);
+            itensHtml += `
+                <tr>
+                    <td>${item.descricao}</td>
+                    <td class="text-center">${item.quantidade}</td>
+                    <td class="text-center">${item.unidade}</td>
+                    <td class="text-end">R$ ${(item.preco_unitario || 0).toFixed(2)}</td>
+                    <td class="text-end"><strong>R$ ${total.toFixed(2)}</strong></td>
+                </tr>
+            `;
+        });
+    }
+    
+    templateDiv.innerHTML = `
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <h6 class="text-primary mb-0">${template.nome}</h6>
+            <button type="button" class="btn btn-sm btn-outline-danger" onclick="removerTemplate(${template.id})">
+                <i class="fas fa-trash"></i> Remover Template
+            </button>
+        </div>
+        <div class="table-responsive">
+            <table class="table table-sm">
+                <thead class="table-light">
+                    <tr>
+                        <th>Descrição</th>
+                        <th class="text-center">Qtd</th>
+                        <th class="text-center">Unidade</th>
+                        <th class="text-end">Valor Unit.</th>
+                        <th class="text-end">Total</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${itensHtml}
+                </tbody>
+                <tfoot>
+                    <tr class="table-warning">
+                        <th colspan="4" class="text-end">Subtotal ${template.nome}:</th>
+                        <th class="text-end">R$ ${subtotal.toFixed(2)}</th>
+                    </tr>
+                </tfoot>
+            </table>
+        </div>
+    `;
+    
+    container.appendChild(templateDiv);
+    
+    // Scroll para ver o template adicionado
+    templateDiv.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+function removerTemplate(templateId) {
+    // Remover do array
+    templatesCarregadosData = templatesCarregadosData.filter(t => t.id != templateId);
+    
+    // Remover da interface
+    const templateDiv = document.querySelector(`[data-template-id="${templateId}"]`);
+    if (templateDiv) {
+        templateDiv.remove();
+    }
+    
+    // Atualizar total
+    atualizarTotalGeral();
+    
+    alert('Template removido com sucesso!');
+}
+
+function atualizarTotalGeral() {
+    let totalTemplates = 0;
+    let totalServicos = 0;
+    
+    // Somar todos os templates carregados
+    templatesCarregadosData.forEach(template => {
+        if (template.itens_padrao) {
+            template.itens_padrao.forEach(item => {
+                totalTemplates += (item.quantidade || 0) * (item.preco_unitario || 0);
+            });
+        }
+    });
+    
+    // Somar serviços adicionais
+    document.querySelectorAll('#servicosContainer .servico-item').forEach(item => {
+        const quantidade = parseFloat(item.querySelector('.servico-quantidade').value) || 0;
+        const valorUnitario = parseFloat(item.querySelector('.servico-valor-unitario').value) || 0;
+        totalServicos += quantidade * valorUnitario;
+    });
+    
+    const totalGeral = totalTemplates + totalServicos;
+    
+    // Atualizar display do total
+    document.getElementById('totalProposta').textContent = 'R$ ' + totalGeral.toFixed(2).replace('.', ',');
+    
+    // Atualizar input hidden para o formulário
+    const inputValor = document.querySelector('input[name="valor_proposta"]');
+    if (inputValor) {
+        inputValor.value = totalGeral.toFixed(2);
+    }
+    
+    console.log(`Totais: Templates R$ ${totalTemplates.toFixed(2)} + Serviços R$ ${totalServicos.toFixed(2)} = Total R$ ${totalGeral.toFixed(2)}`);
+}
+
 function carregarTemplateDebug() {
     console.log('=== FUNÇÃO DEBUG ESPECÍFICA ===');
     
@@ -687,7 +810,6 @@ function carregarTemplateComValor(templateId) {
                     calcularTotal();
                     
                     console.log(`✅ ${data.itens_padrao.length} serviços adicionados do template`);
-                }
                 }
                 
                 console.log(`Total de campos preenchidos: ${camposPreenchidos}`);
