@@ -212,6 +212,25 @@
             color: #333;
         }
         
+        .categoria-titulo {
+            text-align: center;
+            font-weight: bold;
+            font-size: 12pt;
+            margin: 20px 0 10px 0;
+            padding: 8px;
+            background-color: #f8f9fa;
+            border: 1px solid #ddd;
+        }
+        
+        .subtotal-row td {
+            border-top: 2px solid #333 !important;
+            font-weight: bold;
+        }
+        
+        .valor-total-final {
+            margin-top: 30px;
+        }
+        
         /* Tabela de itens */
         .items-table {
             width: 100%;
@@ -422,37 +441,85 @@
         <div class="section">
             <div class="section-title">2. PREÇOS UNITÁRIOS E TOTAIS ESTIMADOS:</div>
             
-            <div class="subsection-title">2.1 &nbsp;&nbsp;&nbsp;&nbsp; ESCOPO DE FORNECIMENTO:</div>
+            <div class="subsection-title" style="margin: 20px 0 15px 40px;">2.1 &nbsp;&nbsp;&nbsp;&nbsp; ESCOPO DE FORNECIMENTO:</div>
             
             {% if proposta.itens %}
+                <!-- Simulando múltiplas categorias como no formato original -->
+                <div class="categoria-titulo">PROJETO</div>
                 <table class="items-table">
                     <thead>
                         <tr>
-                            <th>Item</th>
-                            <th>Descrição</th>
-                            <th>Unid.</th>
-                            <th>Qtd.</th>
-                            <th>Valor Unit.</th>
-                            <th>Valor Total</th>
+                            <th style="width: 8%;">ITEM</th>
+                            <th style="width: 40%;">DESCRIÇÃO</th>
+                            <th style="width: 8%;">QTD</th>
+                            <th style="width: 8%;">UNID</th>
+                            <th style="width: 18%;">PREÇO UNI</th>
+                            <th style="width: 18%;">SUBTOTAL</th>
                         </tr>
                     </thead>
                     <tbody>
-                        {% for item in proposta.itens %}
+                        {% if proposta.itens[0] %}
                         <tr>
-                            <td>{{ item.item_numero }}</td>
-                            <td>{{ item.descricao }}</td>
-                            <td>{{ item.unidade }}</td>
-                            <td>{{ "%.2f"|format(item.quantidade) }}</td>
-                            <td class="price">{{ "R$ %.2f"|format(item.preco_unitario) }}</td>
-                            <td class="price"><strong>{{ "R$ %.2f"|format(item.quantidade * item.preco_unitario) }}</strong></td>
+                            <td style="text-align: center;">{{ proposta.itens[0].item_numero }}</td>
+                            <td>{{ proposta.itens[0].descricao }}</td>
+                            <td style="text-align: center;">{{ "%.0f"|format(proposta.itens[0].quantidade) if proposta.itens[0].quantidade == proposta.itens[0].quantidade|int else "%.2f"|format(proposta.itens[0].quantidade) }}</td>
+                            <td style="text-align: center;">{{ proposta.itens[0].unidade }}</td>
+                            <td style="text-align: right;">R$ {{ "%.2f"|format(proposta.itens[0].preco_unitario) }}</td>
+                            <td style="text-align: right;">R$ {{ "%.2f"|format(proposta.itens[0].quantidade * proposta.itens[0].preco_unitario) }}</td>
                         </tr>
-                        {% endfor %}
-                        <tr>
-                            <td colspan="5"><strong>VALOR TOTAL DA PROPOSTA:</strong></td>
-                            <td class="price"><strong>{{ "R$ %.2f"|format(proposta.valor_total or 0) }}</strong></td>
+                        {% endif %}
+                        <tr class="subtotal-row">
+                            <td colspan="5" style="text-align: right; font-weight: bold; background-color: #f0f0f0;">SUBTOTAL</td>
+                            <td style="text-align: right; font-weight: bold; background-color: #f0f0f0;">R$ {{ "%.2f"|format(proposta.itens[0].quantidade * proposta.itens[0].preco_unitario if proposta.itens[0] else 0) }}</td>
                         </tr>
                     </tbody>
                 </table>
+                <br>
+                
+                {% if proposta.itens|length > 1 %}
+                <div class="categoria-titulo">ESTRUTURA METÁLICA</div>
+                <table class="items-table">
+                    <thead>
+                        <tr>
+                            <th style="width: 8%;">ITEM</th>
+                            <th style="width: 40%;">DESCRIÇÃO</th>
+                            <th style="width: 8%;">QTD</th>
+                            <th style="width: 8%;">UNID</th>
+                            <th style="width: 18%;">PREÇO UNI</th>
+                            <th style="width: 18%;">SUBTOTAL</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% set subtotal_estrutura = 0 %}
+                        {% for item in proposta.itens[1:] %}
+                        <tr>
+                            <td style="text-align: center;">{{ item.item_numero }}</td>
+                            <td>{{ item.descricao }}</td>
+                            <td style="text-align: center;">{{ "%.0f"|format(item.quantidade) if item.quantidade == item.quantidade|int else "%.2f"|format(item.quantidade) }}</td>
+                            <td style="text-align: center;">{{ item.unidade }}</td>
+                            <td style="text-align: right;">R$ {{ "%.2f"|format(item.preco_unitario) }}</td>
+                            <td style="text-align: right;">R$ {{ "%.2f"|format(item.quantidade * item.preco_unitario) }}</td>
+                        </tr>
+                        {% set subtotal_estrutura = subtotal_estrutura + (item.quantidade * item.preco_unitario) %}
+                        {% endfor %}
+                        <tr class="subtotal-row">
+                            <td colspan="5" style="text-align: right; font-weight: bold; background-color: #f0f0f0;">SUBTOTAL</td>
+                            <td style="text-align: right; font-weight: bold; background-color: #f0f0f0;">R$ {{ "%.2f"|format(subtotal_estrutura) }}</td>
+                        </tr>
+                    </tbody>
+                </table>
+                <br>
+                {% endif %}
+                
+                <div class="valor-total-final">
+                    <table style="width: 100%; margin-top: 20px;">
+                        <tr>
+                            <td style="text-align: right; font-size: 14pt; font-weight: bold; padding: 15px; background: linear-gradient(135deg, #28a745 0%, #20c997 100%); color: white; border-radius: 5px;">
+                                VALOR TOTAL: &nbsp;&nbsp; R$ {{ "%.2f"|format(proposta.valor_total) }}
+                            </td>
+                        </tr>
+                    </table>
+                </div>
             {% else %}
                 <div class="highlight-box">
                     <div class="value-highlight">VALOR TOTAL: {{ "R$ %.2f"|format(proposta.valor_total or 0) }}</div>
