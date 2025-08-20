@@ -96,12 +96,8 @@
                                     <label for="logo_upload" class="form-label">Logo da Empresa (Geral)</label>
                                     <div class="d-flex align-items-center gap-3">
                                         {% if config and config.logo_base64 %}
-                                            <div class="position-relative">
-                                                <img id="logo_preview" src="data:image/png;base64,{{ config.logo_base64 }}" 
-                                                     alt="Logo atual" style="width: 60px; height: 60px; object-fit: contain; border: 1px solid #ddd; border-radius: 4px;">
-                                                <button type="button" class="btn btn-sm btn-danger position-absolute top-0 end-0 rounded-circle p-1" 
-                                                        onclick="clearImage('logo')" style="width: 20px; height: 20px; font-size: 10px; margin-top: -5px; margin-right: -5px;">×</button>
-                                            </div>
+                                            <img id="logo_preview" src="data:image/png;base64,{{ config.logo_base64 }}" 
+                                                 alt="Logo atual" style="width: 60px; height: 60px; object-fit: contain; border: 1px solid #ddd; border-radius: 4px;">
                                         {% else %}
                                             <div id="logo_preview" style="width: 60px; height: 60px; border: 2px dashed #ddd; border-radius: 4px; display: flex; align-items: center; justify-content: center;">
                                                 <i class="fas fa-image text-muted"></i>
@@ -113,7 +109,6 @@
                                         </div>
                                     </div>
                                     <input type="hidden" id="logo_base64" name="logo_base64" value="{{ config.logo_base64 if config else '' }}">
-                                    <input type="hidden" id="clear_logo" name="clear_logo" value="">
                                 </div>
                             </div>
                             <div class="col-md-6">
@@ -121,12 +116,8 @@
                                     <label for="logo_pdf_upload" class="form-label">Logo para PDF</label>
                                     <div class="d-flex align-items-center gap-3">
                                         {% if config and config.logo_pdf_base64 %}
-                                            <div class="position-relative">
-                                                <img id="logo_pdf_preview" src="data:image/png;base64,{{ config.logo_pdf_base64 }}" 
-                                                     alt="Logo PDF atual" style="width: 60px; height: 60px; object-fit: contain; border: 1px solid #ddd; border-radius: 4px;">
-                                                <button type="button" class="btn btn-sm btn-danger position-absolute top-0 end-0 rounded-circle p-1" 
-                                                        onclick="clearImage('logo_pdf')" style="width: 20px; height: 20px; font-size: 10px; margin-top: -5px; margin-right: -5px;">×</button>
-                                            </div>
+                                            <img id="logo_pdf_preview" src="data:image/png;base64,{{ config.logo_pdf_base64 }}" 
+                                                 alt="Logo PDF atual" style="width: 60px; height: 60px; object-fit: contain; border: 1px solid #ddd; border-radius: 4px;">
                                         {% else %}
                                             <div id="logo_pdf_preview" style="width: 60px; height: 60px; border: 2px dashed #ddd; border-radius: 4px; display: flex; align-items: center; justify-content: center;">
                                                 <i class="fas fa-file-pdf text-muted"></i>
@@ -138,7 +129,6 @@
                                         </div>
                                     </div>
                                     <input type="hidden" id="logo_pdf_base64" name="logo_pdf_base64" value="{{ config.logo_pdf_base64 if config else '' }}">
-                                    <input type="hidden" id="clear_logo_pdf" name="clear_logo_pdf" value="">
                                 </div>
                             </div>
                             
@@ -151,13 +141,9 @@
                                     </label>
                                     <div class="d-flex align-items-center gap-3">
                                         {% if config and config.header_pdf_base64 %}
-                                        <div class="position-relative">
-                                            <img id="header_pdf_preview" src="data:image/png;base64,{{ config.header_pdf_base64 }}" alt="Header PDF" style="height: 60px; max-width: 200px; object-fit: contain; border: 1px solid #ddd; border-radius: 4px;">
-                                            <button type="button" class="btn btn-sm btn-danger position-absolute top-0 end-0 rounded-circle p-1" 
-                                                    onclick="clearImage('header_pdf')" style="width: 20px; height: 20px; font-size: 10px; margin-top: -5px; margin-right: -5px;">×</button>
-                                        </div>
+                                        <img src="data:image/png;base64,{{ config.header_pdf_base64 }}" alt="Header PDF" style="height: 60px; max-width: 200px; object-fit: contain; border: 1px solid #ddd; border-radius: 4px;">
                                         {% else %}
-                                        <div id="header_pdf_preview" class="bg-light border rounded d-flex align-items-center justify-content-center" style="height: 60px; width: 200px;">
+                                        <div class="bg-light border rounded d-flex align-items-center justify-content-center" style="height: 60px; width: 200px;">
                                             <i class="fas fa-image text-muted"></i>
                                         </div>
                                         {% endif %}
@@ -170,7 +156,6 @@
                                         </div>
                                     </div>
                                     <input type="hidden" id="header_pdf_base64" name="header_pdf_base64" value="{{ config.header_pdf_base64 if config else '' }}">
-                                    <input type="hidden" id="clear_header_pdf" name="clear_header_pdf" value="">
                                 </div>
                             </div>
                         </div>
@@ -399,49 +384,6 @@ document.getElementById('logo_pdf_upload').addEventListener('change', function(e
     }
 });
 
-// Função para limpar imagens
-function clearImage(imageType) {
-    // Definir campos baseado no tipo
-    let previewElement, hiddenField, clearField, uploadField;
-    
-    switch(imageType) {
-        case 'logo':
-            previewElement = document.getElementById('logo_preview');
-            hiddenField = document.getElementById('logo_base64');
-            clearField = document.getElementById('clear_logo');
-            uploadField = document.getElementById('logo_upload');
-            break;
-        case 'logo_pdf':
-            previewElement = document.getElementById('logo_pdf_preview');
-            hiddenField = document.getElementById('logo_pdf_base64');
-            clearField = document.getElementById('clear_logo_pdf');
-            uploadField = document.getElementById('logo_pdf_upload');
-            break;
-        case 'header_pdf':
-            previewElement = document.getElementById('header_pdf_preview');
-            hiddenField = document.getElementById('header_pdf_base64');
-            clearField = document.getElementById('clear_header_pdf');
-            uploadField = document.getElementById('header_pdf_upload');
-            break;
-    }
-    
-    if (previewElement && hiddenField && clearField && uploadField) {
-        // Limpar valores
-        hiddenField.value = '';
-        clearField.value = 'true';
-        uploadField.value = '';
-        
-        // Atualizar preview visual
-        if (imageType === 'logo') {
-            previewElement.outerHTML = '<div id="logo_preview" style="width: 60px; height: 60px; border: 2px dashed #ddd; border-radius: 4px; display: flex; align-items: center; justify-content: center;"><i class="fas fa-image text-muted"></i></div>';
-        } else if (imageType === 'logo_pdf') {
-            previewElement.outerHTML = '<div id="logo_pdf_preview" style="width: 60px; height: 60px; border: 2px dashed #ddd; border-radius: 4px; display: flex; align-items: center; justify-content: center;"><i class="fas fa-file-pdf text-muted"></i></div>';
-        } else if (imageType === 'header_pdf') {
-            previewElement.outerHTML = '<div id="header_pdf_preview" class="bg-light border rounded d-flex align-items-center justify-content-center" style="height: 60px; width: 200px;"><i class="fas fa-image text-muted"></i></div>';
-        }
-    }
-}
-
 // Upload do header PDF
 document.getElementById('header_pdf_upload').addEventListener('change', function(e) {
     const file = e.target.files[0];
@@ -477,28 +419,14 @@ document.getElementById('header_pdf_upload').addEventListener('change', function
             const base64 = event.target.result.split(',')[1];
             document.getElementById('header_pdf_base64').value = base64;
             
-            // Atualizar preview com botão de remoção
-            const currentPreview = document.getElementById('header_pdf_preview');
+            // Atualizar preview
+            const currentPreview = document.querySelector('img[alt="Header PDF"], .bg-light.border.rounded');
             if (currentPreview) {
-                const container = document.createElement('div');
-                container.className = 'position-relative';
-                
                 const img = document.createElement('img');
-                img.id = 'header_pdf_preview';
                 img.src = event.target.result;
                 img.alt = 'Header PDF';
                 img.style.cssText = 'height: 60px; max-width: 200px; object-fit: contain; border: 1px solid #ddd; border-radius: 4px;';
-                
-                const clearBtn = document.createElement('button');
-                clearBtn.type = 'button';
-                clearBtn.className = 'btn btn-sm btn-danger position-absolute top-0 end-0 rounded-circle p-1';
-                clearBtn.style.cssText = 'width: 20px; height: 20px; font-size: 10px; margin-top: -5px; margin-right: -5px;';
-                clearBtn.innerHTML = '×';
-                clearBtn.onclick = () => clearImage('header_pdf');
-                
-                container.appendChild(img);
-                container.appendChild(clearBtn);
-                currentPreview.replaceWith(container);
+                currentPreview.replaceWith(img);
             }
             
             img.src = event.target.result; // Para validação de dimensões
