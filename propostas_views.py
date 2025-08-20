@@ -439,16 +439,6 @@ def atualizar_proposta(id):
         db.session.rollback()
         flash(f'Erro ao atualizar proposta: {str(e)}', 'error')
         return redirect(url_for('propostas.editar_proposta', id=id))
-        proposta.calcular_valor_total()
-        
-        db.session.commit()
-        flash('Proposta atualizada com sucesso!', 'success')
-        return redirect(url_for('propostas.visualizar_proposta', id=proposta.id))
-        
-    except Exception as e:
-        db.session.rollback()
-        flash(f'Erro ao atualizar proposta: {str(e)}', 'error')
-        return redirect(url_for('propostas.editar_proposta', id=id))
 
 @propostas_bp.route('/<int:id>/arquivos/upload', methods=['POST'])
 @login_required
