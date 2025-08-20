@@ -56,23 +56,40 @@ def salvar_empresa():
         
         # Upload de logo em base64
         logo_base64 = request.form.get('logo_base64')
-        if logo_base64:
+        if logo_base64 and logo_base64.strip():
             config.logo_base64 = logo_base64
+            print("DEBUG LOGO: Logo base64 salva")
+        elif request.form.get('clear_logo') == 'true':
+            config.logo_base64 = None
+            print("DEBUG LOGO: Logo base64 removida")
             
         # Upload de logo PDF em base64
         logo_pdf_base64 = request.form.get('logo_pdf_base64')
-        if logo_pdf_base64:
+        if logo_pdf_base64 and logo_pdf_base64.strip():
             config.logo_pdf_base64 = logo_pdf_base64
+            print("DEBUG LOGO PDF: Logo PDF base64 salva")
+        elif request.form.get('clear_logo_pdf') == 'true':
+            config.logo_pdf_base64 = None
+            print("DEBUG LOGO PDF: Logo PDF base64 removida")
             
-        # Upload de header PDF em base64
-        header_pdf_base64 = request.form.get('header_pdf_base64')
-        print(f"DEBUG HEADER: header_pdf_base64 recebido = {bool(header_pdf_base64)} (tamanho: {len(header_pdf_base64) if header_pdf_base64 else 0})")
-        print(f"DEBUG HEADER: Conteúdo do form header: {header_pdf_base64[:100] if header_pdf_base64 else 'None'}...")
-        if header_pdf_base64:
+        # Upload de header PDF em base64 - VERSÃO CORRIGIDA
+        header_pdf_base64 = request.form.get('header_pdf_base64', '').strip()
+        clear_header = request.form.get('clear_header_pdf', '').strip()
+        
+        print(f"DEBUG HEADER: Campo header_pdf_base64 = {len(header_pdf_base64) if header_pdf_base64 else 0} chars")
+        print(f"DEBUG HEADER: Campo clear_header_pdf = '{clear_header}'")
+        print(f"DEBUG HEADER: Todos os campos do form: {list(request.form.keys())}")
+        
+        # Se há comando para limpar
+        if clear_header == 'true':
+            config.header_pdf_base64 = None
+            print("DEBUG HEADER: ✅ Header PDF removido com sucesso")
+        # Se há dados para salvar
+        elif header_pdf_base64 and len(header_pdf_base64) > 100:  # Base64 válido deve ter mais de 100 chars
             config.header_pdf_base64 = header_pdf_base64
-            print("DEBUG HEADER: Header PDF salvo na config")
+            print(f"DEBUG HEADER: ✅ Header PDF salvo com sucesso ({len(header_pdf_base64)} chars)")
         else:
-            print("DEBUG HEADER: Nenhum header recebido no form")
+            print(f"DEBUG HEADER: ⚠️ Nenhuma ação realizada (header vazio ou inválido)")
         
         # Personalização visual
         cor_primaria = request.form.get('cor_primaria', '#007bff')

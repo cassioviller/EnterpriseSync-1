@@ -1,0 +1,548 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Proposta Comercial {{ proposta.numero_proposta }}</title>
+    <style>
+        /* Reset e configurações base */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        @page {
+            size: A4;
+            margin: 0;
+        }
+        
+        body {
+            font-family: 'Arial', sans-serif;
+            font-size: 11pt;
+            line-height: 1.4;
+            color: #333;
+            background: #f5f5f5;
+        }
+        
+        .page {
+            width: 210mm;
+            min-height: 297mm;
+            margin: 20px auto;
+            background: white;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+            position: relative;
+            padding: 2cm 1.5cm;
+            page-break-after: always;
+        }
+        
+        .page:last-child {
+            page-break-after: avoid;
+        }
+        
+        @media print {
+            body {
+                background: white;
+            }
+            .page {
+                margin: 0;
+                box-shadow: none;
+                page-break-after: always;
+                width: auto;
+                min-height: auto;
+            }
+        }
+        
+        /* Header personalizado ou padrão */
+        .header-personalizado {
+            width: 100%;
+            height: 120px;
+            margin: -2cm -1.5cm 30px -1.5cm;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+            background: white;
+        }
+        
+        .header-personalizado img {
+            max-width: 100%;
+            max-height: 120px;
+            object-fit: contain;
+        }
+        
+        .header-padrao {
+            height: 80px;
+            margin: -2cm -1.5cm 30px -1.5cm;
+            background: linear-gradient(90deg, #28a745 0%, #28a745 30%, #333 30%, #333 100%);
+            padding: 15px 30px;
+            color: white;
+            display: flex;
+            align-items: center;
+        }
+        
+        .header-padrao .logo {
+            height: 50px;
+            margin-right: 20px;
+        }
+        
+        .header-padrao .company-info {
+            flex: 1;
+        }
+        
+        .header-padrao .company-name {
+            font-size: 18pt;
+            font-weight: bold;
+            margin-bottom: 2px;
+        }
+        
+        .header-padrao .company-tagline {
+            font-size: 10pt;
+            color: #ccc;
+        }
+        
+        /* Conteúdo da página */
+        .date-location {
+            text-align: left;
+            margin: 20px 0;
+            font-size: 11pt;
+        }
+        
+        .recipient {
+            margin: 20px 0;
+            line-height: 1.6;
+        }
+        
+        .subject {
+            margin: 20px 0;
+            font-weight: bold;
+        }
+        
+        .reference {
+            margin: 20px 0;
+            border-bottom: 1px solid #333;
+            padding-bottom: 10px;
+        }
+        
+        .greeting {
+            margin: 20px 0;
+        }
+        
+        .intro-text {
+            margin: 20px 0;
+            text-align: justify;
+        }
+        
+        .signature {
+            margin: 30px 0;
+            text-align: left;
+        }
+        
+        .signature-name {
+            font-weight: bold;
+            margin-top: 40px;
+        }
+        
+        .website {
+            text-align: center;
+            margin: 30px 0;
+            font-size: 10pt;
+            color: #666;
+        }
+        
+        .contact-info {
+            background-color: #f8f9fa;
+            padding: 20px;
+            margin: 30px 0;
+            border-left: 4px solid #28a745;
+        }
+        
+        .contact-title {
+            font-size: 14pt;
+            font-weight: bold;
+            color: #333;
+            margin-bottom: 5px;
+        }
+        
+        .contact-subtitle {
+            font-size: 9pt;
+            color: #666;
+            margin-bottom: 15px;
+        }
+        
+        .contact-details {
+            line-height: 1.6;
+        }
+        
+        .contact-details div {
+            margin: 3px 0;
+        }
+        
+        /* Sumário */
+        .summary {
+            text-align: center;
+            font-size: 16pt;
+            font-weight: bold;
+            margin: 40px 0;
+        }
+        
+        .toc {
+            margin: 30px 0;
+        }
+        
+        .toc-item {
+            display: flex;
+            justify-content: space-between;
+            margin: 8px 0;
+            border-bottom: 1px dotted #ccc;
+            padding-bottom: 2px;
+        }
+        
+        /* Seções técnicas */
+        .section {
+            margin: 25px 0;
+        }
+        
+        .section-title {
+            font-size: 12pt;
+            font-weight: bold;
+            margin-bottom: 10px;
+            color: #28a745;
+        }
+        
+        .subsection-title {
+            font-size: 11pt;
+            font-weight: bold;
+            margin: 15px 0 10px 0;
+            color: #333;
+        }
+        
+        /* Tabela de itens */
+        .items-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+            font-size: 10pt;
+        }
+        
+        .items-table th,
+        .items-table td {
+            border: 1px solid #ddd;
+            padding: 8px;
+            text-align: left;
+        }
+        
+        .items-table th {
+            background-color: #f8f9fa;
+            font-weight: bold;
+            color: #333;
+        }
+        
+        .items-table .price {
+            text-align: right;
+        }
+        
+        .items-table tbody tr:nth-child(even) {
+            background-color: #f9f9f9;
+        }
+        
+        .items-table tbody tr:last-child {
+            background-color: #e8f5e8;
+            font-weight: bold;
+        }
+        
+        /* Lista com bullets */
+        .bullet-list {
+            margin: 10px 0;
+            padding-left: 20px;
+        }
+        
+        .bullet-list li {
+            margin: 5px 0;
+        }
+        
+        /* Valores destacados */
+        .highlight-box {
+            background-color: #fff3cd;
+            border: 1px solid #ffeaa7;
+            padding: 15px;
+            margin: 20px 0;
+            border-radius: 4px;
+        }
+        
+        .value-highlight {
+            font-size: 14pt;
+            font-weight: bold;
+            color: #28a745;
+        }
+    </style>
+</head>
+<body>
+    <!-- Página 1: Carta de Apresentação -->
+    <div class="page">
+        {% if config and config.header_pdf_base64 %}
+        <!-- Header personalizado -->
+        <div class="header-personalizado">
+            <img src="data:image/jpeg;base64,{{ config.header_pdf_base64 }}" alt="Header Personalizado">
+        </div>
+        {% else %}
+        <!-- Header padrão Estruturas do Vale -->
+        <div class="header-padrao">
+            {% if config and config.logo_pdf_base64 %}
+                <img src="data:image/png;base64,{{ config.logo_pdf_base64 }}" alt="Logo" class="logo">
+            {% elif config and config.logo_base64 %}
+                <img src="data:image/png;base64,{{ config.logo_base64 }}" alt="Logo" class="logo">
+            {% endif %}
+            <div class="company-info">
+                <div class="company-name">{{ config.nome_empresa if config else 'Estruturas do Vale' }}</div>
+                <div class="company-tagline">ESTRUTURAS METÁLICAS</div>
+            </div>
+        </div>
+        {% endif %}
+
+        <div class="date-location">
+            São José dos Campos, {{ proposta.criado_em.strftime('%d de %B de %Y') if proposta.criado_em else 'data da proposta' }}.
+        </div>
+
+        <div class="recipient">
+            À {{ proposta.cliente_nome }}<br><br>
+            A/c.: {{ proposta.cliente_nome }}<br>
+            {% if proposta.cliente_telefone %}
+            &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;{{ proposta.cliente_telefone }}<br>
+            {% endif %}
+        </div>
+
+        <div class="subject">
+            <strong>Ass.:</strong> {{ proposta.assunto or 'Fabricação e montagem de estrutura metálica.' }}
+        </div>
+
+        <div class="reference">
+            <strong>N. Ref.:</strong> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Proposta Comercial {{ proposta.numero_proposta }} –
+        </div>
+
+        <div class="greeting">
+            Prezados;
+        </div>
+
+        <div class="intro-text">
+            Atendendo à solicitação de V.Sas., apresentamos nossas <strong>"Condições Comerciais"</strong>, para o fornecimento em referência.
+        </div>
+
+        <div class="intro-text">
+            Na expectativa de ter atendido às condições especificadas, aproveitamos para expressar os nossos votos de estima e consideração.
+        </div>
+
+        <div class="signature">
+            Atenciosamente,
+            <div class="signature-name">
+                Jefferson Luiz Moreira – Gerente Estruturas do Vale
+            </div>
+        </div>
+
+        <div class="website">
+            www.estruturasdovale.com.br
+        </div>
+
+        <!-- Informações de Contato -->
+        <div class="contact-info">
+            <div class="contact-title">Eng° Lucas Barbosa Alves Pinto</div>
+            <div class="contact-subtitle">CREA-SP/0486276-SP</div>
+            <div class="contact-details">
+                <div>📧 contato@estruturasdovale.com.br</div>
+                <div>📞 12 99187-7435</div>
+                <div>📍 Rua Benedito Nunes da Campos, 140, Residencial União,</div>
+                <div>&nbsp;&nbsp;&nbsp;&nbsp;São José dos Campos - CEP: 12.239-908</div>
+                <div>🌐 www.estruturasdovale.com.br</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Página 2: Sumário -->
+    <div class="page">
+        {% if config and config.header_pdf_base64 %}
+        <div class="header-personalizado">
+            <img src="data:image/jpeg;base64,{{ config.header_pdf_base64 }}" alt="Header Personalizado">
+        </div>
+        {% else %}
+        <div class="header-padrao">
+            {% if config and config.logo_pdf_base64 %}
+                <img src="data:image/png;base64,{{ config.logo_pdf_base64 }}" alt="Logo" class="logo">
+            {% elif config and config.logo_base64 %}
+                <img src="data:image/png;base64,{{ config.logo_base64 }}" alt="Logo" class="logo">
+            {% endif %}
+            <div class="company-info">
+                <div class="company-name">{{ config.nome_empresa if config else 'Estruturas do Vale' }}</div>
+                <div class="company-tagline">ESTRUTURAS METÁLICAS</div>
+            </div>
+        </div>
+        {% endif %}
+
+        <div class="summary">Sumário</div>
+
+        <div class="toc">
+            <div class="toc-item">
+                <span>1. OBJETO:</span>
+                <span>3</span>
+            </div>
+            <div class="toc-item">
+                <span>2. PREÇOS UNITÁRIOS E TOTAIS ESTIMADOS:</span>
+                <span>3</span>
+            </div>
+            <div class="toc-item">
+                <span>2.1 ESCOPO DE FORNECIMENTO:</span>
+                <span>3</span>
+            </div>
+            <div class="toc-item">
+                <span>3. ITENS INCLUSOS NO FORNECIMENTO</span>
+                <span>3</span>
+            </div>
+            <div class="toc-item">
+                <span>4. ITENS EXCLUSOS DO FORNECIMENTO</span>
+                <span>3</span>
+            </div>
+            <div class="toc-item">
+                <span>5. CONDIÇÕES DE PAGAMENTO</span>
+                <span>3</span>
+            </div>
+            <div class="toc-item">
+                <span>6. CONDIÇÕES DE ENTREGA</span>
+                <span>4</span>
+            </div>
+            <div class="toc-item">
+                <span>7. GARANTIAS</span>
+                <span>4</span>
+            </div>
+            <div class="toc-item">
+                <span>8. CONSIDERAÇÕES GERAIS</span>
+                <span>4</span>
+            </div>
+            <div class="toc-item">
+                <span>9. VALIDADE DA PROPOSTA:</span>
+                <span>4</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Página 3: Conteúdo Técnico -->
+    <div class="page">
+        {% if config and config.header_pdf_base64 %}
+        <div class="header-personalizado">
+            <img src="data:image/jpeg;base64,{{ config.header_pdf_base64 }}" alt="Header Personalizado">
+        </div>
+        {% else %}
+        <div class="header-padrao">
+            {% if config and config.logo_pdf_base64 %}
+                <img src="data:image/png;base64,{{ config.logo_pdf_base64 }}" alt="Logo" class="logo">
+            {% elif config and config.logo_base64 %}
+                <img src="data:image/png;base64,{{ config.logo_base64 }}" alt="Logo" class="logo">
+            {% endif %}
+            <div class="company-info">
+                <div class="company-name">{{ config.nome_empresa if config else 'Estruturas do Vale' }}</div>
+                <div class="company-tagline">ESTRUTURAS METÁLICAS</div>
+            </div>
+        </div>
+        {% endif %}
+
+        <div class="section">
+            <div class="section-title">1. OBJETO:</div>
+            <p>{{ proposta.objeto or 'Esta proposta descreve as condições comerciais a serem atendidas para o fornecimento de mão de obra especializada para fabricação e montagem de estruturas conforme segue.' }}</p>
+            <p><strong>Documentos de referência:</strong> {{ proposta.documentos_referencia or "'Medidas enviadas pelo cliente'" }}</p>
+        </div>
+
+        <div class="section">
+            <div class="section-title">2. PREÇOS UNITÁRIOS E TOTAIS ESTIMADOS:</div>
+            
+            <div class="subsection-title">2.1 &nbsp;&nbsp;&nbsp;&nbsp; ESCOPO DE FORNECIMENTO:</div>
+            
+            {% if proposta.itens %}
+                <table class="items-table">
+                    <thead>
+                        <tr>
+                            <th>Item</th>
+                            <th>Descrição</th>
+                            <th>Unid.</th>
+                            <th>Qtd.</th>
+                            <th>Valor Unit.</th>
+                            <th>Valor Total</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for item in proposta.itens %}
+                        <tr>
+                            <td>{{ item.item_numero }}</td>
+                            <td>{{ item.descricao }}</td>
+                            <td>{{ item.unidade }}</td>
+                            <td>{{ "%.2f"|format(item.quantidade) }}</td>
+                            <td class="price">{{ "R$ %.2f"|format(item.preco_unitario) }}</td>
+                            <td class="price"><strong>{{ "R$ %.2f"|format(item.quantidade * item.preco_unitario) }}</strong></td>
+                        </tr>
+                        {% endfor %}
+                        <tr>
+                            <td colspan="5"><strong>VALOR TOTAL DA PROPOSTA:</strong></td>
+                            <td class="price"><strong>{{ "R$ %.2f"|format(proposta.valor_total or 0) }}</strong></td>
+                        </tr>
+                    </tbody>
+                </table>
+            {% else %}
+                <div class="highlight-box">
+                    <div class="value-highlight">VALOR TOTAL: {{ "R$ %.2f"|format(proposta.valor_total or 0) }}</div>
+                </div>
+            {% endif %}
+        </div>
+
+        <div class="section">
+            <div class="section-title">3. ITENS INCLUSOS NO FORNECIMENTO</div>
+            <div class="bullet-list">
+                <li>Fornecimento de mão de obra especializada</li>
+                <li>Materiais conforme especificação técnica</li>
+                <li>Montagem e instalação no local</li>
+                <li>Supervisão técnica especializada</li>
+            </div>
+        </div>
+
+        <div class="section">
+            <div class="section-title">4. ITENS EXCLUSOS DO FORNECIMENTO</div>
+            <div class="bullet-list">
+                <li>Fundações e base civil</li>
+                <li>Energia elétrica no local</li>
+                <li>Hospedagem e alimentação da equipe</li>
+                <li>Licenças e aprovações junto aos órgãos competentes</li>
+            </div>
+        </div>
+
+        <div class="section">
+            <div class="section-title">5. CONDIÇÕES DE PAGAMENTO</div>
+            <p>10% de entrada na assinatura do contrato<br>
+            10% após projeto aprovado<br>
+            45% compra dos perfis<br>
+            25% no início da montagem in loco<br>
+            10% após a conclusão da montagem</p>
+        </div>
+
+        <div class="section">
+            <div class="section-title">6. CONDIÇÕES DE ENTREGA</div>
+            <p>Prazo de execução: {{ proposta.prazo_entrega or '90 dias' }} após aprovação do projeto e liberação do cliente.</p>
+        </div>
+
+        <div class="section">
+            <div class="section-title">7. GARANTIAS</div>
+            <p>A Estruturas do Vale garante todos os materiais empregados nos serviços contra defeitos de fabricação pelo prazo de 12 (doze) meses contados a partir da data de conclusão da obra, conforme NBR 8800.</p>
+        </div>
+
+        <div class="section">
+            <div class="section-title">8. CONSIDERAÇÕES GERAIS</div>
+            <div class="bullet-list">
+                <li>Proposta válida por {{ proposta.validade or '7 dias' }}</li>
+                <li>Valores não incluem impostos (13,5% de nota fiscal)</li>
+                <li>Execução conforme normas técnicas brasileiras</li>
+                <li>Projeto executivo incluído no escopo</li>
+            </div>
+        </div>
+
+        <div class="section">
+            <div class="section-title">9. VALIDADE DA PROPOSTA:</div>
+            <p>Esta proposta tem validade de {{ proposta.validade or '7 dias' }} a partir da data de emissão.</p>
+        </div>
+    </div>
+</body>
+</html>

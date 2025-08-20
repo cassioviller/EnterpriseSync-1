@@ -30,6 +30,7 @@ def executar_migracoes():
         # Migração 4: Adicionar campos de personalização visual na configuração da empresa
         migrar_personalizacao_visual_empresa()
         
+        logger.info("✅ Migrações automáticas concluídas com sucesso!")
         
     except Exception as e:
         logger.error(f"❌ Erro durante migrações automáticas: {e}")
