@@ -84,13 +84,13 @@ INFO:migrations:✅ Migrações automáticas concluídas com sucesso!
 
 ## Recent Changes (20/08/2025)
 
-### Sistema de Header PDF Personalizado - CORREÇÃO PRODUÇÃO ✅
-- **Problema identificado**: Header personalizado não substituía header padrão em produção
-- **Correção implementada**: Template PDF agora usa lógica condicional exclusiva
-- **Lógica**: OU header personalizado OU header padrão (nunca ambos)
-- **Template corrigido**: `pdf_estruturas_vale.html` com estrutura condicional limpa
+### Sistema de Header PDF Personalizado - LÓGICA FINAL ✅
+- **Especificação do cliente**: APENAS header da imagem cadastrada, sem header fixo verde
+- **Lógica implementada**: SE existe header_pdf_base64 MOSTRA ele, SENÃO fica vazio
+- **Template final**: `pdf_estruturas_vale_final.html` - sem fallback para header verde
+- **Comportamento**: Sem imagem cadastrada = PDF sem header (conforme solicitado)
 - **Deploy automático**: Correção aplicada automaticamente via Docker
-- **Status**: PRONTO PARA DEPLOY EM PRODUÇÃO 🚀
+- **Status**: IMPLEMENTADO CONFORME ESPECIFICAÇÃO 🚀
 
 ### Sistema de Header PDF Personalizado - IMPLEMENTADO ✅
 - **Campo header_pdf_base64**: Campo para upload de header completo do PDF
