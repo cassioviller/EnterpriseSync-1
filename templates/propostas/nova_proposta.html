@@ -209,7 +209,7 @@
                                         <small class="text-muted">Total de templates disponíveis: {{ templates|length }}</small>
                                     </div>
                                     <div class="col-md-4">
-                                        <button type="button" class="btn btn-primary w-100" onclick="carregarTemplate()">
+                                        <button type="button" class="btn btn-primary w-100" onclick="carregarTemplateDebug()">
                                             <i class="fas fa-download me-1"></i> Carregar Template
                                         </button>
                                     </div>
@@ -460,10 +460,26 @@ function carregarTemplate() {
     console.log('=== DEBUG CARREGAR TEMPLATE ===');
     console.log('Elemento select encontrado:', select);
     console.log('Template ID selecionado:', templateId);
+    console.log('Selected index:', select ? select.selectedIndex : 'N/A');
     console.log('Total de options no select:', select ? select.options.length : 'N/A');
     
-    if (!templateId) {
+    // Debug de todas as opções
+    if (select) {
+        console.log('=== DEBUG TODAS AS OPÇÕES ===');
+        for (let i = 0; i < select.options.length; i++) {
+            const option = select.options[i];
+            console.log(`Option ${i}: value="${option.value}", text="${option.text}", selected=${option.selected}`);
+        }
+        
+        // Verificar se há uma opção selecionada
+        const selectedOption = select.options[select.selectedIndex];
+        console.log('Opção selecionada:', selectedOption);
+        console.log('Valor da opção selecionada:', selectedOption ? selectedOption.value : 'N/A');
+    }
+    
+    if (!templateId || templateId === '') {
         console.error('ERRO: Nenhum template selecionado');
+        console.error('Valor recebido:', `"${templateId}"`);
         alert('Selecione um template primeiro.');
         return;
     }
@@ -550,6 +566,68 @@ function carregarTemplate() {
             console.error('URL tentada:', url);
             
             alert(`ERRO DETALHADO:\nTipo: ${error.name}\nMensagem: ${error.message}\nURL: ${url}\n\nVerifique o console para stack trace completo.`);
+        });
+}
+
+// Função debug específica para testar
+function carregarTemplateDebug() {
+    console.log('=== FUNÇÃO DEBUG ESPECÍFICA ===');
+    
+    // Tentar múltiplas formas de obter o elemento
+    const select1 = document.getElementById('seletorTemplate');
+    const select2 = document.querySelector('#seletorTemplate');
+    const select3 = document.querySelector('select');
+    
+    console.log('getElementById:', select1);
+    console.log('querySelector id:', select2);
+    console.log('querySelector select:', select3);
+    
+    const select = select1 || select2 || select3;
+    
+    if (!select) {
+        alert('ERRO CRÍTICO: Nenhum seletor encontrado na página!');
+        return;
+    }
+    
+    console.log('Seletor encontrado:', select);
+    console.log('Valor atual:', select.value);
+    console.log('Index selecionado:', select.selectedIndex);
+    
+    // Forçar a obtenção do valor através do index
+    const selectedOption = select.options[select.selectedIndex];
+    const valorForcado = selectedOption ? selectedOption.value : '';
+    
+    console.log('Valor forçado:', valorForcado);
+    
+    if (!valorForcado || valorForcado === '') {
+        alert('Selecione um template na lista primeiro!');
+        return;
+    }
+    
+    // Chamar a função original com o valor correto
+    console.log('Chamando carregarTemplate com valor:', valorForcado);
+    carregarTemplateComValor(valorForcado);
+}
+
+function carregarTemplateComValor(templateId) {
+    console.log('=== CARREGANDO TEMPLATE COM VALOR ESPECÍFICO ===');
+    console.log('Template ID recebido:', templateId);
+    
+    const url = `/propostas/api/template/${templateId}`;
+    console.log('URL da requisição:', url);
+    
+    fetch(url)
+        .then(response => {
+            console.log('Status da resposta:', response.status);
+            return response.json();
+        })
+        .then(data => {
+            console.log('Dados recebidos:', data);
+            alert(`Template "${data.nome}" carregado com sucesso!\nDados: ${JSON.stringify(data, null, 2)}`);
+        })
+        .catch(error => {
+            console.error('Erro:', error);
+            alert(`Erro: ${error.message}`);
         });
 }
 
