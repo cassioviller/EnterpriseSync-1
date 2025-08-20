@@ -189,15 +189,12 @@
                     </div>
                 </div>
 
-                <!-- Campos Adicionais da Proposta -->
+                <!-- Seletor de Template e Campos Editáveis -->
                 <hr>
-                <h6 class="text-primary mb-3">Detalhes da Proposta</h6>
-                
-                <!-- Seletor de Template -->
                 <div class="row mb-4">
                     <div class="col-md-12">
                         <div class="d-flex justify-content-between align-items-center">
-                            <h6 class="text-primary mb-0">Pré-carregar Campos do Template</h6>
+                            <h6 class="text-primary mb-0">Pré-carregar Template</h6>
                             <div class="d-flex gap-2">
                                 <select class="form-select" id="seletorTemplate" style="width: 300px;">
                                     <option value="">Selecione um template para pré-carregar...</option>
@@ -209,126 +206,6 @@
                                     <i class="fas fa-download me-1"></i> Carregar
                                 </button>
                             </div>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="row">
-                    <!-- Itens Inclusos -->
-                    <div class="col-md-6">
-                        <div class="mb-3">
-                            <label class="form-label">Itens Inclusos no Fornecimento</label>
-                            <textarea class="form-control" name="itens_inclusos" id="itensInclusos" rows="5" 
-                                      placeholder="Mão de obra para execução dos serviços; Todos os equipamentos de segurança necessários; Transporte e alimentação da equipe">{{ padrao_itens_inclusos or '' }}</textarea>
-                            <small class="text-muted">Separe os itens com ponto e vírgula (;) ou vírgula (,)</small>
-                        </div>
-                    </div>
-                    
-                    <!-- Itens Exclusos -->
-                    <div class="col-md-6">
-                        <div class="mb-3">
-                            <label class="form-label">Itens Exclusos do Fornecimento</label>
-                            <textarea class="form-control" name="itens_exclusos" id="itensExclusos" rows="5" 
-                                      placeholder="Projeto e execução de qualquer obra civil; Fornecimento de local para armazenagem; Pintura final">{{ padrao_itens_exclusos or '' }}</textarea>
-                            <small class="text-muted">Separe os itens com ponto e vírgula (;) ou vírgula (,)</small>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="row">
-                    <!-- Condições -->
-                    <div class="col-md-6">
-                        <div class="mb-3">
-                            <label class="form-label">Considerações Gerais</label>
-                            <textarea class="form-control" name="condicoes" id="condicoes" rows="4" 
-                                      placeholder="Proposta válida por X dias; Valores não incluem impostos; Execução conforme normas técnicas">{{ padrao_condicoes or '' }}</textarea>
-                        </div>
-                    </div>
-                    
-                    <!-- Condições de Pagamento -->
-                    <div class="col-md-6">
-                        <div class="mb-3">
-                            <label class="form-label">Condições de Pagamento</label>
-                            <textarea class="form-control" name="condicoes_pagamento" id="condicoesPagamento" rows="4" 
-                                      placeholder="10% entrada; 45% compra dos perfis; 35% montagem; 10% conclusão">{{ padrao_condicoes_pagamento or '' }}</textarea>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="row">
-                    <!-- Garantias -->
-                    <div class="col-md-6">
-                        <div class="mb-3">
-                            <label class="form-label">Garantias</label>
-                            <textarea class="form-control" name="garantias" id="garantias" rows="3" 
-                                      placeholder="12 meses contra defeitos de fabricação conforme NBR 8800">{{ padrao_garantias or '' }}</textarea>
-                        </div>
-                    </div>
-                    
-                    <!-- Prazo e Validade -->
-                    <div class="col-md-6">
-                        <div class="row">
-                            <div class="col-md-6">
-                                <div class="mb-3">
-                                    <label class="form-label">Prazo Entrega (dias)</label>
-                                    <input type="number" class="form-control" name="prazo_entrega_dias" id="prazoEntrega" value="{{ padrao_prazo_entrega or 90 }}">
-                                </div>
-                            </div>
-                            <div class="col-md-6">
-                                <div class="mb-3">
-                                    <label class="form-label">Validade (dias)</label>
-                                    <input type="number" class="form-control" name="validade_dias" id="validadeDias" value="{{ padrao_validade or 7 }}">
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- NOVOS CAMPOS EDITÁVEIS - PRIMEIRA E SEGUNDA PÁGINA DO PDF -->
-                <hr class="my-4">
-                <h6 class="text-primary mb-3">Conteúdo da Carta de Apresentação (Página 1)</h6>
-                
-                <div class="row">
-                    <!-- Abertura da carta -->
-                    <div class="col-md-6">
-                        <div class="mb-3">
-                            <label class="form-label">Abertura da Carta</label>
-                            <textarea class="form-control" name="carta_abertura" id="cartaAbertura" rows="4" 
-                                      placeholder="Prezado(a) cliente, apresentamos nossa proposta comercial...">Prezado(a) cliente,
-
-Apresentamos nossa proposta comercial para o fornecimento e montagem de estrutura metálica conforme solicitação.</textarea>
-                        </div>
-                    </div>
-                    
-                    <!-- Apresentação da empresa -->
-                    <div class="col-md-6">
-                        <div class="mb-3">
-                            <label class="form-label">Apresentação da Empresa</label>
-                            <textarea class="form-control" name="apresentacao_empresa" id="apresentacaoEmpresa" rows="4" 
-                                      placeholder="A Estruturas do Vale atua há X anos no mercado...">A Estruturas do Vale atua no mercado de estruturas metálicas com tradição em qualidade e pontualidade, oferecendo soluções completas em engenharia estrutural.</textarea>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="row">
-                    <!-- Descrição do projeto -->
-                    <div class="col-md-6">
-                        <div class="mb-3">
-                            <label class="form-label">Descrição do Projeto</label>
-                            <textarea class="form-control" name="descricao_projeto" id="descricaoProjeto" rows="4" 
-                                      placeholder="O projeto contempla a execução de...">O projeto contempla a execução de estrutura metálica conforme projeto anexo, incluindo todos os detalhes construtivos e especificações técnicas necessárias.</textarea>
-                        </div>
-                    </div>
-                    
-                    <!-- Fechamento da carta -->
-                    <div class="col-md-6">
-                        <div class="mb-3">
-                            <label class="form-label">Fechamento da Carta</label>
-                            <textarea class="form-control" name="carta_fechamento" id="cartaFechamento" rows="4" 
-                                      placeholder="Permanecemos à disposição para esclarecimentos...">Permanecemos à disposição para esclarecimentos adicionais e aguardamos sua aprovação.
-
-Atenciosamente,
-Equipe Estruturas do Vale</textarea>
                         </div>
                     </div>
                 </div>

@@ -1,0 +1,63 @@
+Erro inesperado no sistema
+Ocorreu um erro interno no servidor. Nossa equipe foi notificada.
+
+ Detalhes Técnicos do Erro:
+EXCEÇÃO NÃO TRATADA: Could not build url for endpoint 'main.templates'. Did you mean 'main.test' instead?
+
+URL: https://a719a4a9-73c7-43ac-9f05-28b6e4b40780-00-1x2879rl5g3q1.riker.replit.dev/configuracoes/
+MÉTODO: GET
+TIMESTAMP: 20/08/2025 14:06:31
+TIPO DO ERRO: BuildError
+
+TRACEBACK COMPLETO:
+Traceback (most recent call last):
+  File "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/flask/app.py", line 917, in full_dispatch_request
+    rv = self.dispatch_request()
+         ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/flask/app.py", line 902, in dispatch_request
+    return self.ensure_sync(self.view_functions[rule.endpoint])(**view_args)  # type: ignore[no-any-return]
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/workspace/decorators.py", line 13, in decorated_function
+    return f(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^
+  File "/home/runner/workspace/configuracoes_views.py", line 20, in configuracoes
+    return render_template('configuracoes/index.html', config=config)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/flask/templating.py", line 150, in render_template
+    return _render(app, template, context)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/flask/templating.py", line 131, in _render
+    rv = template.render(context)
+         ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/jinja2/environment.py", line 1295, in render
+    self.environment.handle_exception()
+  File "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/jinja2/environment.py", line 942, in handle_exception
+    raise rewrite_traceback_stack(source=source)
+  File "/home/runner/workspace/templates/configuracoes/index.html", line 1, in top-level template code
+    {% extends "base.html" %}
+  File "/home/runner/workspace/templates/base.html", line 925, in top-level template code
+    {% block content %}{% endblock %}
+    ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/workspace/templates/configuracoes/index.html", line 62, in block 'content'
+    <a href="{{ url_for('main.templates') }}" class="btn btn-success">
+    ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/flask/app.py", line 1121, in url_for
+    return self.handle_url_build_error(error, endpoint, values)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/flask/app.py", line 1110, in url_for
+    rv = url_adapter.build(  # type: ignore[union-attr]
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/werkzeug/routing/map.py", line 924, in build
+    raise BuildError(endpoint, values, method, self)
+werkzeug.routing.exceptions.BuildError: Could not build url for endpoint 'main.templates'. Did you mean 'main.test' instead?
+
+
+CONTEXTO DA REQUISIÇÃO:
+- Headers: {'Host': 'a719a4a9-73c7-43ac-9f05-28b6e4b40780-00-1x2879rl5g3q1.riker.replit.dev', 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Safari/537.36', 'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7', 'Accept-Encoding': 'identity, gzip, deflate, br, zstd', 'Accept-Language': 'pt-BR,pt;q=0.9,en-US;q=0.8,en;q=0.7', 'Cookie': 'session=.eJwlzksKwzAMRdG9eNyBLMuy3c0E_UwzK0laKKV7byDDB_fB-aZlbrE_0v3YXnFLy-rpnqQ5TRRybGWKGUnOXEC91RxdhjEEOTnX4EBqFWEqFq5GBDEAJqpm6TzPN0StQNoH29m5DbQCzQJEBys3hxKCTBSzZ1fujOmEvPbYLk2Gc-vnKfu-iB3rOy7t7w9MITeB.aKXWYA.ieY9y70PhX4iuX7hZrhoAsz-V1k', 'Dnt': '1', 'Referer': 'https://a719a4a9-73c7-43ac-9f05-28b6e4b40780-00-1x2879rl5g3q1.riker.replit.dev/configuracoes/empresa', 'Sec-Ch-Ua': '"Not;A=Brand";v="99", "Google Chrome";v="139", "Chromium";v="139"', 'Sec-Ch-Ua-Mobile': '?0', 'Sec-Ch-Ua-Platform': '"Windows"', 'Sec-Fetch-Dest': 'iframe', 'Sec-Fetch-Mode': 'navigate', 'Sec-Fetch-Site': 'same-origin', 'Sec-Fetch-Storage-Access': 'active', 'Sec-Fetch-User': '?1', 'Upgrade-Insecure-Requests': '1', 'X-Forwarded-For': '177.62.67.196, 10.81.4.92', 'X-Forwarded-Proto': 'https', 'X-Replit-User-Bio': '', 'X-Replit-User-Id': '', 'X-Replit-User-Name': '', 'X-Replit-User-Profile-Image': '', 'X-Replit-User-Roles': '', 'X-Replit-User-Teams': '', 'X-Replit-User-Url': ''}
+- Args: {}
+- Form: Nenhum
+- JSON: Não é JSON
+ URL que causou o erro:
+https://a719a4a9-73c7-43ac-9f05-28b6e4b40780-00-1x2879rl5g3q1.riker.replit.dev/configuracoes/
+ Horário do erro:
+20/08/2025 14:06:31
