@@ -56,21 +56,31 @@ def salvar_empresa():
         
         # Upload de logo em base64
         logo_base64 = request.form.get('logo_base64')
-        if logo_base64:
+        if logo_base64 and logo_base64.strip():
             config.logo_base64 = logo_base64
+            print("DEBUG LOGO: Logo base64 salva")
+        elif request.form.get('clear_logo') == 'true':
+            config.logo_base64 = None
+            print("DEBUG LOGO: Logo base64 removida")
             
         # Upload de logo PDF em base64
         logo_pdf_base64 = request.form.get('logo_pdf_base64')
-        if logo_pdf_base64:
+        if logo_pdf_base64 and logo_pdf_base64.strip():
             config.logo_pdf_base64 = logo_pdf_base64
+            print("DEBUG LOGO PDF: Logo PDF base64 salva")
+        elif request.form.get('clear_logo_pdf') == 'true':
+            config.logo_pdf_base64 = None
+            print("DEBUG LOGO PDF: Logo PDF base64 removida")
             
         # Upload de header PDF em base64
         header_pdf_base64 = request.form.get('header_pdf_base64')
         print(f"DEBUG HEADER: header_pdf_base64 recebido = {bool(header_pdf_base64)} (tamanho: {len(header_pdf_base64) if header_pdf_base64 else 0})")
-        print(f"DEBUG HEADER: Conteúdo do form header: {header_pdf_base64[:100] if header_pdf_base64 else 'None'}...")
-        if header_pdf_base64:
+        if header_pdf_base64 and header_pdf_base64.strip():
             config.header_pdf_base64 = header_pdf_base64
             print("DEBUG HEADER: Header PDF salvo na config")
+        elif request.form.get('clear_header_pdf') == 'true':
+            config.header_pdf_base64 = None
+            print("DEBUG HEADER: Header PDF removido")
         else:
             print("DEBUG HEADER: Nenhum header recebido no form")
         
