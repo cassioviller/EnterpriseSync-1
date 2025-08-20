@@ -457,67 +457,99 @@ function carregarTemplate() {
     const select = document.getElementById('seletorTemplate');
     const templateId = select.value;
     
+    console.log('=== DEBUG CARREGAR TEMPLATE ===');
+    console.log('Elemento select encontrado:', select);
+    console.log('Template ID selecionado:', templateId);
+    console.log('Total de options no select:', select ? select.options.length : 'N/A');
+    
     if (!templateId) {
+        console.error('ERRO: Nenhum template selecionado');
         alert('Selecione um template primeiro.');
         return;
     }
     
-    console.log('Carregando template ID:', templateId);
+    const url = `/propostas/api/template/${templateId}`;
+    console.log('URL da requisição:', url);
     
-    fetch(`/propostas/api/template/${templateId}`)
+    fetch(url)
         .then(response => {
-            console.log('Response status:', response.status);
-            return response.json();
-        })
-        .then(data => {
-            console.log('Template data:', data);
+            console.log('Status da resposta:', response.status);
+            console.log('Headers da resposta:', response.headers);
+            console.log('URL final:', response.url);
             
-            if (data && data.id) {
-                // Preencher campos básicos
-                const campos = [
-                    { field: 'itensInclusos', api: 'itens_inclusos' },
-                    { field: 'itensExclusos', api: 'itens_exclusos' },
-                    { field: 'condicoes', api: 'condicoes' },
-                    { field: 'condicoesPagamento', api: 'condicoes_pagamento' },
-                    { field: 'garantias', api: 'garantias' },
-                    { field: 'prazoEntrega', api: 'prazo_entrega_dias' },
-                    { field: 'validadeDias', api: 'validade_dias' }
-                ];
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+            }
+            
+            return response.text(); // Primeiro como texto para debug
+        })
+        .then(text => {
+            console.log('Resposta bruta (texto):', text);
+            
+            try {
+                const data = JSON.parse(text);
+                console.log('Dados parseados:', data);
                 
-                let camposPreenchidos = 0;
-                campos.forEach(campo => {
-                    const elemento = document.getElementById(campo.field);
-                    if (elemento && data[campo.api]) {
-                        elemento.value = data[campo.api];
-                        camposPreenchidos++;
-                        console.log(`Campo ${campo.field} preenchido com:`, data[campo.api]);
+                if (data && data.id) {
+                    console.log('Template válido encontrado:', data.nome);
+                    
+                    // Verificar se campos existem na página
+                    const campos = [
+                        { field: 'itensInclusos', api: 'itens_inclusos' },
+                        { field: 'itensExclusos', api: 'itens_exclusos' },
+                        { field: 'condicoes', api: 'condicoes' },
+                        { field: 'condicoesPagamento', api: 'condicoes_pagamento' },
+                        { field: 'garantias', api: 'garantias' },
+                        { field: 'prazoEntrega', api: 'prazo_entrega_dias' },
+                        { field: 'validadeDias', api: 'validade_dias' }
+                    ];
+                    
+                    let camposPreenchidos = 0;
+                    let camposNaoEncontrados = [];
+                    
+                    campos.forEach(campo => {
+                        const elemento = document.getElementById(campo.field);
+                        console.log(`Verificando campo ${campo.field}:`, elemento ? 'EXISTE' : 'NÃO EXISTE');
+                        
+                        if (elemento) {
+                            if (data[campo.api]) {
+                                elemento.value = data[campo.api];
+                                camposPreenchidos++;
+                                console.log(`✅ Campo ${campo.field} preenchido:`, data[campo.api]);
+                            } else {
+                                console.log(`⚠️ Campo ${campo.field} existe mas sem dados no template`);
+                            }
+                        } else {
+                            camposNaoEncontrados.push(campo.field);
+                        }
+                    });
+                    
+                    if (camposNaoEncontrados.length > 0) {
+                        console.error('Campos não encontrados na página:', camposNaoEncontrados);
                     }
-                });
+                    
+                    console.log(`Total de campos preenchidos: ${camposPreenchidos}`);
+                    alert(`Template "${data.nome}" carregado!\nCampos preenchidos: ${camposPreenchidos}\nVerifique o console para detalhes.`);
+                    
+                } else {
+                    console.error('Estrutura de dados inválida:', data);
+                    alert(`Erro: Template não possui ID válido\nEstrutura: ${JSON.stringify(data, null, 2)}`);
+                }
                 
-                // Preencher campos técnicos das seções se existirem
-                const secoes = [
-                    'secaoEspecificacoes', 'secaoMateriais', 'secaoFabricacao',
-                    'secaoLogistica', 'secaoMontagem', 'secaoQualidade',
-                    'secaoSeguranca', 'secaoAssistencia', 'secaoConsideracoes'
-                ];
-                
-                secoes.forEach(secao => {
-                    const elemento = document.getElementById(secao);
-                    const apiField = secao.replace('secao', 'secao_').toLowerCase();
-                    if (elemento && data[apiField]) {
-                        elemento.value = data[apiField];
-                        camposPreenchidos++;
-                    }
-                });
-                
-                alert(`Template "${data.nome}" carregado com sucesso!\nCampos preenchidos: ${camposPreenchidos}`);
-            } else {
-                alert('Erro ao carregar template: ' + (data.error || 'Resposta inválida'));
+            } catch (parseError) {
+                console.error('Erro ao fazer parse do JSON:', parseError);
+                console.error('Texto recebido:', text);
+                alert(`Erro ao interpretar resposta do servidor\nTexto: ${text.substring(0, 200)}...`);
             }
         })
         .catch(error => {
-            console.error('Erro ao carregar template:', error);
-            alert('Erro ao carregar template. Verifique o console para mais detalhes.');
+            console.error('=== ERRO DETALHADO ===');
+            console.error('Tipo do erro:', error.name);
+            console.error('Mensagem:', error.message);
+            console.error('Stack:', error.stack);
+            console.error('URL tentada:', url);
+            
+            alert(`ERRO DETALHADO:\nTipo: ${error.name}\nMensagem: ${error.message}\nURL: ${url}\n\nVerifique o console para stack trace completo.`);
         });
 }
 
