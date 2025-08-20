@@ -86,42 +86,25 @@
                     </div>
                 </div>
 
-                <!-- Seleção de Template -->
+                <!-- Pré-carregar Template -->
                 <hr>
                 <div class="mb-4">
-                    <h6 class="text-primary mb-3">Template de Proposta</h6>
+                    <h6 class="text-primary mb-3">Pré-carregar Template</h6>
                     <div class="row">
-                        <div class="col-md-6">
-                            <div class="mb-3">
-                                <label class="form-label">Selecionar Template (opcional)</label>
-                                <select class="form-select" id="templateSelect" onchange="carregarTemplate()">
-                                    <option value="">Criar proposta do zero</option>
-                                    {% for template in templates %}
-                                    <option value="{{ template.id }}" 
-                                            data-categoria="{{ template.categoria }}"
-                                            data-prazo="{{ template.prazo_entrega_dias }}">
-                                        {{ template.nome }} ({{ template.categoria }})
-                                    </option>
-                                    {% endfor %}
-                                </select>
-                            </div>
+                        <div class="col-md-8">
+                            <select class="form-select" id="seletorTemplate">
+                                <option value="">Selecione um template para pré-carregar...</option>
+                                {% for template in templates %}
+                                <option value="{{ template.id }}">{{ template.nome }} ({{ template.categoria }})</option>
+                                {% endfor %}
+                            </select>
+                            <small class="text-muted">Total de templates disponíveis: {{ templates|length }}</small>
                         </div>
-                        <div class="col-md-6">
-                            <div id="templateInfo" class="alert alert-info" style="display: none;">
-                                <h6 class="mb-2">Template Selecionado:</h6>
-                                <p class="mb-1"><strong>Nome:</strong> <span id="templateNome"></span></p>
-                                <p class="mb-1"><strong>Categoria:</strong> <span id="templateCategoria"></span></p>
-                                <p class="mb-0"><strong>Prazo Padrão:</strong> <span id="templatePrazo"></span> dias</p>
-                            </div>
+                        <div class="col-md-4">
+                            <button type="button" class="btn btn-primary w-100" onclick="carregarTemplateDebug()">
+                                <i class="fas fa-download me-1"></i> Pré-carregar Template
+                            </button>
                         </div>
-                    </div>
-                    <div class="d-flex gap-2 mb-3">
-                        <button type="button" class="btn btn-outline-success btn-sm" onclick="carregarTemplate()" id="btnCarregarTemplate" disabled>
-                            <i class="fas fa-download"></i> Carregar Serviços do Template
-                        </button>
-                        <button type="button" class="btn btn-outline-warning btn-sm" onclick="limparServicos()">
-                            <i class="fas fa-broom"></i> Limpar Todos os Serviços
-                        </button>
                     </div>
                 </div>
 
@@ -189,35 +172,7 @@
                     </div>
                 </div>
 
-                <!-- Seletor de Template e Campos Editáveis -->
-                <hr>
-                <div class="row mb-4">
-                    <div class="col-md-12">
-                        <div class="card">
-                            <div class="card-header">
-                                <h6 class="text-primary mb-0">Pré-carregar Template</h6>
-                            </div>
-                            <div class="card-body">
-                                <div class="row">
-                                    <div class="col-md-8">
-                                        <select class="form-select" id="seletorTemplate">
-                                            <option value="">Selecione um template para pré-carregar...</option>
-                                            {% for template in templates %}
-                                            <option value="{{ template.id }}">{{ template.nome }} ({{ template.categoria }})</option>
-                                            {% endfor %}
-                                        </select>
-                                        <small class="text-muted">Total de templates disponíveis: {{ templates|length }}</small>
-                                    </div>
-                                    <div class="col-md-4">
-                                        <button type="button" class="btn btn-primary w-100" onclick="carregarTemplateDebug()">
-                                            <i class="fas fa-download me-1"></i> Carregar Template
-                                        </button>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
+
 
                 <hr class="my-4">
                 <h6 class="text-primary mb-3">Conteúdo Técnico das Seções (Páginas 3-9)</h6>
@@ -627,15 +582,9 @@ function carregarTemplateComValor(templateId) {
             if (data && data.id) {
                 console.log('=== PREENCHENDO CAMPOS DO FORMULÁRIO ===');
                 
-                // Mapear campos por nome correto (usando name, não id)
+                // Mapear apenas campos que existem nesta página
                 const campos = [
-                    { name: 'itens_inclusos', value: data.itens_inclusos },
-                    { name: 'itens_exclusos', value: data.itens_exclusos },
-                    { name: 'condicoes', value: data.condicoes },
-                    { name: 'condicoes_pagamento', value: data.condicoes_pagamento },
-                    { name: 'garantias', value: data.garantias },
-                    { name: 'prazo_entrega_dias', value: data.prazo_entrega_dias },
-                    { name: 'validade_dias', value: data.validade_dias },
+                    { name: 'prazo_execucao', value: data.prazo_entrega_dias },
                     { name: 'percentual_nota_fiscal', value: data.percentual_nota_fiscal }
                 ];
                 
@@ -651,27 +600,12 @@ function carregarTemplateComValor(templateId) {
                     }
                 });
                 
-                // Preencher seções técnicas também
-                const secoes = [
-                    { name: 'secao_especificacoes', value: data.secao_especificacoes },
-                    { name: 'secao_materiais', value: data.secao_materiais },
-                    { name: 'secao_fabricacao', value: data.secao_fabricacao },
-                    { name: 'secao_logistica', value: data.secao_logistica },
-                    { name: 'secao_montagem', value: data.secao_montagem },
-                    { name: 'secao_qualidade', value: data.secao_qualidade },
-                    { name: 'secao_seguranca', value: data.secao_seguranca },
-                    { name: 'secao_assistencia', value: data.secao_assistencia },
-                    { name: 'secao_consideracoes', value: data.secao_consideracoes }
-                ];
-                
-                secoes.forEach(secao => {
-                    const elemento = document.querySelector(`[name="${secao.name}"]`);
-                    if (elemento && secao.value) {
-                        elemento.value = secao.value;
-                        camposPreenchidos++;
-                        console.log(`✅ Seção ${secao.name} preenchida`);
-                    }
-                });
+                console.log('=== CAMPOS DISPONÍVEIS NESTA PÁGINA ===');
+                console.log('Esta página tem apenas campos básicos:');
+                console.log('- Dados do cliente');
+                console.log('- Serviços/itens');
+                console.log('- Valores');
+                console.log('Campos como itens_inclusos, condições, etc. estão em outras páginas do sistema.');
                 
                 // Preencher itens de serviços
                 if (data.itens_padrao && data.itens_padrao.length > 0) {
@@ -754,9 +688,27 @@ function carregarTemplateComValor(templateId) {
                     
                     console.log(`✅ ${data.itens_padrao.length} serviços adicionados do template`);
                 }
+                }
                 
                 console.log(`Total de campos preenchidos: ${camposPreenchidos}`);
-                alert(`Template "${data.nome}" carregado com sucesso!\n\n✅ Campos preenchidos: ${camposPreenchidos}\n✅ Serviços adicionados: ${data.itens_padrao ? data.itens_padrao.length : 0}\n\nO formulário está pronto para edição!`);
+                console.log(`Total de serviços adicionados: ${data.itens_padrao ? data.itens_padrao.length : 0}`);
+                
+                // Calcular valor total atual
+                let valorTotal = 0;
+                document.querySelectorAll('.servico-item').forEach(item => {
+                    const quantidade = parseFloat(item.querySelector('.servico-quantidade').value) || 0;
+                    const valorUnitario = parseFloat(item.querySelector('.servico-valor-unitario').value) || 0;
+                    valorTotal += quantidade * valorUnitario;
+                });
+                
+                alert(`✅ Template "${data.nome}" carregado com sucesso!\n\n` +
+                      `🔧 Serviços adicionados: ${data.itens_padrao ? data.itens_padrao.length : 0}\n` +
+                      `📋 Campos preenchidos: ${camposPreenchidos}\n\n` +
+                      `O formulário está pronto para edição!\n` +
+                      `Total calculado automaticamente: R$ ${valorTotal.toFixed(2)}`);
+                
+                // Scroll para o topo para ver os serviços carregados
+                document.getElementById('servicosContainer').scrollIntoView({ behavior: 'smooth' });
                 
             } else {
                 alert('Erro: Dados do template inválidos');
