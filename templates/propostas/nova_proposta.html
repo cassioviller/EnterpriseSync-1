@@ -527,7 +527,13 @@ function criarTabelaTemplate(template) {
             const total = (item.quantidade || 0) * (item.preco_unitario || 0);
             itensHtml += `
                 <tr>
-                    <td>${item.descricao}</td>
+                    <td>
+                        <input type="text" 
+                               class="form-control form-control-sm" 
+                               value="${item.descricao}" 
+                               onchange="atualizarItemTemplate(${template.id}, ${index}, 'descricao', this.value)"
+                               placeholder="Descrição do serviço">
+                    </td>
                     <td class="text-center">
                         <input type="number" 
                                class="form-control form-control-sm text-center template-quantidade" 
@@ -539,7 +545,17 @@ function criarTabelaTemplate(template) {
                                onchange="atualizarItemTemplate(${template.id}, ${index}, 'quantidade', this.value)"
                                style="width: 80px; margin: 0 auto;">
                     </td>
-                    <td class="text-center">${item.unidade}</td>
+                    <td class="text-center">
+                        <select class="form-select form-select-sm" 
+                                onchange="atualizarItemTemplate(${template.id}, ${index}, 'unidade', this.value)"
+                                style="width: 80px; margin: 0 auto;">
+                            <option value="m²" ${item.unidade === 'm²' ? 'selected' : ''}>m²</option>
+                            <option value="m" ${item.unidade === 'm' ? 'selected' : ''}>m</option>
+                            <option value="un" ${item.unidade === 'un' ? 'selected' : ''}>un</option>
+                            <option value="kg" ${item.unidade === 'kg' ? 'selected' : ''}>kg</option>
+                            <option value="h" ${item.unidade === 'h' ? 'selected' : ''}>h</option>
+                        </select>
+                    </td>
                     <td class="text-end">
                         <input type="number" 
                                class="form-control form-control-sm text-end template-preco" 
@@ -553,6 +569,9 @@ function criarTabelaTemplate(template) {
                     </td>
                     <td class="text-end">
                         <strong id="total-item-${template.id}-${index}">R$ ${total.toFixed(2)}</strong>
+                        <button type="button" class="btn btn-sm btn-outline-danger ms-2" onclick="removerItemTemplate(${template.id}, ${index})" title="Remover item">
+                            <i class="fas fa-trash"></i>
+                        </button>
                     </td>
                 </tr>
             `;
@@ -577,10 +596,17 @@ function criarTabelaTemplate(template) {
                         <th class="text-end">Total</th>
                     </tr>
                 </thead>
-                <tbody>
+                <tbody id="tbody-template-${template.id}">
                     ${itensHtml}
                 </tbody>
                 <tfoot>
+                    <tr>
+                        <td colspan="5" class="text-center py-2">
+                            <button type="button" class="btn btn-sm btn-outline-success me-2" onclick="adicionarItemTemplate(${template.id})">
+                                <i class="fas fa-plus"></i> Adicionar Item
+                            </button>
+                        </td>
+                    </tr>
                     <tr class="table-warning">
                         <th colspan="4" class="text-end">Subtotal ${template.nome}:</th>
                         <th class="text-end" id="subtotal-template-${template.id}">R$ ${subtotal.toFixed(2)}</th>
@@ -653,6 +679,198 @@ function atualizarItemTemplate(templateId, itemIndex, campo, valor) {
     atualizarTotalGeral();
     
     console.log(`Item atualizado: ${campo} = ${valorNumerico}, novo total do item: R$ ${novoTotal.toFixed(2)}, novo subtotal do template: R$ ${novoSubtotal.toFixed(2)}`);
+}
+
+// Função para adicionar novo item a um template
+function adicionarItemTemplate(templateId) {
+    const template = templatesCarregadosData.find(t => t.id == templateId);
+    if (!template) {
+        console.error('Template não encontrado:', templateId);
+        return;
+    }
+    
+    // Criar novo item padrão
+    const novoItem = {
+        descricao: 'Novo serviço',
+        quantidade: 1,
+        unidade: 'm²',
+        preco_unitario: 0
+    };
+    
+    // Adicionar ao array do template
+    if (!template.itens_padrao) {
+        template.itens_padrao = [];
+    }
+    template.itens_padrao.push(novoItem);
+    
+    const novoIndex = template.itens_padrao.length - 1;
+    
+    // Adicionar linha na tabela
+    const tbody = document.getElementById(`tbody-template-${templateId}`);
+    if (tbody) {
+        const novaLinha = document.createElement('tr');
+        novaLinha.innerHTML = `
+            <td>
+                <input type="text" 
+                       class="form-control form-control-sm" 
+                       value="${novoItem.descricao}" 
+                       onchange="atualizarItemTemplate(${templateId}, ${novoIndex}, 'descricao', this.value)"
+                       placeholder="Descrição do serviço">
+            </td>
+            <td class="text-center">
+                <input type="number" 
+                       class="form-control form-control-sm text-center template-quantidade" 
+                       value="${novoItem.quantidade}" 
+                       min="0" 
+                       step="0.1"
+                       data-template-id="${templateId}" 
+                       data-item-index="${novoIndex}"
+                       onchange="atualizarItemTemplate(${templateId}, ${novoIndex}, 'quantidade', this.value)"
+                       style="width: 80px; margin: 0 auto;">
+            </td>
+            <td class="text-center">
+                <select class="form-select form-select-sm" 
+                        onchange="atualizarItemTemplate(${templateId}, ${novoIndex}, 'unidade', this.value)"
+                        style="width: 80px; margin: 0 auto;">
+                    <option value="m²" selected>m²</option>
+                    <option value="m">m</option>
+                    <option value="un">un</option>
+                    <option value="kg">kg</option>
+                    <option value="h">h</option>
+                </select>
+            </td>
+            <td class="text-end">
+                <input type="number" 
+                       class="form-control form-control-sm text-end template-preco" 
+                       value="${novoItem.preco_unitario.toFixed(2)}" 
+                       min="0" 
+                       step="0.01"
+                       data-template-id="${templateId}" 
+                       data-item-index="${novoIndex}"
+                       onchange="atualizarItemTemplate(${templateId}, ${novoIndex}, 'preco_unitario', this.value)"
+                       style="width: 120px; margin-left: auto;">
+            </td>
+            <td class="text-end">
+                <strong id="total-item-${templateId}-${novoIndex}">R$ 0,00</strong>
+                <button type="button" class="btn btn-sm btn-outline-danger ms-2" onclick="removerItemTemplate(${templateId}, ${novoIndex})" title="Remover item">
+                    <i class="fas fa-trash"></i>
+                </button>
+            </td>
+        `;
+        
+        tbody.appendChild(novaLinha);
+    }
+    
+    // Atualizar totais
+    atualizarTotalGeral();
+    
+    console.log(`Novo item adicionado ao template ${templateId}, index ${novoIndex}`);
+}
+
+// Função para remover item de um template
+function removerItemTemplate(templateId, itemIndex) {
+    const template = templatesCarregadosData.find(t => t.id == templateId);
+    if (!template || !template.itens_padrao) {
+        console.error('Template ou itens não encontrados');
+        return;
+    }
+    
+    // Confirmar remoção
+    if (confirm('Tem certeza que deseja remover este item?')) {
+        // Remover do array
+        template.itens_padrao.splice(itemIndex, 1);
+        
+        // Recriar a tabela completamente para reindexar
+        recriarTabelaTemplate(templateId);
+        
+        // Atualizar totais
+        atualizarTotalGeral();
+        
+        console.log(`Item ${itemIndex} removido do template ${templateId}`);
+    }
+}
+
+// Função para recriar tabela após remoção de item
+function recriarTabelaTemplate(templateId) {
+    const template = templatesCarregadosData.find(t => t.id == templateId);
+    if (!template) return;
+    
+    // Encontrar o tbody da tabela
+    const tbody = document.getElementById(`tbody-template-${templateId}`);
+    if (!tbody) return;
+    
+    // Limpar tbody
+    tbody.innerHTML = '';
+    
+    // Recriar todas as linhas com índices corretos
+    if (template.itens_padrao && template.itens_padrao.length > 0) {
+        template.itens_padrao.forEach((item, index) => {
+            const total = (item.quantidade || 0) * (item.preco_unitario || 0);
+            
+            const novaLinha = document.createElement('tr');
+            novaLinha.innerHTML = `
+                <td>
+                    <input type="text" 
+                           class="form-control form-control-sm" 
+                           value="${item.descricao}" 
+                           onchange="atualizarItemTemplate(${templateId}, ${index}, 'descricao', this.value)"
+                           placeholder="Descrição do serviço">
+                </td>
+                <td class="text-center">
+                    <input type="number" 
+                           class="form-control form-control-sm text-center template-quantidade" 
+                           value="${item.quantidade}" 
+                           min="0" 
+                           step="0.1"
+                           data-template-id="${templateId}" 
+                           data-item-index="${index}"
+                           onchange="atualizarItemTemplate(${templateId}, ${index}, 'quantidade', this.value)"
+                           style="width: 80px; margin: 0 auto;">
+                </td>
+                <td class="text-center">
+                    <select class="form-select form-select-sm" 
+                            onchange="atualizarItemTemplate(${templateId}, ${index}, 'unidade', this.value)"
+                            style="width: 80px; margin: 0 auto;">
+                        <option value="m²" ${item.unidade === 'm²' ? 'selected' : ''}>m²</option>
+                        <option value="m" ${item.unidade === 'm' ? 'selected' : ''}>m</option>
+                        <option value="un" ${item.unidade === 'un' ? 'selected' : ''}>un</option>
+                        <option value="kg" ${item.unidade === 'kg' ? 'selected' : ''}>kg</option>
+                        <option value="h" ${item.unidade === 'h' ? 'selected' : ''}>h</option>
+                    </select>
+                </td>
+                <td class="text-end">
+                    <input type="number" 
+                           class="form-control form-control-sm text-end template-preco" 
+                           value="${(item.preco_unitario || 0).toFixed(2)}" 
+                           min="0" 
+                           step="0.01"
+                           data-template-id="${templateId}" 
+                           data-item-index="${index}"
+                           onchange="atualizarItemTemplate(${templateId}, ${index}, 'preco_unitario', this.value)"
+                           style="width: 120px; margin-left: auto;">
+                </td>
+                <td class="text-end">
+                    <strong id="total-item-${templateId}-${index}">R$ ${total.toFixed(2)}</strong>
+                    <button type="button" class="btn btn-sm btn-outline-danger ms-2" onclick="removerItemTemplate(${templateId}, ${index})" title="Remover item">
+                        <i class="fas fa-trash"></i>
+                    </button>
+                </td>
+            `;
+            
+            tbody.appendChild(novaLinha);
+        });
+    }
+    
+    // Atualizar subtotal
+    let novoSubtotal = 0;
+    template.itens_padrao.forEach(item => {
+        novoSubtotal += (item.quantidade || 0) * (item.preco_unitario || 0);
+    });
+    
+    const subtotalElement = document.getElementById(`subtotal-template-${templateId}`);
+    if (subtotalElement) {
+        subtotalElement.textContent = `R$ ${novoSubtotal.toFixed(2)}`;
+    }
 }
 
 function atualizarTotalGeral() {
