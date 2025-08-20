@@ -68,6 +68,23 @@ def index():
     return render_template('propostas/listar.html', propostas=propostas, 
                          status_filter=status_filter, cliente_filter=cliente_filter)
 
+@propostas_bp.route('/<int:proposta_id>/organizar')
+@login_required
+def organizar_proposta(proposta_id):
+    """Interface de organização drag-and-drop para propostas"""
+    from bypass_auth import get_current_user_bypass
+    
+    current_user = get_current_user_bypass()
+    admin_id = getattr(current_user, 'admin_id', None) or current_user.id
+    
+    proposta = PropostaComercialSIGE.query.filter_by(id=proposta_id, admin_id=admin_id).first()
+    
+    if not proposta:
+        flash('Proposta não encontrada', 'error')
+        return redirect(url_for('propostas.index'))
+    
+    return render_template('propostas/organizar_proposta.html', proposta=proposta)
+
 @propostas_bp.route('/debug-templates')
 def debug_templates():
     """Rota de debug para verificar templates sem autenticação"""

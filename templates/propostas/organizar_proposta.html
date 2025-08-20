@@ -1,0 +1,681 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Organizar Proposta - Sistema Drag & Drop</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Sortable/1.14.0/Sortable.min.js"></script>
+    <style>
+        .drag-area {
+            min-height: 400px;
+            background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+            border: 2px dashed #28a745;
+            border-radius: 10px;
+            padding: 20px;
+            transition: all 0.3s ease;
+        }
+        
+        .drag-area.dragover {
+            background: linear-gradient(135deg, #d1ecf1 0%, #bee5eb 100%);
+            border-color: #007bff;
+        }
+        
+        .categoria-grupo {
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+            overflow: hidden;
+        }
+        
+        .categoria-header {
+            background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+            color: white;
+            padding: 15px 20px;
+            font-weight: bold;
+            cursor: move;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .categoria-header:hover {
+            background: linear-gradient(135deg, #20c997 0%, #28a745 100%);
+        }
+        
+        .categoria-header.editing {
+            background: linear-gradient(135deg, #ffc107 0%, #fd7e14 100%);
+        }
+        
+        .categoria-titulo-input {
+            background: rgba(255,255,255,0.2);
+            border: 1px solid rgba(255,255,255,0.3);
+            color: white;
+            border-radius: 4px;
+            padding: 5px 10px;
+            font-weight: bold;
+        }
+        
+        .categoria-titulo-input::placeholder {
+            color: rgba(255,255,255,0.7);
+        }
+        
+        .item-proposta {
+            background: #f8f9fa;
+            border: 1px solid #e9ecef;
+            border-radius: 6px;
+            padding: 15px;
+            margin: 10px 15px;
+            cursor: move;
+            transition: all 0.3s ease;
+            position: relative;
+        }
+        
+        .item-proposta:hover {
+            background: #e9ecef;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        }
+        
+        .item-proposta.dragging {
+            opacity: 0.5;
+            transform: rotate(2deg);
+        }
+        
+        .item-numero {
+            background: #007bff;
+            color: white;
+            border-radius: 50%;
+            width: 30px;
+            height: 30px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            font-size: 12px;
+            position: absolute;
+            top: -10px;
+            left: -10px;
+            border: 3px solid white;
+        }
+        
+        .item-descricao {
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 8px;
+            margin-left: 20px;
+        }
+        
+        .item-detalhes {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 0.9em;
+            color: #666;
+            margin-left: 20px;
+        }
+        
+        .item-valores {
+            text-align: right;
+        }
+        
+        .valor-unitario {
+            color: #28a745;
+            font-weight: 600;
+        }
+        
+        .subtotal {
+            color: #007bff;
+            font-weight: bold;
+            font-size: 1.1em;
+        }
+        
+        .template-selector {
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+        
+        .template-card {
+            background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+            border: 2px solid #dee2e6;
+            border-radius: 8px;
+            padding: 15px;
+            margin: 10px 0;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            position: relative;
+        }
+        
+        .template-card:hover {
+            border-color: #007bff;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        }
+        
+        .template-card.selected {
+            border-color: #28a745;
+            background: linear-gradient(135deg, #d4edda 0%, #c3e6cb 100%);
+        }
+        
+        .template-nome {
+            font-weight: bold;
+            color: #333;
+            margin-bottom: 5px;
+        }
+        
+        .template-categoria {
+            background: #007bff;
+            color: white;
+            padding: 2px 8px;
+            border-radius: 12px;
+            font-size: 0.8em;
+            display: inline-block;
+            margin-bottom: 8px;
+        }
+        
+        .template-itens {
+            font-size: 0.9em;
+            color: #666;
+        }
+        
+        .btn-add-categoria {
+            background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+            border: none;
+            color: white;
+            padding: 12px 20px;
+            border-radius: 8px;
+            font-weight: bold;
+            transition: all 0.3s ease;
+        }
+        
+        .btn-add-categoria:hover {
+            background: linear-gradient(135deg, #20c997 0%, #28a745 100%);
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(40, 167, 69, 0.3);
+        }
+        
+        .valor-total-container {
+            background: linear-gradient(135deg, #007bff 0%, #0056b3 100%);
+            color: white;
+            padding: 20px;
+            border-radius: 8px;
+            text-align: center;
+            font-size: 1.5em;
+            font-weight: bold;
+            margin: 30px 0;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+        }
+        
+        .sortable-ghost {
+            opacity: 0.4;
+        }
+        
+        .sortable-chosen {
+            transform: rotate(2deg);
+        }
+        
+        .empty-category {
+            text-align: center;
+            padding: 40px 20px;
+            color: #6c757d;
+            font-style: italic;
+            border: 2px dashed #dee2e6;
+            border-radius: 8px;
+            margin: 15px;
+        }
+        
+        .action-buttons {
+            position: fixed;
+            bottom: 30px;
+            right: 30px;
+            z-index: 1000;
+        }
+        
+        .action-buttons .btn {
+            margin-left: 10px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+        }
+    </style>
+</head>
+<body>
+    <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+        <div class="container">
+            <a class="navbar-brand" href="/dashboard">
+                <i class="fas fa-cogs"></i> SIGE - Organizador de Propostas
+            </a>
+            <div class="navbar-nav ms-auto">
+                <a class="nav-link" href="/propostas/listar">
+                    <i class="fas fa-arrow-left"></i> Voltar
+                </a>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container mt-4">
+        <div class="row">
+            <div class="col-md-4">
+                <!-- Seletor de Templates -->
+                <div class="template-selector">
+                    <h5><i class="fas fa-puzzle-piece"></i> Templates Disponíveis</h5>
+                    <p class="text-muted">Selecione templates para carregar itens automaticamente</p>
+                    
+                    <div id="templates-lista">
+                        <!-- Templates serão carregados via JavaScript -->
+                    </div>
+                    
+                    <button type="button" class="btn btn-outline-primary w-100 mt-3" onclick="carregarTemplatesSelecionados()">
+                        <i class="fas fa-download"></i> Carregar Templates Selecionados
+                    </button>
+                </div>
+                
+                <!-- Controles -->
+                <div class="card">
+                    <div class="card-body">
+                        <h6><i class="fas fa-tools"></i> Controles</h6>
+                        <button type="button" class="btn btn-add-categoria w-100 mb-2" onclick="adicionarNovaCategoria()">
+                            <i class="fas fa-plus"></i> Nova Categoria
+                        </button>
+                        <button type="button" class="btn btn-outline-warning w-100 mb-2" onclick="reorganizarItens()">
+                            <i class="fas fa-sort"></i> Auto-Reorganizar
+                        </button>
+                        <button type="button" class="btn btn-outline-info w-100" onclick="previewPDF()">
+                            <i class="fas fa-eye"></i> Preview PDF
+                        </button>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="col-md-8">
+                <!-- Área de Organização -->
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <h4><i class="fas fa-list"></i> Organização da Proposta</h4>
+                    <span class="badge bg-secondary">{{ proposta.numero_proposta }}</span>
+                </div>
+                
+                <div id="categorias-container" class="drag-area">
+                    <div class="text-center text-muted" id="drag-instructions" style="padding: 60px 20px;">
+                        <i class="fas fa-arrows-alt fa-3x mb-3"></i>
+                        <h5>Arraste e Solte para Organizar</h5>
+                        <p>Carregue templates ou adicione categorias para começar</p>
+                    </div>
+                </div>
+                
+                <div class="valor-total-container">
+                    <i class="fas fa-calculator"></i>
+                    VALOR TOTAL: R$ <span id="valor-total">{{ "%.2f"|format(proposta.valor_total) }}</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Botões de Ação Flutuantes -->
+    <div class="action-buttons">
+        <button type="button" class="btn btn-success btn-lg" onclick="salvarOrganizacao()">
+            <i class="fas fa-save"></i> Salvar
+        </button>
+        <button type="button" class="btn btn-primary btn-lg" onclick="gerarPDF()">
+            <i class="fas fa-file-pdf"></i> Gerar PDF
+        </button>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        let proposta_id = {{ proposta.id }};
+        let categorias = [];
+        let templates_selecionados = [];
+        
+        // Dados iniciais
+        let itens_proposta = {{ proposta.itens | tojsonfilter | safe }};
+        let templates_disponiveis = [];
+        
+        // Inicializar quando a página carregar
+        document.addEventListener('DOMContentLoaded', function() {
+            carregarTemplates();
+            organizarItensExistentes();
+            initializarDragAndDrop();
+        });
+        
+        function carregarTemplates() {
+            fetch('/api/templates/listar')
+                .then(response => response.json())
+                .then(data => {
+                    templates_disponiveis = data.templates;
+                    renderizarTemplates();
+                })
+                .catch(error => console.error('Erro ao carregar templates:', error));
+        }
+        
+        function renderizarTemplates() {
+            const container = document.getElementById('templates-lista');
+            container.innerHTML = '';
+            
+            templates_disponiveis.forEach(template => {
+                const templateCard = document.createElement('div');
+                templateCard.className = 'template-card';
+                templateCard.setAttribute('data-template-id', template.id);
+                templateCard.onclick = () => toggleTemplateSelection(template.id);
+                
+                templateCard.innerHTML = `
+                    <div class="template-categoria">${template.categoria}</div>
+                    <div class="template-nome">${template.nome}</div>
+                    <div class="template-itens">${template.total_itens} itens</div>
+                `;
+                
+                container.appendChild(templateCard);
+            });
+        }
+        
+        function toggleTemplateSelection(templateId) {
+            const card = document.querySelector(`[data-template-id="${templateId}"]`);
+            const index = templates_selecionados.indexOf(templateId);
+            
+            if (index > -1) {
+                templates_selecionados.splice(index, 1);
+                card.classList.remove('selected');
+            } else {
+                templates_selecionados.push(templateId);
+                card.classList.add('selected');
+            }
+        }
+        
+        function carregarTemplatesSelecionados() {
+            if (templates_selecionados.length === 0) {
+                alert('Selecione pelo menos um template');
+                return;
+            }
+            
+            fetch('/api/templates/carregar-multiplos', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    template_ids: templates_selecionados,
+                    proposta_id: proposta_id
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    // Adicionar novos itens às categorias
+                    data.novos_itens.forEach(item => {
+                        adicionarItemACategoria(item);
+                    });
+                    atualizarValorTotal();
+                    
+                    // Limpar seleção
+                    templates_selecionados = [];
+                    document.querySelectorAll('.template-card').forEach(card => {
+                        card.classList.remove('selected');
+                    });
+                } else {
+                    alert('Erro ao carregar templates: ' + data.message);
+                }
+            })
+            .catch(error => console.error('Erro:', error));
+        }
+        
+        function organizarItensExistentes() {
+            // Organizar itens existentes por categoria
+            const container = document.getElementById('categorias-container');
+            const instructions = document.getElementById('drag-instructions');
+            
+            if (itens_proposta.length > 0) {
+                instructions.style.display = 'none';
+                
+                // Agrupar por categoria
+                const grupos = {};
+                itens_proposta.forEach(item => {
+                    const categoria = item.categoria_titulo || 'Itens Gerais';
+                    if (!grupos[categoria]) {
+                        grupos[categoria] = [];
+                    }
+                    grupos[categoria].push(item);
+                });
+                
+                // Criar categorias
+                Object.keys(grupos).forEach(categoria => {
+                    criarCategoria(categoria, grupos[categoria]);
+                });
+            }
+        }
+        
+        function criarCategoria(titulo, itens = []) {
+            const container = document.getElementById('categorias-container');
+            const instructions = document.getElementById('drag-instructions');
+            instructions.style.display = 'none';
+            
+            const categoriaDiv = document.createElement('div');
+            categoriaDiv.className = 'categoria-grupo';
+            categoriaDiv.setAttribute('data-categoria-id', Date.now());
+            
+            const headerDiv = document.createElement('div');
+            headerDiv.className = 'categoria-header';
+            headerDiv.innerHTML = `
+                <div>
+                    <span class="categoria-titulo">${titulo}</span>
+                    <input type="text" class="categoria-titulo-input d-none" value="${titulo}" placeholder="Título da categoria">
+                </div>
+                <div>
+                    <button class="btn btn-sm btn-light me-2" onclick="editarTitulo(this)">
+                        <i class="fas fa-edit"></i>
+                    </button>
+                    <button class="btn btn-sm btn-danger" onclick="removerCategoria(this)">
+                        <i class="fas fa-trash"></i>
+                    </button>
+                </div>
+            `;
+            
+            const itensDiv = document.createElement('div');
+            itensDiv.className = 'categoria-itens';
+            
+            if (itens.length === 0) {
+                itensDiv.innerHTML = '<div class="empty-category">Arraste itens para esta categoria</div>';
+            } else {
+                itens.forEach(item => {
+                    itensDiv.appendChild(criarItemElement(item));
+                });
+            }
+            
+            categoriaDiv.appendChild(headerDiv);
+            categoriaDiv.appendChild(itensDiv);
+            container.appendChild(categoriaDiv);
+            
+            // Tornar os itens desta categoria sortable
+            new Sortable(itensDiv, {
+                group: 'itens',
+                animation: 150,
+                ghostClass: 'sortable-ghost',
+                chosenClass: 'sortable-chosen',
+                onStart: function(evt) {
+                    evt.item.classList.add('dragging');
+                },
+                onEnd: function(evt) {
+                    evt.item.classList.remove('dragging');
+                    atualizarOrdemItens();
+                    atualizarValorTotal();
+                }
+            });
+        }
+        
+        function criarItemElement(item) {
+            const itemDiv = document.createElement('div');
+            itemDiv.className = 'item-proposta';
+            itemDiv.setAttribute('data-item-id', item.id);
+            
+            itemDiv.innerHTML = `
+                <div class="item-numero">${item.item_numero}</div>
+                <div class="item-descricao">${item.descricao}</div>
+                <div class="item-detalhes">
+                    <div>
+                        <span class="badge bg-secondary">${item.quantidade} ${item.unidade}</span>
+                    </div>
+                    <div class="item-valores">
+                        <div class="valor-unitario">R$ ${parseFloat(item.preco_unitario).toFixed(2)}</div>
+                        <div class="subtotal">R$ ${(item.quantidade * item.preco_unitario).toFixed(2)}</div>
+                    </div>
+                </div>
+            `;
+            
+            return itemDiv;
+        }
+        
+        function adicionarNovaCategoria() {
+            const titulo = prompt('Nome da nova categoria:');
+            if (titulo && titulo.trim()) {
+                criarCategoria(titulo.trim());
+            }
+        }
+        
+        function editarTitulo(btn) {
+            const header = btn.closest('.categoria-header');
+            const titulo = header.querySelector('.categoria-titulo');
+            const input = header.querySelector('.categoria-titulo-input');
+            
+            if (titulo.classList.contains('d-none')) {
+                // Cancelar edição
+                titulo.classList.remove('d-none');
+                input.classList.add('d-none');
+                header.classList.remove('editing');
+                btn.innerHTML = '<i class="fas fa-edit"></i>';
+            } else {
+                // Iniciar edição
+                titulo.classList.add('d-none');
+                input.classList.remove('d-none');
+                input.focus();
+                header.classList.add('editing');
+                btn.innerHTML = '<i class="fas fa-check"></i>';
+                
+                input.onblur = function() {
+                    if (input.value.trim()) {
+                        titulo.textContent = input.value.trim();
+                    }
+                    titulo.classList.remove('d-none');
+                    input.classList.add('d-none');
+                    header.classList.remove('editing');
+                    btn.innerHTML = '<i class="fas fa-edit"></i>';
+                };
+                
+                input.onkeypress = function(e) {
+                    if (e.key === 'Enter') {
+                        input.blur();
+                    }
+                };
+            }
+        }
+        
+        function removerCategoria(btn) {
+            if (confirm('Tem certeza que deseja remover esta categoria? Os itens serão perdidos.')) {
+                btn.closest('.categoria-grupo').remove();
+                atualizarValorTotal();
+            }
+        }
+        
+        function atualizarOrdemItens() {
+            // Atualizar ordem dos itens em cada categoria
+            document.querySelectorAll('.categoria-grupo').forEach((categoria, categoriaIndex) => {
+                const itens = categoria.querySelectorAll('.item-proposta');
+                itens.forEach((item, itemIndex) => {
+                    item.setAttribute('data-grupo-ordem', categoriaIndex + 1);
+                    item.setAttribute('data-item-ordem', itemIndex + 1);
+                });
+            });
+        }
+        
+        function atualizarValorTotal() {
+            let total = 0;
+            document.querySelectorAll('.item-proposta').forEach(item => {
+                const subtotalText = item.querySelector('.subtotal').textContent;
+                const subtotal = parseFloat(subtotalText.replace('R$ ', '').replace(',', '.'));
+                total += subtotal;
+            });
+            
+            document.getElementById('valor-total').textContent = total.toFixed(2);
+        }
+        
+        function initializarDragAndDrop() {
+            const container = document.getElementById('categorias-container');
+            
+            // Tornar as categorias sortable entre si
+            new Sortable(container, {
+                animation: 150,
+                handle: '.categoria-header',
+                ghostClass: 'sortable-ghost',
+                onEnd: function() {
+                    atualizarOrdemItens();
+                }
+            });
+        }
+        
+        function salvarOrganizacao() {
+            const organizacao = [];
+            
+            document.querySelectorAll('.categoria-grupo').forEach((categoria, categoriaIndex) => {
+                const titulo = categoria.querySelector('.categoria-titulo').textContent;
+                const itens = [];
+                
+                categoria.querySelectorAll('.item-proposta').forEach((item, itemIndex) => {
+                    itens.push({
+                        item_id: parseInt(item.getAttribute('data-item-id')),
+                        categoria_titulo: titulo,
+                        grupo_ordem: categoriaIndex + 1,
+                        item_ordem_no_grupo: itemIndex + 1
+                    });
+                });
+                
+                if (itens.length > 0) {
+                    organizacao.push({
+                        categoria: titulo,
+                        ordem: categoriaIndex + 1,
+                        itens: itens
+                    });
+                }
+            });
+            
+            fetch('/api/propostas/salvar-organizacao', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    proposta_id: proposta_id,
+                    organizacao: organizacao
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    alert('Organização salva com sucesso!');
+                } else {
+                    alert('Erro ao salvar: ' + data.message);
+                }
+            })
+            .catch(error => {
+                console.error('Erro:', error);
+                alert('Erro ao salvar organização');
+            });
+        }
+        
+        function gerarPDF() {
+            window.open(`/propostas/pdf/{{ proposta.id }}`, '_blank');
+        }
+        
+        function previewPDF() {
+            window.open(`/propostas/pdf/{{ proposta.id }}?preview=1`, '_blank');
+        }
+        
+        function reorganizarItens() {
+            if (confirm('Isso irá reorganizar automaticamente os itens por tipo. Continuar?')) {
+                // Lógica de auto-reorganização baseada em palavras-chave
+                // Implementar se necessário
+                alert('Funcionalidade em desenvolvimento');
+            }
+        }
+    </script>
+</body>
+</html>

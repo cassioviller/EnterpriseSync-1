@@ -219,6 +219,16 @@ with app.app_context():
     except Exception as e:
         logging.error(f"❌ Erro ao registrar blueprint propostas: {e}")
     
+    # Registrar API de organização
+    try:
+        from api_organizer import api_organizer
+        app.register_blueprint(api_organizer)
+        logging.info("✅ Blueprint API organizer registrado")
+    except ImportError as e:
+        logging.warning(f"⚠️ Blueprint API organizer não encontrado: {e}")
+    except Exception as e:
+        logging.error(f"❌ Erro ao registrar blueprint API organizer: {e}")
+    
     # Registrar blueprint de configurações
     try:
         from configuracoes_views import configuracoes_bp

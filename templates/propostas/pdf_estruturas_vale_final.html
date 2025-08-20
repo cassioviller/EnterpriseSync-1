@@ -444,72 +444,49 @@
             <div class="subsection-title" style="margin: 20px 0 15px 40px;">2.1 &nbsp;&nbsp;&nbsp;&nbsp; ESCOPO DE FORNECIMENTO:</div>
             
             {% if proposta.itens %}
-                <!-- Simulando múltiplas categorias como no formato original -->
-                <div class="categoria-titulo">PROJETO</div>
-                <table class="items-table">
-                    <thead>
-                        <tr>
-                            <th style="width: 8%;">ITEM</th>
-                            <th style="width: 40%;">DESCRIÇÃO</th>
-                            <th style="width: 8%;">QTD</th>
-                            <th style="width: 8%;">UNID</th>
-                            <th style="width: 18%;">PREÇO UNI</th>
-                            <th style="width: 18%;">SUBTOTAL</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% if proposta.itens[0] %}
-                        <tr>
-                            <td style="text-align: center;">{{ proposta.itens[0].item_numero }}</td>
-                            <td>{{ proposta.itens[0].descricao }}</td>
-                            <td style="text-align: center;">{{ "%.0f"|format(proposta.itens[0].quantidade) if proposta.itens[0].quantidade == proposta.itens[0].quantidade|int else "%.2f"|format(proposta.itens[0].quantidade) }}</td>
-                            <td style="text-align: center;">{{ proposta.itens[0].unidade }}</td>
-                            <td style="text-align: right;">R$ {{ "%.2f"|format(proposta.itens[0].preco_unitario) }}</td>
-                            <td style="text-align: right;">R$ {{ "%.2f"|format(proposta.itens[0].quantidade * proposta.itens[0].preco_unitario) }}</td>
-                        </tr>
-                        {% endif %}
-                        <tr class="subtotal-row">
-                            <td colspan="5" style="text-align: right; font-weight: bold; background-color: #f0f0f0;">SUBTOTAL</td>
-                            <td style="text-align: right; font-weight: bold; background-color: #f0f0f0;">R$ {{ "%.2f"|format(proposta.itens[0].quantidade * proposta.itens[0].preco_unitario if proposta.itens[0] else 0) }}</td>
-                        </tr>
-                    </tbody>
-                </table>
-                <br>
+                {% set categorias = {} %}
+                {% for item in proposta.itens %}
+                    {% set categoria = item.categoria_titulo or item.template_origem_nome or 'SERVIÇOS GERAIS' %}
+                    {% if categoria not in categorias %}
+                        {% set _ = categorias.update({categoria: []}) %}
+                    {% endif %}
+                    {% set _ = categorias[categoria].append(item) %}
+                {% endfor %}
                 
-                {% if proposta.itens|length > 1 %}
-                <div class="categoria-titulo">ESTRUTURA METÁLICA</div>
-                <table class="items-table">
-                    <thead>
-                        <tr>
-                            <th style="width: 8%;">ITEM</th>
-                            <th style="width: 40%;">DESCRIÇÃO</th>
-                            <th style="width: 8%;">QTD</th>
-                            <th style="width: 8%;">UNID</th>
-                            <th style="width: 18%;">PREÇO UNI</th>
-                            <th style="width: 18%;">SUBTOTAL</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% set subtotal_estrutura = 0 %}
-                        {% for item in proposta.itens[1:] %}
-                        <tr>
-                            <td style="text-align: center;">{{ item.item_numero }}</td>
-                            <td>{{ item.descricao }}</td>
-                            <td style="text-align: center;">{{ "%.0f"|format(item.quantidade) if item.quantidade == item.quantidade|int else "%.2f"|format(item.quantidade) }}</td>
-                            <td style="text-align: center;">{{ item.unidade }}</td>
-                            <td style="text-align: right;">R$ {{ "%.2f"|format(item.preco_unitario) }}</td>
-                            <td style="text-align: right;">R$ {{ "%.2f"|format(item.quantidade * item.preco_unitario) }}</td>
-                        </tr>
-                        {% set subtotal_estrutura = subtotal_estrutura + (item.quantidade * item.preco_unitario) %}
-                        {% endfor %}
-                        <tr class="subtotal-row">
-                            <td colspan="5" style="text-align: right; font-weight: bold; background-color: #f0f0f0;">SUBTOTAL</td>
-                            <td style="text-align: right; font-weight: bold; background-color: #f0f0f0;">R$ {{ "%.2f"|format(subtotal_estrutura) }}</td>
-                        </tr>
-                    </tbody>
-                </table>
-                <br>
-                {% endif %}
+                {% for categoria, itens_categoria in categorias.items() %}
+                    <div class="categoria-titulo">{{ categoria.upper() }}</div>
+                    <table class="items-table">
+                        <thead>
+                            <tr>
+                                <th style="width: 8%;">ITEM</th>
+                                <th style="width: 40%;">DESCRIÇÃO</th>
+                                <th style="width: 8%;">QTD</th>
+                                <th style="width: 8%;">UNID</th>
+                                <th style="width: 18%;">PREÇO UNI</th>
+                                <th style="width: 18%;">SUBTOTAL</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% set subtotal_categoria = 0 %}
+                            {% for item in itens_categoria %}
+                            <tr>
+                                <td style="text-align: center;">{{ item.item_numero }}</td>
+                                <td>{{ item.descricao }}</td>
+                                <td style="text-align: center;">{{ "%.0f"|format(item.quantidade) if item.quantidade == item.quantidade|int else "%.2f"|format(item.quantidade) }}</td>
+                                <td style="text-align: center;">{{ item.unidade }}</td>
+                                <td style="text-align: right;">R$ {{ "%.2f"|format(item.preco_unitario) }}</td>
+                                <td style="text-align: right;">R$ {{ "%.2f"|format(item.quantidade * item.preco_unitario) }}</td>
+                            </tr>
+                            {% set subtotal_categoria = subtotal_categoria + (item.quantidade * item.preco_unitario) %}
+                            {% endfor %}
+                            <tr class="subtotal-row">
+                                <td colspan="5" style="text-align: right; font-weight: bold; background-color: #f0f0f0;">SUBTOTAL</td>
+                                <td style="text-align: right; font-weight: bold; background-color: #f0f0f0;">R$ {{ "%.2f"|format(subtotal_categoria) }}</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                    <br>
+                {% endfor %}
                 
                 <div class="valor-total-final">
                     <table style="width: 100%; margin-top: 20px;">

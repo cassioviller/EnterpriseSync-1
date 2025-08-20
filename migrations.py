@@ -30,6 +30,9 @@ def executar_migracoes():
         # Migração 4: Adicionar campos de personalização visual na configuração da empresa
         migrar_personalizacao_visual_empresa()
         
+        # Migração 5: Adicionar campos de organização para proposta_itens
+        migrar_campos_organizacao_propostas()
+        
         logger.info("✅ Migrações automáticas concluídas com sucesso!")
         
     except Exception as e:
@@ -336,3 +339,49 @@ def verificar_estrutura_tabela():
             
     except Exception as e:
         logger.error(f"❌ Erro ao verificar estrutura da tabela: {e}")
+
+def migrar_campos_organizacao_propostas():
+    """
+    Adiciona campos de organização avançada para proposta_itens
+    """
+    try:
+        connection = db.engine.raw_connection()
+        cursor = connection.cursor()
+        
+        # Lista de colunas para adicionar
+        colunas_organizacao = [
+            ('categoria_titulo', 'VARCHAR(100)'),
+            ('template_origem_id', 'INTEGER'),
+            ('template_origem_nome', 'VARCHAR(100)'),
+            ('grupo_ordem', 'INTEGER DEFAULT 1'),
+            ('item_ordem_no_grupo', 'INTEGER DEFAULT 1')
+        ]
+        
+        for nome_coluna, tipo_coluna in colunas_organizacao:
+            # Verificar se a coluna já existe
+            cursor.execute("""
+                SELECT column_name 
+                FROM information_schema.columns 
+                WHERE table_name = 'proposta_itens' 
+                AND column_name = %s
+            """, (nome_coluna,))
+            
+            exists = cursor.fetchone()
+            
+            if not exists:
+                logger.info(f"🔄 Adicionando coluna '{nome_coluna}' na tabela proposta_itens...")
+                cursor.execute(f"ALTER TABLE proposta_itens ADD COLUMN {nome_coluna} {tipo_coluna}")
+                logger.info(f"✅ Coluna '{nome_coluna}' adicionada com sucesso")
+            else:
+                logger.info(f"✅ Coluna '{nome_coluna}' já existe na tabela proposta_itens")
+        
+        connection.commit()
+        cursor.close()
+        connection.close()
+        
+    except Exception as e:
+        logger.error(f"❌ Erro ao adicionar campos de organização: {str(e)}")
+        if 'connection' in locals():
+            connection.rollback()
+            cursor.close()
+            connection.close()

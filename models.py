@@ -2044,7 +2044,17 @@ class PropostaItem(db.Model):
     preco_unitario = db.Column(db.Numeric(10,2), nullable=False)
     ordem = db.Column(db.Integer, nullable=False, default=1)
     
+    # Novos campos para organização avançada
+    categoria_titulo = db.Column(db.String(100))  # Título personalizado da categoria (ex: "PROJETO", "ESTRUTURA METÁLICA")
+    template_origem_id = db.Column(db.Integer, db.ForeignKey('proposta_templates.id'))  # Template de origem
+    template_origem_nome = db.Column(db.String(100))  # Nome do template quando foi carregado
+    grupo_ordem = db.Column(db.Integer, default=1)  # Ordem do grupo/categoria
+    item_ordem_no_grupo = db.Column(db.Integer, default=1)  # Ordem do item dentro do grupo
+    
     criado_em = db.Column(db.DateTime, default=datetime.utcnow)
+    
+    # Relacionamento com template (opcional)
+    template_origem = db.relationship('PropostaTemplate', backref='itens_utilizados')
     
     @property
     def subtotal(self):
@@ -2059,7 +2069,12 @@ class PropostaItem(db.Model):
             'unidade': self.unidade,
             'preco_unitario': float(self.preco_unitario),
             'subtotal': float(self.subtotal),
-            'ordem': self.ordem
+            'ordem': self.ordem,
+            'categoria_titulo': self.categoria_titulo,
+            'template_origem_id': self.template_origem_id,
+            'template_origem_nome': self.template_origem_nome,
+            'grupo_ordem': self.grupo_ordem,
+            'item_ordem_no_grupo': self.item_ordem_no_grupo
         }
 
 class PropostaArquivo(db.Model):
