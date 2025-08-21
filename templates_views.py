@@ -155,9 +155,15 @@ def listar_templates():
     ).paginate(page=page, per_page=12, error_out=False)
     
     # Categorias disponíveis para filtro
-    categorias = db.session.query(PropostaTemplate.categoria).filter_by(
-        admin_id=admin_id
-    ).distinct().all()
+    if current_user.tipo_usuario.name == 'SUPER_ADMIN':
+        categorias = db.session.query(PropostaTemplate.categoria).distinct().all()
+    else:
+        # Admin_id dinâmico que funciona em dev e produção
+        from multitenant_helper import get_admin_id
+        admin_id = get_admin_id()
+        categorias = db.session.query(PropostaTemplate.categoria).filter_by(
+            admin_id=admin_id
+        ).distinct().all()
     categorias = [cat[0] for cat in categorias]
     
     return render_template('templates/listar.html',
