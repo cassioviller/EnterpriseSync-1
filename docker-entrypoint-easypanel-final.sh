@@ -99,19 +99,106 @@ CREATE TABLE IF NOT EXISTS registro_ponto (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
--- USUÁRIOS ADMINISTRATIVOS - CORRIGIDO PARA PRODUÇÃO
-INSERT INTO usuario (id, username, email, nome, password_hash, tipo_usuario, ativo, admin_id) 
-VALUES 
-(4, 'admin', 'admin@estruturasdovale.com.br', 'Administrador do Sistema', 'scrypt:32768:8:1$o8T5NlEWKHiEXE2Q$46c1dd2f6a3d0f0c3e2e8e1a1a9a5a7a8a8a9a5a7a8a8a9a5a7a8a8a9a5a7a8a8a9a5a7a8a8a9a5a7a8a8a9a5a7', 'super_admin', TRUE, NULL),
-(10, 'valeverde', 'admin@valeverde.com.br', 'Administrador Vale Verde', 'scrypt:32768:8:1$o8T5NlEWKHiEXE2Q$46c1dd2f6a3d0f0c3e2e8e1a1a9a5a7a8a8a9a5a7a8a8a9a5a7a8a8a9a5a7a8a8a9a5a7a8a8a9a5a7a8a8a9a5a7', 'admin', TRUE, NULL)
-ON CONFLICT (id) DO UPDATE SET 
-    username = EXCLUDED.username,
-    email = EXCLUDED.email,
-    nome = EXCLUDED.nome,
-    tipo_usuario = EXCLUDED.tipo_usuario;
+-- CRIAR TABELA CONFIGURACAO_EMPRESA SEM FOREIGN KEY
+CREATE TABLE IF NOT EXISTS configuracao_empresa (
+    id SERIAL PRIMARY KEY,
+    admin_id INTEGER NOT NULL,
+    nome_empresa VARCHAR(200) NOT NULL,
+    cnpj VARCHAR(20),
+    endereco TEXT,
+    telefone VARCHAR(20),
+    email VARCHAR(120),
+    website VARCHAR(200),
+    logo_url VARCHAR(500),
+    itens_inclusos_padrao TEXT,
+    itens_exclusos_padrao TEXT,
+    condicoes_padrao TEXT,
+    condicoes_pagamento_padrao TEXT,
+    garantias_padrao TEXT,
+    observacoes_gerais_padrao TEXT,
+    prazo_entrega_padrao INTEGER,
+    validade_padrao INTEGER,
+    percentual_nota_fiscal_padrao DECIMAL(5,2),
+    criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    atualizado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    logo_base64 TEXT,
+    cor_primaria VARCHAR(7) DEFAULT '#007bff',
+    cor_secundaria VARCHAR(7) DEFAULT '#6c757d',
+    cor_fundo_proposta VARCHAR(7) DEFAULT '#f8f9fa',
+    logo_pdf_base64 TEXT,
+    header_pdf_base64 TEXT,
+    UNIQUE(admin_id)
+);
 
--- GARANTIR SEQUÊNCIA DE USUÁRIOS ATUALIZADA
-SELECT setval('usuario_id_seq', GREATEST(10, (SELECT MAX(id) FROM usuario)));
+-- CRIAR TABELA PROPOSTA_TEMPLATES SEM FOREIGN KEY  
+CREATE TABLE IF NOT EXISTS proposta_templates (
+    id SERIAL PRIMARY KEY,
+    nome VARCHAR(200) NOT NULL,
+    categoria VARCHAR(100),
+    itens_padrao TEXT,
+    prazo_entrega_dias INTEGER DEFAULT 90,
+    validade_dias INTEGER DEFAULT 7,
+    percentual_nota_fiscal DECIMAL(5,2) DEFAULT 13.50,
+    itens_inclusos TEXT,
+    itens_exclusos TEXT,
+    condicoes TEXT,
+    condicoes_pagamento TEXT,
+    garantias TEXT,
+    ativo BOOLEAN DEFAULT TRUE,
+    publico BOOLEAN DEFAULT FALSE,
+    uso_contador INTEGER DEFAULT 0,
+    admin_id INTEGER NOT NULL,
+    criado_por INTEGER,
+    criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    atualizado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- CRIAR TABELA PROPOSTAS_COMERCIAIS SEM FOREIGN KEY
+CREATE TABLE IF NOT EXISTS propostas_comerciais (
+    id SERIAL PRIMARY KEY,
+    numero_proposta VARCHAR(50) UNIQUE NOT NULL,
+    cliente_nome VARCHAR(200) NOT NULL,
+    cliente_email VARCHAR(120),
+    cliente_telefone VARCHAR(20),
+    cliente_endereco TEXT,
+    assunto VARCHAR(500),
+    objeto TEXT,
+    valor_total DECIMAL(10,2) NOT NULL DEFAULT 0.0,
+    prazo_entrega INTEGER DEFAULT 90,
+    validade INTEGER DEFAULT 7,
+    percentual_nota_fiscal DECIMAL(5,2) DEFAULT 13.50,
+    status VARCHAR(50) DEFAULT 'rascunho',
+    admin_id INTEGER NOT NULL,
+    criado_por INTEGER,
+    criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    atualizado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    publico BOOLEAN DEFAULT FALSE,
+    token_cliente VARCHAR(255) UNIQUE,
+    itens_inclusos TEXT,
+    itens_exclusos TEXT,
+    condicoes TEXT,
+    condicoes_pagamento TEXT,
+    garantias TEXT,
+    observacoes_gerais TEXT
+);
+
+-- CRIAR TABELA PROPOSTA_ITENS SEM FOREIGN KEY
+CREATE TABLE IF NOT EXISTS proposta_itens (
+    id SERIAL PRIMARY KEY,
+    proposta_id INTEGER NOT NULL,
+    descricao VARCHAR(500) NOT NULL,
+    quantidade DECIMAL(10,3) NOT NULL DEFAULT 1,
+    unidade VARCHAR(10) DEFAULT 'un',
+    preco_unitario DECIMAL(10,2) NOT NULL DEFAULT 0.0,
+    subtotal DECIMAL(10,2) NOT NULL DEFAULT 0.0,
+    ordem INTEGER DEFAULT 0,
+    admin_id INTEGER NOT NULL,
+    categoria_titulo VARCHAR(200),
+    template_origem_id INTEGER,
+    template_origem_nome VARCHAR(200),
+    grupo_ordem INTEGER DEFAULT 0,
+    item_ordem_no_grupo INTEGER DEFAULT 0
+);
 
 -- CONFIGURAÇÃO DA EMPRESA PARA O ADMIN ID=10
 INSERT INTO configuracao_empresa (
@@ -171,9 +258,40 @@ EOSQL
     echo "✅ Estrutura criada via SQL direto!"
 fi
 
-# Adicionar colunas que podem estar faltando
-echo "🔧 Atualizando schema para compatibilidade..."
+# Remover foreign keys problemáticas e adicionar colunas que podem estar faltando
+echo "🔧 Removendo constraints problemáticas e atualizando schema..."
 psql "$DATABASE_URL" << 'EOSQL' || true
+-- REMOVER FOREIGN KEY CONSTRAINTS PROBLEMÁTICAS
+DO $$
+BEGIN
+    -- Remover constraint de configuracao_empresa se existir
+    IF EXISTS (SELECT 1 FROM information_schema.table_constraints 
+               WHERE constraint_name = 'configuracao_empresa_admin_id_fkey' 
+               AND table_name = 'configuracao_empresa') THEN
+        ALTER TABLE configuracao_empresa DROP CONSTRAINT configuracao_empresa_admin_id_fkey;
+        RAISE NOTICE 'Foreign key constraint configuracao_empresa_admin_id_fkey removida';
+    END IF;
+    
+    -- Remover constraint de proposta_templates se existir
+    IF EXISTS (SELECT 1 FROM information_schema.table_constraints 
+               WHERE constraint_name = 'proposta_templates_admin_id_fkey' 
+               AND table_name = 'proposta_templates') THEN
+        ALTER TABLE proposta_templates DROP CONSTRAINT proposta_templates_admin_id_fkey;
+        RAISE NOTICE 'Foreign key constraint proposta_templates_admin_id_fkey removida';
+    END IF;
+    
+    -- Remover constraint de propostas_comerciais se existir
+    IF EXISTS (SELECT 1 FROM information_schema.table_constraints 
+               WHERE constraint_name = 'propostas_comerciais_admin_id_fkey' 
+               AND table_name = 'propostas_comerciais') THEN
+        ALTER TABLE propostas_comerciais DROP CONSTRAINT propostas_comerciais_admin_id_fkey;
+        RAISE NOTICE 'Foreign key constraint propostas_comerciais_admin_id_fkey removida';
+    END IF;
+    
+    RAISE NOTICE 'Constraints de foreign key removidas com sucesso';
+END
+$$;
+
 -- Adicionar campos que podem estar faltando (compatibilidade com schema existente)
 ALTER TABLE obra ADD COLUMN IF NOT EXISTS token_cliente VARCHAR(255) UNIQUE;
 ALTER TABLE obra ADD COLUMN IF NOT EXISTS responsavel_id INTEGER;

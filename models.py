@@ -2229,7 +2229,7 @@ class ConfiguracaoEmpresa(db.Model):
     __tablename__ = 'configuracao_empresa'
     
     id = db.Column(db.Integer, primary_key=True)
-    admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False)
+    admin_id = db.Column(db.Integer, nullable=False)  # Removido foreign key para evitar problemas em produção
     
     # Dados da empresa
     nome_empresa = db.Column(db.String(200), nullable=False)
