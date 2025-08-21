@@ -178,10 +178,10 @@ def test_nova_proposta():
 @admin_required
 def nova_proposta():
     """Exibe formulário para criar nova proposta"""
-    # Admin_id dinâmico que funciona em dev e produção
+    # Admin_id dinâmico que funciona em dev e produção  
     from multitenant_helper import get_admin_id
     admin_id = get_admin_id()
-    print(f"DEBUG TEMPLATES: Buscando templates para admin_id={admin_id}")
+    print(f"DEBUG TEMPLATES NOVA: Buscando templates para admin_id={admin_id}")
     
     # Buscar configuração da empresa
     config_empresa = ConfiguracaoEmpresa.query.filter_by(admin_id=admin_id).first()
@@ -192,14 +192,18 @@ def nova_proposta():
         ativo=True
     ).order_by(PropostaTemplate.categoria, PropostaTemplate.nome).all()
     
-    print(f"DEBUG TEMPLATES: Encontrou {len(templates)} templates para admin_id={admin_id}")
+    print(f"DEBUG TEMPLATES NOVA: Encontrou {len(templates)} templates para admin_id={admin_id}")
     for t in templates:
-        print(f"DEBUG TEMPLATE: {t.id}: {t.nome} (admin_id={t.admin_id})")
+        print(f"DEBUG TEMPLATE NOVA: {t.id}: {t.nome} (admin_id={t.admin_id})")
+    
+    # Debug adicional - verificar se templates estão sendo passados para o template
+    print(f"DEBUG RENDER NOVA: Passando {len(templates)} templates para template")
+    print(f"DEBUG RENDER NOVA: Config empresa: {config_empresa.nome_empresa if config_empresa else 'None'}")
     
     # Se não encontrou templates para esse admin_id, mostrar todos disponíveis para debug
     if len(templates) == 0:
         todos_templates = PropostaTemplate.query.filter_by(ativo=True).all()
-        print(f"DEBUG: Nenhum template para admin_id={admin_id}. Templates disponíveis:")
+        print(f"DEBUG NOVA: Nenhum template para admin_id={admin_id}. Templates disponíveis:")
         for t in todos_templates:
             print(f"  Template {t.id}: {t.nome} (admin_id={t.admin_id})")
     
