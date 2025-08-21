@@ -24,8 +24,18 @@ def configuracoes():
 @admin_required
 def empresa():
     """Configurações da empresa"""
-    admin_id = getattr(current_user, 'admin_id', None) or current_user.id
+    # Para funcionário, usar admin_id. Para admin, usar o próprio ID
+    if hasattr(current_user, 'tipo_usuario') and current_user.tipo_usuario.value == 'funcionario':
+        admin_id = getattr(current_user, 'admin_id', current_user.id)
+    else:
+        admin_id = current_user.id
+    
+    print(f"DEBUG EMPRESA: user.id={current_user.id}, admin_id={admin_id}")
     config = ConfiguracaoEmpresa.query.filter_by(admin_id=admin_id).first()
+    print(f"DEBUG EMPRESA: config encontrada={config is not None}")
+    if config:
+        print(f"DEBUG EMPRESA: nome_empresa={config.nome_empresa}")
+    
     return render_template('configuracoes/empresa.html', config=config)
 
 @configuracoes_bp.route('/empresa/salvar', methods=['POST'])
@@ -34,9 +44,13 @@ def empresa():
 def salvar_empresa():
     """Salva configurações da empresa"""
     try:
-        # Obter admin_id corretamente (para ADMIN usa o próprio ID, para SUPER_ADMIN pode ser diferente)
-        admin_id = getattr(current_user, 'admin_id', None) or current_user.id
-        print(f"DEBUG SALVAR: admin_id = {admin_id}, user.id = {current_user.id}")
+        # Para funcionário, usar admin_id. Para admin, usar o próprio ID
+        if hasattr(current_user, 'tipo_usuario') and current_user.tipo_usuario.value == 'funcionario':
+            admin_id = getattr(current_user, 'admin_id', current_user.id)
+        else:
+            admin_id = current_user.id
+            
+        print(f"DEBUG SALVAR: user.id={current_user.id}, admin_id={admin_id}, tipo={getattr(current_user, 'tipo_usuario', 'N/A')}")
         
         config = ConfiguracaoEmpresa.query.filter_by(admin_id=admin_id).first()
         print(f"DEBUG SALVAR: config existente = {config is not None}")
