@@ -76,14 +76,11 @@ def get_template_data(template_id):
     current_user = MockCurrentUser()
     admin_id = getattr(current_user, 'admin_id', None) or getattr(current_user, 'id', None)
     
-    # Buscar template próprio ou público
-    template = PropostaTemplate.query.filter(
-        PropostaTemplate.id == template_id,
-        PropostaTemplate.ativo == True,
-        db.or_(
-            PropostaTemplate.admin_id == admin_id,
-            PropostaTemplate.publico == True
-        )
+    # Buscar apenas template do próprio admin (multitenant)
+    template = PropostaTemplate.query.filter_by(
+        id=template_id, 
+        admin_id=admin_id, 
+        ativo=True
     ).first()
     
     if not template:
@@ -189,13 +186,10 @@ def nova_proposta():
     # Buscar configuração da empresa
     config_empresa = ConfiguracaoEmpresa.query.filter_by(admin_id=admin_id).first()
     
-    # Buscar templates próprios e públicos
-    templates = PropostaTemplate.query.filter(
-        PropostaTemplate.ativo == True,
-        db.or_(
-            PropostaTemplate.admin_id == admin_id,
-            PropostaTemplate.publico == True
-        )
+    # Buscar apenas templates do próprio admin (multitenant)
+    templates = PropostaTemplate.query.filter_by(
+        admin_id=admin_id, 
+        ativo=True
     ).order_by(PropostaTemplate.categoria, PropostaTemplate.nome).all()
     
     # Definir valores padrão da empresa ou usar padrões do sistema
