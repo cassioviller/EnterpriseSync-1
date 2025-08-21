@@ -404,88 +404,105 @@ O prazo poderá ser alterado em função de condições climáticas adversas.</t
                 </div>
             </div>
 
-            <!-- ABA 5: ITENS E SERVIÇOS -->
+            <!-- ABA 5: ITENS DO TEMPLATE -->
             <div class="tab-pane fade" id="itens" role="tabpanel">
                 <div class="card">
                     <div class="card-header bg-primary text-white">
-                        <h5 class="mb-0"><i class="fas fa-list"></i> Itens e Serviços do Template</h5>
+                        <h5 class="mb-0"><i class="fas fa-list"></i> Itens do Template</h5>
                     </div>
                     <div class="card-body">
-                        <!-- Seleção de Serviços -->
-                        <div class="row mb-4">
-                            <div class="col-md-8">
-                                <div class="input-group">
-                                    <span class="input-group-text"><i class="fas fa-search"></i></span>
-                                    <input type="text" class="form-control" id="buscaServico" 
-                                           placeholder="Buscar serviços disponíveis...">
-                                </div>
+                        <!-- Formulário para adicionar novo item -->
+                        <div class="card bg-light mb-4">
+                            <div class="card-header">
+                                <h6 class="mb-0"><i class="fas fa-plus"></i> Adicionar Novo Item</h6>
                             </div>
-                            <div class="col-md-4">
-                                <select class="form-select" id="filtroCategoria">
-                                    <option value="">Todas as categorias</option>
-                                    {% for categoria, servicos in servicos_por_categoria.items() %}
-                                    <option value="{{ categoria }}">{{ categoria }}</option>
-                                    {% endfor %}
-                                </select>
+                            <div class="card-body">
+                                <div class="row">
+                                    <div class="col-md-5">
+                                        <div class="mb-3">
+                                            <label for="novoItemDescricao" class="form-label">Descrição *</label>
+                                            <input type="text" class="form-control" id="novoItemDescricao" 
+                                                   placeholder="Ex: Fabricação de estrutura metálica">
+                                        </div>
+                                    </div>
+                                    <div class="col-md-2">
+                                        <div class="mb-3">
+                                            <label for="novoItemQuantidade" class="form-label">Quantidade *</label>
+                                            <input type="number" class="form-control" id="novoItemQuantidade" 
+                                                   value="1" min="0.1" step="0.1">
+                                        </div>
+                                    </div>
+                                    <div class="col-md-2">
+                                        <div class="mb-3">
+                                            <label for="novoItemUnidade" class="form-label">Unidade *</label>
+                                            <select class="form-select" id="novoItemUnidade">
+                                                <option value="un">un</option>
+                                                <option value="m²">m²</option>
+                                                <option value="m³">m³</option>
+                                                <option value="m">m</option>
+                                                <option value="kg">kg</option>
+                                                <option value="ton">ton</option>
+                                                <option value="h">h</option>
+                                                <option value="dia">dia</option>
+                                                <option value="pç">pç</option>
+                                                <option value="lote">lote</option>
+                                                <option value="vb">vb</option>
+                                            </select>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-2">
+                                        <div class="mb-3">
+                                            <label for="novoItemPreco" class="form-label">Preço Unit. *</label>
+                                            <input type="number" class="form-control" id="novoItemPreco" 
+                                                   min="0" step="0.01" placeholder="0,00">
+                                        </div>
+                                    </div>
+                                    <div class="col-md-1">
+                                        <label class="form-label d-block">&nbsp;</label>
+                                        <button type="button" class="btn btn-success w-100" onclick="adicionarItemManual()">
+                                            <i class="fas fa-plus"></i>
+                                        </button>
+                                    </div>
+                                </div>
                             </div>
                         </div>
 
-                        <!-- Lista de Serviços Compacta -->
-                        <div class="row">
-                            <div class="col-md-6">
-                                <div class="card bg-light">
-                                    <div class="card-header">
-                                        <h6 class="mb-0 text-muted">Serviços Disponíveis</h6>
-                                    </div>
-                                    <div class="card-body p-2" style="max-height: 400px; overflow-y: auto;">
-                                        {% for categoria, servicos in servicos_por_categoria.items() %}
-                                        <div class="mb-3">
-                                            <h6 class="text-primary mb-1">{{ categoria }}</h6>
-                                            {% for servico in servicos %}
-                                            <div class="d-flex justify-content-between align-items-center p-2 border-bottom">
-                                                <div class="flex-grow-1">
-                                                    <small><strong>{{ servico.nome }}</strong></small><br>
-                                                    <small class="text-muted">{{ servico.unidade_medida }} - R$ {{ "%.2f"|format(servico.custo_unitario) }}</small>
-                                                </div>
-                                                <button type="button" class="btn btn-sm btn-success ms-2"
-                                                        onclick="adicionarServicoAoTemplate({{ servico.id }}, '{{ servico.nome }}', '{{ servico.unidade_medida }}', {{ servico.custo_unitario }})">
-                                                    <i class="fas fa-plus"></i>
-                                                </button>
-                                            </div>
-                                            {% endfor %}
-                                        </div>
-                                        {% endfor %}
-                                    </div>
-                                </div>
+                        <!-- Lista de itens adicionados -->
+                        <div class="card">
+                            <div class="card-header d-flex justify-content-between align-items-center">
+                                <h6 class="mb-0 text-success"><i class="fas fa-list-ul"></i> Itens do Template</h6>
+                                <small class="text-muted">Total de itens: <span id="contadorItens">0</span></small>
                             </div>
-
-                            <div class="col-md-6">
-                                <div class="card">
-                                    <div class="card-header">
-                                        <h6 class="mb-0 text-success">Itens Selecionados</h6>
-                                    </div>
-                                    <div class="card-body p-2">
-                                        <div class="table-responsive">
-                                            <table class="table table-sm table-hover" id="tabelaItens">
-                                                <thead class="table-dark">
-                                                    <tr>
-                                                        <th width="40">#</th>
-                                                        <th>Descrição</th>
-                                                        <th width="60">Qtd</th>
-                                                        <th width="80">Preço</th>
-                                                        <th width="60">Ações</th>
-                                                    </tr>
-                                                </thead>
-                                                <tbody id="corpoTabelaItens">
-                                                    <!-- Itens dinâmicos -->
-                                                </tbody>
-                                            </table>
-                                        </div>
-                                        
-                                        <div class="text-end mt-3">
-                                            <h5 class="text-primary">Total: R$ <span id="totalTemplate">0,00</span></h5>
-                                        </div>
-                                    </div>
+                            <div class="card-body p-0">
+                                <div class="table-responsive">
+                                    <table class="table table-hover mb-0" id="tabelaItens">
+                                        <thead class="table-dark">
+                                            <tr>
+                                                <th width="50">#</th>
+                                                <th>Descrição</th>
+                                                <th width="80">Qtd</th>
+                                                <th width="80">Unidade</th>
+                                                <th width="100">Preço Unit.</th>
+                                                <th width="100">Subtotal</th>
+                                                <th width="80">Ações</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="corpoTabelaItens">
+                                            <tr>
+                                                <td colspan="7" class="text-center text-muted py-4">
+                                                    <i class="fas fa-inbox fa-2x mb-2 d-block"></i>
+                                                    Nenhum item adicionado ainda
+                                                </td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                                
+                                <div class="bg-light p-3 text-end">
+                                    <h5 class="mb-0 text-primary">
+                                        <i class="fas fa-calculator me-2"></i>
+                                        Total Geral: R$ <span id="totalTemplate">0,00</span>
+                                    </h5>
                                 </div>
                             </div>
                         </div>
@@ -517,7 +534,62 @@ O prazo poderá ser alterado em função de condições climáticas adversas.</t
 let itensTemplate = [];
 let contadorItens = 0;
 
-// Função para adicionar serviço ao template
+// Função para adicionar item manual
+function adicionarItemManual() {
+    const descricao = document.getElementById('novoItemDescricao').value.trim();
+    const quantidade = parseFloat(document.getElementById('novoItemQuantidade').value);
+    const unidade = document.getElementById('novoItemUnidade').value;
+    const preco = parseFloat(document.getElementById('novoItemPreco').value);
+    
+    // Validações
+    if (!descricao) {
+        alert('Descrição é obrigatória');
+        document.getElementById('novoItemDescricao').focus();
+        return;
+    }
+    
+    if (!quantidade || quantidade <= 0) {
+        alert('Quantidade deve ser maior que zero');
+        document.getElementById('novoItemQuantidade').focus();
+        return;
+    }
+    
+    if (!preco || preco <= 0) {
+        alert('Preço deve ser maior que zero');
+        document.getElementById('novoItemPreco').focus();
+        return;
+    }
+    
+    // Adicionar item
+    contadorItens++;
+    const novoItem = {
+        ordem: contadorItens,
+        descricao: descricao,
+        quantidade: quantidade,
+        unidade: unidade,
+        preco_unitario: preco,
+        subtotal: quantidade * preco
+    };
+    
+    itensTemplate.push(novoItem);
+    
+    // Limpar formulário
+    document.getElementById('novoItemDescricao').value = '';
+    document.getElementById('novoItemQuantidade').value = '1';
+    document.getElementById('novoItemUnidade').value = 'un';
+    document.getElementById('novoItemPreco').value = '';
+    
+    // Atualizar interface
+    atualizarTabelaItens();
+    atualizarTotal();
+    atualizarJsonItens();
+    atualizarContadorItens();
+    
+    // Focar no campo descrição para próximo item
+    document.getElementById('novoItemDescricao').focus();
+}
+
+// Função para adicionar serviço ao template (manter para compatibilidade)
 function adicionarServicoAoTemplate(id, nome, unidade, preco) {
     contadorItens++;
     const novoItem = {
@@ -533,21 +605,41 @@ function adicionarServicoAoTemplate(id, nome, unidade, preco) {
     atualizarTabelaItens();
     atualizarTotal();
     atualizarJsonItens();
+    atualizarContadorItens();
 }
 
 // Função para atualizar a tabela de itens
 function atualizarTabelaItens() {
     const tbody = document.getElementById('corpoTabelaItens');
+    
+    if (itensTemplate.length === 0) {
+        tbody.innerHTML = `
+            <tr>
+                <td colspan="7" class="text-center text-muted py-4">
+                    <i class="fas fa-inbox fa-2x mb-2 d-block"></i>
+                    Nenhum item adicionado ainda
+                </td>
+            </tr>
+        `;
+        return;
+    }
+    
     tbody.innerHTML = '';
     
     itensTemplate.forEach((item, index) => {
         const row = tbody.insertRow();
         row.innerHTML = `
-            <td>${item.ordem}</td>
+            <td class="fw-bold">${item.ordem}</td>
             <td class="text-break">${item.descricao}</td>
             <td><input type="number" class="form-control form-control-sm" value="${item.quantidade}" min="0.1" step="0.1" onchange="atualizarQuantidade(${index}, this.value)"></td>
-            <td class="text-nowrap">R$ ${item.subtotal.toFixed(2)}</td>
-            <td><button type="button" class="btn btn-sm btn-outline-danger" onclick="removerItem(${index})"><i class="fas fa-trash"></i></button></td>
+            <td class="text-center">${item.unidade}</td>
+            <td class="text-end">R$ ${item.preco_unitario.toFixed(2)}</td>
+            <td class="text-end fw-bold">R$ ${item.subtotal.toFixed(2)}</td>
+            <td class="text-center">
+                <button type="button" class="btn btn-sm btn-outline-danger" onclick="removerItem(${index})" title="Remover item">
+                    <i class="fas fa-trash"></i>
+                </button>
+            </td>
         `;
     });
 }
@@ -567,6 +659,12 @@ function removerItem(index) {
     atualizarTabelaItens();
     atualizarTotal();
     atualizarJsonItens();
+    atualizarContadorItens();
+}
+
+// Função para atualizar contador de itens
+function atualizarContadorItens() {
+    document.getElementById('contadorItens').textContent = itensTemplate.length;
 }
 
 // Função para atualizar total
@@ -651,9 +749,32 @@ document.getElementById('templateForm').addEventListener('submit', function(e) {
     }
 });
 
-// Busca de serviços
+// Suporte ao Enter nos campos de item
+document.addEventListener('DOMContentLoaded', function() {
+    const camposItem = ['novoItemDescricao', 'novoItemQuantidade', 'novoItemUnidade', 'novoItemPreco'];
+    
+    camposItem.forEach(function(campoId) {
+        const campo = document.getElementById(campoId);
+        if (campo) {
+            campo.addEventListener('keypress', function(e) {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    adicionarItemManual();
+                }
+            });
+        }
+    });
+    
+    // Foco inicial no nome do template
+    const nomeField = document.getElementById('nome');
+    if (nomeField) {
+        nomeField.focus();
+    }
+});
+
+// Busca de serviços (removido - não é mais necessário)
 function buscarServicos() {
-    // Implementar busca se necessário
+    // Função mantida para compatibilidade
 }
 </script>
 
