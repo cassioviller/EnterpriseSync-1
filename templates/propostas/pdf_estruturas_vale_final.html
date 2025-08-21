@@ -57,10 +57,9 @@
             
             /* Quebras inteligentes para impressão A4 */
             .section {
-                page-break-inside: auto; /* Permite quebrar seções se necessário */
                 margin: 15px 0;
-                orphans: 2; /* Mínimo 2 linhas no final da página */
-                widows: 2; /* Mínimo 2 linhas no início da página */
+                orphans: 3; /* Mínimo 3 linhas no final da página */
+                widows: 3; /* Mínimo 3 linhas no início da página */
             }
             
             .items-table {
@@ -68,9 +67,13 @@
                 margin: 10px 0;
             }
             
-            /* Força quebra de página após seções específicas se estiver muito grande */
-            .section:nth-child(3) { /* Seção 2 - tabela de preços */
-                page-break-after: auto;
+            /* Força quebra antes das seções que normalmente ficam na mesma página */
+            .section:nth-of-type(4) { /* Seção 3 - Itens Inclusos */
+                page-break-before: auto;
+            }
+            
+            .section:nth-of-type(6) { /* Seção 5 - Condições de Pagamento */
+                page-break-before: auto;
             }
         }
         
@@ -556,11 +559,16 @@
             {% endif %}
         </div>
 
-        <div class="section">
+        <div class="section" style="page-break-inside: avoid;">
             <div class="section-title">3. ITENS INCLUSOS NO FORNECIMENTO</div>
             {% if proposta.itens_inclusos %}
                 <div style="text-align: justify; line-height: 1.7;">
-                    {{ proposta.itens_inclusos | replace(';', ';<br>') | replace(',', ',<br>') | replace('\n', '<br>') | safe }}
+                    {% set linhas = proposta.itens_inclusos.split('\n') %}
+                    {% for linha in linhas %}
+                        {% if linha.strip() %}
+                            {{ linha.strip() }};<br>
+                        {% endif %}
+                    {% endfor %}
                 </div>
             {% else %}
                 <div style="text-align: justify; line-height: 1.7;">
@@ -574,11 +582,16 @@
             {% endif %}
         </div>
 
-        <div class="section">
+        <div class="section" style="page-break-inside: avoid;">
             <div class="section-title">4. ITENS EXCLUSOS DO FORNECIMENTO</div>
             {% if proposta.itens_exclusos %}
                 <div style="text-align: justify; line-height: 1.7;">
-                    {{ proposta.itens_exclusos | replace(';', ';<br>') | replace(',', ',<br>') | replace('\n', '<br>') | safe }}
+                    {% set linhas = proposta.itens_exclusos.split('\n') %}
+                    {% for linha in linhas %}
+                        {% if linha.strip() %}
+                            {{ linha.strip() }};<br>
+                        {% endif %}
+                    {% endfor %}
                 </div>
             {% else %}
                 <div style="text-align: justify; line-height: 1.7;">

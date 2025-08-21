@@ -647,12 +647,32 @@ def gerar_pdf(id):
         config_empresa = ConfiguracaoEmpresa.query.filter_by(admin_id=admin_id).first()
         
         # Tratamento de dados para formatação correta no PDF
+        import json
+        
         if hasattr(proposta, 'itens_inclusos') and proposta.itens_inclusos:
-            if isinstance(proposta.itens_inclusos, list):
+            if isinstance(proposta.itens_inclusos, str):
+                try:
+                    # Tenta parsear se for string JSON
+                    itens_list = json.loads(proposta.itens_inclusos)
+                    if isinstance(itens_list, list):
+                        proposta.itens_inclusos = '\n'.join(itens_list)
+                except json.JSONDecodeError:
+                    # Se não for JSON válido, mantém como está
+                    pass
+            elif isinstance(proposta.itens_inclusos, list):
                 proposta.itens_inclusos = '\n'.join(proposta.itens_inclusos)
         
         if hasattr(proposta, 'itens_exclusos') and proposta.itens_exclusos:
-            if isinstance(proposta.itens_exclusos, list):
+            if isinstance(proposta.itens_exclusos, str):
+                try:
+                    # Tenta parsear se for string JSON
+                    itens_list = json.loads(proposta.itens_exclusos)
+                    if isinstance(itens_list, list):
+                        proposta.itens_exclusos = '\n'.join(itens_list)
+                except json.JSONDecodeError:
+                    # Se não for JSON válido, mantém como está
+                    pass
+            elif isinstance(proposta.itens_exclusos, list):
                 proposta.itens_exclusos = '\n'.join(proposta.itens_exclusos)
         
         # Debug da configuração

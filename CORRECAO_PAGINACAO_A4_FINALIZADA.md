@@ -10,16 +10,22 @@ O PDF das propostas estava com problemas de paginação inadequada para formato 
 
 ## 🔧 CORREÇÕES IMPLEMENTADAS
 
-### 1. **Formatação de Dados no Backend**
+### 1. **Formatação de Dados JSON no Backend**
 ```python
-# Tratamento de dados para formatação correta no PDF
-if hasattr(proposta, 'itens_inclusos') and proposta.itens_inclusos:
-    if isinstance(proposta.itens_inclusos, list):
-        proposta.itens_inclusos = '\n'.join(proposta.itens_inclusos)
+# Tratamento de dados JSON para formatação correta no PDF
+import json
 
-if hasattr(proposta, 'itens_exclusos') and proposta.itens_exclusos:
-    if isinstance(proposta.itens_exclusos, list):
-        proposta.itens_exclusos = '\n'.join(proposta.itens_exclusos)
+if hasattr(proposta, 'itens_inclusos') and proposta.itens_inclusos:
+    if isinstance(proposta.itens_inclusos, str):
+        try:
+            # Processa arrays JSON vindos do banco
+            itens_list = json.loads(proposta.itens_inclusos)
+            if isinstance(itens_list, list):
+                proposta.itens_inclusos = '\n'.join(itens_list)
+        except json.JSONDecodeError:
+            pass
+    elif isinstance(proposta.itens_inclusos, list):
+        proposta.itens_inclusos = '\n'.join(proposta.itens_inclusos)
 ```
 
 ### 2. **CSS Otimizado para A4**
