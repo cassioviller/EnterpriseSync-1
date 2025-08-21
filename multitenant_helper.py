@@ -54,8 +54,8 @@ def get_admin_id():
             print(f"DEBUG HELPER: Fallback para admin_id={fallback_id}")
             return fallback_id
         except:
-            print("DEBUG HELPER: Fallback final para admin_id=10")
-            return 10
+            print("DEBUG HELPER: Fallback final para admin_id=2 (produção)")
+            return 2
 
 def get_current_user_safe():
     """
