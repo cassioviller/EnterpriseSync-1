@@ -27,7 +27,7 @@
         
         .page {
             width: 210mm;
-            min-height: 297mm;
+            max-width: 210mm;
             margin: 20px auto;
             background: white;
             box-shadow: 0 0 10px rgba(0,0,0,0.1);
@@ -49,19 +49,28 @@
                 box-shadow: none;
                 page-break-after: auto; /* Fluxo natural na impressão */
                 width: 210mm;
-                min-height: 297mm;
+                height: auto;
+                min-height: 250mm;
+                max-height: none;
                 padding: 1.5cm 1.5cm;
             }
             
             /* Quebras inteligentes para impressão A4 */
             .section {
-                page-break-inside: avoid;
+                page-break-inside: auto; /* Permite quebrar seções se necessário */
                 margin: 15px 0;
+                orphans: 2; /* Mínimo 2 linhas no final da página */
+                widows: 2; /* Mínimo 2 linhas no início da página */
             }
             
             .items-table {
-                page-break-inside: avoid;
+                page-break-inside: avoid; /* Evita quebrar tabelas */
                 margin: 10px 0;
+            }
+            
+            /* Força quebra de página após seções específicas se estiver muito grande */
+            .section:nth-child(3) { /* Seção 2 - tabela de preços */
+                page-break-after: auto;
             }
         }
         

@@ -646,6 +646,15 @@ def gerar_pdf(id):
         
         config_empresa = ConfiguracaoEmpresa.query.filter_by(admin_id=admin_id).first()
         
+        # Tratamento de dados para formatação correta no PDF
+        if hasattr(proposta, 'itens_inclusos') and proposta.itens_inclusos:
+            if isinstance(proposta.itens_inclusos, list):
+                proposta.itens_inclusos = '\n'.join(proposta.itens_inclusos)
+        
+        if hasattr(proposta, 'itens_exclusos') and proposta.itens_exclusos:
+            if isinstance(proposta.itens_exclusos, list):
+                proposta.itens_exclusos = '\n'.join(proposta.itens_exclusos)
+        
         # Debug da configuração
         if config_empresa:
             print(f"DEBUG PDF: Config empresa: {config_empresa.nome_empresa}")
