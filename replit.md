@@ -93,13 +93,13 @@ INFO:migrations:✅ Migrações automáticas concluídas com sucesso!
 - **Dimensões A4**: Mantidas em todas as páginas, fixas ou dinâmicas
 - **Status**: FUNCIONAL - Sistema de paginação inteligente implementado
 
-### 🚨 HOTFIX: Correção Templates e Formato Tabelas - IMPLEMENTADO
-- **Templates em produção**: Corrigido acesso a templates públicos para admin_id=10
-- **API de templates**: Modificada para buscar templates próprios + públicos
-- **Processamento organizado**: Função criar_proposta agora processa dados organizados por template
-- **Sistema híbrido**: Suporte a itens simples + templates organizados
-- **Preservação de formato**: Tabelas organizadas mantidas após salvar proposta
-- **Status**: CORRIGIDO - Templates e organização funcionais
+### ✅ CORREÇÃO: Templates em Produção - RESOLVIDO
+- **Problema identificado**: Não era falta de templates - existem 4 templates ativos para admin_id=10
+- **Lógica de busca corrigida**: admin_id estava sendo calculado incorretamente no bypass
+- **Sistema multitenant mantido**: Cada empresa vê apenas seus próprios templates
+- **Debug adicionado**: Logs para monitorar busca de templates em produção
+- **API funcionando**: Template loading corrigido para multitenant verdadeiro
+- **Status**: CORRIGIDO - Templates carregando corretamente
 
 ## Recent Changes (21/08/2025)
 

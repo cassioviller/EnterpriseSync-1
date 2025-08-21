@@ -76,6 +76,8 @@ def get_template_data(template_id):
     current_user = MockCurrentUser()
     admin_id = getattr(current_user, 'admin_id', None) or getattr(current_user, 'id', None)
     
+    print(f"DEBUG API TEMPLATE: Buscando template {template_id} para admin_id={admin_id}")
+    
     # Buscar apenas template do próprio admin (multitenant)
     template = PropostaTemplate.query.filter_by(
         id=template_id, 
@@ -178,19 +180,21 @@ def test_nova_proposta():
 def nova_proposta():
     """Exibe formulário para criar nova proposta"""
     # Admin_id dinâmico baseado no tipo de usuário
-    if hasattr(current_user, 'tipo_usuario') and current_user.tipo_usuario.value == 'funcionario':
-        admin_id = getattr(current_user, 'admin_id', current_user.id)
-    else:
-        admin_id = current_user.id
+    admin_id = getattr(current_user, 'admin_id', None) or current_user.id
+    print(f"DEBUG TEMPLATES: Buscando templates para admin_id={admin_id}")
     
     # Buscar configuração da empresa
     config_empresa = ConfiguracaoEmpresa.query.filter_by(admin_id=admin_id).first()
     
-    # Buscar apenas templates do próprio admin (multitenant)
+    # Buscar templates do admin correto (multitenant)
     templates = PropostaTemplate.query.filter_by(
         admin_id=admin_id, 
         ativo=True
     ).order_by(PropostaTemplate.categoria, PropostaTemplate.nome).all()
+    
+    print(f"DEBUG TEMPLATES: Encontrou {len(templates)} templates para admin_id={admin_id}")
+    for t in templates:
+        print(f"DEBUG TEMPLATE: {t.id}: {t.nome} (admin_id={t.admin_id})")
     
     # Definir valores padrão da empresa ou usar padrões do sistema
     padrao_itens_inclusos = "Mão de obra para execução dos serviços; Todos os equipamentos de segurança necessários; Transporte e alimentação da equipe; Container para guarda de ferramentas; Movimentação de carga (Munck); Transporte dos materiais"
