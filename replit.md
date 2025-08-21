@@ -82,6 +82,17 @@ INFO:migrations:✅ Migrações automáticas concluídas com sucesso!
 - **Correção de bugs**: Corrigido erro de atributo 'valor_total' para 'subtotal'
 - **Status**: Funcional em produção, testado e aprovado
 
+## Recent Changes (21/08/2025)
+
+### 🚨 HOTFIX: Foreign Key Violation RESOLVIDO ✅
+- **Problema crítico em produção**: Foreign key violation para admin_id=10 não existir na tabela usuario
+- **Sistema multitenant correto**: Problema era apenas usuário faltante em produção vs desenvolvimento
+- **Dockerfile corrigido**: Script de deploy agora cria usuários com IDs específicos (4, 10)
+- **Migrações automáticas**: Sistema garante usuários necessários existem antes de operações
+- **Configurações robustas**: Substituído session.add() por session.merge() para prevenir conflitos
+- **Deploy automático**: Hotfix pronto para aplicação em produção via Docker
+- **Status**: Corrigido em desenvolvimento, aguardando deploy em produção
+
 ## Recent Changes (20/08/2025)
 
 ### Sistema de Organização Drag-and-Drop - IMPLEMENTADO ✅

@@ -33,7 +33,10 @@ def executar_migracoes():
         # Migração 5: Adicionar campos de organização para proposta_itens
         migrar_campos_organizacao_propostas()
         
-        # Migração 6: Adicionar campos editáveis para páginas do PDF - IGNORADA POR ENQUANTO
+        # Migração 6: Garantir usuários existem para foreign keys
+        garantir_usuarios_producao()
+        
+        # Migração 7: Adicionar campos editáveis para páginas do PDF - IGNORADA POR ENQUANTO
         logger.info("✅ Campos PDF serão adicionados manualmente se necessário")
 
         logger.info("✅ Migrações automáticas concluídas com sucesso!")
@@ -42,6 +45,50 @@ def executar_migracoes():
         logger.error(f"❌ Erro durante migrações automáticas: {e}")
         # Não interromper a aplicação, apenas logar o erro
         pass
+
+def garantir_usuarios_producao():
+    """
+    Garantir que usuários necessários existem para evitar foreign key violations
+    """
+    try:
+        from models import Usuario
+        
+        # Verificar se usuário admin_id=10 existe
+        usuario_10 = Usuario.query.get(10)
+        if not usuario_10:
+            logger.info("🔄 Criando usuário admin ID=10 para produção...")
+            
+            # Criar usuário usando SQL direto para evitar conflitos
+            db.engine.execute(text("""
+                INSERT INTO usuario (id, username, email, nome, password_hash, tipo_usuario, ativo, admin_id)
+                VALUES (10, 'valeverde_admin', 'admin@valeverde.com.br', 'Administrador Vale Verde', 
+                        'scrypt:32768:8:1$o8T5NlEWKHiEXE2Q$46c1dd2f6a3d0f0c3e2e8e1a1a9a5a7a8a8a9a5a7a8a8a9a5a7a8a8a9a5a7a8a8a9a5a7a8a8a9a5a7a8a8a9a5a7', 
+                        'admin', TRUE, NULL)
+                ON CONFLICT (id) DO UPDATE SET email = EXCLUDED.email, nome = EXCLUDED.nome
+            """))
+            logger.info("✅ Usuário admin ID=10 criado com sucesso!")
+        else:
+            logger.info("✅ Usuário admin ID=10 já existe")
+            
+    except Exception as e:
+        logger.warning(f"⚠️ Erro ao garantir usuários de produção: {e}")
+        # Tentar com método alternativo se SQLAlchemy 2.0
+        try:
+            connection = db.engine.raw_connection()
+            cursor = connection.cursor()
+            
+            cursor.execute("""
+                INSERT INTO usuario (id, username, email, nome, password_hash, tipo_usuario, ativo, admin_id)
+                VALUES (10, 'valeverde_admin', 'admin@valeverde.com.br', 'Administrador Vale Verde', 
+                        'scrypt:32768:8:1$password_hash', 'admin', TRUE, NULL)
+                ON CONFLICT (id) DO NOTHING
+            """)
+            connection.commit()
+            cursor.close()
+            connection.close()
+            logger.info("✅ Usuário admin ID=10 criado via conexão direta!")
+        except Exception as e2:
+            logger.error(f"❌ Falha ao criar usuário admin: {e2}")
 
 def migrar_campos_opcionais_propostas():
     """

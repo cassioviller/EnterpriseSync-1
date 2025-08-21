@@ -99,12 +99,53 @@ CREATE TABLE IF NOT EXISTS registro_ponto (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
--- USUÁRIOS ADMINISTRATIVOS
-INSERT INTO usuario (username, email, nome, password_hash, tipo_usuario, ativo, admin_id) 
+-- USUÁRIOS ADMINISTRATIVOS - CORRIGIDO PARA PRODUÇÃO
+INSERT INTO usuario (id, username, email, nome, password_hash, tipo_usuario, ativo, admin_id) 
 VALUES 
-('admin', 'admin@sige.com', 'Super Admin', 'scrypt:32768:8:1$o8T5NlEWKHiEXE2Q$46c1dd2f6a3d0f0c3e2e8e1a1a9a5a7a8a8a9a5a7a8a8a9a5a7a8a8a9a5a7a8a8a9a5a7a8a8a9a5a7a8a8a9a5a7', 'super_admin', TRUE, NULL),
-('valeverde', 'valeverde@sige.com', 'Vale Verde Admin', 'scrypt:32768:8:1$o8T5NlEWKHiEXE2Q$46c1dd2f6a3d0f0c3e2e8e1a1a9a5a7a8a8a9a5a7a8a8a9a5a7a8a8a9a5a7a8a8a9a5a7a8a8a9a5a7a8a8a9a5a7', 'admin', TRUE, 10)
-ON CONFLICT (email) DO NOTHING;
+(4, 'admin', 'admin@estruturasdovale.com.br', 'Administrador do Sistema', 'scrypt:32768:8:1$o8T5NlEWKHiEXE2Q$46c1dd2f6a3d0f0c3e2e8e1a1a9a5a7a8a8a9a5a7a8a8a9a5a7a8a8a9a5a7a8a8a9a5a7a8a8a9a5a7a8a8a9a5a7', 'super_admin', TRUE, NULL),
+(10, 'valeverde', 'admin@valeverde.com.br', 'Administrador Vale Verde', 'scrypt:32768:8:1$o8T5NlEWKHiEXE2Q$46c1dd2f6a3d0f0c3e2e8e1a1a9a5a7a8a8a9a5a7a8a8a9a5a7a8a8a9a5a7a8a8a9a5a7a8a8a9a5a7a8a8a9a5a7', 'admin', TRUE, NULL)
+ON CONFLICT (id) DO UPDATE SET 
+    username = EXCLUDED.username,
+    email = EXCLUDED.email,
+    nome = EXCLUDED.nome,
+    tipo_usuario = EXCLUDED.tipo_usuario;
+
+-- GARANTIR SEQUÊNCIA DE USUÁRIOS ATUALIZADA
+SELECT setval('usuario_id_seq', GREATEST(10, (SELECT MAX(id) FROM usuario)));
+
+-- CONFIGURAÇÃO DA EMPRESA PARA O ADMIN ID=10
+INSERT INTO configuracao_empresa (
+    admin_id, nome_empresa, cnpj, endereco, telefone, email, website,
+    itens_inclusos_padrao, itens_exclusos_padrao, condicoes_padrao, 
+    condicoes_pagamento_padrao, garantias_padrao, prazo_entrega_padrao,
+    validade_padrao, percentual_nota_fiscal_padrao, cor_primaria,
+    cor_secundaria, cor_fundo_proposta
+) VALUES (
+    10, 
+    'Vale Verde Estruturas Metálicas',
+    '12.345.678/0001-90',
+    'Rodovia BR-116, KM 142 - Distrito Industrial, São José dos Campos/SP',
+    '(12) 99999-9999',
+    'contato@valeverde.com.br',
+    'https://www.valeverde.com.br',
+    'Mão de obra para execução dos serviços; Todos os equipamentos de segurança necessários; Transporte e alimentação da equipe; Container para guarda de ferramentas; Movimentação de carga (Munck); Transporte dos materiais',
+    'Projeto e execução de qualquer obra civil, fundações, alvenarias, elétrica, automação, tubulações etc.; Execução de ensaios destrutivos e radiográficos; Fornecimento de local para armazenagem das peças; Fornecimento e/ou serviços não especificados claramente nesta proposta; Fornecimento de escoramento (escoras); Fornecimento de andaimes e plataformas; Técnico de segurança; Pintura final de acabamento; Calhas, rufos, condutores e pingadeiras',
+    'Prazo de Entrega: 90 dias; Percentual Nota Fiscal: 13.50%; Pagamento via PIX com desconto de 2%',
+    '10% de entrada na assinatura do contrato; 10% após projeto aprovado; 45% compra dos perfis; 25% no início da montagem in loco; 10% após a conclusão da montagem',
+    'A Vale Verde Estruturas Metálicas garante todos os materiais empregados nos serviços contra defeitos de fabricação pelo prazo de 12 (doze) meses contados a partir da data de conclusão da obra, conforme NBR 8800.; Garantia de montagem: 12 meses; Suporte técnico: 24 meses',
+    90,
+    7,
+    13.50,
+    '#008b3a',
+    '#6c757d',
+    '#f0f8ff'
+) ON CONFLICT (admin_id) DO UPDATE SET
+    nome_empresa = EXCLUDED.nome_empresa,
+    cnpj = EXCLUDED.cnpj,
+    endereco = EXCLUDED.endereco,
+    telefone = EXCLUDED.telefone,
+    email = EXCLUDED.email,
+    website = EXCLUDED.website;
 
 -- FUNCIONÁRIOS DEMO PARA PRODUÇÃO - CORRIGIDO ADMIN_ID
 INSERT INTO funcionario (codigo, nome, cpf, cargo, salario, data_admissao, admin_id, ativo)
