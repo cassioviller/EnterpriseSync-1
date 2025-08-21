@@ -752,11 +752,52 @@ def gerar_pdf(id):
         
         print(f"DEBUG PDF: Usando template: {template_name}")
         
+        # Buscar template da proposta se existe
+        template_proposta = None
+        if hasattr(proposta, 'template_id') and proposta.template_id:
+            template_proposta = PropostaTemplate.query.get(proposta.template_id)
+        
+        # Carregar e organizar itens da proposta para o PDF
+        if hasattr(proposta, 'itens') and proposta.itens:
+            # Organizar itens por categoria se existir
+            itens_organizados = []
+            categorias = {}
+            
+            for item in proposta.itens:
+                categoria = getattr(item, 'categoria_titulo', 'Serviços')
+                if categoria not in categorias:
+                    categorias[categoria] = []
+                categorias[categoria].append(item)
+            
+            for categoria, itens_categoria in categorias.items():
+                itens_organizados.append((categoria, itens_categoria))
+            
+            proposta.itens_organizados = itens_organizados
+            print(f"DEBUG PDF: {len(proposta.itens)} itens organizados em {len(itens_organizados)} categorias")
+        else:
+            proposta.itens_organizados = []
+            print("DEBUG PDF: Nenhum item encontrado na proposta")
+        
+        # Calcular total geral
+        total_geral = 0
+        if proposta.itens:
+            total_geral = sum(item.quantidade * item.preco_unitario for item in proposta.itens)
+        
+        # Usar valor_total da proposta se maior que total calculado
+        if proposta.valor_total and proposta.valor_total > total_geral:
+            total_geral = proposta.valor_total
+        
+        print(f"DEBUG PDF: Total calculado dos itens: {total_geral}")
+        print(f"DEBUG PDF: Valor total da proposta: {proposta.valor_total}")
+        print(f"DEBUG PDF: Total geral final: {total_geral}")
+        
         # Renderizar HTML da proposta
         html_content = render_template(template_name, 
                                      proposta=proposta, 
+                                     template=template_proposta,  # Passando o template da proposta
                                      config=config_empresa,
-                                     config_empresa=config_empresa)
+                                     config_empresa=config_empresa,
+                                     total_geral=total_geral)
         
         print("DEBUG PDF: Template renderizado com sucesso")
         return html_content

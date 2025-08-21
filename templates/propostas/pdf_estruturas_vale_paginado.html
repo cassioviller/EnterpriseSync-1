@@ -429,7 +429,6 @@
             {% if proposta.itens and proposta.itens|length > 0 %}
                 <!-- Se há múltiplas categorias organizadas -->
                 {% if proposta.itens_organizados %}
-                    {% set total_geral = 0 %}
                     {% for categoria_nome, itens_categoria in proposta.itens_organizados %}
                         <div style="text-align: center; font-weight: bold; margin: 15px 0;">{{ categoria_nome.upper() }}</div>
                         
@@ -456,14 +455,13 @@
                                     <td>R$ {{ "%.2f"|format(item.subtotal) }}</td>
                                 </tr>
                                 {% set subtotal_categoria = subtotal_categoria + item.subtotal %}
-                                {% set total_geral = total_geral + item.subtotal %}
                                 {% endfor %}
                             </tbody>
                         </table>
                     {% endfor %}
                     
                     <div style="text-align: right; margin-top: 20px; font-weight: bold; font-size: 12pt;">
-                        VALOR TOTAL: R$ {{ "%.2f"|format(total_geral) }}
+                        VALOR TOTAL: R$ {{ "%.2f"|format(proposta.valor_total) }}
                     </div>
                 {% else %}
                     <!-- Formato tradicional simples -->
