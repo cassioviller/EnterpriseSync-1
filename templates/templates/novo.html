@@ -11,7 +11,7 @@
                 <i class="fas fa-plus-circle text-primary me-2"></i>
                 Novo Template de Proposta
             </h1>
-            <p class="text-muted mb-0">Crie um template reutilizável com serviços/atividades pré-selecionados</p>
+            <p class="text-muted mb-0">Crie um template completo com todos os dados da proposta</p>
         </div>
         <div>
             <a href="{{ url_for('templates.dashboard') }}" class="btn btn-outline-secondary">
@@ -21,55 +21,152 @@
     </div>
 
     <form method="POST" id="templateForm">
-        <div class="row">
-            <!-- Informações Básicas -->
-            <div class="col-md-8">
-                <div class="card mb-4">
-                    <div class="card-header">
-                        <h5 class="card-title mb-0">
-                            <i class="fas fa-info-circle text-primary"></i> Informações Básicas
-                        </h5>
-                    </div>
-                    <div class="card-body">
-                        <div class="row">
-                            <div class="col-md-8">
-                                <div class="mb-3">
-                                    <label for="nome" class="form-label">Nome do Template *</label>
-                                    <input type="text" class="form-control" id="nome" name="nome" required 
-                                           placeholder="Ex: Estrutura Metálica Padrão">
-                                </div>
+        <!-- Navigation Tabs -->
+        <ul class="nav nav-pills nav-justified mb-4" id="templateTabs" role="tablist">
+            <li class="nav-item" role="presentation">
+                <button class="nav-link active" id="basico-tab" data-bs-toggle="pill" data-bs-target="#basico" type="button" role="tab">
+                    <i class="fas fa-info-circle"></i> Básico
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="destinatario-tab" data-bs-toggle="pill" data-bs-target="#destinatario" type="button" role="tab">
+                    <i class="fas fa-user"></i> Destinatário
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="engenheiro-tab" data-bs-toggle="pill" data-bs-target="#engenheiro" type="button" role="tab">
+                    <i class="fas fa-user-tie"></i> Engenheiro
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="proposta-tab" data-bs-toggle="pill" data-bs-target="#proposta" type="button" role="tab">
+                    <i class="fas fa-file-contract"></i> Proposta
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="itens-tab" data-bs-toggle="pill" data-bs-target="#itens" type="button" role="tab">
+                    <i class="fas fa-list"></i> Itens
+                </button>
+            </li>
+        </ul>
+
+        <!-- Tab Content -->
+        <div class="tab-content" id="templateTabsContent">
+            
+            <!-- ABA 1: INFORMAÇÕES BÁSICAS -->
+            <div class="tab-pane fade show active" id="basico" role="tabpanel">
+                <div class="row">
+                    <div class="col-md-8">
+                        <div class="card">
+                            <div class="card-header bg-primary text-white">
+                                <h5 class="mb-0"><i class="fas fa-info-circle"></i> Informações Básicas</h5>
                             </div>
-                            <div class="col-md-4">
+                            <div class="card-body">
+                                <div class="row">
+                                    <div class="col-md-8">
+                                        <div class="mb-3">
+                                            <label for="nome" class="form-label">Nome do Template *</label>
+                                            <input type="text" class="form-control form-control-lg" id="nome" name="nome" required 
+                                                   placeholder="Ex: Estrutura Metálica Residencial">
+                                        </div>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <div class="mb-3">
+                                            <label for="categoria" class="form-label">Categoria *</label>
+                                            <select class="form-select form-select-lg" id="categoria" name="categoria" required>
+                                                <option value="">Selecione...</option>
+                                                <option value="Estrutura Metálica">Estrutura Metálica</option>
+                                                <option value="Mezanino">Mezanino</option>
+                                                <option value="Cobertura">Cobertura</option>
+                                                <option value="Galpão Industrial">Galpão Industrial</option>
+                                                <option value="Cobertura Gourmet">Cobertura Gourmet</option>
+                                                <option value="Reforma">Reforma</option>
+                                                <option value="Outros">Outros</option>
+                                            </select>
+                                        </div>
+                                    </div>
+                                </div>
+                                
                                 <div class="mb-3">
-                                    <label for="categoria" class="form-label">Categoria *</label>
-                                    <select class="form-select" id="categoria" name="categoria" required>
-                                        <option value="">Selecione...</option>
-                                        <option value="Estrutura Metálica">Estrutura Metálica</option>
-                                        <option value="Mezanino">Mezanino</option>
-                                        <option value="Cobertura">Cobertura</option>
-                                        <option value="Galpão Industrial">Galpão Industrial</option>
-                                        <option value="Cobertura Gourmet">Cobertura Gourmet</option>
-                                        <option value="Reforma">Reforma</option>
-                                        <option value="Outros">Outros</option>
-                                    </select>
+                                    <label for="descricao" class="form-label">Descrição</label>
+                                    <textarea class="form-control" id="descricao" name="descricao" rows="4"
+                                              placeholder="Descrição detalhada do template e sua aplicação"></textarea>
+                                </div>
+
+                                <!-- Configurações Rápidas -->
+                                <div class="row">
+                                    <div class="col-md-3">
+                                        <div class="mb-3">
+                                            <label for="prazo_entrega_dias" class="form-label">Prazo (dias)</label>
+                                            <input type="number" class="form-control" id="prazo_entrega_dias" 
+                                                   name="prazo_entrega_dias" value="90" min="1">
+                                        </div>
+                                    </div>
+                                    <div class="col-md-3">
+                                        <div class="mb-3">
+                                            <label for="validade_dias" class="form-label">Validade (dias)</label>
+                                            <input type="number" class="form-control" id="validade_dias" 
+                                                   name="validade_dias" value="7" min="1">
+                                        </div>
+                                    </div>
+                                    <div class="col-md-3">
+                                        <div class="mb-3">
+                                            <label for="percentual_nota_fiscal" class="form-label">% Nota Fiscal</label>
+                                            <input type="number" class="form-control" id="percentual_nota_fiscal" 
+                                                   name="percentual_nota_fiscal" value="13.5" step="0.1" min="0" max="100">
+                                        </div>
+                                    </div>
+                                    <div class="col-md-3">
+                                        <div class="mb-3">
+                                            <label class="form-label d-block">&nbsp;</label>
+                                            <div class="form-check">
+                                                <input class="form-check-input" type="checkbox" id="publico" name="publico">
+                                                <label class="form-check-label" for="publico">
+                                                    Template público
+                                                </label>
+                                            </div>
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
                         </div>
-                        
-                        <div class="mb-3">
-                            <label for="descricao" class="form-label">Descrição</label>
-                            <textarea class="form-control" id="descricao" name="descricao" rows="3"
-                                      placeholder="Descrição detalhada do template e sua aplicação"></textarea>
+                    </div>
+                    
+                    <div class="col-md-4">
+                        <div class="card h-100">
+                            <div class="card-header bg-info text-white">
+                                <h6 class="mb-0"><i class="fas fa-lightbulb"></i> Dicas</h6>
+                            </div>
+                            <div class="card-body">
+                                <div class="alert alert-info">
+                                    <small>
+                                        <strong>Nome:</strong> Use nomes descritivos e específicos<br>
+                                        <strong>Categoria:</strong> Ajuda na organização e busca<br>
+                                        <strong>Público:</strong> Permite que outros usuários usem este template
+                                    </small>
+                                </div>
+                                
+                                <div class="mt-4">
+                                    <h6 class="text-muted">Template Existente</h6>
+                                    <select class="form-select" id="templatePreCarregado" onchange="carregarTemplateCompleto()">
+                                        <option value="">Selecione um template para pré-carregar...</option>
+                                        {% for template in templates_existentes %}
+                                        <option value="{{ template.id }}">{{ template.nome }} ({{ template.categoria }})</option>
+                                        {% endfor %}
+                                    </select>
+                                    <small class="text-muted">Carregue um template existente como base</small>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>
+            </div>
 
-                <!-- DADOS DO DESTINATÁRIO -->
-                <div class="card mb-4">
-                    <div class="card-header">
-                        <h5 class="card-title mb-0">
-                            <i class="fas fa-user text-primary"></i> Dados do Destinatário
-                        </h5>
+            <!-- ABA 2: DADOS DO DESTINATÁRIO -->
+            <div class="tab-pane fade" id="destinatario" role="tabpanel">
+                <div class="card">
+                    <div class="card-header bg-primary text-white">
+                        <h5 class="mb-0"><i class="fas fa-user"></i> Dados do Destinatário</h5>
                     </div>
                     <div class="card-body">
                         <div class="row">
@@ -106,144 +203,150 @@
                             </div>
                         </div>
 
-                        <div class="mb-3">
-                            <label for="assunto" class="form-label">Ass. (Assunto)</label>
-                            <input type="text" class="form-control" id="assunto" name="assunto" 
-                                   placeholder="Ex: Fabricação e montagem de estrutura metálica">
+                        <div class="row">
+                            <div class="col-md-8">
+                                <div class="mb-3">
+                                    <label for="assunto" class="form-label">Ass. (Assunto)</label>
+                                    <input type="text" class="form-control" id="assunto" name="assunto" 
+                                           placeholder="Ex: Fabricação e montagem de estrutura metálica">
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="mb-3">
+                                    <label for="cidade_data" class="form-label">Cidade e Data</label>
+                                    <input type="text" class="form-control" id="cidade_data" name="cidade_data" 
+                                           value="São José dos Campos, [DATA]" 
+                                           placeholder="Ex: São José dos Campos">
+                                </div>
+                            </div>
                         </div>
-                        
+
                         <div class="mb-3">
-                            <label for="cidade_data" class="form-label">Cidade e Data</label>
-                            <input type="text" class="form-control" id="cidade_data" name="cidade_data" 
-                                   placeholder="Ex: São José dos Campos" value="São José dos Campos">
+                            <label for="texto_apresentacao" class="form-label">Texto de Apresentação</label>
+                            <textarea class="form-control" id="texto_apresentacao" name="texto_apresentacao" rows="6">Prezados,
+
+Atendendo a solicitação de V.sas., apresentamos nossas "Condições Comerciais" para o fornecimento em referência.
+
+Na expectativa de ter atendido às condições especificadas, aproveitamos para expressar os nossos votos de estima e consideração.
+
+Atenciosamente,
+
+Jefferson Luiz Moreira – Gerente Estruturas do Vale</textarea>
                         </div>
                     </div>
                 </div>
+            </div>
 
-                <!-- DADOS DO ENGENHEIRO -->
-                <div class="card mb-4">
-                    <div class="card-header">
-                        <h5 class="card-title mb-0">
-                            <i class="fas fa-user-tie text-success"></i> Dados do Engenheiro
-                        </h5>
+            <!-- ABA 3: DADOS DO ENGENHEIRO -->
+            <div class="tab-pane fade" id="engenheiro" role="tabpanel">
+                <div class="card">
+                    <div class="card-header bg-primary text-white">
+                        <h5 class="mb-0"><i class="fas fa-user-tie"></i> Dados do Engenheiro Responsável</h5>
                     </div>
                     <div class="card-body">
                         <div class="row">
-                            <div class="col-md-6">
+                            <div class="col-md-8">
                                 <div class="mb-3">
                                     <label for="engenheiro_nome" class="form-label">Nome do Engenheiro</label>
                                     <input type="text" class="form-control" id="engenheiro_nome" name="engenheiro_nome" 
-                                           placeholder="Ex: Engº Lucas Barbosa Alves Pinto" value="Engº Lucas Barbosa Alves Pinto">
+                                           value="Engº Lucas Barbosa Alves Pinto"
+                                           placeholder="Ex: Engº João Silva">
                                 </div>
                             </div>
-                            <div class="col-md-6">
+                            <div class="col-md-4">
                                 <div class="mb-3">
                                     <label for="engenheiro_crea" class="form-label">CREA</label>
                                     <input type="text" class="form-control" id="engenheiro_crea" name="engenheiro_crea" 
-                                           placeholder="Ex: CREA- 5070458626-SP" value="CREA- 5070458626-SP">
+                                           value="CREA- 5070458626-SP"
+                                           placeholder="Ex: CREA-12345/SP">
                                 </div>
                             </div>
                         </div>
-                        
+
                         <div class="row">
                             <div class="col-md-6">
                                 <div class="mb-3">
-                                    <label for="engenheiro_email" class="form-label">Email</label>
+                                    <label for="engenheiro_email" class="form-label">E-mail</label>
                                     <input type="email" class="form-control" id="engenheiro_email" name="engenheiro_email" 
-                                           placeholder="Ex: contato@estruturasdovale.com.br" value="contato@estruturasdovale.com.br">
+                                           value="contato@estruturasdovale.com.br"
+                                           placeholder="Ex: engenheiro@empresa.com.br">
                                 </div>
                             </div>
                             <div class="col-md-6">
                                 <div class="mb-3">
                                     <label for="engenheiro_telefone" class="form-label">Telefone</label>
                                     <input type="text" class="form-control" id="engenheiro_telefone" name="engenheiro_telefone" 
-                                           placeholder="Ex: 12 99187-7435" value="12 99187-7435">
+                                           value="12 99187-7435"
+                                           placeholder="Ex: (12) 99999-9999">
                                 </div>
                             </div>
                         </div>
-                        
-                        <div class="mb-3">
-                            <label for="engenheiro_endereco" class="form-label">Endereço</label>
-                            <input type="text" class="form-control" id="engenheiro_endereco" name="engenheiro_endereco" 
-                                   placeholder="Ex: Rua Benedita Nunes de Campos, 140. Residencial União, São José dos Campos - CEP 12.239-008" 
-                                   value="Rua Benedita Nunes de Campos, 140. Residencial União, São José dos Campos - CEP 12.239-008">
-                        </div>
-                        
-                        <div class="mb-3">
-                            <label for="engenheiro_website" class="form-label">Website</label>
-                            <input type="text" class="form-control" id="engenheiro_website" name="engenheiro_website" 
-                                   placeholder="Ex: www.estruturasdovale.com.br" value="www.estruturasdovale.com.br">
-                        </div>
-                    </div>
-                </div>
 
-                <!-- APRESENTAÇÃO -->
-                <div class="card mb-4">
-                    <div class="card-header">
-                        <h5 class="card-title mb-0">
-                            <i class="fas fa-handshake text-info"></i> Apresentação
-                        </h5>
-                    </div>
-                    <div class="card-body">
-                        <div class="mb-3">
-                            <label for="texto_apresentacao" class="form-label">Texto de Apresentação</label>
-                            <textarea class="form-control" id="texto_apresentacao" name="texto_apresentacao" rows="4"
-                                      placeholder="Texto de apresentação da proposta">Atendendo à solicitação de V.Sas., apresentamos nossas "Condições Comerciais", para o fornecimento em referência.
-
-Na expectativa de ter atendido às condições especificadas, aproveitamos para expressar os nossos votos de estima e consideração.</textarea>
+                        <div class="row">
+                            <div class="col-md-8">
+                                <div class="mb-3">
+                                    <label for="engenheiro_endereco" class="form-label">Endereço Completo</label>
+                                    <textarea class="form-control" id="engenheiro_endereco" name="engenheiro_endereco" rows="2">Rua Benedita Nunes de Campos, 140. Residencial União, São José dos Campos - CEP 12.239-008</textarea>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="mb-3">
+                                    <label for="engenheiro_website" class="form-label">Website</label>
+                                    <input type="text" class="form-control" id="engenheiro_website" name="engenheiro_website" 
+                                           value="www.estruturasdovale.com.br"
+                                           placeholder="Ex: www.empresa.com.br">
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>
+            </div>
 
-                <!-- SEÇÕES DA PROPOSTA -->
-                <div class="card mb-4">
-                    <div class="card-header">
-                        <h5 class="card-title mb-0">
-                            <i class="fas fa-list-ol text-warning"></i> Conteúdo das Seções da Proposta
-                        </h5>
-                    </div>
-                    <div class="card-body">
-                        <!-- 1. OBJETO -->
-                        <div class="mb-4">
-                            <h6 class="text-primary">1. OBJETO</h6>
-                            <textarea class="form-control" id="secao_objeto" name="secao_objeto" rows="3"
-                                      placeholder="Descreva o objeto da proposta">Esta proposta descreve as condições comerciais a serem atendidas para o fornecimento de mão de obra especializada para fabricação e montagem de estruturas conforme segue.</textarea>
+            <!-- ABA 4: SEÇÕES DA PROPOSTA -->
+            <div class="tab-pane fade" id="proposta" role="tabpanel">
+                <div class="row">
+                    <div class="col-md-6">
+                        <!-- Seção 1: Objeto -->
+                        <div class="card mb-4">
+                            <div class="card-header bg-success text-white">
+                                <h6 class="mb-0"><i class="fas fa-bullseye"></i> 1. OBJETO</h6>
+                            </div>
+                            <div class="card-body">
+                                <textarea class="form-control" id="secao_objeto" name="secao_objeto" rows="3">Esta proposta descreve as condições comerciais a serem atendidas para o fornecimento de mão de obra especializada para fabricação e montagem de estruturas conforme segue.</textarea>
+                            </div>
                         </div>
 
-                        <!-- 3. ITENS INCLUSOS -->
-                        <div class="mb-4">
-                            <h6 class="text-primary">3. ITENS INCLUSOS NO FORNECIMENTO</h6>
-                            <textarea class="form-control" id="itens_inclusos" name="itens_inclusos" rows="4"
-                                      placeholder="Liste os itens inclusos no fornecimento (separados por ; ou quebra de linha)">• Fornecimento de materiais conforme especificação técnica;
-• Transporte dos materiais até a obra;
-• Mão de obra especializada para montagem;
-• Equipamentos necessários para a montagem.</textarea>
+                        <!-- Seção 3: Itens Inclusos -->
+                        <div class="card mb-4">
+                            <div class="card-header bg-success text-white">
+                                <h6 class="mb-0"><i class="fas fa-check-circle"></i> 3. ITENS INCLUSOS</h6>
+                            </div>
+                            <div class="card-body">
+                                <textarea class="form-control" id="itens_inclusos" name="itens_inclusos" rows="4" placeholder="Itens inclusos no orçamento (separados por vírgula)"></textarea>
+                            </div>
                         </div>
 
-                        <!-- 4. ITENS EXCLUSOS -->
-                        <div class="mb-4">
-                            <h6 class="text-primary">4. ITENS EXCLUSOS DO FORNECIMENTO</h6>
-                            <textarea class="form-control" id="itens_exclusos" name="itens_exclusos" rows="4"
-                                      placeholder="Liste os itens exclusos do fornecimento (separados por ; ou quebra de linha)">• Fundações e estrutura de concreto;
-• Instalações elétricas e hidráulicas;
-• Acabamentos e pintura;
-• Licenças e aprovações junto aos órgãos competentes.</textarea>
+                        <!-- Seção 5: Condições de Pagamento -->
+                        <div class="card mb-4">
+                            <div class="card-header bg-success text-white">
+                                <h6 class="mb-0"><i class="fas fa-credit-card"></i> 5. CONDIÇÕES DE PAGAMENTO</h6>
+                            </div>
+                            <div class="card-body">
+                                <textarea class="form-control" id="condicoes_pagamento" name="condicoes_pagamento" rows="5">10% de entrada na assinatura do contrato
+10% após projeto aprovado
+45% compra dos perfis
+25% no início da montagem in loco
+10% após a conclusão da montagem</textarea>
+                            </div>
                         </div>
 
-                        <!-- 6. CONDIÇÕES DE ENTREGA -->
-                        <div class="mb-4">
-                            <h6 class="text-primary">6. CONDIÇÕES DE ENTREGA</h6>
-                            <textarea class="form-control" id="condicoes_entrega" name="condicoes_entrega" rows="3"
-                                      placeholder="Descreva as condições de entrega">Prazo de entrega de 90 dias corridos após aprovação do projeto executivo e recebimento da primeira parcela.
-
-O prazo poderá ser alterado em função de condições climáticas adversas.</textarea>
-                        </div>
-
-                        <!-- 8. CONSIDERAÇÕES GERAIS -->
-                        <div class="mb-4">
-                            <h6 class="text-primary">8. CONSIDERAÇÕES GERAIS</h6>
-                            <textarea class="form-control" id="consideracoes_gerais" name="consideracoes_gerais" rows="6"
-                                      placeholder="Considerações gerais da proposta">8.1 Modificações e Cancelamentos
+                        <!-- Seção 8: Considerações Gerais -->
+                        <div class="card">
+                            <div class="card-header bg-success text-white">
+                                <h6 class="mb-0"><i class="fas fa-clipboard-list"></i> 8. CONSIDERAÇÕES GERAIS</h6>
+                            </div>
+                            <div class="card-body">
+                                <textarea class="form-control" id="consideracoes_gerais" name="consideracoes_gerais" rows="6">8.1 Modificações e Cancelamentos
 Qualquer alteração no escopo do projeto deverá ser previamente aprovada por escrito, podendo resultar em ajustes nos prazos e valores.
 
 8.2 Obrigações do Contratante
@@ -251,32 +354,66 @@ O contratante deverá fornecer energia elétrica, água potável e local adequad
 
 8.3 Água e Energia
 Por conta do contratante o fornecimento de água e energia elétrica durante o período de execução da obra.</textarea>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="col-md-6">
+                        <!-- Seção 4: Itens Exclusos -->
+                        <div class="card mb-4">
+                            <div class="card-header bg-warning text-dark">
+                                <h6 class="mb-0"><i class="fas fa-times-circle"></i> 4. ITENS EXCLUSOS</h6>
+                            </div>
+                            <div class="card-body">
+                                <textarea class="form-control" id="itens_exclusos" name="itens_exclusos" rows="4" placeholder="Itens não inclusos no orçamento (separados por vírgula)"></textarea>
+                            </div>
                         </div>
 
-                        <!-- 9. VALIDADE DA PROPOSTA -->
-                        <div class="mb-4">
-                            <h6 class="text-primary">9. VALIDADE DA PROPOSTA</h6>
-                            <textarea class="form-control" id="secao_validade" name="secao_validade" rows="2"
-                                      placeholder="Defina a validade da proposta">Esta proposta tem validade de 7 (sete) dias corridos a partir da data de emissão.</textarea>
+                        <!-- Seção 6: Condições de Entrega -->
+                        <div class="card mb-4">
+                            <div class="card-header bg-warning text-dark">
+                                <h6 class="mb-0"><i class="fas fa-truck"></i> 6. CONDIÇÕES DE ENTREGA</h6>
+                            </div>
+                            <div class="card-body">
+                                <textarea class="form-control" id="condicoes_entrega" name="condicoes_entrega" rows="3">Prazo de entrega de 90 dias corridos após aprovação do projeto executivo e recebimento da primeira parcela.
+
+O prazo poderá ser alterado em função de condições climáticas adversas.</textarea>
+                            </div>
+                        </div>
+
+                        <!-- Seção 7: Garantias -->
+                        <div class="card mb-4">
+                            <div class="card-header bg-warning text-dark">
+                                <h6 class="mb-0"><i class="fas fa-shield-alt"></i> 7. GARANTIAS</h6>
+                            </div>
+                            <div class="card-body">
+                                <textarea class="form-control" id="garantias" name="garantias" rows="3">A Estruturas do Vale garante todos os materiais empregados nos serviços contra defeitos de fabricação pelo prazo de 12 (doze) meses contados a partir da data de conclusão da obra, conforme NBR 8800.</textarea>
+                            </div>
+                        </div>
+
+                        <!-- Seção 9: Validade -->
+                        <div class="card">
+                            <div class="card-header bg-info text-white">
+                                <h6 class="mb-0"><i class="fas fa-calendar-alt"></i> 9. VALIDADE DA PROPOSTA</h6>
+                            </div>
+                            <div class="card-body">
+                                <textarea class="form-control" id="secao_validade" name="secao_validade" rows="2">Esta proposta tem validade de 7 (sete) dias corridos a partir da data de emissão.</textarea>
+                            </div>
                         </div>
                     </div>
                 </div>
-                    </div>
-                </div>
+            </div>
 
-                <!-- Itens do Template -->
-                <div class="card mb-4">
-                    <div class="card-header d-flex justify-content-between align-items-center">
-                        <h5 class="card-title mb-0">
-                            <i class="fas fa-list text-success"></i> Itens do Template
-                        </h5>
-                        <button type="button" class="btn btn-sm btn-success" onclick="adicionarItem()">
-                            <i class="fas fa-plus"></i> Adicionar Item
-                        </button>
+            <!-- ABA 5: ITENS E SERVIÇOS -->
+            <div class="tab-pane fade" id="itens" role="tabpanel">
+                <div class="card">
+                    <div class="card-header bg-primary text-white">
+                        <h5 class="mb-0"><i class="fas fa-list"></i> Itens e Serviços do Template</h5>
                     </div>
                     <div class="card-body">
-                        <div class="row mb-3">
-                            <div class="col-md-6">
+                        <!-- Seleção de Serviços -->
+                        <div class="row mb-4">
+                            <div class="col-md-8">
                                 <div class="input-group">
                                     <span class="input-group-text"><i class="fas fa-search"></i></span>
                                     <input type="text" class="form-control" id="buscaServico" 
@@ -291,40 +428,29 @@ Por conta do contratante o fornecimento de água e energia elétrica durante o p
                                     {% endfor %}
                                 </select>
                             </div>
-                            <div class="col-md-2">
-                                <button type="button" class="btn btn-outline-primary w-100" onclick="buscarServicos()">
-                                    Buscar
-                                </button>
-                            </div>
                         </div>
 
-                        <!-- Lista de Serviços Disponíveis -->
-                        <div class="row mb-4">
-                            <div class="col-12">
-                                <h6 class="text-muted mb-2">Serviços Disponíveis</h6>
-                                <div class="border rounded p-3" style="max-height: 300px; overflow-y: auto;">
-                                    <div id="servicosDisponiveis" class="row">
+                        <!-- Lista de Serviços Compacta -->
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="card bg-light">
+                                    <div class="card-header">
+                                        <h6 class="mb-0 text-muted">Serviços Disponíveis</h6>
+                                    </div>
+                                    <div class="card-body p-2" style="max-height: 400px; overflow-y: auto;">
                                         {% for categoria, servicos in servicos_por_categoria.items() %}
-                                        <div class="col-12 mb-3">
-                                            <h6 class="text-primary mb-2">{{ categoria }}</h6>
+                                        <div class="mb-3">
+                                            <h6 class="text-primary mb-1">{{ categoria }}</h6>
                                             {% for servico in servicos %}
-                                            <div class="card card-sm mb-2 servico-item" data-categoria="{{ categoria }}">
-                                                <div class="card-body p-2">
-                                                    <div class="d-flex justify-content-between align-items-center">
-                                                        <div>
-                                                            <strong>{{ servico.nome }}</strong>
-                                                            <br>
-                                                            <small class="text-muted">
-                                                                {{ servico.unidade_medida }} - 
-                                                                R$ {{ "%.2f"|format(servico.custo_unitario) }}
-                                                            </small>
-                                                        </div>
-                                                        <button type="button" class="btn btn-sm btn-outline-success"
-                                                                onclick="adicionarServicoAoTemplate({{ servico.id }}, '{{ servico.nome }}', '{{ servico.unidade_medida }}', {{ servico.custo_unitario }})">
-                                                            <i class="fas fa-plus"></i>
-                                                        </button>
-                                                    </div>
+                                            <div class="d-flex justify-content-between align-items-center p-2 border-bottom">
+                                                <div class="flex-grow-1">
+                                                    <small><strong>{{ servico.nome }}</strong></small><br>
+                                                    <small class="text-muted">{{ servico.unidade_medida }} - R$ {{ "%.2f"|format(servico.custo_unitario) }}</small>
                                                 </div>
+                                                <button type="button" class="btn btn-sm btn-success ms-2"
+                                                        onclick="adicionarServicoAoTemplate({{ servico.id }}, '{{ servico.nome }}', '{{ servico.unidade_medida }}', {{ servico.custo_unitario }})">
+                                                    <i class="fas fa-plus"></i>
+                                                </button>
                                             </div>
                                             {% endfor %}
                                         </div>
@@ -332,32 +458,35 @@ Por conta do contratante o fornecimento de água e energia elétrica durante o p
                                     </div>
                                 </div>
                             </div>
-                        </div>
 
-                        <!-- Itens Selecionados -->
-                        <div id="itensTemplate">
-                            <h6 class="text-muted mb-2">Itens do Template</h6>
-                            <div class="table-responsive">
-                                <table class="table table-sm" id="tabelaItens">
-                                    <thead>
-                                        <tr>
-                                            <th>Ordem</th>
-                                            <th>Descrição</th>
-                                            <th>Qtd</th>
-                                            <th>Unidade</th>
-                                            <th>Preço Unit.</th>
-                                            <th>Subtotal</th>
-                                            <th>Ações</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody id="corpoTabelaItens">
-                                        <!-- Itens serão adicionados dinamicamente -->
-                                    </tbody>
-                                </table>
-                            </div>
-                            
-                            <div class="text-end mt-3">
-                                <strong>Total do Template: R$ <span id="totalTemplate">0,00</span></strong>
+                            <div class="col-md-6">
+                                <div class="card">
+                                    <div class="card-header">
+                                        <h6 class="mb-0 text-success">Itens Selecionados</h6>
+                                    </div>
+                                    <div class="card-body p-2">
+                                        <div class="table-responsive">
+                                            <table class="table table-sm table-hover" id="tabelaItens">
+                                                <thead class="table-dark">
+                                                    <tr>
+                                                        <th width="40">#</th>
+                                                        <th>Descrição</th>
+                                                        <th width="60">Qtd</th>
+                                                        <th width="80">Preço</th>
+                                                        <th width="60">Ações</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody id="corpoTabelaItens">
+                                                    <!-- Itens dinâmicos -->
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                        
+                                        <div class="text-end mt-3">
+                                            <h5 class="text-primary">Total: R$ <span id="totalTemplate">0,00</span></h5>
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
                         </div>
 
@@ -366,219 +495,198 @@ Por conta do contratante o fornecimento de água e energia elétrica durante o p
                     </div>
                 </div>
             </div>
-
-            <!-- Configurações -->
-            <div class="col-md-4">
-                <div class="card mb-4">
-                    <div class="card-header">
-                        <h5 class="card-title mb-0">
-                            <i class="fas fa-cog text-warning"></i> Configurações
-                        </h5>
-                    </div>
-                    <div class="card-body">
-                        <div class="row">
-                            <div class="col-6">
-                                <div class="mb-3">
-                                    <label for="prazo_entrega_dias" class="form-label">Prazo (dias)</label>
-                                    <input type="number" class="form-control" id="prazo_entrega_dias" 
-                                           name="prazo_entrega_dias" value="90" min="1">
-                                </div>
-                            </div>
-                            <div class="col-6">
-                                <div class="mb-3">
-                                    <label for="validade_dias" class="form-label">Validade (dias)</label>
-                                    <input type="number" class="form-control" id="validade_dias" 
-                                           name="validade_dias" value="7" min="1">
-                                </div>
-                            </div>
-                        </div>
-                        
-                        <div class="mb-3">
-                            <label for="percentual_nota_fiscal" class="form-label">% Nota Fiscal</label>
-                            <input type="number" class="form-control" id="percentual_nota_fiscal" 
-                                   name="percentual_nota_fiscal" value="13.5" step="0.1" min="0" max="100">
-                        </div>
-                        
-                        <div class="mb-3">
-                            <div class="form-check">
-                                <input class="form-check-input" type="checkbox" id="publico" name="publico">
-                                <label class="form-check-label" for="publico">
-                                    Template público (outros usuários podem usar)
-                                </label>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="card">
-                    <div class="card-header">
-                        <h5 class="card-title mb-0">
-                            <i class="fas fa-file-text text-info"></i> Condições Padrão
-                        </h5>
-                    </div>
-                    <div class="card-body">
-                        <div class="mb-3">
-                            <label for="condicoes_pagamento" class="form-label">Condições de Pagamento</label>
-                            <textarea class="form-control" id="condicoes_pagamento" name="condicoes_pagamento" rows="4">10% de entrada na assinatura do contrato
-10% após projeto aprovado
-45% compra dos perfis
-25% no início da montagem in loco
-10% após a conclusão da montagem</textarea>
-                        </div>
-                        
-                        <div class="mb-3">
-                            <label for="garantias" class="form-label">Garantias</label>
-                            <textarea class="form-control" id="garantias" name="garantias" rows="3">A Estruturas do Vale garante todos os materiais empregados nos serviços contra defeitos de fabricação pelo prazo de 12 (doze) meses contados a partir da data de conclusão da obra, conforme NBR 8800.</textarea>
-                        </div>
-                    </div>
-                </div>
-            </div>
         </div>
 
-        <!-- Botões de Ação -->
-        <div class="row">
-            <div class="col-12">
-                <div class="card">
-                    <div class="card-body d-flex justify-content-between">
-                        <div>
-                            <a href="{{ url_for('templates.dashboard') }}" class="btn btn-secondary">
-                                <i class="fas fa-times"></i> Cancelar
-                            </a>
-                        </div>
-                        <div>
-                            <button type="submit" class="btn btn-primary">
-                                <i class="fas fa-save"></i> Criar Template
-                            </button>
-                        </div>
-                    </div>
-                </div>
+        <!-- Botões de Ação Fixos -->
+        <div class="position-fixed bottom-0 end-0 p-4" style="z-index: 1000;">
+            <div class="d-flex gap-2">
+                <button type="button" class="btn btn-outline-secondary" onclick="window.history.back()">
+                    <i class="fas fa-times"></i> Cancelar
+                </button>
+                <button type="submit" class="btn btn-primary btn-lg">
+                    <i class="fas fa-save"></i> Salvar Template
+                </button>
             </div>
         </div>
     </form>
 </div>
 
+<!-- JavaScript para funcionalidades -->
 <script>
-let contadorItens = 0;
+// Variáveis globais
 let itensTemplate = [];
+let contadorItens = 0;
 
-function adicionarServicoAoTemplate(servicoId, nome, unidade, precoUnitario) {
+// Função para adicionar serviço ao template
+function adicionarServicoAoTemplate(id, nome, unidade, preco) {
     contadorItens++;
-    
     const novoItem = {
-        id: contadorItens,
-        servico_id: servicoId,
+        ordem: contadorItens,
         descricao: nome,
         quantidade: 1,
         unidade: unidade,
-        preco_unitario: parseFloat(precoUnitario),
-        ordem: contadorItens
+        preco_unitario: preco,
+        subtotal: preco
     };
     
     itensTemplate.push(novoItem);
     atualizarTabelaItens();
-    atualizarJSONItens();
-}
-
-function adicionarItem() {
-    contadorItens++;
-    
-    const novoItem = {
-        id: contadorItens,
-        servico_id: null,
-        descricao: '',
-        quantidade: 1,
-        unidade: 'un',
-        preco_unitario: 0,
-        ordem: contadorItens
-    };
-    
-    itensTemplate.push(novoItem);
-    atualizarTabelaItens();
-    atualizarJSONItens();
-}
-
-function removerItem(itemId) {
-    itensTemplate = itensTemplate.filter(item => item.id !== itemId);
-    atualizarTabelaItens();
-    atualizarJSONItens();
-}
-
-function atualizarTabelaItens() {
-    const corpo = document.getElementById('corpoTabelaItens');
-    corpo.innerHTML = '';
-    
-    itensTemplate.forEach(item => {
-        const linha = document.createElement('tr');
-        linha.innerHTML = `
-            <td>${item.ordem}</td>
-            <td>
-                <input type="text" class="form-control form-control-sm" 
-                       value="${item.descricao}" 
-                       onchange="atualizarItem(${item.id}, 'descricao', this.value)">
-            </td>
-            <td>
-                <input type="number" class="form-control form-control-sm" 
-                       value="${item.quantidade}" min="0.001" step="0.001"
-                       onchange="atualizarItem(${item.id}, 'quantidade', parseFloat(this.value))">
-            </td>
-            <td>
-                <select class="form-select form-select-sm" 
-                        onchange="atualizarItem(${item.id}, 'unidade', this.value)">
-                    <option value="un" ${item.unidade === 'un' ? 'selected' : ''}>un</option>
-                    <option value="m²" ${item.unidade === 'm²' ? 'selected' : ''}>m²</option>
-                    <option value="m" ${item.unidade === 'm' ? 'selected' : ''}>m</option>
-                    <option value="kg" ${item.unidade === 'kg' ? 'selected' : ''}>kg</option>
-                    <option value="ton" ${item.unidade === 'ton' ? 'selected' : ''}>ton</option>
-                </select>
-            </td>
-            <td>
-                <input type="number" class="form-control form-control-sm" 
-                       value="${item.preco_unitario}" min="0" step="0.01"
-                       onchange="atualizarItem(${item.id}, 'preco_unitario', parseFloat(this.value))">
-            </td>
-            <td>R$ ${(item.quantidade * item.preco_unitario).toLocaleString('pt-BR', {minimumFractionDigits: 2})}</td>
-            <td>
-                <button type="button" class="btn btn-sm btn-outline-danger" 
-                        onclick="removerItem(${item.id})">
-                    <i class="fas fa-trash"></i>
-                </button>
-            </td>
-        `;
-        corpo.appendChild(linha);
-    });
-    
     atualizarTotal();
+    atualizarJsonItens();
 }
 
-function atualizarItem(itemId, campo, valor) {
-    const item = itensTemplate.find(i => i.id === itemId);
-    if (item) {
-        item[campo] = valor;
-        atualizarTabelaItens();
-        atualizarJSONItens();
-    }
+// Função para atualizar a tabela de itens
+function atualizarTabelaItens() {
+    const tbody = document.getElementById('corpoTabelaItens');
+    tbody.innerHTML = '';
+    
+    itensTemplate.forEach((item, index) => {
+        const row = tbody.insertRow();
+        row.innerHTML = `
+            <td>${item.ordem}</td>
+            <td class="text-break">${item.descricao}</td>
+            <td><input type="number" class="form-control form-control-sm" value="${item.quantidade}" min="0.1" step="0.1" onchange="atualizarQuantidade(${index}, this.value)"></td>
+            <td class="text-nowrap">R$ ${item.subtotal.toFixed(2)}</td>
+            <td><button type="button" class="btn btn-sm btn-outline-danger" onclick="removerItem(${index})"><i class="fas fa-trash"></i></button></td>
+        `;
+    });
 }
 
+// Função para atualizar quantidade
+function atualizarQuantidade(index, novaQtd) {
+    itensTemplate[index].quantidade = parseFloat(novaQtd);
+    itensTemplate[index].subtotal = itensTemplate[index].quantidade * itensTemplate[index].preco_unitario;
+    atualizarTabelaItens();
+    atualizarTotal();
+    atualizarJsonItens();
+}
+
+// Função para remover item
+function removerItem(index) {
+    itensTemplate.splice(index, 1);
+    atualizarTabelaItens();
+    atualizarTotal();
+    atualizarJsonItens();
+}
+
+// Função para atualizar total
 function atualizarTotal() {
-    const total = itensTemplate.reduce((soma, item) => soma + (item.quantidade * item.preco_unitario), 0);
+    const total = itensTemplate.reduce((sum, item) => sum + item.subtotal, 0);
     document.getElementById('totalTemplate').textContent = total.toLocaleString('pt-BR', {minimumFractionDigits: 2});
 }
 
-function atualizarJSONItens() {
+// Função para atualizar JSON dos itens
+function atualizarJsonItens() {
     document.getElementById('itens_json').value = JSON.stringify(itensTemplate);
 }
 
-function buscarServicos() {
-    const busca = document.getElementById('buscaServico').value;
-    const categoria = document.getElementById('filtroCategoria').value;
+// Função para carregar template existente
+function carregarTemplateCompleto() {
+    const select = document.getElementById('templatePreCarregado');
+    const templateId = select.value;
     
-    // Implementar busca via AJAX se necessário
-    console.log('Buscando:', busca, categoria);
+    if (!templateId) return;
+    
+    fetch(`/propostas/api/template/${templateId}`)
+        .then(response => response.json())
+        .then(data => {
+            // Preencher campos básicos
+            document.getElementById('nome').value = data.nome + ' (Cópia)';
+            document.getElementById('categoria').value = data.categoria;
+            document.getElementById('prazo_entrega_dias').value = data.prazo_entrega_dias || 90;
+            document.getElementById('validade_dias').value = data.validade_dias || 7;
+            document.getElementById('percentual_nota_fiscal').value = data.percentual_nota_fiscal || 13.5;
+            
+            // Preencher seções da proposta
+            if (data.condicoes_pagamento) document.getElementById('condicoes_pagamento').value = data.condicoes_pagamento;
+            if (data.garantias) document.getElementById('garantias').value = data.garantias;
+            if (data.itens_inclusos) document.getElementById('itens_inclusos').value = data.itens_inclusos;
+            if (data.itens_exclusos) document.getElementById('itens_exclusos').value = data.itens_exclusos;
+            
+            // Carregar itens se existirem
+            if (data.itens_padrao && data.itens_padrao.length > 0) {
+                itensTemplate = data.itens_padrao.map((item, index) => ({
+                    ordem: index + 1,
+                    descricao: item.descricao,
+                    quantidade: item.quantidade,
+                    unidade: item.unidade,
+                    preco_unitario: item.preco_unitario || item.valor_unitario,
+                    subtotal: item.subtotal || (item.quantidade * (item.preco_unitario || item.valor_unitario))
+                }));
+                contadorItens = itensTemplate.length;
+                atualizarTabelaItens();
+                atualizarTotal();
+                atualizarJsonItens();
+            }
+            
+            // Ir para a aba de itens
+            const itensTab = new bootstrap.Tab(document.getElementById('itens-tab'));
+            itensTab.show();
+        })
+        .catch(error => {
+            console.error('Erro ao carregar template:', error);
+            alert('Erro ao carregar template');
+        });
 }
 
-// Inicializar
-document.addEventListener('DOMContentLoaded', function() {
-    atualizarTabelaItens();
+// Validação do formulário
+document.getElementById('templateForm').addEventListener('submit', function(e) {
+    const nome = document.getElementById('nome').value.trim();
+    const categoria = document.getElementById('categoria').value;
+    
+    if (!nome) {
+        e.preventDefault();
+        alert('Nome do template é obrigatório');
+        document.getElementById('basico-tab').click();
+        document.getElementById('nome').focus();
+        return;
+    }
+    
+    if (!categoria) {
+        e.preventDefault();
+        alert('Categoria é obrigatória');
+        document.getElementById('basico-tab').click();
+        document.getElementById('categoria').focus();
+        return;
+    }
 });
+
+// Busca de serviços
+function buscarServicos() {
+    // Implementar busca se necessário
+}
 </script>
+
+<style>
+.nav-pills .nav-link {
+    border-radius: 0;
+    margin-right: 2px;
+}
+
+.nav-pills .nav-link.active {
+    background-color: #0d6efd;
+}
+
+.card-header h5, .card-header h6 {
+    font-weight: 600;
+}
+
+.form-control:focus, .form-select:focus {
+    border-color: #0d6efd;
+    box-shadow: 0 0 0 0.2rem rgba(13, 110, 253, 0.25);
+}
+
+.position-fixed {
+    bottom: 20px !important;
+    right: 20px !important;
+}
+
+.table-sm th, .table-sm td {
+    padding: 0.5rem 0.25rem;
+}
+
+.text-break {
+    word-break: break-word;
+}
+</style>
 {% endblock %}
