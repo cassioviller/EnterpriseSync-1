@@ -72,9 +72,9 @@ def index():
 @login_required
 def get_template_data(template_id):
     """API para obter dados de um template específico"""
-    from bypass_auth import MockCurrentUser
-    current_user = MockCurrentUser()
-    admin_id = getattr(current_user, 'admin_id', None) or getattr(current_user, 'id', None)
+    # Admin_id dinâmico que funciona em dev e produção
+    from multitenant_helper import get_admin_id
+    admin_id = get_admin_id()
     
     print(f"DEBUG API TEMPLATE: Buscando template {template_id} para admin_id={admin_id}")
     
@@ -179,12 +179,9 @@ def test_nova_proposta():
 @admin_required
 def nova_proposta():
     """Exibe formulário para criar nova proposta"""
-    # Importar bypass para garantir usuário correto
-    from bypass_auth import MockCurrentUser
-    current_user = MockCurrentUser()
-    
-    # Admin_id dinâmico baseado no tipo de usuário
-    admin_id = getattr(current_user, 'admin_id', None) or current_user.id
+    # Admin_id dinâmico que funciona em dev e produção
+    from multitenant_helper import get_admin_id
+    admin_id = get_admin_id()
     print(f"DEBUG TEMPLATES: Buscando templates para admin_id={admin_id}")
     
     # Buscar configuração da empresa
@@ -368,9 +365,8 @@ def criar_teste_template(template_id):
 def criar_proposta():
     """Cria uma nova proposta"""
     try:
-        # Importar bypass para garantir usuário correto
-        from bypass_auth import MockCurrentUser
-        current_user = MockCurrentUser()
+        # Admin_id dinâmico que funciona em dev e produção
+        from multitenant_helper import get_admin_id
         # Validação obrigatória: apenas nome do cliente
         cliente_nome = request.form.get('cliente_nome')
         if not cliente_nome or not cliente_nome.strip():

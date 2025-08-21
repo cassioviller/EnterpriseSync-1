@@ -15,11 +15,9 @@ configuracoes_bp = Blueprint('configuracoes', __name__, url_prefix='/configuraco
 @admin_required
 def configuracoes():
     """Página principal de configurações da empresa"""
-    # Importar bypass para garantir usuário correto
-    from bypass_auth import MockCurrentUser
-    current_user = MockCurrentUser()
-    
-    admin_id = getattr(current_user, 'admin_id', None) or current_user.id
+    # Admin_id dinâmico que funciona em dev e produção
+    from multitenant_helper import get_admin_id
+    admin_id = get_admin_id()
     config = ConfiguracaoEmpresa.query.filter_by(admin_id=admin_id).first()
     return render_template('configuracoes/index.html', config=config)
 
@@ -28,12 +26,9 @@ def configuracoes():
 @admin_required
 def empresa():
     """Configurações da empresa"""
-    # Importar bypass para garantir usuário correto
-    from bypass_auth import MockCurrentUser
-    current_user = MockCurrentUser()
-    
-    # Admin_id dinâmico baseado no tipo de usuário
-    admin_id = getattr(current_user, 'admin_id', None) or current_user.id
+    # Admin_id dinâmico que funciona em dev e produção
+    from multitenant_helper import get_admin_id
+    admin_id = get_admin_id()
     
     print(f"DEBUG EMPRESA: user.id={current_user.id}, admin_id={admin_id}")
     config = ConfiguracaoEmpresa.query.filter_by(admin_id=admin_id).first()
@@ -49,12 +44,9 @@ def empresa():
 def salvar_empresa():
     """Salva configurações da empresa"""
     try:
-        # Importar bypass para garantir usuário correto
-        from bypass_auth import MockCurrentUser
-        current_user = MockCurrentUser()
-        
-        # Admin_id dinâmico baseado no tipo de usuário
-        admin_id = getattr(current_user, 'admin_id', None) or current_user.id
+        # Admin_id dinâmico que funciona em dev e produção
+        from multitenant_helper import get_admin_id
+        admin_id = get_admin_id()
             
         print(f"DEBUG SALVAR: user.id={current_user.id}, admin_id={admin_id}, tipo={getattr(current_user, 'tipo_usuario', 'N/A')}")
         
