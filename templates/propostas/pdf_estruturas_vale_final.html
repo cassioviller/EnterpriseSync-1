@@ -32,8 +32,8 @@
             background: white;
             box-shadow: 0 0 10px rgba(0,0,0,0.1);
             position: relative;
-            padding: 2cm 1.5cm;
-            page-break-after: always;
+            padding: 1.5cm 1.5cm;
+            page-break-after: auto; /* Permite fluxo natural */
         }
         
         .page:last-child {
@@ -47,9 +47,21 @@
             .page {
                 margin: 0;
                 box-shadow: none;
-                page-break-after: always;
-                width: auto;
-                min-height: auto;
+                page-break-after: auto; /* Fluxo natural na impressão */
+                width: 210mm;
+                min-height: 297mm;
+                padding: 1.5cm 1.5cm;
+            }
+            
+            /* Quebras inteligentes para impressão A4 */
+            .section {
+                page-break-inside: avoid;
+                margin: 15px 0;
+            }
+            
+            .items-table {
+                page-break-inside: avoid;
+                margin: 10px 0;
             }
         }
         
@@ -185,25 +197,20 @@
             padding-bottom: 2px;
         }
         
-        /* Seções técnicas */
+        /* Seções técnicas com quebras otimizadas para A4 */
         .section {
-            margin: 30px 0;
-            page-break-inside: avoid;
+            margin: 20px 0 25px 0;
+            page-break-inside: avoid; /* Evita quebrar seção no meio */
         }
         
-        /* Quebras de página para seções */
-        .section:nth-of-type(3),  /* Seção 1 */
-        .section:nth-of-type(5),  /* Seção 3 */
-        .section:nth-of-type(7),  /* Seção 5 */
-        .section:nth-of-type(9) { /* Seção 7 */
+        /* Quebras inteligentes - permite fluxo natural mas evita quebras no meio das seções */
+        .items-table {
+            page-break-inside: avoid; /* Evita quebrar tabela no meio */
+        }
+        
+        /* Seções maiores podem forçar nova página se necessário */
+        .section:has(.items-table) {
             page-break-before: auto;
-        }
-        
-        .section:nth-of-type(4),  /* Seção 2 */
-        .section:nth-of-type(6),  /* Seção 4 */
-        .section:nth-of-type(8),  /* Seção 6 */
-        .section:nth-of-type(10) { /* Seção 8 */
-            page-break-after: auto;
         }
         
         .section-title {
@@ -460,8 +467,8 @@
         </div>
     </div>
 
-    <!-- Página 3: Conteúdo Técnico -->
-    <div class="page">
+    <!-- Conteúdo Técnico - Fluxo Contínuo -->
+    <div class="page content-flow">
         {% if config and config.header_pdf_base64 %}
         <div class="header-personalizado">
             <img src="data:image/jpeg;base64,{{ config.header_pdf_base64 }}" alt="Header Personalizado">
