@@ -41,10 +41,12 @@ def salvar_empresa():
         config = ConfiguracaoEmpresa.query.filter_by(admin_id=admin_id).first()
         print(f"DEBUG SALVAR: config existente = {config is not None}")
         
+        # Usar merge() ao invés de add() para evitar conflitos
         if not config:
             config = ConfiguracaoEmpresa()
             config.admin_id = admin_id
-            db.session.add(config)
+        
+        # Importante: não usar session.add() se o objeto já existe
         
         # Dados básicos da empresa
         config.nome_empresa = request.form.get('nome_empresa')
@@ -118,6 +120,8 @@ def salvar_empresa():
         config.atualizado_em = datetime.utcnow()
         
         print(f"DEBUG: Salvando config para admin_id {admin_id}")
+        # Usar merge para evitar conflitos de foreign key
+        config = db.session.merge(config)
         db.session.commit()
         print("DEBUG: Commit realizado com sucesso")
         flash('Configurações da empresa salvas com sucesso!', 'success')
