@@ -688,7 +688,7 @@ def gerar_pdf(id):
         formato = request.args.get('formato', 'estruturas_vale')
         
         if formato == 'estruturas_vale':
-            template_name = 'propostas/pdf_estruturas_vale_final.html'
+            template_name = 'propostas/pdf_estruturas_vale_paginado.html'
         else:
             template_name = 'propostas/pdf.html'
         

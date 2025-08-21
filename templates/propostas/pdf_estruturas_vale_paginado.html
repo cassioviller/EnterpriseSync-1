@@ -1,0 +1,551 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Proposta Comercial {{ proposta.numero_proposta }}</title>
+    <style>
+        /* Reset e configurações base */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        @page {
+            size: A4;
+            margin: 0;
+        }
+        
+        body {
+            font-family: 'Arial', sans-serif;
+            font-size: 11pt;
+            line-height: 1.4;
+            color: #333;
+            background: white;
+            margin: 0;
+            padding: 0;
+        }
+        
+        .page {
+            width: 210mm;
+            height: 297mm;
+            margin: 0;
+            background: white;
+            position: relative;
+            padding: 20mm 20mm 20mm 20mm;
+            box-sizing: border-box;
+            page-break-after: always;
+            overflow: hidden;
+        }
+        
+        .page:last-child {
+            page-break-after: auto;
+        }
+        
+        @media print {
+            body {
+                background: white;
+                margin: 0;
+                padding: 0;
+            }
+            .page {
+                width: 210mm;
+                height: 297mm;
+                margin: 0;
+                padding: 20mm;
+                box-sizing: border-box;
+                page-break-after: always;
+            }
+            .page:last-child {
+                page-break-after: auto;
+            }
+        }
+        
+        /* Estilo do header em cada página */
+        .page-header {
+            width: 100%;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+        
+        .page-header img {
+            max-width: 100%;
+            max-height: 60px;
+            height: auto;
+        }
+        
+        /* Estilos da primeira página */
+        .date-location {
+            text-align: right;
+            margin-bottom: 30px;
+            font-size: 11pt;
+        }
+        
+        .recipient {
+            margin-bottom: 20px;
+            line-height: 1.6;
+        }
+        
+        .subject {
+            margin-bottom: 15px;
+        }
+        
+        .reference {
+            margin-bottom: 30px;
+        }
+        
+        .greeting {
+            margin-bottom: 20px;
+            font-weight: bold;
+        }
+        
+        .intro-text {
+            margin-bottom: 20px;
+            text-align: justify;
+            line-height: 1.6;
+        }
+        
+        .signature {
+            margin-top: 40px;
+            margin-bottom: 40px;
+        }
+        
+        .company-info {
+            text-align: center;
+            margin-top: 30px;
+        }
+        
+        .contact-info {
+            margin-top: 30px;
+            border-top: 1px solid #ccc;
+            padding-top: 20px;
+            line-height: 1.6;
+        }
+        
+        /* Estilos do sumário */
+        .toc-title {
+            text-align: center;
+            font-size: 14pt;
+            font-weight: bold;
+            margin-bottom: 30px;
+        }
+        
+        .toc-item {
+            display: flex;
+            justify-content: space-between;
+            margin: 8px 0;
+            border-bottom: 1px dotted #ccc;
+            padding-bottom: 5px;
+        }
+        
+        /* Seções de conteúdo */
+        .section {
+            margin: 20px 0;
+        }
+        
+        .section-title {
+            font-weight: bold;
+            font-size: 12pt;
+            margin-bottom: 15px;
+            color: #2c5530;
+        }
+        
+        .section-content {
+            line-height: 1.6;
+            text-align: justify;
+        }
+        
+        /* Tabela de itens */
+        .items-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+            font-size: 10pt;
+        }
+        
+        .items-table th,
+        .items-table td {
+            border: 1px solid #333;
+            padding: 8px 6px;
+            text-align: center;
+        }
+        
+        .items-table th {
+            background-color: #f0f0f0;
+            font-weight: bold;
+        }
+        
+        .items-table td:nth-child(2) {
+            text-align: left;
+        }
+        
+        .items-table td:nth-child(5),
+        .items-table td:nth-child(6) {
+            text-align: right;
+        }
+        
+        .total-row {
+            font-weight: bold;
+            background-color: #f8f8f8;
+        }
+        
+        /* Lista com bullets */
+        .bullet-list {
+            margin: 15px 0;
+            padding-left: 20px;
+        }
+        
+        .bullet-list p {
+            margin: 5px 0;
+            line-height: 1.5;
+            text-indent: -15px;
+            padding-left: 15px;
+        }
+        
+        .bullet-list p:before {
+            content: "• ";
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <!-- PÁGINA 1 - Carta de Apresentação -->
+    <div class="page">
+        {% if config_empresa and config_empresa.header_pdf_base64 %}
+        <div class="page-header">
+            <img src="data:image/png;base64,{{ config_empresa.header_pdf_base64 }}" alt="Header da Empresa">
+        </div>
+        {% endif %}
+        
+        <div class="date-location">
+            São José dos Campos, {{ proposta.data_criacao.strftime('%d de %B de %Y')|replace('January', 'janeiro')|replace('February', 'fevereiro')|replace('March', 'março')|replace('April', 'abril')|replace('May', 'maio')|replace('June', 'junho')|replace('July', 'julho')|replace('August', 'agosto')|replace('September', 'setembro')|replace('October', 'outubro')|replace('November', 'novembro')|replace('December', 'dezembro') if proposta.data_criacao else '18 de agosto de 2025' }}.
+        </div>
+        
+        <div class="recipient">
+            <p><strong>À {{ proposta.cliente_nome }}</strong></p>
+            <br>
+            {% if proposta.cliente_contato %}
+            <p><strong>A/c.:</strong> {{ proposta.cliente_contato }}</p>
+            {% endif %}
+            {% if proposta.cliente_telefone %}
+            <p>{{ proposta.cliente_telefone }}</p>
+            {% endif %}
+        </div>
+        
+        <div class="subject">
+            <p><strong>Ass.:</strong> {{ proposta.assunto or proposta.objeto or 'Fabricação e montagem de estrutura metálica.' }}</p>
+        </div>
+        
+        <div class="reference">
+            <p><strong>N. Ref.:</strong>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Proposta Comercial {{ proposta.numero_proposta }}</p>
+        </div>
+        
+        <div class="greeting">
+            <p>Prezados;</p>
+        </div>
+        
+        <div class="intro-text">
+            <p>Atendendo à solicitação de V.Sas., apresentamos nossas <strong>"Condições Comerciais"</strong>, para o fornecimento em referência.</p>
+        </div>
+        
+        <div class="intro-text">
+            <p>Na expectativa de ter atendido às condições especificadas, aproveitamos para expressar os nossos votos de estima e consideração.</p>
+        </div>
+        
+        <div class="signature">
+            <p><strong>Atenciosamente,</strong></p>
+            <br>
+            <p><strong>{{ config_empresa.responsavel_nome if config_empresa and config_empresa.responsavel_nome else 'Jefferson Luiz Moreira' }} – Gerente {{ config_empresa.nome_empresa if config_empresa and config_empresa.nome_empresa else 'Estruturas do Vale' }}</strong></p>
+        </div>
+        
+        <div class="company-info">
+            <p><strong>{{ config_empresa.site if config_empresa and config_empresa.site else 'www.estruturasdovale.com.br' }}</strong></p>
+        </div>
+    </div>
+
+    <!-- PÁGINA 2 - Sumário -->
+    <div class="page">
+        {% if config_empresa and config_empresa.header_pdf_base64 %}
+        <div class="page-header">
+            <img src="data:image/png;base64,{{ config_empresa.header_pdf_base64 }}" alt="Header da Empresa">
+        </div>
+        {% endif %}
+        
+        <div class="toc-title">Sumário</div>
+        
+        <div class="toc-item">
+            <span>1. OBJETO:</span>
+            <span>3</span>
+        </div>
+        <div class="toc-item">
+            <span>2. PREÇOS UNITÁRIOS E TOTAIS ESTIMADOS:</span>
+            <span>3</span>
+        </div>
+        <div class="toc-item">
+            <span>2.1 ESCOPO DE FORNECIMENTO:</span>
+            <span>3</span>
+        </div>
+        <div class="toc-item">
+            <span>3. ITENS INCLUSOS NO FORNECIMENTO</span>
+            <span>3</span>
+        </div>
+        <div class="toc-item">
+            <span>4. ITENS EXCLUSOS DO FORNECIMENTO</span>
+            <span>3</span>
+        </div>
+        <div class="toc-item">
+            <span>5. CONDIÇÕES DE PAGAMENTO</span>
+            <span>4</span>
+        </div>
+        <div class="toc-item">
+            <span>6. CONDIÇÕES DE ENTREGA</span>
+            <span>4</span>
+        </div>
+        <div class="toc-item">
+            <span>7. GARANTIAS</span>
+            <span>4</span>
+        </div>
+        <div class="toc-item">
+            <span>8. CONSIDERAÇÕES GERAIS</span>
+            <span>4</span>
+        </div>
+        <div class="toc-item">
+            <span>9. VALIDADE DA PROPOSTA:</span>
+            <span>5</span>
+        </div>
+    </div>
+
+    <!-- PÁGINA 3 - Conteúdo Principal -->
+    <div class="page">
+        {% if config_empresa and config_empresa.header_pdf_base64 %}
+        <div class="page-header">
+            <img src="data:image/png;base64,{{ config_empresa.header_pdf_base64 }}" alt="Header da Empresa">
+        </div>
+        {% endif %}
+        
+        <!-- 1. OBJETO -->
+        <div class="section">
+            <div class="section-title">1. OBJETO:</div>
+            <div class="section-content">
+                <p>Esta proposta descreve as condições comerciais a serem atendidas para o fornecimento de mão de obra especializada para fabricação e montagem de estruturas conforme segue.</p>
+                <br>
+                <p><strong>Documentos de referência:</strong> {{ proposta.documentos_referencia or 'Medidas enviadas pelo cliente' }}</p>
+            </div>
+        </div>
+
+        <!-- 2. PREÇOS UNITÁRIOS E TOTAIS ESTIMADOS -->
+        <div class="section">
+            <div class="section-title">2. PREÇOS UNITÁRIOS E TOTAIS ESTIMADOS:</div>
+            
+            <div class="section-title" style="margin-top: 15px; margin-left: 20px;">2.1 ESCOPO DE FORNECIMENTO:</div>
+            
+            {% if proposta.itens and proposta.itens|length > 0 %}
+                <!-- Se há múltiplas categorias organizadas -->
+                {% if proposta.itens_organizados %}
+                    {% set total_geral = 0 %}
+                    {% for categoria_nome, itens_categoria in proposta.itens_organizados %}
+                        <div style="text-align: center; font-weight: bold; margin: 15px 0;">{{ categoria_nome.upper() }}</div>
+                        
+                        <table class="items-table">
+                            <thead>
+                                <tr>
+                                    <th>ITEM</th>
+                                    <th>DESCRIÇÃO</th>
+                                    <th>QTD</th>
+                                    <th>UNID</th>
+                                    <th>PREÇO UNI</th>
+                                    <th>SUBTOTAL</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% set subtotal_categoria = 0 %}
+                                {% for item in itens_categoria %}
+                                <tr>
+                                    <td>{{ item.item_numero }}</td>
+                                    <td>{{ item.descricao }}</td>
+                                    <td>{{ "%.0f"|format(item.quantidade) if item.quantidade == item.quantidade|int else "%.2f"|format(item.quantidade) }}</td>
+                                    <td>{{ item.unidade }}</td>
+                                    <td>R$ {{ "%.2f"|format(item.preco_unitario) }}</td>
+                                    <td>R$ {{ "%.2f"|format(item.subtotal) }}</td>
+                                </tr>
+                                {% set subtotal_categoria = subtotal_categoria + item.subtotal %}
+                                {% set total_geral = total_geral + item.subtotal %}
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    {% endfor %}
+                    
+                    <div style="text-align: right; margin-top: 20px; font-weight: bold; font-size: 12pt;">
+                        VALOR TOTAL: R$ {{ "%.2f"|format(total_geral) }}
+                    </div>
+                {% else %}
+                    <!-- Formato tradicional simples -->
+                    <div style="text-align: center; font-weight: bold; margin: 15px 0;">SERVIÇOS GERAIS</div>
+                    
+                    <table class="items-table">
+                        <thead>
+                            <tr>
+                                <th>ITEM</th>
+                                <th>DESCRIÇÃO</th>
+                                <th>QTD</th>
+                                <th>UNID</th>
+                                <th>PREÇO UNI</th>
+                                <th>SUBTOTAL</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for item in proposta.itens %}
+                            <tr>
+                                <td>{{ item.item_numero }}</td>
+                                <td>{{ item.descricao }}</td>
+                                <td>{{ "%.0f"|format(item.quantidade) if item.quantidade == item.quantidade|int else "%.2f"|format(item.quantidade) }}</td>
+                                <td>{{ item.unidade }}</td>
+                                <td>R$ {{ "%.2f"|format(item.preco_unitario) }}</td>
+                                <td>R$ {{ "%.2f"|format(item.subtotal) }}</td>
+                            </tr>
+                            {% endfor %}
+                            <tr class="total-row">
+                                <td colspan="5" style="text-align: right;"><strong>VALOR TOTAL</strong></td>
+                                <td style="text-align: right;"><strong>R$ {{ "%.2f"|format(proposta.valor_total) }}</strong></td>
+                            </tr>
+                        </tbody>
+                    </table>
+                {% endif %}
+            {% endif %}
+        </div>
+
+        <!-- 3. ITENS INCLUSOS NO FORNECIMENTO -->
+        <div class="section">
+            <div class="section-title">3. ITENS INCLUSOS NO FORNECIMENTO</div>
+            {% if proposta.itens_inclusos %}
+                <div class="bullet-list">
+                    {% set linhas = proposta.itens_inclusos.split('\n') %}
+                    {% for linha in linhas %}
+                        {% if linha.strip() %}
+                            <p>{{ linha.strip() }}</p>
+                        {% endif %}
+                    {% endfor %}
+                </div>
+            {% else %}
+                <div class="bullet-list">
+                    <p>Mão de obra para execução dos serviços</p>
+                    <p>Todos os equipamentos de segurança necessários</p>
+                    <p>Transporte e alimentação da equipe</p>
+                    <p>Container para guarda de ferramentas</p>
+                    <p>Movimentação de carga (Munck)</p>
+                    <p>Transporte dos materiais</p>
+                </div>
+            {% endif %}
+        </div>
+
+        <!-- 4. ITENS EXCLUSOS DO FORNECIMENTO -->
+        <div class="section">
+            <div class="section-title">4. ITENS EXCLUSOS DO FORNECIMENTO</div>
+            {% if proposta.itens_exclusos %}
+                <div class="bullet-list">
+                    {% set linhas = proposta.itens_exclusos.split('\n') %}
+                    {% for linha in linhas %}
+                        {% if linha.strip() %}
+                            <p>{{ linha.strip() }}</p>
+                        {% endif %}
+                    {% endfor %}
+                </div>
+            {% else %}
+                <div class="bullet-list">
+                    <p>Projeto e execução de qualquer obra civil, fundações, alvenarias, elétrica, automação, tubulações etc., salvo se inclusas no escopo do serviço</p>
+                    <p>Execução de ensaios destrutivos e radiográficos</p>
+                    <p>Fornecimento de local para armazenagem das peças</p>
+                    <p>Fornecimento e/ou serviços não especificados claramente nesta proposta</p>
+                    <p>Fornecimento de escoramento (escoras)</p>
+                    <p>Fornecimento de andaimes e plataformas</p>
+                    <p>Técnico de segurança</p>
+                    <p>Pintura final de acabamento</p>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- PÁGINA 4 - Condições Finais -->
+    <div class="page">
+        {% if config_empresa and config_empresa.header_pdf_base64 %}
+        <div class="page-header">
+            <img src="data:image/png;base64,{{ config_empresa.header_pdf_base64 }}" alt="Header da Empresa">
+        </div>
+        {% endif %}
+
+        <!-- 5. CONDIÇÕES DE PAGAMENTO -->
+        <div class="section">
+            <div class="section-title">5. CONDIÇÕES DE PAGAMENTO</div>
+            {% if proposta.condicoes_pagamento %}
+                <div class="section-content">
+                    {{ proposta.condicoes_pagamento | replace('\n', '<br>')|safe }}
+                </div>
+            {% else %}
+                <div class="bullet-list">
+                    <p>25% de entrada na assinatura do contrato</p>
+                    <p>50% compra dos perfis</p>
+                    <p>25% após a conclusão da montagem</p>
+                    <p>Considerar 13,5% para emissão de nota fiscal</p>
+                </div>
+            {% endif %}
+        </div>
+
+        <!-- 6. CONDIÇÕES DE ENTREGA -->
+        <div class="section">
+            <div class="section-title">6. CONDIÇÕES DE ENTREGA</div>
+            <div class="section-content">
+                {% if proposta.prazo_entrega_dias %}
+                <p>Prazo de execução: {{ proposta.prazo_entrega_dias }} dias após aprovação do projeto e liberação do cliente.</p>
+                {% else %}
+                <p>Prazos estimados para montagem das estruturas 90 dias com agendamento prévio.</p>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- 7. GARANTIAS -->
+        <div class="section">
+            <div class="section-title">7. GARANTIAS</div>
+            {% if proposta.garantias %}
+                <div class="section-content">
+                    {{ proposta.garantias | replace('\n', '<br>')|safe }}
+                </div>
+            {% else %}
+                <div class="section-content">
+                    <p>A garantia da {{ config_empresa.nome_empresa if config_empresa and config_empresa.nome_empresa else 'Estruturas do Vale' }} limita-se a reparar ou substituir os itens defeituosos de seu fornecimento, sem qualquer outra despesa.</p>
+                    <br>
+                    <p>A COMPRADORA não poderá executar qualquer serviço atinente à garantia, nem mesmo permitir que terceiros o façam, sem autorização prévia e por escrito da {{ config_empresa.nome_empresa if config_empresa and config_empresa.nome_empresa else 'Estruturas do vale' }}.</p>
+                </div>
+            {% endif %}
+        </div>
+
+        <!-- 8. CONSIDERAÇÕES GERAIS -->
+        <div class="section">
+            <div class="section-title">8. CONSIDERAÇÕES GERAIS</div>
+            {% if proposta.condicoes %}
+                <div class="section-content">
+                    {{ proposta.condicoes | replace('\n', '<br>')|safe }}
+                </div>
+            {% else %}
+                <div class="section-content">
+                    <p><strong>Proposta válida por {{ proposta.validade_dias or '7' }} dias a partir da data de emissão</strong></p>
+                    <br>
+                    <p><strong>Valores não incluem impostos ({{ proposta.percentual_nota_fiscal or '13.50' }}% de nota fiscal)</strong></p>
+                    <br>
+                    <p><strong>Execução conforme normas técnicas brasileiras (NBR 8800, NBR 14762)</strong></p>
+                    <br>
+                    <p><strong>Projeto executivo detalhado incluído no escopo de fornecimento</strong></p>
+                </div>
+            {% endif %}
+        </div>
+
+        <!-- 9. VALIDADE DA PROPOSTA -->
+        <div class="section">
+            <div class="section-title">9. VALIDADE DA PROPOSTA:</div>
+            <div class="section-content">
+                <p>Esta proposta tem validade de {{ proposta.validade_dias or '7' }} dias a partir da data de emissão.</p>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

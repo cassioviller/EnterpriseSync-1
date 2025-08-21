@@ -22,18 +22,25 @@
             font-size: 11pt;
             line-height: 1.4;
             color: #333;
-            background: #f5f5f5;
+            background: white;
+            margin: 0;
+            padding: 0;
         }
         
         .page {
             width: 210mm;
-            max-width: 210mm;
-            margin: 20px auto;
+            height: 297mm;
+            margin: 0;
             background: white;
-            box-shadow: 0 0 10px rgba(0,0,0,0.1);
             position: relative;
-            padding: 1.5cm 1.5cm;
-            page-break-after: auto; /* Permite fluxo natural */
+            padding: 2cm 2cm 2cm 2cm;
+            box-sizing: border-box;
+            page-break-after: always;
+            overflow: hidden;
+        }
+        
+        .page:last-child {
+            page-break-after: auto;
         }
         
         .page:last-child {
@@ -43,38 +50,46 @@
         @media print {
             body {
                 background: white;
+                margin: 0;
+                padding: 0;
             }
             .page {
-                margin: 0;
-                box-shadow: none;
-                page-break-after: auto; /* Fluxo natural na impressão */
                 width: 210mm;
-                height: auto;
-                min-height: 250mm;
-                max-height: none;
-                padding: 1.5cm 1.5cm;
+                height: 297mm;
+                margin: 0;
+                padding: 2cm;
+                box-sizing: border-box;
+                page-break-after: always;
             }
-            
-            /* Quebras inteligentes para impressão A4 */
-            .section {
-                margin: 15px 0;
-                orphans: 3; /* Mínimo 3 linhas no final da página */
-                widows: 3; /* Mínimo 3 linhas no início da página */
+            .page:last-child {
+                page-break-after: auto;
             }
-            
-            .items-table {
-                page-break-inside: avoid; /* Evita quebrar tabelas */
-                margin: 10px 0;
-            }
-            
-            /* Força quebra antes das seções que normalmente ficam na mesma página */
-            .section:nth-of-type(4) { /* Seção 3 - Itens Inclusos */
-                page-break-before: auto;
-            }
-            
-            .section:nth-of-type(6) { /* Seção 5 - Condições de Pagamento */
-                page-break-before: auto;
-            }
+        }
+        
+        /* Estilo do header em cada página */
+        .page-header {
+            width: 100%;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+        
+        .page-header img {
+            max-width: 100%;
+            max-height: 80px;
+            height: auto;
+        }
+        
+        /* Seções com espaçamento adequado */
+        .section {
+            margin: 15px 0;
+            page-break-inside: avoid;
+        }
+        
+        .section-title {
+            font-weight: bold;
+            font-size: 12pt;
+            margin-bottom: 10px;
+            color: #2c5530;
         }
         
         /* Header personalizado ocupando toda largura da página */
