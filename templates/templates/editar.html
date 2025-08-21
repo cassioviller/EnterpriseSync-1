@@ -69,6 +69,127 @@
                     </div>
                 </div>
 
+                <!-- DADOS DA PRIMEIRA PÁGINA -->
+                <div class="card mb-4">
+                    <div class="card-header">
+                        <h5 class="card-title mb-0">
+                            <i class="fas fa-file-alt text-info"></i> Dados da Primeira Página
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="cidade_data" class="form-label">Cidade/Local</label>
+                                    <input type="text" class="form-control" id="cidade_data" name="cidade_data" 
+                                           value="{{ template.cidade_data or 'São José dos Campos' }}">
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="destinatario" class="form-label">Destinatário</label>
+                                    <input type="text" class="form-control" id="destinatario" name="destinatario" 
+                                           value="{{ template.destinatario or '' }}" placeholder="À [Nome do Cliente]">
+                                </div>
+                            </div>
+                        </div>
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="atencao_de" class="form-label">A/c:</label>
+                                    <input type="text" class="form-control" id="atencao_de" name="atencao_de" 
+                                           value="{{ template.atencao_de or '' }}" placeholder="Responsável pelo cliente">
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="telefone_cliente" class="form-label">Telefone Cliente</label>
+                                    <input type="text" class="form-control" id="telefone_cliente" name="telefone_cliente" 
+                                           value="{{ template.telefone_cliente or '' }}" placeholder="(12) 98111-0980">
+                                </div>
+                            </div>
+                        </div>
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="assunto" class="form-label">Assunto</label>
+                                    <input type="text" class="form-control" id="assunto" name="assunto" 
+                                           value="{{ template.assunto or '' }}" placeholder="Fabricação e montagem de estrutura metálica">
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="numero_referencia" class="form-label">N. Ref.</label>
+                                    <input type="text" class="form-control" id="numero_referencia" name="numero_referencia" 
+                                           value="{{ template.numero_referencia or '' }}" placeholder="Proposta Comercial 333-25">
+                                </div>
+                            </div>
+                        </div>
+                        <div class="mb-3">
+                            <label for="texto_apresentacao" class="form-label">Texto de Apresentação</label>
+                            <textarea class="form-control" id="texto_apresentacao" name="texto_apresentacao" rows="5">{{ template.texto_apresentacao or 'Prezados,\n\nAtendendo a solicitação de V.sas., apresentamos nossas "Condições Comerciais" para o fornecimento em referência.\n\nNa expectativa de ter atendido às condições especificadas, aproveitamos para expressar os nossos votos de estima e consideração.\n\nAtenciosamente,\n\nJefferson Luiz Moreira – Gerente Estruturas do Vale' }}</textarea>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- DADOS DO ENGENHEIRO -->
+                <div class="card mb-4">
+                    <div class="card-header">
+                        <h5 class="card-title mb-0">
+                            <i class="fas fa-user-tie text-warning"></i> Dados do Engenheiro Responsável
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="engenheiro_nome" class="form-label">Nome do Engenheiro</label>
+                                    <input type="text" class="form-control" id="engenheiro_nome" name="engenheiro_nome" 
+                                           value="{{ template.engenheiro_nome or 'Engº Lucas Barbosa Alves Pinto' }}">
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="engenheiro_crea" class="form-label">CREA</label>
+                                    <input type="text" class="form-control" id="engenheiro_crea" name="engenheiro_crea" 
+                                           value="{{ template.engenheiro_crea or 'CREA- 5070458626-SP' }}">
+                                </div>
+                            </div>
+                        </div>
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="engenheiro_email" class="form-label">Email</label>
+                                    <input type="email" class="form-control" id="engenheiro_email" name="engenheiro_email" 
+                                           value="{{ template.engenheiro_email or 'contato@estruturasdovale.com.br' }}">
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="engenheiro_telefone" class="form-label">Telefone</label>
+                                    <input type="text" class="form-control" id="engenheiro_telefone" name="engenheiro_telefone" 
+                                           value="{{ template.engenheiro_telefone or '12 99187-7435' }}">
+                                </div>
+                            </div>
+                        </div>
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="engenheiro_endereco" class="form-label">Endereço</label>
+                                    <textarea class="form-control" id="engenheiro_endereco" name="engenheiro_endereco" rows="2">{{ template.engenheiro_endereco or 'Rua Benedita Nunes de Campos, 140. Residencial União, São José dos Campos - CEP 12.239-008' }}</textarea>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="engenheiro_website" class="form-label">Website</label>
+                                    <input type="text" class="form-control" id="engenheiro_website" name="engenheiro_website" 
+                                           value="{{ template.engenheiro_website or 'www.estruturasdovale.com.br' }}">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
                 <!-- Itens do Template -->
                 <div class="card mb-4">
                     <div class="card-header d-flex justify-content-between align-items-center">

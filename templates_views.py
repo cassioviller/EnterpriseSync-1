@@ -209,6 +209,23 @@ def novo_template():
             template.admin_id = admin_id
             template.criado_por = current_user.id
             
+            # NOVOS CAMPOS COMPLETOS - Dados da primeira página
+            template.cidade_data = request.form.get('cidade_data')
+            template.destinatario = request.form.get('destinatario')
+            template.atencao_de = request.form.get('atencao_de')
+            template.telefone_cliente = request.form.get('telefone_cliente')
+            template.assunto = request.form.get('assunto')
+            template.numero_referencia = request.form.get('numero_referencia')
+            template.texto_apresentacao = request.form.get('texto_apresentacao')
+            
+            # NOVOS CAMPOS COMPLETOS - Dados do engenheiro
+            template.engenheiro_nome = request.form.get('engenheiro_nome')
+            template.engenheiro_crea = request.form.get('engenheiro_crea')
+            template.engenheiro_email = request.form.get('engenheiro_email')
+            template.engenheiro_telefone = request.form.get('engenheiro_telefone')
+            template.engenheiro_endereco = request.form.get('engenheiro_endereco')
+            template.engenheiro_website = request.form.get('engenheiro_website')
+            
             # Processar itens do template (JSON)
             itens_json = request.form.get('itens_json')
             if itens_json:
@@ -276,6 +293,23 @@ def editar_template(id):
             template.garantias = request.form.get('garantias')
             template.publico = 'publico' in request.form
             template.atualizado_em = datetime.utcnow()
+            
+            # NOVOS CAMPOS COMPLETOS - Dados da primeira página
+            template.cidade_data = request.form.get('cidade_data')
+            template.destinatario = request.form.get('destinatario')
+            template.atencao_de = request.form.get('atencao_de')
+            template.telefone_cliente = request.form.get('telefone_cliente')
+            template.assunto = request.form.get('assunto')
+            template.numero_referencia = request.form.get('numero_referencia')
+            template.texto_apresentacao = request.form.get('texto_apresentacao')
+            
+            # NOVOS CAMPOS COMPLETOS - Dados do engenheiro
+            template.engenheiro_nome = request.form.get('engenheiro_nome')
+            template.engenheiro_crea = request.form.get('engenheiro_crea')
+            template.engenheiro_email = request.form.get('engenheiro_email')
+            template.engenheiro_telefone = request.form.get('engenheiro_telefone')
+            template.engenheiro_endereco = request.form.get('engenheiro_endereco')
+            template.engenheiro_website = request.form.get('engenheiro_website')
             
             # Atualizar itens do template
             itens_json = request.form.get('itens_json')

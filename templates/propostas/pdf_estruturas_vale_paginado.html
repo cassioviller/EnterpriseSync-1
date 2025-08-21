@@ -293,26 +293,26 @@
         
         <div class="page-content fixed-content">
             <div class="date-location">
-                São José dos Campos, {{ proposta.data_criacao.strftime('%d de %B de %Y')|replace('January', 'janeiro')|replace('February', 'fevereiro')|replace('March', 'março')|replace('April', 'abril')|replace('May', 'maio')|replace('June', 'junho')|replace('July', 'julho')|replace('August', 'agosto')|replace('September', 'setembro')|replace('October', 'outubro')|replace('November', 'novembro')|replace('December', 'dezembro') if proposta.data_criacao else '18 de agosto de 2025' }}.
+                {{ template.cidade_data or 'São José dos Campos' }}, {{ proposta.data_criacao.strftime('%d de %B de %Y')|replace('January', 'janeiro')|replace('February', 'fevereiro')|replace('March', 'março')|replace('April', 'abril')|replace('May', 'maio')|replace('June', 'junho')|replace('July', 'julho')|replace('August', 'agosto')|replace('September', 'setembro')|replace('October', 'outubro')|replace('November', 'novembro')|replace('December', 'dezembro') if proposta.data_criacao else '18 de agosto de 2025' }}.
             </div>
         
         <div class="recipient">
-            <p><strong>À {{ proposta.cliente_nome }}</strong></p>
+            <p><strong>{{ template.destinatario or 'À ' + proposta.cliente_nome }}</strong></p>
             <br>
-            {% if proposta.cliente_contato %}
-            <p><strong>A/c.:</strong> {{ proposta.cliente_contato }}</p>
+            {% if template.atencao_de or proposta.cliente_contato %}
+            <p><strong>A/c.:</strong> {{ template.atencao_de or proposta.cliente_contato }}</p>
             {% endif %}
-            {% if proposta.cliente_telefone %}
-            <p>{{ proposta.cliente_telefone }}</p>
+            {% if template.telefone_cliente or proposta.cliente_telefone %}
+            <p>{{ template.telefone_cliente or proposta.cliente_telefone }}</p>
             {% endif %}
         </div>
         
         <div class="subject">
-            <p><strong>Ass.:</strong> {{ proposta.assunto or proposta.objeto or 'Fabricação e montagem de estrutura metálica.' }}</p>
+            <p><strong>Ass.:</strong> {{ template.assunto or proposta.assunto or proposta.objeto or 'Fabricação e montagem de estrutura metálica.' }}</p>
         </div>
         
         <div class="reference">
-            <p><strong>N. Ref.:</strong>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Proposta Comercial {{ proposta.numero_proposta }}</p>
+            <p><strong>N. Ref.:</strong>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;{{ template.numero_referencia or 'Proposta Comercial ' + proposta.numero_proposta }}</p>
         </div>
         
         <div class="greeting">
@@ -320,11 +320,12 @@
         </div>
         
         <div class="intro-text">
-            <p>Atendendo à solicitação de V.Sas., apresentamos nossas <strong>"Condições Comerciais"</strong>, para o fornecimento em referência.</p>
-        </div>
-        
-        <div class="intro-text">
-            <p>Na expectativa de ter atendido às condições especificadas, aproveitamos para expressar os nossos votos de estima e consideração.</p>
+            {% if template.texto_apresentacao %}
+                {{ template.texto_apresentacao | replace('\n', '</p><p>') | safe }}
+            {% else %}
+                <p>Atendendo à solicitação de V.Sas., apresentamos nossas <strong>"Condições Comerciais"</strong>, para o fornecimento em referência.</p>
+                <p>Na expectativa de ter atendido às condições especificadas, aproveitamos para expressar os nossos votos de estima e consideração.</p>
+            {% endif %}
         </div>
         
         <div class="signature">
@@ -333,8 +334,15 @@
             <p><strong>{{ config_empresa.responsavel_nome if config_empresa and config_empresa.responsavel_nome else 'Jefferson Luiz Moreira' }} – Gerente {{ config_empresa.nome_empresa if config_empresa and config_empresa.nome_empresa else 'Estruturas do Vale' }}</strong></p>
         </div>
         
+            <!-- Dados do Engenheiro (da primeira página - conforme imagem) -->
             <div class="company-info">
-                <p><strong>{{ config_empresa.site if config_empresa and config_empresa.site else 'www.estruturasdovale.com.br' }}</strong></p>
+                <p><strong>{{ template.engenheiro_nome or 'Engº Lucas Barbosa Alves Pinto' }}</strong></p>
+                <p>{{ template.engenheiro_crea or 'CREA- 5070458626-SP' }}</p>
+                <br>
+                <p><i class="fas fa-envelope"></i> {{ template.engenheiro_email or 'contato@estruturasdovale.com.br' }}</p>
+                <p><i class="fas fa-phone"></i> {{ template.engenheiro_telefone or '12 99187-7435' }}</p>
+                <p><i class="fas fa-map-marker-alt"></i> {{ template.engenheiro_endereco or 'Rua Benedita Nunes de Campos, 140. Residencial União, São José dos Campos - CEP 12.239-008' }}</p>
+                <p><i class="fas fa-globe"></i> {{ template.engenheiro_website or 'www.estruturasdovale.com.br' }}</p>
             </div>
         </div>
     </div>

@@ -2119,6 +2119,34 @@ class PropostaTemplate(db.Model):
     validade_dias = db.Column(db.Integer, default=7)
     percentual_nota_fiscal = db.Column(db.Numeric(5,2), default=13.5)
     
+    # CAMPOS COMPLETOS DO TEMPLATE - PRIMEIRA PÁGINA ATÉ PONTO 9
+    # Dados do cliente (primeira página)
+    cidade_data = db.Column(db.String(200), default='São José dos Campos, [DATA]')
+    destinatario = db.Column(db.String(200))  # "À [Nome do Cliente]"
+    atencao_de = db.Column(db.String(200))    # "A/c.: [Responsável]"
+    telefone_cliente = db.Column(db.String(50)) # "12 98111-0980"
+    assunto = db.Column(db.Text)              # "Ass.: Fabricação e montagem de estrutura metálica."
+    numero_referencia = db.Column(db.String(100)) # "N. Ref.: Proposta Comercial 333-25 – Estrutura Metálica"
+    
+    # Texto de apresentação
+    texto_apresentacao = db.Column(db.Text, default="""Prezados,
+
+Atendendo a solicitação de V.sas., apresentamos nossas "Condições Comerciais" para o fornecimento em referência.
+
+Na expectativa de ter atendido às condições especificadas, aproveitamos para expressar os nossos votos de estima e consideração.
+
+Atenciosamente,
+
+Jefferson Luiz Moreira – Gerente Estruturas do Vale""")
+    
+    # Dados do engenheiro responsável (rodapé/cabeçalho)
+    engenheiro_nome = db.Column(db.String(200), default='Engº Lucas Barbosa Alves Pinto')
+    engenheiro_crea = db.Column(db.String(50), default='CREA- 5070458626-SP')
+    engenheiro_email = db.Column(db.String(120), default='contato@estruturasdovale.com.br')
+    engenheiro_telefone = db.Column(db.String(50), default='12 99187-7435')
+    engenheiro_endereco = db.Column(db.Text, default='Rua Benedita Nunes de Campos, 140. Residencial União, São José dos Campos - CEP 12.239-008')
+    engenheiro_website = db.Column(db.String(200), default='www.estruturasdovale.com.br')
+    
     # Itens inclusos e exclusos
     itens_inclusos = db.Column(db.Text)
     itens_exclusos = db.Column(db.Text)
@@ -2248,13 +2276,9 @@ class ConfiguracaoEmpresa(db.Model):
     cor_secundaria = db.Column(db.String(7), default='#6c757d')  # Cor secundária
     cor_fundo_proposta = db.Column(db.String(7), default='#f8f9fa')  # Cor de fundo das propostas
     
-    # Dados padrão para propostas
-    itens_inclusos_padrao = db.Column(db.Text)
-    itens_exclusos_padrao = db.Column(db.Text)
-    condicoes_padrao = db.Column(db.Text)
-    condicoes_pagamento_padrao = db.Column(db.Text)
-    garantias_padrao = db.Column(db.Text)
-    observacoes_gerais_padrao = db.Column(db.Text)
+    # REMOVIDO: Campos transferidos para PropostaTemplate para evitar conflitos
+    # itens_inclusos_padrao, itens_exclusos_padrao, condicoes_padrao, 
+    # condicoes_pagamento_padrao, garantias_padrao, observacoes_gerais_padrao
     
     # Configurações padrão
     prazo_entrega_padrao = db.Column(db.Integer, default=90)
@@ -2281,12 +2305,7 @@ class ConfiguracaoEmpresa(db.Model):
             'cor_primaria': self.cor_primaria,
             'cor_secundaria': self.cor_secundaria,
             'cor_fundo_proposta': self.cor_fundo_proposta,
-            'itens_inclusos_padrao': self.itens_inclusos_padrao,
-            'itens_exclusos_padrao': self.itens_exclusos_padrao,
-            'condicoes_padrao': self.condicoes_padrao,
-            'condicoes_pagamento_padrao': self.condicoes_pagamento_padrao,
-            'garantias_padrao': self.garantias_padrao,
-            'observacoes_gerais_padrao': self.observacoes_gerais_padrao,
+            # Campos removidos - agora no template
             'prazo_entrega_padrao': self.prazo_entrega_padrao,
             'validade_padrao': self.validade_padrao,
             'percentual_nota_fiscal_padrao': float(self.percentual_nota_fiscal_padrao) if self.percentual_nota_fiscal_padrao else 13.5
