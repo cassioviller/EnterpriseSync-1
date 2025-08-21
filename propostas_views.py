@@ -107,10 +107,9 @@ def get_template_data(template_id):
 @login_required
 def organizar_proposta(proposta_id):
     """Interface de organização drag-and-drop para propostas"""
-    from bypass_auth import get_current_user_bypass
-    
-    current_user = get_current_user_bypass()
-    admin_id = getattr(current_user, 'admin_id', None) or current_user.id
+    # Admin_id dinâmico que funciona em dev e produção
+    from multitenant_helper import get_admin_id
+    admin_id = get_admin_id()
     
     proposta = PropostaComercialSIGE.query.filter_by(id=proposta_id, admin_id=admin_id).first()
     
@@ -367,6 +366,7 @@ def criar_proposta():
     try:
         # Admin_id dinâmico que funciona em dev e produção
         from multitenant_helper import get_admin_id
+        admin_id = get_admin_id()
         # Validação obrigatória: apenas nome do cliente
         cliente_nome = request.form.get('cliente_nome')
         if not cliente_nome or not cliente_nome.strip():
