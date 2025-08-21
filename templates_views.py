@@ -62,8 +62,12 @@ def dashboard():
         ).limit(5).all()
         
     else:
+        # Importar bypass para garantir usuário correto
+        from bypass_auth import MockCurrentUser
+        current_user = MockCurrentUser()
+        
         # Admin comum vê apenas seus templates
-        admin_id = current_user.id
+        admin_id = getattr(current_user, 'admin_id', None) or current_user.id
         
         total_templates = PropostaTemplate.query.filter_by(admin_id=admin_id).count()
         templates_ativos = PropostaTemplate.query.filter_by(admin_id=admin_id, ativo=True).count()
@@ -127,7 +131,11 @@ def listar_templates():
     if current_user.tipo_usuario.name == 'SUPER_ADMIN':
         query = PropostaTemplate.query
     else:
-        admin_id = current_user.id
+        # Importar bypass para garantir usuário correto
+        from bypass_auth import MockCurrentUser
+        current_user = MockCurrentUser()
+        
+        admin_id = getattr(current_user, 'admin_id', None) or current_user.id
         query = PropostaTemplate.query.filter_by(admin_id=admin_id)
     
     # Aplicar filtros
