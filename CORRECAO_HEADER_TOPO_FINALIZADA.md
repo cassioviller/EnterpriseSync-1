@@ -23,10 +23,11 @@
 }
 
 .page-header img {
-    width: 100%;
-    max-height: 60px;
+    max-width: 100%;
     height: auto;
     display: block;
+    margin: 0 auto;
+    object-fit: contain; /* Mantém proporção original */
 }
 ```
 
