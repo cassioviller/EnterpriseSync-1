@@ -172,9 +172,11 @@ def test_nova_proposta():
 @admin_required
 def nova_proposta():
     """Exibe formulário para criar nova proposta"""
-    from bypass_auth import MockCurrentUser
-    current_user = MockCurrentUser()
-    admin_id = getattr(current_user, 'admin_id', None) or getattr(current_user, 'id', None)
+    # Admin_id dinâmico baseado no tipo de usuário
+    if hasattr(current_user, 'tipo_usuario') and current_user.tipo_usuario.value == 'funcionario':
+        admin_id = getattr(current_user, 'admin_id', current_user.id)
+    else:
+        admin_id = current_user.id
     
     # Buscar configuração da empresa
     config_empresa = ConfiguracaoEmpresa.query.filter_by(admin_id=admin_id).first()
@@ -632,8 +634,16 @@ def gerar_pdf(id):
         print(f"DEBUG PDF: Valor total: {proposta.valor_total}")
         print(f"DEBUG PDF: Número de itens: {len(proposta.itens) if proposta.itens else 0}")
         
-        # Buscar configurações da empresa
-        admin_id = getattr(current_user, 'admin_id', 10)
+        # Buscar configurações da empresa - admin_id dinâmico (com fallback para desenvolvimento)
+        if hasattr(current_user, 'is_authenticated') and current_user.is_authenticated:
+            if hasattr(current_user, 'tipo_usuario') and current_user.tipo_usuario.value == 'funcionario':
+                admin_id = getattr(current_user, 'admin_id', current_user.id)
+            else:
+                admin_id = current_user.id
+        else:
+            # Fallback para desenvolvimento quando não autenticado
+            admin_id = 10
+        
         config_empresa = ConfiguracaoEmpresa.query.filter_by(admin_id=admin_id).first()
         
         # Debug da configuração

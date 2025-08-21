@@ -84,6 +84,15 @@ INFO:migrations:✅ Migrações automáticas concluídas com sucesso!
 
 ## Recent Changes (21/08/2025)
 
+### ✅ CORREÇÃO COMPLETA: Admin ID Dinâmico Implementado
+- **Problema resolvido**: Sistema usava admin_id fixo/hardcoded em várias rotas
+- **Headers PDF funcionando**: PDFs agora carregam configurações da empresa correta
+- **Configurações carregando**: Formulários não ficam mais vazios, puxam dados do admin correto
+- **Sistema verdadeiramente multitenant**: Cada usuário vê apenas dados da sua empresa
+- **Lógica implementada**: Funcionários usam admin_id do chefe, administradores usam próprio ID
+- **Fallback seguro**: Sistema continua funcionando mesmo em desenvolvimento
+- **Status**: FUNCIONANDO - Headers PDF e configurações operacionais
+
 ### 🚨 HOTFIX: Foreign Key Violation RESOLVIDO ✅
 - **Problema crítico em produção**: Foreign key violation para admin_id=10 não existir na tabela usuario
 - **Sistema multitenant correto**: Problema era apenas usuário faltante em produção vs desenvolvimento
