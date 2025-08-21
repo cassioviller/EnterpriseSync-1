@@ -76,7 +76,15 @@ def get_template_data(template_id):
     current_user = MockCurrentUser()
     admin_id = getattr(current_user, 'admin_id', None) or getattr(current_user, 'id', None)
     
-    template = PropostaTemplate.query.filter_by(id=template_id, admin_id=admin_id, ativo=True).first()
+    # Buscar template próprio ou público
+    template = PropostaTemplate.query.filter(
+        PropostaTemplate.id == template_id,
+        PropostaTemplate.ativo == True,
+        db.or_(
+            PropostaTemplate.admin_id == admin_id,
+            PropostaTemplate.publico == True
+        )
+    ).first()
     
     if not template:
         return jsonify({'error': 'Template não encontrado'}), 404
@@ -181,10 +189,13 @@ def nova_proposta():
     # Buscar configuração da empresa
     config_empresa = ConfiguracaoEmpresa.query.filter_by(admin_id=admin_id).first()
     
-    # Buscar templates disponíveis
-    templates = PropostaTemplate.query.filter_by(
-        admin_id=admin_id, 
-        ativo=True
+    # Buscar templates próprios e públicos
+    templates = PropostaTemplate.query.filter(
+        PropostaTemplate.ativo == True,
+        db.or_(
+            PropostaTemplate.admin_id == admin_id,
+            PropostaTemplate.publico == True
+        )
     ).order_by(PropostaTemplate.categoria, PropostaTemplate.nome).all()
     
     # Definir valores padrão da empresa ou usar padrões do sistema
@@ -401,37 +412,72 @@ def criar_proposta():
         # Debug dos dados recebidos
         print(f"DEBUG ITENS: Form data keys: {list(request.form.keys())}")
         
-        # Itens da tabela de serviços
-        descricoes = request.form.getlist('item_descricao')
-        quantidades = request.form.getlist('item_quantidade')
-        unidades = request.form.getlist('item_unidade')
-        precos = request.form.getlist('item_preco')
-        
-        print(f"DEBUG ITENS: Descrições: {descricoes}")
-        print(f"DEBUG ITENS: Quantidades: {quantidades}")
-        print(f"DEBUG ITENS: Unidades: {unidades}")
-        print(f"DEBUG ITENS: Preços: {precos}")
-        
         valor_total_proposta = 0
         
-        for i, descricao in enumerate(descricoes):
-            if descricao and descricao.strip():
-                item = PropostaItem()
-                item.proposta_id = proposta.id
-                item.item_numero = i + 1
-                item.descricao = descricao.strip()
-                item.quantidade = float(quantidades[i]) if i < len(quantidades) and quantidades[i] else 0
-                item.unidade = unidades[i] if i < len(unidades) else 'un'
-                item.preco_unitario = float(precos[i]) if i < len(precos) and precos[i] else 0
-                item.ordem = i + 1  # Campo obrigatório
+        # Processar itens organizados por template (formato novo)
+        templates_data = request.form.get('templates_organizados')
+        if templates_data:
+            import json
+            try:
+                templates_organizados = json.loads(templates_data)
+                print(f"DEBUG TEMPLATES: {len(templates_organizados)} categorias encontradas")
                 
-                # Calcular valor total do item
-                valor_item = item.quantidade * item.preco_unitario
-                valor_total_proposta += valor_item
-                
-                print(f"DEBUG ITEM {i+1}: {item.descricao} - {item.quantidade} {item.unidade} x R$ {item.preco_unitario} = R$ {valor_item}")
-                
-                db.session.add(item)
+                for categoria in templates_organizados:
+                    categoria_titulo = categoria.get('categoria_titulo', '')
+                    template_origem_id = categoria.get('template_origem_id')
+                    template_origem_nome = categoria.get('template_origem_nome', '')
+                    
+                    for i, item_data in enumerate(categoria.get('itens', [])):
+                        item = PropostaItem()
+                        item.proposta_id = proposta.id
+                        item.descricao = item_data.get('descricao', '')
+                        item.quantidade = float(item_data.get('quantidade', 0))
+                        item.unidade = item_data.get('unidade', 'un')
+                        item.preco_unitario = float(item_data.get('preco_unitario', 0))
+                        
+                        # Campos para organização
+                        item.categoria_titulo = categoria_titulo
+                        item.template_origem_id = template_origem_id
+                        item.template_origem_nome = template_origem_nome
+                        item.grupo_ordem = categoria.get('grupo_ordem', 0)
+                        item.item_ordem_no_grupo = i + 1
+                        item.ordem = i + 1
+                        
+                        valor_item = item.quantidade * item.preco_unitario
+                        valor_total_proposta += valor_item
+                        
+                        print(f"DEBUG TEMPLATE ITEM: {item.descricao} - {item.quantidade} x R$ {item.preco_unitario} = R$ {valor_item}")
+                        db.session.add(item)
+                        
+            except json.JSONDecodeError as e:
+                print(f"DEBUG: Erro ao processar templates organizados: {e}")
+                # Fallback para processamento simples
+        
+        # Fallback: Processar itens simples se não houver templates organizados
+        if not templates_data:
+            descricoes = request.form.getlist('item_descricao')
+            quantidades = request.form.getlist('item_quantidade')
+            unidades = request.form.getlist('item_unidade')
+            precos = request.form.getlist('item_preco')
+            
+            print(f"DEBUG ITENS SIMPLES: {len(descricoes)} itens encontrados")
+            
+            for i, descricao in enumerate(descricoes):
+                if descricao and descricao.strip():
+                    item = PropostaItem()
+                    item.proposta_id = proposta.id
+                    item.item_numero = i + 1
+                    item.descricao = descricao.strip()
+                    item.quantidade = float(quantidades[i]) if i < len(quantidades) and quantidades[i] else 0
+                    item.unidade = unidades[i] if i < len(unidades) else 'un'
+                    item.preco_unitario = float(precos[i]) if i < len(precos) and precos[i] else 0
+                    item.ordem = i + 1
+                    
+                    valor_item = item.quantidade * item.preco_unitario
+                    valor_total_proposta += valor_item
+                    
+                    print(f"DEBUG ITEM SIMPLES {i+1}: {item.descricao} - R$ {valor_item}")
+                    db.session.add(item)
         
         # Atualizar valor total da proposta
         proposta.valor_total = valor_total_proposta
