@@ -430,7 +430,7 @@
                 <!-- Se há múltiplas categorias organizadas -->
                 {% if proposta.itens_organizados %}
                     {% for categoria_nome, itens_categoria in proposta.itens_organizados %}
-                        <div style="text-align: center; font-weight: bold; margin: 15px 0;">{{ categoria_nome.upper() }}</div>
+                        <div style="text-align: center; font-weight: bold; margin: 15px 0;">{{ (categoria_nome or 'ITENS').upper() }}</div>
                         
                         <table class="items-table">
                             <thead>
