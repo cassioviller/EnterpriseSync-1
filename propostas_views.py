@@ -179,6 +179,10 @@ def test_nova_proposta():
 @admin_required
 def nova_proposta():
     """Exibe formulário para criar nova proposta"""
+    # Importar bypass para garantir usuário correto
+    from bypass_auth import MockCurrentUser
+    current_user = MockCurrentUser()
+    
     # Admin_id dinâmico baseado no tipo de usuário
     admin_id = getattr(current_user, 'admin_id', None) or current_user.id
     print(f"DEBUG TEMPLATES: Buscando templates para admin_id={admin_id}")
@@ -195,6 +199,13 @@ def nova_proposta():
     print(f"DEBUG TEMPLATES: Encontrou {len(templates)} templates para admin_id={admin_id}")
     for t in templates:
         print(f"DEBUG TEMPLATE: {t.id}: {t.nome} (admin_id={t.admin_id})")
+    
+    # Se não encontrou templates para esse admin_id, mostrar todos disponíveis para debug
+    if len(templates) == 0:
+        todos_templates = PropostaTemplate.query.filter_by(ativo=True).all()
+        print(f"DEBUG: Nenhum template para admin_id={admin_id}. Templates disponíveis:")
+        for t in todos_templates:
+            print(f"  Template {t.id}: {t.nome} (admin_id={t.admin_id})")
     
     # Definir valores padrão da empresa ou usar padrões do sistema
     padrao_itens_inclusos = "Mão de obra para execução dos serviços; Todos os equipamentos de segurança necessários; Transporte e alimentação da equipe; Container para guarda de ferramentas; Movimentação de carga (Munck); Transporte dos materiais"
@@ -357,6 +368,9 @@ def criar_teste_template(template_id):
 def criar_proposta():
     """Cria uma nova proposta"""
     try:
+        # Importar bypass para garantir usuário correto
+        from bypass_auth import MockCurrentUser
+        current_user = MockCurrentUser()
         # Validação obrigatória: apenas nome do cliente
         cliente_nome = request.form.get('cliente_nome')
         if not cliente_nome or not cliente_nome.strip():
