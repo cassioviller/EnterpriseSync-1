@@ -37,7 +37,7 @@ class MockCurrentUser:
     
     @property
     def admin_id(self):
-        return 10  # Para funcionário, admin_id aponta para o admin responsável
+        return 2  # Ajustado para usar admin_id=2 onde estão os dados da Estruturas do Vale
     
     @property
     def email(self):
