@@ -29,20 +29,29 @@
         
         .page {
             width: 210mm;
-            height: 297mm;
+            min-height: 297mm;
             margin: 0;
             background: white;
             position: relative;
             padding: 0;
             box-sizing: border-box;
             page-break-after: always;
-            page-break-inside: avoid;
-            overflow: hidden;
+            overflow: visible;
             display: block;
         }
         
         .page:last-child {
             page-break-after: avoid;
+        }
+        
+        .page.fixed-height {
+            height: 297mm;
+            overflow: hidden;
+        }
+        
+        .page.dynamic-height {
+            min-height: 297mm;
+            height: auto;
         }
         
         @media print {
@@ -53,14 +62,18 @@
             }
             .page {
                 width: 210mm;
-                height: 297mm;
+                min-height: 297mm;
                 margin: 0 !important;
-                padding: 20mm;
+                padding: 0;
                 box-sizing: border-box;
                 page-break-after: always !important;
-                page-break-inside: avoid !important;
                 display: block;
                 break-after: page;
+                overflow: visible;
+            }
+            .page.fixed-height {
+                height: 297mm !important;
+                overflow: hidden;
             }
             .page:last-child {
                 page-break-after: avoid !important;
@@ -98,8 +111,18 @@
         /* Conteúdo da página com margem para não sobrepor o header */
         .page-content {
             padding: 80px 20mm 20mm 20mm;
-            height: calc(297mm - 80px);
+            min-height: calc(297mm - 80px);
             box-sizing: border-box;
+        }
+        
+        .page-content.fixed-content {
+            height: calc(297mm - 80px);
+            overflow: hidden;
+        }
+        
+        .page-content.dynamic-content {
+            min-height: calc(297mm - 80px);
+            height: auto;
         }
         
         /* Estilos da primeira página */
@@ -169,6 +192,9 @@
         /* Seções de conteúdo */
         .section {
             margin: 20px 0;
+            page-break-inside: avoid;
+            orphans: 3;
+            widows: 3;
         }
         
         .section-title {
@@ -176,11 +202,19 @@
             font-size: 12pt;
             margin-bottom: 15px;
             color: #2c5530;
+            page-break-after: avoid;
         }
         
         .section-content {
             line-height: 1.6;
             text-align: justify;
+        }
+        
+        /* Quebras inteligentes para tabelas grandes */
+        .large-table-section {
+            page-break-before: auto;
+            page-break-after: auto;
+            page-break-inside: auto;
         }
         
         /* Tabela de itens */
@@ -189,6 +223,7 @@
             border-collapse: collapse;
             margin: 20px 0;
             font-size: 10pt;
+            page-break-inside: auto;
         }
         
         .items-table th,
@@ -196,11 +231,13 @@
             border: 1px solid #333;
             padding: 8px 6px;
             text-align: center;
+            page-break-inside: avoid;
         }
         
         .items-table th {
             background-color: #f0f0f0;
             font-weight: bold;
+            page-break-after: avoid;
         }
         
         .items-table td:nth-child(2) {
@@ -215,6 +252,15 @@
         .total-row {
             font-weight: bold;
             background-color: #f8f8f8;
+            page-break-before: avoid;
+        }
+        
+        .items-table tbody tr {
+            page-break-inside: avoid;
+        }
+        
+        .items-table thead {
+            display: table-header-group;
         }
         
         /* Lista com bullets */
@@ -238,14 +284,14 @@
 </head>
 <body>
     <!-- PÁGINA 1 - Carta de Apresentação -->
-    <div class="page">
+    <div class="page fixed-height">
         {% if config_empresa and config_empresa.header_pdf_base64 %}
         <div class="page-header">
             <img src="data:image/png;base64,{{ config_empresa.header_pdf_base64 }}" alt="Header da Empresa">
         </div>
         {% endif %}
         
-        <div class="page-content">
+        <div class="page-content fixed-content">
             <div class="date-location">
                 São José dos Campos, {{ proposta.data_criacao.strftime('%d de %B de %Y')|replace('January', 'janeiro')|replace('February', 'fevereiro')|replace('March', 'março')|replace('April', 'abril')|replace('May', 'maio')|replace('June', 'junho')|replace('July', 'julho')|replace('August', 'agosto')|replace('September', 'setembro')|replace('October', 'outubro')|replace('November', 'novembro')|replace('December', 'dezembro') if proposta.data_criacao else '18 de agosto de 2025' }}.
             </div>
@@ -294,14 +340,14 @@
     </div>
 
     <!-- PÁGINA 2 - Sumário -->
-    <div class="page">
+    <div class="page fixed-height">
         {% if config_empresa and config_empresa.header_pdf_base64 %}
         <div class="page-header">
             <img src="data:image/png;base64,{{ config_empresa.header_pdf_base64 }}" alt="Header da Empresa">
         </div>
         {% endif %}
         
-        <div class="page-content">
+        <div class="page-content fixed-content">
             <div class="toc-title">Sumário</div>
         
         <div class="toc-item">
@@ -348,14 +394,14 @@
     </div>
 
     <!-- PÁGINA 3 - Conteúdo Principal -->
-    <div class="page">
+    <div class="page dynamic-height">
         {% if config_empresa and config_empresa.header_pdf_base64 %}
         <div class="page-header">
             <img src="data:image/png;base64,{{ config_empresa.header_pdf_base64 }}" alt="Header da Empresa">
         </div>
         {% endif %}
         
-        <div class="page-content">
+        <div class="page-content dynamic-content">
             <!-- 1. OBJETO -->
         <div class="section">
             <div class="section-title">1. OBJETO:</div>
@@ -500,14 +546,14 @@
     </div>
 
     <!-- PÁGINA 4 - Condições Finais -->
-    <div class="page">
+    <div class="page dynamic-height">
         {% if config_empresa and config_empresa.header_pdf_base64 %}
         <div class="page-header">
             <img src="data:image/png;base64,{{ config_empresa.header_pdf_base64 }}" alt="Header da Empresa">
         </div>
         {% endif %}
 
-        <div class="page-content">
+        <div class="page-content dynamic-content">
             <!-- 5. CONDIÇÕES DE PAGAMENTO -->
         <div class="section">
             <div class="section-title">5. CONDIÇÕES DE PAGAMENTO</div>
