@@ -2162,6 +2162,21 @@ Jefferson Luiz Moreira – Gerente Estruturas do Vale""")
     # Garantias padrão
     garantias = db.Column(db.Text, default="""A Estruturas do Vale garante todos os materiais empregados nos serviços contra defeitos de fabricação pelo prazo de 12 (doze) meses contados a partir da data de conclusão da obra, conforme NBR 8800.""")
     
+    # SEÇÕES COMPLETAS DA PROPOSTA (1-9)
+    secao_objeto = db.Column(db.Text, default="""Esta proposta descreve as condições comerciais a serem atendidas para o fornecimento de mão de obra especializada para fabricação e montagem de estruturas conforme segue.""")
+    condicoes_entrega = db.Column(db.Text, default="""Prazo de entrega de 90 dias corridos após aprovação do projeto executivo e recebimento da primeira parcela.
+
+O prazo poderá ser alterado em função de condições climáticas adversas.""")
+    consideracoes_gerais = db.Column(db.Text, default="""8.1 Modificações e Cancelamentos
+Qualquer alteração no escopo do projeto deverá ser previamente aprovada por escrito, podendo resultar em ajustes nos prazos e valores.
+
+8.2 Obrigações do Contratante
+O contratante deverá fornecer energia elétrica, água potável e local adequado para estoque temporário dos materiais.
+
+8.3 Água e Energia
+Por conta do contratante o fornecimento de água e energia elétrica durante o período de execução da obra.""")
+    secao_validade = db.Column(db.Text, default="""Esta proposta tem validade de 7 (sete) dias corridos a partir da data de emissão.""")
+    
     # Status e controle
     ativo = db.Column(db.Boolean, default=True)
     publico = db.Column(db.Boolean, default=False)  # Se pode ser usado por outros usuários

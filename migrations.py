@@ -36,7 +36,10 @@ def executar_migracoes():
         # Migração 6: Garantir usuários existem para foreign keys
         garantir_usuarios_producao()
         
-        # Migração 7: Adicionar campos editáveis para páginas do PDF - IGNORADA POR ENQUANTO
+        # Migração 7: Adicionar novos campos completos para templates
+        migrar_campos_completos_templates()
+        
+        # Migração 8: Adicionar campos editáveis para páginas do PDF - IGNORADA POR ENQUANTO
         logger.info("✅ Campos PDF serão adicionados manualmente se necessário")
 
         logger.info("✅ Migrações automáticas concluídas com sucesso!")
@@ -431,6 +434,69 @@ def migrar_campos_organizacao_propostas():
         
     except Exception as e:
         logger.error(f"❌ Erro ao adicionar campos de organização: {str(e)}")
+        if 'connection' in locals():
+            connection.rollback()
+            cursor.close()
+            connection.close()
+
+def migrar_campos_completos_templates():
+    """
+    Migração 7: Adicionar campos completos para templates (dados do cliente, engenheiro, seções)
+    """
+    try:
+        connection = db.engine.raw_connection()
+        cursor = connection.cursor()
+        
+        # Lista de colunas completas para adicionar
+        colunas_completas = [
+            # Dados do cliente (primeira página)
+            ("cidade_data", "VARCHAR(200) DEFAULT 'São José dos Campos, [DATA]'"),
+            ("destinatario", "VARCHAR(200)"),
+            ("atencao_de", "VARCHAR(200)"),
+            ("telefone_cliente", "VARCHAR(50)"),
+            ("assunto", "TEXT"),
+            ("numero_referencia", "VARCHAR(100)"),
+            ("texto_apresentacao", "TEXT"),
+            
+            # Dados do engenheiro responsável
+            ("engenheiro_nome", "VARCHAR(200) DEFAULT 'Engº Lucas Barbosa Alves Pinto'"),
+            ("engenheiro_crea", "VARCHAR(50) DEFAULT 'CREA- 5070458626-SP'"),
+            ("engenheiro_email", "VARCHAR(120) DEFAULT 'contato@estruturasdovale.com.br'"),
+            ("engenheiro_telefone", "VARCHAR(50) DEFAULT '12 99187-7435'"),
+            ("engenheiro_endereco", "TEXT DEFAULT 'Rua Benedita Nunes de Campos, 140. Residencial União, São José dos Campos - CEP 12.239-008'"),
+            ("engenheiro_website", "VARCHAR(200) DEFAULT 'www.estruturasdovale.com.br'"),
+            
+            # Seções completas da proposta (1-9)
+            ("secao_objeto", "TEXT"),
+            ("condicoes_entrega", "TEXT"),
+            ("consideracoes_gerais", "TEXT"),
+            ("secao_validade", "TEXT")
+        ]
+        
+        for nome_coluna, tipo_coluna in colunas_completas:
+            # Verificar se a coluna já existe
+            cursor.execute("""
+                SELECT column_name 
+                FROM information_schema.columns 
+                WHERE table_name = 'proposta_templates' 
+                AND column_name = %s
+            """, (nome_coluna,))
+            
+            exists = cursor.fetchone()
+            
+            if not exists:
+                logger.info(f"🔄 Adicionando coluna '{nome_coluna}' na tabela proposta_templates...")
+                cursor.execute(f"ALTER TABLE proposta_templates ADD COLUMN {nome_coluna} {tipo_coluna}")
+                logger.info(f"✅ Coluna '{nome_coluna}' adicionada com sucesso")
+            else:
+                logger.info(f"✅ Coluna '{nome_coluna}' já existe na tabela proposta_templates")
+        
+        connection.commit()
+        cursor.close()
+        connection.close()
+        
+    except Exception as e:
+        logger.error(f"❌ Erro ao adicionar campos completos de templates: {str(e)}")
         if 'connection' in locals():
             connection.rollback()
             cursor.close()

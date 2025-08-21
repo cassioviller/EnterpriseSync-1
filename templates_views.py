@@ -226,6 +226,14 @@ def novo_template():
             template.engenheiro_endereco = request.form.get('engenheiro_endereco')
             template.engenheiro_website = request.form.get('engenheiro_website')
             
+            # SEÇÕES COMPLETAS DA PROPOSTA (1-9)
+            template.itens_inclusos = request.form.get('itens_inclusos')
+            template.itens_exclusos = request.form.get('itens_exclusos')
+            template.secao_objeto = request.form.get('secao_objeto')
+            template.condicoes_entrega = request.form.get('condicoes_entrega')
+            template.consideracoes_gerais = request.form.get('consideracoes_gerais')
+            template.secao_validade = request.form.get('secao_validade')
+            
             # Processar itens do template (JSON)
             itens_json = request.form.get('itens_json')
             if itens_json:
@@ -310,6 +318,14 @@ def editar_template(id):
             template.engenheiro_telefone = request.form.get('engenheiro_telefone')
             template.engenheiro_endereco = request.form.get('engenheiro_endereco')
             template.engenheiro_website = request.form.get('engenheiro_website')
+            
+            # SEÇÕES COMPLETAS DA PROPOSTA (1-9)
+            template.itens_inclusos = request.form.get('itens_inclusos')
+            template.itens_exclusos = request.form.get('itens_exclusos')
+            template.secao_objeto = request.form.get('secao_objeto')
+            template.condicoes_entrega = request.form.get('condicoes_entrega')
+            template.consideracoes_gerais = request.form.get('consideracoes_gerais')
+            template.secao_validade = request.form.get('secao_validade')
             
             # Atualizar itens do template
             itens_json = request.form.get('itens_json')
