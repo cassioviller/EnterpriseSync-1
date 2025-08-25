@@ -1553,7 +1553,10 @@ def lista_rdos():
         
     except Exception as e:
         print(f"ERRO LISTA RDO: {str(e)}")
-        return redirect(url_for('main.dashboard'))
+        if current_user.tipo_usuario == TipoUsuario.FUNCIONARIO:
+            return redirect(url_for('main.funcionario_lista_rdos'))
+        else:
+            return redirect(url_for('main.dashboard'))
 
 @main_bp.route('/rdo/novo')
 @funcionario_required
@@ -2159,7 +2162,7 @@ def funcionario_criar_rdo():
         db.session.rollback()
         print(f"ERRO FUNCIONÁRIO CRIAR RDO: {str(e)}")
         flash('Erro ao criar RDO. Tente novamente.', 'error')
-        return redirect(url_for('main.funcionario_novo_rdo'))
+        return redirect(url_for('main.funcionario_lista_rdos'))
 
 @main_bp.route('/funcionario/rdo/<int:id>')
 @funcionario_required
