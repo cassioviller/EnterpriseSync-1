@@ -2065,36 +2065,65 @@ def funcionario_novo_rdo():
 @main_bp.route('/funcionario/rdo/criar', methods=['POST'])
 @funcionario_required
 def funcionario_criar_rdo():
-    """Funcionário criar RDO"""
+    """Funcionário criar ou editar RDO"""
     try:
-        # Dados básicos
-        obra_id = request.form.get('obra_id', type=int)
-        data_relatorio = datetime.strptime(request.form.get('data_relatorio'), '%Y-%m-%d').date()
+        # Verificar se é edição ou criação
+        rdo_id = request.form.get('rdo_id', type=int)
         
-        # Verificar se obra pertence ao admin do funcionário
-        obra = Obra.query.filter_by(id=obra_id, admin_id=current_user.admin_id).first()
-        if not obra:
-            flash('Obra não encontrada ou sem permissão de acesso.', 'error')
-            return redirect(url_for('main.funcionario_novo_rdo'))
-        
-        # Verificar se já existe RDO para esta obra/data
-        rdo_existente = RDO.query.filter_by(obra_id=obra_id, data_relatorio=data_relatorio).first()
-        if rdo_existente:
-            flash(f'Já existe um RDO para esta obra na data {data_relatorio.strftime("%d/%m/%Y")}.', 'warning')
-            return redirect(url_for('main.funcionario_novo_rdo'))
-        
-        # Gerar número do RDO específico para este admin
-        contador_rdos = RDO.query.join(Obra).filter(
-            Obra.admin_id == current_user.admin_id
-        ).count()
-        numero_rdo = f"RDO-{current_user.admin_id}-{datetime.now().year}-{contador_rdos + 1:03d}"
-        
-        # Criar RDO com campos padronizados
-        rdo = RDO()
-        rdo.numero_rdo = numero_rdo
-        rdo.obra_id = obra_id
-        rdo.data_relatorio = data_relatorio
-        rdo.admin_id = current_user.admin_id  # Vincular ao admin correto
+        if rdo_id:
+            # EDIÇÃO - Buscar RDO existente
+            rdo = RDO.query.join(Obra).filter(
+                RDO.id == rdo_id,
+                Obra.admin_id == current_user.admin_id
+            ).first()
+            
+            if not rdo:
+                flash('RDO não encontrado ou sem permissão de acesso.', 'error')
+                return redirect(url_for('main.funcionario_lista_rdos'))
+            
+            if rdo.status != 'Rascunho':
+                flash('Apenas RDOs em rascunho podem ser editados.', 'warning')
+                return redirect(url_for('main.funcionario_visualizar_rdo', id=rdo_id))
+            
+            # Limpar atividades antigas para substituir pelas novas
+            RDOAtividade.query.filter_by(rdo_id=rdo.id).delete()
+            RDOMaoObra.query.filter_by(rdo_id=rdo.id).delete()
+            RDOEquipamento.query.filter_by(rdo_id=rdo.id).delete()
+            RDOOcorrencia.query.filter_by(rdo_id=rdo.id).delete()
+            
+            print(f"DEBUG EDIÇÃO: Editando RDO {rdo.numero_rdo}")
+            
+        else:
+            # CRIAÇÃO - Lógica original
+            obra_id = request.form.get('obra_id', type=int)
+            data_relatorio = datetime.strptime(request.form.get('data_relatorio'), '%Y-%m-%d').date()
+            
+            # Verificar se obra pertence ao admin do funcionário
+            obra = Obra.query.filter_by(id=obra_id, admin_id=current_user.admin_id).first()
+            if not obra:
+                flash('Obra não encontrada ou sem permissão de acesso.', 'error')
+                return redirect(url_for('main.funcionario_novo_rdo'))
+            
+            # Verificar se já existe RDO para esta obra/data
+            rdo_existente = RDO.query.filter_by(obra_id=obra_id, data_relatorio=data_relatorio).first()
+            if rdo_existente:
+                flash(f'Já existe um RDO para esta obra na data {data_relatorio.strftime("%d/%m/%Y")}.', 'warning')
+                return redirect(url_for('main.funcionario_novo_rdo'))
+            
+            # Gerar número do RDO específico para este admin
+            contador_rdos = RDO.query.join(Obra).filter(
+                Obra.admin_id == current_user.admin_id
+            ).count()
+            numero_rdo = f"RDO-{current_user.admin_id}-{datetime.now().year}-{contador_rdos + 1:03d}"
+            
+            # Criar RDO com campos padronizados
+            rdo = RDO()
+            rdo.numero_rdo = numero_rdo
+            rdo.obra_id = obra_id
+            rdo.data_relatorio = data_relatorio
+            rdo.admin_id = current_user.admin_id  # Vincular ao admin correto
+            
+            print(f"DEBUG CRIAÇÃO: Criando novo RDO {numero_rdo}")
         
         # Campos climáticos padronizados
         rdo.clima_geral = request.form.get('clima_geral', '').strip()
@@ -2200,14 +2229,26 @@ def funcionario_criar_rdo():
         
         db.session.commit()
         
-        flash(f'RDO {numero_rdo} criado com sucesso!', 'success')
+        if rdo_id:
+            flash(f'RDO {rdo.numero_rdo} atualizado com sucesso!', 'success')
+        else:
+            flash(f'RDO {rdo.numero_rdo} criado com sucesso!', 'success')
+            
         return redirect(url_for('main.funcionario_visualizar_rdo', id=rdo.id))
         
     except Exception as e:
         db.session.rollback()
-        print(f"ERRO FUNCIONÁRIO CRIAR RDO: {str(e)}")
-        flash('Erro ao criar RDO. Tente novamente.', 'error')
-        return redirect(url_for('main.funcionario_lista_rdos'))
+        print(f"ERRO FUNCIONÁRIO CRIAR/EDITAR RDO: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        
+        rdo_id = request.form.get('rdo_id', type=int)
+        if rdo_id:
+            flash('Erro ao atualizar RDO. Tente novamente.', 'error')
+            return redirect(url_for('main.funcionario_editar_rdo', id=rdo_id))
+        else:
+            flash('Erro ao criar RDO. Tente novamente.', 'error')
+            return redirect(url_for('main.funcionario_novo_rdo'))
 
 @main_bp.route('/funcionario/rdo/<int:id>')
 @funcionario_required
