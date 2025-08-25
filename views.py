@@ -2023,22 +2023,24 @@ def funcionario_novo_rdo():
                     subatividades = SubAtividade.query.filter_by(servico_id=servico.id).all()
                     print(f"DEBUG FUNCIONÁRIO SERVIÇO: {servico.nome} - {len(subatividades)} subatividades")
                     
-                    # Adicionar serviço principal como atividade
+                    # Estruturar como serviço com subatividades
                     atividades_anteriores.append({
-                        'descricao': f"{servico.nome} - {servico.categoria}",
+                        'descricao': servico.nome,
+                        'categoria': servico.categoria,
                         'percentual': 0,
-                        'observacoes': f"Serviço: {servico.nome}"
+                        'observacoes': f"Serviço: {servico.nome}",
+                        'subatividades': [
+                            {
+                                'id': sub.id,
+                                'nome': sub.nome,
+                                'percentual': 0,
+                                'descricao': ''
+                            }
+                            for sub in subatividades
+                        ]
                     })
-                    
-                    # Adicionar cada subatividade
-                    for sub in subatividades:
-                        atividades_anteriores.append({
-                            'descricao': f"  → {sub.nome}",
-                            'percentual': 0,
-                            'observacoes': f"Subatividade de {servico.nome}"
-                        })
                 
-                print(f"DEBUG FUNCIONÁRIO: Total de {len(atividades_anteriores)} atividades pré-carregadas")
+                print(f"DEBUG FUNCIONÁRIO: Total de {len(atividades_anteriores)} serviços pré-carregados")
         
         return render_template('funcionario/novo_rdo.html', 
                              obras=obras,
