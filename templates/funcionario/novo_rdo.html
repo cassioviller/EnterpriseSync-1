@@ -464,8 +464,185 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
 
-    // JavaScript idêntico ao template admin (adicionar/remover elementos, processar dados)
-    // ... [código JavaScript completo igual ao template admin]
+    // Adicionar atividade
+    document.getElementById('adicionar-atividade').addEventListener('click', function() {
+        const container = document.getElementById('atividades-container');
+        const newItem = container.querySelector('.atividade-item').cloneNode(true);
+        
+        // Limpar campos e remover classe de pré-carregado
+        newItem.classList.remove('bg-light');
+        newItem.querySelectorAll('input, textarea').forEach(input => input.value = '');
+        newItem.querySelectorAll('small').forEach(small => small.remove());
+        
+        container.appendChild(newItem);
+        
+        // Adicionar event listener para remoção
+        newItem.querySelector('.remover-atividade').addEventListener('click', function() {
+            if (container.children.length > 1) {
+                newItem.remove();
+            }
+        });
+    });
+
+    // Adicionar mão de obra
+    document.getElementById('adicionar-mao-obra').addEventListener('click', function() {
+        const container = document.getElementById('mao-obra-container');
+        const newItem = container.querySelector('.mao-obra-item').cloneNode(true);
+        
+        // Limpar campos
+        newItem.querySelectorAll('input, select').forEach(input => {
+            if (input.type === 'number') {
+                input.value = '8';
+            } else {
+                input.value = '';
+            }
+        });
+        
+        container.appendChild(newItem);
+        
+        // Adicionar event listener para remoção
+        newItem.querySelector('.remover-mao-obra').addEventListener('click', function() {
+            if (container.children.length > 1) {
+                newItem.remove();
+            }
+        });
+    });
+
+    // Adicionar equipamento
+    document.getElementById('adicionar-equipamento').addEventListener('click', function() {
+        const container = document.getElementById('equipamentos-container');
+        const newItem = container.querySelector('.equipamento-item').cloneNode(true);
+        
+        // Limpar campos
+        newItem.querySelectorAll('input, select').forEach(input => {
+            if (input.type === 'number') {
+                input.value = input.classList.contains('equipamento-quantidade') ? '1' : '8';
+            } else if (input.type === 'text') {
+                input.value = '';
+            }
+        });
+        
+        container.appendChild(newItem);
+        
+        // Adicionar event listener para remoção
+        newItem.querySelector('.remover-equipamento').addEventListener('click', function() {
+            if (container.children.length > 1) {
+                newItem.remove();
+            }
+        });
+    });
+
+    // Adicionar ocorrência
+    document.getElementById('adicionar-ocorrencia').addEventListener('click', function() {
+        const container = document.getElementById('ocorrencias-container');
+        const newItem = container.querySelector('.ocorrencia-item').cloneNode(true);
+        
+        // Limpar campos
+        newItem.querySelectorAll('textarea').forEach(textarea => textarea.value = '');
+        
+        container.appendChild(newItem);
+        
+        // Adicionar event listener para remoção
+        newItem.querySelector('.remover-ocorrencia').addEventListener('click', function() {
+            if (container.children.length > 1) {
+                newItem.remove();
+            }
+        });
+    });
+
+    // Event listeners para remoção inicial
+    document.querySelectorAll('.remover-atividade').forEach(btn => {
+        btn.addEventListener('click', function() {
+            const container = document.getElementById('atividades-container');
+            if (container.children.length > 1) {
+                btn.closest('.atividade-item').remove();
+            }
+        });
+    });
+
+    document.querySelectorAll('.remover-mao-obra').forEach(btn => {
+        btn.addEventListener('click', function() {
+            const container = document.getElementById('mao-obra-container');
+            if (container.children.length > 1) {
+                btn.closest('.mao-obra-item').remove();
+            }
+        });
+    });
+
+    // Processar dados antes do envio
+    document.getElementById('form-rdo').addEventListener('submit', function(e) {
+        // Processar atividades
+        const atividades = [];
+        document.querySelectorAll('.atividade-item').forEach(item => {
+            const descricao = item.querySelector('.atividade-descricao').value;
+            const percentual = item.querySelector('.atividade-percentual').value;
+            const observacoes = item.querySelector('.atividade-observacoes').value;
+            
+            if (descricao.trim()) {
+                atividades.push({
+                    descricao: descricao,
+                    percentual: percentual || 0,
+                    observacoes: observacoes
+                });
+            }
+        });
+        
+        // Processar mão de obra
+        const maoObra = [];
+        document.querySelectorAll('.mao-obra-item').forEach(item => {
+            const funcionarioId = item.querySelector('.mao-obra-funcionario').value;
+            const funcao = item.querySelector('.mao-obra-funcao').value;
+            const horas = item.querySelector('.mao-obra-horas').value;
+            
+            if (funcionarioId && funcao.trim()) {
+                maoObra.push({
+                    funcionario_id: funcionarioId,
+                    funcao: funcao,
+                    horas: horas || 8
+                });
+            }
+        });
+        
+        // Processar equipamentos
+        const equipamentos = [];
+        document.querySelectorAll('.equipamento-item').forEach(item => {
+            const nome = item.querySelector('.equipamento-nome').value;
+            const quantidade = item.querySelector('.equipamento-quantidade').value;
+            const horas = item.querySelector('.equipamento-horas').value;
+            const estado = item.querySelector('.equipamento-estado').value;
+            
+            if (nome.trim()) {
+                equipamentos.push({
+                    nome: nome,
+                    quantidade: quantidade || 1,
+                    horas: horas || 8,
+                    estado: estado
+                });
+            }
+        });
+        
+        // Processar ocorrências
+        const ocorrencias = [];
+        document.querySelectorAll('.ocorrencia-item').forEach(item => {
+            const descricao = item.querySelector('.ocorrencia-descricao').value;
+            const problemas = item.querySelector('.ocorrencia-problemas').value;
+            const acoes = item.querySelector('.ocorrencia-acoes').value;
+            
+            if (descricao.trim()) {
+                ocorrencias.push({
+                    descricao: descricao,
+                    problemas: problemas,
+                    acoes: acoes
+                });
+            }
+        });
+        
+        // Definir valores nos campos hidden
+        document.getElementById('atividades-json').value = JSON.stringify(atividades);
+        document.getElementById('mao-obra-json').value = JSON.stringify(maoObra);
+        document.getElementById('equipamentos-json').value = JSON.stringify(equipamentos);
+        document.getElementById('ocorrencias-json').value = JSON.stringify(ocorrencias);
+    });
 
     // Definir data atual por padrão
     document.getElementById('data_relatorio').value = new Date().toISOString().split('T')[0];
