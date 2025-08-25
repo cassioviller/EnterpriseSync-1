@@ -1,0 +1,5 @@
+[
+{"id":2,"nome":"Estrutura Metálica","descricao":"","categoria":"estrutura","unidade_medida":"m2","unidade_simbolo":null,"custo_unitario":0,"complexidade":3,"requer_especializacao":false,"ativo":true,"created_at":"2025-07-25 11:58:00.275649","updated_at":"2025-07-25 11:58:00.275653"},
+{"id":4,"nome":"Beiral Metálico","descricao":"","categoria":"acabamento","unidade_medida":"m2","unidade_simbolo":null,"custo_unitario":0,"complexidade":3,"requer_especializacao":false,"ativo":true,"created_at":"2025-07-30 11:06:02.27497","updated_at":"2025-07-30 11:06:02.274975"},
+{"id":3,"nome":"Manta PVC","descricao":"","categoria":"cobertura","unidade_medida":"m2","unidade_simbolo":null,"custo_unitario":0,"complexidade":3,"requer_especializacao":false,"ativo":true,"created_at":"2025-07-30 11:02:13.71803","updated_at":"2025-07-30 11:06:22.089145"}
+]
