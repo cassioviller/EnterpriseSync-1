@@ -37,7 +37,7 @@ class MockCurrentUser:
     
     @property
     def admin_id(self):
-        return 2  # Admin ID=2 (Estruturas do Vale) como em produção
+        return 10  # Admin ID=10 (Vale Verde Estruturas Metálicas)
     
     @property
     def email(self):

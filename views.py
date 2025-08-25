@@ -58,7 +58,10 @@ def logout():
 def index():
     if current_user.is_authenticated:
         if current_user.tipo_usuario == TipoUsuario.FUNCIONARIO:
-            return redirect(url_for('main.lista_rdos'))
+            print(f"DEBUG INDEX: Funcionário {current_user.email} redirecionado para dashboard funcionário")
+            return redirect(url_for('main.funcionario_dashboard'))
+        elif current_user.tipo_usuario == TipoUsuario.SUPER_ADMIN:
+            return redirect(url_for('main.super_admin_dashboard'))
         else:
             return redirect(url_for('main.dashboard'))
     return redirect(url_for('main.login'))
@@ -66,20 +69,27 @@ def index():
 # ===== DASHBOARD PRINCIPAL =====
 @main_bp.route('/dashboard')
 def dashboard():
-    # Sistema robusto de detecção de admin_id para produção
+    # REDIRECIONAMENTO BASEADO NO TIPO DE USUÁRIO
+    if hasattr(current_user, 'tipo_usuario') and current_user.is_authenticated:
+        # FUNCIONÁRIO - SEMPRE vai para dashboard específico (SEGURANÇA CRÍTICA)
+        if current_user.tipo_usuario == TipoUsuario.FUNCIONARIO:
+            print(f"DEBUG DASHBOARD: Funcionário {current_user.email} BLOQUEADO do dashboard admin - redirecionado")
+            return redirect(url_for('main.funcionario_dashboard'))
+            
+        # SUPER ADMIN - vai para dashboard específico
+        elif current_user.tipo_usuario == TipoUsuario.SUPER_ADMIN:
+            return redirect(url_for('main.super_admin_dashboard'))
+    
+    # Sistema robusto de detecção de admin_id para produção (APENAS ADMINS)
     try:
         # Determinar admin_id com fallback robusto
         admin_id = 2  # Default fallback
         
         if hasattr(current_user, 'tipo_usuario') and current_user.is_authenticated:
-            if current_user.tipo_usuario == TipoUsuario.SUPER_ADMIN:
-                # Buscar automaticamente o admin_id com mais funcionários ativos
-                admin_counts = db.session.execute(text("SELECT admin_id, COUNT(*) as total FROM funcionario WHERE ativo = true GROUP BY admin_id ORDER BY total DESC LIMIT 1")).fetchone()
-                admin_id = admin_counts[0] if admin_counts else 2
-            elif current_user.tipo_usuario == TipoUsuario.ADMIN:
+            if current_user.tipo_usuario == TipoUsuario.ADMIN:
                 admin_id = current_user.id
             else:
-                admin_id = current_user.admin_id if current_user.admin_id else 2
+                admin_id = current_user.admin_id if hasattr(current_user, 'admin_id') and current_user.admin_id else 2
         else:
             # Sistema de bypass - buscar admin_id com mais funcionários
             try:
