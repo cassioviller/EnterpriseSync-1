@@ -97,40 +97,82 @@
                         </h6>
                         <div class="mb-4">
                             <div id="atividades-container">
+                                <div class="d-flex justify-content-between align-items-center mb-3">
+                                    <span class="badge bg-primary p-2">Progresso Total da Obra: <span id="progresso-total">0%</span></span>
+                                </div>
+                                
                                 {% if atividades_anteriores %}
                                     {% for atividade in atividades_anteriores %}
-                                    <div class="atividade-item border rounded p-3 mb-3 bg-light">
-                                        <div class="row">
-                                            <div class="col-md-6">
-                                                <label class="form-label">Descrição da Atividade</label>
-                                                <input type="text" class="form-control atividade-descricao" 
-                                                       value="{{ atividade.descricao }}" 
-                                                       placeholder="Ex: Concretagem da laje...">
-                                                <small class="text-muted">Pré-carregado do RDO anterior</small>
-                                            </div>
-                                            <div class="col-md-3">
-                                                <label class="form-label">% Conclusão</label>
-                                                <input type="number" class="form-control atividade-percentual" 
-                                                       value="{{ atividade.percentual }}"
-                                                       min="0" max="100" placeholder="0">
-                                                <small class="text-info">Anterior: {{ atividade.percentual }}%</small>
-                                            </div>
-                                            <div class="col-md-3">
-                                                <label class="form-label">Ações</label>
-                                                <div>
-                                                    <button type="button" class="btn btn-sm btn-danger remover-atividade">
-                                                        <i class="fas fa-trash"></i>
+                                    <div class="servico-container border rounded mb-4">
+                                        <!-- Cabeçalho do Serviço -->
+                                        <div class="bg-primary text-white p-3 border-bottom">
+                                            <div class="row align-items-center">
+                                                <div class="col-md-6">
+                                                    <h6 class="mb-0">
+                                                        <i class="fas fa-cogs me-2"></i>{{ atividade.descricao }}
+                                                        <span class="badge bg-light text-dark ms-2">{{ atividade.categoria|title }}</span>
+                                                    </h6>
+                                                    <small>{{ atividade.observacoes }}</small>
+                                                </div>
+                                                <div class="col-md-4">
+                                                    <label class="form-label text-white mb-1">Progresso do Serviço</label>
+                                                    <div class="input-group">
+                                                        <input type="number" class="form-control servico-percentual" 
+                                                               name="atividades[percentual][]" min="0" max="100" step="0.1" 
+                                                               value="{{ atividade.percentual }}" readonly style="background-color: white;">
+                                                        <span class="input-group-text">%</span>
+                                                    </div>
+                                                    <input type="hidden" class="atividade-descricao" value="{{ atividade.descricao }}">
+                                                    <input type="hidden" class="atividade-observacoes" value="{{ atividade.observacoes }}">
+                                                </div>
+                                                <div class="col-md-2">
+                                                    <button type="button" class="btn btn-sm btn-outline-light w-100" 
+                                                            onclick="toggleSubatividades(this)">
+                                                        <i class="fas fa-chevron-down"></i> Sub
                                                     </button>
                                                 </div>
                                             </div>
                                         </div>
-                                        <div class="row mt-2">
-                                            <div class="col-12">
-                                                <label class="form-label">Observações Técnicas</label>
-                                                <textarea class="form-control atividade-observacoes" rows="2" 
-                                                          placeholder="Observações técnicas...">{{ atividade.observacoes }}</textarea>
+                                        
+                                        <!-- Subatividades -->
+                                        {% if atividade.subatividades %}
+                                        <div class="subatividades-container" style="display: none;">
+                                            <div class="p-3 bg-light">
+                                                <h6 class="text-primary mb-3">
+                                                    <i class="fas fa-tasks me-2"></i>Subatividades ({{ atividade.subatividades|length }})
+                                                </h6>
+                                                
+                                                {% for sub in atividade.subatividades %}
+                                                <div class="subatividade-item mb-3 p-3 border rounded bg-white">
+                                                    <div class="row align-items-center">
+                                                        <div class="col-md-6">
+                                                            <strong>{{ sub.nome }}</strong>
+                                                            {% if sub.descricao %}
+                                                            <p class="text-muted mb-0 mt-1">{{ sub.descricao }}</p>
+                                                            {% endif %}
+                                                        </div>
+                                                        <div class="col-md-4">
+                                                            <div class="input-group">
+                                                                <input type="number" class="form-control subatividade-percentual" 
+                                                                       name="subatividades[{{ sub.id }}][percentual]" 
+                                                                       min="0" max="100" step="0.1" value="{{ sub.percentual }}"
+                                                                       onchange="calcularProgressoServico(this)">
+                                                                <span class="input-group-text">%</span>
+                                                            </div>
+                                                            <input type="hidden" name="subatividades[{{ sub.id }}][nome]" value="{{ sub.nome }}">
+                                                        </div>
+                                                        <div class="col-md-2">
+                                                            <div class="progress">
+                                                                <div class="progress-bar bg-success" role="progressbar" 
+                                                                     style="width: {{ sub.percentual }}%"></div>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                                {% endfor %}
                                             </div>
                                         </div>
+                                        {% endif %}
                                     </div>
                                     {% endfor %}
                                 {% else %}
@@ -536,6 +578,75 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Definir data atual por padrão
     document.getElementById('data_relatorio').value = new Date().toISOString().split('T')[0];
+
+    // ===== FUNÇÕES PARA SUBATIVIDADES E CÁLCULO HIERÁRQUICO =====
+    
+    // Toggle das subatividades
+    function toggleSubatividades(button) {
+        const servicoContainer = button.closest('.servico-container');
+        const subatividades = servicoContainer.querySelector('.subatividades-container');
+        const icon = button.querySelector('i');
+        
+        if (subatividades.style.display === 'none') {
+            subatividades.style.display = 'block';
+            icon.className = 'fas fa-chevron-up';
+            button.innerHTML = '<i class="fas fa-chevron-up"></i> Sub';
+        } else {
+            subatividades.style.display = 'none';
+            icon.className = 'fas fa-chevron-down';
+            button.innerHTML = '<i class="fas fa-chevron-down"></i> Sub';
+        }
+    }
+
+    // Calcular progresso do serviço baseado nas subatividades
+    function calcularProgressoServico(input) {
+        const servicoContainer = input.closest('.servico-container');
+        const subatividades = servicoContainer.querySelectorAll('.subatividade-percentual');
+        const servicoPercentual = servicoContainer.querySelector('.servico-percentual');
+        const progressBar = input.closest('.subatividade-item').querySelector('.progress-bar');
+        
+        // Atualizar barra de progresso da subatividade
+        progressBar.style.width = input.value + '%';
+        
+        // Calcular média das subatividades para o serviço
+        let total = 0;
+        let count = 0;
+        
+        subatividades.forEach(sub => {
+            if (sub.value && parseFloat(sub.value) >= 0) {
+                total += parseFloat(sub.value);
+                count++;
+            }
+        });
+        
+        const mediaServico = count > 0 ? (total / count) : 0;
+        servicoPercentual.value = mediaServico.toFixed(1);
+        
+        // Calcular progresso total da obra
+        calcularProgressoTotalObra();
+    }
+
+    // Calcular progresso total da obra baseado nos serviços
+    function calcularProgressoTotalObra() {
+        const servicosPercentuais = document.querySelectorAll('.servico-percentual');
+        let totalObra = 0;
+        let countServicos = 0;
+        
+        servicosPercentuais.forEach(servico => {
+            if (servico.value && parseFloat(servico.value) >= 0) {
+                totalObra += parseFloat(servico.value);
+                countServicos++;
+            }
+        });
+        
+        const progressoObra = countServicos > 0 ? (totalObra / countServicos) : 0;
+        document.getElementById('progresso-total').textContent = progressoObra.toFixed(1) + '%';
+    }
+
+    // Inicializar cálculos quando a página carregar
+    window.addEventListener('load', function() {
+        calcularProgressoTotalObra();
+    });
 
     document.querySelectorAll('.remover-mao-obra').forEach(btn => {
         btn.addEventListener('click', function() {

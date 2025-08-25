@@ -1604,10 +1604,28 @@ def novo_rdo():
                 ).all()
                 
                 for servico_obra, servico in servicos_obra:
+                    # Buscar subatividades do serviço
+                    subatividades = SubAtividade.query.filter_by(
+                        servico_id=servico.id
+                    ).order_by(SubAtividade.ordem_execucao).all()
+                    
+                    # Criar lista de subatividades para o RDO
+                    subatividades_list = []
+                    for sub in subatividades:
+                        subatividades_list.append({
+                            'id': sub.id,
+                            'nome': sub.nome,
+                            'descricao': sub.descricao or '',
+                            'percentual': 0
+                        })
+                    
                     atividades_anteriores.append({
                         'descricao': servico.nome,
                         'percentual': 0,  # Começar com 0% para primeiro RDO
-                        'observacoes': f'Quantidade planejada: {servico_obra.quantidade_planejada} {servico.unidade_simbolo or servico.unidade_medida}'
+                        'observacoes': f'Quantidade planejada: {servico_obra.quantidade_planejada} {servico.unidade_simbolo or servico.unidade_medida}',
+                        'servico_id': servico.id,
+                        'categoria': servico.categoria or 'geral',
+                        'subatividades': subatividades_list
                     })
                 
                 print(f"DEBUG: Pré-carregando {len(atividades_anteriores)} serviços da obra como atividades")
