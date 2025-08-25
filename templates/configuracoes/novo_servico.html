@@ -1,0 +1,91 @@
+{% extends "base.html" %}
+
+{% block title %}Novo Serviço - SIGE{% endblock %}
+
+{% block content %}
+<div class="container-fluid px-4">
+    <div class="row">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h2><i class="fas fa-plus me-2"></i> Novo Serviço</h2>
+                <a href="{{ url_for('main.servicos') }}" class="btn btn-secondary">
+                    <i class="fas fa-arrow-left me-1"></i> Voltar
+                </a>
+            </div>
+
+            <div class="card">
+                <div class="card-body">
+                    <form method="POST">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="nome" class="form-label">Nome do Serviço *</label>
+                                    <input type="text" class="form-control" id="nome" name="nome" required>
+                                    <small class="form-text text-muted">Ex: Estrutura Metálica, Pintura, Soldagem</small>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="categoria" class="form-label">Categoria *</label>
+                                    <select class="form-select" id="categoria" name="categoria" required>
+                                        <option value="">Selecione uma categoria</option>
+                                        <option value="estrutura">Estrutura</option>
+                                        <option value="cobertura">Cobertura</option>
+                                        <option value="acabamento">Acabamento</option>
+                                        <option value="pintura">Pintura</option>
+                                        <option value="soldagem">Soldagem</option>
+                                        <option value="montagem">Montagem</option>
+                                        <option value="instalacao">Instalação</option>
+                                        <option value="outros">Outros</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="unidade_medida" class="form-label">Unidade de Medida *</label>
+                                    <select class="form-select" id="unidade_medida" name="unidade_medida" required>
+                                        <option value="">Selecione uma unidade</option>
+                                        <option value="m2">m² (metros quadrados)</option>
+                                        <option value="m3">m³ (metros cúbicos)</option>
+                                        <option value="m">m (metros lineares)</option>
+                                        <option value="kg">kg (quilogramas)</option>
+                                        <option value="ton">ton (toneladas)</option>
+                                        <option value="un">un (unidades)</option>
+                                        <option value="h">h (horas)</option>
+                                        <option value="l">l (litros)</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="custo_unitario" class="form-label">Custo Unitário (R$)</label>
+                                    <input type="number" class="form-control" id="custo_unitario" name="custo_unitario" step="0.01" min="0" value="0">
+                                    <small class="form-text text-muted">Opcional - custo por unidade</small>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="descricao" class="form-label">Descrição</label>
+                            <textarea class="form-control" id="descricao" name="descricao" rows="3"></textarea>
+                            <small class="form-text text-muted">Descrição detalhada do serviço (opcional)</small>
+                        </div>
+
+                        <div class="d-flex gap-2">
+                            <button type="submit" class="btn btn-success">
+                                <i class="fas fa-save me-1"></i> Salvar Serviço
+                            </button>
+                            <a href="{{ url_for('main.servicos') }}" class="btn btn-secondary">
+                                <i class="fas fa-times me-1"></i> Cancelar
+                            </a>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

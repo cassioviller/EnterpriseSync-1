@@ -3208,6 +3208,52 @@ def servicos():
         flash('Erro ao carregar serviços.', 'error')
         return redirect(url_for('main.dashboard'))
 
+@main_bp.route('/servicos/novo', methods=['GET', 'POST'])
+@admin_required
+def novo_servico():
+    """Criar novo serviço"""
+    if request.method == 'POST':
+        try:
+            nome = request.form.get('nome')
+            categoria = request.form.get('categoria')
+            unidade_medida = request.form.get('unidade_medida')
+            descricao = request.form.get('descricao', '')
+            custo_unitario = float(request.form.get('custo_unitario', 0))
+            
+            # Validações básicas
+            if not nome or not categoria or not unidade_medida:
+                flash('Nome, categoria e unidade de medida são obrigatórios.', 'error')
+                return render_template('configuracoes/novo_servico.html')
+            
+            # Verificar se serviço já existe
+            servico_existente = Servico.query.filter_by(nome=nome).first()
+            if servico_existente:
+                flash(f'Serviço "{nome}" já existe.', 'error')
+                return render_template('configuracoes/novo_servico.html')
+            
+            # Criar novo serviço
+            novo_servico = Servico(
+                nome=nome,
+                categoria=categoria,
+                unidade_medida=unidade_medida,
+                descricao=descricao,
+                custo_unitario=custo_unitario,
+                ativo=True
+            )
+            
+            db.session.add(novo_servico)
+            db.session.commit()
+            
+            flash(f'Serviço "{nome}" criado com sucesso!', 'success')
+            return redirect(url_for('main.servicos'))
+            
+        except Exception as e:
+            db.session.rollback()
+            print(f"ERRO CRIAR SERVIÇO: {str(e)}")
+            flash('Erro ao criar serviço.', 'error')
+    
+    return render_template('configuracoes/novo_servico.html')
+
 @main_bp.route('/relatorios')
 @admin_required
 def relatorios():
