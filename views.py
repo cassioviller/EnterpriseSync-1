@@ -2073,17 +2073,18 @@ def funcionario_criar_rdo():
             flash(f'Já existe um RDO para esta obra na data {data_relatorio.strftime("%d/%m/%Y")}.', 'warning')
             return redirect(url_for('main.funcionario_novo_rdo'))
         
-        # Gerar número do RDO
+        # Gerar número do RDO específico para este admin
         contador_rdos = RDO.query.join(Obra).filter(
             Obra.admin_id == current_user.admin_id
         ).count()
-        numero_rdo = f"RDO-{datetime.now().year}-{contador_rdos + 1:03d}"
+        numero_rdo = f"RDO-{current_user.admin_id}-{datetime.now().year}-{contador_rdos + 1:03d}"
         
         # Criar RDO com campos padronizados
         rdo = RDO()
         rdo.numero_rdo = numero_rdo
         rdo.obra_id = obra_id
         rdo.data_relatorio = data_relatorio
+        rdo.admin_id = current_user.admin_id  # Vincular ao admin correto
         
         # Campos climáticos padronizados
         rdo.clima_geral = request.form.get('clima_geral', '').strip()
