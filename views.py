@@ -2182,6 +2182,35 @@ def funcionario_visualizar_rdo(id):
         flash('RDO não encontrado.', 'error')
         return redirect(url_for('main.funcionario_lista_rdos'))
 
+@main_bp.route('/funcionario/rdo/<int:id>/editar')
+@funcionario_required
+def funcionario_editar_rdo(id):
+    """Funcionário editar RDO específico"""
+    try:
+        # Buscar RDO com verificação de acesso multitenant
+        rdo = RDO.query.join(Obra).filter(
+            RDO.id == id,
+            Obra.admin_id == current_user.admin_id
+        ).first_or_404()
+        
+        # Só pode editar RDOs em rascunho
+        if rdo.status != 'Rascunho':
+            flash('Apenas RDOs em rascunho podem ser editados.', 'warning')
+            return redirect(url_for('main.funcionario_visualizar_rdo', id=id))
+        
+        # Buscar funcionários para mão de obra
+        funcionarios = Funcionario.query.filter_by(
+            admin_id=current_user.admin_id, 
+            ativo=True
+        ).order_by(Funcionario.nome).all()
+        
+        return render_template('funcionario/editar_rdo.html', rdo=rdo, funcionarios=funcionarios)
+        
+    except Exception as e:
+        print(f"ERRO FUNCIONÁRIO EDITAR RDO: {str(e)}")
+        flash('RDO não encontrado.', 'error')
+        return redirect(url_for('main.funcionario_lista_rdos'))
+
 @main_bp.route('/funcionario/obras')
 @funcionario_required
 def funcionario_obras():
@@ -3168,7 +3197,10 @@ def usuarios():
         return render_template('usuarios/lista_usuarios.html', usuarios=usuarios)
     except Exception as e:
         flash(f'Erro ao carregar usuários: {str(e)}', 'error')
-        return redirect(url_for('main.dashboard'))
+        if current_user.tipo_usuario == TipoUsuario.FUNCIONARIO:
+            return redirect(url_for('main.funcionario_dashboard'))
+        else:
+            return redirect(url_for('main.dashboard'))
 
 @main_bp.route('/usuarios/novo', methods=['GET', 'POST'])
 @admin_required
@@ -3247,7 +3279,10 @@ def servicos():
     except Exception as e:
         print(f"ERRO GESTÃO SERVIÇOS: {str(e)}")
         flash('Erro ao carregar serviços.', 'error')
-        return redirect(url_for('main.dashboard'))
+        if current_user.tipo_usuario == TipoUsuario.FUNCIONARIO:
+            return redirect(url_for('main.funcionario_dashboard'))
+        else:
+            return redirect(url_for('main.dashboard'))
 
 @main_bp.route('/servicos/novo', methods=['GET', 'POST'])
 @admin_required
