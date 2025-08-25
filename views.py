@@ -3195,7 +3195,18 @@ def horarios():
 @admin_required
 def servicos():
     """Gestão de serviços"""
-    return render_template('configuracoes/servicos.html')
+    try:
+        admin_id = current_user.id if current_user.tipo_usuario == TipoUsuario.ADMIN else current_user.admin_id
+        
+        # Buscar todos os serviços
+        servicos = Servico.query.order_by(Servico.categoria, Servico.nome).all()
+        
+        return render_template('configuracoes/servicos.html', servicos=servicos)
+        
+    except Exception as e:
+        print(f"ERRO GESTÃO SERVIÇOS: {str(e)}")
+        flash('Erro ao carregar serviços.', 'error')
+        return redirect(url_for('main.dashboard'))
 
 @main_bp.route('/relatorios')
 @admin_required

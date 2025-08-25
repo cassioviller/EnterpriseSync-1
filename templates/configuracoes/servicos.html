@@ -18,11 +18,53 @@
                     <h5 class="mb-0"><i class="fas fa-list me-2"></i> Serviços Disponíveis</h5>
                 </div>
                 <div class="card-body">
+                    {% if servicos %}
+                    <div class="table-responsive">
+                        <table class="table table-striped">
+                            <thead>
+                                <tr>
+                                    <th>Nome</th>
+                                    <th>Categoria</th>
+                                    <th>Unidade</th>
+                                    <th>Subatividades</th>
+                                    <th>Status</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for servico in servicos %}
+                                <tr>
+                                    <td>
+                                        <strong>{{ servico.nome }}</strong>
+                                        {% if servico.descricao %}
+                                        <br><small class="text-muted">{{ servico.descricao }}</small>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        <span class="badge bg-secondary">{{ servico.categoria or 'Sem categoria' }}</span>
+                                    </td>
+                                    <td>{{ servico.unidade_medida }}</td>
+                                    <td>
+                                        <span class="badge bg-info">{{ servico.subatividades|length }} subatividades</span>
+                                    </td>
+                                    <td>
+                                        {% if servico.ativo %}
+                                        <span class="badge bg-success">Ativo</span>
+                                        {% else %}
+                                        <span class="badge bg-danger">Inativo</span>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    {% else %}
                     <div class="text-center py-5">
                         <i class="fas fa-tools fa-3x text-muted mb-3"></i>
-                        <h5 class="text-muted">Funcionalidade em Desenvolvimento</h5>
-                        <p class="text-muted">A gestão de serviços será implementada em breve.</p>
+                        <h5 class="text-muted">Nenhum serviço cadastrado</h5>
+                        <p class="text-muted">Clique em "Novo Serviço" para cadastrar o primeiro serviço.</p>
                     </div>
+                    {% endif %}
                 </div>
             </div>
         </div>
