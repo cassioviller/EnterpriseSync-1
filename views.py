@@ -2007,6 +2007,38 @@ def funcionario_novo_rdo():
                     for ativ in ultimo_rdo.atividades
                 ]
                 print(f"DEBUG FUNCIONÁRIO: Pré-carregando {len(atividades_anteriores)} atividades do RDO {ultimo_rdo.numero_rdo}")
+            else:
+                # Primeiro RDO da obra - carregar atividades dos serviços cadastrados
+                servicos_obra = db.session.query(ServicoObra, Servico).join(
+                    Servico, ServicoObra.servico_id == Servico.id
+                ).filter(
+                    ServicoObra.obra_id == obra_id,
+                    ServicoObra.ativo == True
+                ).all()
+                
+                print(f"DEBUG FUNCIONÁRIO: Pré-carregando {len(servicos_obra)} serviços da obra como atividades")
+                
+                for servico_obra, servico in servicos_obra:
+                    # Buscar subatividades do serviço
+                    subatividades = SubAtividade.query.filter_by(servico_id=servico.id).all()
+                    print(f"DEBUG FUNCIONÁRIO SERVIÇO: {servico.nome} - {len(subatividades)} subatividades")
+                    
+                    # Adicionar serviço principal como atividade
+                    atividades_anteriores.append({
+                        'descricao': f"{servico.nome} - {servico.categoria}",
+                        'percentual': 0,
+                        'observacoes': f"Serviço: {servico.nome}"
+                    })
+                    
+                    # Adicionar cada subatividade
+                    for sub in subatividades:
+                        atividades_anteriores.append({
+                            'descricao': f"  → {sub.nome}",
+                            'percentual': 0,
+                            'observacoes': f"Subatividade de {servico.nome}"
+                        })
+                
+                print(f"DEBUG FUNCIONÁRIO: Total de {len(atividades_anteriores)} atividades pré-carregadas")
         
         return render_template('funcionario/novo_rdo.html', 
                              obras=obras,
