@@ -1,0 +1,52 @@
+Erro inesperado no sistema
+Ocorreu um erro interno no servidor. Nossa equipe foi notificada.
+
+ Detalhes Técnicos do Erro:
+EXCEÇÃO NÃO TRATADA: unsupported format string passed to NoneType.__format__
+
+URL: https://a719a4a9-73c7-43ac-9f05-28b6e4b40780-00-1x2879rl5g3q1.riker.replit.dev/dashboard
+MÉTODO: GET
+TIMESTAMP: 25/08/2025 13:19:52
+TIPO DO ERRO: TypeError
+
+TRACEBACK COMPLETO:
+Traceback (most recent call last):
+  File "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/flask/app.py", line 917, in full_dispatch_request
+    rv = self.dispatch_request()
+         ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/flask/app.py", line 902, in dispatch_request
+    return self.ensure_sync(self.view_functions[rule.endpoint])(**view_args)  # type: ignore[no-any-return]
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/workspace/views.py", line 407, in dashboard
+    return render_template('dashboard.html',
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/flask/templating.py", line 150, in render_template
+    return _render(app, template, context)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/flask/templating.py", line 131, in _render
+    rv = template.render(context)
+         ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/jinja2/environment.py", line 1295, in render
+    self.environment.handle_exception()
+  File "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/jinja2/environment.py", line 942, in handle_exception
+    raise rewrite_traceback_stack(source=source)
+  File "/home/runner/workspace/templates/dashboard.html", line 1, in top-level template code
+    {% extends "base.html" %}
+  File "/home/runner/workspace/templates/base.html", line 925, in top-level template code
+    {% block content %}{% endblock %}
+    ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/workspace/templates/dashboard.html", line 481, in block 'content'
+    <td>R$ {{ '{:,.2f}'.format(obra.orcamento) }}</td>
+    ^^^^^^^^^^^^^^^^^^^^^^^^^
+TypeError: unsupported format string passed to NoneType.__format__
+
+
+CONTEXTO DA REQUISIÇÃO:
+- Headers: {'Host': 'a719a4a9-73c7-43ac-9f05-28b6e4b40780-00-1x2879rl5g3q1.riker.replit.dev', 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Safari/537.36', 'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7', 'Accept-Encoding': 'identity, gzip, deflate, br, zstd', 'Accept-Language': 'pt-BR,pt;q=0.9,en-US;q=0.8,en;q=0.7', 'Cookie': 'session=.eJwljksKwzAMBe_idRfyJ5KVywTZkmh2JU4KpfTuNWT55s1ivmHzw8YzrOdx2SNsu4Y1GGRffElUfOHajZ0bUeRqXV1JijtCMjZ0rRRTBaCkjEplypgwNUTnaJRIUxXt1HrXHFlMwUxMRLh67ZhLm9dEkCeM0Ao1CjPkGnbcNRHmbp-XjLFJP_e33bW_P84aOXs.aKxi9g.DvrDBxJ8OCDWSdqEcAIjj7McDM8', 'Dnt': '1', 'Referer': 'https://a719a4a9-73c7-43ac-9f05-28b6e4b40780-00-1x2879rl5g3q1.riker.replit.dev/__replco/workspace_iframe.html?initialPath=%2F&id=%3Ar2l9%3A', 'Sec-Ch-Ua': '"Not;A=Brand";v="99", "Google Chrome";v="139", "Chromium";v="139"', 'Sec-Ch-Ua-Mobile': '?0', 'Sec-Ch-Ua-Platform': '"Windows"', 'Sec-Fetch-Dest': 'iframe', 'Sec-Fetch-Mode': 'navigate', 'Sec-Fetch-Site': 'same-origin', 'Sec-Fetch-Storage-Access': 'active', 'Upgrade-Insecure-Requests': '1', 'X-Forwarded-For': '177.62.66.200, 10.81.6.227', 'X-Forwarded-Proto': 'https', 'X-Replit-User-Bio': '', 'X-Replit-User-Id': '', 'X-Replit-User-Name': '', 'X-Replit-User-Profile-Image': '', 'X-Replit-User-Roles': '', 'X-Replit-User-Teams': '', 'X-Replit-User-Url': ''}
+- Args: {}
+- Form: Nenhum
+- JSON: Não é JSON
+ URL que causou o erro:
+https://a719a4a9-73c7-43ac-9f05-28b6e4b40780-00-1x2879rl5g3q1.riker.replit.dev/dashboard
+ Horário do erro:
+25/08/2025 13:19:52

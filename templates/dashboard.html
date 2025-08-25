@@ -478,7 +478,7 @@ html[data-bs-theme="dark"] .header-btn i {
                                 <tr>
                                     <td>{{ obra.nome }}</td>
                                     <td>{{ obra.data_inicio.strftime('%d/%m/%Y') if obra.data_inicio else '-' }}</td>
-                                    <td>R$ {{ '{:,.2f}'.format(obra.orcamento) }}</td>
+                                    <td>R$ {{ '{:,.2f}'.format(obra.orcamento or 0) }}</td>
                                 </tr>
                                 {% endfor %}
                             </tbody>
