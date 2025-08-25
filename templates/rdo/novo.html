@@ -18,7 +18,7 @@
                 </div>
                 
                 <div class="card-body">
-                    <form action="{{ url_for('main.criar_rdo') }}" method="POST" id="form-rdo">
+                    <form action="{% if current_user.tipo_usuario.name == 'FUNCIONARIO' %}{{ url_for('main.funcionario_criar_rdo') }}{% else %}{{ url_for('main.criar_rdo') }}{% endif %}" method="POST" id="form-rdo">
                         <!-- Dados Básicos -->
                         <div class="row mb-4">
                             <div class="col-md-6">
@@ -357,7 +357,7 @@
 
                         <!-- Botões -->
                         <div class="d-flex justify-content-end gap-2">
-                            <a href="{{ url_for('main.lista_rdos') }}" class="btn btn-secondary">Cancelar</a>
+                            <a href="{% if current_user.tipo_usuario.name == 'FUNCIONARIO' %}{{ url_for('main.funcionario_rdos') }}{% else %}{{ url_for('main.lista_rdos') }}{% endif %}" class="btn btn-secondary">Cancelar</a>
                             <button type="submit" class="btn btn-primary">
                                 <i class="fas fa-save me-1"></i>Criar RDO
                             </button>
@@ -376,7 +376,7 @@ document.addEventListener('DOMContentLoaded', function() {
         const obraId = this.value;
         if (obraId) {
             // Recarregar página com obra selecionada para pré-carregar atividades
-            window.location.href = '{{ url_for("main.novo_rdo") }}?obra_id=' + obraId;
+            window.location.href = '{% if current_user.tipo_usuario.name == "FUNCIONARIO" %}{{ url_for("main.funcionario_novo_rdo") }}{% else %}{{ url_for("main.novo_rdo") }}{% endif %}?obra_id=' + obraId;
         }
     });
 
