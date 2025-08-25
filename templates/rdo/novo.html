@@ -647,6 +647,10 @@ document.addEventListener('DOMContentLoaded', function() {
     window.addEventListener('load', function() {
         calcularProgressoTotalObra();
     });
+    
+    // Tornar as funções globais para usar nos onclick
+    window.toggleSubatividades = toggleSubatividades;
+    window.calcularProgressoServico = calcularProgressoServico;
 
     document.querySelectorAll('.remover-mao-obra').forEach(btn => {
         btn.addEventListener('click', function() {

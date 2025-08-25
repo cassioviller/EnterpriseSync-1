@@ -1629,6 +1629,8 @@ def novo_rdo():
                     })
                 
                 print(f"DEBUG: Pré-carregando {len(atividades_anteriores)} serviços da obra como atividades")
+                for ativ in atividades_anteriores:
+                    print(f"DEBUG SERVIÇO: {ativ['descricao']} - {len(ativ['subatividades'])} subatividades")
         
         return render_template('rdo/novo.html', 
                              obras=obras,
