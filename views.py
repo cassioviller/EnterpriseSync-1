@@ -1677,12 +1677,12 @@ def criar_rdo():
         rdo.obra_id = obra_id
         rdo.data_relatorio = data_relatorio
         # Buscar o funcionário correspondente ao usuário logado
-        funcionario = Funcionario.query.filter_by(email=current_user.email, admin_id=admin_id).first()
+        funcionario = Funcionario.query.filter_by(email=current_user.email, admin_id=current_user.admin_id).first()
         if funcionario:
             rdo.criado_por_id = funcionario.id
         else:
             flash('Funcionário não encontrado. Entre em contato com o administrador.', 'error')
-            return redirect(url_for('main.novo_rdo'))
+            return redirect(url_for('main.funcionario_novo_rdo'))
         rdo.tempo_manha = request.form.get('tempo_manha', 'Bom')
         rdo.tempo_tarde = request.form.get('tempo_tarde', 'Bom')
         rdo.tempo_noite = request.form.get('tempo_noite', 'Bom')
@@ -2102,12 +2102,12 @@ def funcionario_criar_rdo():
         rdo.comentario_geral = request.form.get('comentario_geral', '').strip()
         rdo.status = 'Rascunho'
         # Buscar o funcionário correspondente ao usuário logado
-        funcionario = Funcionario.query.filter_by(email=current_user.email, admin_id=admin_id).first()
+        funcionario = Funcionario.query.filter_by(email=current_user.email, admin_id=current_user.admin_id).first()
         if funcionario:
             rdo.criado_por_id = funcionario.id
         else:
             flash('Funcionário não encontrado. Entre em contato com o administrador.', 'error')
-            return redirect(url_for('main.novo_rdo'))
+            return redirect(url_for('main.funcionario_novo_rdo'))
         
         db.session.add(rdo)
         db.session.flush()  # Para obter o ID
@@ -2857,12 +2857,12 @@ def criar_rdo_teste():
         rdo.comentario_geral = f'RDO de teste criado via mobile em {datetime.now().strftime("%d/%m/%Y %H:%M")}'
         rdo.status = 'Rascunho'
         # Buscar o funcionário correspondente ao usuário logado
-        funcionario = Funcionario.query.filter_by(email=current_user.email, admin_id=admin_id).first()
+        funcionario = Funcionario.query.filter_by(email=current_user.email, admin_id=current_user.admin_id).first()
         if funcionario:
             rdo.criado_por_id = funcionario.id
         else:
             flash('Funcionário não encontrado. Entre em contato com o administrador.', 'error')
-            return redirect(url_for('main.novo_rdo'))
+            return redirect(url_for('main.funcionario_novo_rdo'))
         
         db.session.add(rdo)
         db.session.flush()
