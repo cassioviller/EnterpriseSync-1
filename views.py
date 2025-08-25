@@ -1843,7 +1843,7 @@ def finalizar_rdo(id):
         return redirect(url_for('main.lista_rdos'))
 
 @main_bp.route('/rdo/api/ultimo-rdo/<int:obra_id>')
-@admin_required
+@funcionario_required
 def api_ultimo_rdo(obra_id):
     """API para buscar atividades do último RDO de uma obra"""
     try:
