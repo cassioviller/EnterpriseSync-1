@@ -1584,6 +1584,7 @@ def novo_rdo():
             ).first()
             
             if ultimo_rdo:
+                # Já existe RDO anterior - carregar atividades do último RDO
                 atividades_anteriores = [
                     {
                         'descricao': ativ.descricao_atividade,
@@ -1593,6 +1594,23 @@ def novo_rdo():
                     for ativ in ultimo_rdo.atividades
                 ]
                 print(f"DEBUG: Pré-carregando {len(atividades_anteriores)} atividades do RDO {ultimo_rdo.numero_rdo}")
+            else:
+                # Primeiro RDO da obra - carregar atividades dos serviços cadastrados
+                servicos_obra = db.session.query(ServicoObra, Servico).join(
+                    Servico, ServicoObra.servico_id == Servico.id
+                ).filter(
+                    ServicoObra.obra_id == obra_id,
+                    ServicoObra.ativo == True
+                ).all()
+                
+                for servico_obra, servico in servicos_obra:
+                    atividades_anteriores.append({
+                        'descricao': servico.nome,
+                        'percentual': 0,  # Começar com 0% para primeiro RDO
+                        'observacoes': f'Quantidade planejada: {servico_obra.quantidade_planejada} {servico.unidade_simbolo or servico.unidade_medida}'
+                    })
+                
+                print(f"DEBUG: Pré-carregando {len(atividades_anteriores)} serviços da obra como atividades")
         
         return render_template('rdo/novo.html', 
                              obras=obras,
@@ -1845,7 +1863,7 @@ def finalizar_rdo(id):
 @main_bp.route('/rdo/api/ultimo-rdo/<int:obra_id>')
 @funcionario_required
 def api_ultimo_rdo(obra_id):
-    """API para buscar atividades do último RDO de uma obra"""
+    """API para buscar atividades para novo RDO - dos serviços da obra ou RDO anterior"""
     try:
         admin_id = current_user.id if current_user.tipo_usuario == TipoUsuario.ADMIN else current_user.admin_id
         
@@ -1859,26 +1877,46 @@ def api_ultimo_rdo(obra_id):
             RDO.data_relatorio.desc()
         ).first()
         
-        if not ultimo_rdo:
-            return jsonify({'atividades': []})
+        atividades = []
+        origem = ''
         
-        atividades = [
-            {
-                'descricao': ativ.descricao_atividade,
-                'percentual': ativ.percentual_conclusao,
-                'observacoes': ativ.observacoes_tecnicas or ''
-            }
-            for ativ in ultimo_rdo.atividades
-        ]
+        if ultimo_rdo:
+            # Já existe RDO anterior - carregar atividades do último RDO
+            atividades = [
+                {
+                    'descricao': ativ.descricao_atividade,
+                    'percentual': ativ.percentual_conclusao,
+                    'observacoes': ativ.observacoes_tecnicas or ''
+                }
+                for ativ in ultimo_rdo.atividades
+            ]
+            origem = f'RDO anterior: {ultimo_rdo.numero_rdo} ({ultimo_rdo.data_relatorio.strftime("%d/%m/%Y")})'
+        else:
+            # Primeiro RDO da obra - carregar atividades dos serviços cadastrados na obra
+            servicos_obra = db.session.query(ServicoObra, Servico).join(
+                Servico, ServicoObra.servico_id == Servico.id
+            ).filter(
+                ServicoObra.obra_id == obra_id,
+                ServicoObra.ativo == True
+            ).all()
+            
+            for servico_obra, servico in servicos_obra:
+                atividades.append({
+                    'descricao': servico.nome,
+                    'percentual': 0,  # Começar com 0% para novo RDO
+                    'observacoes': f'Quantidade planejada: {servico_obra.quantidade_planejada} {servico.unidade_simbolo or servico.unidade_medida}'
+                })
+            
+            origem = f'Serviços cadastrados na obra ({len(atividades)} serviços)'
         
         return jsonify({
             'atividades': atividades,
-            'ultimo_rdo': ultimo_rdo.numero_rdo,
-            'data_anterior': ultimo_rdo.data_relatorio.strftime('%d/%m/%Y')
+            'origem': origem,
+            'total_atividades': len(atividades)
         })
         
     except Exception as e:
-        print(f"ERRO API ÚLTIMO RDO: {str(e)}")
+        print(f"ERRO API ATIVIDADES OBRA: {str(e)}")
         return jsonify({'error': 'Erro interno'}), 500
 
 # ===== ROTAS ESPECÍFICAS PARA FUNCIONÁRIOS - RDO =====
