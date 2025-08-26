@@ -1,0 +1,544 @@
+2. Testes de Stress e Performance
+
+2.1 Testes de Carga
+
+Cenário 1: Volume Alto de Dados
+
+Python
+
+
+# test_performance.py
+def test_obra_com_muitos_servicos():
+    """Testa obra com 50+ serviços e 200+ subatividades"""
+    
+    # Criar obra complexa
+    obra_grande = create_obra("Mega Projeto")
+    
+    # Adicionar 50 serviços com 4-5 subatividades cada
+    for i in range(50):
+        servico = create_servico(f"Serviço {i}")
+        for j in range(5):
+            create_subatividade(f"Sub {i}-{j}", servico.id)
+        add_servico_to_obra(obra_grande.id, servico.id)
+    
+    # Medir tempo de carregamento
+    start_time = time.time()
+    rdo = create_rdo(obra_grande.id, funcionario.id, date.today())
+    load_time = time.time() - start_time
+    
+    # Deve carregar em menos de 3 segundos
+    assert load_time < 3.0
+    
+    # Interface deve ser responsiva
+    assert count_subatividades(rdo.id) == 250
+    assert all_porcentagens_zero(rdo.id) == True
+
+def test_historico_extenso():
+    """Testa obra com 365 RDOs (1 ano de histórico)"""
+    
+    obra = create_obra("Obra Longa Duração")
+    funcionario = get_funcionario_test()
+    
+    # Criar RDO para cada dia do ano
+    start_date = date(2024, 1, 1)
+    for i in range(365):
+        current_date = start_date + timedelta(days=i)
+        rdo = create_rdo(obra.id, funcionario.id, current_date)
+        
+        # Simular progresso gradual
+        update_random_porcentagens(rdo.id, progress_day=i)
+    
+    # Testar carregamento do histórico
+    start_time = time.time()
+    historico = get_historico_obra(obra.id)
+    load_time = time.time() - start_time
+    
+    assert len(historico) == 365
+    assert load_time < 2.0  # Deve carregar em menos de 2 segundos
+
+
+Cenário 2: Múltiplos Usuários Simultâneos
+
+Python
+
+
+def test_concorrencia_multiplos_usuarios():
+    """Simula 10 funcionários criando RDOs simultaneamente"""
+    
+    import threading
+    import concurrent.futures
+    
+    def criar_rdo_simultanea(funcionario_id, obra_id):
+        try:
+            rdo = create_rdo(obra_id, funcionario_id, date.today())
+            update_subatividade_porcentagem(rdo.id, "Sub1", random.randint(1, 100))
+            return True
+        except Exception as e:
+            return False
+    
+    # Criar 10 threads simulando usuários
+    with concurrent.futures.ThreadPoolExecutor(max_workers=10) as executor:
+        futures = []
+        for i in range(10):
+            future = executor.submit(criar_rdo_simultanea, f"func_{i}", obra_test.id)
+            futures.append(future)
+        
+        # Verificar resultados
+        results = [future.result() for future in futures]
+        success_rate = sum(results) / len(results)
+        
+        # Pelo menos 80% deve ter sucesso
+        assert success_rate >= 0.8
+
+
+2.2 Testes de Usabilidade
+
+Teste de Fluxo Completo:
+
+Python
+
+
+def test_fluxo_usuario_completo():
+    """Testa jornada completa do usuário do login ao relatório"""
+    
+    # 1. Login
+    login_result = login_user("funcionario1", "senha123")
+    assert login_result.success == True
+    
+    # 2. Visualizar obras disponíveis
+    obras = get_obras_funcionario(funcionario1.id)
+    assert len(obras) > 0
+    
+    # 3. Selecionar obra
+    obra_selecionada = obras[0]
+    servicos = get_servicos_obra(obra_selecionada.id)
+    assert len(servicos) > 0
+    
+    # 4. Criar RDO
+    rdo = create_rdo(obra_selecionada.id, funcionario1.id, date.today())
+    assert rdo is not None
+    
+    # 5. Preencher subatividades
+    for servico in servicos:
+        subatividades = get_subatividades_servico(servico.id)
+        for sub in subatividades:
+            update_subatividade_porcentagem(rdo.id, sub.nome, random.randint(0, 50))
+    
+    # 6. Salvar RDO
+    save_result = save_rdo(rdo.id)
+    assert save_result.success == True
+    
+    # 7. Visualizar histórico
+    historico = get_historico_obra(obra_selecionada.id)
+    assert len(historico) >= 1
+    
+    # 8. Gerar relatório
+    relatorio = generate_relatorio_obra(obra_selecionada.id)
+    assert relatorio is not None
+
+
+3. Validações de Segurança e Compliance
+
+3.1 Testes de Segurança
+
+Teste de Injeção SQL:
+
+Python
+
+
+def test_sql_injection_protection():
+    """Testa proteção contra SQL injection"""
+    
+    malicious_inputs = [
+        "'; DROP TABLE rdos; --",
+        "1' OR '1'='1",
+        "<script>alert('xss')</script>",
+        "../../etc/passwd",
+        "admin'/**/OR/**/1=1#"
+    ]
+    
+    for malicious_input in malicious_inputs:
+        # Tentar injeção em diferentes campos
+        try:
+            create_rdo_with_malicious_input(malicious_input)
+            assert False, f"Sistema vulnerável a: {malicious_input}"
+        except (ValidationError, SecurityError):
+            pass  # Esperado - sistema deve rejeitar
+
+
+Teste de Autorização:
+
+Python
+
+
+def test_authorization_bypass():
+    """Testa tentativas de bypass de autorização"""
+    
+    # Funcionário tentando acessar dados de outro funcionário
+    func1_token = login("funcionario1", "senha")
+    func2_rdo_id = get_rdo_id_from_funcionario2()
+    
+    response = make_request_with_token(
+        f"/api/rdos/{func2_rdo_id}", 
+        token=func1_token
+    )
+    assert response.status_code == 403  # Forbidden
+    
+    # Funcionário tentando acessar endpoints de admin
+    admin_endpoints = [
+        "/api/admin/usuarios",
+        "/api/admin/obras",
+        "/api/admin/relatorios"
+    ]
+    
+    for endpoint in admin_endpoints:
+        response = make_request_with_token(endpoint, token=func1_token)
+        assert response.status_code in [401, 403]
+
+
+3.2 Validação de Dados
+
+Teste de Integridade de Dados:
+
+Python
+
+
+def test_data_integrity():
+    """Testa integridade dos dados em cenários complexos"""
+    
+    # Criar sequência de RDOs
+    obra = create_obra_test()
+    rdos = []
+    
+    for i in range(10):
+        rdo = create_rdo(obra.id, funcionario.id, date.today() + timedelta(days=i))
+        
+        # Simular progresso crescente
+        update_subatividade_porcentagem(rdo.id, "Sub1", i * 10)
+        update_subatividade_porcentagem(rdo.id, "Sub2", i * 5)
+        rdos.append(rdo)
+    
+    # Verificar integridade
+    for i, rdo in enumerate(rdos):
+        sub1_percent = get_subatividade_porcentagem(rdo.id, "Sub1")
+        sub2_percent = get_subatividade_porcentagem(rdo.id, "Sub2")
+        
+        assert sub1_percent == i * 10
+        assert sub2_percent == i * 5
+        
+        # Verificar que não há regressão
+        if i > 0:
+            prev_rdo = rdos[i-1]
+            prev_sub1 = get_subatividade_porcentagem(prev_rdo.id, "Sub1")
+            assert sub1_percent >= prev_sub1
+
+
+4. Testes de Aceitação do Usuário
+
+4.1 Cenários Reais de Uso
+
+Cenário: Funcionário Novo no Sistema
+
+Plain Text
+
+
+DADO que um novo funcionário foi contratado
+E ele recebeu acesso ao sistema
+QUANDO ele faz login pela primeira vez
+ENTÃO ele deve ver um tutorial/onboarding
+E deve conseguir criar sua primeira RDO sem dificuldades
+E deve receber feedback claro sobre cada ação
+
+
+Cenário: Administrador Gerenciando Múltiplas Obras
+
+Plain Text
+
+
+DADO que o administrador gerencia 20 obras simultâneas
+E cada obra tem múltiplos funcionários
+QUANDO ele acessa o dashboard
+ENTÃO deve ver resumo de todas as obras
+E conseguir identificar rapidamente obras com problemas
+E gerar relatórios consolidados em menos de 30 segundos
+
+
+Cenário: Obra Complexa com Muitas Subatividades
+
+Plain Text
+
+
+DADO uma obra com 15 serviços e 75 subatividades
+QUANDO o funcionário cria uma RDO
+ENTÃO a interface deve permanecer responsiva
+E ele deve conseguir navegar facilmente entre serviços
+E salvar a RDO em menos de 5 segundos
+
+
+4.2 Testes de Acessibilidade
+
+Python
+
+
+def test_accessibility():
+    """Testa acessibilidade da interface"""
+    
+    # Verificar se todos os elementos têm labels
+    assert all_form_elements_have_labels()
+    
+    # Verificar contraste de cores
+    assert color_contrast_meets_wcag_standards()
+    
+    # Verificar navegação por teclado
+    assert keyboard_navigation_works()
+    
+    # Verificar compatibilidade com screen readers
+    assert screen_reader_compatible()
+    
+    # Verificar responsividade mobile
+    assert mobile_responsive()
+
+
+5. Otimizações Finais
+
+5.1 Performance do Banco de Dados
+
+SQL
+
+
+-- Índices para otimização
+CREATE INDEX idx_rdo_obra_data ON rdos(obra_id, data_criacao);
+CREATE INDEX idx_subatividade_rdo ON subatividades_rdo(rdo_id);
+CREATE INDEX idx_usuario_obra ON usuario_obra(usuario_id, obra_id);
+
+-- Queries otimizadas
+-- Buscar última RDO de uma obra
+SELECT * FROM rdos 
+WHERE obra_id = ? 
+ORDER BY data_criacao DESC 
+LIMIT 1;
+
+-- Buscar histórico com paginação
+SELECT * FROM rdos 
+WHERE obra_id = ? 
+ORDER BY data_criacao DESC 
+LIMIT ? OFFSET ?;
+
+
+5.2 Cache e Otimizações
+
+Python
+
+
+# Implementar cache para dados frequentes
+@cache(timeout=300)  # 5 minutos
+def get_servicos_obra(obra_id):
+    return db.query(Servico).join(ObraServico).filter(
+        ObraServico.obra_id == obra_id
+    ).all()
+
+@cache(timeout=60)  # 1 minuto
+def get_ultima_rdo(obra_id):
+    return db.query(RDO).filter(
+        RDO.obra_id == obra_id
+    ).order_by(RDO.data_criacao.desc()).first()
+
+
+6. Checklist Final de Produção
+
+✅ Performance
+
+
+
+
+Carregamento de RDO < 3 segundos (obra com 50+ serviços)
+
+
+
+
+Histórico de 365 RDOs carrega < 2 segundos
+
+
+
+
+Interface responsiva em dispositivos móveis
+
+
+
+
+Suporte a 10+ usuários simultâneos
+
+
+
+
+Queries otimizadas com índices apropriados
+
+✅ Segurança
+
+
+
+
+Proteção contra SQL injection
+
+
+
+
+Validação de autorização em todos os endpoints
+
+
+
+
+Sanitização de inputs do usuário
+
+
+
+
+Logs de auditoria funcionando
+
+
+
+
+Backup automático configurado
+
+✅ Usabilidade
+
+
+
+
+Tutorial/onboarding para novos usuários
+
+
+
+
+Feedback visual para todas as ações
+
+
+
+
+Mensagens de erro claras e úteis
+
+
+
+
+Atalhos de teclado implementados
+
+
+
+
+Acessibilidade WCAG 2.1 AA
+
+✅ Funcionalidades
+
+
+
+
+Herança de porcentagens 100% funcional
+
+
+
+
+Permissões por perfil rigorosamente respeitadas
+
+
+
+
+Sistema de notificações ativo
+
+
+
+
+Relatórios e dashboard funcionais
+
+
+
+
+Export/import de dados
+
+✅ Testes
+
+
+
+
+100% dos testes automatizados passando
+
+
+
+
+Testes de stress validados
+
+
+
+
+Cenários de aceitação do usuário aprovados
+
+
+
+
+Testes de segurança passando
+
+
+
+
+Performance validada com dados reais
+
+7. Documentação Final
+
+Crie documentação completa incluindo:
+
+1.
+Manual do Usuário (Administrador e Funcionário)
+
+2.
+Guia de Instalação e Configuração
+
+3.
+Documentação da API (endpoints, parâmetros, exemplos)
+
+4.
+Guia de Troubleshooting (problemas comuns e soluções)
+
+5.
+Plano de Backup e Recuperação
+
+6.
+Procedimentos de Segurança
+
+8. Deploy e Monitoramento
+
+Python
+
+
+# Script de deploy automatizado
+def deploy_to_production():
+    # Executar todos os testes
+    run_all_tests()
+    
+    # Backup do banco atual
+    backup_database()
+    
+    # Deploy da aplicação
+    deploy_application()
+    
+    # Verificar saúde do sistema
+    health_check()
+    
+    # Notificar equipe
+    notify_deployment_success()
+
+# Monitoramento contínuo
+def setup_monitoring():
+    # Alertas de performance
+    setup_performance_alerts()
+    
+    # Monitoramento de erros
+    setup_error_tracking()
+    
+    # Métricas de uso
+    setup_usage_analytics()
+    
+    # Backup automático
+    schedule_automatic_backups()
+
+
+Este prompt final garante que o sistema RDO esteja completamente pronto para produção, com todos os refinamentos, otimizações e validações necessárias para um ambiente real de trabalho.
+
