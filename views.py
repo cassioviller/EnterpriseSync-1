@@ -2063,6 +2063,7 @@ def funcionario_novo_rdo():
         return redirect(url_for('main.funcionario_dashboard'))
 
 @main_bp.route('/funcionario/rdo/refatorado')
+@main_bp.route('/funcionario/rdo/consolidado')  # Redirect da rota antiga
 @funcionario_required
 def funcionario_rdo_refatorado():
     """Funcionário criar RDO com interface refatorada e moderna"""
@@ -2094,9 +2095,16 @@ def funcionario_rdo_refatorado():
             }
             funcionarios_dict.append(func_dict)
         
+        # Verificar se há obra pré-selecionada via parâmetro
+        obra_id = request.args.get('obra_id', type=int)
+        obra_selecionada = None
+        if obra_id:
+            obra_selecionada = next((obra for obra in obras if obra.id == obra_id), None)
+        
         return render_template('funcionario/rdo_refatorado.html', 
                              obras=obras, 
-                             funcionarios=funcionarios_dict, 
+                             funcionarios=funcionarios_dict,
+                             obra_selecionada=obra_selecionada,
                              date=date)
         
     except Exception as e:

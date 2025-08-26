@@ -97,7 +97,7 @@
                 <div class="card-body">
                     <div class="row">
                         <div class="col-md-3">
-                            <a href="{{ url_for('main.funcionario_rdo_consolidado') }}" class="btn btn-success w-100 mb-2">
+                            <a href="{{ url_for('main.funcionario_rdo_refatorado') }}" class="btn btn-success w-100 mb-2">
                                 <i class="fas fa-plus-circle me-2"></i>Criar RDO
                             </a>
                         </div>
@@ -185,7 +185,7 @@
                                 <br>
                                 <small class="text-muted">{{ obra.endereco[:50] }}{% if obra.endereco|length > 50 %}...{% endif %}</small>
                             </div>
-                            <a href="{{ url_for('main.funcionario_rdo_consolidado') }}?obra_id={{ obra.id }}" class="btn btn-sm btn-primary">
+                            <a href="{{ url_for('main.funcionario_rdo_refatorado') }}?obra_id={{ obra.id }}" class="btn btn-sm btn-primary">
                                 <i class="fas fa-plus"></i> RDO
                             </a>
                         </div>

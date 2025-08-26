@@ -902,6 +902,15 @@ document.addEventListener('DOMContentLoaded', function() {
     // Definir data padrão
     const hoje = new Date().toISOString().split('T')[0];
     document.getElementById('data_relatorio').value = hoje;
+    
+    // Verificar se há obra pré-selecionada via URL
+    const urlParams = new URLSearchParams(window.location.search);
+    const obraId = urlParams.get('obra_id');
+    if (obraId) {
+        const obraSelect = document.getElementById('obra_id');
+        obraSelect.value = obraId;
+        carregarServicos(obraId);
+    }
 });
 
 // ===========================
