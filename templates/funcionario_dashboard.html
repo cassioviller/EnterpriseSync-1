@@ -185,7 +185,7 @@
                                 <br>
                                 <small class="text-muted">{{ obra.endereco[:50] }}{% if obra.endereco|length > 50 %}...{% endif %}</small>
                             </div>
-                            <a href="{{ url_for('main.funcionario_novo_rdo', obra_id=obra.id) }}" class="btn btn-sm btn-primary">
+                            <a href="{{ url_for('main.funcionario_rdo_consolidado') }}?obra_id={{ obra.id }}" class="btn btn-sm btn-primary">
                                 <i class="fas fa-plus"></i> RDO
                             </a>
                         </div>

@@ -2184,7 +2184,36 @@ def funcionario_criar_rdo():
         
         print(f"DEBUG FUNCIONÁRIO: RDO {numero_rdo} criado por funcionário ID {current_user.id}")
         
-        # Processar atividades (mesmo código do admin)
+        # Processar atividades (sistema novo de subatividades)
+        print("DEBUG: Processando subatividades do formulário...")
+        
+        # Percorrer todas as subatividades enviadas no formulário
+        for key, value in request.form.items():
+            if key.startswith('subatividade_') and key.endswith('_percentual'):
+                try:
+                    # Extrair ID da subatividade: subatividade_123_percentual -> 123
+                    subatividade_id = key.split('_')[1]
+                    percentual = float(value) if value else 0
+                    
+                    if percentual > 0:  # Só salvar se tem percentual
+                        # Buscar informações da subatividade
+                        subatividade = SubAtividade.query.get(subatividade_id)
+                        if subatividade:
+                            # Criar atividade no RDO baseada na subatividade
+                            atividade = RDOAtividade()
+                            atividade.rdo_id = rdo.id
+                            atividade.descricao_atividade = f"{subatividade.servico.nome} - {subatividade.nome}"
+                            atividade.percentual_conclusao = percentual
+                            atividade.observacoes_tecnicas = f"Subatividade ID: {subatividade_id}"
+                            db.session.add(atividade)
+                            
+                            print(f"DEBUG: Subatividade {subatividade.nome}: {percentual}%")
+                        
+                except (ValueError, IndexError) as e:
+                    print(f"Erro ao processar subatividade {key}: {e}")
+                    continue
+        
+        # Processar atividades antigas (fallback para compatibilidade)
         atividades_json = request.form.get('atividades', '[]')
         if atividades_json and atividades_json != '[]':
             try:
@@ -2198,11 +2227,44 @@ def funcionario_criar_rdo():
                         atividade.percentual_conclusao = float(ativ_data.get('percentual', 0))
                         atividade.observacoes_tecnicas = ativ_data.get('observacoes', '').strip()
                         db.session.add(atividade)
+                        print(f"DEBUG: Atividade manual: {descricao} - {ativ_data.get('percentual', 0)}%")
             except (json.JSONDecodeError, ValueError) as e:
-                print(f"Erro ao processar atividades: {e}")
+                print(f"Erro ao processar atividades JSON: {e}")
                 flash(f'Erro ao processar atividades: {e}', 'warning')
         
-        # Processar mão de obra
+        # Processar mão de obra (sistema novo)
+        print("DEBUG: Processando funcionários do formulário...")
+        
+        # Percorrer funcionários enviados no formulário
+        for key, value in request.form.items():
+            if key.startswith('funcionario_') and key.endswith('_nome'):
+                try:
+                    # Extrair ID do funcionário: funcionario_123_nome -> 123
+                    funcionario_id = key.split('_')[1]
+                    nome_funcionario = value
+                    
+                    # Buscar horas trabalhadas correspondentes
+                    horas_key = f'funcionario_{funcionario_id}_horas'
+                    horas = float(request.form.get(horas_key, 8))
+                    
+                    if nome_funcionario and horas > 0:
+                        # Buscar funcionário no banco
+                        funcionario = Funcionario.query.get(funcionario_id)
+                        if funcionario:
+                            mao_obra = RDOMaoObra()
+                            mao_obra.rdo_id = rdo.id
+                            mao_obra.funcionario_id = int(funcionario_id)
+                            mao_obra.funcao_exercida = funcionario.funcao_ref.nome if funcionario.funcao_ref else 'Geral'
+                            mao_obra.horas_trabalhadas = horas
+                            db.session.add(mao_obra)
+                            
+                            print(f"DEBUG: Funcionário {nome_funcionario}: {horas}h")
+                        
+                except (ValueError, IndexError) as e:
+                    print(f"Erro ao processar funcionário {key}: {e}")
+                    continue
+        
+        # Processar mão de obra antiga (fallback para compatibilidade)
         mao_obra_json = request.form.get('mao_obra', '[]')
         if mao_obra_json and mao_obra_json != '[]':
             try:
@@ -2216,8 +2278,9 @@ def funcionario_criar_rdo():
                         mao_obra.funcao_exercida = mo_data.get('funcao', '').strip()
                         mao_obra.horas_trabalhadas = float(mo_data.get('horas', 8))
                         db.session.add(mao_obra)
+                        print(f"DEBUG: Funcionário JSON ID {funcionario_id}: {mo_data.get('horas', 8)}h")
             except (json.JSONDecodeError, ValueError) as e:
-                print(f"Erro ao processar mão de obra: {e}")
+                print(f"Erro ao processar mão de obra JSON: {e}")
                 flash(f'Erro ao processar mão de obra: {e}', 'warning')
         
         # Processar equipamentos
@@ -2257,6 +2320,11 @@ def funcionario_criar_rdo():
                 print(f"Erro ao processar ocorrências: {e}")
                 flash(f'Erro ao processar ocorrências: {e}', 'warning')
         
+        # Log final antes de commitar
+        total_atividades = RDOAtividade.query.filter_by(rdo_id=rdo.id).count()
+        total_funcionarios = RDOMaoObra.query.filter_by(rdo_id=rdo.id).count()
+        print(f"DEBUG FINAL: RDO {rdo.numero_rdo} - {total_atividades} atividades, {total_funcionarios} funcionários")
+        
         db.session.commit()
         
         if rdo_id:
@@ -2269,6 +2337,7 @@ def funcionario_criar_rdo():
     except Exception as e:
         db.session.rollback()
         print(f"ERRO FUNCIONÁRIO CRIAR/EDITAR RDO: {str(e)}")
+        print(f"DEBUG FORM DATA: {dict(request.form)}")
         import traceback
         traceback.print_exc()
         

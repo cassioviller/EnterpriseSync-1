@@ -186,7 +186,7 @@
     </div>
 
     <!-- Formulário Principal -->
-    <form id="rdo-form" method="POST">
+    <form id="rdo-form" method="POST" action="{{ url_for('main.funcionario_criar_rdo') }}">
         <!-- Informações Básicas -->
         <div class="rdo-section">
             <div class="section-header">
@@ -201,7 +201,7 @@
                         <select name="obra_id" id="obra_id" class="form-select" required onchange="carregarServicos(this.value)">
                             <option value="">Selecione uma obra</option>
                             {% for obra in obras %}
-                            <option value="{{ obra.id }}">{{ obra.nome }}</option>
+                            <option value="{{ obra.id }}" {% if request.args.get('obra_id') == obra.id|string %}selected{% endif %}>{{ obra.nome }}</option>
                             {% endfor %}
                         </select>
                     </div>
@@ -362,6 +362,12 @@ document.addEventListener('DOMContentLoaded', function() {
     // Carregar funcionários disponíveis
     carregarFuncionarios();
     renderizarFuncionariosSelecionados();
+    
+    // Carregar serviços da obra se já selecionada (via URL)
+    const obraSelect = document.getElementById('obra_id');
+    if (obraSelect.value) {
+        carregarServicos(obraSelect.value);
+    }
     
     // Autocomplete funcionários
     const funcionarioSearch = document.getElementById('funcionario-search');
@@ -622,6 +628,9 @@ function coletarDados() {
         dados[key] = value;
     }
     
+    // Debug para verificar dados coletados
+    console.log('Dados coletados do formulário:', dados);
+    
     return dados;
 }
 
@@ -634,12 +643,19 @@ function salvarRascunho() {
 
 function salvarRDO(dados) {
     console.log('Salvando RDO:', dados);
-    mostrarNotificacao('RDO finalizado com sucesso!', 'success');
     
-    // Redirecionar após 2 segundos
-    setTimeout(() => {
-        window.location.href = "{{ url_for('main.funcionario_dashboard') }}";
-    }, 2000);
+    // Submeter o formulário normalmente
+    const form = document.getElementById('rdo-form');
+    
+    // Adicionar status como campo hidden
+    const statusInput = document.createElement('input');
+    statusInput.type = 'hidden';
+    statusInput.name = 'status';
+    statusInput.value = 'Finalizado';
+    form.appendChild(statusInput);
+    
+    // Submeter formulário
+    form.submit();
 }
 
 function atualizarProgresso() {
