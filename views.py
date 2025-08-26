@@ -2065,7 +2065,7 @@ def funcionario_novo_rdo():
 @main_bp.route('/funcionario/rdo/consolidado')
 @funcionario_required
 def funcionario_rdo_consolidado():
-    """Funcionário criar RDO com interface consolidada"""
+    """Funcionário criar RDO com interface única e limpa"""
     try:
         # Buscar todas as obras do admin
         obras = Obra.query.filter_by(admin_id=current_user.admin_id).order_by(Obra.nome).all()
@@ -2081,16 +2081,16 @@ def funcionario_rdo_consolidado():
             flash('Não há obras disponíveis. Contate o administrador.', 'warning')
             return redirect(url_for('main.funcionario_dashboard'))
         
-        return render_template('funcionario/rdo_consolidado.html', 
+        return render_template('funcionario/rdo_simples.html', 
                              obras=obras, 
                              funcionarios=funcionarios, 
                              date=date)
         
     except Exception as e:
-        print(f"ERRO FUNCIONÁRIO RDO CONSOLIDADO: {str(e)}")
+        print(f"ERRO FUNCIONÁRIO RDO: {str(e)}")
         import traceback
         traceback.print_exc()
-        flash('Erro ao carregar formulário de RDO consolidado.', 'error')
+        flash('Erro ao carregar formulário de RDO.', 'error')
         return redirect(url_for('main.funcionario_dashboard'))
 
 @main_bp.route('/funcionario/rdo/criar', methods=['POST'])
@@ -3116,6 +3116,58 @@ def funcionario_rdo_novo_melhorado():
         print(f"ERRO RDO NOVO MELHORADO: {str(e)}")
         flash('Erro ao carregar página de RDO.', 'error')
         return redirect(url_for('main.funcionario_dashboard'))
+
+@main_bp.route('/api/test/rdo/servicos-obra/<int:obra_id>')
+@funcionario_required
+def api_servicos_obra(obra_id):
+    """API para carregar serviços de uma obra específica"""
+    try:
+        # Verificar acesso à obra
+        obra = Obra.query.filter_by(id=obra_id, admin_id=current_user.admin_id).first()
+        if not obra:
+            return jsonify({'success': False, 'error': 'Obra não encontrada'}), 404
+        
+        # Buscar serviços da obra com suas subatividades
+        servicos_obra = db.session.query(ServicoObra, Servico).join(
+            Servico, ServicoObra.servico_id == Servico.id
+        ).filter(
+            ServicoObra.obra_id == obra_id,
+            ServicoObra.ativo == True
+        ).all()
+        
+        servicos = []
+        for servico_obra, servico in servicos_obra:
+            # Buscar subatividades do serviço
+            subatividades = SubAtividade.query.filter_by(
+                servico_id=servico.id
+            ).order_by(SubAtividade.ordem_execucao).all()
+            
+            servicos.append({
+                'id': servico.id,
+                'nome': servico.nome,
+                'categoria': servico.categoria or 'Geral',
+                'unidade_medida': servico.unidade_medida or 'un',
+                'subatividades': [
+                    {
+                        'id': sub.id,
+                        'nome': sub.nome,
+                        'descricao': sub.descricao or '',
+                        'percentual_heranca': sub.percentual_heranca or 0
+                    }
+                    for sub in subatividades
+                ]
+            })
+        
+        return jsonify({
+            'success': True,
+            'obra_id': obra_id,
+            'obra_nome': obra.nome,
+            'servicos': servicos
+        })
+        
+    except Exception as e:
+        print(f"ERRO API SERVIÇOS OBRA: {str(e)}")
+        return jsonify({'success': False, 'error': str(e)}), 500
 
 @main_bp.route('/funcionario/rdo/progresso/<int:obra_id>')
 @funcionario_required

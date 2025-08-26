@@ -1,0 +1,21 @@
+<!-- API endpoint para carregar serviços de uma obra específica -->
+<!-- Este endpoint será usado pelo JavaScript do RDO -->
+
+<script>
+// API para carregar serviços de uma obra
+async function carregarServicosObra(obraId) {
+    try {
+        const response = await fetch(`/api/test/rdo/servicos-obra/${obraId}`);
+        const data = await response.json();
+        
+        if (response.ok) {
+            return data.servicos || [];
+        } else {
+            throw new Error(data.error || 'Erro ao carregar serviços');
+        }
+    } catch (error) {
+        console.error('Erro:', error);
+        return [];
+    }
+}
+</script>
