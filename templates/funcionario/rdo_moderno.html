@@ -326,6 +326,16 @@ body {
 .funcionario-card.selected {
     border-color: var(--primary-color);
     background: rgba(25, 135, 84, 0.05);
+    box-shadow: 0 0 0 3px rgba(25, 135, 84, 0.1);
+}
+
+.funcionario-card.horas-preenchidas {
+    border-color: var(--success-color);
+}
+
+.funcionario-status {
+    margin-left: auto;
+    font-size: 1.2rem;
 }
 
 .funcionario-avatar {
@@ -469,54 +479,159 @@ body {
     border-left-color: var(--warning-color);
 }
 
-/* Responsivo Mobile */
+/* Responsivo Mobile-First Avançado */
 @media (max-width: 768px) {
     .rdo-title {
-        font-size: 2rem;
+        font-size: 1.8rem;
+        line-height: 1.2;
+    }
+    
+    .rdo-subtitle {
+        font-size: 1rem;
+    }
+    
+    .rdo-header {
+        padding: 1.5rem 0;
+        margin-bottom: 1.5rem;
     }
     
     .card-body-modern {
-        padding: 1.5rem;
+        padding: 1.25rem;
     }
     
-    .rdo-grid.two-cols {
+    .card-header-modern {
+        padding: 1.25rem;
+    }
+    
+    .rdo-grid.two-cols,
+    .rdo-grid.three-cols {
         grid-template-columns: 1fr;
+        gap: 1rem;
+    }
+    
+    .subatividade-item {
+        flex-direction: row;
+        padding: 1rem 0.75rem;
+    }
+    
+    .subatividade-nome {
+        font-size: 0.9rem;
+        margin-right: 0.5rem;
+    }
+    
+    .percentual-input {
+        width: 70px;
+        padding: 0.4rem;
+        font-size: 0.9rem;
+    }
+    
+    .funcionario-card {
+        padding: 1rem;
+    }
+    
+    .funcionario-avatar {
+        width: 40px;
+        height: 40px;
+        font-size: 1rem;
+        margin-right: 0.75rem;
+    }
+    
+    .funcionario-nome {
+        font-size: 0.95rem;
+    }
+    
+    .funcionario-funcao {
+        font-size: 0.8rem;
+    }
+    
+    .horas-input {
+        width: 70px;
+        margin-left: 0.75rem;
+    }
+    
+    .bottom-nav {
+        padding: 0.75rem;
+        gap: 0.75rem;
+    }
+    
+    .bottom-nav .btn {
+        padding: 0.875rem 0.5rem;
+        font-size: 0.9rem;
+    }
+    
+    /* Padding bottom para navegação mobile */
+    body {
+        padding-bottom: 90px;
+    }
+    
+    .modern-card {
+        margin-bottom: 1.5rem;
+    }
+}
+
+@media (max-width: 480px) {
+    .container-fluid {
+        padding: 0 1rem;
+    }
+    
+    .rdo-title {
+        font-size: 1.6rem;
+    }
+    
+    .card-body-modern,
+    .card-header-modern {
+        padding: 1rem;
     }
     
     .subatividade-item {
         flex-direction: column;
         align-items: flex-start;
         gap: 0.75rem;
+        text-align: left;
     }
     
     .subatividade-nome {
         margin-right: 0;
+        font-size: 0.85rem;
+        line-height: 1.3;
     }
     
     .percentual-input {
         width: 100%;
         max-width: 120px;
+        align-self: stretch;
     }
     
     .funcionario-card {
         flex-direction: column;
         text-align: center;
-        gap: 1rem;
+        gap: 0.75rem;
+        padding: 1rem 0.75rem;
     }
     
     .funcionario-avatar {
-        margin-right: 0;
+        margin: 0 auto;
     }
     
     .horas-input {
-        margin-left: 0;
+        margin: 0;
         width: 100%;
         max-width: 120px;
     }
     
-    /* Adicionar padding bottom para navegação mobile */
-    body {
-        padding-bottom: 100px;
+    .bottom-nav .btn {
+        flex-direction: column;
+        gap: 0.25rem;
+        padding: 0.75rem 0.25rem;
+        font-size: 0.8rem;
+    }
+    
+    .form-control-modern {
+        padding: 0.75rem;
+    }
+    
+    .form-label-modern {
+        font-size: 0.9rem;
     }
 }
 
@@ -710,6 +825,10 @@ body {
                         <i class="fas fa-tasks icon"></i>
                         Atividades e Progresso
                     </h4>
+                    <div class="d-flex align-items-center gap-2">
+                        <span class="small text-muted">Progresso:</span>
+                        <span id="progresso-total" class="badge bg-primary">0% (0 atividades)</span>
+                    </div>
                 </div>
                 <div class="card-body-modern">
                     <div id="servicos-container" class="atividades-container">
@@ -874,9 +993,12 @@ function renderizarServicos() {
     
     servicosCarregados.forEach(servico => {
         html += `
-            <div class="atividade-item">
+            <div class="atividade-item" data-servico-id="${servico.id}">
                 <div class="atividade-header">
-                    <h5 class="atividade-nome">${servico.nome}</h5>
+                    <h5 class="atividade-nome">
+                        <i class="fas fa-cog text-primary me-2"></i>
+                        ${servico.nome}
+                    </h5>
                     <span class="atividade-categoria">${servico.categoria}</span>
                 </div>
                 
@@ -886,8 +1008,12 @@ function renderizarServicos() {
         if (servico.subatividades && servico.subatividades.length > 0) {
             servico.subatividades.forEach(sub => {
                 html += `
-                    <div class="subatividade-item">
-                        <div class="subatividade-nome">${sub.nome}</div>
+                    <div class="subatividade-item" data-subatividade-id="${sub.id}">
+                        <div class="subatividade-nome">
+                            <i class="fas fa-check-circle text-muted me-1"></i>
+                            ${sub.nome}
+                            ${sub.descricao ? `<small class="d-block text-muted">${sub.descricao}</small>` : ''}
+                        </div>
                         <div class="d-flex align-items-center gap-2">
                             <input type="number" 
                                    name="subatividade_${sub.id}_percentual" 
@@ -896,16 +1022,21 @@ function renderizarServicos() {
                                    max="100" 
                                    step="0.1"
                                    placeholder="0"
-                                   onchange="atualizarPercentual(this)">
-                            <span class="text-muted">%</span>
+                                   onchange="atualizarPercentual(this)"
+                                   data-heranca="${sub.percentual_heranca || 0}">
+                            <span class="text-muted fw-bold">%</span>
                         </div>
                     </div>
                 `;
             });
         } else {
             html += `
-                <div class="subatividade-item">
-                    <div class="subatividade-nome">${servico.nome} - Execução Geral</div>
+                <div class="subatividade-item" data-servico-geral="${servico.id}">
+                    <div class="subatividade-nome">
+                        <i class="fas fa-play-circle text-success me-1"></i>
+                        ${servico.nome} - Execução Geral
+                        <small class="d-block text-muted">Unidade: ${servico.unidade_medida}</small>
+                    </div>
                     <div class="d-flex align-items-center gap-2">
                         <input type="number" 
                                name="servico_${servico.id}_percentual" 
@@ -915,7 +1046,7 @@ function renderizarServicos() {
                                step="0.1"
                                placeholder="0"
                                onchange="atualizarPercentual(this)">
-                        <span class="text-muted">%</span>
+                        <span class="text-muted fw-bold">%</span>
                     </div>
                 </div>
             `;
@@ -931,7 +1062,7 @@ function renderizarServicos() {
 }
 
 function carregarFuncionarios() {
-    const funcionarios = {{ funcionarios | tojsonfilter | safe }};
+    const funcionarios = {{ funcionarios | tojson | safe }};
     funcionariosDisponiveis = funcionarios;
     renderizarFuncionarios();
 }
@@ -956,13 +1087,19 @@ function renderizarFuncionarios() {
         const isSelected = funcionariosSelecionados.includes(funcionario.id);
         
         html += `
-            <div class="funcionario-card ${isSelected ? 'selected' : ''}" onclick="toggleFuncionario(${funcionario.id})">
+            <div class="funcionario-card ${isSelected ? 'selected' : ''}" 
+                 onclick="toggleFuncionario(${funcionario.id})"
+                 data-funcionario-id="${funcionario.id}">
                 <div class="funcionario-avatar">${iniciais}</div>
                 <div class="funcionario-info">
                     <h6 class="funcionario-nome">${funcionario.nome}</h6>
-                    <p class="funcionario-funcao">${funcionario.funcao_ref?.nome || 'Função não definida'}</p>
+                    <p class="funcionario-funcao">
+                        <i class="fas fa-user-tag text-muted me-1"></i>
+                        ${funcionario.funcao_ref?.nome || 'Função não definida'}
+                    </p>
                 </div>
                 <div class="d-flex align-items-center gap-2">
+                    <label class="form-label-modern mb-0 small">Horas:</label>
                     <input type="number" 
                            name="funcionario_${funcionario.id}_horas" 
                            class="horas-input form-control-modern" 
@@ -971,10 +1108,14 @@ function renderizarFuncionarios() {
                            step="0.5" 
                            value="8"
                            placeholder="8h"
-                           onclick="event.stopPropagation()">
-                    <span class="text-muted">h</span>
+                           onclick="event.stopPropagation()"
+                           onchange="validarHoras(this)">
+                    <span class="text-muted fw-bold">h</span>
                 </div>
                 <input type="hidden" name="funcionario_${funcionario.id}_nome" value="${funcionario.nome}">
+                <div class="funcionario-status">
+                    ${isSelected ? '<i class="fas fa-check-circle text-success"></i>' : '<i class="fas fa-circle text-muted"></i>'}
+                </div>
             </div>
         `;
     });
@@ -995,24 +1136,100 @@ function toggleFuncionario(funcionarioId) {
 function atualizarPercentual(input) {
     const valor = parseFloat(input.value) || 0;
     
-    // Validação visual
+    // Validação e normalização
     if (valor > 100) {
         input.value = 100;
-        mostrarNotificacao('Percentual não pode exceder 100%', 'warning');
+        mostrarNotificacao('Percentual limitado a 100%', 'warning');
+        vibrar();
     }
     
     if (valor < 0) {
         input.value = 0;
     }
     
-    // Feedback visual
+    // Feedback visual avançado
     const item = input.closest('.subatividade-item');
-    if (valor > 0) {
-        item.style.borderColor = 'var(--success-color)';
-        item.style.backgroundColor = 'rgba(40, 167, 69, 0.05)';
-    } else {
+    const icon = item.querySelector('i');
+    
+    // Remover classes anteriores
+    item.classList.remove('border-success', 'border-warning', 'border-danger');
+    icon.classList.remove('text-success', 'text-warning', 'text-danger', 'text-muted');
+    
+    if (valor === 0) {
         item.style.borderColor = 'transparent';
         item.style.backgroundColor = '#f8f9fa';
+        icon.classList.add('text-muted');
+    } else if (valor > 0 && valor < 50) {
+        item.style.borderColor = 'var(--warning-color)';
+        item.style.backgroundColor = 'rgba(255, 193, 7, 0.05)';
+        icon.classList.add('text-warning');
+    } else if (valor >= 50 && valor < 100) {
+        item.style.borderColor = 'var(--info-color)';
+        item.style.backgroundColor = 'rgba(23, 162, 184, 0.05)';
+        icon.classList.add('text-info');
+    } else if (valor === 100) {
+        item.style.borderColor = 'var(--success-color)';
+        item.style.backgroundColor = 'rgba(40, 167, 69, 0.05)';
+        icon.classList.add('text-success');
+    }
+    
+    // Calcular progresso total
+    calcularProgressoTotal();
+}
+
+function validarHoras(input) {
+    const horas = parseFloat(input.value) || 0;
+    
+    if (horas > 12) {
+        input.value = 12;
+        mostrarNotificacao('Máximo de 12 horas por funcionário', 'warning');
+        vibrar();
+    }
+    
+    if (horas < 0) {
+        input.value = 0;
+    }
+    
+    // Feedback visual
+    const card = input.closest('.funcionario-card');
+    if (horas > 0) {
+        card.classList.add('horas-preenchidas');
+    } else {
+        card.classList.remove('horas-preenchidas');
+    }
+}
+
+function calcularProgressoTotal() {
+    const percentuais = document.querySelectorAll('[name*="_percentual"]');
+    let total = 0;
+    let count = 0;
+    
+    percentuais.forEach(input => {
+        const valor = parseFloat(input.value) || 0;
+        if (valor > 0) {
+            total += valor;
+            count++;
+        }
+    });
+    
+    const media = count > 0 ? (total / count).toFixed(1) : 0;
+    
+    // Atualizar indicador visual
+    const indicator = document.getElementById('progresso-total');
+    if (indicator) {
+        indicator.textContent = `${media}% (${count} atividades)`;
+        
+        // Atualizar cor do badge baseado no progresso
+        indicator.className = 'badge';
+        if (media == 0) {
+            indicator.classList.add('bg-secondary');
+        } else if (media < 30) {
+            indicator.classList.add('bg-danger');
+        } else if (media < 70) {
+            indicator.classList.add('bg-warning');
+        } else {
+            indicator.classList.add('bg-success');
+        }
     }
 }
 
@@ -1021,7 +1238,9 @@ function validarFormulario() {
     const dataRelatorio = document.getElementById('data_relatorio').value;
     
     let erros = [];
+    let avisos = [];
     
+    // Validações obrigatórias
     if (!obraId) {
         erros.push('Selecione uma obra');
     }
@@ -1030,30 +1249,62 @@ function validarFormulario() {
         erros.push('Informe a data do relatório');
     }
     
-    // Verificar se pelo menos uma atividade foi preenchida
+    // Verificar atividades preenchidas
     const percentuais = document.querySelectorAll('[name*="_percentual"]');
-    let temAtividade = false;
+    let atividadesPreenchidas = 0;
+    let totalPercentual = 0;
+    
     percentuais.forEach(input => {
-        if (parseFloat(input.value) > 0) {
-            temAtividade = true;
+        const valor = parseFloat(input.value) || 0;
+        if (valor > 0) {
+            atividadesPreenchidas++;
+            totalPercentual += valor;
         }
     });
     
-    if (!temAtividade) {
+    if (atividadesPreenchidas === 0) {
         erros.push('Preencha pelo menos uma atividade com percentual maior que 0');
     }
     
-    // Verificar funcionários selecionados
-    if (funcionariosSelecionados.length === 0) {
-        erros.push('Selecione pelo menos um funcionário');
+    // Verificar funcionários com horas
+    const horasInputs = document.querySelectorAll('[name*="_horas"]');
+    let funcionariosComHoras = 0;
+    let totalHoras = 0;
+    
+    horasInputs.forEach(input => {
+        const horas = parseFloat(input.value) || 0;
+        if (horas > 0) {
+            funcionariosComHoras++;
+            totalHoras += horas;
+        }
+    });
+    
+    if (funcionariosComHoras === 0) {
+        erros.push('Defina horas trabalhadas para pelo menos um funcionário');
     }
     
+    // Avisos (não impedem o salvamento)
+    if (totalPercentual > (atividadesPreenchidas * 100)) {
+        avisos.push('Alguns percentuais podem estar duplicados');
+    }
+    
+    if (totalHoras > (funcionariosComHoras * 10)) {
+        avisos.push('Muitas horas por funcionário - verifique os dados');
+    }
+    
+    // Mostrar erros (bloqueiam)
     if (erros.length > 0) {
         mostrarNotificacao(`Corrija os seguintes erros:\n• ${erros.join('\n• ')}`, 'error');
+        vibrar();
         return false;
     }
     
-    mostrarNotificacao('Formulário validado com sucesso! 🎉', 'success');
+    // Mostrar avisos (não bloqueiam)
+    if (avisos.length > 0) {
+        mostrarNotificacao(`Atenção:\n• ${avisos.join('\n• ')}`, 'warning');
+    }
+    
+    mostrarNotificacao(`Formulário validado! ${atividadesPreenchidas} atividades, ${funcionariosComHoras} funcionários`, 'success');
     return true;
 }
 
