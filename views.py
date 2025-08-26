@@ -2081,7 +2081,7 @@ def funcionario_rdo_consolidado():
             flash('Não há obras disponíveis. Contate o administrador.', 'warning')
             return redirect(url_for('main.funcionario_dashboard'))
         
-        return render_template('funcionario/rdo_simples.html', 
+        return render_template('funcionario/rdo_moderno.html', 
                              obras=obras, 
                              funcionarios=funcionarios, 
                              date=date)

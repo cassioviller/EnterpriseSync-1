@@ -1,0 +1,1152 @@
+{% extends "layout.html" %}
+
+{% block title %}RDO - Relatório Diário de Obra{% endblock %}
+
+{% block head %}
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<meta name="theme-color" content="#198754">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="RDO Mobile">
+
+<!-- PWA Meta Tags -->
+<link rel="manifest" href="/static/manifest.json">
+<link rel="apple-touch-icon" href="/static/icon-192.png">
+
+<!-- Custom CSS para RDO Moderno -->
+<style>
+:root {
+    --primary-color: #198754;
+    --primary-dark: #157347;
+    --secondary-color: #6c757d;
+    --success-color: #28a745;
+    --warning-color: #ffc107;
+    --danger-color: #dc3545;
+    --info-color: #17a2b8;
+    --light-color: #f8f9fa;
+    --dark-color: #343a40;
+    
+    --border-radius: 12px;
+    --border-radius-sm: 8px;
+    --box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+    --box-shadow-sm: 0 2px 8px rgba(0,0,0,0.06);
+    --transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    
+    --font-weight-medium: 500;
+    --font-weight-semibold: 600;
+    --font-weight-bold: 700;
+}
+
+/* Reset e Base Styles */
+* {
+    box-sizing: border-box;
+}
+
+body {
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+    background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+    color: var(--dark-color);
+    line-height: 1.6;
+    min-height: 100vh;
+}
+
+/* Header Moderno */
+.rdo-header {
+    background: linear-gradient(135deg, var(--primary-color) 0%, var(--primary-dark) 100%);
+    color: white;
+    padding: 2rem 0;
+    margin-bottom: 2rem;
+    position: relative;
+    overflow: hidden;
+}
+
+.rdo-header::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ffffff' fill-opacity='0.05'%3E%3Ccircle cx='30' cy='30' r='4'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E") repeat;
+    opacity: 0.1;
+}
+
+.rdo-header .container {
+    position: relative;
+    z-index: 2;
+}
+
+.rdo-title {
+    font-size: 2.5rem;
+    font-weight: var(--font-weight-bold);
+    margin: 0;
+    text-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.rdo-subtitle {
+    font-size: 1.1rem;
+    opacity: 0.9;
+    margin: 0.5rem 0 0 0;
+    font-weight: var(--font-weight-medium);
+}
+
+/* Cards Modernos */
+.modern-card {
+    background: white;
+    border-radius: var(--border-radius);
+    box-shadow: var(--box-shadow);
+    border: 1px solid rgba(0,0,0,0.05);
+    overflow: hidden;
+    transition: var(--transition);
+    margin-bottom: 2rem;
+}
+
+.modern-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 30px rgba(0,0,0,0.12);
+}
+
+.card-header-modern {
+    background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+    border-bottom: 1px solid rgba(0,0,0,0.08);
+    padding: 1.5rem;
+    position: relative;
+}
+
+.card-header-modern h4 {
+    margin: 0;
+    font-size: 1.25rem;
+    font-weight: var(--font-weight-semibold);
+    color: var(--dark-color);
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.card-header-modern .icon {
+    width: 24px;
+    height: 24px;
+    color: var(--primary-color);
+}
+
+.card-body-modern {
+    padding: 2rem;
+}
+
+/* Form Inputs Modernos */
+.form-group-modern {
+    margin-bottom: 1.5rem;
+}
+
+.form-label-modern {
+    display: block;
+    font-weight: var(--font-weight-medium);
+    color: var(--dark-color);
+    margin-bottom: 0.5rem;
+    font-size: 0.95rem;
+}
+
+.form-label-modern .required {
+    color: var(--danger-color);
+    margin-left: 4px;
+}
+
+.form-control-modern {
+    width: 100%;
+    padding: 0.875rem 1rem;
+    border: 2px solid #e9ecef;
+    border-radius: var(--border-radius-sm);
+    font-size: 1rem;
+    transition: var(--transition);
+    background: white;
+    color: var(--dark-color);
+    font-family: inherit;
+}
+
+.form-control-modern:focus {
+    outline: none;
+    border-color: var(--primary-color);
+    box-shadow: 0 0 0 3px rgba(25, 135, 84, 0.1);
+    transform: translateY(-1px);
+}
+
+.form-control-modern::placeholder {
+    color: #adb5bd;
+    font-weight: 400;
+}
+
+/* Select Moderno */
+.select-modern {
+    position: relative;
+}
+
+.select-modern::after {
+    content: '▼';
+    position: absolute;
+    right: 1rem;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--secondary-color);
+    pointer-events: none;
+    font-size: 0.8rem;
+}
+
+.select-modern select {
+    appearance: none;
+    -webkit-appearance: none;
+    padding-right: 3rem;
+}
+
+/* Grid System Responsivo */
+.rdo-grid {
+    display: grid;
+    gap: 1.5rem;
+}
+
+.rdo-grid.two-cols {
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+}
+
+.rdo-grid.three-cols {
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+}
+
+/* Seção de Atividades */
+.atividades-container {
+    background: white;
+    border-radius: var(--border-radius);
+    box-shadow: var(--box-shadow);
+    overflow: hidden;
+}
+
+.atividade-item {
+    padding: 1.5rem;
+    border-bottom: 1px solid #f1f3f4;
+    transition: var(--transition);
+    position: relative;
+}
+
+.atividade-item:hover {
+    background: #f8f9fa;
+}
+
+.atividade-item:last-child {
+    border-bottom: none;
+}
+
+.atividade-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1rem;
+}
+
+.atividade-nome {
+    font-weight: var(--font-weight-semibold);
+    color: var(--dark-color);
+    font-size: 1.1rem;
+    margin: 0;
+}
+
+.atividade-categoria {
+    background: var(--primary-color);
+    color: white;
+    padding: 0.25rem 0.75rem;
+    border-radius: 20px;
+    font-size: 0.8rem;
+    font-weight: var(--font-weight-medium);
+}
+
+.subatividades-grid {
+    display: grid;
+    gap: 1rem;
+    margin-top: 1rem;
+}
+
+.subatividade-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 1rem;
+    background: #f8f9fa;
+    border-radius: var(--border-radius-sm);
+    border: 2px solid transparent;
+    transition: var(--transition);
+}
+
+.subatividade-item:hover {
+    border-color: var(--primary-color);
+    background: white;
+}
+
+.subatividade-nome {
+    font-weight: var(--font-weight-medium);
+    color: var(--dark-color);
+    flex: 1;
+    margin-right: 1rem;
+}
+
+.percentual-input {
+    width: 80px;
+    padding: 0.5rem;
+    border: 2px solid #e9ecef;
+    border-radius: var(--border-radius-sm);
+    text-align: center;
+    font-weight: var(--font-weight-semibold);
+    font-size: 1rem;
+}
+
+.percentual-input:focus {
+    border-color: var(--primary-color);
+    outline: none;
+    box-shadow: 0 0 0 3px rgba(25, 135, 84, 0.1);
+}
+
+/* Seção de Funcionários */
+.funcionarios-container {
+    display: grid;
+    gap: 1rem;
+}
+
+.funcionario-card {
+    display: flex;
+    align-items: center;
+    padding: 1.25rem;
+    background: white;
+    border: 2px solid #e9ecef;
+    border-radius: var(--border-radius-sm);
+    transition: var(--transition);
+}
+
+.funcionario-card:hover {
+    border-color: var(--primary-color);
+    box-shadow: var(--box-shadow-sm);
+}
+
+.funcionario-card.selected {
+    border-color: var(--primary-color);
+    background: rgba(25, 135, 84, 0.05);
+}
+
+.funcionario-avatar {
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    background: var(--primary-color);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-weight: var(--font-weight-bold);
+    margin-right: 1rem;
+    font-size: 1.2rem;
+}
+
+.funcionario-info {
+    flex: 1;
+}
+
+.funcionario-nome {
+    font-weight: var(--font-weight-semibold);
+    color: var(--dark-color);
+    margin: 0 0 0.25rem 0;
+}
+
+.funcionario-funcao {
+    color: var(--secondary-color);
+    font-size: 0.9rem;
+    margin: 0;
+}
+
+.horas-input {
+    width: 80px;
+    margin-left: 1rem;
+}
+
+/* Navegação Bottom Mobile */
+.bottom-nav {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background: white;
+    border-top: 1px solid #e9ecef;
+    padding: 1rem;
+    display: flex;
+    gap: 1rem;
+    z-index: 1000;
+    box-shadow: 0 -4px 20px rgba(0,0,0,0.1);
+}
+
+.bottom-nav .btn {
+    flex: 1;
+    padding: 1rem;
+    border-radius: var(--border-radius-sm);
+    border: none;
+    font-weight: var(--font-weight-semibold);
+    transition: var(--transition);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+}
+
+.btn-primary-modern {
+    background: linear-gradient(135deg, var(--primary-color) 0%, var(--primary-dark) 100%);
+    color: white;
+}
+
+.btn-primary-modern:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 15px rgba(25, 135, 84, 0.3);
+}
+
+.btn-secondary-modern {
+    background: #6c757d;
+    color: white;
+}
+
+.btn-success-modern {
+    background: linear-gradient(135deg, var(--success-color) 0%, #1e7e34 100%);
+    color: white;
+}
+
+/* Status e Indicadores */
+.status-indicator {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem 1rem;
+    border-radius: 20px;
+    font-size: 0.9rem;
+    font-weight: var(--font-weight-medium);
+}
+
+.status-draft {
+    background: rgba(255, 193, 7, 0.1);
+    color: #856404;
+}
+
+.status-progress {
+    background: rgba(23, 162, 184, 0.1);
+    color: #0c5460;
+}
+
+.status-completed {
+    background: rgba(40, 167, 69, 0.1);
+    color: #155724;
+}
+
+/* Notificações Modernas */
+.notification-modern {
+    position: fixed;
+    top: 2rem;
+    right: 2rem;
+    background: white;
+    padding: 1.5rem;
+    border-radius: var(--border-radius);
+    box-shadow: var(--box-shadow);
+    border-left: 4px solid var(--primary-color);
+    z-index: 1100;
+    min-width: 300px;
+    transform: translateX(100%);
+    transition: var(--transition);
+}
+
+.notification-modern.show {
+    transform: translateX(0);
+}
+
+.notification-modern.success {
+    border-left-color: var(--success-color);
+}
+
+.notification-modern.error {
+    border-left-color: var(--danger-color);
+}
+
+.notification-modern.warning {
+    border-left-color: var(--warning-color);
+}
+
+/* Responsivo Mobile */
+@media (max-width: 768px) {
+    .rdo-title {
+        font-size: 2rem;
+    }
+    
+    .card-body-modern {
+        padding: 1.5rem;
+    }
+    
+    .rdo-grid.two-cols {
+        grid-template-columns: 1fr;
+    }
+    
+    .subatividade-item {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 0.75rem;
+    }
+    
+    .subatividade-nome {
+        margin-right: 0;
+    }
+    
+    .percentual-input {
+        width: 100%;
+        max-width: 120px;
+    }
+    
+    .funcionario-card {
+        flex-direction: column;
+        text-align: center;
+        gap: 1rem;
+    }
+    
+    .funcionario-avatar {
+        margin-right: 0;
+    }
+    
+    .horas-input {
+        margin-left: 0;
+        width: 100%;
+        max-width: 120px;
+    }
+    
+    /* Adicionar padding bottom para navegação mobile */
+    body {
+        padding-bottom: 100px;
+    }
+}
+
+/* Animações */
+@keyframes fadeInUp {
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.fade-in-up {
+    animation: fadeInUp 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+@keyframes pulse {
+    0%, 100% {
+        transform: scale(1);
+    }
+    50% {
+        transform: scale(1.05);
+    }
+}
+
+.pulse {
+    animation: pulse 2s infinite;
+}
+
+/* Loading State */
+.loading {
+    position: relative;
+    overflow: hidden;
+}
+
+.loading::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.6), transparent);
+    animation: loading 1.5s infinite;
+}
+
+@keyframes loading {
+    0% {
+        left: -100%;
+    }
+    100% {
+        left: 100%;
+    }
+}
+
+/* Auto-save Indicator */
+.auto-save-indicator {
+    position: fixed;
+    top: 1rem;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(40, 167, 69, 0.9);
+    color: white;
+    padding: 0.5rem 1rem;
+    border-radius: 20px;
+    font-size: 0.9rem;
+    z-index: 1100;
+    opacity: 0;
+    transition: var(--transition);
+}
+
+.auto-save-indicator.show {
+    opacity: 1;
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<!-- Header Moderno -->
+<div class="rdo-header">
+    <div class="container">
+        <div class="d-flex justify-content-between align-items-center">
+            <div>
+                <h1 class="rdo-title">RDO Mobile</h1>
+                <p class="rdo-subtitle">Relatório Diário de Obra - Interface Moderna</p>
+            </div>
+            <div class="status-indicator status-draft">
+                <i class="fas fa-edit"></i>
+                Rascunho
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Indicador de Auto-save -->
+<div id="auto-save-indicator" class="auto-save-indicator">
+    <i class="fas fa-check-circle"></i>
+    Salvo automaticamente
+</div>
+
+<!-- Notificação Moderna -->
+<div id="notification" class="notification-modern">
+    <div class="d-flex align-items-center">
+        <i class="fas fa-info-circle me-2"></i>
+        <span id="notification-text">Mensagem aqui</span>
+    </div>
+</div>
+
+<div class="container-fluid px-3">
+    <!-- Formulário Principal -->
+    <form id="rdo-form" method="POST" action="{{ url_for('main.funcionario_criar_rdo') }}">
+        <div class="rdo-grid">
+            <!-- Seção 1: Informações Básicas -->
+            <div class="modern-card fade-in-up">
+                <div class="card-header-modern">
+                    <h4>
+                        <i class="fas fa-info-circle icon"></i>
+                        Informações Básicas
+                    </h4>
+                </div>
+                <div class="card-body-modern">
+                    <div class="rdo-grid two-cols">
+                        <div class="form-group-modern">
+                            <label class="form-label-modern">
+                                <i class="fas fa-building text-primary me-2"></i>
+                                Obra <span class="required">*</span>
+                            </label>
+                            <div class="select-modern">
+                                <select name="obra_id" id="obra_id" class="form-control-modern" required onchange="carregarServicos(this.value)">
+                                    <option value="">Selecione uma obra</option>
+                                    {% for obra in obras %}
+                                    <option value="{{ obra.id }}" {% if request.args.get('obra_id') == obra.id|string %}selected{% endif %}>{{ obra.nome }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                        </div>
+                        
+                        <div class="form-group-modern">
+                            <label class="form-label-modern">
+                                <i class="fas fa-calendar text-primary me-2"></i>
+                                Data do Relatório <span class="required">*</span>
+                            </label>
+                            <input type="date" name="data_relatorio" id="data_relatorio" class="form-control-modern" required>
+                        </div>
+                    </div>
+                    
+                    <div class="rdo-grid three-cols">
+                        <div class="form-group-modern">
+                            <label class="form-label-modern">
+                                <i class="fas fa-sun text-warning me-2"></i>
+                                Clima
+                            </label>
+                            <div class="select-modern">
+                                <select name="clima" class="form-control-modern">
+                                    <option value="">Selecione</option>
+                                    <option value="Ensolarado">☀️ Ensolarado</option>
+                                    <option value="Parcialmente nublado">⛅ Parcialmente nublado</option>
+                                    <option value="Nublado">☁️ Nublado</option>
+                                    <option value="Chuvoso">🌧️ Chuvoso</option>
+                                    <option value="Tempestade">⛈️ Tempestade</option>
+                                </select>
+                            </div>
+                        </div>
+                        
+                        <div class="form-group-modern">
+                            <label class="form-label-modern">
+                                <i class="fas fa-thermometer-half text-info me-2"></i>
+                                Temperatura
+                            </label>
+                            <input type="text" name="temperatura" class="form-control-modern" placeholder="Ex: 25°C">
+                        </div>
+                        
+                        <div class="form-group-modern">
+                            <label class="form-label-modern">
+                                <i class="fas fa-wind text-secondary me-2"></i>
+                                Condições Climáticas
+                            </label>
+                            <input type="text" name="condicoes_climaticas" class="form-control-modern" placeholder="Descreva as condições">
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Seção 2: Atividades e Serviços -->
+            <div class="modern-card fade-in-up">
+                <div class="card-header-modern">
+                    <h4>
+                        <i class="fas fa-tasks icon"></i>
+                        Atividades e Progresso
+                    </h4>
+                </div>
+                <div class="card-body-modern">
+                    <div id="servicos-container" class="atividades-container">
+                        <div class="text-center py-4">
+                            <div class="loading">
+                                <i class="fas fa-spinner fa-spin fa-2x text-muted"></i>
+                                <p class="mt-2 text-muted">Selecione uma obra para carregar os serviços</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Seção 3: Mão de Obra -->
+            <div class="modern-card fade-in-up">
+                <div class="card-header-modern">
+                    <h4>
+                        <i class="fas fa-users icon"></i>
+                        Mão de Obra
+                    </h4>
+                </div>
+                <div class="card-body-modern">
+                    <div id="funcionarios-container" class="funcionarios-container">
+                        <!-- Funcionários serão carregados dinamicamente -->
+                    </div>
+                </div>
+            </div>
+
+            <!-- Seção 4: Observações -->
+            <div class="modern-card fade-in-up">
+                <div class="card-header-modern">
+                    <h4>
+                        <i class="fas fa-comment-alt icon"></i>
+                        Observações Gerais
+                    </h4>
+                </div>
+                <div class="card-body-modern">
+                    <div class="form-group-modern">
+                        <label class="form-label-modern">
+                            <i class="fas fa-edit text-primary me-2"></i>
+                            Comentário Geral do Dia
+                        </label>
+                        <textarea name="comentario_geral" class="form-control-modern" rows="4" 
+                                  placeholder="Descreva as principais atividades, dificuldades encontradas, materiais utilizados e outras observações relevantes..."></textarea>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </form>
+</div>
+
+<!-- Navegação Bottom Mobile -->
+<div class="bottom-nav">
+    <button type="button" class="btn btn-secondary-modern" onclick="voltarDashboard()">
+        <i class="fas fa-arrow-left"></i>
+        Voltar
+    </button>
+    <button type="button" class="btn btn-primary-modern" onclick="validarFormulario()">
+        <i class="fas fa-check-circle"></i>
+        Validar
+    </button>
+    <button type="button" class="btn btn-success-modern" onclick="salvarRDO()">
+        <i class="fas fa-save"></i>
+        Finalizar
+    </button>
+</div>
+
+<script>
+// Variáveis globais
+let servicosCarregados = [];
+let funcionariosDisponiveis = [];
+let funcionariosSelecionados = [];
+let autoSaveInterval;
+
+// Inicialização
+document.addEventListener('DOMContentLoaded', function() {
+    inicializarFormulario();
+    carregarFuncionarios();
+    iniciarAutoSave();
+    
+    // Carregar serviços se obra já selecionada
+    const obraSelect = document.getElementById('obra_id');
+    if (obraSelect.value) {
+        carregarServicos(obraSelect.value);
+    }
+});
+
+function inicializarFormulario() {
+    // Definir data padrão
+    const hoje = new Date().toISOString().split('T')[0];
+    document.getElementById('data_relatorio').value = hoje;
+    
+    // Adicionar eventos aos inputs para feedback visual
+    const inputs = document.querySelectorAll('.form-control-modern');
+    inputs.forEach(input => {
+        input.addEventListener('focus', function() {
+            this.parentElement.classList.add('focused');
+        });
+        
+        input.addEventListener('blur', function() {
+            this.parentElement.classList.remove('focused');
+        });
+    });
+}
+
+async function carregarServicos(obraId) {
+    if (!obraId) {
+        document.getElementById('servicos-container').innerHTML = `
+            <div class="text-center py-4">
+                <i class="fas fa-building fa-2x text-muted mb-3"></i>
+                <p class="text-muted">Selecione uma obra para carregar os serviços</p>
+            </div>
+        `;
+        return;
+    }
+    
+    try {
+        // Mostrar loading
+        document.getElementById('servicos-container').innerHTML = `
+            <div class="text-center py-4 loading">
+                <i class="fas fa-spinner fa-spin fa-2x text-primary mb-3"></i>
+                <p class="text-muted">Carregando serviços da obra...</p>
+            </div>
+        `;
+        
+        const response = await fetch(`/api/test/rdo/servicos-obra/${obraId}`);
+        const data = await response.json();
+        
+        if (data.success && data.servicos) {
+            servicosCarregados = data.servicos;
+            renderizarServicos();
+        } else {
+            throw new Error(data.error || 'Erro ao carregar serviços');
+        }
+        
+    } catch (error) {
+        console.error('Erro:', error);
+        document.getElementById('servicos-container').innerHTML = `
+            <div class="text-center py-4">
+                <i class="fas fa-exclamation-triangle fa-2x text-warning mb-3"></i>
+                <p class="text-muted">Erro ao carregar serviços: ${error.message}</p>
+                <button class="btn btn-primary-modern mt-2" onclick="carregarServicos(${obraId})">
+                    <i class="fas fa-redo"></i> Tentar Novamente
+                </button>
+            </div>
+        `;
+    }
+}
+
+function renderizarServicos() {
+    if (!servicosCarregados.length) {
+        document.getElementById('servicos-container').innerHTML = `
+            <div class="text-center py-4">
+                <i class="fas fa-info-circle fa-2x text-info mb-3"></i>
+                <p class="text-muted">Nenhum serviço encontrado para esta obra</p>
+            </div>
+        `;
+        return;
+    }
+    
+    let html = '';
+    
+    servicosCarregados.forEach(servico => {
+        html += `
+            <div class="atividade-item">
+                <div class="atividade-header">
+                    <h5 class="atividade-nome">${servico.nome}</h5>
+                    <span class="atividade-categoria">${servico.categoria}</span>
+                </div>
+                
+                <div class="subatividades-grid">
+        `;
+        
+        if (servico.subatividades && servico.subatividades.length > 0) {
+            servico.subatividades.forEach(sub => {
+                html += `
+                    <div class="subatividade-item">
+                        <div class="subatividade-nome">${sub.nome}</div>
+                        <div class="d-flex align-items-center gap-2">
+                            <input type="number" 
+                                   name="subatividade_${sub.id}_percentual" 
+                                   class="percentual-input" 
+                                   min="0" 
+                                   max="100" 
+                                   step="0.1"
+                                   placeholder="0"
+                                   onchange="atualizarPercentual(this)">
+                            <span class="text-muted">%</span>
+                        </div>
+                    </div>
+                `;
+            });
+        } else {
+            html += `
+                <div class="subatividade-item">
+                    <div class="subatividade-nome">${servico.nome} - Execução Geral</div>
+                    <div class="d-flex align-items-center gap-2">
+                        <input type="number" 
+                               name="servico_${servico.id}_percentual" 
+                               class="percentual-input" 
+                               min="0" 
+                               max="100" 
+                               step="0.1"
+                               placeholder="0"
+                               onchange="atualizarPercentual(this)">
+                        <span class="text-muted">%</span>
+                    </div>
+                </div>
+            `;
+        }
+        
+        html += `
+                </div>
+            </div>
+        `;
+    });
+    
+    document.getElementById('servicos-container').innerHTML = html;
+}
+
+function carregarFuncionarios() {
+    const funcionarios = {{ funcionarios | tojsonfilter | safe }};
+    funcionariosDisponiveis = funcionarios;
+    renderizarFuncionarios();
+}
+
+function renderizarFuncionarios() {
+    const container = document.getElementById('funcionarios-container');
+    
+    if (!funcionariosDisponiveis.length) {
+        container.innerHTML = `
+            <div class="text-center py-4">
+                <i class="fas fa-user-plus fa-2x text-muted mb-3"></i>
+                <p class="text-muted">Nenhum funcionário disponível</p>
+            </div>
+        `;
+        return;
+    }
+    
+    let html = '';
+    
+    funcionariosDisponiveis.forEach(funcionario => {
+        const iniciais = funcionario.nome.split(' ').map(n => n[0]).join('').toUpperCase();
+        const isSelected = funcionariosSelecionados.includes(funcionario.id);
+        
+        html += `
+            <div class="funcionario-card ${isSelected ? 'selected' : ''}" onclick="toggleFuncionario(${funcionario.id})">
+                <div class="funcionario-avatar">${iniciais}</div>
+                <div class="funcionario-info">
+                    <h6 class="funcionario-nome">${funcionario.nome}</h6>
+                    <p class="funcionario-funcao">${funcionario.funcao_ref?.nome || 'Função não definida'}</p>
+                </div>
+                <div class="d-flex align-items-center gap-2">
+                    <input type="number" 
+                           name="funcionario_${funcionario.id}_horas" 
+                           class="horas-input form-control-modern" 
+                           min="0" 
+                           max="12" 
+                           step="0.5" 
+                           value="8"
+                           placeholder="8h"
+                           onclick="event.stopPropagation()">
+                    <span class="text-muted">h</span>
+                </div>
+                <input type="hidden" name="funcionario_${funcionario.id}_nome" value="${funcionario.nome}">
+            </div>
+        `;
+    });
+    
+    container.innerHTML = html;
+}
+
+function toggleFuncionario(funcionarioId) {
+    const index = funcionariosSelecionados.indexOf(funcionarioId);
+    if (index > -1) {
+        funcionariosSelecionados.splice(index, 1);
+    } else {
+        funcionariosSelecionados.push(funcionarioId);
+    }
+    renderizarFuncionarios();
+}
+
+function atualizarPercentual(input) {
+    const valor = parseFloat(input.value) || 0;
+    
+    // Validação visual
+    if (valor > 100) {
+        input.value = 100;
+        mostrarNotificacao('Percentual não pode exceder 100%', 'warning');
+    }
+    
+    if (valor < 0) {
+        input.value = 0;
+    }
+    
+    // Feedback visual
+    const item = input.closest('.subatividade-item');
+    if (valor > 0) {
+        item.style.borderColor = 'var(--success-color)';
+        item.style.backgroundColor = 'rgba(40, 167, 69, 0.05)';
+    } else {
+        item.style.borderColor = 'transparent';
+        item.style.backgroundColor = '#f8f9fa';
+    }
+}
+
+function validarFormulario() {
+    const obraId = document.getElementById('obra_id').value;
+    const dataRelatorio = document.getElementById('data_relatorio').value;
+    
+    let erros = [];
+    
+    if (!obraId) {
+        erros.push('Selecione uma obra');
+    }
+    
+    if (!dataRelatorio) {
+        erros.push('Informe a data do relatório');
+    }
+    
+    // Verificar se pelo menos uma atividade foi preenchida
+    const percentuais = document.querySelectorAll('[name*="_percentual"]');
+    let temAtividade = false;
+    percentuais.forEach(input => {
+        if (parseFloat(input.value) > 0) {
+            temAtividade = true;
+        }
+    });
+    
+    if (!temAtividade) {
+        erros.push('Preencha pelo menos uma atividade com percentual maior que 0');
+    }
+    
+    // Verificar funcionários selecionados
+    if (funcionariosSelecionados.length === 0) {
+        erros.push('Selecione pelo menos um funcionário');
+    }
+    
+    if (erros.length > 0) {
+        mostrarNotificacao(`Corrija os seguintes erros:\n• ${erros.join('\n• ')}`, 'error');
+        return false;
+    }
+    
+    mostrarNotificacao('Formulário validado com sucesso! 🎉', 'success');
+    return true;
+}
+
+function salvarRDO() {
+    if (!validarFormulario()) {
+        return;
+    }
+    
+    // Mostrar loading
+    const btn = document.querySelector('.btn-success-modern');
+    const originalText = btn.innerHTML;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Salvando...';
+    btn.disabled = true;
+    
+    // Adicionar status como finalizado
+    const statusInput = document.createElement('input');
+    statusInput.type = 'hidden';
+    statusInput.name = 'status';
+    statusInput.value = 'Finalizado';
+    document.getElementById('rdo-form').appendChild(statusInput);
+    
+    // Submeter formulário
+    setTimeout(() => {
+        document.getElementById('rdo-form').submit();
+    }, 1000);
+}
+
+function voltarDashboard() {
+    if (confirm('Tem certeza que deseja voltar? Dados não salvos serão perdidos.')) {
+        window.location.href = "{{ url_for('main.funcionario_dashboard') }}";
+    }
+}
+
+function iniciarAutoSave() {
+    autoSaveInterval = setInterval(() => {
+        salvarRascunho();
+    }, 30000); // 30 segundos
+}
+
+function salvarRascunho() {
+    const dados = coletarDados();
+    
+    // Simular salvamento
+    mostrarAutoSave();
+    
+    console.log('Rascunho salvo:', dados);
+}
+
+function coletarDados() {
+    const formData = new FormData(document.getElementById('rdo-form'));
+    const dados = {};
+    
+    for (let [key, value] of formData.entries()) {
+        dados[key] = value;
+    }
+    
+    return dados;
+}
+
+function mostrarNotificacao(texto, tipo = 'info') {
+    const notification = document.getElementById('notification');
+    const textElement = document.getElementById('notification-text');
+    
+    textElement.textContent = texto;
+    notification.className = `notification-modern ${tipo}`;
+    notification.classList.add('show');
+    
+    setTimeout(() => {
+        notification.classList.remove('show');
+    }, 4000);
+}
+
+function mostrarAutoSave() {
+    const indicator = document.getElementById('auto-save-indicator');
+    indicator.classList.add('show');
+    
+    setTimeout(() => {
+        indicator.classList.remove('show');
+    }, 2000);
+}
+
+// Feedback háptico (se disponível)
+function vibrar() {
+    if (navigator.vibrate) {
+        navigator.vibrate(50);
+    }
+}
+
+// Adicionar vibração aos cliques importantes
+document.addEventListener('click', function(e) {
+    if (e.target.matches('.btn, .funcionario-card, .subatividade-item')) {
+        vibrar();
+    }
+});
+</script>
+{% endblock %}
