@@ -275,6 +275,53 @@
         padding: 8px 6px;
     }
     
+    /* Dropdown funcionários */
+    .dropdown-funcionarios {
+        position: absolute;
+        top: 100%;
+        left: 0;
+        right: 0;
+        background: white;
+        border: 1px solid var(--border-color);
+        border-radius: 8px;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        z-index: 1050;
+        max-height: 200px;
+        overflow-y: auto;
+    }
+    
+    .funcionario-option {
+        padding: 10px 12px;
+        cursor: pointer;
+        border-bottom: 1px solid #f0f0f0;
+    }
+    
+    .funcionario-option:hover {
+        background: #f8f9fa;
+    }
+    
+    .funcionario-option:last-child {
+        border-bottom: none;
+    }
+    
+    .funcionario-selecionado {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 10px 12px;
+        background: #f8f9fa;
+        border: 1px solid #dee2e6;
+        border-radius: 6px;
+        margin-bottom: 8px;
+    }
+    
+    .funcionario-selecionado .btn-remove {
+        color: #dc3545;
+        background: none;
+        border: none;
+        padding: 2px 6px;
+    }
+    
     /* Ferramentas mobile */
     .ferramenta-row {
         flex-direction: column;
@@ -460,6 +507,16 @@
         font-size: 13px;
     }
     
+    /* Dropdown mobile */
+    .dropdown-funcionarios {
+        max-height: 150px;
+    }
+    
+    .funcionario-option {
+        padding: 12px;
+        font-size: 0.9rem;
+    }
+    
     .btn {
         padding: 10px 16px;
         font-size: 0.85rem;
@@ -633,28 +690,47 @@
                 <i class="fas fa-chevron-down"></i>
             </div>
             <div class="section-body">
-                <div id="funcionarios-container">
-                    {% for funcionario in funcionarios %}
-                    <div class="funcionario-row">
-                        <div class="funcionario-nome">
-                            <i class="fas fa-user text-primary"></i> {{ funcionario.nome }}
+                <!-- Adicionar Funcionário -->
+                <div class="mb-3">
+                    <div class="d-flex gap-2 align-items-end">
+                        <div class="flex-1 position-relative">
+                            <label class="form-label fw-bold">Selecionar Funcionário</label>
+                            <input type="text" 
+                                   id="funcionario-search" 
+                                   class="form-control" 
+                                   placeholder="Digite o nome do funcionário..."
+                                   autocomplete="off">
+                            <div id="funcionario-dropdown" class="dropdown-funcionarios" style="display: none;">
+                                <!-- Lista de funcionários será carregada aqui -->
+                            </div>
                         </div>
-                        <div class="d-flex align-items-center gap-2">
+                        <div>
+                            <label class="form-label fw-bold">Horas</label>
                             <input type="number" 
-                                   class="horas-input" 
-                                   name="funcionario_{{ funcionario.id }}_horas"
+                                   id="horas-funcionario" 
+                                   class="form-control" 
+                                   style="width: 80px;"
                                    min="0" max="12" step="0.5" 
-                                   placeholder="0">
-                            <span class="text-muted">horas</span>
+                                   placeholder="8">
                         </div>
-                        <input type="hidden" name="funcionario_{{ funcionario.id }}_nome" value="{{ funcionario.nome }}">
+                        <button type="button" class="btn btn-primary" onclick="adicionarFuncionario()">
+                            <i class="fas fa-plus"></i> Adicionar
+                        </button>
+                    </div>
+                </div>
+                
+                <!-- Lista de Funcionários Selecionados -->
+                <div id="funcionarios-selecionados">
+                    <!-- Funcionários selecionados aparecerão aqui -->
+                </div>
+                
+                <!-- Container original mantido para compatibilidade -->
+                <div id="funcionarios-container" style="display: none;">
+                    {% for funcionario in funcionarios %}
+                    <div class="funcionario-item" data-id="{{ funcionario.id }}" data-nome="{{ funcionario.nome }}">
+                        {{ funcionario.nome }}
                     </div>
                     {% endfor %}
-                    {% if not funcionarios %}
-                    <div class="text-center py-3 text-muted">
-                        <p>Nenhum funcionário ativo encontrado</p>
-                    </div>
-                    {% endif %}
                 </div>
             </div>
         </div>
@@ -728,6 +804,8 @@
 <script>
 let servicosCarregados = [];
 let validacaoErros = [];
+let funcionariosDisponiveis = [];
+let funcionariosSelecionados = [];
 
 // Toggle seções
 function toggleSection(header) {
@@ -1283,11 +1361,159 @@ function vibrarErro() {
     }
 }
 
+// Funcionalidades dos funcionários
+function carregarFuncionarios() {
+    // Carregar lista de funcionários disponíveis
+    const funcionarios = document.querySelectorAll('#funcionarios-container .funcionario-item');
+    funcionariosDisponiveis = Array.from(funcionarios).map(item => ({
+        id: item.dataset.id,
+        nome: item.dataset.nome
+    }));
+}
+
+function filtrarFuncionarios(termo) {
+    if (!termo) return [];
+    
+    const termoLower = termo.toLowerCase();
+    return funcionariosDisponiveis.filter(func => 
+        func.nome.toLowerCase().includes(termoLower)
+    );
+}
+
+function mostrarDropdownFuncionarios(funcionarios) {
+    const dropdown = document.getElementById('funcionario-dropdown');
+    
+    if (funcionarios.length === 0) {
+        dropdown.style.display = 'none';
+        return;
+    }
+    
+    dropdown.innerHTML = funcionarios.map(func => `
+        <div class="funcionario-option" onclick="selecionarFuncionarioDropdown('${func.id}', '${func.nome}')">
+            <i class="fas fa-user text-primary"></i> ${func.nome}
+        </div>
+    `).join('');
+    
+    dropdown.style.display = 'block';
+}
+
+function selecionarFuncionarioDropdown(id, nome) {
+    document.getElementById('funcionario-search').value = nome;
+    document.getElementById('funcionario-dropdown').style.display = 'none';
+}
+
+function adicionarFuncionario() {
+    const searchInput = document.getElementById('funcionario-search');
+    const horasInput = document.getElementById('horas-funcionario');
+    
+    const nomeFuncionario = searchInput.value.trim();
+    const horas = parseFloat(horasInput.value) || 0;
+    
+    if (!nomeFuncionario) {
+        mostrarNotificacao('Selecione um funcionário', 'warning');
+        return;
+    }
+    
+    if (horas <= 0 || horas > 12) {
+        mostrarNotificacao('Informe as horas trabalhadas (0.5 a 12)', 'warning');
+        return;
+    }
+    
+    // Verificar se funcionário já foi adicionado
+    if (funcionariosSelecionados.find(f => f.nome === nomeFuncionario)) {
+        mostrarNotificacao('Funcionário já adicionado', 'warning');
+        return;
+    }
+    
+    // Encontrar o ID do funcionário
+    const funcionario = funcionariosDisponiveis.find(f => f.nome === nomeFuncionario);
+    const funcionarioId = funcionario ? funcionario.id : Date.now(); // Fallback para ID único
+    
+    // Adicionar à lista
+    funcionariosSelecionados.push({
+        id: funcionarioId,
+        nome: nomeFuncionario,
+        horas: horas
+    });
+    
+    // Atualizar interface
+    renderizarFuncionariosSelecionados();
+    
+    // Limpar campos
+    searchInput.value = '';
+    horasInput.value = '';
+    
+    mostrarNotificacao(`${nomeFuncionario} adicionado (${horas}h)`, 'success');
+    vibrarSucesso();
+}
+
+function removerFuncionario(index) {
+    const funcionario = funcionariosSelecionados[index];
+    funcionariosSelecionados.splice(index, 1);
+    renderizarFuncionariosSelecionados();
+    mostrarNotificacao(`${funcionario.nome} removido`, 'info');
+}
+
+function renderizarFuncionariosSelecionados() {
+    const container = document.getElementById('funcionarios-selecionados');
+    
+    if (funcionariosSelecionados.length === 0) {
+        container.innerHTML = `
+            <div class="text-center py-3 text-muted">
+                <i class="fas fa-users fa-2x mb-2"></i>
+                <p>Nenhum funcionário adicionado</p>
+            </div>
+        `;
+        return;
+    }
+    
+    container.innerHTML = funcionariosSelecionados.map((func, index) => `
+        <div class="funcionario-selecionado">
+            <div>
+                <i class="fas fa-user text-primary"></i> 
+                <strong>${func.nome}</strong> - ${func.horas}h
+                <input type="hidden" name="funcionario_${func.id}_nome" value="${func.nome}">
+                <input type="hidden" name="funcionario_${func.id}_horas" value="${func.horas}">
+            </div>
+            <button type="button" class="btn-remove" onclick="removerFuncionario(${index})">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+    `).join('');
+}
+
 // Event listeners
 document.addEventListener('DOMContentLoaded', function() {
     // Definir data padrão
     const hoje = new Date().toISOString().split('T')[0];
     document.getElementById('data_relatorio').value = hoje;
+    
+    // Carregar funcionários disponíveis
+    carregarFuncionarios();
+    renderizarFuncionariosSelecionados();
+    
+    // Autocomplete funcionários
+    const funcionarioSearch = document.getElementById('funcionario-search');
+    funcionarioSearch.addEventListener('input', function() {
+        const termo = this.value.trim();
+        const funcionarios = filtrarFuncionarios(termo);
+        mostrarDropdownFuncionarios(funcionarios);
+    });
+    
+    // Fechar dropdown ao clicar fora
+    document.addEventListener('click', function(e) {
+        if (!e.target.closest('.position-relative')) {
+            document.getElementById('funcionario-dropdown').style.display = 'none';
+        }
+    });
+    
+    // Enter para adicionar funcionário
+    document.getElementById('horas-funcionario').addEventListener('keypress', function(e) {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            adicionarFuncionario();
+        }
+    });
     
     // Submit do formulário
     document.getElementById('rdo-form').addEventListener('submit', function(e) {
