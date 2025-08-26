@@ -3,18 +3,7 @@
 ## Overview
 Sistema multi-tenant de gestão empresarial com foco em propostas comerciais, gestão de funcionários, controle de obras e folha de pagamento automatizada.
 
-## Recent Changes (26/08/2025)
 
-### ✅ SISTEMA RDO CONSOLIDADO - IMPLEMENTADO
-- **Interface única limpa**: Criado template rdo_consolidado.html substituindo código sobreposto
-- **Subatividades simplificadas**: Uma linha por subatividade (5 subatividades = 5 linhas) 
-- **Observações removidas**: Campo observações das subatividades removido para reduzir comprimento
-- **Código limpo**: Eliminado sobreposição de código entre templates antigos
-- **Template antigo removido**: rdo_aprimorado.html completamente removido do sistema
-- **Rotas corrigidas**: Todas referências antigas atualizadas para funcionario_rdo_consolidado
-- **Dashboard atualizado**: Botões direcionam para "Sistema RDO Consolidado"
-- **Performance mantida**: 87.5% taxa de sucesso nos testes com 0.99s tempo resposta
-- **Status**: FUNCIONAL - Sistema consolidado operacional
 
 ## Arquitetura
 - **Backend**: Flask + SQLAlchemy + PostgreSQL
@@ -74,6 +63,21 @@ INFO:migrations:✅ Migrações automáticas concluídas com sucesso!
 - Isolamento de dados por admin_id
 - Controle de acesso baseado em roles
 - Bypass de autenticação para desenvolvimento
+
+## Recent Changes (26/08/2025)
+
+### ✅ SISTEMA RDO MOBILE-FIRST - IMPLEMENTADO
+- **Design responsivo avançado**: Mobile-first design com breakpoints para 768px, 480px e orientação landscape
+- **Layout horizontal de percentuais**: Percentuais aparecem ao lado dos nomes das subatividades conforme solicitado
+- **Interface otimizada para touch**: Feedback visual em botões, vibração háptica, gestos de toque nativos
+- **Barra de navegação mobile**: Barra fixa inferior com ações principais (Voltar, Validar, Salvar, Finalizar)
+- **Auto-save inteligente**: Salvamento automático a cada 30 segundos em dispositivos móveis
+- **Teclados otimizados**: Teclado numérico para inputs decimais, prevenção de zoom no iOS
+- **Meta tags PWA**: Viewport completo, theme colors, experiência de app nativo
+- **Seleção automática**: Auto-seleção de valores em inputs para entrada rápida de dados
+- **Detecção de orientação**: Layout adaptativo para modo retrato/paisagem
+- **Seções completas**: Funcionários e Ferramentas restauradas com layouts mobile-otimizados
+- **Status**: FUNCIONAL - Sistema totalmente otimizado para smartphones e tablets
 
 ## Recent Changes (18/08/2025)
 

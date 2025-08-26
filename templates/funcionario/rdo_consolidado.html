@@ -3,6 +3,11 @@
 {% block title %}Sistema RDO Consolidado - SIGE{% endblock %}
 
 {% block head %}
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#0d6efd">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="RDO - SIGE">
 <style>
 :root {
     --primary-color: #0d6efd;
@@ -385,6 +390,42 @@
         font-size: 16px; /* Previne zoom */
         resize: vertical;
     }
+    
+    /* Mobile bottom bar */
+    .mobile-bottom-bar {
+        position: fixed;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        background: white;
+        border-top: 1px solid var(--border-color);
+        box-shadow: 0 -2px 10px rgba(0,0,0,0.1);
+        z-index: 1040;
+        padding-bottom: env(safe-area-inset-bottom);
+    }
+    
+    .mobile-bottom-bar .btn-sm {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 2px;
+        padding: 8px 12px;
+        border: none;
+        background: transparent;
+    }
+    
+    .mobile-bottom-bar .btn-sm:hover {
+        background: rgba(0,0,0,0.05);
+    }
+    
+    .mobile-bottom-bar .btn-sm small {
+        font-size: 0.7rem;
+    }
+    
+    /* Ajustar padding do body para mobile bottom bar */
+    .mobile-device .rdo-container {
+        padding-bottom: 80px;
+    }
 }
 
 /* Extra small devices */
@@ -653,9 +694,32 @@
     </form>
 
     <!-- Floating Save (Mobile) -->
-    <button type="button" class="floating-save btn btn-primary d-md-none" onclick="salvarRascunho()">
+    <button type="button" class="floating-save btn btn-primary d-md-none" onclick="salvarRascunho()" id="floating-save-btn">
         <i class="fas fa-save"></i>
+        <span class="d-none" id="save-text">Salvar</span>
     </button>
+    
+    <!-- Mobile Bottom Bar -->
+    <div class="mobile-bottom-bar d-md-none" id="mobile-bottom-bar">
+        <div class="d-flex justify-content-around align-items-center p-2">
+            <button type="button" class="btn btn-outline-secondary btn-sm" onclick="window.location.href='{{ url_for('main.funcionario_dashboard') }}'">
+                <i class="fas fa-arrow-left"></i>
+                <small>Voltar</small>
+            </button>
+            <button type="button" class="btn btn-outline-primary btn-sm" onclick="validarFormulario()">
+                <i class="fas fa-check-circle"></i>
+                <small>Validar</small>
+            </button>
+            <button type="button" class="btn btn-outline-success btn-sm" onclick="salvarRascunho()">
+                <i class="fas fa-save"></i>
+                <small>Salvar</small>
+            </button>
+            <button type="submit" class="btn btn-success btn-sm" form="rdo-form" id="btn-finalizar-mobile" disabled>
+                <i class="fas fa-check"></i>
+                <small>Finalizar</small>
+            </button>
+        </div>
+    </div>
 </div>
 
 <!-- Notification Container -->
@@ -1031,18 +1095,192 @@ function mostrarNotificacao(mensagem, tipo = 'info') {
     
     const notification = document.createElement('div');
     notification.className = `alert alert-${tipo} alert-dismissible`;
+    
+    // Melhorar notificações no mobile
+    if (window.innerWidth <= 768) {
+        notification.style.animation = 'slideInRight 0.3s ease-out';
+        notification.style.fontSize = '0.9rem';
+        notification.style.padding = '10px 12px';
+    }
+    
     notification.innerHTML = `
         ${mensagem}
-        <button type="button" class="btn-close" onclick="this.parentElement.remove()"></button>
+        <button type="button" class="btn-close" onclick="this.parentElement.remove()" style="font-size: 0.8rem;"></button>
     `;
     
     container.appendChild(notification);
     
+    // Auto-dismiss mais rápido no mobile
+    const dismissTime = window.innerWidth <= 768 ? 3000 : 5000;
     setTimeout(() => {
         if (notification.parentElement) {
-            notification.remove();
+            notification.style.animation = 'slideOutRight 0.3s ease-in';
+            setTimeout(() => notification.remove(), 300);
         }
-    }, 5000);
+    }, dismissTime);
+}
+
+// Adicionar animações CSS para mobile
+const mobileAnimations = `
+    @keyframes slideInRight {
+        from { transform: translateX(100%); opacity: 0; }
+        to { transform: translateX(0); opacity: 1; }
+    }
+    
+    @keyframes slideOutRight {
+        from { transform: translateX(0); opacity: 1; }
+        to { transform: translateX(100%); opacity: 0; }
+    }
+    
+    @media (max-width: 768px) {
+        .btn:active, .section-header:active {
+            transform: scale(0.98);
+            transition: transform 0.1s;
+        }
+        
+        .subatividade-input:focus, .horas-input:focus {
+            border-color: var(--primary-color);
+            box-shadow: 0 0 0 3px rgba(13, 110, 253, 0.25);
+            transform: scale(1.05);
+            transition: all 0.2s;
+        }
+        
+        .mobile-device .loading-overlay {
+            backdrop-filter: blur(3px);
+        }
+        
+        .mobile-landscape .floating-save {
+            display: none !important;
+        }
+    }
+`;
+
+// Injetar animações mobile
+const style = document.createElement('style');
+style.textContent = mobileAnimations;
+document.head.appendChild(style);
+
+// Mobile UX enhancements
+let touchStartY = 0;
+let isScrolling = false;
+
+// Melhorar experiência touch
+function melhorarTouch() {
+    // Adicionar feedback visual touch nos botões
+    document.querySelectorAll('.btn, .section-header').forEach(element => {
+        element.addEventListener('touchstart', function() {
+            this.style.transform = 'scale(0.98)';
+        });
+        
+        element.addEventListener('touchend', function() {
+            this.style.transform = 'scale(1)';
+        });
+    });
+    
+    // Otimizar inputs para mobile
+    document.querySelectorAll('input[type="number"]').forEach(input => {
+        // Adicionar teclado numérico no mobile
+        input.setAttribute('inputmode', 'decimal');
+        input.setAttribute('pattern', '[0-9]*');
+        
+        // Melhorar UX com seleção automática
+        input.addEventListener('focus', function() {
+            if (window.innerWidth <= 768) {
+                setTimeout(() => this.select(), 100);
+            }
+        });
+    });
+}
+
+// Auto-save no mobile (salvar automaticamente a cada mudança)
+let autoSaveTimer = null;
+function autoSaveMobile() {
+    if (window.innerWidth <= 768) {
+        clearTimeout(autoSaveTimer);
+        autoSaveTimer = setTimeout(() => {
+            const obraId = document.getElementById('obra_id').value;
+            if (obraId) {
+                salvarRascunho();
+                mostrarNotificacao('💾 Auto-salvamento realizado', 'success');
+            }
+        }, 30000); // Auto-save a cada 30 segundos no mobile
+    }
+}
+
+// Detectar orientação mobile
+function detectarOrientacao() {
+    if (window.innerWidth <= 768) {
+        const isLandscape = window.innerWidth > window.innerHeight;
+        document.body.classList.toggle('mobile-landscape', isLandscape);
+        
+        // Ajustar floating button
+        const floatingBtn = document.querySelector('.floating-save');
+        if (floatingBtn) {
+            floatingBtn.style.display = isLandscape ? 'none' : 'block';
+        }
+    }
+}
+
+// Swipe gestures para mobile
+function adicionarSwipeGestures() {
+    if (window.innerWidth <= 768) {
+        document.addEventListener('touchstart', function(e) {
+            touchStartY = e.touches[0].clientY;
+        });
+        
+        document.addEventListener('touchmove', function(e) {
+            if (!isScrolling) {
+                const touchY = e.touches[0].clientY;
+                const diffY = touchStartY - touchY;
+                
+                // Pull to refresh gesture (puxar para baixo no topo)
+                if (window.scrollY === 0 && diffY < -50) {
+                    mostrarNotificacao('🔄 Puxe mais para recarregar', 'info');
+                }
+            }
+        });
+    }
+}
+
+// Otimizações específicas mobile
+function otimizarMobile() {
+    if (window.innerWidth <= 768) {
+        // Ajustar altura do viewport
+        document.documentElement.style.setProperty('--vh', `${window.innerHeight * 0.01}px`);
+        
+        // Melhorar scroll
+        document.body.style.overscrollBehavior = 'contain';
+        
+        // Otimizar taps duplos
+        document.addEventListener('touchstart', function(e) {
+            if (e.touches.length > 1) {
+                e.preventDefault();
+            }
+        });
+        
+        // Adicionar classes mobile
+        document.body.classList.add('mobile-device');
+        
+        // Esconder elementos não essenciais
+        const progressGeral = document.querySelector('.rdo-section .section-body .d-flex');
+        if (progressGeral) {
+            progressGeral.style.flexDirection = 'column';
+            progressGeral.style.gap = '10px';
+        }
+    }
+}
+
+// Vibração haptica no mobile (se suportada)
+function vibrarSucesso() {
+    if ('vibrate' in navigator && window.innerWidth <= 768) {
+        navigator.vibrate(100);
+    }
+}
+
+function vibrarErro() {
+    if ('vibrate' in navigator && window.innerWidth <= 768) {
+        navigator.vibrate([100, 100, 100]);
+    }
 }
 
 // Event listeners
@@ -1059,8 +1297,34 @@ document.addEventListener('DOMContentLoaded', function() {
             const dados = coletarDados();
             dados.status = 'Finalizado';
             salvarRDO(dados);
+            vibrarSucesso();
+        } else {
+            vibrarErro();
         }
     });
+    
+    // Inicializar otimizações mobile
+    melhorarTouch();
+    detectarOrientacao();
+    adicionarSwipeGestures();
+    otimizarMobile();
+    
+    // Listeners para auto-save mobile
+    document.querySelectorAll('input, select, textarea').forEach(element => {
+        element.addEventListener('change', autoSaveMobile);
+        element.addEventListener('input', autoSaveMobile);
+    });
+});
+
+// Listener para mudança de orientação
+window.addEventListener('orientationchange', function() {
+    setTimeout(detectarOrientacao, 100);
+});
+
+// Listener para resize
+window.addEventListener('resize', function() {
+    detectarOrientacao();
+    otimizarMobile();
 });
 
 // Adicionar ferramenta
