@@ -954,7 +954,7 @@ async function carregarServicos(obraId) {
             </div>
         `;
         
-        const response = await fetch(`/api/test/rdo/servicos-obra/${obraId}`);
+        const response = await fetch(`/api/rdo/servicos-obra/${obraId}`);
         const data = await response.json();
         
         if (data.success && data.servicos) {
@@ -1319,16 +1319,40 @@ function salvarRDO() {
     btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Salvando...';
     btn.disabled = true;
     
+    const form = document.getElementById('rdo-form');
+    
+    // Remover inputs anteriores para evitar duplicação
+    const existingInputs = form.querySelectorAll('input[name="finalizar_rdo"], input[name="funcionarios_selecionados"], input[name="status"]');
+    existingInputs.forEach(input => input.remove());
+    
+    // Adicionar campo indicando finalização
+    const inputFinalizar = document.createElement('input');
+    inputFinalizar.type = 'hidden';
+    inputFinalizar.name = 'finalizar_rdo';
+    inputFinalizar.value = 'true';
+    form.appendChild(inputFinalizar);
+    
     // Adicionar status como finalizado
     const statusInput = document.createElement('input');
     statusInput.type = 'hidden';
     statusInput.name = 'status';
     statusInput.value = 'Finalizado';
-    document.getElementById('rdo-form').appendChild(statusInput);
+    form.appendChild(statusInput);
+    
+    // Coletar dados dos funcionários selecionados
+    funcionariosSelecionados.forEach(funcId => {
+        const hiddenInput = document.createElement('input');
+        hiddenInput.type = 'hidden';
+        hiddenInput.name = 'funcionarios_selecionados';
+        hiddenInput.value = funcId;
+        form.appendChild(hiddenInput);
+    });
+    
+    mostrarNotificacao('Salvando RDO...', 'info');
     
     // Submeter formulário
     setTimeout(() => {
-        document.getElementById('rdo-form').submit();
+        form.submit();
     }, 1000);
 }
 

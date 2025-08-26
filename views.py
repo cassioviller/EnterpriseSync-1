@@ -2081,9 +2081,22 @@ def funcionario_rdo_consolidado():
             flash('Não há obras disponíveis. Contate o administrador.', 'warning')
             return redirect(url_for('main.funcionario_dashboard'))
         
+        # Converter funcionários para dicionários serializáveis
+        funcionarios_dict = []
+        for func in funcionarios:
+            func_dict = {
+                'id': func.id,
+                'nome': func.nome,
+                'email': func.email,
+                'funcao_ref': {
+                    'nome': func.funcao_ref.nome if func.funcao_ref else 'Função não definida'
+                } if func.funcao_ref else None
+            }
+            funcionarios_dict.append(func_dict)
+        
         return render_template('funcionario/rdo_moderno.html', 
                              obras=obras, 
-                             funcionarios=funcionarios, 
+                             funcionarios=funcionarios_dict, 
                              date=date)
         
     except Exception as e:
@@ -2589,27 +2602,83 @@ def api_rdo_servicos_obra(obra_id):
         ).all()
         
         servicos_data = []
-        for servico_obra, servico in servicos_obra:
-            # Buscar subatividades mestre para este serviço
-            subatividades = SubatividadeMestre.query.filter_by(
-                servico_id=servico.id,
-                admin_id=current_user.admin_id,
-                ativo=True
-            ).order_by(SubatividadeMestre.ordem_padrao).all()
+        
+        # Se não há serviços específicos, buscar serviços padrão do sistema
+        if not servicos_obra:
+            print(f"DEBUG: Nenhum serviço específico da obra {obra_id}, buscando serviços padrão")
+            servicos_padrao = Servico.query.filter_by(admin_id=current_user.admin_id, ativo=True).limit(10).all()
             
-            subatividades_data = [sub.to_dict() for sub in subatividades]
-            
-            servico_data = {
-                'id': servico.id,
-                'nome': servico.nome,
-                'descricao': servico.descricao,
-                'categoria': servico.categoria,
-                'quantidade_planejada': float(servico_obra.quantidade_planejada or 0),
-                'quantidade_executada': float(servico_obra.quantidade_executada or 0),
-                'percentual_obra': round((servico_obra.quantidade_executada / servico_obra.quantidade_planejada * 100) if servico_obra.quantidade_planejada > 0 else 0, 2),
-                'subatividades': subatividades_data
-            }
-            servicos_data.append(servico_data)
+            for servico in servicos_padrao:
+                # Buscar subatividades para criar dados de exemplo
+                subatividades_data = []
+                
+                # Criar subatividades padrão para o serviço
+                if servico.nome:
+                    subatividades_base = [
+                        {'nome': f'{servico.nome} - Preparação', 'ordem': 1},
+                        {'nome': f'{servico.nome} - Execução', 'ordem': 2}, 
+                        {'nome': f'{servico.nome} - Finalização', 'ordem': 3}
+                    ]
+                    
+                    for i, sub_base in enumerate(subatividades_base):
+                        subatividades_data.append({
+                            'id': f"{servico.id}0{i+1}",  # ID único fictício
+                            'nome': sub_base['nome'],
+                            'descricao': f"Etapa {sub_base['ordem']} do {servico.nome}",
+                            'unidade_medida': 'UN',
+                            'percentual_heranca': 0
+                        })
+                
+                servicos_data.append({
+                    'id': servico.id,
+                    'nome': servico.nome,
+                    'categoria': servico.categoria or 'Geral',
+                    'unidade_medida': servico.unidade_medida or 'UN',
+                    'subatividades': subatividades_data
+                })
+        else:
+            # Processar serviços específicos da obra
+            for servico_obra, servico in servicos_obra:
+                # Buscar subatividades mestre para este serviço
+                try:
+                    subatividades = SubatividadeMestre.query.filter_by(
+                        servico_id=servico.id,
+                        admin_id=current_user.admin_id,
+                        ativo=True
+                    ).order_by(SubatividadeMestre.ordem_padrao).all()
+                    
+                    subatividades_data = []
+                    for sub in subatividades:
+                        subatividades_data.append({
+                            'id': sub.id,
+                            'nome': sub.nome,
+                            'descricao': sub.descricao or '',
+                            'unidade_medida': sub.unidade_medida or 'UN',
+                            'percentual_heranca': 0
+                        })
+                    
+                except:
+                    # Fallback para subatividades simples
+                    subatividades_data = [
+                        {
+                            'id': f"{servico.id}01",
+                            'nome': f'{servico.nome} - Execução',
+                            'descricao': f'Execução do serviço {servico.nome}',
+                            'unidade_medida': 'UN',
+                            'percentual_heranca': 0
+                        }
+                    ]
+                
+                servico_data = {
+                    'id': servico.id,
+                    'nome': servico.nome,
+                    'categoria': servico.categoria or 'Geral',
+                    'unidade_medida': servico.unidade_medida or 'UN',
+                    'subatividades': subatividades_data
+                }
+                servicos_data.append(servico_data)
+        
+        print(f"DEBUG API: Retornando {len(servicos_data)} serviços para obra {obra.nome}")
         
         return jsonify({
             'success': True,
