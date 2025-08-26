@@ -1,246 +1,7 @@
 # SIGE - Sistema de Gestão Empresarial
 
 ## Overview
-Sistema multi-tenant de gestão empresarial com foco em propostas comerciais, gestão de funcionários, controle de obras e folha de pagamento automatizada.
-
-
-
-## Arquitetura
-- **Backend**: Flask + SQLAlchemy + PostgreSQL
-- **Frontend**: Templates Jinja2 + Bootstrap
-- **Deploy**: Docker via Replit
-- **Database**: PostgreSQL com migrações automáticas
-
-## Migrações Automáticas
-Sistema implementado para resolver problemas de schema entre ambientes de desenvolvimento e produção:
-
-### Como Funciona
-- Arquivo `migrations.py` contém todas as migrações automáticas
-- Executado automaticamente na inicialização da aplicação (app.py)
-- Verifica se tabelas/colunas existem antes de criar
-- Logs detalhados de todas as operações
-
-### Problema Resolvido
-- Ambiente de produção tinha tabela `proposta_templates` incompleta
-- Sistema agora detecta e cria automaticamente todas as colunas necessárias:
-  - categoria, itens_padrao, prazo_entrega_dias, validade_dias
-  - percentual_nota_fiscal, itens_inclusos, itens_exclusos
-  - condicoes, condicoes_pagamento, garantias
-  - ativo, publico, uso_contador, admin_id, criado_por
-  - criado_em, atualizado_em
-
-### Logs de Migração
-```
-INFO:migrations:🔄 Iniciando migrações automáticas do banco de dados...
-INFO:migrations:✅ Tabela proposta_templates já existe
-INFO:migrations:✅ Coluna 'categoria' já existe na tabela proposta_templates
-INFO:migrations:✅ Migrações automáticas concluídas com sucesso!
-```
-
-## Módulos Principais
-
-### 1. Gestão de Propostas
-- Templates reutilizáveis (`PropostaTemplate`)
-- Propostas comerciais com itens e cálculos automáticos
-- Sistema de categorização e filtros
-
-### 2. Gestão de Funcionários
-- Cadastro completo com fotos (base64)
-- Controle de ponto automatizado
-- Cálculo de horas extras e atrasos
-
-### 3. Gestão de Obras
-- Controle de obras e projetos
-- RDO (Relatório Diário de Obra)
-- Alocação de funcionários e equipamentos
-
-### 4. Folha de Pagamento
-- Cálculo automático baseado em registros de ponto
-- Configuração salarial por funcionário
-- Relatórios mensais detalhados
-
-### 5. Sistema Multi-tenant
-- Isolamento de dados por admin_id
-- Controle de acesso baseado em roles
-- Bypass de autenticação para desenvolvimento
-
-## Recent Changes (26/08/2025)
-
-### ✅ REFATORAÇÃO COMPLETA DE INTERFACE - RDO PROFISSIONAL IMPLEMENTADO
-- **Design System Profissional Completo**: Interface totalmente redesenhada seguindo guidelines UX/UI modernas
-- **Layout Grid Responsivo**: Sistema de grid CSS moderno com breakpoints inteligentes (768px, 1024px)
-- **Componentes Modulares**: Cards modernos, inputs estilizados, navegação intuitiva
-- **Paleta de Cores Coesa**: Verde primário (#198754) com gradientes e variações harmoniosas
-- **Tipografia Hierárquica**: Inter font com pesos semânticos e escala tipográfica
-- **Espacamento Consistente**: Sistema de spacing baseado em CSS variables
-- **Estados Visuais Avançados**: Hover, focus, loading, success, error com feedback visual
-- **Validação em Tempo Real**: Campos com validação visual e feedback imediato
-- **Acessibilidade WCAG**: Contraste adequado, navegação por teclado, aria-labels
-- **Performance Otimizada**: CSS moderno, animações GPU-aceleradas, carregamento eficiente
-- **Indicadores de Progresso**: Barra de progresso dinâmica e auto-save visual
-- **Mobile-First Design**: Interface otimizada para smartphones e tablets
-
-### ✅ CORREÇÕES CRÍTICAS IMPLEMENTADAS
-- **Erro de serialização JSON**: Funcionários convertidos para dicionários serializáveis
-- **API de serviços melhorada**: Fallback inteligente para serviços padrão
-- **Template base corrigido**: Correção de herança de templates (layout.html → base.html)
-- **Navegação unificada**: Rota única `/funcionario/rdo/refatorado` para RDO
-- **Função salvarRDO otimizada**: Coleta adequada de dados e validação robusta
-
-### ✅ SISTEMA RDO MOBILE-FIRST - IMPLEMENTADO
-- **Design System Profissional**: Interface completamente redesenhada seguindo princípios de UX/UI modernos
-- **Layout Mobile-First Avançado**: Grid system responsivo com breakpoints inteligentes
-- **Componentes Modulares**: Cards modernos, inputs estilizados, navegação bottom mobile
-- **Paleta de Cores Coesa**: Verde primário (#198754) com gradientes e variações harmoniosas  
-- **Tipografia Hierárquica**: Inter font com pesos semânticos (medium, semibold, bold)
-- **Micro-interações**: Animações suaves, feedback háptico, transições CSS cubic-bezier
-- **Estados Visuais**: Hover, focus, loading, success, error com indicadores claros
-- **Auto-save Inteligente**: Salvamento automático a cada 30s com indicador visual
-- **Acessibilidade WCAG**: Contraste adequado, navegação por teclado, aria-labels
-- **Performance Otimizada**: CSS moderno, animações GPU-aceleradas, carregamento eficiente
-
-### ✅ SISTEMA RDO MOBILE-FIRST - IMPLEMENTADO
-- **Design responsivo avançado**: Mobile-first design com breakpoints para 768px, 480px e orientação landscape
-- **Layout horizontal de percentuais**: Percentuais aparecem ao lado dos nomes das subatividades conforme solicitado
-- **Interface otimizada para touch**: Feedback visual em botões, vibração háptica, gestos de toque nativos
-- **Barra de navegação mobile**: Barra fixa inferior com ações principais (Voltar, Validar, Salvar, Finalizar)
-- **Auto-save inteligente**: Salvamento automático a cada 30 segundos em dispositivos móveis
-- **Teclados otimizados**: Teclado numérico para inputs decimais, prevenção de zoom no iOS
-- **Meta tags PWA**: Viewport completo, theme colors, experiência de app nativo
-- **Seleção automática**: Auto-seleção de valores em inputs para entrada rápida de dados
-- **Detecção de orientação**: Layout adaptativo para modo retrato/paisagem
-- **Seções completas**: Funcionários e Ferramentas restauradas com layouts mobile-otimizados
-- **Status**: FUNCIONAL - Sistema totalmente otimizado para smartphones e tablets
-
-## Recent Changes (18/08/2025)
-
-### Sistema de Numeração Customizável - IMPLEMENTADO ✅
-- **Campo editável na criação**: Usuários podem definir números personalizados para propostas
-- **Campo editável na edição**: Possibilidade de alterar números existentes
-- **Backend atualizado**: Processamento correto do campo numero_proposta
-- **Validação implementada**: Campo obrigatório com orientações claras
-- **Interface intuitiva**: Placeholders e textos de ajuda para facilitar uso
-- **Status**: Funcional em desenvolvimento, pronto para produção
-
-### Sistema de PDF Personalizado Estruturas do Vale - IMPLEMENTADO ✅
-- **Novo formato profissional**: Template PDF seguindo exatamente modelo da Estruturas do Vale
-- **Design corporativo**: Header verde/cinza, logo personalizado, layout formal
-- **Carta de apresentação**: Página inicial com dados formais do cliente
-- **Sumário numerado**: Página com índice e numeração das seções
-- **Estrutura completa**: 9 seções numeradas conforme padrão da empresa
-- **Sistema de alternância**: Dropdown para escolher entre formato Estruturas do Vale e formato simples
-- **Correção de bugs**: Corrigido erro de atributo 'valor_total' para 'subtotal'
-- **Status**: Funcional em produção, testado e aprovado
-
-## Recent Changes (21/08/2025)
-
-### ✅ Sistema de Paginação Dinâmica A4 - IMPLEMENTADO
-- **Template híbrido**: Páginas 1-2 fixas, 3-4 dinâmicas para expansão automática
-- **Quebra automática**: Conteúdo que excede altura da página cria novas páginas automaticamente
-- **Headers repetidos**: Imagem personalizada aparece em todas as páginas, inclusive extras
-- **CSS inteligente**: Evita quebras inadequadas em seções e linhas de tabela
-- **Tabelas grandes**: Expandem naturalmente sem cortar conteúdo
-- **Dimensões A4**: Mantidas em todas as páginas, fixas ou dinâmicas
-- **Status**: FUNCIONAL - Sistema de paginação inteligente implementado
-
-### ✅ SISTEMA MULTITENANT FUNCIONANDO EM PRODUÇÃO - FINAL
-- **Problema raiz**: bypass_auth.py só existe em desenvolvimento, causando erros em produção
-- **Solução universal**: Criado multitenant_helper.py que funciona em dev e produção
-- **Helper inteligente**: Detecta ambiente e usa bypass ou current_user real
-- **Admin_id dinâmico**: Calcula corretamente baseado no tipo de usuário
-- **Views corrigidas**: Propostas, configurações e templates usando helper universal
-- **Sem dependências**: Produção não depende mais de arquivos de desenvolvimento
-- **Status**: FUNCIONANDO - Sistema verdadeiramente multitenant em ambos ambientes
-
-## Recent Changes (21/08/2025)
-
-### ✅ CORREÇÃO COMPLETA: Admin ID Dinâmico Implementado
-- **Problema resolvido**: Sistema usava admin_id fixo/hardcoded em várias rotas
-- **Headers PDF funcionando**: PDFs agora carregam configurações da empresa correta
-- **Configurações carregando**: Formulários não ficam mais vazios, puxam dados do admin correto
-- **Sistema verdadeiramente multitenant**: Cada usuário vê apenas dados da sua empresa
-- **Lógica implementada**: Funcionários usam admin_id do chefe, administradores usam próprio ID
-- **Fallback seguro**: Sistema continua funcionando mesmo em desenvolvimento
-- **Status**: FUNCIONANDO - Headers PDF e configurações operacionais
-
-### 🚨 HOTFIX: Foreign Key Violation RESOLVIDO ✅
-- **Problema crítico em produção**: Foreign key violation para admin_id=10 não existir na tabela usuario
-- **Sistema multitenant correto**: Problema era apenas usuário faltante em produção vs desenvolvimento
-- **Dockerfile corrigido**: Script de deploy agora cria usuários com IDs específicos (4, 10)
-- **Migrações automáticas**: Sistema garante usuários necessários existem antes de operações
-- **Configurações robustas**: Substituído session.add() por session.merge() para prevenir conflitos
-- **Deploy automático**: Hotfix pronto para aplicação em produção via Docker
-- **Status**: Corrigido em desenvolvimento, aguardando deploy em produção
-
-## Recent Changes (20/08/2025)
-
-### Sistema de Organização Drag-and-Drop - IMPLEMENTADO ✅
-- **Interface completa**: Sistema avançado para organizar propostas por arrastar e soltar
-- **Múltiplos templates**: Carregamento de vários templates onde cada um vira uma categoria separada
-- **Campos de banco**: categoria_titulo, template_origem_id/nome, grupo_ordem, item_ordem_no_grupo
-- **API completa**: Endpoints para listar templates, carregar múltiplos e salvar organização
-- **PDF dinâmico**: Template atualizado para exibir múltiplas categorias com subtotais
-- **Interface moderna**: Design profissional com Sortable.js e Bootstrap
-- **Botão na listagem**: Link "Organizar" adicionado na lista de propostas
-- **Status**: FUNCIONAL - Sistema completo implementado
-
-### Correção de Quebras de Linha PDF - IMPLEMENTADO ✅
-- **Problema identificado**: PDF não quebrava linhas com vírgulas como separador
-- **Solução aplicada**: Template atualizado para quebrar tanto ; quanto , seguidos de <br>
-- **Seções corrigidas**: Itens inclusos e exclusos agora quebram corretamente
-- **Status**: CORRIGIDO
-
-### Sistema de Header PDF Personalizado - LÓGICA FINAL ✅
-- **Especificação do cliente**: APENAS header da imagem cadastrada, sem header fixo verde
-- **Lógica implementada**: SE existe header_pdf_base64 MOSTRA ele, SENÃO fica vazio
-- **Template final**: `pdf_estruturas_vale_final.html` - sem fallback para header verde
-- **Comportamento**: Sem imagem cadastrada = PDF sem header (conforme solicitado)
-- **Deploy automático**: Correção aplicada automaticamente via Docker
-- **Status**: IMPLEMENTADO CONFORME ESPECIFICAÇÃO 🚀
-
-### Sistema de Header PDF Personalizado - IMPLEMENTADO ✅
-- **Campo header_pdf_base64**: Campo para upload de header completo do PDF
-- **Substituição completa**: Header personalizado substitui totalmente header verde
-- **Dimensões recomendadas**: 800-1200px × 80-120px (proporção 10:1)
-- **Aplicação automática**: Header aplicado em todas as páginas do PDF estruturado
-- **Migração automática**: Campo adicionado via sistema de migrações
-
-### Sistema de Personalização da Empresa - FUNCIONAL EM PRODUÇÃO ✅
-- **Configurações visuais completas**: Upload de logo e seleção de cores personalizadas
-- **Portal do cliente personalizado**: Cores e logo aplicadas dinamicamente nas propostas públicas
-- **Campos implementados**: logo_base64, logo_pdf_base64, header_pdf_base64, cor_primaria, cor_secundaria, cor_fundo_proposta
-- **Interface atualizada**: Link "Empresa" adicionado no dropdown Configurações
-- **Carregamento dinâmico**: Configurações aplicadas em tempo real, inclusive em propostas existentes
-- **Fallbacks implementados**: Sistema robusto para ambientes de produção
-- **Scripts de migração**: Criados para garantir funcionamento em produção
-- **Status**: FUNCIONANDO EM DESENVOLVIMENTO E PRODUÇÃO 🚀
-
-### Sistema de Propostas - COMPLETO E TESTADO ✅
-- **Debug completo realizado**: Todos os problemas identificados e corrigidos
-- **Campo 'ordem' corrigido**: Adicionado valor padrão e setado corretamente no código
-- **Rotas funcionando**: 20+ rotas do blueprint propostas registradas e testadas
-- **Formulários processando**: Campos name corretos, valores salvos no banco
-- **Templates funcionais**: listar.html, nova_proposta.html, visualizar.html
-- **Fluxo completo testado**: Criação, listagem, cálculo de valores automático
-- **Status**: PRONTO PARA DEPLOY EM PRODUÇÃO 🚀
-
-### Migração de Schema Automática - RESOLVIDO ✅
-- Implementado sistema de migrações automáticas completo
-- Resolvido problema de colunas faltantes na tabela proposta_templates
-- Sistema detecta e cria automaticamente tabela completa se necessário
-- Migrações executadas automaticamente no deploy via Docker
-- **Status**: Funcionando em produção
-
-### Correção Admin ID - RESOLVIDO ✅
-- Corrigido erro "null value in column admin_id" na tabela configuracao_empresa
-- Adicionado admin_id ao MockCurrentUser no sistema de bypass
-- Implementada verificação segura de admin_id nas views
-- **Status**: Configurações da empresa funcionando normalmente
-
-### Arquivos Adicionados
-- `migrations.py` - Sistema de migrações automáticas
-- `bypass_auth.py` - Atualizado com admin_id para desenvolvimento
-- `configuracoes_views.py` - Corrigido para tratar admin_id adequadamente
+SIGE (Sistema de Gestão Empresarial) is a multi-tenant business management system focused on commercial proposals, employee management, construction project control, and automated payroll. Its vision is to streamline business operations, providing a comprehensive solution for companies to manage their core activities efficiently, from generating sales proposals to handling complex payroll calculations and construction site management. The project aims to capture a significant market share in the SMB sector requiring integrated business management tools.
 
 ## User Preferences
 - Priorizar soluções automáticas que funcionem no deploy
@@ -248,8 +9,28 @@ INFO:migrations:✅ Migrações automáticas concluídas com sucesso!
 - Implementar logs detalhados para debugging
 - Sistema deve ser resiliente a diferenças entre ambientes
 
-## Development Guidelines
-- Usar sistema de migrações automáticas para mudanças de schema
-- Testar localmente antes do deploy
-- Manter logs informativos
-- Implementar verificações de segurança antes de alterações no banco
+## System Architecture
+The system is built with a Flask backend, SQLAlchemy ORM, and PostgreSQL database, with Jinja2 templates and Bootstrap for the frontend. Deployment is managed via Docker on Replit. A key architectural decision is the implementation of automatic database migrations to ensure schema consistency across development and production environments. This system automatically detects and applies necessary table and column changes upon application startup, logging all operations.
+
+**Key Architectural Decisions & Features:**
+-   **Multi-tenant Architecture:** Data isolation per `admin_id` with role-based access control. Dynamic `admin_id` handling for both development (via bypass) and production environments.
+-   **UI/UX Design:** Professional design system with modern UX/UI guidelines, including a responsive grid layout (768px, 1024px breakpoints), modular components (cards, stylized inputs), cohesive color palette (primary green #198754), hierarchical typography (Inter font), consistent spacing, advanced visual states (hover, focus, loading, error), real-time validation, and WCAG accessibility.
+-   **Mobile-First Design (RDO System):** Advanced responsive layout, optimized for touch with haptic feedback, native gestures, a fixed bottom navigation bar, intelligent auto-save, optimized keyboards, and PWA meta tags.
+-   **Automated Database Migrations:** `migrations.py` handles schema updates (e.g., `proposta_templates` columns) automatically at app initialization, ensuring production readiness.
+-   **Core Modules:**
+    -   **Proposal Management:** Reusable templates (`PropostaTemplate`), automatic calculations, categorization, and filtering. Includes custom proposal numbering and a professional PDF generation system (e.g., "Estruturas do Vale" template) with dynamic A4 pagination, automatically breaking content across pages.
+    -   **Employee Management:** Full registration with photo support, automated time clocking, and overtime/lateness calculation.
+    -   **Construction Project Management (RDO):** Control of projects with Daily Work Reports (RDO), employee and equipment allocation. Includes a refactored, professional RDO interface with real-time validation and auto-save.
+    -   **Payroll:** Automatic calculation based on time clock records and configurable salaries.
+-   **Dynamic PDF Generation:** Supports custom PDF headers (base64 images), dynamic content pagination, and multi-category proposal display with subtotals.
+-   **Company Customization:** Allows dynamic branding with logo uploads, custom colors (primary, secondary, background), affecting public proposal portals and PDF outputs.
+-   **Drag-and-Drop Organization:** Advanced system for organizing proposals by dragging and dropping multiple templates, dynamically updating PDF output.
+
+## External Dependencies
+-   **Flask:** Web framework for the backend.
+-   **SQLAlchemy:** ORM for database interaction.
+-   **PostgreSQL:** Relational database management system.
+-   **Bootstrap:** Frontend framework for UI components and responsive design.
+-   **Jinja2:** Templating engine for rendering HTML.
+-   **Docker:** Containerization platform for deployment.
+-   **Sortable.js:** JavaScript library used for drag-and-drop functionality in the UI.
