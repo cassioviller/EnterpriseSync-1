@@ -2101,7 +2101,7 @@ def funcionario_rdo_refatorado():
         if obra_id:
             obra_selecionada = next((obra for obra in obras if obra.id == obra_id), None)
         
-        return render_template('funcionario/rdo_refatorado.html', 
+        return render_template('funcionario/rdo_consolidado.html', 
                              obras=obras, 
                              funcionarios=funcionarios_dict,
                              obra_selecionada=obra_selecionada,
