@@ -2062,33 +2062,7 @@ def funcionario_novo_rdo():
         print(f"ERRO FUNCIONÁRIO NOVO RDO: {str(e)}")
         return redirect(url_for('main.funcionario_dashboard'))
 
-@main_bp.route('/funcionario/rdo/aprimorado')
-@funcionario_required
-def funcionario_rdo_aprimorado():
-    """Funcionário criar RDO com interface aprimorada"""
-    try:
-        # Buscar todas as obras do admin
-        obras = Obra.query.filter_by(admin_id=current_user.admin_id).order_by(Obra.nome).all()
-        
-        # Buscar funcionários para mão de obra
-        funcionarios = Funcionario.query.filter_by(
-            admin_id=current_user.admin_id, 
-            ativo=True
-        ).order_by(Funcionario.nome).all()
-        
-        # Verificar se há obras disponíveis
-        if not obras:
-            flash('Não há obras disponíveis. Contate o administrador.', 'warning')
-            return redirect(url_for('main.funcionario_dashboard'))
-        
-        return render_template('funcionario/rdo_aprimorado.html', obras=obras, funcionarios=funcionarios, date=date)
-        
-    except Exception as e:
-        print(f"ERRO FUNCIONÁRIO RDO APRIMORADO: {str(e)}")
-        import traceback
-        traceback.print_exc()
-        flash('Erro ao carregar formulário de RDO aprimorado.', 'error')
-        return redirect(url_for('main.funcionario_dashboard'))
+# Route removida: funcionario_rdo_aprimorado - template consolidado em novo_rdo.html
 
 @main_bp.route('/funcionario/rdo/criar', methods=['POST'])
 @funcionario_required

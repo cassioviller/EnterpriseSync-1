@@ -1,78 +1,311 @@
 {% extends "base.html" %}
 
-{% block title %}Novo RDO - Funcionário - SIGE{% endblock %}
+{% block title %}Novo RDO - Sistema Avançado - SIGE{% endblock %}
 
 {% block head %}
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <style>
-/* Mobile-first optimizations */
-.mobile-optimized {
-    font-size: 16px; /* Prevent zoom on iOS */
+/* RDO Avançado - Design Profissional */
+:root {
+    --primary-color: #0d6efd;
+    --success-color: #28a745;
+    --warning-color: #ffc107;
+    --danger-color: #dc3545;
+    --info-color: #17a2b8;
+    --light-bg: #f8f9fa;
+    --border-color: #e9ecef;
+    --shadow-light: 0 2px 8px rgba(0,0,0,0.1);
+    --shadow-medium: 0 4px 15px rgba(0,0,0,0.15);
+    --transition-smooth: all 0.3s ease;
 }
 
+.rdo-container {
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 20px;
+    background: var(--light-bg);
+    min-height: 100vh;
+}
+
+/* Header melhorado */
+.rdo-header {
+    background: linear-gradient(135deg, var(--primary-color) 0%, #0056b3 100%);
+    color: white;
+    padding: 25px 30px;
+    border-radius: 15px;
+    margin-bottom: 25px;
+    box-shadow: var(--shadow-medium);
+}
+
+.rdo-header h2 {
+    margin: 0;
+    font-size: 28px;
+    font-weight: 700;
+}
+
+.rdo-header .subtitle {
+    font-size: 16px;
+    opacity: 0.9;
+    margin-top: 5px;
+}
+
+/* Seções colapsáveis */
+.rdo-section {
+    background: white;
+    border-radius: 12px;
+    margin-bottom: 25px;
+    box-shadow: var(--shadow-light);
+    overflow: hidden;
+}
+
+.section-header {
+    background: var(--primary-color);
+    color: white;
+    padding: 18px 25px;
+    cursor: pointer;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-weight: 600;
+    font-size: 18px;
+    transition: var(--transition-smooth);
+}
+
+.section-header:hover {
+    background: #0056b3;
+}
+
+.section-header i {
+    font-size: 20px;
+    transition: var(--transition-smooth);
+}
+
+.section-header.collapsed i {
+    transform: rotate(-180deg);
+}
+
+.section-body {
+    padding: 25px;
+    border-top: 1px solid var(--border-color);
+}
+
+/* Form controls aprimorados */
 .form-control, .form-select {
     font-size: 16px;
-    padding: 12px;
+    padding: 12px 16px;
     border-radius: 8px;
-    touch-action: manipulation;
+    border: 2px solid var(--border-color);
+    transition: var(--transition-smooth);
+    background: white;
 }
 
+.form-control:focus, .form-select:focus {
+    border-color: var(--primary-color);
+    box-shadow: 0 0 0 0.25rem rgba(13, 110, 253, 0.15);
+}
+
+/* Botões personalizados */
 .btn {
     padding: 12px 20px;
     font-size: 16px;
     border-radius: 8px;
-    touch-action: manipulation;
+    font-weight: 600;
+    transition: var(--transition-smooth);
+    border: none;
 }
 
-.mobile-section {
-    background: #f8f9fa;
+.btn-primary {
+    background: linear-gradient(135deg, var(--primary-color) 0%, #0056b3 100%);
+    box-shadow: 0 4px 12px rgba(13, 110, 253, 0.3);
+}
+
+.btn-primary:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(13, 110, 253, 0.4);
+}
+
+.btn-success {
+    background: linear-gradient(135deg, var(--success-color) 0%, #1e7e34 100%);
+}
+
+.btn-outline-primary {
+    color: var(--primary-color);
+    border: 2px solid var(--primary-color);
+    background: transparent;
+}
+
+.btn-outline-primary:hover {
+    background: var(--primary-color);
+    color: white;
+}
+
+/* Alertas e notificações */
+.alert {
+    border: none;
+    border-radius: 10px;
+    padding: 15px 20px;
+    margin-bottom: 20px;
+    font-weight: 500;
+}
+
+.alert-success {
+    background: linear-gradient(135deg, #d4edda 0%, #c3e6cb 100%);
+    color: #155724;
+    border-left: 4px solid var(--success-color);
+}
+
+.alert-warning {
+    background: linear-gradient(135deg, #fff3cd 0%, #ffeaa7 100%);
+    color: #856404;
+    border-left: 4px solid var(--warning-color);
+}
+
+.alert-danger {
+    background: linear-gradient(135deg, #f8d7da 0%, #f5c6cb 100%);
+    color: #721c24;
+    border-left: 4px solid var(--danger-color);
+}
+
+/* Progresso e indicadores */
+.progress-indicator {
+    background: white;
+    border-radius: 12px;
+    padding: 20px;
+    margin-bottom: 25px;
+    box-shadow: var(--shadow-light);
+}
+
+.progress {
+    height: 8px;
+    border-radius: 4px;
+    background: var(--border-color);
+}
+
+.progress-bar {
+    border-radius: 4px;
+    transition: width 0.6s ease;
+}
+
+/* Subatividades */
+.servico-container {
+    background: white;
     border-radius: 12px;
     margin-bottom: 20px;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    border: 2px solid var(--border-color);
+    overflow: hidden;
+    transition: var(--transition-smooth);
 }
 
-.mobile-section-header {
-    background: linear-gradient(135deg, #0d6efd 0%, #0056b3 100%);
-    color: white;
-    padding: 15px 20px;
-    border-radius: 12px 12px 0 0;
+.servico-container:hover {
+    border-color: var(--primary-color);
+    box-shadow: var(--shadow-light);
+}
+
+.servico-header {
+    background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+    padding: 18px 25px;
     font-weight: 600;
-    position: sticky;
-    top: 0;
-    z-index: 100;
+    color: #495057;
+    border-bottom: 1px solid var(--border-color);
 }
 
-.mobile-section-body {
-    padding: 20px;
+.subatividade-item {
+    padding: 20px 25px;
+    border-bottom: 1px solid var(--border-color);
+    transition: var(--transition-smooth);
 }
 
+.subatividade-item:hover {
+    background: #f8f9fa;
+}
+
+.subatividade-item:last-child {
+    border-bottom: none;
+}
+
+.subatividade-label {
+    font-weight: 600;
+    color: #495057;
+    margin-bottom: 10px;
+}
+
+.input-group {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    flex-wrap: wrap;
+}
+
+.percentage-input {
+    width: 100px;
+    text-align: center;
+}
+
+/* Loading states */
+.loading {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 40px;
+    color: var(--primary-color);
+}
+
+.spinner {
+    width: 40px;
+    height: 40px;
+    border: 4px solid var(--border-color);
+    border-top: 4px solid var(--primary-color);
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+    margin-right: 10px;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+/* Mobile responsivo */
+@media (max-width: 768px) {
+    .rdo-container {
+        padding: 15px;
+    }
+    
+    .rdo-header {
+        padding: 20px;
+    }
+    
+    .section-body {
+        padding: 20px;
+    }
+    
+    .input-group {
+        flex-direction: column;
+        align-items: stretch;
+    }
+    
+    .percentage-input {
+        width: 100%;
+        max-width: 200px;
+    }
+}
+
+/* Floating action button */
 .floating-save {
     position: fixed;
-    bottom: 20px;
-    right: 20px;
+    bottom: 30px;
+    right: 30px;
     z-index: 1000;
     border-radius: 50px;
     padding: 15px 25px;
-    box-shadow: 0 4px 12px rgba(13,110,253,0.3);
+    box-shadow: 0 6px 20px rgba(13, 110, 253, 0.4);
+    transition: var(--transition-smooth);
 }
 
-.item-container {
-    background: white;
-    border-radius: 8px;
-    padding: 15px;
-    margin-bottom: 15px;
-    border-left: 4px solid #0d6efd;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+.floating-save:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 8px 25px rgba(13, 110, 253, 0.5);
 }
-
-.add-item-btn {
-    width: 100%;
-    padding: 15px;
-    border: 2px dashed #0d6efd;
-    background: transparent;
-    color: #0d6efd;
-    border-radius: 8px;
-    font-weight: 500;
 }
 
 .add-item-btn:hover {
@@ -143,620 +376,682 @@
 {% endblock %}
 
 {% block content %}
-<div class="container-fluid">
-    <div class="row">
-        <div class="col-12">
-            <div class="card">
-                <div class="card-header d-flex justify-content-between align-items-center">
-                    <h5 class="mb-0">
-                        <i class="fas fa-plus-circle me-2"></i>Novo Relatório Diário de Obra (RDO)
-                    </h5>
-                    <div>
-                        <a href="{{ url_for('main.funcionario_dashboard') }}" class="btn btn-outline-secondary">
-                            <i class="fas fa-arrow-left me-1"></i>Voltar ao Dashboard
-                        </a>
+<div class="rdo-container">
+    <!-- Loading Overlay -->
+    <div class="loading-overlay" id="loading-overlay" style="display: none;">
+        <div class="spinner"></div>
+    </div>
+    
+    <!-- Header -->
+    <div class="rdo-header">
+        <div class="d-flex justify-content-between align-items-center">
+            <div>
+                <h2>
+                    <i class="fas fa-clipboard-list"></i>
+                    Sistema RDO Avançado
+                </h2>
+                <div class="subtitle">
+                    Relatório Diário de Obra com validações inteligentes e carregamento dinâmico
+                </div>
+            </div>
+            <a href="{{ url_for('main.funcionario_dashboard') }}" class="btn btn-outline-light">
+                <i class="fas fa-arrow-left me-2"></i>Voltar ao Dashboard
+            </a>
+        </div>
+    </div>
+
+    <!-- Progress Indicator -->
+    <div class="progress-indicator">
+        <div class="d-flex justify-content-between align-items-center">
+            <span class="text-muted">Progresso da Obra:</span>
+            <div class="progress" style="width: 200px;">
+                <div class="progress-bar bg-success" id="obra-progress" style="width: 0%"></div>
+            </div>
+            <span class="fw-bold text-primary" id="obra-progress-text">0%</span>
+        </div>
+    </div>
+
+    <!-- Form -->
+    <form id="rdo-form-avancado" method="POST">
+        <!-- Seção 1: Dados Gerais -->
+        <div class="rdo-section">
+            <div class="section-header" onclick="toggleSection(this)">
+                <h4>
+                    <i class="fas fa-info-circle"></i>
+                    Informações Gerais
+                </h4>
+                <i class="fas fa-chevron-down"></i>
+            </div>
+            <div class="section-body">
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="form-group mb-3">
+                            <label class="form-label fw-bold">
+                                <i class="fas fa-building text-primary"></i>
+                                Obra <span class="text-danger">*</span>
+                            </label>
+                            <select name="obra_id" id="obra_id" class="form-select" required onchange="carregarServicosObra(this.value)">
+                                <option value="">Selecione uma obra para carregar os serviços</option>
+                                {% for obra in obras %}
+                                <option value="{{ obra.id }}">{{ obra.nome }}</option>
+                                {% endfor %}
+                            </select>
+                            <small class="text-muted">Os serviços e subatividades serão carregados automaticamente após a seleção da obra.</small>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="form-group mb-3">
+                            <label class="form-label fw-bold">
+                                <i class="fas fa-calendar text-primary"></i>
+                                Data do Relatório <span class="text-danger">*</span>
+                            </label>
+                            <input type="date" name="data_relatorio" id="data_relatorio" 
+                                   class="form-control" required 
+                                   max="{{ date.today().strftime('%Y-%m-%d') if date else '' }}">
+                            <small class="text-muted">Não é permitido criar RDO para datas futuras.</small>
+                        </div>
                     </div>
                 </div>
                 
-                <div class="card-body">
-                    <form action="{{ url_for('main.funcionario_criar_rdo') }}" method="POST" id="form-rdo">
-                        <!-- Dados Básicos -->
-                        <div class="row mb-4">
-                            <div class="col-md-6">
-                                <label for="obra_id" class="form-label">Obra *</label>
-                                <select class="form-select" id="obra_id" name="obra_id" required>
-                                    <option value="">Selecione uma obra...</option>
-                                    {% for obra in obras %}
-                                    <option value="{{ obra.id }}" {% if obra_selecionada == obra.id %}selected{% endif %}>
-                                        {{ obra.nome }}
-                                    </option>
-                                    {% endfor %}
-                                </select>
-                                {% if atividades_anteriores %}
-                                <small class="text-success">
-                                    <i class="fas fa-info-circle"></i> 
-                                    Atividades do RDO anterior pré-carregadas ({{ atividades_anteriores|length }} itens)
-                                </small>
-                                {% endif %}
-                            </div>
-                            
-                            <div class="col-md-6">
-                                <label for="data_relatorio" class="form-label">Data do Relatório *</label>
-                                <input type="date" class="form-control" id="data_relatorio" name="data_relatorio" 
-                                       value="" required>
-                            </div>
-                        </div>
-
-                        <!-- Condições Climáticas -->
-                        <h6 class="mb-3">Condições Climáticas</h6>
-                        <div class="row mb-4">
-                            <div class="col-md-4">
-                                <label for="clima" class="form-label">Clima</label>
-                                <select class="form-select" id="clima" name="clima">
-                                    <option value="">Selecione...</option>
-                                    <option value="Ensolarado">Ensolarado</option>
-                                    <option value="Parcialmente nublado">Parcialmente nublado</option>
-                                    <option value="Nublado">Nublado</option>
-                                    <option value="Chuvoso">Chuvoso</option>
-                                    <option value="Tempestade">Tempestade</option>
-                                </select>
-                            </div>
-                            <div class="col-md-4">
-                                <label for="temperatura" class="form-label">Temperatura</label>
-                                <input type="text" class="form-control" id="temperatura" name="temperatura" 
-                                       placeholder="Ex: 25°C">
-                            </div>
-                            <div class="col-md-4">
-                                <label for="condicoes_climaticas" class="form-label">Observações Climáticas</label>
-                                <textarea class="form-control" id="condicoes_climaticas" name="condicoes_climaticas" 
-                                          rows="2" placeholder="Detalhes sobre o clima..."></textarea>
-                            </div>
-                        </div>
-
-                        <!-- Atividades Executadas -->
-                        <h6 class="mb-3">
-                            Atividades Executadas
-                            {% if atividades_anteriores %}
-                            <span class="badge bg-info ms-2">Pré-carregadas do RDO anterior</span>
-                            {% endif %}
-                        </h6>
-                        <div class="mb-4">
-                            <div id="atividades-container">
-                                <div class="d-flex justify-content-between align-items-center mb-3">
-                                    <span class="badge bg-primary p-2">Progresso Total da Obra: <span id="progresso-total">0%</span></span>
-                                </div>
-                                
-                                {% if atividades_anteriores %}
-                                    {% for atividade in atividades_anteriores %}
-                                    <div class="servico-container border rounded mb-4">
-                                        <!-- Cabeçalho do Serviço -->
-                                        <div class="bg-primary text-white p-3 border-bottom">
-                                            <div class="row align-items-center">
-                                                <div class="col-md-6">
-                                                    <h6 class="mb-0">
-                                                        <i class="fas fa-cogs me-2"></i>{{ atividade.descricao }}
-                                                        <span class="badge bg-light text-dark ms-2">{{ atividade.categoria|title }}</span>
-                                                    </h6>
-                                                    <small>{{ atividade.observacoes }}</small>
-                                                </div>
-                                                <div class="col-md-4">
-                                                    <label class="form-label text-white mb-1">Progresso do Serviço</label>
-                                                    <div class="input-group">
-                                                        <input type="number" class="form-control servico-percentual" 
-                                                               name="atividades[percentual][]" min="0" max="100" step="0.1" 
-                                                               value="{{ atividade.percentual }}" readonly style="background-color: white;">
-                                                        <span class="input-group-text">%</span>
-                                                    </div>
-                                                    <input type="hidden" class="atividade-descricao" value="{{ atividade.descricao }}">
-                                                    <input type="hidden" class="atividade-observacoes" value="{{ atividade.observacoes }}">
-                                                </div>
-                                                <div class="col-md-2">
-                                                    <button type="button" class="btn btn-sm btn-outline-light w-100" 
-                                                            onclick="toggleSubatividades(this)">
-                                                        <i class="fas fa-chevron-down"></i> Sub
-                                                    </button>
-                                                </div>
-                                            </div>
-                                        </div>
-                                        
-                                        <!-- Subatividades -->
-                                        {% if atividade.subatividades %}
-                                        <div class="subatividades-container" style="display: none;">
-                                            <div class="p-3 bg-light">
-                                                <h6 class="text-primary mb-3">
-                                                    <i class="fas fa-tasks me-2"></i>Subatividades ({{ atividade.subatividades|length }})
-                                                </h6>
-                                                
-                                                {% for sub in atividade.subatividades %}
-                                                <div class="subatividade-item mb-3 p-3 border rounded bg-white">
-                                                    <div class="row align-items-center">
-                                                        <div class="col-md-6">
-                                                            <strong>{{ sub.nome }}</strong>
-                                                            {% if sub.descricao %}
-                                                            <p class="text-muted mb-0 mt-1">{{ sub.descricao }}</p>
-                                                            {% endif %}
-                                                        </div>
-                                                        <div class="col-md-4">
-                                                            <div class="input-group">
-                                                                <input type="number" class="form-control subatividade-percentual" 
-                                                                       name="subatividades[{{ sub.id }}][percentual]" 
-                                                                       min="0" max="100" step="0.1" value="{{ sub.percentual }}"
-                                                                       onchange="calcularProgressoServico(this)">
-                                                                <span class="input-group-text">%</span>
-                                                            </div>
-                                                            <input type="hidden" name="subatividades[{{ sub.id }}][nome]" value="{{ sub.nome }}">
-                                                        </div>
-                                                        <div class="col-md-2">
-                                                            <div class="progress">
-                                                                <div class="progress-bar bg-success" role="progressbar" 
-                                                                     style="width: {{ sub.percentual }}%"></div>
-                                                            </div>
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                                {% endfor %}
-                                            </div>
-                                        </div>
-                                        {% endif %}
-                                    </div>
-                                    {% endfor %}
-                                {% else %}
-                                    <div class="atividade-item border rounded p-3 mb-3">
-                                        <div class="row">
-                                            <div class="col-md-6">
-                                                <label class="form-label">Descrição da Atividade</label>
-                                                <input type="text" class="form-control atividade-descricao" 
-                                                       placeholder="Ex: Concretagem da laje...">
-                                            </div>
-                                            <div class="col-md-3">
-                                                <label class="form-label">% Conclusão</label>
-                                                <input type="number" class="form-control atividade-percentual" 
-                                                       min="0" max="100" placeholder="0">
-                                            </div>
-                                            <div class="col-md-3">
-                                                <label class="form-label">Ações</label>
-                                                <div>
-                                                    <button type="button" class="btn btn-sm btn-danger remover-atividade">
-                                                        <i class="fas fa-trash"></i>
-                                                    </button>
-                                                </div>
-                                            </div>
-                                        </div>
-                                        <div class="row mt-2">
-                                            <div class="col-12">
-                                                <label class="form-label">Observações Técnicas</label>
-                                                <textarea class="form-control atividade-observacoes" rows="2" 
-                                                          placeholder="Observações técnicas..."></textarea>
-                                            </div>
-                                        </div>
-                                    </div>
-                                {% endif %}
-                            </div>
-                            
-                            <button type="button" class="btn btn-outline-primary" id="adicionar-atividade">
-                                <i class="fas fa-plus me-1"></i>Adicionar Atividade
-                            </button>
-                        </div>
-
-                        <!-- Mão de Obra -->
-                        <h6 class="mb-3">Mão de Obra Utilizada</h6>
-                        <div class="mb-4">
-                            <div id="mao-obra-container">
-                                <div class="mao-obra-item border rounded p-3 mb-3">
-                                    <div class="row">
-                                        <div class="col-md-4">
-                                            <label class="form-label">Funcionário</label>
-                                            <select class="form-select mao-obra-funcionario">
-                                                <option value="">Selecione um funcionário...</option>
-                                                {% for funcionario in funcionarios %}
-                                                <option value="{{ funcionario.id }}">{{ funcionario.nome }}</option>
-                                                {% endfor %}
-                                            </select>
-                                        </div>
-                                        <div class="col-md-3">
-                                            <label class="form-label">Função Exercida</label>
-                                            <input type="text" class="form-control mao-obra-funcao" 
-                                                   placeholder="Ex: Pedreiro, Servente...">
-                                        </div>
-                                        <div class="col-md-3">
-                                            <label class="form-label">Horas Trabalhadas</label>
-                                            <input type="number" class="form-control mao-obra-horas" 
-                                                   step="0.5" min="0" value="8">
-                                        </div>
-                                        <div class="col-md-2">
-                                            <label class="form-label">Ações</label>
-                                            <div>
-                                                <button type="button" class="btn btn-sm btn-danger remover-mao-obra">
-                                                    <i class="fas fa-trash"></i>
-                                                </button>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                            
-                            <button type="button" class="btn btn-outline-primary" id="adicionar-mao-obra">
-                                <i class="fas fa-plus me-1"></i>Adicionar Funcionário
-                            </button>
-                        </div>
-
-                        <!-- Equipamentos -->
-                        <h6 class="mb-3">Equipamentos Utilizados</h6>
-                        <div class="mb-4">
-                            <div id="equipamentos-container">
-                                <div class="equipamento-item border rounded p-3 mb-3">
-                                    <div class="row">
-                                        <div class="col-md-4">
-                                            <label class="form-label">Nome do Equipamento</label>
-                                            <input type="text" class="form-control equipamento-nome" 
-                                                   placeholder="Ex: Betoneira, Guincho...">
-                                        </div>
-                                        <div class="col-md-2">
-                                            <label class="form-label">Quantidade</label>
-                                            <input type="number" class="form-control equipamento-quantidade" 
-                                                   min="1" value="1">
-                                        </div>
-                                        <div class="col-md-2">
-                                            <label class="form-label">Horas de Uso</label>
-                                            <input type="number" class="form-control equipamento-horas" 
-                                                   step="0.5" min="0" value="8">
-                                        </div>
-                                        <div class="col-md-2">
-                                            <label class="form-label">Estado</label>
-                                            <select class="form-select equipamento-estado">
-                                                <option value="Bom">Bom</option>
-                                                <option value="Regular">Regular</option>
-                                                <option value="Ruim">Ruim</option>
-                                            </select>
-                                        </div>
-                                        <div class="col-md-2">
-                                            <label class="form-label">Ações</label>
-                                            <div>
-                                                <button type="button" class="btn btn-sm btn-danger remover-equipamento">
-                                                    <i class="fas fa-trash"></i>
-                                                </button>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                            
-                            <button type="button" class="btn btn-outline-primary" id="adicionar-equipamento">
-                                <i class="fas fa-plus me-1"></i>Adicionar Equipamento
-                            </button>
-                        </div>
-
-                        <!-- Ocorrências -->
-                        <h6 class="mb-3">Ocorrências e Problemas</h6>
-                        <div class="mb-4">
-                            <div id="ocorrencias-container">
-                                <div class="ocorrencia-item border rounded p-3 mb-3">
-                                    <div class="row">
-                                        <div class="col-12 mb-2">
-                                            <label class="form-label">Descrição da Ocorrência</label>
-                                            <textarea class="form-control ocorrencia-descricao" rows="2" 
-                                                      placeholder="Descreva a ocorrência ou problema identificado..."></textarea>
-                                        </div>
-                                    </div>
-                                    <div class="row">
-                                        <div class="col-md-6">
-                                            <label class="form-label">Problemas Identificados</label>
-                                            <textarea class="form-control ocorrencia-problemas" rows="2" 
-                                                      placeholder="Detalhe os problemas..."></textarea>
-                                        </div>
-                                        <div class="col-md-6">
-                                            <label class="form-label">Ações Corretivas</label>
-                                            <textarea class="form-control ocorrencia-acoes" rows="2" 
-                                                      placeholder="Ações tomadas ou necessárias..."></textarea>
-                                        </div>
-                                    </div>
-                                    <div class="row mt-2">
-                                        <div class="col-12 text-end">
-                                            <button type="button" class="btn btn-sm btn-danger remover-ocorrencia">
-                                                <i class="fas fa-trash"></i> Remover
-                                            </button>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                            
-                            <button type="button" class="btn btn-outline-primary" id="adicionar-ocorrencia">
-                                <i class="fas fa-plus me-1"></i>Adicionar Ocorrência
-                            </button>
-                        </div>
-
-                        <!-- Comentário Geral -->
-                        <h6 class="mb-3">Observações Gerais</h6>
-                        <div class="mb-4">
-                            <div class="col-12">
-                                <label for="comentario_geral" class="form-label">Comentário Geral sobre o Andamento da Obra</label>
-                                <textarea class="form-control" id="comentario_geral" name="comentario_geral" 
-                                          rows="4" placeholder="Observações gerais sobre o andamento da obra..."></textarea>
-                            </div>
-                        </div>
-
-                        <!-- Hidden inputs para dados JSON -->
-                        <input type="hidden" id="atividades-json" name="atividades">
-                        <input type="hidden" id="mao-obra-json" name="mao_obra">
-                        <input type="hidden" id="equipamentos-json" name="equipamentos">
-                        <input type="hidden" id="ocorrencias-json" name="ocorrencias">
-
-                        <!-- Botões -->
-                        <div class="d-flex justify-content-end gap-2">
-                            <a href="{{ url_for('main.funcionario_dashboard') }}" class="btn btn-secondary">Cancelar</a>
-                            <button type="submit" class="btn btn-primary">
-                                <i class="fas fa-save me-1"></i>Criar RDO
-                            </button>
-                        </div>
-                    </form>
+                <div class="form-group mb-3">
+                    <label class="form-label fw-bold">
+                        <i class="fas fa-comment text-primary"></i>
+                        Comentário Geral
+                    </label>
+                    <textarea name="comentario_geral" id="comentario_geral" 
+                              class="form-control" rows="3"
+                              placeholder="Observações gerais sobre o dia de trabalho..."></textarea>
                 </div>
             </div>
         </div>
-    </div>
+
+        <!-- Seção 2: Condições Climáticas -->
+        <div class="rdo-section">
+            <div class="section-header" onclick="toggleSection(this)">
+                <h4>
+                    <i class="fas fa-cloud-sun"></i>
+                    Condições Climáticas
+                </h4>
+                <i class="fas fa-chevron-down"></i>
+            </div>
+            <div class="section-body">
+                <div class="row">
+                    <div class="col-md-4">
+                        <div class="form-group mb-3">
+                            <label class="form-label fw-bold">
+                                <i class="fas fa-sun text-warning"></i>
+                                Clima
+                            </label>
+                            <select name="clima_geral" id="clima_geral" class="form-select">
+                                <option value="">Selecione...</option>
+                                <option value="Ensolarado">☀️ Ensolarado</option>
+                                <option value="Parcialmente nublado">⛅ Parcialmente nublado</option>
+                                <option value="Nublado">☁️ Nublado</option>
+                                <option value="Chuvoso">🌧️ Chuvoso</option>
+                                <option value="Tempestade">⛈️ Tempestade</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="form-group mb-3">
+                            <label class="form-label fw-bold">
+                                <i class="fas fa-thermometer-half text-info"></i>
+                                Temperatura
+                            </label>
+                            <input type="text" name="temperatura_media" id="temperatura_media" 
+                                   class="form-control" placeholder="Ex: 25°C">
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="form-group mb-3">
+                            <label class="form-label fw-bold">
+                                <i class="fas fa-eye text-info"></i>
+                                Observações Climáticas
+                            </label>
+                            <textarea name="observacoes_climaticas" id="observacoes_climaticas" 
+                                      class="form-control" rows="2"
+                                      placeholder="Detalhes sobre o clima..."></textarea>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Seção 3: Atividades e Subatividades -->
+        <div class="rdo-section">
+            <div class="section-header" onclick="toggleSection(this)">
+                <h4>
+                    <i class="fas fa-tasks"></i>
+                    Atividades e Subatividades <span id="servicos-count" class="text-muted">0 serviços</span>
+                </h4>
+                <i class="fas fa-chevron-down"></i>
+            </div>
+            <div class="section-body">
+                <!-- Botão para herdar percentuais -->
+                <div class="d-flex justify-content-between align-items-center mb-4">
+                    <div class="d-flex gap-2">
+                        <button type="button" class="btn btn-outline-primary" id="herdar-percentuais" onclick="herdarPercentuais()" disabled>
+                            <i class="fas fa-download"></i>
+                            Herdar Anterior
+                        </button>
+                        <button type="button" class="btn btn-outline-info" onclick="validarFormulario()">
+                            <i class="fas fa-check-circle"></i>
+                            Validar
+                        </button>
+                    </div>
+                    <div class="alert alert-info py-2 px-3 mb-0" style="display: none;" id="progress-info">
+                        <small><i class="fas fa-info-circle"></i> Progresso será calculado automaticamente</small>
+                    </div>
+                </div>
+
+                <!-- Container de Serviços -->
+                <div id="servicos-container">
+                    <div class="text-center py-5 text-muted" id="no-services-message">
+                        <div class="spinner mb-3" style="display: none;" id="loading-services"></div>
+                        <i class="fas fa-building fa-3x mb-3"></i>
+                        <h5>Selecione uma obra para carregar os serviços</h5>
+                        <p>Os serviços e subatividades serão carregados automaticamente após a seleção da obra.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Action Buttons -->
+        <div class="d-flex justify-content-between mt-4">
+            <button type="button" class="btn btn-outline-secondary" onclick="window.location.href='{{ url_for('main.funcionario_dashboard') }}'">
+                <i class="fas fa-times"></i>
+                Cancelar
+            </button>
+            <div class="d-flex gap-2">
+                <button type="button" class="btn btn-outline-primary" onclick="salvarRascunho()">
+                    <i class="fas fa-save"></i>
+                    Salvar Rascunho
+                </button>
+                <button type="submit" class="btn btn-success" id="finalizar-btn" disabled>
+                    <i class="fas fa-check"></i>
+                    Finalizar RDO
+                </button>
+            </div>
+        </div>
+    </form>
+
+    <!-- Floating Save Button (Mobile) -->
+    <button type="button" class="floating-save d-md-none" onclick="salvarRascunho()">
+        <i class="fas fa-save"></i>
+        Salvar
+    </button>
 </div>
 
+<!-- Notification Container -->
+<div id="notification-container" style="position: fixed; top: 20px; right: 20px; z-index: 1050;"></div>
+
 <script>
-document.addEventListener('DOMContentLoaded', function() {
-    // Função para recarregar atividades quando obra muda
-    document.getElementById('obra_id').addEventListener('change', function() {
-        const obraId = this.value;
-        if (obraId) {
-            // Recarregar página com obra selecionada para pré-carregar atividades
-            window.location.href = '{{ url_for("main.funcionario_novo_rdo") }}?obra_id=' + obraId;
-        }
-    });
+// Sistema RDO Avançado - JavaScript
+let servicosCarregados = [];
+let alertasValidacao = [];
 
-    // Adicionar atividade
-    document.getElementById('adicionar-atividade').addEventListener('click', function() {
-        const container = document.getElementById('atividades-container');
-        const newItem = container.querySelector('.atividade-item').cloneNode(true);
-        
-        // Limpar campos e remover classe de pré-carregado
-        newItem.classList.remove('bg-light');
-        newItem.querySelectorAll('input, textarea').forEach(input => input.value = '');
-        newItem.querySelectorAll('small').forEach(small => small.remove());
-        
-        container.appendChild(newItem);
-        
-        // Adicionar event listener para remoção
-        newItem.querySelector('.remover-atividade').addEventListener('click', function() {
-            if (container.children.length > 1) {
-                newItem.remove();
-            }
-        });
-    });
-
-    // Adicionar mão de obra
-    document.getElementById('adicionar-mao-obra').addEventListener('click', function() {
-        const container = document.getElementById('mao-obra-container');
-        const newItem = container.querySelector('.mao-obra-item').cloneNode(true);
-        
-        // Limpar campos
-        newItem.querySelectorAll('input, select').forEach(input => {
-            if (input.type === 'number') {
-                input.value = '8';
-            } else {
-                input.value = '';
-            }
-        });
-        
-        container.appendChild(newItem);
-        
-        // Adicionar event listener para remoção
-        newItem.querySelector('.remover-mao-obra').addEventListener('click', function() {
-            if (container.children.length > 1) {
-                newItem.remove();
-            }
-        });
-    });
-
-    // Adicionar equipamento
-    document.getElementById('adicionar-equipamento').addEventListener('click', function() {
-        const container = document.getElementById('equipamentos-container');
-        const newItem = container.querySelector('.equipamento-item').cloneNode(true);
-        
-        // Limpar campos
-        newItem.querySelectorAll('input, select').forEach(input => {
-            if (input.type === 'number') {
-                input.value = input.classList.contains('equipamento-quantidade') ? '1' : '8';
-            } else if (input.type === 'text') {
-                input.value = '';
-            }
-        });
-        
-        container.appendChild(newItem);
-        
-        // Adicionar event listener para remoção
-        newItem.querySelector('.remover-equipamento').addEventListener('click', function() {
-            if (container.children.length > 1) {
-                newItem.remove();
-            }
-        });
-    });
-
-    // Adicionar ocorrência
-    document.getElementById('adicionar-ocorrencia').addEventListener('click', function() {
-        const container = document.getElementById('ocorrencias-container');
-        const newItem = container.querySelector('.ocorrencia-item').cloneNode(true);
-        
-        // Limpar campos
-        newItem.querySelectorAll('textarea').forEach(textarea => textarea.value = '');
-        
-        container.appendChild(newItem);
-        
-        // Adicionar event listener para remoção
-        newItem.querySelector('.remover-ocorrencia').addEventListener('click', function() {
-            if (container.children.length > 1) {
-                newItem.remove();
-            }
-        });
-    });
-
-    // Event listeners para remoção inicial
-    document.querySelectorAll('.remover-atividade').forEach(btn => {
-        btn.addEventListener('click', function() {
-            const container = document.getElementById('atividades-container');
-            if (container.children.length > 1) {
-                btn.closest('.atividade-item').remove();
-            }
-        });
-    });
-
-    document.querySelectorAll('.remover-mao-obra').forEach(btn => {
-        btn.addEventListener('click', function() {
-            const container = document.getElementById('mao-obra-container');
-            if (container.children.length > 1) {
-                btn.closest('.mao-obra-item').remove();
-            }
-        });
-    });
-
-    // Processar dados antes do envio
-    document.getElementById('form-rdo').addEventListener('submit', function(e) {
-        // Processar atividades
-        const atividades = [];
-        document.querySelectorAll('.atividade-item').forEach(item => {
-            const descricao = item.querySelector('.atividade-descricao').value;
-            const percentual = item.querySelector('.atividade-percentual').value;
-            const observacoes = item.querySelector('.atividade-observacoes').value;
-            
-            if (descricao.trim()) {
-                atividades.push({
-                    descricao: descricao,
-                    percentual: percentual || 0,
-                    observacoes: observacoes
-                });
-            }
-        });
-        
-        // Processar mão de obra
-        const maoObra = [];
-        document.querySelectorAll('.mao-obra-item').forEach(item => {
-            const funcionarioId = item.querySelector('.mao-obra-funcionario').value;
-            const funcao = item.querySelector('.mao-obra-funcao').value;
-            const horas = item.querySelector('.mao-obra-horas').value;
-            
-            if (funcionarioId && funcao.trim()) {
-                maoObra.push({
-                    funcionario_id: funcionarioId,
-                    funcao: funcao,
-                    horas: horas || 8
-                });
-            }
-        });
-        
-        // Processar equipamentos
-        const equipamentos = [];
-        document.querySelectorAll('.equipamento-item').forEach(item => {
-            const nome = item.querySelector('.equipamento-nome').value;
-            const quantidade = item.querySelector('.equipamento-quantidade').value;
-            const horas = item.querySelector('.equipamento-horas').value;
-            const estado = item.querySelector('.equipamento-estado').value;
-            
-            if (nome.trim()) {
-                equipamentos.push({
-                    nome: nome,
-                    quantidade: quantidade || 1,
-                    horas: horas || 8,
-                    estado: estado
-                });
-            }
-        });
-        
-        // Processar ocorrências
-        const ocorrencias = [];
-        document.querySelectorAll('.ocorrencia-item').forEach(item => {
-            const descricao = item.querySelector('.ocorrencia-descricao').value;
-            const problemas = item.querySelector('.ocorrencia-problemas').value;
-            const acoes = item.querySelector('.ocorrencia-acoes').value;
-            
-            if (descricao.trim()) {
-                ocorrencias.push({
-                    descricao: descricao,
-                    problemas: problemas,
-                    acoes: acoes
-                });
-            }
-        });
-        
-        // Definir valores nos campos hidden
-        document.getElementById('atividades-json').value = JSON.stringify(atividades);
-        document.getElementById('mao-obra-json').value = JSON.stringify(maoObra);
-        document.getElementById('equipamentos-json').value = JSON.stringify(equipamentos);
-        document.getElementById('ocorrencias-json').value = JSON.stringify(ocorrencias);
-    });
-
-    // Funções para sistema hierárquico de subatividades
-    function toggleSubatividades(button) {
-        const container = button.closest('.servico-container');
-        const subContainer = container.querySelector('.subatividades-container');
-        const icon = button.querySelector('i');
-        
-        if (subContainer.style.display === 'none' || !subContainer.style.display) {
-            subContainer.style.display = 'block';
-            icon.className = 'fas fa-chevron-up';
-        } else {
-            subContainer.style.display = 'none';
-            icon.className = 'fas fa-chevron-down';
-        }
+// Funções de seção colapsável
+function toggleSection(header) {
+    const section = header.nextElementSibling;
+    const icon = header.querySelector('i:last-child');
+    
+    if (section.classList.contains('section-body')) {
+        section.style.display = section.style.display === 'none' ? 'block' : 'none';
+        icon.style.transform = section.style.display === 'none' ? 'rotate(-180deg)' : 'rotate(0deg)';
     }
+}
 
-    function calcularProgressoServico(element) {
-        const container = element.closest('.servico-container');
-        const subatividades = container.querySelectorAll('.subatividade-percentual');
-        const servicoInput = container.querySelector('.servico-percentual');
-        
-        let total = 0;
-        let count = 0;
-        
-        subatividades.forEach(sub => {
-            if (sub.value && parseFloat(sub.value) >= 0) {
-                total += parseFloat(sub.value);
-                count++;
-            }
-        });
-        
-        const media = count > 0 ? (total / count) : 0;
-        servicoInput.value = media.toFixed(1);
-        
-        // Atualizar barra de progresso
-        const progressBar = element.closest('.subatividade-item').querySelector('.progress-bar');
-        if (progressBar) {
-            progressBar.style.width = element.value + '%';
-        }
-        
-        // Calcular progresso total da obra
-        calcularProgressoTotalObra();
+// Carregar serviços da obra selecionada
+async function carregarServicosObra(obraId) {
+    if (!obraId) {
+        limparServicos();
+        return;
     }
-
-    // Calcular progresso total da obra baseado nos serviços
-    function calcularProgressoTotalObra() {
-        const servicosPercentuais = document.querySelectorAll('.servico-percentual');
-        let totalObra = 0;
-        let countServicos = 0;
+    
+    mostrarLoading('loading-services', true);
+    document.getElementById('no-services-message').innerHTML = `
+        <div class="spinner mb-3"></div>
+        <h5>Carregando serviços da obra...</h5>
+        <p>Aguarde enquanto carregamos os dados.</p>
+    `;
+    
+    try {
+        const response = await fetch(`/api/test/rdo/servicos-obra/${obraId}`);
+        if (!response.ok) throw new Error('Erro ao carregar serviços');
         
-        servicosPercentuais.forEach(servico => {
-            if (servico.value && parseFloat(servico.value) >= 0) {
-                totalObra += parseFloat(servico.value);
-                countServicos++;
-            }
-        });
+        const data = await response.json();
+        servicosCarregados = data.servicos || [];
         
-        const progressoObra = countServicos > 0 ? (totalObra / countServicos) : 0;
-        document.getElementById('progresso-total').textContent = progressoObra.toFixed(1) + '%';
+        renderizarServicos();
+        habilitarBotoes();
+        
+        mostrarNotificacao(`${servicosCarregados.length} serviços carregados com sucesso!`, 'success');
+        
+    } catch (error) {
+        console.error('Erro:', error);
+        mostrarNotificacao('Erro ao carregar serviços da obra', 'error');
+        servicosCarregados = [];
     }
+    
+    mostrarLoading('loading-services', false);
+    atualizarContadorServicos();
+}
 
-    // Inicializar cálculos quando a página carregar
-    window.addEventListener('load', function() {
-        calcularProgressoTotalObra();
+// Renderizar serviços e subatividades
+function renderizarServicos() {
+    const container = document.getElementById('servicos-container');
+    
+    if (servicosCarregados.length === 0) {
+        container.innerHTML = `
+            <div class="text-center py-5 text-muted">
+                <i class="fas fa-inbox fa-3x mb-3"></i>
+                <h5>Nenhum serviço encontrado</h5>
+                <p>Esta obra não possui serviços cadastrados.</p>
+            </div>
+        `;
+        return;
+    }
+    
+    let html = '';
+    servicosCarregados.forEach((servico, index) => {
+        html += criarHtmlServico(servico, index);
     });
     
-    // Tornar as funções globais para usar nos onclick
-    window.toggleSubatividades = toggleSubatividades;
-    window.calcularProgressoServico = calcularProgressoServico;
+    container.innerHTML = html;
+    document.getElementById('progress-info').style.display = 'block';
+}
 
-    // Definir data atual por padrão
-    document.getElementById('data_relatorio').value = new Date().toISOString().split('T')[0];
+// Criar HTML de um serviço
+function criarHtmlServico(servico, index) {
+    const subatividades = servico.subatividades || [];
+    
+    return `
+        <div class="servico-container mb-4" data-servico-id="${servico.id}">
+            <div class="servico-header">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <h6 class="mb-0">
+                            <i class="fas fa-cogs me-2"></i>
+                            ${servico.nome}
+                        </h6>
+                        <small class="text-muted">${subatividades.length} subatividades</small>
+                    </div>
+                    <button type="button" class="btn btn-outline-primary btn-sm" 
+                            onclick="toggleSubatividades(${index})">
+                        <i class="fas fa-chevron-down"></i>
+                        Expandir
+                    </button>
+                </div>
+            </div>
+            
+            <div class="subatividades-list" id="subatividades-${index}" style="display: none;">
+                ${subatividades.map((sub, subIndex) => criarHtmlSubatividade(sub, index, subIndex)).join('')}
+            </div>
+        </div>
+    `;
+}
+
+// Criar HTML de subatividade
+function criarHtmlSubatividade(subatividade, servicoIndex, subIndex) {
+    return `
+        <div class="subatividade-item">
+            <div class="subatividade-label">
+                <i class="fas fa-tasks text-primary me-2"></i>
+                ${subatividade.nome}
+            </div>
+            <div class="input-group">
+                <input type="number" 
+                       class="form-control percentage-input" 
+                       name="subatividades[${servicoIndex}][${subIndex}][percentual]"
+                       min="0" max="100" step="0.1" value="0"
+                       onchange="validarPercentual(this); calcularProgressoGeral();"
+                       placeholder="0.0">
+                <span class="input-group-text">%</span>
+                <input type="hidden" name="subatividades[${servicoIndex}][${subIndex}][nome]" value="${subatividade.nome}">
+                <input type="hidden" name="subatividades[${servicoIndex}][${subIndex}][servico_id]" value="${servicosCarregados[servicoIndex].id}">
+                <input type="hidden" name="subatividades[${servicoIndex}][${subIndex}][servico_nome]" value="${servicosCarregados[servicoIndex].nome}">
+            </div>
+            <div class="mt-2">
+                <textarea class="form-control" 
+                          name="subatividades[${servicoIndex}][${subIndex}][observacoes]"
+                          placeholder="Observações técnicas..." rows="2"></textarea>
+            </div>
+        </div>
+    `;
+}
+
+// Toggle subatividades
+function toggleSubatividades(servicoIndex) {
+    const container = document.getElementById(`subatividades-${servicoIndex}`);
+    const isVisible = container.style.display !== 'none';
+    
+    container.style.display = isVisible ? 'none' : 'block';
+    
+    const button = container.previousElementSibling.querySelector('button');
+    const icon = button.querySelector('i');
+    
+    icon.className = isVisible ? 'fas fa-chevron-down' : 'fas fa-chevron-up';
+    button.innerHTML = `${icon.outerHTML} ${isVisible ? 'Expandir' : 'Contrair'}`;
+}
+
+// Validar percentual
+function validarPercentual(input) {
+    const valor = parseFloat(input.value);
+    
+    if (isNaN(valor) || valor < 0) {
+        input.value = 0;
+        mostrarNotificacao('Percentual deve ser maior que 0%', 'warning');
+    } else if (valor > 100) {
+        input.value = 100;
+        mostrarNotificacao('Percentual não pode exceder 100%', 'warning');
+    }
+    
+    // Alerta para conclusão
+    if (valor === 100) {
+        const nome = input.closest('.subatividade-item').querySelector('.subatividade-label').textContent.trim();
+        mostrarNotificacao(`✅ Subatividade "${nome}" foi concluída!`, 'success');
+    }
+}
+
+// Calcular progresso geral
+function calcularProgressoGeral() {
+    const inputs = document.querySelectorAll('.percentage-input');
+    let total = 0;
+    let count = 0;
+    
+    inputs.forEach(input => {
+        const valor = parseFloat(input.value) || 0;
+        total += valor;
+        count++;
+    });
+    
+    const progressoMedio = count > 0 ? (total / count) : 0;
+    
+    document.getElementById('obra-progress').style.width = `${progressoMedio}%`;
+    document.getElementById('obra-progress-text').textContent = `${progressoMedio.toFixed(1)}%`;
+    
+    return progressoMedio;
+}
+
+// Herdar percentuais do RDO anterior
+async function herdarPercentuais() {
+    const obraId = document.getElementById('obra_id').value;
+    if (!obraId) {
+        mostrarNotificacao('Selecione uma obra primeiro', 'warning');
+        return;
+    }
+    
+    mostrarLoading('loading-overlay', true);
+    
+    try {
+        const response = await fetch(`/api/rdo/herdar-percentuais/${obraId}`);
+        const data = await response.json();
+        
+        if (response.ok && data.success) {
+            // Aplicar percentuais herdados
+            if (data.percentuais && Object.keys(data.percentuais).length > 0) {
+                aplicarPercentuaisHerdados(data.percentuais);
+                mostrarNotificacao(`Percentuais herdados do último RDO!`, 'success');
+            } else {
+                mostrarNotificação('Nenhum RDO anterior encontrado para herança', 'info');
+            }
+        } else {
+            mostrarNotificacao(data.error || 'Erro ao herdar percentuais', 'error');
+        }
+        
+    } catch (error) {
+        console.error('Erro:', error);
+        mostrarNotificacao('Erro ao conectar com o servidor', 'error');
+    }
+    
+    mostrarLoading('loading-overlay', false);
+}
+
+// Aplicar percentuais herdados
+function aplicarPercentuaisHerdados(percentuais) {
+    Object.keys(percentuais).forEach(subatividade => {
+        const percentual = percentuais[subatividade];
+        
+        // Buscar input correspondente pelo nome da subatividade
+        const inputs = document.querySelectorAll('.percentage-input');
+        inputs.forEach(input => {
+            const nomeInput = input.closest('.subatividade-item').querySelector('input[name*="[nome]"]');
+            if (nomeInput && nomeInput.value === subatividade) {
+                input.value = percentual;
+                validarPercentual(input);
+            }
+        });
+    });
+    
+    calcularProgressoGeral();
+}
+
+// Validar formulário
+function validarFormulario() {
+    alertasValidacao = [];
+    
+    // Validar dados obrigatórios
+    const obraId = document.getElementById('obra_id').value;
+    const dataRelatorio = document.getElementById('data_relatorio').value;
+    
+    if (!obraId) {
+        alertasValidacao.push('Obra deve ser selecionada');
+    }
+    
+    if (!dataRelatorio) {
+        alertasValidacao.push('Data do relatório é obrigatória');
+    }
+    
+    // Validar data futura
+    if (dataRelatorio) {
+        const hoje = new Date().toISOString().split('T')[0];
+        if (dataRelatorio > hoje) {
+            alertasValidacao.push('Não é permitido criar RDO para data futura');
+        }
+    }
+    
+    // Validar percentuais
+    const inputs = document.querySelectorAll('.percentage-input');
+    let temPercentuais = false;
+    
+    inputs.forEach(input => {
+        const valor = parseFloat(input.value) || 0;
+        if (valor > 0) temPercentuais = true;
+        
+        if (valor < 0 || valor > 100) {
+            const nome = input.closest('.subatividade-item').querySelector('.subatividade-label').textContent.trim();
+            alertasValidacao.push(`Percentual inválido para "${nome}": ${valor}%`);
+        }
+    });
+    
+    if (!temPercentuais) {
+        alertasValidacao.push('Adicione pelo menos um percentual de subatividade');
+    }
+    
+    // Mostrar resultados
+    mostrarResultadosValidacao();
+    
+    return alertasValidacao.length === 0;
+}
+
+// Mostrar resultados da validação
+function mostrarResultadosValidacao() {
+    if (alertasValidacao.length === 0) {
+        mostrarNotificacao('✅ Formulário válido! Pronto para salvar.', 'success');
+        document.getElementById('finalizar-btn').disabled = false;
+    } else {
+        const mensagem = `❌ ${alertasValidacao.length} problema(s) encontrado(s):\n• ${alertasValidacao.join('\n• ')}`;
+        mostrarNotificacao(mensagem, 'error');
+        document.getElementById('finalizar-btn').disabled = true;
+    }
+}
+
+// Salvar como rascunho
+async function salvarRascunho() {
+    if (!validarFormulario()) return;
+    
+    const formData = coletarDadosFormulario();
+    formData.status = 'Rascunho';
+    
+    await salvarRDO(formData, false);
+}
+
+// Coletar dados do formulário
+function coletarDadosFormulario() {
+    const form = document.getElementById('rdo-form-avancado');
+    const formData = new FormData(form);
+    
+    const dados = {
+        obra_id: formData.get('obra_id'),
+        data_relatorio: formData.get('data_relatorio'),
+        clima_geral: formData.get('clima_geral'),
+        temperatura_media: formData.get('temperatura_media'),
+        observacoes_climaticas: formData.get('observacoes_climaticas'),
+        comentario_geral: formData.get('comentario_geral'),
+        subatividades: []
+    };
+    
+    // Coletar subatividades
+    const inputs = document.querySelectorAll('.percentage-input');
+    inputs.forEach(input => {
+        const percentual = parseFloat(input.value) || 0;
+        if (percentual > 0) {
+            const container = input.closest('.subatividade-item');
+            const nomeInput = container.querySelector('input[name*="[nome]"]');
+            const servicoIdInput = container.querySelector('input[name*="[servico_id]"]');
+            const servicoNomeInput = container.querySelector('input[name*="[servico_nome]"]');
+            const observacoesTextarea = container.querySelector('textarea');
+            
+            dados.subatividades.push({
+                servico_id: parseInt(servicoIdInput.value),
+                servico_nome: servicoNomeInput.value,
+                nome_subatividade: nomeInput.value,
+                percentual_conclusao: percentual,
+                observacoes_tecnicas: observacoesTextarea.value || ''
+            });
+        }
+    });
+    
+    return dados;
+}
+
+// Salvar RDO
+async function salvarRDO(dados, finalizar = false) {
+    mostrarLoading('loading-overlay', true);
+    
+    try {
+        const response = await fetch('/api/test/rdo/salvar-subatividades', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(dados)
+        });
+        
+        const result = await response.json();
+        
+        if (response.ok && result.success) {
+            const tipo = finalizar ? 'finalizado' : 'salvo como rascunho';
+            mostrarNotificacao(`✅ RDO ${tipo} com sucesso! ID: ${result.rdo_id}`, 'success');
+            
+            // Mostrar alertas se existirem
+            if (result.alertas && result.alertas.length > 0) {
+                result.alertas.forEach(alerta => {
+                    mostrarNotificacao(`🔔 ${alerta}`, 'info');
+                });
+            }
+            
+            // Redirecionar após salvar
+            setTimeout(() => {
+                window.location.href = '/funcionario/dashboard';
+            }, 2000);
+            
+        } else {
+            mostrarNotificacao(`❌ ${result.error || 'Erro ao salvar RDO'}`, 'error');
+        }
+        
+    } catch (error) {
+        console.error('Erro:', error);
+        mostrarNotificacao('❌ Erro de conexão com o servidor', 'error');
+    }
+    
+    mostrarLoading('loading-overlay', false);
+}
+
+// Funções auxiliares
+function limparServicos() {
+    servicosCarregados = [];
+    document.getElementById('servicos-container').innerHTML = `
+        <div class="text-center py-5 text-muted" id="no-services-message">
+            <i class="fas fa-building fa-3x mb-3"></i>
+            <h5>Selecione uma obra para carregar os serviços</h5>
+            <p>Os serviços e subatividades serão carregados automaticamente após a seleção da obra.</p>
+        </div>
+    `;
+    atualizarContadorServicos();
+    desabilitarBotoes();
+}
+
+function atualizarContadorServicos() {
+    document.getElementById('servicos-count').textContent = `${servicosCarregados.length} serviços`;
+}
+
+function habilitarBotoes() {
+    document.getElementById('herdar-percentuais').disabled = false;
+}
+
+function desabilitarBotoes() {
+    document.getElementById('herdar-percentuais').disabled = true;
+    document.getElementById('finalizar-btn').disabled = true;
+}
+
+function mostrarLoading(elementId, mostrar) {
+    const element = document.getElementById(elementId);
+    if (element) {
+        element.style.display = mostrar ? 'flex' : 'none';
+    }
+}
+
+function mostrarNotificacao(mensagem, tipo = 'info') {
+    const container = document.getElementById('notification-container');
+    
+    const notification = document.createElement('div');
+    notification.className = `alert alert-${tipo} alert-dismissible fade show`;
+    notification.innerHTML = `
+        ${mensagem}
+        <button type="button" class="btn-close" onclick="this.parentElement.remove()"></button>
+    `;
+    
+    container.appendChild(notification);
+    
+    // Auto-remover após 5 segundos
+    setTimeout(() => {
+        if (notification.parentElement) {
+            notification.remove();
+        }
+    }, 5000);
+}
+
+// Event listeners
+document.addEventListener('DOMContentLoaded', function() {
+    // Definir data padrão como hoje
+    const hoje = new Date().toISOString().split('T')[0];
+    document.getElementById('data_relatorio').value = hoje;
+    
+    // Configurar submit do formulário
+    document.getElementById('rdo-form-avancado').addEventListener('submit', function(e) {
+        e.preventDefault();
+        
+        if (validarFormulario()) {
+            const dados = coletarDadosFormulario();
+            dados.status = 'Finalizado';
+            salvarRDO(dados, true);
+        }
+    });
 });
+
+console.log('🚀 Sistema RDO Avançado inicializado com sucesso!');
 </script>
 {% endblock %}
+                            <div class="col-md-6">
+                                <label for="obra_id" class="form-label">Obra *</label>
