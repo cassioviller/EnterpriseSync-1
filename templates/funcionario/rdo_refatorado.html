@@ -333,54 +333,135 @@ body {
 }
 
 /* ===========================
-   SEÇÃO DE FUNCIONÁRIOS
+   SEÇÃO DE FUNCIONÁRIOS MODERNA
    =========================== */
-.funcionarios-grid {
+.funcionario-selector-container {
+    margin-bottom: var(--spacing-xxl);
+    padding: var(--spacing-lg);
+    background: var(--bg-secondary);
+    border-radius: var(--radius-lg);
+    border: 2px dashed var(--color-primary-light);
+}
+
+.funcionario-input-group {
+    display: flex;
+    gap: var(--spacing-md);
+    align-items: flex-end;
+}
+
+.autocomplete-wrapper {
+    flex: 1;
+    position: relative;
+}
+
+.autocomplete-dropdown {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    background: var(--bg-primary);
+    border: 1px solid var(--color-primary-light);
+    border-radius: var(--radius-md);
+    box-shadow: var(--shadow-lg);
+    max-height: 200px;
+    overflow-y: auto;
+    z-index: 1000;
+    display: none;
+}
+
+.autocomplete-item {
+    padding: var(--spacing-md);
+    cursor: pointer;
+    border-bottom: 1px solid #e9ecef;
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-md);
+    transition: background-color var(--transition-fast);
+}
+
+.autocomplete-item:hover,
+.autocomplete-item.highlighted {
+    background: var(--color-primary-light);
+}
+
+.autocomplete-item:last-child {
+    border-bottom: none;
+}
+
+.autocomplete-avatar {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    background: var(--color-primary);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-weight: var(--font-weight-bold);
+    font-size: 0.8rem;
+}
+
+.autocomplete-info {
+    flex: 1;
+}
+
+.autocomplete-name {
+    font-weight: var(--font-weight-semibold);
+    color: var(--color-primary-dark);
+    margin: 0;
+    font-size: 0.9rem;
+}
+
+.autocomplete-role {
+    font-size: 0.75rem;
+    color: var(--color-secondary);
+    margin: 0;
+}
+
+.section-subtitle {
+    font-size: 1.1rem;
+    font-weight: var(--font-weight-semibold);
+    color: var(--color-primary-dark);
+    margin-bottom: var(--spacing-lg);
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+}
+
+.badge-count {
+    background: var(--color-primary);
+    color: white;
+    font-size: 0.75rem;
+    padding: 2px 8px;
+    border-radius: 12px;
+    min-width: 20px;
+    text-align: center;
+}
+
+.funcionarios-lista {
     display: grid;
     gap: var(--spacing-md);
 }
 
-@media (min-width: 768px) {
-    .funcionarios-grid {
-        grid-template-columns: 1fr 1fr;
-    }
-}
-
-@media (min-width: 1024px) {
-    .funcionarios-grid {
-        grid-template-columns: 1fr 1fr 1fr;
-    }
-}
-
-.funcionario-card {
+.funcionario-item {
     background: var(--bg-primary);
-    border: 2px solid #e9ecef;
+    border: 1px solid #e9ecef;
     border-radius: var(--radius-md);
     padding: var(--spacing-lg);
-    transition: all var(--transition-normal);
-    cursor: pointer;
-}
-
-.funcionario-card:hover {
-    border-color: var(--color-primary);
-    box-shadow: var(--shadow-md);
-}
-
-.funcionario-card.selected {
-    border-color: var(--color-primary);
-    background: var(--color-primary-light);
-}
-
-.funcionario-info {
     display: flex;
     align-items: center;
     gap: var(--spacing-md);
-    margin-bottom: var(--spacing-md);
+    transition: all var(--transition-normal);
+}
+
+.funcionario-item:hover {
+    border-color: var(--color-primary);
+    box-shadow: var(--shadow-sm);
 }
 
 .funcionario-avatar {
-    width: 40px;
-    height: 40px;
+    width: 48px;
+    height: 48px;
     border-radius: 50%;
     background: var(--color-primary);
     display: flex;
@@ -390,10 +471,14 @@ body {
     font-weight: var(--font-weight-bold);
 }
 
+.funcionario-info {
+    flex: 1;
+}
+
 .funcionario-name {
     font-weight: var(--font-weight-semibold);
     color: var(--color-primary-dark);
-    margin: 0;
+    margin: 0 0 2px 0;
 }
 
 .funcionario-role {
@@ -402,16 +487,73 @@ body {
     margin: 0;
 }
 
+.funcionario-controls {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-md);
+}
+
 .horas-input-group {
     display: flex;
     align-items: center;
     gap: var(--spacing-sm);
+    background: var(--bg-secondary);
+    border-radius: var(--radius-md);
+    padding: var(--spacing-sm);
 }
 
 .horas-input {
     width: 80px;
     text-align: center;
     font-weight: var(--font-weight-semibold);
+    border: none;
+    background: transparent;
+    color: var(--color-primary);
+}
+
+.horas-input:focus {
+    background: var(--bg-primary);
+    border-radius: var(--radius-sm);
+}
+
+.btn-remove {
+    background: var(--color-danger);
+    color: white;
+    border: none;
+    border-radius: 50%;
+    width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all var(--transition-fast);
+}
+
+.btn-remove:hover {
+    background: #c82333;
+    transform: scale(1.1);
+}
+
+.empty-funcionarios {
+    text-align: center;
+    padding: var(--spacing-xxl);
+    color: var(--color-secondary);
+}
+
+.empty-funcionarios i {
+    font-size: 3rem;
+    color: var(--color-primary-light);
+    margin-bottom: var(--spacing-lg);
+}
+
+.empty-funcionarios p {
+    font-weight: var(--font-weight-medium);
+    margin-bottom: var(--spacing-sm);
+}
+
+.empty-funcionarios small {
+    color: var(--color-secondary);
 }
 
 /* ===========================
@@ -791,34 +933,43 @@ body {
                 </h3>
             </div>
             <div class="rdo-card-body">
-                <div id="funcionarios-container">
-                    <div class="funcionarios-grid">
-                        {% for funcionario in funcionarios %}
-                        <div class="funcionario-card" onclick="toggleFuncionario({{ funcionario.id }})">
-                            <div class="funcionario-info">
-                                <div class="funcionario-avatar">
-                                    {{ funcionario.nome[0].upper() }}
-                                </div>
-                                <div>
-                                    <h5 class="funcionario-name">{{ funcionario.nome }}</h5>
-                                    {% if funcionario.funcao_ref %}
-                                    <p class="funcionario-role">{{ funcionario.funcao_ref.nome }}</p>
-                                    {% endif %}
-                                </div>
+                <!-- Seletor de Funcionários com Autocomplete -->
+                <div class="funcionario-selector-container">
+                    <div class="form-group">
+                        <label class="form-label">
+                            <i class="fas fa-user-plus"></i>
+                            Adicionar Funcionário
+                        </label>
+                        <div class="funcionario-input-group">
+                            <div class="autocomplete-wrapper">
+                                <input type="text" 
+                                       id="funcionario-search" 
+                                       class="form-control" 
+                                       placeholder="Digite o nome do funcionário..."
+                                       autocomplete="off">
+                                <div class="autocomplete-dropdown" id="funcionario-dropdown"></div>
                             </div>
-                            <div class="horas-input-group">
-                                <input type="number" 
-                                       name="funcionario_{{ funcionario.id }}_horas" 
-                                       class="form-control horas-input" 
-                                       min="0" 
-                                       max="12" 
-                                       step="0.5" 
-                                       value="8"
-                                       placeholder="8">
-                                <span class="percentage-label">horas</span>
-                            </div>
+                            <button type="button" class="btn-modern btn-primary" onclick="adicionarFuncionario()">
+                                <i class="fas fa-plus"></i>
+                                Adicionar
+                            </button>
                         </div>
-                        {% endfor %}
+                    </div>
+                </div>
+
+                <!-- Lista de Funcionários Selecionados -->
+                <div class="funcionarios-selecionados-container">
+                    <h4 class="section-subtitle">
+                        <i class="fas fa-users"></i>
+                        Funcionários Selecionados
+                        <span class="badge badge-count" id="funcionarios-count">0</span>
+                    </h4>
+                    <div id="funcionarios-selecionados-lista" class="funcionarios-lista">
+                        <div class="empty-funcionarios">
+                            <i class="fas fa-user-friends"></i>
+                            <p>Nenhum funcionário selecionado</p>
+                            <small>Use o campo acima para adicionar funcionários</small>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -888,6 +1039,7 @@ body {
 let servicosCarregados = [];
 let funcionariosDisponiveis = {{ funcionarios | tojson }};
 let funcionariosSelecionados = [];
+let funcionarioSelecionado = null;
 let autoSaveInterval;
 let progressInterval;
 
@@ -926,10 +1078,12 @@ function inicializarFormulario() {
         });
     });
     
-    // Selecionar todos os funcionários por padrão
-    funcionariosDisponiveis.forEach(func => {
-        funcionariosSelecionados.push(func.id);
-    });
+    // Inicializar sistema de autocomplete
+    inicializarAutocompleteFuncionarios();
+    
+    // Renderizar estado inicial dos funcionários
+    renderizarFuncionariosSelecionados();
+    atualizarContadorFuncionarios();
     
     updateProgressBar(25);
 }
@@ -1085,19 +1239,186 @@ function renderizarServicos() {
 }
 
 // ===========================
-// FUNÇÕES DE FUNCIONÁRIOS
+// SISTEMA DE FUNCIONÁRIOS COM AUTOCOMPLETE
 // ===========================
-function toggleFuncionario(funcId) {
-    const card = event.currentTarget;
-    const index = funcionariosSelecionados.indexOf(funcId);
+function inicializarAutocompleteFuncionarios() {
+    const searchInput = document.getElementById('funcionario-search');
+    const dropdown = document.getElementById('funcionario-dropdown');
+    let highlightedIndex = -1;
     
-    if (index > -1) {
-        funcionariosSelecionados.splice(index, 1);
-        card.classList.remove('selected');
-    } else {
-        funcionariosSelecionados.push(funcId);
-        card.classList.add('selected');
+    searchInput.addEventListener('input', function() {
+        const query = this.value.toLowerCase().trim();
+        
+        if (query.length < 2) {
+            dropdown.style.display = 'none';
+            return;
+        }
+        
+        const filteredFuncionarios = funcionariosDisponiveis.filter(func => 
+            func.nome.toLowerCase().includes(query) && 
+            !funcionariosSelecionados.some(sel => sel.id === func.id)
+        );
+        
+        if (filteredFuncionarios.length === 0) {
+            dropdown.style.display = 'none';
+            return;
+        }
+        
+        renderizarDropdownFuncionarios(filteredFuncionarios);
+        dropdown.style.display = 'block';
+        highlightedIndex = -1;
+    });
+    
+    searchInput.addEventListener('keydown', function(e) {
+        const items = dropdown.querySelectorAll('.autocomplete-item');
+        
+        if (e.key === 'ArrowDown') {
+            e.preventDefault();
+            highlightedIndex = Math.min(highlightedIndex + 1, items.length - 1);
+            updateHighlight(items);
+        } else if (e.key === 'ArrowUp') {
+            e.preventDefault();
+            highlightedIndex = Math.max(highlightedIndex - 1, -1);
+            updateHighlight(items);
+        } else if (e.key === 'Enter') {
+            e.preventDefault();
+            if (highlightedIndex >= 0 && items[highlightedIndex]) {
+                const funcId = items[highlightedIndex].dataset.funcId;
+                selecionarFuncionario(parseInt(funcId));
+            }
+        } else if (e.key === 'Escape') {
+            dropdown.style.display = 'none';
+            highlightedIndex = -1;
+        }
+    });
+    
+    // Fechar dropdown ao clicar fora
+    document.addEventListener('click', function(e) {
+        if (!searchInput.contains(e.target) && !dropdown.contains(e.target)) {
+            dropdown.style.display = 'none';
+        }
+    });
+}
+
+function renderizarDropdownFuncionarios(funcionarios) {
+    const dropdown = document.getElementById('funcionario-dropdown');
+    
+    dropdown.innerHTML = funcionarios.map(func => `
+        <div class="autocomplete-item" data-func-id="${func.id}" onclick="selecionarFuncionario(${func.id})">
+            <div class="autocomplete-avatar">
+                ${func.nome[0].toUpperCase()}
+            </div>
+            <div class="autocomplete-info">
+                <p class="autocomplete-name">${func.nome}</p>
+                <p class="autocomplete-role">${func.funcao_ref ? func.funcao_ref.nome : 'Função não definida'}</p>
+            </div>
+        </div>
+    `).join('');
+}
+
+function updateHighlight(items) {
+    items.forEach((item, index) => {
+        item.classList.toggle('highlighted', index === highlightedIndex);
+    });
+}
+
+function selecionarFuncionario(funcId) {
+    const funcionario = funcionariosDisponiveis.find(f => f.id === funcId);
+    if (!funcionario) return;
+    
+    funcionarioSelecionado = funcionario;
+    document.getElementById('funcionario-search').value = funcionario.nome;
+    document.getElementById('funcionario-dropdown').style.display = 'none';
+}
+
+function adicionarFuncionario() {
+    if (!funcionarioSelecionado) {
+        mostrarNotificacao('Selecione um funcionário primeiro', 'warning');
+        return;
     }
+    
+    // Verificar se já foi adicionado
+    if (funcionariosSelecionados.some(f => f.id === funcionarioSelecionado.id)) {
+        mostrarNotificacao('Funcionário já foi adicionado', 'warning');
+        return;
+    }
+    
+    // Adicionar às listas
+    funcionariosSelecionados.push({
+        ...funcionarioSelecionado,
+        horas: 8
+    });
+    
+    // Limpar seleção
+    funcionarioSelecionado = null;
+    document.getElementById('funcionario-search').value = '';
+    
+    // Atualizar interface
+    renderizarFuncionariosSelecionados();
+    atualizarContadorFuncionarios();
+    
+    mostrarNotificacao('Funcionário adicionado com sucesso', 'success');
+}
+
+function removerFuncionario(funcId) {
+    funcionariosSelecionados = funcionariosSelecionados.filter(f => f.id !== funcId);
+    renderizarFuncionariosSelecionados();
+    atualizarContadorFuncionarios();
+    mostrarNotificacao('Funcionário removido', 'info');
+}
+
+function renderizarFuncionariosSelecionados() {
+    const container = document.getElementById('funcionarios-selecionados-lista');
+    
+    if (funcionariosSelecionados.length === 0) {
+        container.innerHTML = `
+            <div class="empty-funcionarios">
+                <i class="fas fa-user-friends"></i>
+                <p>Nenhum funcionário selecionado</p>
+                <small>Use o campo acima para adicionar funcionários</small>
+            </div>
+        `;
+        return;
+    }
+    
+    container.innerHTML = funcionariosSelecionados.map(func => `
+        <div class="funcionario-item">
+            <div class="funcionario-avatar">
+                ${func.nome[0].toUpperCase()}
+            </div>
+            <div class="funcionario-info">
+                <h5 class="funcionario-name">${func.nome}</h5>
+                <p class="funcionario-role">${func.funcao_ref ? func.funcao_ref.nome : 'Função não definida'}</p>
+            </div>
+            <div class="funcionario-controls">
+                <div class="horas-input-group">
+                    <input type="number" 
+                           name="funcionario_${func.id}_horas" 
+                           class="form-control horas-input" 
+                           min="0" 
+                           max="12" 
+                           step="0.5" 
+                           value="${func.horas}"
+                           onchange="atualizarHorasFuncionario(${func.id}, this.value)">
+                    <span class="percentage-label">horas</span>
+                </div>
+                <button type="button" class="btn-remove" onclick="removerFuncionario(${func.id})" title="Remover funcionário">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+        </div>
+    `).join('');
+}
+
+function atualizarHorasFuncionario(funcId, horas) {
+    const funcionario = funcionariosSelecionados.find(f => f.id === funcId);
+    if (funcionario) {
+        funcionario.horas = parseFloat(horas) || 0;
+    }
+}
+
+function atualizarContadorFuncionarios() {
+    document.getElementById('funcionarios-count').textContent = funcionariosSelecionados.length;
 }
 
 // ===========================
