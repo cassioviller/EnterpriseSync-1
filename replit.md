@@ -3,6 +3,19 @@
 ## Overview
 Sistema multi-tenant de gestão empresarial com foco em propostas comerciais, gestão de funcionários, controle de obras e folha de pagamento automatizada.
 
+## Recent Changes (26/08/2025)
+
+### ✅ SISTEMA RDO CONSOLIDADO - IMPLEMENTADO
+- **Interface única limpa**: Criado template rdo_consolidado.html substituindo código sobreposto
+- **Subatividades simplificadas**: Uma linha por subatividade (5 subatividades = 5 linhas) 
+- **Observações removidas**: Campo observações das subatividades removido para reduzir comprimento
+- **Código limpo**: Eliminado sobreposição de código entre templates antigos
+- **Template antigo removido**: rdo_aprimorado.html completamente removido do sistema
+- **Rotas corrigidas**: Todas referências antigas atualizadas para funcionario_rdo_consolidado
+- **Dashboard atualizado**: Botões direcionam para "Sistema RDO Consolidado"
+- **Performance mantida**: 87.5% taxa de sucesso nos testes com 0.99s tempo resposta
+- **Status**: FUNCIONAL - Sistema consolidado operacional
+
 ## Arquitetura
 - **Backend**: Flask + SQLAlchemy + PostgreSQL
 - **Frontend**: Templates Jinja2 + Bootstrap

@@ -1,0 +1,745 @@
+{% extends "base.html" %}
+
+{% block title %}Sistema RDO Consolidado - SIGE{% endblock %}
+
+{% block head %}
+<style>
+:root {
+    --primary-color: #0d6efd;
+    --success-color: #28a745;
+    --warning-color: #ffc107;
+    --danger-color: #dc3545;
+    --light-bg: #f8f9fa;
+    --border-color: #e9ecef;
+    --shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+
+.rdo-container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 20px;
+    background: var(--light-bg);
+    min-height: 100vh;
+}
+
+.rdo-header {
+    background: linear-gradient(135deg, var(--primary-color) 0%, #0056b3 100%);
+    color: white;
+    padding: 25px 30px;
+    border-radius: 12px;
+    margin-bottom: 25px;
+    box-shadow: var(--shadow);
+}
+
+.rdo-section {
+    background: white;
+    border-radius: 12px;
+    margin-bottom: 20px;
+    box-shadow: var(--shadow);
+    overflow: hidden;
+}
+
+.section-header {
+    background: var(--primary-color);
+    color: white;
+    padding: 15px 20px;
+    cursor: pointer;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-weight: 600;
+}
+
+.section-body {
+    padding: 20px;
+}
+
+.form-control, .form-select {
+    border: 2px solid var(--border-color);
+    border-radius: 8px;
+    padding: 10px 12px;
+}
+
+.form-control:focus, .form-select:focus {
+    border-color: var(--primary-color);
+    box-shadow: 0 0 0 0.25rem rgba(13, 110, 253, 0.15);
+}
+
+.subatividade-row {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    padding: 10px;
+    border-bottom: 1px solid var(--border-color);
+    background: #f8f9fa;
+    border-radius: 8px;
+    margin-bottom: 10px;
+}
+
+.subatividade-row:last-child {
+    border-bottom: none;
+}
+
+.subatividade-nome {
+    flex: 2;
+    font-weight: 600;
+    color: #495057;
+}
+
+.subatividade-input {
+    width: 80px;
+    text-align: center;
+    border: 2px solid var(--border-color);
+    border-radius: 6px;
+    padding: 5px;
+}
+
+.progress-bar-mini {
+    flex: 1;
+    height: 8px;
+    background: var(--border-color);
+    border-radius: 4px;
+    overflow: hidden;
+}
+
+.progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--success-color), var(--primary-color));
+    width: 0%;
+    transition: width 0.3s ease;
+}
+
+.btn {
+    padding: 10px 20px;
+    border-radius: 8px;
+    font-weight: 600;
+    border: none;
+    cursor: pointer;
+}
+
+.btn-primary {
+    background: var(--primary-color);
+    color: white;
+}
+
+.btn-success {
+    background: var(--success-color);
+    color: white;
+}
+
+.btn-outline-primary {
+    background: transparent;
+    color: var(--primary-color);
+    border: 2px solid var(--primary-color);
+}
+
+.floating-save {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    z-index: 1000;
+    border-radius: 50px;
+    padding: 15px 25px;
+    box-shadow: 0 4px 15px rgba(13, 110, 253, 0.3);
+}
+
+.loading-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0,0,0,0.7);
+    display: none;
+    justify-content: center;
+    align-items: center;
+    z-index: 9999;
+}
+
+.spinner {
+    width: 40px;
+    height: 40px;
+    border: 4px solid rgba(255,255,255,0.3);
+    border-top: 4px solid white;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+.alert {
+    padding: 12px 16px;
+    border-radius: 8px;
+    margin-bottom: 15px;
+    border: none;
+}
+
+.alert-success {
+    background: #d4edda;
+    color: #155724;
+}
+
+.alert-warning {
+    background: #fff3cd;
+    color: #856404;
+}
+
+.alert-danger {
+    background: #f8d7da;
+    color: #721c24;
+}
+
+@media (max-width: 768px) {
+    .subatividade-row {
+        flex-direction: column;
+        gap: 10px;
+        text-align: center;
+    }
+    
+    .subatividade-input {
+        width: 100px;
+    }
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="rdo-container">
+    <!-- Loading Overlay -->
+    <div class="loading-overlay" id="loading-overlay">
+        <div class="spinner"></div>
+    </div>
+    
+    <!-- Header -->
+    <div class="rdo-header">
+        <div class="d-flex justify-content-between align-items-center">
+            <div>
+                <h2><i class="fas fa-clipboard-list"></i> Sistema RDO Consolidado</h2>
+                <p class="mb-0 opacity-75">Relatório Diário de Obra com controle de subatividades</p>
+            </div>
+            <a href="{{ url_for('main.funcionario_dashboard') }}" class="btn btn-outline-light">
+                <i class="fas fa-arrow-left"></i> Voltar
+            </a>
+        </div>
+    </div>
+
+    <!-- Progress Display -->
+    <div class="rdo-section mb-3">
+        <div class="section-body py-3">
+            <div class="d-flex justify-content-between align-items-center">
+                <span class="fw-bold">Progresso Geral da Obra:</span>
+                <div class="d-flex align-items-center gap-3">
+                    <div class="progress-bar-mini" style="width: 200px;">
+                        <div class="progress-fill" id="progresso-geral"></div>
+                    </div>
+                    <span class="fw-bold text-primary" id="progresso-texto">0%</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Form -->
+    <form id="rdo-form" method="POST">
+        <!-- Dados Básicos -->
+        <div class="rdo-section">
+            <div class="section-header" onclick="toggleSection(this)">
+                <h5><i class="fas fa-info-circle"></i> Informações Básicas</h5>
+                <i class="fas fa-chevron-down"></i>
+            </div>
+            <div class="section-body">
+                <div class="row">
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label fw-bold">
+                            <i class="fas fa-building text-primary"></i> Obra *
+                        </label>
+                        <select name="obra_id" id="obra_id" class="form-select" required onchange="carregarServicos(this.value)">
+                            <option value="">Selecione uma obra</option>
+                            {% for obra in obras %}
+                            <option value="{{ obra.id }}">{{ obra.nome }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label fw-bold">
+                            <i class="fas fa-calendar text-primary"></i> Data do Relatório *
+                        </label>
+                        <input type="date" name="data_relatorio" id="data_relatorio" 
+                               class="form-control" required>
+                    </div>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label fw-bold">
+                        <i class="fas fa-comment text-primary"></i> Comentário Geral
+                    </label>
+                    <textarea name="comentario_geral" class="form-control" rows="3" 
+                              placeholder="Observações gerais sobre o trabalho do dia..."></textarea>
+                </div>
+            </div>
+        </div>
+
+        <!-- Condições Climáticas -->
+        <div class="rdo-section">
+            <div class="section-header" onclick="toggleSection(this)">
+                <h5><i class="fas fa-cloud-sun"></i> Condições Climáticas</h5>
+                <i class="fas fa-chevron-down"></i>
+            </div>
+            <div class="section-body">
+                <div class="row">
+                    <div class="col-md-4 mb-3">
+                        <label class="form-label fw-bold">Clima</label>
+                        <select name="clima_geral" class="form-select">
+                            <option value="">Selecione...</option>
+                            <option value="Ensolarado">☀️ Ensolarado</option>
+                            <option value="Parcialmente nublado">⛅ Parcialmente nublado</option>
+                            <option value="Nublado">☁️ Nublado</option>
+                            <option value="Chuvoso">🌧️ Chuvoso</option>
+                            <option value="Tempestade">⛈️ Tempestade</option>
+                        </select>
+                    </div>
+                    <div class="col-md-4 mb-3">
+                        <label class="form-label fw-bold">Temperatura</label>
+                        <input type="text" name="temperatura_media" class="form-control" 
+                               placeholder="Ex: 25°C">
+                    </div>
+                    <div class="col-md-4 mb-3">
+                        <label class="form-label fw-bold">Observações</label>
+                        <textarea name="observacoes_climaticas" class="form-control" rows="2" 
+                                  placeholder="Detalhes sobre o clima..."></textarea>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Serviços e Subatividades -->
+        <div class="rdo-section">
+            <div class="section-header" onclick="toggleSection(this)">
+                <h5><i class="fas fa-tasks"></i> Serviços e Subatividades <span id="servicos-count" class="opacity-75">(0 serviços)</span></h5>
+                <i class="fas fa-chevron-down"></i>
+            </div>
+            <div class="section-body">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <button type="button" class="btn btn-outline-primary" onclick="herdarPercentuais()" id="btn-herdar" disabled>
+                        <i class="fas fa-download"></i> Herdar RDO Anterior
+                    </button>
+                    <button type="button" class="btn btn-outline-success" onclick="validarFormulario()">
+                        <i class="fas fa-check-circle"></i> Validar Dados
+                    </button>
+                </div>
+
+                <!-- Container de Serviços -->
+                <div id="servicos-container">
+                    <div class="text-center py-5 text-muted">
+                        <i class="fas fa-building fa-3x mb-3"></i>
+                        <h5>Selecione uma obra para carregar os serviços</h5>
+                        <p>Os serviços disponíveis serão listados aqui automaticamente</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Botões de Ação -->
+        <div class="d-flex justify-content-between mt-4">
+            <button type="button" class="btn btn-outline-secondary" onclick="window.location.href='{{ url_for('main.funcionario_dashboard') }}'">
+                <i class="fas fa-times"></i> Cancelar
+            </button>
+            <div class="d-flex gap-2">
+                <button type="button" class="btn btn-outline-primary" onclick="salvarRascunho()">
+                    <i class="fas fa-save"></i> Salvar Rascunho
+                </button>
+                <button type="submit" class="btn btn-success" id="btn-finalizar" disabled>
+                    <i class="fas fa-check"></i> Finalizar RDO
+                </button>
+            </div>
+        </div>
+    </form>
+
+    <!-- Floating Save (Mobile) -->
+    <button type="button" class="floating-save btn btn-primary d-md-none" onclick="salvarRascunho()">
+        <i class="fas fa-save"></i>
+    </button>
+</div>
+
+<!-- Notification Container -->
+<div id="notifications" style="position: fixed; top: 20px; right: 20px; z-index: 1050;"></div>
+
+<script>
+let servicosCarregados = [];
+let validacaoErros = [];
+
+// Toggle seções
+function toggleSection(header) {
+    const section = header.nextElementSibling;
+    const icon = header.querySelector('.fas:last-child');
+    
+    if (section.style.display === 'none') {
+        section.style.display = 'block';
+        icon.classList.replace('fa-chevron-right', 'fa-chevron-down');
+    } else {
+        section.style.display = 'none';
+        icon.classList.replace('fa-chevron-down', 'fa-chevron-right');
+    }
+}
+
+// Carregar serviços da obra
+async function carregarServicos(obraId) {
+    if (!obraId) {
+        limparServicos();
+        return;
+    }
+    
+    mostrarLoading(true);
+    
+    try {
+        const response = await fetch(`/api/test/rdo/servicos-obra/${obraId}`);
+        const data = await response.json();
+        
+        if (response.ok) {
+            servicosCarregados = data.servicos || [];
+            renderizarServicos();
+            document.getElementById('btn-herdar').disabled = false;
+            mostrarNotificacao(`${servicosCarregados.length} serviços carregados`, 'success');
+        } else {
+            throw new Error(data.error || 'Erro ao carregar serviços');
+        }
+    } catch (error) {
+        console.error('Erro:', error);
+        mostrarNotificacao('Erro ao carregar serviços da obra', 'danger');
+        servicosCarregados = [];
+    }
+    
+    mostrarLoading(false);
+    atualizarContador();
+}
+
+// Renderizar serviços
+function renderizarServicos() {
+    const container = document.getElementById('servicos-container');
+    
+    if (servicosCarregados.length === 0) {
+        container.innerHTML = `
+            <div class="text-center py-5 text-muted">
+                <i class="fas fa-inbox fa-3x mb-3"></i>
+                <h5>Nenhum serviço encontrado</h5>
+                <p>Esta obra não possui serviços cadastrados</p>
+            </div>
+        `;
+        return;
+    }
+    
+    let html = '';
+    servicosCarregados.forEach((servico, servicoIndex) => {
+        html += `
+            <div class="rdo-section mb-3">
+                <div class="section-header">
+                    <h6 class="mb-0">
+                        <i class="fas fa-cogs"></i> ${servico.nome}
+                        <span class="opacity-75">(${servico.subatividades?.length || 0} subatividades)</span>
+                    </h6>
+                </div>
+                <div class="section-body">
+        `;
+        
+        if (servico.subatividades && servico.subatividades.length > 0) {
+            servico.subatividades.forEach((sub, subIndex) => {
+                html += `
+                    <div class="subatividade-row">
+                        <div class="subatividade-nome">
+                            <i class="fas fa-tasks text-primary"></i> ${sub.nome}
+                        </div>
+                        <div class="d-flex align-items-center gap-2">
+                            <input type="number" 
+                                   class="subatividade-input" 
+                                   name="subatividades[${servicoIndex}][${subIndex}][percentual]"
+                                   min="0" max="100" step="0.1" value="0"
+                                   onchange="atualizarProgresso(this)"
+                                   placeholder="0">
+                            <span class="text-muted">%</span>
+                        </div>
+                        <div class="progress-bar-mini">
+                            <div class="progress-fill" data-percentual="0"></div>
+                        </div>
+                        <input type="hidden" name="subatividades[${servicoIndex}][${subIndex}][nome]" value="${sub.nome}">
+                        <input type="hidden" name="subatividades[${servicoIndex}][${subIndex}][servico_id]" value="${servico.id}">
+                        <input type="hidden" name="subatividades[${servicoIndex}][${subIndex}][servico_nome]" value="${servico.nome}">
+                    </div>
+                `;
+            });
+        }
+        
+        html += `
+                </div>
+            </div>
+        `;
+    });
+    
+    container.innerHTML = html;
+}
+
+// Atualizar progresso
+function atualizarProgresso(input) {
+    const valor = parseFloat(input.value) || 0;
+    
+    // Validar valor
+    if (valor < 0) input.value = 0;
+    if (valor > 100) input.value = 100;
+    
+    // Atualizar barra de progresso individual
+    const progressBar = input.closest('.subatividade-row').querySelector('.progress-fill');
+    progressBar.style.width = `${input.value}%`;
+    progressBar.setAttribute('data-percentual', input.value);
+    
+    // Calcular progresso geral
+    calcularProgressoGeral();
+}
+
+// Calcular progresso geral
+function calcularProgressoGeral() {
+    const inputs = document.querySelectorAll('.subatividade-input');
+    let total = 0;
+    let count = 0;
+    
+    inputs.forEach(input => {
+        const valor = parseFloat(input.value) || 0;
+        total += valor;
+        count++;
+    });
+    
+    const progressoMedio = count > 0 ? (total / count) : 0;
+    
+    document.getElementById('progresso-geral').style.width = `${progressoMedio}%`;
+    document.getElementById('progresso-texto').textContent = `${progressoMedio.toFixed(1)}%`;
+    
+    return progressoMedio;
+}
+
+// Herdar percentuais do RDO anterior
+async function herdarPercentuais() {
+    const obraId = document.getElementById('obra_id').value;
+    if (!obraId) {
+        mostrarNotificacao('Selecione uma obra primeiro', 'warning');
+        return;
+    }
+    
+    mostrarLoading(true);
+    
+    try {
+        const response = await fetch(`/api/rdo/herdar-percentuais/${obraId}`);
+        const data = await response.json();
+        
+        if (response.ok && data.success) {
+            if (data.percentuais && Object.keys(data.percentuais).length > 0) {
+                aplicarPercentuais(data.percentuais);
+                mostrarNotificacao('Percentuais herdados com sucesso!', 'success');
+            } else {
+                mostrarNotificacao('Nenhum RDO anterior encontrado', 'warning');
+            }
+        } else {
+            mostrarNotificacao(data.error || 'Erro ao herdar percentuais', 'danger');
+        }
+    } catch (error) {
+        console.error('Erro:', error);
+        mostrarNotificacao('Erro de conexão', 'danger');
+    }
+    
+    mostrarLoading(false);
+}
+
+// Aplicar percentuais herdados
+function aplicarPercentuais(percentuais) {
+    Object.keys(percentuais).forEach(nomeSubatividade => {
+        const percentual = percentuais[nomeSubatividade];
+        
+        const inputs = document.querySelectorAll('.subatividade-input');
+        inputs.forEach(input => {
+            const nomeInput = input.closest('.subatividade-row').querySelector('input[name*="[nome]"]');
+            if (nomeInput && nomeInput.value === nomeSubatividade) {
+                input.value = percentual;
+                atualizarProgresso(input);
+            }
+        });
+    });
+}
+
+// Validar formulário
+function validarFormulario() {
+    validacaoErros = [];
+    
+    const obraId = document.getElementById('obra_id').value;
+    const dataRelatorio = document.getElementById('data_relatorio').value;
+    
+    if (!obraId) validacaoErros.push('Obra deve ser selecionada');
+    if (!dataRelatorio) validacaoErros.push('Data do relatório é obrigatória');
+    
+    // Validar data futura
+    if (dataRelatorio) {
+        const hoje = new Date().toISOString().split('T')[0];
+        if (dataRelatorio > hoje) {
+            validacaoErros.push('Data não pode ser futura');
+        }
+    }
+    
+    // Validar se tem pelo menos uma subatividade com percentual
+    const inputs = document.querySelectorAll('.subatividade-input');
+    let temPercentuais = false;
+    
+    inputs.forEach(input => {
+        const valor = parseFloat(input.value) || 0;
+        if (valor > 0) temPercentuais = true;
+    });
+    
+    if (!temPercentuais) {
+        validacaoErros.push('Adicione pelo menos um percentual de subatividade');
+    }
+    
+    // Mostrar resultado
+    if (validacaoErros.length === 0) {
+        mostrarNotificacao('Formulário válido! Pronto para salvar.', 'success');
+        document.getElementById('btn-finalizar').disabled = false;
+    } else {
+        const mensagem = `Problemas encontrados:\n• ${validacaoErros.join('\n• ')}`;
+        mostrarNotificacao(mensagem, 'danger');
+        document.getElementById('btn-finalizar').disabled = true;
+    }
+}
+
+// Salvar rascunho
+async function salvarRascunho() {
+    const dados = coletarDados();
+    dados.status = 'Rascunho';
+    await salvarRDO(dados);
+}
+
+// Coletar dados do formulário
+function coletarDados() {
+    const formData = new FormData(document.getElementById('rdo-form'));
+    
+    const dados = {
+        obra_id: formData.get('obra_id'),
+        data_relatorio: formData.get('data_relatorio'),
+        clima_geral: formData.get('clima_geral'),
+        temperatura_media: formData.get('temperatura_media'),
+        observacoes_climaticas: formData.get('observacoes_climaticas'),
+        comentario_geral: formData.get('comentario_geral'),
+        subatividades: []
+    };
+    
+    // Coletar subatividades com percentual > 0
+    const inputs = document.querySelectorAll('.subatividade-input');
+    inputs.forEach(input => {
+        const percentual = parseFloat(input.value) || 0;
+        if (percentual > 0) {
+            const row = input.closest('.subatividade-row');
+            const nomeInput = row.querySelector('input[name*="[nome]"]');
+            const servicoIdInput = row.querySelector('input[name*="[servico_id]"]');
+            const servicoNomeInput = row.querySelector('input[name*="[servico_nome]"]');
+            
+            dados.subatividades.push({
+                servico_id: parseInt(servicoIdInput.value),
+                servico_nome: servicoNomeInput.value,
+                nome_subatividade: nomeInput.value,
+                percentual_conclusao: percentual,
+                observacoes_tecnicas: '' // Removido conforme solicitado
+            });
+        }
+    });
+    
+    return dados;
+}
+
+// Salvar RDO
+async function salvarRDO(dados) {
+    mostrarLoading(true);
+    
+    try {
+        const response = await fetch('/api/test/rdo/salvar-subatividades', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(dados)
+        });
+        
+        const result = await response.json();
+        
+        if (response.ok && result.success) {
+            const tipo = dados.status === 'Rascunho' ? 'rascunho salvo' : 'RDO finalizado';
+            mostrarNotificacao(`${tipo.toUpperCase()} com sucesso! ID: ${result.rdo_id}`, 'success');
+            
+            setTimeout(() => {
+                window.location.href = '/funcionario/dashboard';
+            }, 2000);
+        } else {
+            mostrarNotificacao(result.error || 'Erro ao salvar RDO', 'danger');
+        }
+    } catch (error) {
+        console.error('Erro:', error);
+        mostrarNotificacao('Erro de conexão com o servidor', 'danger');
+    }
+    
+    mostrarLoading(false);
+}
+
+// Funções auxiliares
+function limparServicos() {
+    servicosCarregados = [];
+    document.getElementById('servicos-container').innerHTML = `
+        <div class="text-center py-5 text-muted">
+            <i class="fas fa-building fa-3x mb-3"></i>
+            <h5>Selecione uma obra para carregar os serviços</h5>
+            <p>Os serviços disponíveis serão listados aqui automaticamente</p>
+        </div>
+    `;
+    document.getElementById('btn-herdar').disabled = true;
+    document.getElementById('btn-finalizar').disabled = true;
+    atualizarContador();
+}
+
+function atualizarContador() {
+    document.getElementById('servicos-count').textContent = `(${servicosCarregados.length} serviços)`;
+}
+
+function mostrarLoading(mostrar) {
+    document.getElementById('loading-overlay').style.display = mostrar ? 'flex' : 'none';
+}
+
+function mostrarNotificacao(mensagem, tipo = 'info') {
+    const container = document.getElementById('notifications');
+    
+    const notification = document.createElement('div');
+    notification.className = `alert alert-${tipo} alert-dismissible`;
+    notification.innerHTML = `
+        ${mensagem}
+        <button type="button" class="btn-close" onclick="this.parentElement.remove()"></button>
+    `;
+    
+    container.appendChild(notification);
+    
+    setTimeout(() => {
+        if (notification.parentElement) {
+            notification.remove();
+        }
+    }, 5000);
+}
+
+// Event listeners
+document.addEventListener('DOMContentLoaded', function() {
+    // Definir data padrão
+    const hoje = new Date().toISOString().split('T')[0];
+    document.getElementById('data_relatorio').value = hoje;
+    
+    // Submit do formulário
+    document.getElementById('rdo-form').addEventListener('submit', function(e) {
+        e.preventDefault();
+        
+        if (validarFormulario() && validacaoErros.length === 0) {
+            const dados = coletarDados();
+            dados.status = 'Finalizado';
+            salvarRDO(dados);
+        }
+    });
+});
+
+console.log('Sistema RDO Consolidado carregado com sucesso!');
+</script>
+{% endblock %}
