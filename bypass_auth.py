@@ -69,8 +69,20 @@ if BYPASS_ATIVO:
         """Decorador que bypassa o login em desenvolvimento"""
         return f
     
+    # Sobrescrever decorador funcionario_required também
+    def bypass_funcionario_required(f):
+        """Decorador que bypassa o funcionario_required em desenvolvimento"""
+        return f
+    
     # Substituir login_required globalmente
     flask_login.login_required = bypass_login_required
+    
+    # Registrar bypass para funcionario_required quando auth.py for importado
+    try:
+        import auth
+        auth.funcionario_required = bypass_funcionario_required
+    except ImportError:
+        pass
     
     # Criar before_request handler para manter sessão
     def criar_before_request(app):

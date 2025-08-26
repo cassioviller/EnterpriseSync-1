@@ -783,7 +783,7 @@ async function carregarServicosObra(obraId) {
     showLoading();
     
     try {
-        const response = await fetch(`/api/rdo/servicos-obra/${obraId}`);
+        const response = await fetch(`/api/test/rdo/servicos-obra/${obraId}`);
         const data = await response.json();
         
         if (data.success) {

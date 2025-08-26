@@ -2438,6 +2438,65 @@ def api_funcionario_funcionarios():
         return jsonify({'error': 'Erro interno', 'success': False}), 500
 
 # ===== ENHANCED RDO API ENDPOINTS =====
+
+# Endpoint de teste sem autenticação para desenvolvimento
+@main_bp.route('/api/test/rdo/servicos-obra/<int:obra_id>')
+def api_test_rdo_servicos_obra(obra_id):
+    """API TEST para carregar serviços dinamicamente baseado na obra selecionada"""
+    try:
+        # Usar admin_id padrão para teste
+        admin_id = 10
+        
+        # Verificar se obra existe
+        obra = Obra.query.filter_by(id=obra_id, admin_id=admin_id).first()
+        if not obra:
+            return jsonify({'error': 'Obra não encontrada', 'success': False}), 404
+        
+        # Buscar serviços associados à obra
+        servicos_obra = db.session.query(ServicoObra, Servico).join(
+            Servico, ServicoObra.servico_id == Servico.id
+        ).filter(
+            ServicoObra.obra_id == obra_id,
+            ServicoObra.ativo == True,
+            Servico.ativo == True
+        ).all()
+        
+        servicos_data = []
+        for servico_obra, servico in servicos_obra:
+            # Buscar subatividades mestre para este serviço
+            subatividades = SubatividadeMestre.query.filter_by(
+                servico_id=servico.id,
+                admin_id=admin_id,
+                ativo=True
+            ).order_by(SubatividadeMestre.ordem_padrao).all()
+            
+            subatividades_data = [sub.to_dict() for sub in subatividades]
+            
+            servico_data = {
+                'id': servico.id,
+                'nome': servico.nome,
+                'descricao': servico.descricao,
+                'categoria': servico.categoria,
+                'quantidade_planejada': float(servico_obra.quantidade_planejada or 0),
+                'quantidade_executada': float(servico_obra.quantidade_executada or 0),
+                'percentual_obra': round((servico_obra.quantidade_executada / servico_obra.quantidade_planejada * 100) if servico_obra.quantidade_planejada > 0 else 0, 2),
+                'subatividades': subatividades_data
+            }
+            servicos_data.append(servico_data)
+        
+        return jsonify({
+            'success': True,
+            'obra': {'id': obra.id, 'nome': obra.nome},
+            'servicos': servicos_data,
+            'total': len(servicos_data)
+        })
+        
+    except Exception as e:
+        print(f"ERRO API TEST RDO SERVIÇOS OBRA: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': 'Erro interno', 'success': False}), 500
+
 @main_bp.route('/api/rdo/servicos-obra/<int:obra_id>')
 @funcionario_required
 def api_rdo_servicos_obra(obra_id):
