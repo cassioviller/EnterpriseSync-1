@@ -205,15 +205,247 @@
     color: #721c24;
 }
 
+/* Mobile-first responsive design */
 @media (max-width: 768px) {
+    .rdo-container {
+        padding: 10px;
+        margin: 0;
+    }
+    
+    .rdo-header {
+        padding: 15px;
+        margin-bottom: 15px;
+    }
+    
+    .rdo-header h2 {
+        font-size: 1.4rem;
+    }
+    
+    .rdo-header .btn {
+        padding: 8px 16px;
+        font-size: 0.9rem;
+    }
+    
+    .section-header {
+        padding: 12px 15px;
+        font-size: 0.95rem;
+    }
+    
+    .section-body {
+        padding: 15px;
+    }
+    
+    /* Subatividades mobile */
     .subatividade-row {
+        padding: 12px 15px;
+        flex-direction: row;
+        justify-content: space-between;
+        align-items: center;
+    }
+    
+    .subatividade-nome {
+        font-size: 0.9rem;
+        flex: 1;
+        margin-right: 15px;
+    }
+    
+    .subatividade-input {
+        width: 50px;
+        padding: 8px 4px;
+        font-size: 14px;
+    }
+    
+    /* Funcionários mobile */
+    .funcionario-row {
+        padding: 12px 15px;
+    }
+    
+    .funcionario-nome {
+        font-size: 0.9rem;
+        margin-right: 15px;
+    }
+    
+    .horas-input {
+        width: 60px;
+        padding: 8px 6px;
+    }
+    
+    /* Ferramentas mobile */
+    .ferramenta-row {
+        flex-direction: column;
+        gap: 12px;
+        padding: 15px;
+    }
+    
+    .ferramenta-row .d-flex.align-items-center.gap-2.flex-1 {
+        width: 100%;
+    }
+    
+    .ferramenta-row .form-control {
+        font-size: 0.9rem;
+    }
+    
+    /* Formulários mobile */
+    .form-control, .form-select {
+        padding: 12px;
+        font-size: 16px; /* Previne zoom no iOS */
+        border-radius: 8px;
+    }
+    
+    .form-label {
+        font-size: 0.9rem;
+        margin-bottom: 8px;
+    }
+    
+    /* Botões mobile */
+    .btn {
+        padding: 12px 20px;
+        font-size: 0.9rem;
+        touch-action: manipulation; /* Melhora touch */
+    }
+    
+    .btn-sm {
+        padding: 8px 12px;
+        font-size: 0.8rem;
+    }
+    
+    /* Cards mobile */
+    .rdo-section {
+        margin-bottom: 15px;
+        box-shadow: 0 2px 6px rgba(0,0,0,0.08);
+    }
+    
+    /* Progress mobile */
+    .d-flex.justify-content-between.align-items-center {
         flex-direction: column;
         gap: 10px;
         text-align: center;
     }
     
-    .subatividade-input {
-        width: 100px;
+    .progress-bar-mini {
+        width: 100%;
+        max-width: 200px;
+    }
+    
+    /* Headers mobile */
+    .d-flex.justify-content-between.align-items-center .btn {
+        margin-bottom: 8px;
+    }
+    
+    /* Melhor experiência touch */
+    .section-header {
+        touch-action: manipulation;
+        min-height: 48px;
+        display: flex;
+        align-items: center;
+    }
+    
+    /* Floating button mobile */
+    .floating-save {
+        bottom: 15px;
+        right: 15px;
+        padding: 12px 20px;
+        font-size: 0.9rem;
+        box-shadow: 0 4px 20px rgba(13, 110, 253, 0.4);
+    }
+    
+    /* Notificações mobile */
+    #notifications {
+        top: 10px;
+        right: 10px;
+        left: 10px;
+        width: auto;
+    }
+    
+    .alert {
+        margin-bottom: 10px;
+        font-size: 0.9rem;
+        padding: 10px 12px;
+    }
+    
+    /* Loading mobile */
+    .loading-overlay .spinner {
+        width: 50px;
+        height: 50px;
+        border-width: 5px;
+    }
+    
+    /* Inputs mobile otimizados */
+    input[type="number"] {
+        -webkit-appearance: none;
+        appearance: none;
+        font-size: 16px; /* Previne zoom */
+    }
+    
+    input[type="date"] {
+        font-size: 16px; /* Previne zoom */
+    }
+    
+    textarea {
+        font-size: 16px; /* Previne zoom */
+        resize: vertical;
+    }
+}
+
+/* Extra small devices */
+@media (max-width: 480px) {
+    .rdo-container {
+        padding: 8px;
+    }
+    
+    .rdo-header {
+        padding: 12px;
+    }
+    
+    .rdo-header h2 {
+        font-size: 1.2rem;
+    }
+    
+    .section-body {
+        padding: 12px;
+    }
+    
+    .subatividade-row, .funcionario-row {
+        padding: 10px 12px;
+    }
+    
+    .subatividade-nome, .funcionario-nome {
+        font-size: 0.85rem;
+    }
+    
+    .subatividade-input, .horas-input {
+        width: 45px;
+        padding: 6px 2px;
+        font-size: 13px;
+    }
+    
+    .btn {
+        padding: 10px 16px;
+        font-size: 0.85rem;
+    }
+    
+    .floating-save {
+        padding: 10px 16px;
+        font-size: 0.85rem;
+    }
+}
+
+/* Landscape mobile */
+@media (max-width: 768px) and (orientation: landscape) {
+    .rdo-header {
+        padding: 10px 15px;
+    }
+    
+    .rdo-header h2 {
+        font-size: 1.3rem;
+    }
+    
+    .section-header {
+        padding: 10px 15px;
+    }
+    
+    .floating-save {
+        display: none; /* Hide em landscape para mais espaço */
     }
 }
 </style>
