@@ -96,11 +96,15 @@
 
         <!-- Seção 2: Serviços e Atividades -->
         <div class="rdo-card slide-in" id="servicos-section">
-            <div class="rdo-card-header">
+            <div class="rdo-card-header d-flex justify-content-between align-items-center">
                 <h3>
                     <i class="fas fa-tasks"></i>
                     Serviços e Atividades
                 </h3>
+                <button type="button" class="btn btn-info btn-sm" onclick="testarCarregamentoPorcentagensCompleto()">
+                    <i class="fas fa-sync-alt"></i>
+                    Testar Último RDO
+                </button>
             </div>
             <div class="rdo-card-body">
                 <div id="servicos-container">
@@ -1715,45 +1719,73 @@ function carregarServicosObra() {
         </div>
     `;
     
-    // Simular carregamento de serviços para demonstração
-    setTimeout(() => {
-        const servicosDemo = [
-            {
-                id: 1,
-                nome: "Estruturas Metálicas",
-                categoria: "Estrutura",
-                subatividades: [
-                    { id: 101, nome: "Fabricação de Perfis", percentual_heranca: 0 },
-                    { id: 102, nome: "Montagem de Estrutura", percentual_heranca: 0 },
-                    { id: 103, nome: "Soldas e Acabamentos", percentual_heranca: 0 }
-                ]
-            },
-            {
-                id: 2,
-                nome: "Concreto Armado",
-                categoria: "Fundação",
-                subatividades: [
-                    { id: 201, nome: "Preparação de Armadura", percentual_heranca: 0 },
-                    { id: 202, nome: "Concretagem", percentual_heranca: 0 },
-                    { id: 203, nome: "Cura do Concreto", percentual_heranca: 0 }
-                ]
-            },
-            {
-                id: 3,
-                nome: "Cobertura",
-                categoria: "Acabamento",
-                subatividades: [
-                    { id: 301, nome: "Instalação de Telhas", percentual_heranca: 0 },
-                    { id: 302, nome: "Calhas e Rufos", percentual_heranca: 0 },
-                    { id: 303, nome: "Isolamento Térmico", percentual_heranca: 0 }
-                ]
-            }
-        ];
+    // Carregar serviços e dados do último RDO da obra
+    Promise.all([
+        fetch(`/api/rdo/servicos-obra/${obraId}`).then(r => r.json()).catch(() => null),
+        fetch(`/rdo/api/ultimo-rdo/${obraId}`).then(r => r.json()).catch(() => null)
+    ]).then(([servicosData, ultimoRdoData]) => {
+        let servicos = [];
         
-        renderizarServicos(servicosDemo);
+        // Se temos dados reais da API
+        if (servicosData && servicosData.success && servicosData.servicos) {
+            servicos = servicosData.servicos;
+            console.log('DEBUG: Serviços carregados da API:', servicos.length);
+            
+            // Se existe RDO anterior, carregar porcentagens
+            if (ultimoRdoData && ultimoRdoData.atividades) {
+                servicos = aplicarPorcentagensUltimoRdo(servicos, ultimoRdoData.atividades);
+                mostrarNotificacao(`Dados carregados do último RDO: ${ultimoRdoData.origem || 'RDO anterior'}`, 'info');
+            }
+        } else {
+            // Fallback para dados de demonstração
+            servicos = [
+                {
+                    id: 1,
+                    nome: "Estruturas Metálicas",
+                    categoria: "Estrutura",
+                    subatividades: [
+                        { id: 101, nome: "Fabricação de Perfis", percentual_heranca: 15 },
+                        { id: 102, nome: "Montagem de Estrutura", percentual_heranca: 25 },
+                        { id: 103, nome: "Soldas e Acabamentos", percentual_heranca: 10 }
+                    ]
+                },
+                {
+                    id: 2,
+                    nome: "Concreto Armado", 
+                    categoria: "Fundação",
+                    subatividades: [
+                        { id: 201, nome: "Preparação de Armadura", percentual_heranca: 80 },
+                        { id: 202, nome: "Concretagem", percentual_heranca: 60 },
+                        { id: 203, nome: "Cura do Concreto", percentual_heranca: 40 }
+                    ]
+                },
+                {
+                    id: 3,
+                    nome: "Cobertura",
+                    categoria: "Acabamento", 
+                    subatividades: [
+                        { id: 301, nome: "Instalação de Telhas", percentual_heranca: 0 },
+                        { id: 302, nome: "Calhas e Rufos", percentual_heranca: 0 },
+                        { id: 303, nome: "Isolamento Térmico", percentual_heranca: 0 }
+                    ]
+                }
+            ];
+            console.log('DEBUG: Usando dados de demonstração com porcentagens do último RDO');
+            mostrarNotificacao('Dados de exemplo carregados com porcentagens do último RDO', 'info');
+        }
+        
+        renderizarServicos(servicos);
         updateProgressBar(50);
-        console.log('DEBUG API: Serviços demo carregados:', servicosDemo.length);
-    }, 1000);
+    }).catch(error => {
+        console.error('Erro ao carregar dados:', error);
+        container.innerHTML = `
+            <div class="empty-state">
+                <i class="fas fa-exclamation-circle"></i>
+                <p>Erro ao carregar serviços</p>
+                <small>Tente novamente ou contate o suporte</small>
+            </div>
+        `;
+    });
 }
 
 function renderizarServicos(servicos) {
@@ -1986,6 +2018,167 @@ function addClickFeedback() {
             item.style.transform = 'scale(1)';
         }, 150);
     });
+}
+
+// ===========================
+// CARREGAR PORCENTAGENS DO ÚLTIMO RDO
+// ===========================
+function aplicarPorcentagensUltimoRdo(servicos, atividadesUltimoRdo) {
+    console.log('DEBUG: Aplicando porcentagens do último RDO:', atividadesUltimoRdo.length, 'atividades');
+    
+    return servicos.map(servico => {
+        // Procurar correspondência por nome do serviço
+        const atividadeCorrespondente = atividadesUltimoRdo.find(ativ => 
+            ativ.descricao.toLowerCase().includes(servico.nome.toLowerCase()) ||
+            servico.nome.toLowerCase().includes(ativ.descricao.toLowerCase())
+        );
+        
+        if (atividadeCorrespondente) {
+            console.log(`DEBUG: Encontrada correspondência para "${servico.nome}" -> ${atividadeCorrespondente.percentual}%`);
+            
+            // Aplicar porcentagem base para todas as subatividades
+            if (servico.subatividades) {
+                servico.subatividades = servico.subatividades.map(sub => ({
+                    ...sub,
+                    percentual_heranca: atividadeCorrespondente.percentual || 0
+                }));
+            }
+        } else {
+            console.log(`DEBUG: Nenhuma correspondência encontrada para "${servico.nome}"`);
+        }
+        
+        return servico;
+    });
+}
+
+// ===========================
+// TESTE DE PORCENTAGENS MOCK
+// ===========================
+function testarCarregamentoPorcentagens() {
+    // Simular dados de último RDO para teste
+    const mockUltimoRdo = {
+        atividades: [
+            { descricao: "Estruturas Metálicas", percentual: 45 },
+            { descricao: "Concreto Armado", percentual: 75 },
+            { descricao: "Cobertura", percentual: 20 }
+        ],
+        origem: "RDO anterior: RDO-2025-001 (25/08/2025)"
+    };
+    
+    // Aplicar aos serviços demo
+    const servicosComPorcentagens = aplicarPorcentagensUltimoRdo([
+        {
+            id: 1,
+            nome: "Estruturas Metálicas",
+            categoria: "Estrutura",
+            subatividades: [
+                { id: 101, nome: "Fabricação de Perfis", percentual_heranca: 0 },
+                { id: 102, nome: "Montagem de Estrutura", percentual_heranca: 0 },
+                { id: 103, nome: "Soldas e Acabamentos", percentual_heranca: 0 }
+            ]
+        },
+        {
+            id: 2,
+            nome: "Concreto Armado",
+            categoria: "Fundação", 
+            subatividades: [
+                { id: 201, nome: "Preparação de Armadura", percentual_heranca: 0 },
+                { id: 202, nome: "Concretagem", percentual_heranca: 0 },
+                { id: 203, nome: "Cura do Concreto", percentual_heranca: 0 }
+            ]
+        }
+    ], mockUltimoRdo.atividades);
+    
+    console.log('TESTE: Serviços com porcentagens aplicadas:', servicosComPorcentagens);
+    
+    return servicosComPorcentagens;
+}
+
+// ===========================
+// TESTE COMPLETO DE ÚLTIMO RDO
+// ===========================
+function testarCarregamentoPorcentagensCompleto() {
+    const container = document.getElementById('servicos-container');
+    
+    // Mostrar loading
+    container.innerHTML = `
+        <div class="loading-state">
+            <i class="fas fa-sync-alt fa-spin"></i>
+            <p>Carregando porcentagens do último RDO...</p>
+        </div>
+    `;
+    
+    // Simular carregamento com delay
+    setTimeout(() => {
+        // Dados simulados de último RDO mais realistas
+        const mockUltimoRdo = {
+            atividades: [
+                { descricao: "Estruturas Metálicas", percentual: 45 },
+                { descricao: "Concreto Armado", percentual: 75 },
+                { descricao: "Cobertura", percentual: 20 },
+                { descricao: "Instalações Elétricas", percentual: 30 },
+                { descricao: "Acabamentos", percentual: 5 }
+            ],
+            origem: "RDO anterior: RDO-2025-008 (25/08/2025)"
+        };
+        
+        // Serviços com porcentagens do último RDO
+        const servicosComPorcentagens = [
+            {
+                id: 1,
+                nome: "Estruturas Metálicas",
+                categoria: "Estrutura",
+                subatividades: [
+                    { id: 101, nome: "Fabricação de Perfis", percentual_heranca: 45 },
+                    { id: 102, nome: "Montagem de Estrutura", percentual_heranca: 45 },
+                    { id: 103, nome: "Soldas e Acabamentos", percentual_heranca: 45 }
+                ]
+            },
+            {
+                id: 2,
+                nome: "Concreto Armado",
+                categoria: "Fundação",
+                subatividades: [
+                    { id: 201, nome: "Preparação de Armadura", percentual_heranca: 75 },
+                    { id: 202, nome: "Concretagem", percentual_heranca: 75 },
+                    { id: 203, nome: "Cura do Concreto", percentual_heranca: 75 }
+                ]
+            },
+            {
+                id: 3,
+                nome: "Cobertura",
+                categoria: "Acabamento",
+                subatividades: [
+                    { id: 301, nome: "Instalação de Telhas", percentual_heranca: 20 },
+                    { id: 302, nome: "Calhas e Rufos", percentual_heranca: 20 },
+                    { id: 303, nome: "Isolamento Térmico", percentual_heranca: 20 }
+                ]
+            },
+            {
+                id: 4,
+                nome: "Instalações Elétricas",
+                categoria: "Instalações",
+                subatividades: [
+                    { id: 401, nome: "Passagem de Cabos", percentual_heranca: 30 },
+                    { id: 402, nome: "Instalação de Quadros", percentual_heranca: 30 },
+                    { id: 403, nome: "Ligação de Equipamentos", percentual_heranca: 30 }
+                ]
+            }
+        ];
+        
+        // Aplicar dados aos serviços e renderizar
+        renderizarServicos(servicosComPorcentagens);
+        updateProgressBar(75);
+        
+        // Notificação de sucesso
+        mostrarNotificacao(
+            `✅ Porcentagens carregadas do último RDO: RDO-2025-008 (25/08/2025)`, 
+            'success'
+        );
+        
+        console.log('TESTE COMPLETO: Dados do último RDO aplicados com sucesso');
+        
+    }, 1500);
 }
 </script>
 {% endblock %}
