@@ -47,6 +47,9 @@ def executar_migracoes():
         
         # Migração 10: CRÍTICA - Adicionar campo admin_id na tabela rdo
         migrar_campo_admin_id_rdo()
+        
+        # Migração 11: CRÍTICA - Criar tabelas do sistema RDO aprimorado
+        migrar_sistema_rdo_aprimorado()
 
         logger.info("✅ Migrações automáticas concluídas com sucesso!")
         
@@ -610,6 +613,144 @@ def migrar_campo_admin_id_rdo():
         
     except Exception as e:
         logger.error(f"❌ ERRO ao migrar campo admin_id RDO: {str(e)}")
+        if 'connection' in locals():
+            connection.rollback()
+            cursor.close()
+            connection.close()
+
+
+def migrar_sistema_rdo_aprimorado():
+    """
+    CRÍTICA: Criar tabelas do sistema RDO aprimorado com subatividades
+    """
+    try:
+        import psycopg2
+        import os
+        
+        # Conectar ao banco usando a URL do ambiente
+        connection = psycopg2.connect(os.environ.get("DATABASE_URL"))
+        cursor = connection.cursor()
+        
+        logger.info("🔄 Criando tabelas do sistema RDO aprimorado...")
+        
+        # Tabela subatividade_mestre
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS subatividade_mestre (
+                id SERIAL PRIMARY KEY,
+                servico_id INTEGER NOT NULL REFERENCES servico(id),
+                nome VARCHAR(200) NOT NULL,
+                descricao TEXT,
+                ordem_padrao INTEGER DEFAULT 0,
+                obrigatoria BOOLEAN DEFAULT TRUE,
+                duracao_estimada_horas FLOAT,
+                complexidade INTEGER DEFAULT 1,
+                admin_id INTEGER NOT NULL REFERENCES usuario(id),
+                ativo BOOLEAN DEFAULT TRUE,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+        
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_subativ_mestre_servico ON subatividade_mestre(servico_id)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_subativ_mestre_admin ON subatividade_mestre(admin_id)")
+        
+        logger.info("✅ Tabela subatividade_mestre criada com sucesso")
+        
+        # Tabela rdo_servico_subatividade
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS rdo_servico_subatividade (
+                id SERIAL PRIMARY KEY,
+                rdo_id INTEGER NOT NULL REFERENCES rdo(id),
+                servico_id INTEGER NOT NULL REFERENCES servico(id),
+                nome_subatividade VARCHAR(200) NOT NULL,
+                descricao_subatividade TEXT,
+                percentual_conclusao FLOAT DEFAULT 0.0,
+                percentual_anterior FLOAT DEFAULT 0.0,
+                incremento_dia FLOAT DEFAULT 0.0,
+                observacoes_tecnicas TEXT,
+                ordem_execucao INTEGER DEFAULT 0,
+                ativo BOOLEAN DEFAULT TRUE,
+                admin_id INTEGER NOT NULL REFERENCES usuario(id),
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+        
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_rdo_servico_subativ ON rdo_servico_subatividade(rdo_id, servico_id)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_subativ_admin ON rdo_servico_subatividade(admin_id)")
+        
+        logger.info("✅ Tabela rdo_servico_subatividade criada com sucesso")
+        
+        # Popular com dados de exemplo para demonstração
+        cursor.execute("""
+            INSERT INTO subatividade_mestre (servico_id, nome, descricao, ordem_padrao, admin_id) 
+            SELECT DISTINCT 
+                s.id,
+                CASE s.nome
+                    WHEN 'Alvenaria de Vedação' THEN 'Levantamento de Parede'
+                    WHEN 'Estrutura de Concreto Armado' THEN 'Preparação das Formas'
+                    WHEN 'Pintura Interna' THEN 'Aplicação de Primer'
+                    WHEN 'Instalação Elétrica' THEN 'Passagem de Eletrodutos'
+                    WHEN 'Revestimento Cerâmico' THEN 'Preparação do Substrato'
+                    ELSE 'Etapa Inicial'
+                END,
+                CASE s.nome
+                    WHEN 'Alvenaria de Vedação' THEN 'Levantamento das paredes de vedação com blocos cerâmicos'
+                    WHEN 'Estrutura de Concreto Armado' THEN 'Montagem e posicionamento das formas para concretagem'
+                    WHEN 'Pintura Interna' THEN 'Aplicação de primer preparatório nas superfícies'
+                    WHEN 'Instalação Elétrica' THEN 'Instalação dos eletrodutos e infraestrutura elétrica'
+                    WHEN 'Revestimento Cerâmico' THEN 'Preparação e nivelamento do substrato para aplicação'
+                    ELSE 'Primeira etapa de execução do serviço'
+                END,
+                1,
+                10
+            FROM servico s 
+            WHERE s.ativo = TRUE 
+            AND NOT EXISTS (
+                SELECT 1 FROM subatividade_mestre sm 
+                WHERE sm.servico_id = s.id AND sm.admin_id = 10
+            )
+            LIMIT 50
+        """)
+        
+        # Segunda subatividade para cada serviço
+        cursor.execute("""
+            INSERT INTO subatividade_mestre (servico_id, nome, descricao, ordem_padrao, admin_id) 
+            SELECT DISTINCT 
+                s.id,
+                CASE s.nome
+                    WHEN 'Alvenaria de Vedação' THEN 'Chapisco'
+                    WHEN 'Estrutura de Concreto Armado' THEN 'Concretagem'
+                    WHEN 'Pintura Interna' THEN 'Aplicação de Tinta'
+                    WHEN 'Instalação Elétrica' THEN 'Fiação e Conexões'
+                    WHEN 'Revestimento Cerâmico' THEN 'Aplicação de Cerâmica'
+                    ELSE 'Etapa Intermediária'
+                END,
+                CASE s.nome
+                    WHEN 'Alvenaria de Vedação' THEN 'Aplicação de chapisco nas paredes levantadas'
+                    WHEN 'Estrutura de Concreto Armado' THEN 'Concretagem da estrutura com controle de qualidade'
+                    WHEN 'Pintura Interna' THEN 'Aplicação da tinta final com acabamento'
+                    WHEN 'Instalação Elétrica' THEN 'Passagem de fiação e execução de conexões'
+                    WHEN 'Revestimento Cerâmico' THEN 'Assentamento das peças cerâmicas'
+                    ELSE 'Segunda etapa de execução do serviço'
+                END,
+                2,
+                10
+            FROM servico s 
+            WHERE s.ativo = TRUE 
+            AND EXISTS (SELECT 1 FROM subatividade_mestre sm WHERE sm.servico_id = s.id AND sm.admin_id = 10)
+            LIMIT 50
+        """)
+        
+        logger.info("✅ Dados de exemplo inseridos nas subatividades mestre")
+        
+        connection.commit()
+        cursor.close()
+        connection.close()
+        logger.info("🎯 Migração do sistema RDO aprimorado concluída!")
+        
+    except Exception as e:
+        logger.error(f"❌ ERRO ao migrar sistema RDO aprimorado: {str(e)}")
         if 'connection' in locals():
             connection.rollback()
             cursor.close()

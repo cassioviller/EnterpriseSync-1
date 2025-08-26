@@ -679,6 +679,128 @@ class OutroCusto(db.Model):
 # As definições das classes PropostaComercialSIGE e ServicoPropostaComercialSIGE
 # foram movidas para models_propostas.py para evitar conflitos de importação
 
+# ================================
+# ENHANCED RDO SYSTEM - SUBATIVIDADES
+# ================================
+
+class RDOServicoSubatividade(db.Model):
+    """
+    Modelo aprimorado para subatividades dos serviços no RDO
+    Implementa a hierarquia: Obra -> Serviço -> Subatividade -> % Conclusão
+    """
+    __tablename__ = 'rdo_servico_subatividade'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    rdo_id = db.Column(db.Integer, db.ForeignKey('rdo.id'), nullable=False)
+    servico_id = db.Column(db.Integer, db.ForeignKey('servico.id'), nullable=False)
+    
+    # Dados da subatividade
+    nome_subatividade = db.Column(db.String(200), nullable=False)
+    descricao_subatividade = db.Column(db.Text)
+    percentual_conclusao = db.Column(db.Float, default=0.0)  # 0.0 a 100.0
+    
+    # Herança automática do RDO anterior
+    percentual_anterior = db.Column(db.Float, default=0.0)  # Para auditoria e histórico
+    incremento_dia = db.Column(db.Float, default=0.0)  # Progresso do dia
+    
+    # Observações técnicas específicas
+    observacoes_tecnicas = db.Column(db.Text)
+    
+    # Metadados
+    ordem_execucao = db.Column(db.Integer, default=0)  # Ordem dentro do serviço
+    ativo = db.Column(db.Boolean, default=True)
+    
+    # Multi-tenant
+    admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False)
+    
+    # Controle de tempo
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    # Relacionamentos
+    rdo = db.relationship('RDO', backref='servico_subatividades')
+    servico = db.relationship('Servico', backref='rdo_subatividades')
+    admin = db.relationship('Usuario', backref='rdo_subatividades_administradas')
+    
+    # Índices para performance
+    __table_args__ = (
+        db.Index('idx_rdo_servico_subativ', 'rdo_id', 'servico_id'),
+        db.Index('idx_subativ_admin', 'admin_id'),
+    )
+    
+    def __repr__(self):
+        return f'<RDOServicoSubatividade {self.nome_subatividade} - {self.percentual_conclusao}%>'
+    
+    def to_dict(self):
+        """Converter para dicionário para API"""
+        return {
+            'id': self.id,
+            'nome_subatividade': self.nome_subatividade,
+            'descricao_subatividade': self.descricao_subatividade,
+            'percentual_conclusao': self.percentual_conclusao,
+            'percentual_anterior': self.percentual_anterior,
+            'incremento_dia': self.incremento_dia,
+            'observacoes_tecnicas': self.observacoes_tecnicas,
+            'ordem_execucao': self.ordem_execucao,
+            'servico_id': self.servico_id,
+            'servico_nome': self.servico.nome if self.servico else None
+        }
+
+
+class SubatividadeMestre(db.Model):
+    """
+    Modelo mestre de subatividades para cada serviço
+    Define as subatividades padrão que podem ser aplicadas aos serviços
+    """
+    __tablename__ = 'subatividade_mestre'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    servico_id = db.Column(db.Integer, db.ForeignKey('servico.id'), nullable=False)
+    
+    # Dados da subatividade
+    nome = db.Column(db.String(200), nullable=False)
+    descricao = db.Column(db.Text)
+    ordem_padrao = db.Column(db.Integer, default=0)
+    
+    # Configurações
+    obrigatoria = db.Column(db.Boolean, default=True)  # Sempre aparece nos RDOs
+    duracao_estimada_horas = db.Column(db.Float)  # Para planejamento
+    complexidade = db.Column(db.Integer, default=1)  # 1-5
+    
+    # Multi-tenant
+    admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False)
+    
+    # Controle
+    ativo = db.Column(db.Boolean, default=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    # Relacionamentos
+    servico = db.relationship('Servico', backref='subatividades_mestre')
+    admin = db.relationship('Usuario', backref='subatividades_mestre_administradas')
+    
+    # Índices
+    __table_args__ = (
+        db.Index('idx_subativ_mestre_servico', 'servico_id'),
+        db.Index('idx_subativ_mestre_admin', 'admin_id'),
+    )
+    
+    def __repr__(self):
+        return f'<SubatividadeMestre {self.nome}>'
+    
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'nome': self.nome,
+            'descricao': self.descricao,
+            'ordem_padrao': self.ordem_padrao,
+            'obrigatoria': self.obrigatoria,
+            'duracao_estimada_horas': self.duracao_estimada_horas,
+            'complexidade': self.complexidade,
+            'servico_id': self.servico_id,
+            'servico_nome': self.servico.nome if self.servico else None
+        }
+
 
 # ================================
 # MÓDULO 3: GESTÃO DE EQUIPES

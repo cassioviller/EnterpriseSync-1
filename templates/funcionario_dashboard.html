@@ -18,8 +18,11 @@
                     {% endif %}
                 </div>
                 <div>
-                    <a href="{{ url_for('main.funcionario_novo_rdo') }}" class="btn btn-primary">
+                    <a href="{{ url_for('main.funcionario_novo_rdo') }}" class="btn btn-primary me-2">
                         <i class="fas fa-plus me-1"></i>Novo RDO
+                    </a>
+                    <a href="{{ url_for('main.funcionario_rdo_aprimorado') }}" class="btn btn-success">
+                        <i class="fas fa-magic me-1"></i>RDO Aprimorado
                     </a>
                 </div>
             </div>
@@ -98,7 +101,12 @@
                     <div class="row">
                         <div class="col-md-3">
                             <a href="{{ url_for('main.funcionario_novo_rdo') }}" class="btn btn-outline-primary w-100 mb-2">
-                                <i class="fas fa-plus-circle me-2"></i>Criar Novo RDO
+                                <i class="fas fa-plus-circle me-2"></i>Criar RDO Padrão
+                            </a>
+                        </div>
+                        <div class="col-md-3">
+                            <a href="{{ url_for('main.funcionario_rdo_aprimorado') }}" class="btn btn-outline-success w-100 mb-2">
+                                <i class="fas fa-magic me-2"></i>RDO Aprimorado
                             </a>
                         </div>
                         <div class="col-md-3">
@@ -111,7 +119,9 @@
                                 <i class="fas fa-building me-2"></i>Ver Obras
                             </a>
                         </div>
-                        <div class="col-md-3">
+                    </div>
+                    <div class="row">
+                        <div class="col-md-3 offset-md-9">
                             <a href="{{ url_for('main.logout') }}" class="btn btn-outline-danger w-100 mb-2">
                                 <i class="fas fa-sign-out-alt me-2"></i>Sair
                             </a>

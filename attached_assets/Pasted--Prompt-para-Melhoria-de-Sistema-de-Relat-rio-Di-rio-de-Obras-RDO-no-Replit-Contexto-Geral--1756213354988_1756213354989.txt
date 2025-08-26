@@ -1,0 +1,79 @@
+# Prompt para Melhoria de Sistema de Relatório Diário de Obras (RDO) no Replit
+
+## Contexto Geral
+
+Preciso de ajuda para refatorar e melhorar uma funcionalidade chave em meu sistema de gestão de obras. A funcionalidade é o **Relatório Diário de Obra (RDO)**, que é preenchido por funcionários e gerenciado por administradores. O objetivo é tornar o processo de preenchimento mais rápido, intuitivo e menos propenso a erros, aproveitando a estrutura de dados existente.
+
+## Stack Tecnológica Sugerida
+
+*   **Backend:** Python com Flask ou Node.js com Express.
+*   **Frontend:** HTML, CSS e JavaScript (pode ser com um framework leve como Vue.js ou apenas vanilla JS para simplicidade).
+*   **Banco de Dados:** SQLite para simplicidade de configuração no Replit.
+
+## Perfis de Usuário e Permissões
+
+Existem dois perfis de usuário que interagem com o módulo de RDO:
+
+1.  **Administrador:**
+    *   Tem acesso total ao sistema, incluindo outras funcionalidades não descritas aqui.
+    *   No contexto das RDOs, ele possui permissões de **CRUD completo** (Criar, Ler, Atualizar e Deletar) sobre qualquer RDO de qualquer obra.
+
+2.  **Funcionário:**
+    *   Tem acesso limitado ao sistema, focando nas RDOs e em um módulo de "Controle de Veículos".
+    *   Pode **criar** novas RDOs para as obras às quais está associado.
+    *   Pode **visualizar e editar** as RDOs que ele mesmo criou ou que estão relacionadas às suas obras.
+    *   **Não pode deletar** RDOs.
+
+## Estrutura de Dados e Relacionamentos
+
+O sistema possui as seguintes entidades principais que se relacionam para formar a RDO:
+
+1.  **Serviços:** Uma tabela de cadastro com todos os serviços que a empresa oferece (ex: "Alvenaria", "Pintura", "Instalação Elétrica").
+2.  **Subatividades:** Uma tabela de cadastro com subatividades detalhadas, cada uma vinculada a um `Serviço` (ex: o serviço "Alvenaria" pode ter as subatividades "Levantamento de parede", "Chapisco", "Reboco").
+3.  **Obras:** O cadastro de uma obra específica. Ao criar uma obra, o administrador seleciona quais `Serviços` (da tabela de Serviços) serão executados nela. Portanto, cada `Obra` tem uma lista de `Serviços` associados.
+4.  **RDO (Relatório Diário de Obra):** O relatório em si. Cada RDO está vinculado a uma única `Obra`.
+
+**Fluxo do Relacionamento:** `Serviço` -> `Obra` -> `RDO`
+
+## Funcionalidade Principal a ser Melhorada: Criação e Edição de RDO
+
+Esta é a funcionalidade central que precisa ser aprimorada. O fluxo de trabalho ideal é o seguinte:
+
+1.  **Seleção da Obra:** O usuário (funcionário ou administrador) inicia a criação de uma nova RDO e seleciona a `Obra` correspondente em um campo de `select` ou busca.
+
+2.  **Listagem de Serviços:** Após selecionar a `Obra`, a interface deve exibir dinamicamente a lista de `Serviços` que foram associados àquela `Obra`.
+
+3.  **Exibição de Subatividades:**
+    *   Ao lado de cada `Serviço` listado, deve haver um botão (ex: "Sub" ou "Ver Subatividades").
+    *   Ao clicar neste botão, a interface deve exibir as `Subatividades` correspondentes àquele `Serviço`.
+    *   Cada `Subatividade` deve ser exibida com um campo para preenchimento de **porcentagem de conclusão** (de 0 a 100).
+
+4.  **Lógica de Preenchimento da Porcentagem (Ponto Crítico):**
+    *   **Se for a primeira RDO criada para aquela Obra:** Todas as `Subatividades` devem aparecer com o campo de porcentagem zerado (0%).
+    *   **Se já existirem RDOs para aquela Obra:** O sistema deve localizar a **última RDO registrada** para a mesma `Obra` e **pré-preencher** os campos de porcentagem de cada `Subatividade` com os valores da RDO anterior. A ideia é que o funcionário precise apenas atualizar o progresso do dia (ex: mudar de 20% para 30%), em vez de preencher tudo do zero.
+
+5.  **Salvamento:** Após ajustar as porcentagens, o usuário salva a RDO. O sistema deve registrar a data, o usuário que a criou e os valores de porcentagem para cada subatividade.
+
+## Tarefas a Serem Desenvolvidas
+
+Com base no contexto acima, desenvolva o seguinte:
+
+1.  **Estrutura do Banco de Dados:** Crie os modelos (schemas) para as tabelas `Servicos`, `Subatividades`, `Obras`, `Usuarios` e `RDOs`, incluindo os relacionamentos necessários.
+
+2.  **API (Backend):**
+    *   Endpoints de CRUD para `Serviços`, `Subatividades` e `Obras` (acessíveis apenas pelo Administrador).
+    *   Um endpoint para `GET /obras/{id}/servicos` que retorna os serviços de uma obra.
+    *   Um endpoint para `GET /servicos/{id}/subatividades` que retorna as subatividades de um serviço.
+    *   Um endpoint para `POST /rdos` para criar uma nova RDO, contendo a lógica de preenchimento de porcentagem.
+    *   Um endpoint para `GET /obras/{id}/rdos/latest` que retorna a última RDO de uma obra para o pré-preenchimento.
+    *   Endpoints de `GET`, `PUT` e `DELETE` para `/rdos/{id}` respeitando as permissões de cada perfil.
+
+3.  **Interface do Usuário (Frontend):**
+    *   Uma página para criar/editar RDOs que implemente o fluxo descrito na seção "Funcionalidade Principal".
+    *   A interface deve ser reativa, carregando os serviços e subatividades dinamicamente via chamadas de API (AJAX/Fetch).
+    *   Uma página para listar todas as RDOs de uma obra, com opções de editar ou deletar (conforme a permissão).
+
+## Resumo do Objetivo
+
+O objetivo final é ter um protótipo funcional no Replit que demonstre essa lógica de criação de RDO, com ênfase na experiência do usuário e na correta implementação da regra de negócio de herança de porcentagens da RDO anterior. A interface deve ser limpa e o processo, o mais automatizado possível para o funcionário.
+
