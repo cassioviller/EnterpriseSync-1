@@ -440,6 +440,7 @@ class RDO(db.Model):
     data_relatorio = db.Column(db.Date, nullable=False)
     obra_id = db.Column(db.Integer, db.ForeignKey('obra.id'), nullable=False)
     criado_por_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False)
+    admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=True)  # Para isolamento multi-tenant
     
     # Condições climáticas padronizadas
     clima_geral = db.Column(db.String(50))  # Ensolarado, Nublado, Chuvoso, etc.
@@ -460,7 +461,8 @@ class RDO(db.Model):
     
     # Relacionamentos
     obra = db.relationship('Obra', backref='rdos', overlaps="rdos")
-    criado_por = db.relationship('Usuario', backref='rdos_criados', overlaps="rdos_criados")
+    criado_por = db.relationship('Usuario', foreign_keys=[criado_por_id], backref='rdos_criados', overlaps="rdos_criados")
+    admin = db.relationship('Usuario', foreign_keys=[admin_id], backref='rdos_admin', overlaps="rdos_admin")
     mao_obra = db.relationship('RDOMaoObra', backref='rdo_ref', cascade='all, delete-orphan', overlaps="rdo_ref")
     equipamentos = db.relationship('RDOEquipamento', backref='rdo_ref', cascade='all, delete-orphan', overlaps="rdo_ref")
     atividades = db.relationship('RDOAtividade', backref='rdo_ref', cascade='all, delete-orphan', overlaps="rdo_ref")

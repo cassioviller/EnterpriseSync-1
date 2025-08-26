@@ -2121,7 +2121,8 @@ def funcionario_criar_rdo():
             rdo.numero_rdo = numero_rdo
             rdo.obra_id = obra_id
             rdo.data_relatorio = data_relatorio
-            rdo.admin_id = current_user.admin_id  # Vincular ao admin correto
+            rdo.criado_por_id = current_user.id  # ID do usuário que criou
+            rdo.admin_id = current_user.admin_id  # Para isolamento multi-tenant
             
             print(f"DEBUG CRIAÇÃO: Criando novo RDO {numero_rdo}")
         
@@ -2141,13 +2142,11 @@ def funcionario_criar_rdo():
         
         rdo.comentario_geral = request.form.get('comentario_geral', '').strip()
         rdo.status = 'Rascunho'
-        # Buscar o funcionário correspondente ao usuário logado
-        funcionario = Funcionario.query.filter_by(email=current_user.email, admin_id=current_user.admin_id).first()
-        if funcionario:
-            rdo.criado_por_id = funcionario.id
-        else:
-            flash('Funcionário não encontrado. Entre em contato com o administrador.', 'error')
-            return redirect(url_for('main.funcionario_novo_rdo'))
+        
+        # Para edição, o criado_por_id já está setado, não alterar
+        if not rdo_id:
+            # Para criação, já foi setado acima
+            pass
         
         db.session.add(rdo)
         db.session.flush()  # Para obter o ID

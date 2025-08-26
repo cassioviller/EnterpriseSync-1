@@ -41,6 +41,12 @@ def executar_migracoes():
         
         # Migração 8: Adicionar campos editáveis para páginas do PDF - IGNORADA POR ENQUANTO
         logger.info("✅ Campos PDF serão adicionados manualmente se necessário")
+        
+        # Migração 9: CRÍTICA - Corrigir campos faltantes na tabela rdo_ocorrencia
+        migrar_campos_rdo_ocorrencia()
+        
+        # Migração 10: CRÍTICA - Adicionar campo admin_id na tabela rdo
+        migrar_campo_admin_id_rdo()
 
         logger.info("✅ Migrações automáticas concluídas com sucesso!")
         
@@ -497,6 +503,113 @@ def migrar_campos_completos_templates():
         
     except Exception as e:
         logger.error(f"❌ Erro ao adicionar campos completos de templates: {str(e)}")
+        if 'connection' in locals():
+            connection.rollback()
+            cursor.close()
+            connection.close()
+
+
+def migrar_campos_rdo_ocorrencia():
+    """
+    CRÍTICA: Migração para corrigir campos faltantes na tabela rdo_ocorrencia
+    O modelo RDOOcorrencia possui campos que não existem na tabela do banco
+    """
+    try:
+        import psycopg2
+        import os
+        
+        # Conectar ao banco usando a URL do ambiente
+        connection = psycopg2.connect(os.environ.get("DATABASE_URL"))
+        cursor = connection.cursor()
+        
+        logger.info("🔄 Verificando e adicionando campos faltantes na tabela rdo_ocorrencia...")
+        
+        # Campos que precisam existir na tabela rdo_ocorrencia
+        campos_necessarios = [
+            ("tipo_ocorrencia", "VARCHAR(50)", "NOT NULL DEFAULT 'Observação'"),
+            ("severidade", "VARCHAR(20)", "DEFAULT 'Baixa'"),
+            ("responsavel_acao", "VARCHAR(100)"),
+            ("prazo_resolucao", "DATE"),
+            ("status_resolucao", "VARCHAR(20)", "DEFAULT 'Pendente'"),
+            ("observacoes_resolucao", "TEXT"),
+            ("criado_em", "TIMESTAMP", "DEFAULT CURRENT_TIMESTAMP")
+        ]
+        
+        for nome_coluna, tipo_coluna, *restricoes in campos_necessarios:
+            # Verificar se a coluna já existe
+            cursor.execute("""
+                SELECT column_name 
+                FROM information_schema.columns 
+                WHERE table_name = 'rdo_ocorrencia' 
+                AND column_name = %s
+            """, (nome_coluna,))
+            
+            exists = cursor.fetchone()
+            
+            if not exists:
+                logger.info(f"🔄 Adicionando coluna '{nome_coluna}' na tabela rdo_ocorrencia...")
+                
+                # Montar comando ALTER TABLE
+                alter_comando = f"ALTER TABLE rdo_ocorrencia ADD COLUMN {nome_coluna} {tipo_coluna}"
+                if restricoes:
+                    alter_comando += f" {restricoes[0]}"
+                
+                cursor.execute(alter_comando)
+                logger.info(f"✅ Coluna '{nome_coluna}' adicionada com sucesso na tabela rdo_ocorrencia")
+            else:
+                logger.info(f"✅ Coluna '{nome_coluna}' já existe na tabela rdo_ocorrencia")
+        
+        connection.commit()
+        cursor.close()
+        connection.close()
+        logger.info("🎯 Migração da tabela rdo_ocorrencia concluída com sucesso!")
+        
+    except Exception as e:
+        logger.error(f"❌ ERRO CRÍTICO ao migrar campos RDO ocorrência: {str(e)}")
+        if 'connection' in locals():
+            connection.rollback()
+            cursor.close()
+            connection.close()
+
+
+def migrar_campo_admin_id_rdo():
+    """
+    CRÍTICA: Adicionar campo admin_id na tabela rdo para suporte multitenant
+    """
+    try:
+        import psycopg2
+        import os
+        
+        # Conectar ao banco usando a URL do ambiente
+        connection = psycopg2.connect(os.environ.get("DATABASE_URL"))
+        cursor = connection.cursor()
+        
+        logger.info("🔄 Verificando se campo admin_id existe na tabela rdo...")
+        
+        # Verificar se a coluna admin_id já existe
+        cursor.execute("""
+            SELECT column_name 
+            FROM information_schema.columns 
+            WHERE table_name = 'rdo' 
+            AND column_name = 'admin_id'
+        """)
+        
+        exists = cursor.fetchone()
+        
+        if not exists:
+            logger.info("🔄 Adicionando coluna 'admin_id' na tabela rdo...")
+            cursor.execute("ALTER TABLE rdo ADD COLUMN admin_id INTEGER REFERENCES usuario(id)")
+            logger.info("✅ Coluna 'admin_id' adicionada com sucesso na tabela rdo")
+        else:
+            logger.info("✅ Coluna 'admin_id' já existe na tabela rdo")
+        
+        connection.commit()
+        cursor.close()
+        connection.close()
+        logger.info("🎯 Migração do campo admin_id na tabela rdo concluída!")
+        
+    except Exception as e:
+        logger.error(f"❌ ERRO ao migrar campo admin_id RDO: {str(e)}")
         if 'connection' in locals():
             connection.rollback()
             cursor.close()
