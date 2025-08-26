@@ -2062,10 +2062,10 @@ def funcionario_novo_rdo():
         print(f"ERRO FUNCIONÁRIO NOVO RDO: {str(e)}")
         return redirect(url_for('main.funcionario_dashboard'))
 
-@main_bp.route('/funcionario/rdo/consolidado')
+@main_bp.route('/funcionario/rdo/refatorado')
 @funcionario_required
-def funcionario_rdo_consolidado():
-    """Funcionário criar RDO com interface única e limpa"""
+def funcionario_rdo_refatorado():
+    """Funcionário criar RDO com interface refatorada e moderna"""
     try:
         # Buscar todas as obras do admin
         obras = Obra.query.filter_by(admin_id=current_user.admin_id).order_by(Obra.nome).all()
@@ -2094,7 +2094,7 @@ def funcionario_rdo_consolidado():
             }
             funcionarios_dict.append(func_dict)
         
-        return render_template('funcionario/rdo_moderno.html', 
+        return render_template('funcionario/rdo_refatorado.html', 
                              obras=obras, 
                              funcionarios=funcionarios_dict, 
                              date=date)
