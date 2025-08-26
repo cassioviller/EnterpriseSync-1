@@ -1,0 +1,265 @@
+# Prompt Complementar: Refinamento de Lógica e Testes Abrangentes para Sistema RDO
+
+## Objetivo
+
+Este prompt complementa o desenvolvimento anterior, focando especificamente em **refinar a lógica de negócio** e implementar **testes abrangentes** que validem todas as funcionalidades do sistema RDO para os perfis de **Administrador** e **Funcionário**. O objetivo é garantir que o sistema seja robusto, seguro e funcione corretamente em todos os cenários possíveis.
+
+## 1. Refinamentos Críticos da Lógica de Negócio
+
+### 1.1 Validações e Regras de Negócio Avançadas
+
+Implemente as seguintes validações e refinamentos:
+
+**Validações de Porcentagem:**
+- Porcentagens devem estar entre 0 e 100
+- Não permitir porcentagens menores que a RDO anterior (o progresso não pode regredir)
+- Alertar quando uma subatividade atinge 100% (conclusão)
+- Validar se a soma das porcentagens faz sentido no contexto da obra
+
+**Controle de Concorrência:**
+- Implementar verificação se outra RDO foi criada enquanto o usuário estava preenchendo
+- Sistema de lock otimista para evitar conflitos de dados
+- Mensagem de aviso se dados foram alterados por outro usuário
+
+**Validações de Data:**
+- Não permitir criar RDO com data futura
+- Não permitir criar múltiplas RDOs para a mesma obra na mesma data
+- Validar sequência cronológica das RDOs
+
+**Validações de Permissão Dinâmica:**
+- Verificar se o funcionário ainda tem acesso à obra no momento da edição
+- Validar se a obra ainda está ativa
+- Controlar acesso baseado no status da obra (ativa, pausada, finalizada)
+
+### 1.2 Lógica de Herança de Porcentagens Refinada
+
+Aprimore a lógica de herança com os seguintes cenários:
+
+**Cenário 1 - Primeira RDO:**
+```
+- Todas subatividades iniciam com 0%
+- Sistema deve sugerir quais subatividades são típicas para o primeiro dia
+- Permitir templates de início rápido por tipo de obra
+```
+
+**Cenário 2 - RDOs Subsequentes:**
+```
+- Herdar porcentagens da última RDO
+- Destacar visualmente quais subatividades tiveram progresso na última RDO
+- Sugerir incrementos típicos baseados no histórico
+- Alertar sobre subatividades que não tiveram progresso há muito tempo
+```
+
+**Cenário 3 - RDO após Intervalo Longo:**
+```
+- Se última RDO foi há mais de X dias, alertar o usuário
+- Permitir justificativa para grandes saltos de porcentagem
+- Sugerir revisão de subatividades que podem ter sido esquecidas
+```
+
+### 1.3 Funcionalidades Avançadas
+
+**Dashboard de Progresso:**
+- Gráfico de evolução das subatividades ao longo do tempo
+- Indicadores de velocidade de progresso
+- Alertas para subatividades atrasadas
+- Projeção de conclusão baseada no ritmo atual
+
+**Histórico e Auditoria:**
+- Log de todas as alterações em RDOs
+- Quem alterou, quando e o que foi alterado
+- Possibilidade de reverter alterações (apenas para administrador)
+- Comentários opcionais em cada RDO
+
+## 2. Plano de Testes Abrangente
+
+### 2.1 Testes para Perfil ADMINISTRADOR
+
+#### Testes de CRUD Completo
+```
+TESTE 1: Criação de RDO
+- Criar RDO para obra nova (primeira RDO)
+- Criar RDO para obra existente (herança de porcentagens)
+- Tentar criar RDO com data inválida
+- Criar RDO com todas as subatividades em 100%
+
+TESTE 2: Leitura/Visualização
+- Visualizar lista de todas as RDOs do sistema
+- Filtrar RDOs por obra, data, funcionário
+- Visualizar detalhes de uma RDO específica
+- Visualizar histórico de alterações de uma RDO
+
+TESTE 3: Atualização
+- Editar RDO própria
+- Editar RDO de outro usuário
+- Alterar porcentagens para valores válidos/inválidos
+- Adicionar comentários e justificativas
+
+TESTE 4: Exclusão
+- Deletar RDO própria
+- Deletar RDO de outro usuário
+- Tentar deletar RDO que afetaria a sequência
+- Confirmar que exclusão não quebra herança de porcentagens
+```
+
+#### Testes de Funcionalidades Administrativas
+```
+TESTE 5: Gestão de Obras
+- Criar obra com serviços selecionados
+- Modificar serviços de obra existente
+- Verificar impacto nas RDOs existentes
+
+TESTE 6: Gestão de Usuários
+- Atribuir funcionários a obras
+- Remover acesso de funcionário a obra
+- Verificar se funcionário perde acesso às RDOs
+
+TESTE 7: Relatórios e Dashboard
+- Gerar relatório de progresso por obra
+- Visualizar dashboard consolidado
+- Exportar dados para Excel/PDF
+```
+
+### 2.2 Testes para Perfil FUNCIONÁRIO
+
+#### Testes de Acesso e Permissões
+```
+TESTE 8: Controle de Acesso
+- Tentar acessar RDO de obra não atribuída
+- Tentar deletar RDO (deve ser negado)
+- Tentar acessar funcionalidades administrativas
+- Verificar acesso apenas às próprias obras
+
+TESTE 9: Criação de RDO
+- Criar primeira RDO para obra atribuída
+- Criar RDO subsequente (verificar herança)
+- Tentar criar RDO para data já existente
+- Criar RDO com porcentagens inválidas
+```
+
+#### Testes de Funcionalidades Específicas
+```
+TESTE 10: Edição de RDO
+- Editar RDO própria criada no mesmo dia
+- Editar RDO própria criada em dias anteriores
+- Tentar editar RDO de outro funcionário (deve ser negado)
+- Salvar alterações válidas e inválidas
+
+TESTE 11: Visualização
+- Ver lista de RDOs das obras atribuídas
+- Visualizar progresso das subatividades
+- Acessar histórico de RDOs da obra
+- Verificar se não vê dados de outras obras
+```
+
+### 2.3 Testes de Integração e Cenários Complexos
+
+#### Cenários de Múltiplos Usuários
+```
+TESTE 12: Concorrência
+- Dois usuários editando a mesma RDO simultaneamente
+- Funcionário criando RDO enquanto admin modifica a obra
+- Verificar locks e mensagens de conflito
+
+TESTE 13: Fluxo Completo de Obra
+- Criar obra com múltiplos serviços
+- Atribuir funcionários
+- Criar sequência de RDOs ao longo do tempo
+- Verificar evolução das porcentagens
+- Finalizar obra e gerar relatório final
+```
+
+#### Testes de Performance e Usabilidade
+```
+TESTE 14: Performance
+- Carregar obra com muitos serviços/subatividades
+- Buscar RDOs em obra com histórico extenso
+- Testar responsividade da interface
+
+TESTE 15: Usabilidade
+- Navegação intuitiva entre telas
+- Feedback visual adequado
+- Mensagens de erro claras
+- Processo de criação de RDO fluido
+```
+
+## 3. Implementação dos Testes
+
+### 3.1 Estrutura de Testes Automatizados
+
+Crie os seguintes tipos de teste:
+
+**Testes Unitários (Backend):**
+- Validações de modelo
+- Lógica de herança de porcentagens
+- Cálculos de progresso
+- Validações de permissão
+
+**Testes de Integração (API):**
+- Endpoints de CRUD
+- Autenticação e autorização
+- Fluxos completos de criação de RDO
+
+**Testes E2E (Frontend):**
+- Fluxos de usuário completos
+- Interações com a interface
+- Validações visuais
+
+### 3.2 Dados de Teste
+
+Crie um conjunto robusto de dados de teste incluindo:
+
+**Usuários:**
+- 1 Administrador
+- 3 Funcionários com diferentes permissões
+- 1 Usuário inativo
+
+**Obras:**
+- Obra pequena (2-3 serviços)
+- Obra média (5-7 serviços)
+- Obra grande (10+ serviços)
+- Obra finalizada
+- Obra pausada
+
+**Histórico de RDOs:**
+- Obra com 1 RDO
+- Obra com sequência de 10+ RDOs
+- Obra com RDOs de diferentes funcionários
+- Obra com gaps de datas
+
+## 4. Critérios de Aceitação
+
+O sistema deve passar em todos os testes acima e atender aos seguintes critérios:
+
+**Funcionalidade:**
+- ✅ Herança de porcentagens funciona corretamente
+- ✅ Permissões respeitadas para cada perfil
+- ✅ Validações impedem dados inconsistentes
+- ✅ Interface responsiva e intuitiva
+
+**Segurança:**
+- ✅ Funcionários não acessam dados não autorizados
+- ✅ Validações server-side para todas as operações
+- ✅ Logs de auditoria funcionando
+
+**Performance:**
+- ✅ Carregamento rápido mesmo com muitos dados
+- ✅ Interface responsiva
+- ✅ Operações concluem em tempo aceitável
+
+**Usabilidade:**
+- ✅ Fluxo de criação de RDO é intuitivo
+- ✅ Feedback visual adequado
+- ✅ Mensagens de erro são claras e úteis
+
+## 5. Entregáveis Esperados
+
+1. **Código refinado** com todas as validações implementadas
+2. **Suite de testes** automatizados cobrindo todos os cenários
+3. **Documentação** dos testes e como executá-los
+4. **Dados de demonstração** para testar todos os cenários
+5. **Relatório de cobertura** dos testes
+6. **Manual de teste** para validação manual se necessário
+
+Implemente este refinamento e conjunto de testes de forma incremental, priorizando primeiro os cenários mais críticos para o negócio.
+

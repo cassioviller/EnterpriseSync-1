@@ -2611,6 +2611,109 @@ def api_rdo_herdar_percentuais(obra_id):
         traceback.print_exc()
         return jsonify({'error': 'Erro interno', 'success': False}), 500
 
+@main_bp.route('/api/test/rdo/salvar-subatividades', methods=['POST'])
+def api_test_rdo_salvar_subatividades():
+    """API TEST para salvar subatividades do RDO com validações avançadas"""
+    try:
+        from rdo_validations import RDOValidator, RDOBusinessRules, RDOAuditLog
+        
+        data = request.get_json()
+        rdo_id = data.get('rdo_id')
+        obra_id = data.get('obra_id')
+        data_relatorio = data.get('data_relatorio')
+        subatividades = data.get('subatividades', [])
+        admin_id = 10  # Usar admin_id padrão para teste
+        
+        # Validações básicas
+        if not rdo_id and not obra_id:
+            return jsonify({'error': 'RDO ID ou Obra ID obrigatório', 'success': False}), 400
+        
+        # Se é criação de novo RDO
+        if not rdo_id and obra_id:
+            # Validar regras de data
+            try:
+                data_obj = datetime.strptime(data_relatorio, '%Y-%m-%d').date()
+                RDOValidator.validate_date_rules(data_obj, obra_id)
+                RDOValidator.validate_obra_status(obra_id, admin_id)
+            except Exception as e:
+                return jsonify({'error': str(e), 'success': False}), 400
+            
+            # Criar novo RDO
+            novo_rdo = RDO()
+            novo_rdo.obra_id = obra_id
+            novo_rdo.data_relatorio = data_obj
+            novo_rdo.numero_rdo = RDOBusinessRules.generate_rdo_number(obra_id)
+            novo_rdo.status = 'Rascunho'
+            novo_rdo.admin_id = admin_id
+            # Buscar um funcionário existente do admin para o teste
+            funcionario_teste = Funcionario.query.filter_by(admin_id=admin_id).first()
+            novo_rdo.criado_por_id = funcionario_teste.id if funcionario_teste else None
+            novo_rdo.responsavel_tecnico = f'Funcionário Teste (ID: 15)'
+            
+            db.session.add(novo_rdo)
+            db.session.commit()
+            rdo_id = novo_rdo.id
+            
+            # Log de auditoria
+            RDOAuditLog.log_rdo_creation(rdo_id, 15)
+        
+        # Validar subatividades
+        validation_errors = []
+        warnings = []
+        alerts = []
+        
+        for sub_data in subatividades:
+            try:
+                percentual = float(sub_data.get('percentual_conclusao', 0))
+                servico_id = sub_data.get('servico_id')
+                servico_nome = sub_data.get('servico_nome', 'N/A')
+                subatividade_nome = sub_data.get('nome_subatividade', '')
+                
+                # Validações avançadas
+                RDOValidator.validate_percentage(percentual)
+                RDOValidator.validate_percentage_progression(
+                    obra_id, servico_id, percentual, servico_nome, subatividade_nome
+                )
+                
+            except Exception as e:
+                validation_errors.append(str(e))
+        
+        # Se houve erros de validação, retornar sem salvar
+        if validation_errors:
+            return jsonify({
+                'success': False,
+                'errors': validation_errors,
+                'message': 'Corrija os erros antes de salvar'
+            }), 400
+        
+        # Gerar alertas e avisos
+        alerts = RDOValidator.get_completion_alerts(subatividades)
+        gap_warning = RDOValidator.validate_long_gap_warning(obra_id)
+        if gap_warning['warning']:
+            warnings.append(gap_warning)
+        
+        # Validações de sequência lógica
+        for servico_nome in set(sub.get('servico_nome', '') for sub in subatividades):
+            servico_subs = [sub for sub in subatividades if sub.get('servico_nome') == servico_nome]
+            seq_warnings = RDOValidator.validate_logical_sequence(servico_subs, servico_nome)
+            warnings.extend(seq_warnings)
+        
+        return jsonify({
+            'success': True,
+            'message': 'Validações concluídas com sucesso',
+            'rdo_id': rdo_id,
+            'alerts': alerts,
+            'warnings': warnings,
+            'suggestions': RDOBusinessRules.suggest_next_activities(obra_id),
+            'overall_progress': RDOBusinessRules.calculate_overall_progress(obra_id)
+        })
+        
+    except Exception as e:
+        print(f"ERRO API TEST RDO SALVAR: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': 'Erro interno', 'success': False}), 500
+
 @main_bp.route('/api/rdo/salvar-subatividades', methods=['POST'])
 @funcionario_required  
 def api_rdo_salvar_subatividades():
