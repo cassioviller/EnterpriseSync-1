@@ -67,13 +67,13 @@
 
 .subatividade-row {
     display: flex;
+    justify-content: space-between;
     align-items: center;
-    gap: 15px;
-    padding: 10px;
+    padding: 8px 15px;
     border-bottom: 1px solid var(--border-color);
     background: #f8f9fa;
-    border-radius: 8px;
-    margin-bottom: 10px;
+    border-radius: 6px;
+    margin-bottom: 8px;
 }
 
 .subatividade-row:last-child {
@@ -81,32 +81,45 @@
 }
 
 .subatividade-nome {
-    flex: 2;
     font-weight: 600;
     color: #495057;
+    flex: 1;
 }
 
 .subatividade-input {
-    width: 80px;
+    width: 60px;
     text-align: center;
     border: 2px solid var(--border-color);
-    border-radius: 6px;
-    padding: 5px;
-}
-
-.progress-bar-mini {
-    flex: 1;
-    height: 8px;
-    background: var(--border-color);
     border-radius: 4px;
-    overflow: hidden;
+    padding: 4px 8px;
+    font-size: 14px;
+    font-weight: bold;
 }
 
-.progress-fill {
-    height: 100%;
-    background: linear-gradient(90deg, var(--success-color), var(--primary-color));
-    width: 0%;
-    transition: width 0.3s ease;
+.funcionario-row, .ferramenta-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px 15px;
+    border-bottom: 1px solid var(--border-color);
+    background: #f8f9fa;
+    border-radius: 6px;
+    margin-bottom: 10px;
+}
+
+.funcionario-nome, .ferramenta-nome {
+    font-weight: 600;
+    color: #495057;
+    flex: 1;
+}
+
+.horas-input {
+    width: 70px;
+    text-align: center;
+    border: 2px solid var(--border-color);
+    border-radius: 4px;
+    padding: 4px 8px;
+    font-size: 14px;
 }
 
 .btn {
@@ -340,6 +353,57 @@
             </div>
         </div>
 
+        <!-- Funcionários (Mão de Obra) -->
+        <div class="rdo-section">
+            <div class="section-header" onclick="toggleSection(this)">
+                <h5><i class="fas fa-users"></i> Funcionários (Mão de Obra)</h5>
+                <i class="fas fa-chevron-down"></i>
+            </div>
+            <div class="section-body">
+                <div id="funcionarios-container">
+                    {% for funcionario in funcionarios %}
+                    <div class="funcionario-row">
+                        <div class="funcionario-nome">
+                            <i class="fas fa-user text-primary"></i> {{ funcionario.nome }}
+                        </div>
+                        <div class="d-flex align-items-center gap-2">
+                            <input type="number" 
+                                   class="horas-input" 
+                                   name="funcionario_{{ funcionario.id }}_horas"
+                                   min="0" max="12" step="0.5" 
+                                   placeholder="0">
+                            <span class="text-muted">horas</span>
+                        </div>
+                        <input type="hidden" name="funcionario_{{ funcionario.id }}_nome" value="{{ funcionario.nome }}">
+                    </div>
+                    {% endfor %}
+                    {% if not funcionarios %}
+                    <div class="text-center py-3 text-muted">
+                        <p>Nenhum funcionário ativo encontrado</p>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Ferramentas e Equipamentos -->
+        <div class="rdo-section">
+            <div class="section-header" onclick="toggleSection(this)">
+                <h5><i class="fas fa-tools"></i> Ferramentas e Equipamentos</h5>
+                <i class="fas fa-chevron-down"></i>
+            </div>
+            <div class="section-body">
+                <div class="mb-3">
+                    <button type="button" class="btn btn-outline-primary btn-sm" onclick="adicionarFerramenta()">
+                        <i class="fas fa-plus"></i> Adicionar Ferramenta
+                    </button>
+                </div>
+                <div id="ferramentas-container">
+                    <!-- Ferramentas serão adicionadas dinamicamente -->
+                </div>
+            </div>
+        </div>
+
         <!-- Botões de Ação -->
         <div class="d-flex justify-content-between mt-4">
             <button type="button" class="btn btn-outline-secondary" onclick="window.location.href='{{ url_for('main.funcionario_dashboard') }}'">
@@ -458,9 +522,6 @@ function renderizarServicos() {
                                    placeholder="0">
                             <span class="text-muted">%</span>
                         </div>
-                        <div class="progress-bar-mini">
-                            <div class="progress-fill" data-percentual="0"></div>
-                        </div>
                         <input type="hidden" name="subatividades[${servicoIndex}][${subIndex}][nome]" value="${sub.nome}">
                         <input type="hidden" name="subatividades[${servicoIndex}][${subIndex}][servico_id]" value="${servico.id}">
                         <input type="hidden" name="subatividades[${servicoIndex}][${subIndex}][servico_nome]" value="${servico.nome}">
@@ -485,11 +546,6 @@ function atualizarProgresso(input) {
     // Validar valor
     if (valor < 0) input.value = 0;
     if (valor > 100) input.value = 100;
-    
-    // Atualizar barra de progresso individual
-    const progressBar = input.closest('.subatividade-row').querySelector('.progress-fill');
-    progressBar.style.width = `${input.value}%`;
-    progressBar.setAttribute('data-percentual', input.value);
     
     // Calcular progresso geral
     calcularProgressoGeral();
@@ -623,7 +679,9 @@ function coletarDados() {
         temperatura_media: formData.get('temperatura_media'),
         observacoes_climaticas: formData.get('observacoes_climaticas'),
         comentario_geral: formData.get('comentario_geral'),
-        subatividades: []
+        subatividades: [],
+        funcionarios: [],
+        ferramentas: []
     };
     
     // Coletar subatividades com percentual > 0
@@ -643,6 +701,39 @@ function coletarDados() {
                 percentual_conclusao: percentual,
                 observacoes_tecnicas: '' // Removido conforme solicitado
             });
+        }
+    });
+    
+    // Coletar funcionários com horas > 0
+    const funcionarioInputs = document.querySelectorAll('.horas-input[name*="funcionario_"]');
+    funcionarioInputs.forEach(input => {
+        const horas = parseFloat(input.value) || 0;
+        if (horas > 0) {
+            const funcionarioId = input.name.match(/funcionario_(\d+)_horas/)[1];
+            const nomeInput = document.querySelector(`input[name="funcionario_${funcionarioId}_nome"]`);
+            
+            dados.funcionarios.push({
+                funcionario_id: parseInt(funcionarioId),
+                nome: nomeInput.value,
+                horas_trabalhadas: horas
+            });
+        }
+    });
+    
+    // Coletar ferramentas com horas > 0
+    const ferramentaInputs = document.querySelectorAll('.horas-input[name*="ferramenta_"]');
+    ferramentaInputs.forEach(input => {
+        const horas = parseFloat(input.value) || 0;
+        if (horas > 0) {
+            const ferramentaId = input.name.match(/ferramenta_(\d+)_horas/)[1];
+            const nomeInput = document.querySelector(`input[name="ferramenta_${ferramentaId}_nome"]`);
+            
+            if (nomeInput && nomeInput.value.trim()) {
+                dados.ferramentas.push({
+                    nome: nomeInput.value.trim(),
+                    horas_utilizadas: horas
+                });
+            }
         }
     });
     
@@ -739,6 +830,47 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
 });
+
+// Adicionar ferramenta
+let contadorFerramentas = 0;
+function adicionarFerramenta() {
+    contadorFerramentas++;
+    const container = document.getElementById('ferramentas-container');
+    
+    const ferramentaHtml = `
+        <div class="ferramenta-row" id="ferramenta-${contadorFerramentas}">
+            <div class="d-flex align-items-center gap-2 flex-1">
+                <i class="fas fa-tools text-primary"></i>
+                <input type="text" 
+                       class="form-control" 
+                       name="ferramenta_${contadorFerramentas}_nome"
+                       placeholder="Nome da ferramenta/equipamento"
+                       required>
+            </div>
+            <div class="d-flex align-items-center gap-2">
+                <input type="number" 
+                       class="horas-input" 
+                       name="ferramenta_${contadorFerramentas}_horas"
+                       min="0" max="12" step="0.5" 
+                       placeholder="0">
+                <span class="text-muted">horas</span>
+                <button type="button" class="btn btn-outline-danger btn-sm" onclick="removerFerramenta(${contadorFerramentas})">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+        </div>
+    `;
+    
+    container.insertAdjacentHTML('beforeend', ferramentaHtml);
+}
+
+// Remover ferramenta
+function removerFerramenta(id) {
+    const elemento = document.getElementById(`ferramenta-${id}`);
+    if (elemento) {
+        elemento.remove();
+    }
+}
 
 console.log('Sistema RDO Consolidado carregado com sucesso!');
 </script>
