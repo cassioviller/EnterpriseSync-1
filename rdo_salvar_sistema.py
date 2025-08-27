@@ -3,7 +3,7 @@
 
 from flask import Blueprint, request, jsonify, redirect, url_for, flash, render_template
 from models import db, RDO, RDOMaoObra, RDOServicoSubatividade, Obra, Funcionario, SubAtividade
-from bypass_auth import obter_admin_id, obter_funcionario_atual
+from bypass_auth import obter_admin_id, obter_usuario_atual
 from datetime import datetime, date
 from sqlalchemy import desc, and_
 import logging
@@ -69,18 +69,19 @@ def processar_salvamento_rdo():
         admin_id = obter_admin_id()
         print(f"✅ Admin ID obtido: {admin_id}")
         
-        # Passo 2: Obter funcionário atual
-        funcionario_id = obter_funcionario_atual()
-        print(f"✅ Funcionário ID obtido: {funcionario_id}")
+        # Passo 2: Obter usuário atual (sem vinculação com funcionário)
+        usuario_id = obter_usuario_atual()
+        print(f"✅ Usuário ID obtido: {usuario_id}")
         
-        # Verificar se funcionário existe
-        funcionario = Funcionario.query.get(funcionario_id)
-        if not funcionario:
-            print(f"❌ ERRO: Funcionário ID={funcionario_id} não encontrado na base de dados")
-            flash('Erro: Funcionário não encontrado na base de dados. Contacte o administrador.', 'error')
+        # Verificar se usuário tem acesso (sem verificar funcionário)
+        from models import Usuario
+        usuario = Usuario.query.get(usuario_id)
+        if not usuario:
+            print(f"❌ ERRO: Usuário ID={usuario_id} não encontrado na base de dados")
+            flash('Erro: Usuário não encontrado na base de dados. Contacte o administrador.', 'error')
             return redirect(url_for('rdo_salvar.funcionario_rdo_consolidado'))
         
-        print(f"✅ Funcionário encontrado: {funcionario.nome} (admin_id={funcionario.admin_id})")
+        print(f"✅ Usuário encontrado: {usuario.username} (admin_id={usuario.admin_id})")
         
         # Passo 3: Obter dados do formulário
         dados = request.form.to_dict()
@@ -97,7 +98,7 @@ def processar_salvamento_rdo():
         rdo = RDO()
         rdo.numero_rdo = gerar_numero_rdo_unico()
         rdo.admin_id = admin_id
-        rdo.criado_por_id = funcionario_id
+        rdo.criado_por_id = usuario_id
         
         print(f"✅ RDO básico criado - Número: {rdo.numero_rdo}")
         
@@ -301,7 +302,7 @@ def salvar_rdo_rapido():
         rdo = RDO()
         rdo.numero_rdo = gerar_numero_rdo_unico()
         rdo.admin_id = admin_id
-        rdo.criado_por_id = obter_funcionario_atual()
+        rdo.criado_por_id = obter_usuario_atual()
         rdo.data_relatorio = date.today()
         rdo.obra_id = dados.get('obra_id')
         rdo.status = 'Rascunho'
