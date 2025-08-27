@@ -2341,7 +2341,8 @@ def funcionario_lista_rdos():
             Obra.admin_id == current_user.admin_id
         ).order_by(RDO.data_relatorio.desc()).all()
         
-        return render_template('funcionario/lista_rdos.html', rdos=rdos)
+        # Redirecionar para a lista principal moderna
+        return redirect(url_for('main.lista_rdos'))
         
     except Exception as e:
         print(f"ERRO FUNCIONÁRIO LISTA RDOs: {str(e)}")

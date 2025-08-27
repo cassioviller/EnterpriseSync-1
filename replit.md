@@ -8,6 +8,8 @@ SIGE (Sistema de Gestão Empresarial) is a multi-tenant business management syst
 - Evitar intervenção manual no banco de produção
 - Implementar logs detalhados para debugging
 - Sistema deve ser resiliente a diferenças entre ambientes
+- Interface moderna com cards elegantes em vez de listas simples
+- Design limpo e profissional com gradientes e animações suaves
 
 ## System Architecture
 The system is built with a Flask backend, SQLAlchemy ORM, and PostgreSQL database, with Jinja2 templates and Bootstrap for the frontend. Deployment is managed via Docker on Replit. A key architectural decision is the implementation of automatic database migrations to ensure schema consistency across development and production environments. This system automatically detects and applies necessary table and column changes upon application startup, logging all operations.
@@ -20,7 +22,7 @@ The system is built with a Flask backend, SQLAlchemy ORM, and PostgreSQL databas
 -   **Core Modules:**
     -   **Proposal Management:** Reusable templates (`PropostaTemplate`), automatic calculations, categorization, and filtering. Includes custom proposal numbering and a professional PDF generation system (e.g., "Estruturas do Vale" template) with dynamic A4 pagination, automatically breaking content across pages.
     -   **Employee Management:** Full registration with photo support, automated time clocking, and overtime/lateness calculation.
-    -   **Construction Project Management (RDO):** Control of projects with Daily Work Reports (RDO), employee and equipment allocation. Includes a refactored, professional RDO interface with real-time validation and auto-save.
+    -   **Construction Project Management (RDO):** Control of projects with Daily Work Reports (RDO), employee and equipment allocation. Features a completely modernized card-based interface (`lista_completa.html`) with gradient headers, statistics dashboard, advanced filtering, and responsive design. All legacy templates cleaned up for maintainability.
     -   **Payroll:** Automatic calculation based on time clock records and configurable salaries.
 -   **Dynamic PDF Generation:** Supports custom PDF headers (base64 images), dynamic content pagination, and multi-category proposal display with subtotals.
 -   **Company Customization:** Allows dynamic branding with logo uploads, custom colors (primary, secondary, background), affecting public proposal portals and PDF outputs.
