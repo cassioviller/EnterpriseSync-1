@@ -10,13 +10,17 @@ SIGE (Sistema de Gestão Empresarial) is a multi-tenant business management syst
 - Sistema deve ser resiliente a diferenças entre ambientes
 - Interface moderna com cards elegantes em vez de listas simples
 - Design limpo e profissional com gradientes e animações suaves
+- Template unificado em todas as páginas do sistema
+- Contraste adequado de texto (valores em preto) para melhor legibilidade
 
 ## System Architecture
 The system is built with a Flask backend, SQLAlchemy ORM, and PostgreSQL database, with Jinja2 templates and Bootstrap for the frontend. Deployment is managed via Docker on Replit. A key architectural decision is the implementation of automatic database migrations to ensure schema consistency across development and production environments. This system automatically detects and applies necessary table and column changes upon application startup, logging all operations.
 
+**Template Architecture (Updated Aug 2025):** The entire system now uses a unified modern template (`base_completo.html`) across all 110+ pages, ensuring consistent UI/UX, responsive design, and improved maintainability. All modules have been migrated from the legacy `base.html` template.
+
 **Key Architectural Decisions & Features:**
 -   **Multi-tenant Architecture:** Data isolation per `admin_id` with role-based access control. Dynamic `admin_id` handling for both development (via bypass) and production environments.
--   **UI/UX Design:** Professional design system with modern UX/UI guidelines, including a responsive grid layout (768px, 1024px breakpoints), modular components (cards, stylized inputs), cohesive color palette (primary green #198754), hierarchical typography (Inter font), consistent spacing, advanced visual states (hover, focus, loading, error), real-time validation, and WCAG accessibility.
+-   **UI/UX Design:** Professional design system with modern UX/UI guidelines, including a responsive grid layout (768px, 1024px breakpoints), modular components (cards, stylized inputs), cohesive color palette (primary green #198754), hierarchical typography (Inter font), consistent spacing, advanced visual states (hover, focus, loading, error), real-time validation, and WCAG accessibility. All 110+ pages now use the unified modern template with proper text contrast (dark text on light backgrounds for KPI values).
 -   **Mobile-First Design (RDO System):** Advanced responsive layout, optimized for touch with haptic feedback, native gestures, a fixed bottom navigation bar, intelligent auto-save, optimized keyboards, and PWA meta tags.
 -   **Automated Database Migrations:** `migrations.py` handles schema updates (e.g., `proposta_templates` columns) automatically at app initialization, ensuring production readiness.
 -   **Core Modules:**
