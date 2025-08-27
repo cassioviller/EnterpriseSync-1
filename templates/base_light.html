@@ -30,7 +30,37 @@
         body {
             background-color: #f8f9fa !important;
             color: #212529 !important;
-            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif !important;
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        }
+        
+        /* Força cor escura em todos os textos */
+        *, *::before, *::after {
+            color: #212529 !important;
+        }
+        
+        h1, h2, h3, h4, h5, h6 {
+            color: #2c3e50 !important;
+            font-weight: 600;
+        }
+        
+        p, span, div, td, th, li, label, input, textarea, select {
+            color: #495057 !important;
+        }
+        
+        .text-white, .text-light, .text-muted {
+            color: #495057 !important;
+        }
+        
+        .btn {
+            color: #ffffff !important;
+        }
+        
+        .nav-link, .navbar-brand {
+            color: #495057 !important;
+        }
+        
+        .dropdown-item {
+            color: #495057 !important;
         }
         
         .card {
@@ -76,6 +106,10 @@
         
         .navbar-brand, .nav-link {
             color: #495057 !important;
+        }
+        
+        .card-title, .card-text {
+            color: #2c3e50 !important;
         }
         
         .nav-link:hover {
@@ -126,7 +160,7 @@
                             <i class="fas fa-cogs me-1"></i> Gestão
                         </a>
                         <ul class="dropdown-menu">
-                            <li><a class="dropdown-item" href="{{ url_for('propostas.dashboard') }}">
+                            <li><a class="dropdown-item" href="{{ url_for('main.propostas') }}">
                                 <i class="fas fa-file-contract me-1"></i> Propostas
                             </a></li>
                             <li><a class="dropdown-item" href="{{ url_for('main.alimentacao') }}">
