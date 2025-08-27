@@ -2242,8 +2242,6 @@ def funcionario_criar_rdo():
                             rdo_servico_subativ.servico_id = subatividade.servico_id  # Importante para hierarchy
                             db.session.add(rdo_servico_subativ)
                             
-                            # Removido: sistema legado RDOAtividade - agora só usa RDOServicoSubatividade
-                            
                             print(f"DEBUG: Subatividade {subatividade.nome}: {percentual}% - {observacoes}")
                         
                 except (ValueError, IndexError) as e:
@@ -2358,9 +2356,9 @@ def funcionario_criar_rdo():
                 flash(f'Erro ao processar ocorrências: {e}', 'warning')
         
         # Log final antes de commitar
-        total_atividades = RDOAtividade.query.filter_by(rdo_id=rdo.id).count()
+        total_subatividades = RDOServicoSubatividade.query.filter_by(rdo_id=rdo.id).count()
         total_funcionarios = RDOMaoObra.query.filter_by(rdo_id=rdo.id).count()
-        print(f"DEBUG FINAL: RDO {rdo.numero_rdo} - {total_atividades} atividades, {total_funcionarios} funcionários")
+        print(f"DEBUG FINAL: RDO {rdo.numero_rdo} - {total_subatividades} subatividades, {total_funcionarios} funcionários")
         
         db.session.commit()
         
@@ -2441,20 +2439,7 @@ def funcionario_visualizar_rdo(id):
                 'observacoes': rdo_subativ.observacoes_tecnicas or ''
             }
         
-        # Carregar atividades legadas se não houver subatividades
-        if not subatividades_salvas:
-            atividades_legadas = RDOAtividade.query.filter_by(rdo_id=rdo.id).all()
-            for atividade in atividades_legadas:
-                # Tentar extrair ID da subatividade das observações
-                if 'Subatividade ID:' in atividade.observacoes_tecnicas:
-                    try:
-                        subativ_id = int(atividade.observacoes_tecnicas.split('Subatividade ID:')[1].strip())
-                        subatividades_salvas[subativ_id] = {
-                            'percentual': atividade.percentual_conclusao,
-                            'observacoes': atividade.observacoes_tecnicas.replace(f'Subatividade ID: {subativ_id}', '').strip()
-                        }
-                    except (ValueError, IndexError):
-                        pass
+        # Não há mais atividades legadas - sistema migrado completamente para RDOServicoSubatividade
         
         # Carregar equipe de trabalho salva
         equipe_salva = {}
