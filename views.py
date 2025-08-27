@@ -2057,7 +2057,14 @@ def funcionario_novo_rdo():
         
         return render_template('funcionario/rdo_refatorado.html', 
                              obras=obras,
-                             funcionarios=funcionarios,
+                             funcionarios=[{
+                                 'id': f.id,
+                                 'nome': f.nome,
+                                 'email': f.email,
+                                 'funcao_ref': {
+                                     'nome': f.funcao_ref.nome if f.funcao_ref else 'Função não definida'
+                                 } if f.funcao_ref else None
+                             } for f in funcionarios],
                              obra_selecionada=obra_id,
                              atividades_anteriores=atividades_anteriores)
         
