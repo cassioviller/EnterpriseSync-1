@@ -10,7 +10,8 @@ import logging
 BYPASS_ATIVO = True
 
 print("🔓 Sistema de bypass de autenticação ativado")
-print("👤 Usuário mock: funcionario@valeverde.com (FUNCIONÁRIO)")
+print("👤 Usuário mock: username=funcionario (FUNCIONÁRIO)")
+print("💡 Para produção: Login = joao / Senha = 123456")
 
 # Forçar reload do current_user para usar email correto
 import flask_login
@@ -45,7 +46,11 @@ class MockCurrentUser:
     
     @property
     def email(self):
-        return 'funcionario@valeverde.com'
+        return 'funcionario@sistema.local'
+    
+    @property
+    def username(self):
+        return 'funcionario'
     
     @property
     def nome(self):

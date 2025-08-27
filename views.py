@@ -41,7 +41,7 @@ def login():
                 return redirect(url_for('main.dashboard'))
             else:
                 # Funcionários são redirecionados para RDO consolidado
-                return redirect(url_for('main.funcionario_rdo_refatorado'))
+                return redirect(url_for('main.funcionario_rdo_consolidado'))
         else:
             flash('Email/Username ou senha inválidos.', 'danger')
     
@@ -59,7 +59,7 @@ def index():
     if current_user.is_authenticated:
         if current_user.tipo_usuario == TipoUsuario.FUNCIONARIO:
             print(f"DEBUG INDEX: Funcionário {current_user.email} redirecionado para RDO consolidado")
-            return redirect(url_for('main.funcionario_rdo_refatorado'))
+            return redirect(url_for('main.funcionario_rdo_consolidado'))
         elif current_user.tipo_usuario == TipoUsuario.SUPER_ADMIN:
             return redirect(url_for('main.super_admin_dashboard'))
         else:
@@ -74,7 +74,7 @@ def dashboard():
         # FUNCIONÁRIO - SEMPRE vai para dashboard específico (SEGURANÇA CRÍTICA)
         if current_user.tipo_usuario == TipoUsuario.FUNCIONARIO:
             print(f"DEBUG DASHBOARD: Funcionário {current_user.email} BLOQUEADO do dashboard admin - redirecionado")
-            return redirect(url_for('main.funcionario_rdo_refatorado'))
+            return redirect(url_for('main.funcionario_rdo_consolidado'))
             
         # SUPER ADMIN - vai para dashboard específico
         elif current_user.tipo_usuario == TipoUsuario.SUPER_ADMIN:
@@ -1292,9 +1292,21 @@ def funcionario_dashboard_desktop():
         print(f"DEBUG DASHBOARD: current_user.admin_id={current_user.admin_id}")
         print(f"DEBUG DASHBOARD: current_user.id={current_user.id}")
         
-        # Buscar funcionário correto - para bypass, usar email funcionario@valeverde.com
-        email_busca = "funcionario@valeverde.com" if current_user.email == "123@gmail.com" else current_user.email
-        funcionario_atual = Funcionario.query.filter_by(email=email_busca).first()
+        # Para sistema de username/senha, buscar funcionário por nome do usuário
+        funcionario_atual = None
+        if hasattr(current_user, 'username') and current_user.username:
+            # Buscar funcionário com nome que contenha o username
+            funcionario_atual = Funcionario.query.filter(
+                Funcionario.nome.ilike(f'%{current_user.username}%')
+            ).first()
+        
+        if not funcionario_atual:
+            # Fallback: buscar por email funcionario@valeverde.com
+            funcionario_atual = Funcionario.query.filter_by(email="funcionario@valeverde.com").first()
+        
+        if not funcionario_atual:
+            # Ultimo fallback: primeiro funcionário ativo
+            funcionario_atual = Funcionario.query.filter_by(admin_id=10, ativo=True).first()
         
         if funcionario_atual:
             print(f"DEBUG DASHBOARD: Funcionário encontrado: {funcionario_atual.nome} (admin_id={funcionario_atual.admin_id})")
