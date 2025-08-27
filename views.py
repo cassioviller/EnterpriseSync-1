@@ -1691,7 +1691,7 @@ def criar_rdo():
             rdo.criado_por_id = funcionario.id
         else:
             flash('Funcionário não encontrado. Entre em contato com o administrador.', 'error')
-            return redirect(url_for('main.funcionario_novo_rdo'))
+            return redirect(url_for('main.funcionario_rdo_novo'))
         rdo.tempo_manha = request.form.get('tempo_manha', 'Bom')
         rdo.tempo_tarde = request.form.get('tempo_tarde', 'Bom')
         rdo.tempo_noite = request.form.get('tempo_noite', 'Bom')
@@ -2063,23 +2063,27 @@ def funcionario_criar_rdo():
             obra_id = request.form.get('obra_id', type=int)
             data_relatorio = datetime.strptime(request.form.get('data_relatorio'), '%Y-%m-%d').date()
             
-            # Verificar se obra pertence ao admin do funcionário
-            obra = Obra.query.filter_by(id=obra_id, admin_id=current_user.admin_id).first()
+            # Buscar funcionário correto primeiro
+            funcionario = Funcionario.query.filter_by(email=current_user.email).first()
+            admin_id_correto = funcionario.admin_id if funcionario else 10
+            
+            # Verificar se obra pertence ao admin correto
+            obra = Obra.query.filter_by(id=obra_id, admin_id=admin_id_correto).first()
             if not obra:
                 flash('Obra não encontrada ou sem permissão de acesso.', 'error')
-                return redirect(url_for('main.funcionario_novo_rdo'))
+                return redirect(url_for('main.funcionario_rdo_novo'))
             
             # Verificar se já existe RDO para esta obra/data
             rdo_existente = RDO.query.filter_by(obra_id=obra_id, data_relatorio=data_relatorio).first()
             if rdo_existente:
                 flash(f'Já existe um RDO para esta obra na data {data_relatorio.strftime("%d/%m/%Y")}.', 'warning')
-                return redirect(url_for('main.funcionario_novo_rdo'))
+                return redirect(url_for('main.funcionario_rdo_novo'))
             
             # Gerar número do RDO específico para este admin
             contador_rdos = RDO.query.join(Obra).filter(
-                Obra.admin_id == current_user.admin_id
+                Obra.admin_id == admin_id_correto
             ).count()
-            numero_rdo = f"RDO-{current_user.admin_id}-{datetime.now().year}-{contador_rdos + 1:03d}"
+            numero_rdo = f"RDO-{admin_id_correto}-{datetime.now().year}-{contador_rdos + 1:03d}"
             
             # Criar RDO com campos padronizados
             rdo = RDO()
@@ -2091,11 +2095,7 @@ def funcionario_criar_rdo():
             print(f"DEBUG MULTITENANT: current_user.admin_id={current_user.admin_id}")
             print(f"DEBUG MULTITENANT: current_user.id={current_user.id}")
             
-            # Para funcionários, buscar ou criar registro na tabela funcionario
-            funcionario = Funcionario.query.filter_by(
-                email=current_user.email, 
-                admin_id=current_user.admin_id
-            ).first()
+            # Usar funcionário já encontrado acima
             
             print(f"DEBUG MULTITENANT: Funcionário encontrado: {funcionario.nome if funcionario else 'NENHUM'}")
             
@@ -2110,7 +2110,7 @@ def funcionario_criar_rdo():
                     return redirect(url_for('main.funcionario_rdo_consolidado'))
             
             rdo.criado_por_id = funcionario.id
-            rdo.admin_id = current_user.admin_id
+            rdo.admin_id = admin_id_correto
             
             print(f"DEBUG: RDO configurado - criado_por_id={rdo.criado_por_id}, admin_id={rdo.admin_id}")
             
@@ -3452,7 +3452,7 @@ def criar_rdo_teste():
             rdo.criado_por_id = funcionario.id
         else:
             flash('Funcionário não encontrado. Entre em contato com o administrador.', 'error')
-            return redirect(url_for('main.funcionario_novo_rdo'))
+            return redirect(url_for('main.funcionario_rdo_novo'))
         
         db.session.add(rdo)
         db.session.flush()
