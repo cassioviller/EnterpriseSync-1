@@ -12,6 +12,10 @@ BYPASS_ATIVO = True
 print("🔓 Sistema de bypass de autenticação ativado")
 print("👤 Usuário mock: funcionario@valeverde.com (FUNCIONÁRIO)")
 
+# Forçar reload do current_user para usar email correto
+import flask_login
+flask_login._get_user = lambda: MockCurrentUser()
+
 # Sobrescrever flask_login.current_user para desenvolvimento
 import flask_login
 from types import SimpleNamespace
