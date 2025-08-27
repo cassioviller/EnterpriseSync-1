@@ -89,14 +89,36 @@ CREATE TABLE IF NOT EXISTS obra (
 CREATE TABLE IF NOT EXISTS registro_ponto (
     id SERIAL PRIMARY KEY,
     funcionario_id INTEGER NOT NULL,
-    data_registro DATE NOT NULL,
+    obra_id INTEGER,
+    data DATE NOT NULL,
     hora_entrada TIME,
-    hora_saida_almoco TIME,
-    hora_retorno_almoco TIME,
     hora_saida TIME,
-    tipo_lancamento VARCHAR(20) DEFAULT 'normal',
-    admin_id INTEGER NOT NULL,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    hora_almoco_saida TIME,
+    hora_almoco_retorno TIME,
+    horas_trabalhadas DECIMAL(5,2) DEFAULT 0.0,
+    horas_extras DECIMAL(5,2) DEFAULT 0.0,
+    observacoes TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    atraso BOOLEAN DEFAULT FALSE,
+    minutos_atraso_entrada INTEGER DEFAULT 0,
+    minutos_atraso_saida INTEGER DEFAULT 0,
+    total_atraso_minutos INTEGER DEFAULT 0,
+    total_atraso_horas DECIMAL(5,2) DEFAULT 0.0,
+    meio_periodo BOOLEAN DEFAULT FALSE,
+    saida_antecipada BOOLEAN DEFAULT FALSE,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    tipo_registro VARCHAR(30) DEFAULT 'normal',
+    percentual_extras DECIMAL(5,2) DEFAULT 0.0,
+    minutos_extras_entrada INTEGER DEFAULT 0,
+    minutos_extras_saida INTEGER DEFAULT 0,
+    total_minutos_extras INTEGER DEFAULT 0,
+    horas_extras_detalhadas DECIMAL(5,2) DEFAULT 0.0,
+    metodo_calculo VARCHAR(50) DEFAULT 'automatico',
+    horas_extras_calculadas DECIMAL(5,2) DEFAULT 0.0,
+    horario_padrao_usado VARCHAR(100),
+    horas_extras_corrigidas DECIMAL(5,2) DEFAULT 0.0,
+    calculo_horario_padrao TEXT,
+    tipo_local VARCHAR(50) DEFAULT 'obra'
 );
 
 -- CRIAR TABELA CONFIGURACAO_EMPRESA SEM FOREIGN KEY
@@ -244,6 +266,52 @@ VALUES
 ('FUN005', 'Pedro Costa Alves', '567.890.123-44', 'Motorista', 2800.00, '2024-05-20', 10, TRUE)
 ON CONFLICT (codigo) DO NOTHING;
 
+-- REGISTROS DE PONTO DEMO PARA KPIs (Julho 2025)
+INSERT INTO registro_ponto (funcionario_id, obra_id, data, hora_entrada, hora_saida, horas_trabalhadas, horas_extras, tipo_registro)
+SELECT 
+    f.id,
+    o.id,
+    date_series.data,
+    '07:00:00'::time,
+    '17:00:00'::time,
+    8.0,
+    CASE WHEN random() > 0.8 THEN 2.0 ELSE 0.0 END,
+    'normal'
+FROM funcionario f
+CROSS JOIN obra o
+CROSS JOIN (
+    SELECT generate_series('2025-07-01'::date, '2025-07-31'::date, '1 day'::interval)::date as data
+    WHERE EXTRACT(dow FROM generate_series('2025-07-01'::date, '2025-07-31'::date, '1 day'::interval)) BETWEEN 1 AND 5
+) date_series
+WHERE f.admin_id = 10 AND o.admin_id = 10
+LIMIT 500
+ON CONFLICT (funcionario_id, data) DO NOTHING;
+
+-- CUSTOS DE VEÍCULOS DEMO
+INSERT INTO custo_veiculo (tipo_custo, descricao, valor, data_custo, admin_id)
+VALUES 
+('combustivel', 'Abastecimento caminhão', 450.00, '2025-07-15', 10),
+('manutencao', 'Troca de óleo', 280.00, '2025-07-20', 10),
+('combustivel', 'Abastecimento van', 120.00, '2025-07-25', 10)
+ON CONFLICT DO NOTHING;
+
+-- REGISTROS DE ALIMENTAÇÃO DEMO
+INSERT INTO registro_alimentacao (funcionario_id, data, valor, tipo_refeicao, admin_id)
+SELECT 
+    f.id,
+    date_series.data,
+    25.00,
+    'almoco',
+    10
+FROM funcionario f
+CROSS JOIN (
+    SELECT generate_series('2025-07-01'::date, '2025-07-31'::date, '1 day'::interval)::date as data
+    WHERE EXTRACT(dow FROM generate_series('2025-07-01'::date, '2025-07-31'::date, '1 day'::interval)) BETWEEN 1 AND 5
+) date_series
+WHERE f.admin_id = 10
+LIMIT 300
+ON CONFLICT (funcionario_id, data) DO NOTHING;
+
 -- CORRIGIR FUNCIONÁRIOS EXISTENTES PARA O ADMIN CORRETO
 -- Em produção, manter os admin_id existentes se já tiverem dados
 -- UPDATE funcionario SET admin_id = 10 WHERE admin_id = 4;
@@ -308,8 +376,64 @@ ALTER TABLE obra ADD COLUMN IF NOT EXISTS proposta_origem_id INTEGER;
 
 ALTER TABLE funcionario ADD COLUMN IF NOT EXISTS foto_base64 TEXT;
 
--- ADICIONAR CAMPO FALTANTE EM REGISTRO_PONTO
+-- ATUALIZAR REGISTRO_PONTO PARA ESTRUTURA COMPLETA
+ALTER TABLE registro_ponto ADD COLUMN IF NOT EXISTS obra_id INTEGER;
+ALTER TABLE registro_ponto ADD COLUMN IF NOT EXISTS horas_trabalhadas DECIMAL(5,2) DEFAULT 0.0;
+ALTER TABLE registro_ponto ADD COLUMN IF NOT EXISTS horas_extras DECIMAL(5,2) DEFAULT 0.0;
+ALTER TABLE registro_ponto ADD COLUMN IF NOT EXISTS observacoes TEXT;
+ALTER TABLE registro_ponto ADD COLUMN IF NOT EXISTS atraso BOOLEAN DEFAULT FALSE;
+ALTER TABLE registro_ponto ADD COLUMN IF NOT EXISTS minutos_atraso_entrada INTEGER DEFAULT 0;
+ALTER TABLE registro_ponto ADD COLUMN IF NOT EXISTS minutos_atraso_saida INTEGER DEFAULT 0;
+ALTER TABLE registro_ponto ADD COLUMN IF NOT EXISTS total_atraso_minutos INTEGER DEFAULT 0;
+ALTER TABLE registro_ponto ADD COLUMN IF NOT EXISTS total_atraso_horas DECIMAL(5,2) DEFAULT 0.0;
+ALTER TABLE registro_ponto ADD COLUMN IF NOT EXISTS meio_periodo BOOLEAN DEFAULT FALSE;
+ALTER TABLE registro_ponto ADD COLUMN IF NOT EXISTS saida_antecipada BOOLEAN DEFAULT FALSE;
+ALTER TABLE registro_ponto ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP;
+ALTER TABLE registro_ponto ADD COLUMN IF NOT EXISTS tipo_registro VARCHAR(30) DEFAULT 'normal';
+ALTER TABLE registro_ponto ADD COLUMN IF NOT EXISTS percentual_extras DECIMAL(5,2) DEFAULT 0.0;
+ALTER TABLE registro_ponto ADD COLUMN IF NOT EXISTS minutos_extras_entrada INTEGER DEFAULT 0;
+ALTER TABLE registro_ponto ADD COLUMN IF NOT EXISTS minutos_extras_saida INTEGER DEFAULT 0;
+ALTER TABLE registro_ponto ADD COLUMN IF NOT EXISTS total_minutos_extras INTEGER DEFAULT 0;
+ALTER TABLE registro_ponto ADD COLUMN IF NOT EXISTS horas_extras_detalhadas DECIMAL(5,2) DEFAULT 0.0;
+ALTER TABLE registro_ponto ADD COLUMN IF NOT EXISTS metodo_calculo VARCHAR(50) DEFAULT 'automatico';
+ALTER TABLE registro_ponto ADD COLUMN IF NOT EXISTS horas_extras_calculadas DECIMAL(5,2) DEFAULT 0.0;
+ALTER TABLE registro_ponto ADD COLUMN IF NOT EXISTS horario_padrao_usado VARCHAR(100);
+ALTER TABLE registro_ponto ADD COLUMN IF NOT EXISTS horas_extras_corrigidas DECIMAL(5,2) DEFAULT 0.0;
+ALTER TABLE registro_ponto ADD COLUMN IF NOT EXISTS calculo_horario_padrao TEXT;
 ALTER TABLE registro_ponto ADD COLUMN IF NOT EXISTS tipo_local VARCHAR(50) DEFAULT 'obra';
+
+-- Renomear coluna se necessário (de data_registro para data)
+DO $$
+BEGIN
+    IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'registro_ponto' AND column_name = 'data_registro') THEN
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'registro_ponto' AND column_name = 'data') THEN
+            ALTER TABLE registro_ponto RENAME COLUMN data_registro TO data;
+            RAISE NOTICE 'Coluna data_registro renomeada para data';
+        END IF;
+    END IF;
+END $$;
+
+-- Criar tabelas de custos se não existirem
+CREATE TABLE IF NOT EXISTS custo_veiculo (
+    id SERIAL PRIMARY KEY,
+    veiculo_id INTEGER,
+    tipo_custo VARCHAR(50) NOT NULL,
+    descricao TEXT,
+    valor DECIMAL(10,2) NOT NULL DEFAULT 0.0,
+    data_custo DATE NOT NULL,
+    admin_id INTEGER,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS registro_alimentacao (
+    id SERIAL PRIMARY KEY,
+    funcionario_id INTEGER,
+    data DATE NOT NULL,
+    valor DECIMAL(10,2) NOT NULL DEFAULT 0.0,
+    tipo_refeicao VARCHAR(30) DEFAULT 'almoco',
+    admin_id INTEGER,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
 ALTER TABLE funcionario ADD COLUMN IF NOT EXISTS departamento_id INTEGER;
 ALTER TABLE funcionario ADD COLUMN IF NOT EXISTS funcao_id INTEGER;
 ALTER TABLE funcionario ADD COLUMN IF NOT EXISTS horario_trabalho_id INTEGER;

@@ -236,23 +236,51 @@ def dashboard():
             ).fetchall()
             print(f"  🏗️ OBRAS POR ADMIN: {[(row[0], row[1]) for row in obras_por_admin]}")
             
-            # Total de registros de ponto
-            registros_ponto = db.session.execute(
-                text("SELECT COUNT(*) FROM registro_ponto WHERE data_registro >= '2025-07-01' AND data_registro <= '2025-07-31'")
-            ).fetchone()
-            print(f"  ⏰ REGISTROS DE PONTO (Jul/2025): {registros_ponto[0] if registros_ponto else 0}")
+            # Verificar estrutura da tabela registro_ponto primeiro
+            try:
+                colunas_ponto = db.session.execute(
+                    text("SELECT column_name FROM information_schema.columns WHERE table_name = 'registro_ponto' ORDER BY ordinal_position")
+                ).fetchall()
+                colunas_str = [col[0] for col in colunas_ponto]
+                print(f"  🔍 COLUNAS REGISTRO_PONTO: {colunas_str}")
+                
+                # Usar coluna correta baseada na estrutura real
+                coluna_data = 'data' if 'data' in colunas_str else 'data_registro'
+                registros_ponto = db.session.execute(
+                    text(f"SELECT COUNT(*) FROM registro_ponto WHERE {coluna_data} >= '2025-07-01' AND {coluna_data} <= '2025-07-31'")
+                ).fetchone()
+                print(f"  ⏰ REGISTROS DE PONTO (Jul/2025): {registros_ponto[0] if registros_ponto else 0}")
+            except Exception as e:
+                print(f"  ❌ ERRO registros ponto: {e}")
             
-            # Total de custos de veículos
-            custos_veiculo = db.session.execute(
-                text("SELECT COUNT(*), COALESCE(SUM(valor), 0) FROM custo_veiculo WHERE data_custo >= '2025-07-01' AND data_custo <= '2025-07-31'")
-            ).fetchone()
-            print(f"  🚗 CUSTOS VEÍCULOS (Jul/2025): {custos_veiculo[0] if custos_veiculo else 0} registros, R$ {custos_veiculo[1] if custos_veiculo else 0}")
+            # Total de custos de veículos - verificar se tabela existe
+            try:
+                tabelas_existentes = db.session.execute(
+                    text("SELECT table_name FROM information_schema.tables WHERE table_schema = 'public'")
+                ).fetchall()
+                tabelas_str = [t[0] for t in tabelas_existentes]
+                
+                if 'custo_veiculo' in tabelas_str:
+                    custos_veiculo = db.session.execute(
+                        text("SELECT COUNT(*), COALESCE(SUM(valor), 0) FROM custo_veiculo WHERE data_custo >= '2025-07-01' AND data_custo <= '2025-07-31'")
+                    ).fetchone()
+                    print(f"  🚗 CUSTOS VEÍCULOS (Jul/2025): {custos_veiculo[0] if custos_veiculo else 0} registros, R$ {custos_veiculo[1] if custos_veiculo else 0}")
+                else:
+                    print(f"  🚗 TABELA custo_veiculo NÃO EXISTE")
+            except Exception as e:
+                print(f"  ❌ ERRO custos veículo: {e}")
             
-            # Total de alimentação
-            alimentacao = db.session.execute(
-                text("SELECT COUNT(*), COALESCE(SUM(valor), 0) FROM registro_alimentacao WHERE data >= '2025-07-01' AND data <= '2025-07-31'")
-            ).fetchone()
-            print(f"  🍽️ ALIMENTAÇÃO (Jul/2025): {alimentacao[0] if alimentacao else 0} registros, R$ {alimentacao[1] if alimentacao else 0}")
+            # Total de alimentação - verificar se tabela existe
+            try:
+                if 'registro_alimentacao' in tabelas_str:
+                    alimentacao = db.session.execute(
+                        text("SELECT COUNT(*), COALESCE(SUM(valor), 0) FROM registro_alimentacao WHERE data >= '2025-07-01' AND data <= '2025-07-31'")
+                    ).fetchone()
+                    print(f"  🍽️ ALIMENTAÇÃO (Jul/2025): {alimentacao[0] if alimentacao else 0} registros, R$ {alimentacao[1] if alimentacao else 0}")
+                else:
+                    print(f"  🍽️ TABELA registro_alimentacao NÃO EXISTE")
+            except Exception as e:
+                print(f"  ❌ ERRO alimentação: {e}")
             
         except Exception as e:
             print(f"❌ ERRO no diagnóstico do banco: {e}")
@@ -276,35 +304,52 @@ def dashboard():
             except Exception as e:
                 print(f"❌ ERRO ao detectar admin_id correto: {e}")
         
-        # Calcular KPIs reais
+        # Calcular KPIs reais com proteção de transação
         total_custo_real = 0
         total_horas_real = 0
         total_extras_real = 0
         total_faltas_real = 0
         custo_transporte_real = 0
         
-        for func in funcionarios_dashboard:
-            # Buscar registros de ponto
-            registros = RegistroPonto.query.filter(
-                RegistroPonto.funcionario_id == func.id,
-                RegistroPonto.data >= data_inicio,
-                RegistroPonto.data <= data_fim
-            ).all()
+        try:
+            # Reiniciar conexão para evitar transação abortada
+            db.session.rollback()
             
-            # Calcular valores por funcionário
-            horas_func = sum(r.horas_trabalhadas or 0 for r in registros)
-            extras_func = sum(r.horas_extras or 0 for r in registros)
-            faltas_func = len([r for r in registros if r.tipo_registro == 'falta'])
+            # Refazer busca de funcionários
+            funcionarios_dashboard = Funcionario.query.filter_by(admin_id=admin_id, ativo=True).all()
+            print(f"✅ APÓS ROLLBACK: {len(funcionarios_dashboard)} funcionários encontrados")
             
-            # Valor/hora do funcionário
-            valor_hora = (func.salario / 220) if func.salario else 0
-            custo_func = (horas_func + extras_func * 1.5) * valor_hora
-            
-            # Acumular totais
-            total_custo_real += custo_func
-            total_horas_real += horas_func
-            total_extras_real += extras_func
-            total_faltas_real += faltas_func
+            for func in funcionarios_dashboard:
+                try:
+                    # Buscar registros de ponto com proteção
+                    registros = RegistroPonto.query.filter(
+                        RegistroPonto.funcionario_id == func.id,
+                        RegistroPonto.data >= data_inicio,
+                        RegistroPonto.data <= data_fim
+                    ).all()
+                    
+                    # Calcular valores por funcionário
+                    horas_func = sum(r.horas_trabalhadas or 0 for r in registros)
+                    extras_func = sum(r.horas_extras or 0 for r in registros)
+                    faltas_func = len([r for r in registros if r.tipo_registro == 'falta'])
+                    
+                    # Valor/hora do funcionário
+                    valor_hora = (func.salario / 220) if func.salario else 0
+                    custo_func = (horas_func + extras_func * 1.5) * valor_hora
+                    
+                    # Acumular totais
+                    total_custo_real += custo_func
+                    total_horas_real += horas_func
+                    total_extras_real += extras_func
+                    total_faltas_real += faltas_func
+                    
+                except Exception as func_error:
+                    print(f"❌ ERRO ao processar funcionário {func.nome}: {func_error}")
+                    continue
+                    
+        except Exception as kpi_error:
+            print(f"❌ ERRO GERAL nos cálculos KPI: {kpi_error}")
+            db.session.rollback()
         
         # Buscar custos de alimentação TOTAL para o período (não por funcionário para evitar duplicação)
         custo_alimentacao_real = 0
