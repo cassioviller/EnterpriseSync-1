@@ -1,7 +1,7 @@
 from flask import Blueprint, render_template, request, redirect, url_for, flash, jsonify, make_response, send_file, session
 from flask_login import login_required, current_user, login_user, logout_user
 from werkzeug.security import check_password_hash, generate_password_hash
-from models import db, Usuario, TipoUsuario, Funcionario, Obra, RDO, RDOAtividade, RDOMaoObra, RDOEquipamento, RDOOcorrencia, RDOFoto, AlocacaoEquipe, Servico, ServicoObra, SubAtividade, RDOServicoSubatividade, SubatividadeMestre
+from models import db, Usuario, TipoUsuario, Funcionario, Obra, RDO, RDOMaoObra, RDOEquipamento, RDOOcorrencia, RDOFoto, AlocacaoEquipe, Servico, ServicoObra, RDOServicoSubatividade, SubatividadeMestre
 from auth import super_admin_required, admin_required, funcionario_required
 from datetime import datetime, date, timedelta
 from sqlalchemy import func, desc, or_, and_, text
@@ -1615,13 +1615,15 @@ def novo_rdo():
             
             if ultimo_rdo:
                 # Já existe RDO anterior - carregar atividades do último RDO
+                # Carregar subatividades do último RDO
+                rdo_subatividades = RDOServicoSubatividade.query.filter_by(rdo_id=ultimo_rdo.id).all()
                 atividades_anteriores = [
                     {
-                        'descricao': ativ.descricao_atividade,
-                        'percentual': ativ.percentual_conclusao,
-                        'observacoes': ativ.observacoes_tecnicas or ''
+                        'descricao': rdo_sub.nome_subatividade,
+                        'percentual': rdo_sub.percentual_conclusao,
+                        'observacoes': rdo_sub.observacoes_tecnicas or ''
                     }
-                    for ativ in ultimo_rdo.atividades
+                    for rdo_sub in rdo_subatividades
                 ]
                 print(f"DEBUG: Pré-carregando {len(atividades_anteriores)} atividades do RDO {ultimo_rdo.numero_rdo}")
             else:
@@ -1635,9 +1637,9 @@ def novo_rdo():
                 
                 for servico_obra, servico in servicos_obra:
                     # Buscar subatividades do serviço
-                    subatividades = SubAtividade.query.filter_by(
-                        servico_id=servico.id
-                    ).order_by(SubAtividade.ordem_execucao).all()
+                    subatividades = SubatividadeMestre.query.filter_by(
+                        servico_id=servico.id, ativo=True
+                    ).order_by(SubatividadeMestre.ordem_padrao).all()
                     
                     # Criar lista de subatividades para o RDO
                     subatividades_list = []
@@ -1731,13 +1733,8 @@ def criar_rdo():
                 
                 for i, ativ_data in enumerate(atividades):
                     if ativ_data.get('descricao', '').strip():  # Só processar se tiver descrição
-                        atividade = RDOAtividade()
-                        atividade.rdo_id = rdo.id
-                        atividade.descricao_atividade = ativ_data.get('descricao', '').strip()
-                        atividade.percentual_conclusao = float(ativ_data.get('percentual', 0))
-                        atividade.observacoes_tecnicas = ativ_data.get('observacoes', '').strip()
-                        db.session.add(atividade)
-                        print(f"DEBUG: Atividade {i+1} adicionada: {atividade.descricao_atividade} - {atividade.percentual_conclusao}%")
+                        # Removido: sistema legado RDOAtividade - agora só usa RDOServicoSubatividade
+                        pass
                         
             except (json.JSONDecodeError, ValueError) as e:
                 print(f"Erro ao processar atividades: {e}")
@@ -1940,14 +1937,15 @@ def api_ultimo_rdo(obra_id):
         origem = ''
         
         if ultimo_rdo:
-            # Já existe RDO anterior - carregar atividades do último RDO
+            # Já existe RDO anterior - carregar subatividades do último RDO
+            rdo_subatividades = RDOServicoSubatividade.query.filter_by(rdo_id=ultimo_rdo.id).all()
             atividades = [
                 {
-                    'descricao': ativ.descricao_atividade,
-                    'percentual': ativ.percentual_conclusao,
-                    'observacoes': ativ.observacoes_tecnicas or ''
+                    'descricao': rdo_sub.nome_subatividade,
+                    'percentual': rdo_sub.percentual_conclusao,
+                    'observacoes': rdo_sub.observacoes_tecnicas or ''
                 }
-                for ativ in ultimo_rdo.atividades
+                for rdo_sub in rdo_subatividades
             ]
             origem = f'RDO anterior: {ultimo_rdo.numero_rdo} ({ultimo_rdo.data_relatorio.strftime("%d/%m/%Y")})'
         else:
@@ -2018,17 +2016,8 @@ def api_percentuais_ultimo_rdo(obra_id):
         
         # Fallback para atividades legadas
         if not percentuais:
-            atividades_legadas = RDOAtividade.query.filter_by(rdo_id=ultimo_rdo.id).all()
-            for atividade in atividades_legadas:
-                if 'Subatividade ID:' in atividade.observacoes_tecnicas:
-                    try:
-                        subativ_id = int(atividade.observacoes_tecnicas.split('Subatividade ID:')[1].strip())
-                        percentuais[subativ_id] = {
-                            'percentual': atividade.percentual_conclusao,
-                            'observacoes': atividade.observacoes_tecnicas.replace(f'Subatividade ID: {subativ_id}', '').strip()
-                        }
-                    except (ValueError, IndexError):
-                        pass
+            # Removido: fallback legado - só usar RDOServicoSubatividade
+            pass
         
         return jsonify({
             'percentuais': percentuais,
@@ -2240,7 +2229,7 @@ def funcionario_criar_rdo():
                         observacoes = request.form.get(obs_key, '').strip()
                         
                         # Buscar informações da subatividade
-                        subatividade = SubAtividade.query.get(subatividade_id)
+                        subatividade = SubatividadeMestre.query.get(subatividade_id)
                         if subatividade:
                             # Salvar no sistema RDO hierárquico
                             rdo_servico_subativ = RDOServicoSubatividade()
@@ -2251,13 +2240,7 @@ def funcionario_criar_rdo():
                             rdo_servico_subativ.servico_id = subatividade.servico_id  # Importante para hierarchy
                             db.session.add(rdo_servico_subativ)
                             
-                            # Também criar no sistema legado para compatibilidade
-                            atividade = RDOAtividade()
-                            atividade.rdo_id = rdo.id
-                            atividade.descricao_atividade = f"{subatividade.servico.nome} - {subatividade.nome}"
-                            atividade.percentual_conclusao = percentual
-                            atividade.observacoes_tecnicas = observacoes
-                            db.session.add(atividade)
+                            # Removido: sistema legado RDOAtividade - agora só usa RDOServicoSubatividade
                             
                             print(f"DEBUG: Subatividade {subatividade.nome}: {percentual}% - {observacoes}")
                         
@@ -2592,7 +2575,7 @@ def api_funcionario_rdos_obra(obra_id):
                 'numero_rdo': rdo.numero_rdo,
                 'data_relatorio': rdo.data_relatorio.strftime('%Y-%m-%d'),
                 'status': rdo.status,
-                'total_atividades': len(rdo.atividades),
+                'total_atividades': RDOServicoSubatividade.query.filter_by(rdo_id=rdo.id).count(),
                 'total_funcionarios': len(rdo.mao_obra)
             }
             for rdo in rdos
@@ -3427,9 +3410,9 @@ def api_servicos_obra(obra_id):
         servicos = []
         for servico_obra, servico in servicos_obra:
             # Buscar subatividades do serviço
-            subatividades = SubAtividade.query.filter_by(
-                servico_id=servico.id
-            ).order_by(SubAtividade.ordem_execucao).all()
+            subatividades = SubatividadeMestre.query.filter_by(
+                servico_id=servico.id, ativo=True
+            ).order_by(SubatividadeMestre.ordem_padrao).all()
             
             servicos.append({
                 'id': servico.id,
@@ -3441,7 +3424,7 @@ def api_servicos_obra(obra_id):
                         'id': sub.id,
                         'nome': sub.nome,
                         'descricao': sub.descricao or '',
-                        'percentual_heranca': sub.percentual_heranca or 0
+                        'percentual_inicial': sub.percentual_inicial or 0
                     }
                     for sub in subatividades
                 ]

@@ -2,7 +2,7 @@
 # Compatível com schema atual da base de dados
 
 from flask import Blueprint, render_template, request, redirect, url_for, flash, jsonify
-from models import db, RDO, RDOMaoObra, RDOServicoSubatividade, Obra, Funcionario, Servico, SubAtividade
+from models import db, RDO, RDOMaoObra, RDOServicoSubatividade, Obra, Funcionario, Servico, SubatividadeMestre
 from bypass_auth import obter_admin_id
 from datetime import datetime, date
 from sqlalchemy import desc, and_
@@ -283,7 +283,7 @@ def processar_subatividades_schema_atual(rdo, dados):
                 observacoes = dados.get(f'subatividade_{subatividade_id}_observacoes', '')
                 
                 # Para schema atual, precisamos do nome da subatividade
-                subatividade = SubAtividade.query.get(int(subatividade_id))
+                subatividade = SubatividadeMestre.query.get(int(subatividade_id))
                 
                 # Usar schema atual
                 registro = RDOServicoSubatividade()

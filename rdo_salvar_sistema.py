@@ -2,7 +2,7 @@
 # Corrige problema de campos incompatíveis entre modelo e database
 
 from flask import Blueprint, request, jsonify, redirect, url_for, flash, render_template
-from models import db, RDO, RDOMaoObra, RDOServicoSubatividade, Obra, Funcionario, SubAtividade
+from models import db, RDO, RDOMaoObra, RDOServicoSubatividade, Obra, Funcionario, SubatividadeMestre
 from bypass_auth import obter_admin_id, obter_usuario_atual
 from datetime import datetime, date
 from sqlalchemy import desc, and_

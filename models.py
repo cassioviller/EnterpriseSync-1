@@ -190,29 +190,11 @@ class Servico(db.Model):
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     
     # Relacionamentos
-    subatividades = db.relationship('SubAtividade', backref='servico', cascade='all, delete-orphan', lazy=True)
+    # Removido: subatividades obsoletas - agora usamos SubatividadeMestre
     historico_produtividade = db.relationship('HistoricoProdutividadeServico', backref='servico', lazy=True)
     servicos_obra = db.relationship('ServicoObra', backref='servico', lazy=True)
 
-class SubAtividade(db.Model):
-    """Subatividades de um serviço para coleta detalhada de dados"""
-    __tablename__ = 'sub_atividade'
-    
-    id = db.Column(db.Integer, primary_key=True)
-    servico_id = db.Column(db.Integer, db.ForeignKey('servico.id'), nullable=False)
-    nome = db.Column(db.String(100), nullable=False)
-    descricao = db.Column(db.Text)
-    ordem_execucao = db.Column(db.Integer, nullable=False)
-    ferramentas_necessarias = db.Column(db.Text)
-    materiais_principais = db.Column(db.Text)
-    requer_aprovacao = db.Column(db.Boolean, default=False)
-    pode_executar_paralelo = db.Column(db.Boolean, default=True)
-    qualificacao_minima = db.Column(db.String(50))  # ajudante, meio_oficial, oficial, especialista
-    ativo = db.Column(db.Boolean, default=True)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    
-    # Relacionamentos
-    historico_produtividade = db.relationship('HistoricoProdutividadeServico', backref='sub_atividade', lazy=True)
+# Removido: SubAtividade - substituído por SubatividadeMestre
 
 class HistoricoProdutividadeServico(db.Model):
     """Histórico de produtividade coletado via RDO"""
@@ -220,7 +202,7 @@ class HistoricoProdutividadeServico(db.Model):
     
     id = db.Column(db.Integer, primary_key=True)
     servico_id = db.Column(db.Integer, db.ForeignKey('servico.id'), nullable=False)
-    sub_atividade_id = db.Column(db.Integer, db.ForeignKey('sub_atividade.id'))
+    # Removido: referência à tabela obsoleta sub_atividade
     obra_id = db.Column(db.Integer, db.ForeignKey('obra.id'), nullable=False)
     funcionario_id = db.Column(db.Integer, db.ForeignKey('funcionario.id'), nullable=False)
     data_execucao = db.Column(db.Date, nullable=False)
@@ -465,7 +447,7 @@ class RDO(db.Model):
     admin = db.relationship('Usuario', foreign_keys=[admin_id], backref='rdos_admin', overlaps="rdos_admin")
     mao_obra = db.relationship('RDOMaoObra', backref='rdo_ref', cascade='all, delete-orphan', overlaps="rdo_ref")
     equipamentos = db.relationship('RDOEquipamento', backref='rdo_ref', cascade='all, delete-orphan', overlaps="rdo_ref")
-    atividades = db.relationship('RDOAtividade', backref='rdo_ref', cascade='all, delete-orphan', overlaps="rdo_ref")
+    # Removido: atividades obsoletas - agora usamos servico_subatividades
     ocorrencias_rdo = db.relationship('RDOOcorrencia', backref='rdo_ref', cascade='all, delete-orphan', overlaps="rdo_ref")
     fotos = db.relationship('RDOFoto', backref='rdo_ref', cascade='all, delete-orphan', overlaps="rdo_ref")
     
@@ -545,14 +527,7 @@ class RDOEquipamento(db.Model):
     estado_conservacao = db.Column(db.String(50), nullable=False)
 
 
-class RDOAtividade(db.Model):
-    __tablename__ = 'rdo_atividade'
-    
-    id = db.Column(db.Integer, primary_key=True)
-    rdo_id = db.Column(db.Integer, db.ForeignKey('rdo.id'), nullable=False)
-    descricao_atividade = db.Column(db.Text, nullable=False)
-    percentual_conclusao = db.Column(db.Float, nullable=False)  # 0-100
-    observacoes_tecnicas = db.Column(db.Text)
+# Removido: RDOAtividade - substituído por RDOServicoSubatividade
 
 
 class RDOOcorrencia(db.Model):
@@ -1589,7 +1564,7 @@ class NotificacaoCliente(db.Model):
     # Relacionamentos
     obra = db.relationship('Obra', backref='notificacoes_obra')
     rdo = db.relationship('RDO', backref='notificacoes')
-    atividade = db.relationship('RDOAtividade', backref='notificacoes')
+    # Removido: relacionamento com RDOAtividade obsoleto
     
     def __repr__(self):
         return f'<NotificacaoCliente {self.titulo}>'
