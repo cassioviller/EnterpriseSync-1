@@ -1558,11 +1558,14 @@ def api_servicos():
         print(f"ERRO API SERVIÇOS: {str(e)}")
         return jsonify([]), 500
 
-# ===== SISTEMA COMPLETO DE RDO =====
+# ===== SISTEMA UNIFICADO DE RDO =====
 
+@main_bp.route('/rdo')
+@main_bp.route('/rdo/')
 @main_bp.route('/rdo/lista')
+@main_bp.route('/funcionario/rdos')
 @login_required
-def lista_rdos():
+def rdo_lista_unificada():
     """Lista RDOs com controle de acesso e design moderno"""
     try:
         # Determinar admin_id baseado no tipo de usuário
@@ -1644,7 +1647,7 @@ def lista_rdos():
             for rdo in rdos.items[:3]:
                 print(f"DEBUG RDO {rdo.id}: {len(rdo.servico_subatividades)} subatividades, {len(rdo.mao_obra)} funcionários, {rdo.progresso_total}% progresso")
         
-        return render_template('rdo/lista_completa.html',
+        return render_template('rdo_lista_unificada.html',
                              rdos=rdos,
                              obras=obras,
                              funcionarios=funcionarios,
@@ -1662,19 +1665,9 @@ def lista_rdos():
         flash('Erro ao carregar lista de RDOs.', 'error')
         return redirect(url_for('main.dashboard'))
 
-# Rota de redirecionamento para compatibilidade com o /rdo antigo  
-@main_bp.route('/rdo')
-@login_required  
-def rdo_redirect():
-    """Redireciona /rdo para a nova lista completa"""
-    return redirect(url_for('main.lista_rdos'))
+# ===== ROTAS ESPECÍFICAS PARA FUNCIONÁRIOS - RDO =====
 
-# Redirecionamento adicional para garantir que funcione
-@main_bp.route('/rdo/')
-@login_required  
-def rdo_redirect_slash():
-    """Redireciona /rdo/ para a nova lista completa"""
-    return redirect(url_for('main.lista_rdos'))
+
 
 @main_bp.route('/rdo/novo')
 @funcionario_required
@@ -2331,23 +2324,7 @@ def api_percentuais_ultimo_rdo(obra_id):
         print(f"ERRO API ATIVIDADES OBRA: {str(e)}")
         return jsonify({'error': 'Erro interno'}), 500
 
-# ===== ROTAS ESPECÍFICAS PARA FUNCIONÁRIOS - RDO =====
-@main_bp.route('/funcionario/rdos')
-@funcionario_required
-def funcionario_lista_rdos():
-    """Lista RDOs para funcionários visualizarem"""
-    try:
-        rdos = RDO.query.join(Obra).filter(
-            Obra.admin_id == current_user.admin_id
-        ).order_by(RDO.data_relatorio.desc()).all()
-        
-        # Redirecionar para a lista principal moderna
-        return redirect(url_for('main.lista_rdos'))
-        
-    except Exception as e:
-        print(f"ERRO FUNCIONÁRIO LISTA RDOs: {str(e)}")
-        flash('Erro ao carregar RDOs.', 'error')
-        return redirect(url_for('main.funcionario_dashboard'))
+
 
 @main_bp.route('/funcionario/rdo/consolidado')
 @funcionario_required
