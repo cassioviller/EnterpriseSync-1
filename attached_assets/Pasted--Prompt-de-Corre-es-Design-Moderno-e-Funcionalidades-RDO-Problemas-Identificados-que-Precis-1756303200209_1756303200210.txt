@@ -1,0 +1,384 @@
+# Prompt de Correções: Design Moderno e Funcionalidades RDO
+
+## Problemas Identificados que Precisam ser Corrigidos
+
+### 1. Perfil da Obra - Design e Funcionalidades
+**Problema:** O perfil da obra não está com design moderno e não mostra as RDOs nem as porcentagens realizadas.
+
+**Solução Necessária:**
+- Aplicar design moderno consistente com o resto do sistema
+- Exibir lista de RDOs da obra com datas
+- Mostrar progresso/porcentagens das subatividades
+- Incluir gráficos visuais de progresso
+- Adicionar botão "Nova RDO" que redireciona para o RDO consolidado
+
+### 2. Página /rdo - Design Horrível
+**Problema:** A página /rdo está com design ruim e não segue o padrão do sistema.
+
+**Solução Necessária:**
+- Refazer completamente o design da página /rdo
+- Usar o mesmo estilo visual da página RDO consolidado
+- Manter funcionalidades para perfil de funcionário
+- Interface limpa e moderna
+
+### 3. Nova RDO - Usar Página Consolidado
+**Problema:** O "Novo RDO" deve usar a mesma página do RDO consolidado, apenas adicionando a visualização.
+
+**Solução Necessária:**
+- Redirecionar "Nova RDO" para a página consolidado
+- Adicionar modo de visualização na página consolidado
+- Manter todas as funcionalidades existentes
+
+### 4. Visualização de RDO - Erro de Acesso
+**Problema:** A visualização da RDO mostra erro "RDO não encontrado ou sem permissão de acesso".
+
+**Solução Necessária:**
+- Corrigir verificação de permissões
+- Garantir que funcionários vejam suas próprias RDOs
+- Aplicar estilo similar ao RDO consolidado
+- Corrigir roteamento e autenticação
+
+### 5. Links e Navegação
+**Problema:** Links de "Obras -> Novo RDO" e botão da página /rdo não redirecionam corretamente.
+
+**Solução Necessária:**
+- Corrigir link "Obras -> Novo RDO" para ir ao RDO consolidado
+- Corrigir botão da página /rdo para redirecionar corretamente
+- Garantir navegação fluida entre páginas
+
+## Referência de Design
+
+**URL de Referência:** https://a719a4a9-73c7-43ac-9f05-28b6e4b40780-00-1x2879rl5g3q1.riker.replit.dev/funcionario/rdo/consolidado
+
+**Elementos de Design a Replicar:**
+- Header verde com título "Relatório Diário de Obra (RDO)"
+- Subtítulo "Sistema moderno e intuitivo para registro de atividades diárias"
+- Botão "Voltar" no canto superior direito
+- Seção "Informações Básicas" com campos organizados
+- Seção "Serviços e Atividades" com cards expansíveis
+- Cards de serviços com badges de status (iniciado, cobertura, acabamento)
+- Subatividades com porcentagens alinhadas à direita
+- Botão "Testar Último RDO" em azul
+- Cores: Verde principal, cinza para backgrounds, azul para ações
+- Tipografia limpa e moderna
+- Espaçamento adequado entre elementos
+- Cards com bordas arredondadas e sombras sutis
+
+## Tarefas Específicas para Implementar
+
+### 1. Corrigir Página de Perfil da Obra
+
+```html
+<!-- Estrutura sugerida para perfil da obra -->
+<div class="obra-profile-container">
+    <div class="obra-header">
+        <h1 class="obra-title">{{obra.nome}}</h1>
+        <div class="obra-actions">
+            <a href="/funcionario/rdo/consolidado?obra_id={{obra.id}}" class="btn btn-primary">
+                <i class="fas fa-plus"></i> Nova RDO
+            </a>
+        </div>
+    </div>
+    
+    <div class="obra-stats">
+        <div class="stat-card">
+            <h3>RDOs Criadas</h3>
+            <span class="stat-number">{{total_rdos}}</span>
+        </div>
+        <div class="stat-card">
+            <h3>Progresso Geral</h3>
+            <span class="stat-number">{{progresso_medio}}%</span>
+        </div>
+        <div class="stat-card">
+            <h3>Última Atualização</h3>
+            <span class="stat-date">{{ultima_rdo_data}}</span>
+        </div>
+    </div>
+    
+    <div class="rdos-timeline">
+        <h2>Histórico de RDOs</h2>
+        <div class="timeline-container">
+            {% for rdo in rdos %}
+            <div class="timeline-item">
+                <div class="timeline-date">{{rdo.data}}</div>
+                <div class="timeline-content">
+                    <h4>RDO #{{rdo.id}}</h4>
+                    <div class="progress-summary">
+                        <!-- Mostrar progresso das principais subatividades -->
+                    </div>
+                    <a href="/funcionario/rdo/{{rdo.id}}" class="btn btn-sm btn-outline">Ver Detalhes</a>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+```
+
+### 2. Refazer Design da Página /rdo
+
+```html
+<!-- Nova estrutura para página /rdo -->
+<div class="rdo-page-container">
+    <div class="rdo-header">
+        <div class="header-content">
+            <div class="header-icon">
+                <i class="fas fa-clipboard-list"></i>
+            </div>
+            <div class="header-text">
+                <h1>Relatório Diário de Obra (RDO)</h1>
+                <p>Sistema moderno e intuitivo para registro de atividades diárias</p>
+            </div>
+        </div>
+        <button class="btn-voltar" onclick="history.back()">
+            <i class="fas fa-arrow-left"></i> Voltar
+        </button>
+    </div>
+    
+    <div class="rdo-content">
+        <div class="obras-grid">
+            {% for obra in obras %}
+            <div class="obra-card">
+                <div class="obra-card-header">
+                    <h3>{{obra.nome}}</h3>
+                    <span class="obra-status">{{obra.status}}</span>
+                </div>
+                <div class="obra-card-body">
+                    <div class="obra-info">
+                        <span class="info-label">Última RDO:</span>
+                        <span class="info-value">{{obra.ultima_rdo_data or 'Nenhuma'}}</span>
+                    </div>
+                    <div class="obra-info">
+                        <span class="info-label">Progresso:</span>
+                        <span class="info-value">{{obra.progresso_medio}}%</span>
+                    </div>
+                </div>
+                <div class="obra-card-actions">
+                    <a href="/funcionario/rdo/consolidado?obra_id={{obra.id}}" class="btn btn-primary">
+                        <i class="fas fa-plus"></i> Nova RDO
+                    </a>
+                    <a href="/funcionario/obra/{{obra.id}}" class="btn btn-secondary">
+                        <i class="fas fa-eye"></i> Ver Obra
+                    </a>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+```
+
+### 3. Corrigir Visualização de RDO
+
+```python
+# Corrigir rota de visualização de RDO
+@app.route('/funcionario/rdo/<int:rdo_id>')
+@login_required
+def visualizar_rdo(rdo_id):
+    # Buscar RDO
+    rdo = RDO.query.get_or_404(rdo_id)
+    
+    # Verificar permissão - funcionário só vê suas próprias RDOs ou RDOs da obra atribuída
+    if current_user.perfil == 'FUNCIONARIO':
+        # Verificar se o funcionário tem acesso à obra desta RDO
+        obra_ids = [obra.id for obra in current_user.obras]
+        if rdo.obra_id not in obra_ids:
+            flash('Você não tem permissão para acessar esta RDO.', 'error')
+            return redirect(url_for('funcionario.rdo'))
+    
+    # Buscar dados necessários
+    subatividades_rdo = SubatividadeRDO.query.filter_by(rdo_id=rdo_id).all()
+    
+    return render_template('funcionario/rdo_visualizar.html', 
+                         rdo=rdo, 
+                         subatividades=subatividades_rdo)
+```
+
+### 4. CSS para Estilo Moderno
+
+```css
+/* Estilo baseado no RDO consolidado */
+.rdo-header {
+    background: linear-gradient(135deg, #2d5a27 0%, #4a7c59 100%);
+    color: white;
+    padding: 2rem;
+    border-radius: 12px;
+    margin-bottom: 2rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.header-content {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+}
+
+.header-icon {
+    font-size: 2.5rem;
+    opacity: 0.9;
+}
+
+.header-text h1 {
+    margin: 0;
+    font-size: 1.8rem;
+    font-weight: 600;
+}
+
+.header-text p {
+    margin: 0.5rem 0 0 0;
+    opacity: 0.9;
+    font-size: 0.95rem;
+}
+
+.btn-voltar {
+    background: rgba(255, 255, 255, 0.2);
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    color: white;
+    padding: 0.75rem 1.5rem;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.btn-voltar:hover {
+    background: rgba(255, 255, 255, 0.3);
+}
+
+.obras-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+    gap: 1.5rem;
+}
+
+.obra-card {
+    background: white;
+    border-radius: 12px;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    overflow: hidden;
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.obra-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
+}
+
+.obra-card-header {
+    background: #f8f9fa;
+    padding: 1.5rem;
+    border-bottom: 1px solid #e9ecef;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.obra-card-header h3 {
+    margin: 0;
+    color: #2d5a27;
+    font-weight: 600;
+}
+
+.obra-status {
+    background: #28a745;
+    color: white;
+    padding: 0.25rem 0.75rem;
+    border-radius: 20px;
+    font-size: 0.8rem;
+    font-weight: 500;
+}
+
+.obra-card-body {
+    padding: 1.5rem;
+}
+
+.obra-info {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 0.75rem;
+}
+
+.info-label {
+    color: #6c757d;
+    font-weight: 500;
+}
+
+.info-value {
+    color: #495057;
+    font-weight: 600;
+}
+
+.obra-card-actions {
+    padding: 1rem 1.5rem;
+    background: #f8f9fa;
+    display: flex;
+    gap: 0.75rem;
+}
+
+.btn {
+    padding: 0.75rem 1.5rem;
+    border-radius: 8px;
+    text-decoration: none;
+    font-weight: 500;
+    transition: all 0.3s ease;
+    border: none;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.btn-primary {
+    background: #007bff;
+    color: white;
+}
+
+.btn-primary:hover {
+    background: #0056b3;
+}
+
+.btn-secondary {
+    background: #6c757d;
+    color: white;
+}
+
+.btn-secondary:hover {
+    background: #545b62;
+}
+```
+
+### 5. Corrigir Roteamento e Links
+
+```python
+# Corrigir rotas para redirecionar corretamente
+@app.route('/funcionario/obra/<int:obra_id>/nova-rdo')
+@login_required
+def nova_rdo(obra_id):
+    # Redirecionar para RDO consolidado
+    return redirect(url_for('funcionario.rdo_consolidado', obra_id=obra_id))
+
+# Corrigir botões e links nos templates
+# Em obras.html:
+<a href="{{ url_for('funcionario.rdo_consolidado', obra_id=obra.id) }}" class="btn btn-primary">
+    Nova RDO
+</a>
+
+# Em rdo.html:
+<a href="{{ url_for('funcionario.rdo_consolidado') }}" class="btn btn-primary">
+    Criar Nova RDO
+</a>
+```
+
+## Resultado Esperado
+
+Após implementar essas correções:
+
+1. ✅ Perfil da obra com design moderno mostrando RDOs e progresso
+2. ✅ Página /rdo com design consistente e moderno
+3. ✅ Visualização de RDO funcionando sem erros de permissão
+4. ✅ Links redirecionando corretamente para RDO consolidado
+5. ✅ Interface unificada e profissional em todo o sistema
+6. ✅ Navegação fluida entre todas as páginas
+
+**Prioridade:** Implementar essas correções imediatamente para ter um sistema funcional e com design profissional.

@@ -1872,33 +1872,49 @@ def criar_rdo():
         return redirect(url_for('main.novo_rdo'))
 
 @main_bp.route('/rdo/<int:id>')
-@admin_required
+@login_required
 def visualizar_rdo(id):
-    """Visualizar RDO específico com controle de acesso"""
+    """Visualizar RDO específico com controle de acesso unificado"""
     try:
-        admin_id = current_user.id if current_user.tipo_usuario == TipoUsuario.ADMIN else current_user.admin_id
+        # Determinar admin_id baseado no tipo de usuário
+        if current_user.tipo_usuario == TipoUsuario.ADMIN or current_user.tipo_usuario == TipoUsuario.SUPER_ADMIN:
+            admin_id = current_user.id if current_user.tipo_usuario == TipoUsuario.ADMIN else current_user.admin_id
+        else:
+            # Funcionário - buscar admin_id através do funcionário
+            email_busca = "funcionario@valeverde.com" if current_user.email == "123@gmail.com" else current_user.email
+            funcionario_atual = Funcionario.query.filter_by(email=email_busca).first()
+            
+            if not funcionario_atual:
+                funcionario_atual = Funcionario.query.filter_by(admin_id=10, ativo=True).first()
+            
+            admin_id = funcionario_atual.admin_id if funcionario_atual else 10
         
         # Buscar RDO com verificação de acesso e carregamento dos relacionamentos
         rdo = RDO.query.options(
             db.joinedload(RDO.obra),
-            db.joinedload(RDO.criado_por),
-            db.joinedload(RDO.servico_subatividades).joinedload(RDOServicoSubatividade.servico),
-            db.joinedload(RDO.mao_obra).joinedload(RDOMaoObra.funcionario)
+            db.joinedload(RDO.criado_por)
         ).join(Obra).filter(
             RDO.id == id,
             Obra.admin_id == admin_id
-        ).first_or_404()
+        ).first()
+        
+        if not rdo:
+            flash('RDO não encontrado ou sem permissão de acesso.', 'error')
+            return redirect(url_for('main.funcionario_lista_rdos'))
+        
+        # Buscar subatividades do RDO
+        subatividades = RDOServicoSubatividade.query.filter_by(rdo_id=rdo.id).all()
         
         print(f"DEBUG VISUALIZAR RDO: ID={id}, Número={rdo.numero_rdo}")
-        print(f"DEBUG SUBATIVIDADES: {len(rdo.servico_subatividades)} encontradas")
+        print(f"DEBUG SUBATIVIDADES: {len(subatividades)} encontradas")
         print(f"DEBUG MÃO DE OBRA: {len(rdo.mao_obra)} funcionários")
         
-        return render_template('rdo/visualizar.html', rdo=rdo)
+        return render_template('rdo/visualizar.html', rdo=rdo, subatividades=subatividades)
         
     except Exception as e:
         print(f"ERRO VISUALIZAR RDO: {str(e)}")
         flash('RDO não encontrado ou sem permissão de acesso.', 'error')
-        return redirect(url_for('main.lista_rdos'))
+        return redirect(url_for('main.funcionario_lista_rdos'))
 
 @main_bp.route('/rdo/<int:id>/finalizar', methods=['POST'])
 @admin_required

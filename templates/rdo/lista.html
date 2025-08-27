@@ -1,78 +1,252 @@
 {% extends "base.html" %}
 
-{% block title %}Relatórios Diários de Obra{% endblock %}
+{% block title %}Relatório Diário de Obra (RDO){% endblock %}
 
-<!-- CSS Moderno para RDO Lista -->
+{% block content %}
 <style>
-/* Sistema de cores e estilo base já definido no base.html */
-#main-content {
+/* Estilo baseado no RDO consolidado */
+body {
     background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
     min-height: 100vh;
     font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
 }
 
-/* Grid de Filtros */
-.filtros-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-    gap: 1.5rem;
-    margin-bottom: 1.5rem;
-}
-
-/* Grid de Estatísticas */
-.stats-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-    gap: 1.5rem;
-    margin-bottom: 2rem;
-}
-
-.stat-card {
-    background: rgba(255, 255, 255, 0.9);
+.rdo-header {
+    background: linear-gradient(135deg, #2d5a27 0%, #4a7c59 100%);
+    color: white;
+    padding: 2rem;
     border-radius: 12px;
-    padding: 1.5rem;
+    margin-bottom: 2rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.header-content {
     display: flex;
     align-items: center;
     gap: 1rem;
-    border: 1px solid #e2e8f0;
-    transition: all 0.3s ease;
 }
 
-.stat-card:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.1);
+.header-icon {
+    font-size: 2.5rem;
+    opacity: 0.9;
 }
 
-.stat-icon {
-    width: 50px;
-    height: 50px;
-    border-radius: 10px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
+.header-text h1 {
+    margin: 0;
+    font-size: 1.8rem;
+    font-weight: 600;
+}
+
+.header-text p {
+    margin: 0.5rem 0 0 0;
+    opacity: 0.9;
+    font-size: 0.95rem;
+}
+
+.btn-voltar {
+    background: rgba(255, 255, 255, 0.2);
+    border: 1px solid rgba(255, 255, 255, 0.3);
     color: white;
-    font-size: 1.5rem;
+    padding: 0.75rem 1.5rem;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    text-decoration: none;
 }
 
-.stat-info h3 {
-    font-size: 1.5rem;
-    font-weight: 700;
-    margin: 0;
-    color: #2d3748;
+.btn-voltar:hover {
+    background: rgba(255, 255, 255, 0.3);
+    color: white;
 }
 
-.stat-info p {
-    margin: 0;
-    color: #718096;
-    font-size: 0.9rem;
-}
-
-/* Container de RDOs */
-.rdos-container {
+.obras-grid {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
     gap: 1.5rem;
 }
+
+.obra-card {
+    background: white;
+    border-radius: 12px;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    overflow: hidden;
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.obra-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
+}
+
+.obra-card-header {
+    background: #f8f9fa;
+    padding: 1.5rem;
+    border-bottom: 1px solid #e9ecef;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.obra-card-header h3 {
+    margin: 0;
+    color: #2d5a27;
+    font-weight: 600;
+    font-size: 1.1rem;
+}
+
+.obra-status {
+    background: #28a745;
+    color: white;
+    padding: 0.25rem 0.75rem;
+    border-radius: 20px;
+    font-size: 0.8rem;
+    font-weight: 500;
+}
+
+.obra-card-body {
+    padding: 1.5rem;
+}
+
+.obra-info {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 0.75rem;
+}
+
+.info-label {
+    color: #6c757d;
+    font-weight: 500;
+}
+
+.info-value {
+    color: #495057;
+    font-weight: 600;
+}
+
+.obra-card-actions {
+    padding: 1rem 1.5rem;
+    background: #f8f9fa;
+    display: flex;
+    gap: 0.75rem;
+}
+
+.btn {
+    padding: 0.75rem 1.5rem;
+    border-radius: 8px;
+    text-decoration: none;
+    font-weight: 500;
+    transition: all 0.3s ease;
+    border: none;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.9rem;
+}
+
+.btn-primary {
+    background: #007bff;
+    color: white;
+}
+
+.btn-primary:hover {
+    background: #0056b3;
+    color: white;
+    text-decoration: none;
+}
+
+.btn-secondary {
+    background: #6c757d;
+    color: white;
+}
+
+.btn-secondary:hover {
+    background: #545b62;
+    color: white;
+    text-decoration: none;
+}
+
+.progress-bar {
+    background: #e9ecef;
+    border-radius: 10px;
+    height: 8px;
+    overflow: hidden;
+    margin-top: 0.5rem;
+}
+
+.progress-fill {
+    background: linear-gradient(90deg, #28a745, #20c997);
+    height: 100%;
+    transition: width 0.3s ease;
+}
+</style>
+
+<div class="container-fluid">
+    <!-- Header RDO -->
+    <div class="rdo-header">
+        <div class="header-content">
+            <div class="header-icon">
+                <i class="fas fa-clipboard-list"></i>
+            </div>
+            <div class="header-text">
+                <h1>Relatório Diário de Obra (RDO)</h1>
+                <p>Sistema moderno e intuitivo para registro de atividades diárias</p>
+            </div>
+        </div>
+        <a href="javascript:history.back()" class="btn-voltar">
+            <i class="fas fa-arrow-left"></i> Voltar
+        </a>
+    </div>
+    
+    <!-- Grid de Obras -->
+    <div class="obras-grid">
+        {% for obra in obras %}
+        <div class="obra-card">
+            <div class="obra-card-header">
+                <h3>{{ obra.nome }}</h3>
+                <span class="obra-status">{{ obra.status or 'Ativa' }}</span>
+            </div>
+            <div class="obra-card-body">
+                <div class="obra-info">
+                    <span class="info-label">Última RDO:</span>
+                    <span class="info-value">{{ obra.ultima_rdo_data or 'Nenhuma' }}</span>
+                </div>
+                <div class="obra-info">
+                    <span class="info-label">Total de RDOs:</span>
+                    <span class="info-value">{{ obra.total_rdos or 0 }}</span>
+                </div>
+                <div class="obra-info">
+                    <span class="info-label">Progresso:</span>
+                    <span class="info-value">{{ "%.1f"|format(obra.progresso_medio or 0) }}%</span>
+                </div>
+                <div class="progress-bar">
+                    <div class="progress-fill" style="width: {{ obra.progresso_medio or 0 }}%"></div>
+                </div>
+            </div>
+            <div class="obra-card-actions">
+                <a href="/funcionario/rdo/consolidado?obra_id={{ obra.id }}" class="btn btn-primary">
+                    <i class="fas fa-plus"></i> Nova RDO
+                </a>
+                <a href="/obras/{{ obra.id }}" class="btn btn-secondary">
+                    <i class="fas fa-eye"></i> Ver Obra
+                </a>
+            </div>
+        </div>
+        {% endfor %}
+        
+        {% if not obras %}
+        <div class="col-12">
+            <div class="alert alert-info text-center">
+                <i class="fas fa-info-circle me-2"></i>
+                Nenhuma obra encontrada. Entre em contato com o administrador para ser atribuído a uma obra.
+            </div>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
 
 .rdos-container.list-view {
     grid-template-columns: 1fr;

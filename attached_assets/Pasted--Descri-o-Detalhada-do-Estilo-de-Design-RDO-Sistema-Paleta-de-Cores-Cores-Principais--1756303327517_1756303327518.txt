@@ -1,0 +1,187 @@
+# Descrição Detalhada do Estilo de Design - RDO Sistema
+
+## Paleta de Cores
+
+**Cores Principais:**
+- **Verde Principal:** #2d5a27 a #4a7c59 (gradiente no header)
+- **Verde Secundário:** #28a745 (badges e botões de ação)
+- **Azul de Ação:** #007bff (botões primários como "Testar Último RDO")
+- **Cinza Claro:** #f8f9fa (backgrounds de seções)
+- **Cinza Médio:** #6c757d (textos secundários)
+- **Branco:** #ffffff (backgrounds de cards)
+- **Texto Principal:** #495057 (textos escuros)
+
+## Layout e Estrutura
+
+**Container Principal:**
+- Largura máxima com margens automáticas
+- Padding lateral consistente
+- Background branco ou cinza muito claro
+
+**Header Principal:**
+- Background com gradiente verde (diagonal de #2d5a27 para #4a7c59)
+- Altura generosa com padding de 2rem
+- Bordas arredondadas (border-radius: 12px)
+- Texto branco
+- Flexbox com justify-content: space-between
+
+**Estrutura do Header:**
+- Lado esquerdo: Ícone + Título + Subtítulo
+- Lado direito: Botão "Voltar"
+- Ícone grande (2.5rem) com opacity 0.9
+- Título em fonte bold, tamanho 1.8rem
+- Subtítulo menor com opacity 0.9
+
+## Componentes e Cards
+
+**Cards de Seção:**
+- Background branco
+- Border-radius: 12px
+- Box-shadow sutil: 0 4px 6px rgba(0, 0, 0, 0.1)
+- Padding interno generoso (1.5rem)
+- Margin-bottom entre seções
+
+**Headers de Seção:**
+- Background cinza claro (#f8f9fa)
+- Padding: 1rem 1.5rem
+- Border-bottom: 1px solid #e9ecef
+- Título com ícone à esquerda
+- Cor do texto: #2d5a27 (verde escuro)
+
+**Cards de Serviços/Atividades:**
+- Background branco
+- Border: 1px solid #e9ecef
+- Border-radius: 8px
+- Padding: 1rem 1.5rem
+- Margin-bottom: 0.75rem
+- Hover effect: transform translateY(-2px) + shadow
+
+## Badges e Status
+
+**Badges de Status:**
+- Border-radius: 20px (totalmente arredondado)
+- Padding: 0.25rem 0.75rem
+- Font-size: 0.8rem
+- Font-weight: 500
+- Cores específicas:
+  - Verde (#28a745): "iniciado"
+  - Azul (#17a2b8): "cobertura" 
+  - Laranja (#fd7e14): "acabamento"
+
+## Botões
+
+**Botão Primário (Azul):**
+- Background: #007bff
+- Color: white
+- Padding: 0.75rem 1.5rem
+- Border-radius: 8px
+- Font-weight: 500
+- Hover: #0056b3
+
+**Botão Voltar (Header):**
+- Background: rgba(255, 255, 255, 0.2)
+- Border: 1px solid rgba(255, 255, 255, 0.3)
+- Color: white
+- Hover: rgba(255, 255, 255, 0.3)
+
+**Botão Secundário:**
+- Background: #6c757d
+- Color: white
+- Hover: #545b62
+
+## Tipografia
+
+**Hierarquia de Textos:**
+- Título Principal: 1.8rem, font-weight: 600
+- Subtítulos: 1.2rem, font-weight: 500
+- Texto Normal: 1rem, font-weight: 400
+- Texto Pequeno: 0.9rem
+- Labels: font-weight: 500
+
+**Família de Fonte:**
+- Sans-serif moderna (provavelmente system fonts)
+- Boa legibilidade
+- Espaçamento adequado entre linhas
+
+## Campos de Input
+
+**Campos de Formulário:**
+- Border: 1px solid #ced4da
+- Border-radius: 6px
+- Padding: 0.75rem 1rem
+- Background: white
+- Focus: border-color azul + box-shadow sutil
+
+**Selects:**
+- Mesmo estilo dos inputs
+- Ícone de dropdown customizado
+
+## Elementos Específicos
+
+**Porcentagens:**
+- Alinhadas à direita
+- Font-weight: 600
+- Cor: #495057
+- Acompanhadas do símbolo "%"
+
+**Contadores de Subatividades:**
+- Texto pequeno e discreto
+- Cor: #6c757d
+- Formato: "X subatividades"
+
+**Ícones:**
+- Font Awesome ou similar
+- Tamanho consistente
+- Cor harmoniosa com o contexto
+- Espaçamento adequado do texto
+
+## Espaçamento e Grid
+
+**Sistema de Espaçamento:**
+- Múltiplos de 0.25rem (4px)
+- Padding padrão: 1rem, 1.5rem, 2rem
+- Margin entre elementos: 0.75rem, 1rem, 1.5rem
+
+**Grid e Layout:**
+- Flexbox para alinhamentos
+- Grid CSS para layouts de cards
+- Gap consistente: 1rem a 1.5rem
+
+## Interações e Estados
+
+**Hover Effects:**
+- Transform: translateY(-2px)
+- Box-shadow mais pronunciada
+- Transição suave: 0.3s ease
+
+**Estados de Botão:**
+- Cursor: pointer
+- Transições suaves
+- Feedback visual claro
+
+## Responsividade
+
+**Breakpoints:**
+- Mobile-first approach
+- Cards empilham em telas menores
+- Padding reduzido em mobile
+- Texto responsivo
+
+## Exemplo de Prompt para LLM
+
+"Crie um design seguindo este estilo específico:
+
+**HEADER:** Gradiente verde diagonal (#2d5a27 para #4a7c59), texto branco, bordas arredondadas 12px, ícone grande à esquerda + título bold + subtítulo, botão 'Voltar' à direita com background transparente.
+
+**CARDS:** Background branco, sombra sutil (0 4px 6px rgba(0,0,0,0.1)), bordas arredondadas 12px, headers com background cinza claro (#f8f9fa).
+
+**BADGES:** Totalmente arredondados (border-radius: 20px), cores: verde #28a745, azul #17a2b8, laranja #fd7e14.
+
+**BOTÕES:** Azul primário #007bff, padding 0.75rem 1.5rem, bordas arredondadas 8px, font-weight 500.
+
+**TIPOGRAFIA:** Sans-serif, títulos 1.8rem bold, textos #495057, labels font-weight 500.
+
+**LAYOUT:** Container centralizado, seções com margin-bottom, flexbox para alinhamentos, hover effects com translateY(-2px).
+
+Use exatamente essas cores, espaçamentos e estilos visuais."
+

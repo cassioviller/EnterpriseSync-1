@@ -1,51 +1,263 @@
 {% extends "base.html" %}
 
-{% block title %}RDO {{ rdo.numero_rdo }} - Sistema Moderno{% endblock %}
+{% block title %}RDO {{ rdo.numero_rdo }} - Relatório Diário de Obra{% endblock %}
 
 {% block content %}
-<div class="container-fluid py-4" id="main-content">
-    <!-- Header Principal -->
-    <div class="header-section">
-        <div class="d-flex align-items-center justify-content-between mb-4">
-            <div class="header-info">
-                <div class="header-icon">
-                    <i class="fas fa-file-alt"></i>
-                </div>
-                <div>
-                    <h1 class="page-title">RDO {{ rdo.numero_rdo }}</h1>
-                    <p class="page-subtitle">
-                        <span class="badge 
-                            {% if rdo.status == 'Finalizado' %}bg-success
-                            {% elif rdo.status == 'Rascunho' %}bg-warning
-                            {% else %}bg-info
-                            {% endif %}">{{ rdo.status }}</span> |
-                        Obra: {{ rdo.obra.nome }} | 
-                        Data: {{ rdo.data_relatorio.strftime('%d/%m/%Y') }}
-                    </p>
-                </div>
+<style>
+/* Estilo baseado no RDO consolidado */
+body {
+    background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+    min-height: 100vh;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+}
+
+.rdo-header {
+    background: linear-gradient(135deg, #2d5a27 0%, #4a7c59 100%);
+    color: white;
+    padding: 2rem;
+    border-radius: 12px;
+    margin-bottom: 2rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.header-content {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+}
+
+.header-icon {
+    font-size: 2.5rem;
+    opacity: 0.9;
+}
+
+.header-text h1 {
+    margin: 0;
+    font-size: 1.8rem;
+    font-weight: 600;
+}
+
+.header-text p {
+    margin: 0.5rem 0 0 0;
+    opacity: 0.9;
+    font-size: 0.95rem;
+}
+
+.btn-voltar {
+    background: rgba(255, 255, 255, 0.2);
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    color: white;
+    padding: 0.75rem 1.5rem;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    text-decoration: none;
+}
+
+.btn-voltar:hover {
+    background: rgba(255, 255, 255, 0.3);
+    color: white;
+}
+
+.info-card {
+    background: white;
+    border-radius: 12px;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    padding: 1.5rem;
+    margin-bottom: 1.5rem;
+}
+
+.info-card h4 {
+    color: #2d5a27;
+    margin-bottom: 1rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.info-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 1rem;
+}
+
+.info-item {
+    display: flex;
+    justify-content: space-between;
+    padding: 0.5rem 0;
+    border-bottom: 1px solid #e9ecef;
+}
+
+.info-label {
+    color: #6c757d;
+    font-weight: 500;
+}
+
+.info-value {
+    color: #495057;
+    font-weight: 600;
+}
+
+.servicos-container {
+    display: grid;
+    gap: 1.5rem;
+}
+
+.servico-card {
+    background: white;
+    border-radius: 12px;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    overflow: hidden;
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.servico-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
+}
+
+.servico-card-header {
+    background: #f8f9fa;
+    padding: 1rem 1.5rem;
+    border-bottom: 1px solid #e9ecef;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.servico-title {
+    color: #2d5a27;
+    font-weight: 600;
+    margin: 0;
+}
+
+.progress-badge {
+    background: #007bff;
+    color: white;
+    padding: 0.25rem 0.75rem;
+    border-radius: 20px;
+    font-size: 0.8rem;
+    font-weight: 500;
+}
+
+.subatividades-list {
+    padding: 1.5rem;
+}
+
+.subatividade-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.75rem 0;
+    border-bottom: 1px solid #e9ecef;
+}
+
+.subatividade-item:last-child {
+    border-bottom: none;
+}
+
+.subatividade-name {
+    color: #495057;
+    font-weight: 500;
+}
+
+.subatividade-progress {
+    color: #007bff;
+    font-weight: 600;
+}
+</style>
+
+<div class="container-fluid">
+    <!-- Header RDO -->
+    <div class="rdo-header">
+        <div class="header-content">
+            <div class="header-icon">
+                <i class="fas fa-file-alt"></i>
             </div>
-            <div class="header-actions">
-                {% if rdo.status == 'Rascunho' %}
-                <a href="{{ url_for('main.editar_rdo', id=rdo.id) }}" class="btn-modern btn-warning">
-                    <i class="fas fa-edit"></i>
-                    Editar
-                </a>
+            <div class="header-text">
+                <h1>RDO {{ rdo.numero_rdo }}</h1>
+                <p>
+                    Obra: {{ rdo.obra.nome }} | 
+                    Data: {{ rdo.data_relatorio.strftime('%d/%m/%Y') }} |
+                    Status: {{ rdo.status }}
+                </p>
+            </div>
+        </div>
+        <a href="/rdo" class="btn-voltar">
+            <i class="fas fa-arrow-left"></i> Voltar
+        </a>
+    </div>
+
+    <!-- Informações Básicas -->
+    <div class="info-card">
+        <h4><i class="fas fa-info-circle"></i> Informações Básicas</h4>
+        <div class="info-grid">
+            <div class="info-item">
+                <span class="info-label">Obra:</span>
+                <span class="info-value">{{ rdo.obra.nome }}</span>
+            </div>
+            <div class="info-item">
+                <span class="info-label">Data do Relatório:</span>
+                <span class="info-value">{{ rdo.data_relatorio.strftime('%d/%m/%Y') }}</span>
+            </div>
+            <div class="info-item">
+                <span class="info-label">Status:</span>
+                <span class="info-value">{{ rdo.status }}</span>
+            </div>
+            <div class="info-item">
+                <span class="info-label">Criado por:</span>
+                <span class="info-value">{{ rdo.criado_por.nome }}</span>
+            </div>
+            {% if rdo.observacoes %}
+            <div class="info-item">
+                <span class="info-label">Observações:</span>
+                <span class="info-value">{{ rdo.observacoes }}</span>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Serviços e Atividades -->
+    {% if subatividades %}
+    <div class="servicos-container">
+        {% set current_servico = namespace(value=None) %}
+        {% for subatividade in subatividades %}
+            {% if current_servico.value != subatividade.servico_id %}
+                {% if current_servico.value is not none %}
+                        </div>
+                    </div>
                 {% endif %}
-                <a href="{{ url_for('main.lista_rdos') }}" class="btn-modern btn-secondary">
-                    <i class="fas fa-arrow-left"></i>
-                    Voltar para Lista
-                </a>
+                {% set current_servico.value = subatividade.servico_id %}
+                <div class="servico-card">
+                    <div class="servico-card-header">
+                        <h5 class="servico-title">{{ subatividade.servico.nome }}</h5>
+                        <span class="progress-badge">{{ subatividade.servico.categoria or 'Serviço' }}</span>
+                    </div>
+                    <div class="subatividades-list">
+            {% endif %}
+            <div class="subatividade-item">
+                <span class="subatividade-name">{{ subatividade.subatividade.nome }}</span>
+                <span class="subatividade-progress">{{ subatividade.percentual_executado }}%</span>
             </div>
-        </div>
-        
-        <!-- Progress Bar Obra -->
-        {% if rdo.progresso_total %}
-        <div class="progress-container">
-            <div class="progress-bar" style="width: {{ rdo.progresso_total }}%"></div>
-            <div class="progress-text">Progresso da Obra: {{ rdo.progresso_total }}%</div>
-        </div>
+        {% endfor %}
+        {% if current_servico.value is not none %}
+                </div>
+            </div>
         {% endif %}
     </div>
+    {% else %}
+    <div class="info-card">
+        <div class="text-center py-4">
+            <i class="fas fa-info-circle fa-3x text-muted mb-3"></i>
+            <h5 class="text-muted">Nenhuma atividade registrada</h5>
+            <p class="text-muted">Este RDO ainda não possui atividades registradas.</p>
+        </div>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}
 
     <!-- Card Principal do RDO -->
     <div class="rdo-card slide-in">
