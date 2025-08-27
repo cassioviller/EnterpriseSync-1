@@ -2009,9 +2009,10 @@ def api_percentuais_ultimo_rdo(obra_id):
         rdo_subatividades = RDOServicoSubatividade.query.filter_by(rdo_id=ultimo_rdo.id).all()
         
         for rdo_subativ in rdo_subatividades:
-            percentuais[rdo_subativ.subatividade_id] = {
-                'percentual': rdo_subativ.percentual,
-                'observacoes': rdo_subativ.observacoes or ''
+            # Usar nome da subatividade como chave em vez de ID
+            percentuais[rdo_subativ.nome_subatividade] = {
+                'percentual': rdo_subativ.percentual_conclusao,
+                'observacoes': rdo_subativ.observacoes_tecnicas or ''
             }
         
         # Fallback para atividades legadas
@@ -2234,9 +2235,10 @@ def funcionario_criar_rdo():
                             # Salvar no sistema RDO hierárquico
                             rdo_servico_subativ = RDOServicoSubatividade()
                             rdo_servico_subativ.rdo_id = rdo.id
-                            rdo_servico_subativ.subatividade_id = subatividade_id
-                            rdo_servico_subativ.percentual = percentual
-                            rdo_servico_subativ.observacoes = observacoes
+                            rdo_servico_subativ.nome_subatividade = subatividade.nome
+                            rdo_servico_subativ.percentual_conclusao = percentual
+                            rdo_servico_subativ.observacoes_tecnicas = observacoes
+                            rdo_servico_subativ.admin_id = current_user.admin_id
                             rdo_servico_subativ.servico_id = subatividade.servico_id  # Importante para hierarchy
                             db.session.add(rdo_servico_subativ)
                             
@@ -2433,9 +2435,10 @@ def funcionario_visualizar_rdo(id):
         rdo_subatividades = RDOServicoSubatividade.query.filter_by(rdo_id=rdo.id).all()
         
         for rdo_subativ in rdo_subatividades:
-            subatividades_salvas[rdo_subativ.subatividade_id] = {
-                'percentual': rdo_subativ.percentual,
-                'observacoes': rdo_subativ.observacoes or ''
+            # Usar nome da subatividade como chave
+            subatividades_salvas[rdo_subativ.nome_subatividade] = {
+                'percentual': rdo_subativ.percentual_conclusao,
+                'observacoes': rdo_subativ.observacoes_tecnicas or ''
             }
         
         # Carregar atividades legadas se não houver subatividades
@@ -2460,7 +2463,7 @@ def funcionario_visualizar_rdo(id):
         for mao_obra in mao_obra_salva:
             equipe_salva[mao_obra.funcionario_id] = {
                 'horas': mao_obra.horas_trabalhadas,
-                'funcao': mao_obra.funcao
+                'funcao': mao_obra.funcao_exercida or 'Funcionário'
             }
         
         print(f"DEBUG VISUALIZAR: RDO {rdo.numero_rdo} - {len(subatividades_salvas)} subatividades, {len(equipe_salva)} funcionários")
