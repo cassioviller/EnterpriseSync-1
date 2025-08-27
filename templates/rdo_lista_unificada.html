@@ -772,6 +772,14 @@ console.log('Initializing RDO with light theme...');
 {% endblock %}
 
 {% block content %}
+
+<!-- Botão Flutuante Mobile para RDO -->
+<div class="floating-action d-lg-none">
+    <button class="btn btn-primary" onclick="window.location.href='/rdo/novo'">
+        <i class="fas fa-plus"></i>
+    </button>
+</div>
+
 <div class="rdo-container">
     <!-- Header Moderno -->
     <div class="page-header">

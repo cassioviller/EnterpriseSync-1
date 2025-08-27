@@ -3,6 +3,41 @@
 {% block title %}Dashboard - SIGE{% endblock %}
 
 {% block content %}
+
+<!-- Botão Flutuante Mobile -->
+<div class="floating-action d-lg-none">
+    <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#quickActionModal">
+        <i class="fas fa-plus"></i>
+    </button>
+</div>
+
+<!-- Modal de Ações Rápidas Mobile -->
+<div class="modal fade" id="quickActionModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Ações Rápidas</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="d-grid gap-2">
+                    <a href="{{ url_for('main.funcionarios') }}" class="btn btn-outline-primary">
+                        <i class="fas fa-users me-2"></i> Gerenciar Funcionários
+                    </a>
+                    <a href="{{ url_for('main.obras') }}" class="btn btn-outline-secondary">
+                        <i class="fas fa-hammer me-2"></i> Ver Obras
+                    </a>
+                    <a href="{{ url_for('main.rdo_lista_unificada') }}" class="btn btn-outline-info">
+                        <i class="fas fa-clipboard-list me-2"></i> RDOs
+                    </a>
+                    <a href="/ponto" class="btn btn-outline-warning">
+                        <i class="fas fa-clock me-2"></i> Controle de Ponto
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
 <style>
 /* Correção de alinhamento para botões do header */
 .header-btn {

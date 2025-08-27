@@ -3,6 +3,13 @@
 {% block title %}Funcionários - SIGE{% endblock %}
 
 {% block content %}
+
+<!-- Botão Flutuante Mobile -->
+<div class="floating-action d-lg-none">
+    <a href="{{ url_for('main.funcionarios') }}?action=novo" class="btn btn-primary">
+        <i class="fas fa-user-plus"></i>
+    </a>
+</div>
 <div class="container-fluid">
     <!-- Cabeçalho -->
     <div class="row">
