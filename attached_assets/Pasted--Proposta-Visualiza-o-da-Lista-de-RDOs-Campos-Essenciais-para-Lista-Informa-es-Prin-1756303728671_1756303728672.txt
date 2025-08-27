@@ -1,0 +1,470 @@
+# Proposta: Visualização da Lista de RDOs
+
+## Campos Essenciais para Lista
+
+### Informações Principais (Sempre Visíveis)
+1. **ID/Código da RDO** - Ex: "RDO-2025-011"
+2. **Data da RDO** - Ex: "29/08/2025"
+3. **Nome da Obra** - Ex: "Galpão Industrial Estruturas Metálicas"
+4. **Progresso Geral** - Ex: "61.7%" com barra visual
+5. **Status** - Badge: "Finalizado", "Em Andamento", "Rascunho"
+6. **Criado por** - Nome do funcionário
+7. **Ações** - Botões: Ver, Editar, (Deletar para admin)
+
+### Informações Secundárias (Opcionais/Hover)
+- Número de subatividades executadas
+- Horas trabalhadas total
+- Número de funcionários envolvidos
+- Última modificação
+- Condições climáticas (ícone)
+
+## Layout Proposto: Cards em Lista
+
+### Estrutura Visual
+```
+┌─────────────────────────────────────────────────────────────────┐
+│ [Badge Status]  RDO-2025-011                    [Ver] [Editar]  │
+│ 📅 29/08/2025  👤 Cássio Viller                                 │
+│ 🏗️ Galpão Industrial Estruturas Metálicas                       │
+│ ████████████████████░░░░ 61.7%                                  │
+│ 6 subatividades • 2 funcionários • 16.0h                       │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+## Implementação Detalhada
+
+### HTML Structure
+```html
+<div class="rdos-list-container">
+    <div class="list-header">
+        <div class="header-content">
+            <div class="header-icon">
+                <i class="fas fa-list"></i>
+            </div>
+            <div class="header-text">
+                <h1>Relatórios Diários de Obra</h1>
+                <p>Histórico completo de RDOs da obra</p>
+            </div>
+        </div>
+        <div class="list-actions">
+            <a href="/funcionario/rdo/consolidado" class="btn btn-primary">
+                <i class="fas fa-plus"></i> Nova RDO
+            </a>
+        </div>
+    </div>
+    
+    <div class="filters-section">
+        <div class="filters-row">
+            <select class="filter-select">
+                <option>Todas as obras</option>
+                <option>Obra específica</option>
+            </select>
+            <select class="filter-select">
+                <option>Todos os status</option>
+                <option>Finalizado</option>
+                <option>Em Andamento</option>
+                <option>Rascunho</option>
+            </select>
+            <input type="date" class="filter-date" placeholder="Data inicial">
+            <input type="date" class="filter-date" placeholder="Data final">
+        </div>
+    </div>
+    
+    <div class="rdos-list">
+        <!-- Card de RDO -->
+        <div class="rdo-card">
+            <div class="rdo-card-header">
+                <div class="rdo-main-info">
+                    <div class="rdo-status-and-id">
+                        <span class="status-badge status-finalizado">Finalizado</span>
+                        <h3 class="rdo-id">RDO-2025-011</h3>
+                    </div>
+                    <div class="rdo-actions">
+                        <a href="/funcionario/rdo/123" class="btn btn-sm btn-outline">
+                            <i class="fas fa-eye"></i> Ver
+                        </a>
+                        <a href="/funcionario/rdo/123/editar" class="btn btn-sm btn-primary">
+                            <i class="fas fa-edit"></i> Editar
+                        </a>
+                        <!-- Só para admin -->
+                        <button class="btn btn-sm btn-danger" onclick="deletarRDO(123)">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="rdo-card-body">
+                <div class="rdo-basic-info">
+                    <div class="info-item">
+                        <i class="fas fa-calendar"></i>
+                        <span>29/08/2025</span>
+                    </div>
+                    <div class="info-item">
+                        <i class="fas fa-user"></i>
+                        <span>Cássio Viller Silva</span>
+                    </div>
+                    <div class="info-item">
+                        <i class="fas fa-clock"></i>
+                        <span>16.0h trabalhadas</span>
+                    </div>
+                </div>
+                
+                <div class="rdo-obra-info">
+                    <i class="fas fa-building"></i>
+                    <span class="obra-nome">Galpão Industrial Estruturas Metálicas</span>
+                </div>
+                
+                <div class="rdo-progress">
+                    <div class="progress-info">
+                        <span class="progress-label">Progresso Geral</span>
+                        <span class="progress-percentage">61.7%</span>
+                    </div>
+                    <div class="progress-bar">
+                        <div class="progress-fill" style="width: 61.7%"></div>
+                    </div>
+                </div>
+                
+                <div class="rdo-summary">
+                    <div class="summary-item">
+                        <i class="fas fa-tasks"></i>
+                        <span>6 subatividades</span>
+                    </div>
+                    <div class="summary-item">
+                        <i class="fas fa-users"></i>
+                        <span>2 funcionários</span>
+                    </div>
+                    <div class="summary-item">
+                        <i class="fas fa-cloud-sun"></i>
+                        <span>Clima registrado</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Repetir para outras RDOs -->
+    </div>
+    
+    <!-- Paginação -->
+    <div class="pagination-container">
+        <nav class="pagination">
+            <button class="page-btn" disabled>« Anterior</button>
+            <button class="page-btn active">1</button>
+            <button class="page-btn">2</button>
+            <button class="page-btn">3</button>
+            <button class="page-btn">Próximo »</button>
+        </nav>
+    </div>
+</div>
+```
+
+### CSS Styling
+```css
+/* Header da lista */
+.list-header {
+    background: linear-gradient(135deg, #2d5a27 0%, #4a7c59 100%);
+    color: white;
+    padding: 2rem;
+    border-radius: 12px;
+    margin-bottom: 2rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+/* Filtros */
+.filters-section {
+    background: white;
+    padding: 1.5rem;
+    border-radius: 12px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    margin-bottom: 2rem;
+}
+
+.filters-row {
+    display: flex;
+    gap: 1rem;
+    flex-wrap: wrap;
+}
+
+.filter-select, .filter-date {
+    padding: 0.75rem 1rem;
+    border: 1px solid #ced4da;
+    border-radius: 6px;
+    background: white;
+    min-width: 200px;
+}
+
+/* Cards de RDO */
+.rdos-list {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+}
+
+.rdo-card {
+    background: white;
+    border-radius: 12px;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    overflow: hidden;
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.rdo-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
+}
+
+.rdo-card-header {
+    background: #f8f9fa;
+    padding: 1.5rem;
+    border-bottom: 1px solid #e9ecef;
+}
+
+.rdo-main-info {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.rdo-status-and-id {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+}
+
+.status-badge {
+    padding: 0.25rem 0.75rem;
+    border-radius: 20px;
+    font-size: 0.8rem;
+    font-weight: 500;
+}
+
+.status-finalizado {
+    background: #28a745;
+    color: white;
+}
+
+.status-andamento {
+    background: #17a2b8;
+    color: white;
+}
+
+.status-rascunho {
+    background: #ffc107;
+    color: #212529;
+}
+
+.rdo-id {
+    margin: 0;
+    color: #2d5a27;
+    font-weight: 600;
+    font-size: 1.2rem;
+}
+
+.rdo-actions {
+    display: flex;
+    gap: 0.5rem;
+}
+
+.rdo-card-body {
+    padding: 1.5rem;
+}
+
+.rdo-basic-info {
+    display: flex;
+    gap: 2rem;
+    margin-bottom: 1rem;
+    flex-wrap: wrap;
+}
+
+.info-item {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    color: #6c757d;
+    font-size: 0.9rem;
+}
+
+.info-item i {
+    color: #2d5a27;
+}
+
+.rdo-obra-info {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    margin-bottom: 1.5rem;
+    padding: 1rem;
+    background: #f8f9fa;
+    border-radius: 8px;
+}
+
+.obra-nome {
+    font-weight: 600;
+    color: #495057;
+}
+
+.rdo-progress {
+    margin-bottom: 1rem;
+}
+
+.progress-info {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 0.5rem;
+}
+
+.progress-label {
+    color: #6c757d;
+    font-weight: 500;
+}
+
+.progress-percentage {
+    color: #2d5a27;
+    font-weight: 700;
+    font-size: 1.1rem;
+}
+
+.progress-bar {
+    height: 8px;
+    background: #e9ecef;
+    border-radius: 4px;
+    overflow: hidden;
+}
+
+.progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #28a745, #20c997);
+    border-radius: 4px;
+    transition: width 0.3s ease;
+}
+
+.rdo-summary {
+    display: flex;
+    gap: 2rem;
+    flex-wrap: wrap;
+}
+
+.summary-item {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    color: #6c757d;
+    font-size: 0.9rem;
+}
+
+.summary-item i {
+    color: #2d5a27;
+}
+
+/* Paginação */
+.pagination-container {
+    display: flex;
+    justify-content: center;
+    margin-top: 2rem;
+}
+
+.pagination {
+    display: flex;
+    gap: 0.5rem;
+}
+
+.page-btn {
+    padding: 0.75rem 1rem;
+    border: 1px solid #ced4da;
+    background: white;
+    color: #495057;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.page-btn:hover:not(:disabled) {
+    background: #f8f9fa;
+}
+
+.page-btn.active {
+    background: #2d5a27;
+    color: white;
+    border-color: #2d5a27;
+}
+
+.page-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+/* Responsividade */
+@media (max-width: 768px) {
+    .rdo-main-info {
+        flex-direction: column;
+        gap: 1rem;
+        align-items: flex-start;
+    }
+    
+    .rdo-basic-info {
+        flex-direction: column;
+        gap: 0.75rem;
+    }
+    
+    .rdo-summary {
+        flex-direction: column;
+        gap: 0.75rem;
+    }
+    
+    .filters-row {
+        flex-direction: column;
+    }
+    
+    .filter-select, .filter-date {
+        min-width: 100%;
+    }
+}
+```
+
+## Funcionalidades Adicionais
+
+### 1. Ordenação
+- Por data (mais recente primeiro)
+- Por progresso (maior/menor)
+- Por obra
+- Por status
+
+### 2. Filtros
+- Por obra específica
+- Por período de datas
+- Por status (Finalizado, Em Andamento, Rascunho)
+- Por funcionário (para admin)
+
+### 3. Busca
+- Campo de busca por ID da RDO
+- Busca por nome da obra
+- Busca por funcionário
+
+### 4. Estados Vazios
+```html
+<!-- Quando não há RDOs -->
+<div class="empty-state">
+    <i class="fas fa-clipboard-list"></i>
+    <h3>Nenhuma RDO encontrada</h3>
+    <p>Crie sua primeira RDO para começar o acompanhamento da obra.</p>
+    <a href="/funcionario/rdo/consolidado" class="btn btn-primary">
+        <i class="fas fa-plus"></i> Criar RDO
+    </a>
+</div>
+```
+
+## Vantagens desta Abordagem
+
+✅ **Informações Essenciais Visíveis** - ID, data, obra, progresso, status
+✅ **Visual Limpo** - Cards organizados com hierarquia clara
+✅ **Ações Rápidas** - Botões de ver/editar sempre visíveis
+✅ **Progresso Visual** - Barra de progresso colorida
+✅ **Filtros Úteis** - Para encontrar RDOs específicas rapidamente
+✅ **Responsivo** - Funciona bem em mobile e desktop
+✅ **Consistente** - Mantém o padrão visual do sistema
+✅ **Escalável** - Funciona com muitas RDOs via paginação
+
+Esta estrutura permite uma visualização eficiente tanto para funcionários (vendo suas RDOs) quanto para administradores (vendo todas as RDOs do sistema).
+

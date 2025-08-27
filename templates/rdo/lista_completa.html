@@ -1,0 +1,793 @@
+{% extends "base.html" %}
+
+{% block title %}Lista de RDOs - Sistema SIGE{% endblock %}
+
+{% block styles %}
+<style>
+/* Header da lista */
+.list-header {
+    background: linear-gradient(135deg, #2d5a27 0%, #4a7c59 100%);
+    color: white;
+    padding: 2rem;
+    border-radius: 12px;
+    margin-bottom: 2rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    box-shadow: 0 4px 20px rgba(45, 90, 39, 0.3);
+}
+
+.header-content {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+}
+
+.header-icon {
+    font-size: 2.5rem;
+    opacity: 0.9;
+}
+
+.header-text h1 {
+    margin: 0;
+    font-size: 1.8rem;
+    font-weight: 600;
+}
+
+.header-text p {
+    margin: 0;
+    opacity: 0.8;
+    font-size: 1rem;
+}
+
+.list-actions .btn {
+    background: rgba(255, 255, 255, 0.15);
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    color: white;
+    text-decoration: none;
+    padding: 0.75rem 1.5rem;
+    border-radius: 8px;
+    font-weight: 500;
+    transition: all 0.3s ease;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.list-actions .btn:hover {
+    background: rgba(255, 255, 255, 0.25);
+    color: white;
+    text-decoration: none;
+    transform: translateY(-2px);
+}
+
+/* Filtros */
+.filters-section {
+    background: white;
+    padding: 1.5rem;
+    border-radius: 12px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    margin-bottom: 2rem;
+}
+
+.filters-section h3 {
+    margin: 0 0 1rem 0;
+    color: #2d5a27;
+    font-size: 1.2rem;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.filters-row {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 1rem;
+    margin-bottom: 1rem;
+}
+
+.filters-row-actions {
+    display: flex;
+    gap: 1rem;
+    justify-content: flex-end;
+    flex-wrap: wrap;
+}
+
+.filter-select, .filter-date, .filter-input {
+    padding: 0.75rem 1rem;
+    border: 1px solid #ced4da;
+    border-radius: 6px;
+    background: white;
+    font-size: 0.9rem;
+    transition: border-color 0.3s ease;
+}
+
+.filter-select:focus, .filter-date:focus, .filter-input:focus {
+    outline: none;
+    border-color: #2d5a27;
+    box-shadow: 0 0 0 2px rgba(45, 90, 39, 0.1);
+}
+
+/* Estatísticas rápidas */
+.stats-section {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 1rem;
+    margin-bottom: 2rem;
+}
+
+.stat-card {
+    background: white;
+    padding: 1.5rem;
+    border-radius: 12px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    text-align: center;
+    transition: transform 0.3s ease;
+}
+
+.stat-card:hover {
+    transform: translateY(-2px);
+}
+
+.stat-card .stat-icon {
+    font-size: 2rem;
+    margin-bottom: 0.5rem;
+}
+
+.stat-card.stat-total .stat-icon { color: #007bff; }
+.stat-card.stat-finalizado .stat-icon { color: #28a745; }
+.stat-card.stat-andamento .stat-icon { color: #17a2b8; }
+.stat-card.stat-rascunho .stat-icon { color: #ffc107; }
+
+.stat-card h3 {
+    margin: 0;
+    font-size: 2rem;
+    font-weight: 700;
+    color: #2d3748;
+}
+
+.stat-card p {
+    margin: 0;
+    color: #6c757d;
+    font-size: 0.9rem;
+}
+
+/* Lista de RDOs */
+.rdos-list {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+}
+
+.rdo-card {
+    background: white;
+    border-radius: 12px;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    overflow: hidden;
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.rdo-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
+}
+
+.rdo-card-header {
+    background: #f8f9fa;
+    padding: 1.5rem;
+    border-bottom: 1px solid #e9ecef;
+}
+
+.rdo-main-info {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 1rem;
+}
+
+.rdo-status-and-id {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    flex-wrap: wrap;
+}
+
+.status-badge {
+    padding: 0.25rem 0.75rem;
+    border-radius: 20px;
+    font-size: 0.8rem;
+    font-weight: 500;
+    text-transform: uppercase;
+}
+
+.status-finalizado {
+    background: #28a745;
+    color: white;
+}
+
+.status-andamento, .status-em-andamento {
+    background: #17a2b8;
+    color: white;
+}
+
+.status-rascunho {
+    background: #ffc107;
+    color: #212529;
+}
+
+.rdo-id {
+    margin: 0;
+    color: #2d5a27;
+    font-weight: 600;
+    font-size: 1.2rem;
+}
+
+.rdo-actions {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+}
+
+.btn-sm {
+    padding: 0.4rem 0.8rem;
+    font-size: 0.8rem;
+    border-radius: 6px;
+    text-decoration: none;
+    font-weight: 500;
+    border: none;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    display: flex;
+    align-items: center;
+    gap: 0.3rem;
+}
+
+.btn-outline {
+    background: transparent;
+    border: 1px solid #6c757d;
+    color: #6c757d;
+}
+
+.btn-outline:hover {
+    background: #6c757d;
+    color: white;
+}
+
+.btn-primary {
+    background: #007bff;
+    color: white;
+}
+
+.btn-primary:hover {
+    background: #0056b3;
+    color: white;
+}
+
+.btn-danger {
+    background: #dc3545;
+    color: white;
+}
+
+.btn-danger:hover {
+    background: #c82333;
+}
+
+.rdo-card-body {
+    padding: 1.5rem;
+}
+
+.rdo-basic-info {
+    display: flex;
+    gap: 2rem;
+    margin-bottom: 1rem;
+    flex-wrap: wrap;
+}
+
+.info-item {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    color: #6c757d;
+    font-size: 0.9rem;
+}
+
+.info-item i {
+    color: #2d5a27;
+}
+
+.rdo-obra-info {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    margin-bottom: 1.5rem;
+    padding: 1rem;
+    background: #f8f9fa;
+    border-radius: 8px;
+}
+
+.obra-nome {
+    font-weight: 600;
+    color: #495057;
+}
+
+.rdo-progress {
+    margin-bottom: 1rem;
+}
+
+.progress-info {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 0.5rem;
+}
+
+.progress-label {
+    color: #6c757d;
+    font-weight: 500;
+}
+
+.progress-percentage {
+    color: #2d5a27;
+    font-weight: 700;
+    font-size: 1.1rem;
+}
+
+.progress-bar {
+    height: 8px;
+    background: #e9ecef;
+    border-radius: 4px;
+    overflow: hidden;
+}
+
+.progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #28a745, #20c997);
+    border-radius: 4px;
+    transition: width 0.3s ease;
+}
+
+.rdo-summary {
+    display: flex;
+    gap: 2rem;
+    flex-wrap: wrap;
+}
+
+.summary-item {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    color: #6c757d;
+    font-size: 0.9rem;
+}
+
+.summary-item i {
+    color: #2d5a27;
+}
+
+/* Paginação */
+.pagination-container {
+    display: flex;
+    justify-content: center;
+    margin-top: 2rem;
+}
+
+.pagination {
+    display: flex;
+    gap: 0.5rem;
+    align-items: center;
+}
+
+.page-btn, .pagination .page-link {
+    padding: 0.75rem 1rem;
+    border: 1px solid #ced4da;
+    background: white;
+    color: #495057;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    text-decoration: none;
+}
+
+.page-btn:hover:not(:disabled), .pagination .page-link:hover {
+    background: #f8f9fa;
+    text-decoration: none;
+    color: #495057;
+}
+
+.page-btn.active, .pagination .page-item.active .page-link {
+    background: #2d5a27;
+    color: white;
+    border-color: #2d5a27;
+}
+
+.page-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+/* Estado vazio */
+.empty-state {
+    text-align: center;
+    padding: 4rem 2rem;
+    background: white;
+    border-radius: 12px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.empty-state .empty-icon {
+    font-size: 4rem;
+    color: #6c757d;
+    margin-bottom: 1rem;
+}
+
+.empty-state h3 {
+    color: #495057;
+    margin-bottom: 0.5rem;
+}
+
+.empty-state p {
+    color: #6c757d;
+    margin-bottom: 1.5rem;
+}
+
+/* Responsividade */
+@media (max-width: 768px) {
+    .list-header {
+        flex-direction: column;
+        gap: 1rem;
+        text-align: center;
+    }
+    
+    .rdo-main-info {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+    
+    .rdo-basic-info {
+        flex-direction: column;
+        gap: 0.75rem;
+    }
+    
+    .rdo-summary {
+        flex-direction: column;
+        gap: 0.75rem;
+    }
+    
+    .filters-row {
+        grid-template-columns: 1fr;
+    }
+    
+    .filters-row-actions {
+        justify-content: flex-start;
+    }
+    
+    .stats-section {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
+
+@media (max-width: 480px) {
+    .stats-section {
+        grid-template-columns: 1fr;
+    }
+    
+    .rdo-actions {
+        justify-content: flex-start;
+    }
+}
+
+/* Animações */
+.fade-in {
+    animation: fadeIn 0.6s ease-out forwards;
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <!-- Header da Lista -->
+    <div class="list-header fade-in">
+        <div class="header-content">
+            <div class="header-icon">
+                <i class="fas fa-list"></i>
+            </div>
+            <div class="header-text">
+                <h1>Relatórios Diários de Obra</h1>
+                <p>Histórico completo de RDOs da empresa</p>
+            </div>
+        </div>
+        <div class="list-actions">
+            <a href="{{ url_for('main.funcionario_rdo_consolidado') }}" class="btn">
+                <i class="fas fa-plus"></i> Nova RDO
+            </a>
+        </div>
+    </div>
+
+    <!-- Estatísticas Rápidas -->
+    <div class="stats-section fade-in">
+        <div class="stat-card stat-total">
+            <div class="stat-icon">
+                <i class="fas fa-file-alt"></i>
+            </div>
+            <h3>{{ rdos.total }}</h3>
+            <p>Total de RDOs</p>
+        </div>
+        
+        <div class="stat-card stat-finalizado">
+            <div class="stat-icon">
+                <i class="fas fa-check-circle"></i>
+            </div>
+            <h3>{{ rdos.items|selectattr('status', 'equalto', 'Finalizado')|list|length }}</h3>
+            <p>RDOs Finalizados</p>
+        </div>
+        
+        <div class="stat-card stat-andamento">
+            <div class="stat-icon">
+                <i class="fas fa-clock"></i>
+            </div>
+            <h3>{{ rdos.items|selectattr('status', 'equalto', 'Em Andamento')|list|length }}</h3>
+            <p>Em Andamento</p>
+        </div>
+        
+        <div class="stat-card stat-rascunho">
+            <div class="stat-icon">
+                <i class="fas fa-edit"></i>
+            </div>
+            <h3>{{ rdos.items|selectattr('status', 'equalto', 'Rascunho')|list|length }}</h3>
+            <p>Em Rascunho</p>
+        </div>
+    </div>
+
+    <!-- Filtros -->
+    <div class="filters-section fade-in">
+        <h3>
+            <i class="fas fa-filter"></i>
+            Filtros e Ordenação
+        </h3>
+        <form method="GET" id="filtrosForm">
+            <div class="filters-row">
+                <select class="filter-select" name="obra_id">
+                    <option value="">Todas as obras</option>
+                    {% for obra in obras %}
+                    <option value="{{ obra.id }}" {% if filters.obra_id == obra.id %}selected{% endif %}>
+                        {{ obra.nome }}
+                    </option>
+                    {% endfor %}
+                </select>
+                
+                <select class="filter-select" name="status">
+                    <option value="">Todos os status</option>
+                    <option value="Finalizado" {% if filters.status == "Finalizado" %}selected{% endif %}>Finalizado</option>
+                    <option value="Em Andamento" {% if filters.status == "Em Andamento" %}selected{% endif %}>Em Andamento</option>
+                    <option value="Rascunho" {% if filters.status == "Rascunho" %}selected{% endif %}>Rascunho</option>
+                </select>
+                
+                {% if current_user.tipo_usuario.name in ['ADMIN', 'SUPER_ADMIN'] %}
+                <select class="filter-select" name="funcionario_id">
+                    <option value="">Todos os funcionários</option>
+                    {% for funcionario in funcionarios %}
+                    <option value="{{ funcionario.id }}" {% if filters.funcionario_id == funcionario.id %}selected{% endif %}>
+                        {{ funcionario.nome }}
+                    </option>
+                    {% endfor %}
+                </select>
+                {% endif %}
+                
+                <input type="date" class="filter-date" name="data_inicio" value="{{ filters.data_inicio }}" placeholder="Data inicial">
+                <input type="date" class="filter-date" name="data_fim" value="{{ filters.data_fim }}" placeholder="Data final">
+                
+                <select class="filter-select" name="order_by">
+                    <option value="data_desc" {% if filters.order_by == "data_desc" %}selected{% endif %}>Data (mais recente)</option>
+                    <option value="data_asc" {% if filters.order_by == "data_asc" %}selected{% endif %}>Data (mais antigo)</option>
+                    <option value="obra" {% if filters.order_by == "obra" %}selected{% endif %}>Obra (A-Z)</option>
+                    <option value="status" {% if filters.order_by == "status" %}selected{% endif %}>Status</option>
+                </select>
+            </div>
+            
+            <div class="filters-row-actions">
+                <button type="submit" class="btn btn-primary">
+                    <i class="fas fa-search"></i>
+                    Filtrar
+                </button>
+                <button type="button" class="btn btn-outline" onclick="limparFiltros()">
+                    <i class="fas fa-refresh"></i>
+                    Limpar
+                </button>
+            </div>
+        </form>
+    </div>
+
+    <!-- Lista de RDOs -->
+    {% if rdos.items %}
+    <div class="rdos-list fade-in">
+        {% for rdo in rdos.items %}
+        <div class="rdo-card">
+            <div class="rdo-card-header">
+                <div class="rdo-main-info">
+                    <div class="rdo-status-and-id">
+                        <span class="status-badge status-{{ rdo.status|lower|replace(' ', '-') }}">{{ rdo.status }}</span>
+                        <h3 class="rdo-id">{{ rdo.numero_rdo or 'RDO-' + rdo.id|string }}</h3>
+                    </div>
+                    <div class="rdo-actions">
+                        <a href="{{ url_for('main.visualizar_rdo', id=rdo.id) }}" class="btn-sm btn-outline">
+                            <i class="fas fa-eye"></i> Ver
+                        </a>
+                        <a href="{{ url_for('main.funcionario_visualizar_rdo', id=rdo.id) }}" class="btn-sm btn-primary">
+                            <i class="fas fa-edit"></i> Editar
+                        </a>
+                        {% if current_user.tipo_usuario.name in ['ADMIN', 'SUPER_ADMIN'] %}
+                        <button class="btn-sm btn-danger" onclick="deletarRDO({{ rdo.id }})">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+            
+            <div class="rdo-card-body">
+                <div class="rdo-basic-info">
+                    <div class="info-item">
+                        <i class="fas fa-calendar"></i>
+                        <span>{{ rdo.data_relatorio.strftime('%d/%m/%Y') }}</span>
+                    </div>
+                    <div class="info-item">
+                        <i class="fas fa-user"></i>
+                        <span>{{ rdo.criado_por.nome if rdo.criado_por else 'Sistema' }}</span>
+                    </div>
+                    <div class="info-item">
+                        <i class="fas fa-clock"></i>
+                        <span>{{ "%.1f"|format(rdo.horas_totais) }}h trabalhadas</span>
+                    </div>
+                </div>
+                
+                <div class="rdo-obra-info">
+                    <i class="fas fa-building"></i>
+                    <span class="obra-nome">{{ rdo.obra.nome }}</span>
+                </div>
+                
+                <div class="rdo-progress">
+                    <div class="progress-info">
+                        <span class="progress-label">Progresso Geral</span>
+                        <span class="progress-percentage">{{ rdo.progresso_total }}%</span>
+                    </div>
+                    <div class="progress-bar">
+                        <div class="progress-fill" style="width: {{ rdo.progresso_total }}%"></div>
+                    </div>
+                </div>
+                
+                <div class="rdo-summary">
+                    <div class="summary-item">
+                        <i class="fas fa-tasks"></i>
+                        <span>{{ rdo.servico_subatividades|length }} subatividades</span>
+                    </div>
+                    <div class="summary-item">
+                        <i class="fas fa-users"></i>
+                        <span>{{ rdo.mao_obra|length }} funcionários</span>
+                    </div>
+                    {% if rdo.condicoes_climaticas %}
+                    <div class="summary-item">
+                        <i class="fas fa-cloud-sun"></i>
+                        <span>{{ rdo.condicoes_climaticas }}</span>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    
+    <!-- Paginação -->
+    {% if rdos.pages > 1 %}
+    <div class="pagination-container fade-in">
+        <nav class="pagination">
+            {% if rdos.has_prev %}
+            <a class="page-btn" href="{{ url_for('main.lista_rdos', page=rdos.prev_num, **filters) }}">
+                <i class="fas fa-arrow-left"></i> Anterior
+            </a>
+            {% else %}
+            <button class="page-btn" disabled>
+                <i class="fas fa-arrow-left"></i> Anterior
+            </button>
+            {% endif %}
+            
+            {% for page_num in rdos.iter_pages() %}
+                {% if page_num %}
+                    {% if page_num != rdos.page %}
+                    <a class="page-btn" href="{{ url_for('main.lista_rdos', page=page_num, **filters) }}">{{ page_num }}</a>
+                    {% else %}
+                    <button class="page-btn active">{{ page_num }}</button>
+                    {% endif %}
+                {% else %}
+                <span class="page-btn" style="border: none; background: none;">...</span>
+                {% endif %}
+            {% endfor %}
+            
+            {% if rdos.has_next %}
+            <a class="page-btn" href="{{ url_for('main.lista_rdos', page=rdos.next_num, **filters) }}">
+                Próximo <i class="fas fa-arrow-right"></i>
+            </a>
+            {% else %}
+            <button class="page-btn" disabled>
+                Próximo <i class="fas fa-arrow-right"></i>
+            </button>
+            {% endif %}
+        </nav>
+    </div>
+    {% endif %}
+    
+    {% else %}
+    <!-- Estado vazio -->
+    <div class="empty-state fade-in">
+        <div class="empty-icon">
+            <i class="fas fa-clipboard-list"></i>
+        </div>
+        <h3>Nenhuma RDO encontrada</h3>
+        <p>{% if filters.obra_id or filters.status or filters.data_inicio or filters.data_fim %}Nenhuma RDO corresponde aos filtros aplicados.{% else %}Crie sua primeira RDO para começar o acompanhamento da obra.{% endif %}</p>
+        <a href="{{ url_for('main.funcionario_rdo_consolidado') }}" class="btn btn-primary">
+            <i class="fas fa-plus"></i> Criar RDO
+        </a>
+    </div>
+    {% endif %}
+</div>
+
+<script>
+function limparFiltros() {
+    const form = document.getElementById('filtrosForm');
+    const inputs = form.querySelectorAll('input, select');
+    inputs.forEach(input => {
+        if (input.type === 'date' || input.type === 'text') {
+            input.value = '';
+        } else if (input.tagName === 'SELECT') {
+            input.selectedIndex = 0;
+        }
+    });
+    form.submit();
+}
+
+function deletarRDO(rdoId) {
+    if (confirm('Tem certeza que deseja excluir esta RDO? Esta ação não pode ser desfeita.')) {
+        fetch(`/rdo/${rdoId}/excluir`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            }
+        })
+        .then(response => {
+            if (response.ok) {
+                location.reload();
+            } else {
+                alert('Erro ao excluir RDO. Tente novamente.');
+            }
+        })
+        .catch(error => {
+            console.error('Erro:', error);
+            alert('Erro ao excluir RDO. Tente novamente.');
+        });
+    }
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+    // Animar entrada dos cards
+    setTimeout(() => {
+        document.querySelectorAll('.fade-in').forEach((element, index) => {
+            setTimeout(() => {
+                element.style.opacity = '1';
+                element.style.transform = 'translateY(0)';
+            }, index * 100);
+        });
+    }, 100);
+});
+</script>
+{% endblock %}
