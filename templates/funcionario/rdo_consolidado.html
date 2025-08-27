@@ -2133,87 +2133,80 @@ function testarCarregamentoPorcentagens() {
 // TESTE COMPLETO DE ÚLTIMO RDO
 // ===========================
 function testarCarregamentoPorcentagensCompleto() {
-    const container = document.getElementById('servicos-container');
+    console.log('🚀 Iniciando carregamento dos dados do último RDO...');
     
-    // Mostrar loading
-    container.innerHTML = `
-        <div class="loading-state">
-            <i class="fas fa-sync-alt fa-spin"></i>
-            <p>Carregando porcentagens do último RDO...</p>
-        </div>
-    `;
+    // Verificar se uma obra está selecionada
+    const obraSelect = document.getElementById('obra_id');
+    const obraId = obraSelect.value;
     
-    // Simular carregamento com delay
-    setTimeout(() => {
-        // Dados simulados de último RDO mais realistas
-        const mockUltimoRdo = {
-            atividades: [
-                { descricao: "Estruturas Metálicas", percentual: 45 },
-                { descricao: "Concreto Armado", percentual: 75 },
-                { descricao: "Cobertura", percentual: 20 },
-                { descricao: "Instalações Elétricas", percentual: 30 },
-                { descricao: "Acabamentos", percentual: 5 }
-            ],
-            origem: "RDO anterior: RDO-2025-008 (25/08/2025)"
-        };
-        
-        // Serviços com porcentagens do último RDO
-        const servicosComPorcentagens = [
-            {
-                id: 1,
-                nome: "Estruturas Metálicas",
-                categoria: "Estrutura",
-                subatividades: [
-                    { id: 101, nome: "Fabricação de Perfis", percentual_heranca: 45 },
-                    { id: 102, nome: "Montagem de Estrutura", percentual_heranca: 45 },
-                    { id: 103, nome: "Soldas e Acabamentos", percentual_heranca: 45 }
-                ]
-            },
-            {
-                id: 2,
-                nome: "Concreto Armado",
-                categoria: "Fundação",
-                subatividades: [
-                    { id: 201, nome: "Preparação de Armadura", percentual_heranca: 75 },
-                    { id: 202, nome: "Concretagem", percentual_heranca: 75 },
-                    { id: 203, nome: "Cura do Concreto", percentual_heranca: 75 }
-                ]
-            },
-            {
-                id: 3,
-                nome: "Cobertura",
-                categoria: "Acabamento",
-                subatividades: [
-                    { id: 301, nome: "Instalação de Telhas", percentual_heranca: 20 },
-                    { id: 302, nome: "Calhas e Rufos", percentual_heranca: 20 },
-                    { id: 303, nome: "Isolamento Térmico", percentual_heranca: 20 }
-                ]
-            },
-            {
-                id: 4,
-                nome: "Instalações Elétricas",
-                categoria: "Instalações",
-                subatividades: [
-                    { id: 401, nome: "Passagem de Cabos", percentual_heranca: 30 },
-                    { id: 402, nome: "Instalação de Quadros", percentual_heranca: 30 },
-                    { id: 403, nome: "Ligação de Equipamentos", percentual_heranca: 30 }
-                ]
+    if (!obraId) {
+        mostrarNotificacao('⚠️ Selecione uma obra primeiro', 'warning');
+        return;
+    }
+    
+    mostrarNotificacao('🔄 Carregando dados do último RDO da obra...', 'info');
+    updateProgressBar(25);
+    
+    // Buscar dados reais do último RDO da obra
+    fetch(`/rdo/api/ultimo-rdo/${obraId}`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.atividades && data.atividades.length > 0) {
+                // Aplicar porcentagens reais aos serviços carregados
+                const servicosContainer = document.getElementById('servicos-container');
+                const servicosCards = servicosContainer.querySelectorAll('.servico-card');
+                
+                let atividadesAplicadas = 0;
+                
+                // Para cada serviço carregado, tentar aplicar porcentagem do último RDO
+                servicosCards.forEach(card => {
+                    const servicoTitulo = card.querySelector('.servico-title h4').textContent.trim();
+                    
+                    // Buscar atividade correspondente no último RDO
+                    const atividadeCorrespondente = data.atividades.find(ativ => 
+                        ativ.descricao.toLowerCase().includes(servicoTitulo.toLowerCase()) ||
+                        servicoTitulo.toLowerCase().includes(ativ.descricao.toLowerCase())
+                    );
+                    
+                    if (atividadeCorrespondente) {
+                        // Aplicar porcentagem a todas as subatividades do serviço
+                        const subatividadesInputs = card.querySelectorAll('.percentual-input');
+                        subatividadesInputs.forEach(input => {
+                            input.value = atividadeCorrespondente.percentual;
+                            // Trigger do evento change para aplicar validações
+                            input.dispatchEvent(new Event('change'));
+                        });
+                        
+                        atividadesAplicadas++;
+                        console.log(`✅ Aplicada porcentagem ${atividadeCorrespondente.percentual}% para "${servicoTitulo}"`);
+                    }
+                });
+                
+                updateProgressBar(100);
+                
+                if (atividadesAplicadas > 0) {
+                    mostrarNotificacao(
+                        `✅ Porcentagens do último RDO aplicadas em ${atividadesAplicadas} serviços`, 
+                        'success'
+                    );
+                } else {
+                    mostrarNotificacao(
+                        '⚠️ Nenhuma correspondência encontrada com o último RDO', 
+                        'warning'
+                    );
+                }
+                
+                console.log(`TESTE COMPLETO: Dados do último RDO aplicados - ${atividadesAplicadas} serviços atualizados`);
+            } else {
+                mostrarNotificacao('ℹ️ Nenhum RDO anterior encontrado para esta obra', 'info');
+                console.log('INFO: Primeira vez criando RDO para esta obra');
             }
-        ];
-        
-        // Aplicar dados aos serviços e renderizar
-        renderizarServicos(servicosComPorcentagens);
-        updateProgressBar(75);
-        
-        // Notificação de sucesso
-        mostrarNotificacao(
-            `✅ Porcentagens carregadas do último RDO: RDO-2025-008 (25/08/2025)`, 
-            'success'
-        );
-        
-        console.log('TESTE COMPLETO: Dados do último RDO aplicados com sucesso');
-        
-    }, 1500);
+        })
+        .catch(error => {
+            console.error('ERRO ao carregar último RDO:', error);
+            mostrarNotificacao('❌ Erro ao carregar dados do último RDO', 'error');
+            updateProgressBar(0);
+        });
 }
 
 // Inicialização adicional para modo edição
