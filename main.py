@@ -1,9 +1,17 @@
 from app import app
 
-# Registrar sistema de visualização e edição RDO
+# Registrar sistema de salvamento RDO
+try:
+    from rdo_salvar_sistema import rdo_salvar_bp
+    app.register_blueprint(rdo_salvar_bp, url_prefix='/')
+    print("✅ Sistema de salvamento RDO registrado")
+except ImportError as e:
+    print(f"⚠️ Sistema RDO salvar não encontrado: {e}")
+
+# Registrar sistema de visualização RDO  
 try:
     from rdo_viewer_editor import rdo_viewer_bp
-    app.register_blueprint(rdo_viewer_bp, url_prefix='/')
+    app.register_blueprint(rdo_viewer_bp, url_prefix='/viewer')
     print("✅ Sistema de visualização RDO registrado")
 except ImportError as e:
     print(f"⚠️ Sistema RDO viewer não encontrado: {e}")

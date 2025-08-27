@@ -105,3 +105,12 @@ if BYPASS_ATIVO:
         criar_before_request(app)
     except:
         pass
+
+def obter_admin_id():
+    """Função utilitária para obter admin_id no contexto atual"""
+    return 10  # Admin ID=10 (Vale Verde Estruturas Metálicas)
+
+def obter_funcionario_atual():
+    """Função utilitária para obter funcionário atual"""
+    # Retornar funcionário ID 101 (Cássio Viller Silva de Azevedo)
+    return 101
