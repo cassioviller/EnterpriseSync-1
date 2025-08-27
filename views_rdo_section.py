@@ -68,16 +68,23 @@ def rdo_lista_unificada():
         
         # Calcular progresso total para cada RDO
         for rdo in rdos.items:
-            if rdo.servico_subatividades:
-                progresso_total = sum(sub.percentual_conclusao for sub in rdo.servico_subatividades) / len(rdo.servico_subatividades)
-                rdo.progresso_total = round(progresso_total, 1)
-            else:
+            try:
+                if rdo.servico_subatividades:
+                    # Usar percentual_conclusao ou 0 se for None
+                    progressos = [sub.percentual_conclusao or 0 for sub in rdo.servico_subatividades]
+                    progresso_total = sum(progressos) / len(progressos) if progressos else 0
+                    rdo.progresso_total = round(progresso_total, 1)
+                else:
+                    rdo.progresso_total = 0
+                
+                # Calcular horas totais
+                if rdo.mao_obra:
+                    rdo.horas_totais = sum(mo.horas_trabalhadas or 0 for mo in rdo.mao_obra)
+                else:
+                    rdo.horas_totais = 0
+            except Exception as calc_error:
+                print(f"Erro calculando progresso RDO {rdo.id}: {calc_error}")
                 rdo.progresso_total = 0
-            
-            # Calcular horas totais
-            if rdo.mao_obra:
-                rdo.horas_totais = sum(mo.horas_trabalhadas or 0 for mo in rdo.mao_obra)
-            else:
                 rdo.horas_totais = 0
         
         # Obras e funcionários para filtros

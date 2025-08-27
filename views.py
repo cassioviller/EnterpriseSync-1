@@ -1621,6 +1621,23 @@ def rdo_lista_unificada():
                 self.has_next = False
                 # Criar objetos simples sem lazy loading
                 for rdo in items:
+                    # Calcular progresso real baseado nas subatividades
+                    subatividades = session.query(RDOServicoSubatividade).filter(
+                        RDOServicoSubatividade.rdo_id == rdo.id
+                    ).all()
+                    
+                    if subatividades:
+                        progresso_real = sum(sub.percentual_conclusao or 0 for sub in subatividades) / len(subatividades)
+                    else:
+                        progresso_real = 0
+                    
+                    # Calcular horas reais da mão de obra
+                    mao_obra = session.query(RDOMaoObra).filter(
+                        RDOMaoObra.rdo_id == rdo.id
+                    ).all()
+                    
+                    horas_reais = sum(mo.horas_trabalhadas or 0 for mo in mao_obra) if mao_obra else 0
+                    
                     obj = type('RDOView', (), {
                         'id': rdo.id,
                         'numero_rdo': rdo.numero_rdo,
@@ -1628,10 +1645,12 @@ def rdo_lista_unificada():
                         'status': rdo.status,
                         'observacoes_gerais': rdo.observacoes_gerais or '',
                         'obra_id': rdo.obra_id,
-                        'progresso_total': 75,
-                        'horas_totais': 8,
+                        'progresso_total': round(progresso_real, 1),
+                        'horas_totais': round(horas_reais, 1),
                         'obra': next((o for o in obras if o.id == rdo.obra_id), None),
-                        'criado_por': None
+                        'criado_por': None,
+                        'servico_subatividades': subatividades,
+                        'mao_obra': mao_obra
                     })()
                     self.items.append(obj)
         
@@ -1679,11 +1698,34 @@ def rdo_lista_unificada():
                     
             rdos = MockPagination(rdos_basicos)
             
-            # Dados básicos sem modificar objetos
+            # Dados básicos com cálculo real de progresso
             for rdo in rdos.items:
-                rdo.progresso_total = 70
-                rdo.horas_totais = 8
-                # Apenas definir atributos sem queries adicionais
+                try:
+                    # Buscar subatividades do RDO
+                    subatividades = db.session.query(RDOServicoSubatividade).filter(
+                        RDOServicoSubatividade.rdo_id == rdo.id
+                    ).all()
+                    
+                    if subatividades:
+                        progresso_real = sum(sub.percentual_conclusao or 0 for sub in subatividades) / len(subatividades)
+                        rdo.progresso_total = round(progresso_real, 1)
+                    else:
+                        rdo.progresso_total = 0
+                    
+                    # Buscar mão de obra
+                    mao_obra = db.session.query(RDOMaoObra).filter(
+                        RDOMaoObra.rdo_id == rdo.id
+                    ).all()
+                    
+                    rdo.horas_totais = sum(mo.horas_trabalhadas or 0 for mo in mao_obra) if mao_obra else 0
+                    rdo.servico_subatividades = subatividades
+                    rdo.mao_obra = mao_obra
+                except Exception as calc_error:
+                    print(f"Erro cálculo RDO {rdo.id}: {calc_error}")
+                    rdo.progresso_total = 0
+                    rdo.horas_totais = 0
+                    rdo.servico_subatividades = []
+                    rdo.mao_obra = []
                 
             print(f"FALLBACK: Carregados {len(rdos.items)} RDOs básicos")
             
