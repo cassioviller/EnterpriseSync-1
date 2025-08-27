@@ -8,6 +8,25 @@ from sqlalchemy import func, desc, or_, and_, text
 import os
 import json
 
+# Importar utilitários de resiliência
+try:
+    from utils.idempotency import idempotent, rdo_key_generator, funcionario_key_generator
+    from utils.circuit_breaker import circuit_breaker, pdf_generation_fallback, database_query_fallback
+    from utils.saga import RDOSaga, FuncionarioSaga
+    print("✅ Utilitários de resiliência importados com sucesso")
+except ImportError as e:
+    print(f"⚠️ Erro ao importar utilitários de resiliência: {e}")
+    # Fallbacks para manter compatibilidade
+    def idempotent(*args, **kwargs):
+        def decorator(func):
+            return func
+        return decorator
+    
+    def circuit_breaker(*args, **kwargs):
+        def decorator(func):
+            return func
+        return decorator
+
 main_bp = Blueprint('main', __name__)
 
 def safe_db_operation(operation, default_value=None):
@@ -80,6 +99,13 @@ def index():
 
 # ===== DASHBOARD PRINCIPAL =====
 @main_bp.route('/dashboard')
+@circuit_breaker(
+    name="database_heavy_query",
+    failure_threshold=2,
+    recovery_timeout=60,
+    expected_exception=(TimeoutError, Exception),
+    fallback=database_query_fallback
+)
 def dashboard():
     # REDIRECIONAMENTO BASEADO NO TIPO DE USUÁRIO
     if hasattr(current_user, 'tipo_usuario') and current_user.is_authenticated:
@@ -885,8 +911,15 @@ def funcionario_perfil(id):
                          graficos=graficos,
                          obras=obras)
 
-# Rota para exportar PDF do funcionário
+# Rota para exportar PDF do funcionário - COM CIRCUIT BREAKER
 @main_bp.route('/funcionario_perfil/<int:id>/pdf')
+@circuit_breaker(
+    name="pdf_generation", 
+    failure_threshold=3, 
+    recovery_timeout=120,
+    expected_exception=(TimeoutError, OSError, IOError),
+    fallback=pdf_generation_fallback
+)
 def funcionario_perfil_pdf(id):
     from models import RegistroPonto
     
@@ -2087,6 +2120,11 @@ def novo_rdo():
 
 @main_bp.route('/rdo/criar', methods=['POST'])
 @funcionario_required
+@idempotent(
+    operation_type='rdo_create',
+    ttl_seconds=3600,  # 1 hora
+    key_generator=rdo_key_generator
+)
 def criar_rdo():
     """Cria um novo RDO"""
     try:
@@ -2734,6 +2772,11 @@ def funcionario_rdo_novo():
 
 @main_bp.route('/rdo/salvar', methods=['POST'])
 @funcionario_required 
+@idempotent(
+    operation_type='rdo_save',
+    ttl_seconds=1800,  # 30 minutos
+    key_generator=rdo_key_generator
+)
 def rdo_salvar_unificado():
     """Interface unificada para salvar RDO - Admin e Funcionário"""
     try:
@@ -3026,6 +3069,11 @@ def rdo_salvar_unificado():
 # Alias para compatibilidade com rota antiga de salvar
 @main_bp.route('/funcionario/rdo/criar', methods=['POST'])
 @funcionario_required
+@idempotent(
+    operation_type='funcionario_rdo_create',
+    ttl_seconds=3600,
+    key_generator=rdo_key_generator
+)
 def funcionario_criar_rdo():
     """Redirect para nova rota unificada de salvar"""
     return rdo_salvar_unificado()
