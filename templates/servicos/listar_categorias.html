@@ -1,0 +1,189 @@
+{% extends "base.html" %}
+
+{% block title %}Categorias de Serviços - Sistema Moderno{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4" id="main-content">
+    <!-- Header Principal -->
+    <div class="header-section">
+        <div class="d-flex align-items-center justify-content-between mb-4">
+            <div class="header-info">
+                <div class="header-icon">
+                    <i class="fas fa-tags"></i>
+                </div>
+                <div>
+                    <h1 class="page-title">Categorias de Serviços</h1>
+                    <p class="page-subtitle">Gerencie as categorias para organizar seus serviços</p>
+                </div>
+            </div>
+            <div class="header-actions">
+                <a href="{{ url_for('servicos.dashboard') }}" class="btn-modern btn-outline">
+                    <i class="fas fa-arrow-left"></i>
+                    Voltar
+                </a>
+                <a href="{{ url_for('servicos.nova_categoria') }}" class="btn-modern btn-success">
+                    <i class="fas fa-plus"></i>
+                    Nova Categoria
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Lista de Categorias -->
+    <div class="rdo-card slide-in">
+        <div class="rdo-card-header">
+            <h3>
+                <i class="fas fa-list"></i>
+                Lista de Categorias
+            </h3>
+            <div class="header-actions">
+                <span class="badge bg-primary">{{ categorias|length }} categoria(s)</span>
+            </div>
+        </div>
+        <div class="rdo-card-body">
+            {% if categorias %}
+            <div class="categorias-list">
+                {% for categoria in categorias %}
+                <div class="categoria-item">
+                    <div class="categoria-info">
+                        <div class="categoria-cor-grande" style="background-color: {{ categoria.cor_hexadecimal }}"></div>
+                        <div class="categoria-detalhes">
+                            <h5 class="mb-1">{{ categoria.nome }}</h5>
+                            <p class="text-muted mb-1">{{ categoria.descricao or 'Sem descrição' }}</p>
+                            <small class="text-info">{{ categoria.total_servicos }} serviço(s)</small>
+                        </div>
+                    </div>
+                    <div class="categoria-status">
+                        {% if categoria.ativo %}
+                        <span class="badge bg-success">Ativo</span>
+                        {% else %}
+                        <span class="badge bg-secondary">Inativo</span>
+                        {% endif %}
+                    </div>
+                    <div class="categoria-actions">
+                        <a href="{{ url_for('servicos.editar_categoria', id=categoria.id) }}" class="btn-modern btn-warning btn-sm">
+                            <i class="fas fa-edit"></i>
+                            Editar
+                        </a>
+                        <a href="{{ url_for('servicos.listar_servicos') }}?categoria_id={{ categoria.id }}" class="btn-modern btn-info btn-sm">
+                            <i class="fas fa-tools"></i>
+                            Ver Serviços
+                        </a>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+            {% else %}
+            <div class="empty-state">
+                <div class="empty-icon">
+                    <i class="fas fa-tags"></i>
+                </div>
+                <h4>Nenhuma categoria encontrada</h4>
+                <p>Crie sua primeira categoria para organizar os serviços.</p>
+                <a href="{{ url_for('servicos.nova_categoria') }}" class="btn-modern btn-primary">
+                    <i class="fas fa-plus"></i>
+                    Criar Primeira Categoria
+                </a>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<!-- CSS Moderno -->
+<style>
+/* Herda do sistema principal */
+#main-content {
+    background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+    min-height: 100vh;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+}
+
+/* Lista de Categorias */
+.categorias-list {
+    display: grid;
+    gap: 1rem;
+}
+
+.categoria-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 1.5rem;
+    background: rgba(255, 255, 255, 0.8);
+    border-radius: 12px;
+    border: 1px solid #e2e8f0;
+    transition: all 0.3s ease;
+}
+
+.categoria-item:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.1);
+}
+
+.categoria-info {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    flex: 1;
+}
+
+.categoria-cor-grande {
+    width: 40px;
+    height: 40px;
+    border-radius: 8px;
+    border: 2px solid rgba(255, 255, 255, 0.9);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.categoria-detalhes h5 {
+    color: #2d3748;
+    font-weight: 600;
+}
+
+.categoria-detalhes p {
+    font-size: 0.9rem;
+    line-height: 1.4;
+}
+
+.categoria-status {
+    margin-right: 1rem;
+}
+
+.categoria-actions {
+    display: flex;
+    gap: 0.5rem;
+}
+
+/* Responsividade */
+@media (max-width: 768px) {
+    .categoria-item {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 1rem;
+    }
+    
+    .categoria-info {
+        flex-direction: column;
+        text-align: center;
+    }
+    
+    .categoria-actions {
+        justify-content: center;
+    }
+}
+</style>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Animar entrada dos cards
+    setTimeout(() => {
+        document.querySelectorAll('.rdo-card').forEach((card, index) => {
+            setTimeout(() => {
+                card.classList.add('slide-in');
+            }, index * 100);
+        });
+    }, 100);
+});
+</script>
+{% endblock %}

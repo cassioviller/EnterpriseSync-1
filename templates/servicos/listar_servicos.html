@@ -1,58 +1,77 @@
 {% extends "base.html" %}
 
-{% block title %}Lista de Serviços - SIGE{% endblock %}
+{% block title %}Gestão de Serviços - Lista - Sistema Moderno{% endblock %}
 
 {% block content %}
-<div class="container-fluid">
-    <!-- Header Profissional -->
-    <div class="d-flex justify-content-between align-items-center mb-4 p-4 bg-white rounded shadow-sm border">
-        <div class="d-flex align-items-center">
-            <div class="me-3">
-                <div class="bg-primary bg-gradient rounded-circle d-flex align-items-center justify-content-center" 
-                     style="width: 48px; height: 48px;">
-                    <i class="fas fa-list text-white fs-5"></i>
+<div class="container-fluid py-4" id="main-content">
+    <!-- Header Principal -->
+    <div class="header-section">
+        <div class="d-flex align-items-center justify-content-between mb-4">
+            <div class="header-info">
+                <div class="header-icon">
+                    <i class="fas fa-tools"></i>
+                </div>
+                <div>
+                    <h1 class="page-title">Gestão de Serviços</h1>
+                    <p class="page-subtitle">Gerencie todos os serviços disponíveis no sistema</p>
                 </div>
             </div>
-            <div>
-                <h1 class="h3 mb-1 fw-bold text-dark">Lista de Serviços</h1>
-                <p class="text-muted mb-0 small">Gestão completa de serviços cadastrados no sistema</p>
+            <div class="header-actions">
+                <a href="{{ url_for('servicos.dashboard') }}" class="btn-modern btn-outline">
+                    <i class="fas fa-arrow-left"></i>
+                    Voltar
+                </a>
+                <a href="{{ url_for('servicos.novo_servico') }}" class="btn-modern btn-success">
+                    <i class="fas fa-plus"></i>
+                    Novo Serviço
+                </a>
             </div>
-        </div>
-        <div class="d-flex gap-2">
-            <a href="{{ url_for('servicos.novo_servico') }}" class="btn btn-primary d-flex align-items-center">
-                <i class="fas fa-plus me-2"></i>
-                <span>Novo Serviço</span>
-            </a>
-            <a href="{{ url_for('main.dashboard') }}" class="btn btn-outline-secondary d-flex align-items-center">
-                <i class="fas fa-tachometer-alt me-2"></i>
-                <span>Dashboard</span>
-            </a>
         </div>
     </div>
 
     <!-- Filtros -->
-    <div class="card mb-4">
-        <div class="card-body">
-            <form method="GET" class="row g-3">
-                <div class="col-md-4">
-                    <label class="form-label">Status</label>
-                    <select name="status" class="form-select">
-                        <option value="todos" {{ 'selected' if status_filter == 'todos' }}>Todos</option>
-                        <option value="ativo" {{ 'selected' if status_filter == 'ativo' }}>Ativos</option>
-                        <option value="inativo" {{ 'selected' if status_filter == 'inativo' }}>Inativos</option>
-                        <option value="descontinuado" {{ 'selected' if status_filter == 'descontinuado' }}>Descontinuados</option>
-                    </select>
+    <div class="rdo-card slide-in">
+        <div class="rdo-card-header">
+            <h3>
+                <i class="fas fa-filter"></i>
+                Filtros de Busca
+            </h3>
+        </div>
+        <div class="rdo-card-body">
+            <form method="GET" id="filtrosForm">
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label class="form-label" for="busca">
+                            <i class="fas fa-search"></i>
+                            Buscar por Nome
+                        </label>
+                        <input type="text" class="form-control" id="busca" name="busca" value="{{ busca }}" placeholder="Digite o nome do serviço...">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label class="form-label" for="categoria_id">
+                            <i class="fas fa-tag"></i>
+                            Categoria
+                        </label>
+                        <select class="form-control" id="categoria_id" name="categoria_id">
+                            <option value="">Todas as categorias</option>
+                            {% for categoria in categorias %}
+                            <option value="{{ categoria.id }}" {% if categoria.id == categoria_id %}selected{% endif %}>
+                                {{ categoria.nome }}
+                            </option>
+                            {% endfor %}
+                        </select>
+                    </div>
                 </div>
-                <div class="col-md-6">
-                    <label class="form-label">Pesquisar</label>
-                    <input type="text" name="search" class="form-control" 
-                           placeholder="Código ou nome do serviço..." 
-                           value="{{ search }}">
-                </div>
-                <div class="col-md-2">
-                    <label class="form-label">&nbsp;</label>
-                    <button type="submit" class="btn btn-primary w-100">
-                        <i class="fas fa-search"></i> Filtrar
+                
+                <div class="filter-actions">
+                    <button type="submit" class="btn-modern btn-primary">
+                        <i class="fas fa-search"></i>
+                        Filtrar
+                    </button>
+                    <button type="button" class="btn-modern btn-outline" onclick="limparFiltros()">
+                        <i class="fas fa-refresh"></i>
+                        Limpar
                     </button>
                 </div>
             </form>
@@ -60,145 +79,212 @@
     </div>
 
     <!-- Lista de Serviços -->
-    <div class="card">
-        <div class="card-header">
-            <h5><i class="fas fa-list me-2"></i>Serviços ({{ servicos.total }})</h5>
+    <div class="rdo-card slide-in">
+        <div class="rdo-card-header">
+            <h3>
+                <i class="fas fa-list"></i>
+                Lista de Serviços
+            </h3>
+            <div class="header-actions">
+                <span class="badge bg-primary">{{ servicos|length }} serviço(s)</span>
+            </div>
         </div>
-        <div class="card-body">
-            {% if servicos.items %}
-                <div class="table-responsive">
-                    <table class="table table-striped">
-                        <thead>
-                            <tr>
-                                <th>Código</th>
-                                <th>Nome</th>
-                                <th>Unidade</th>
-                                <th>Preço Base</th>
-                                <th>Preço Final</th>
-                                <th>Subserviços</th>
-                                <th>Status</th>
-                                <th class="text-center">Ações</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {% for servico in servicos.items %}
-                            <tr>
-                                <td><strong>{{ servico.codigo }}</strong></td>
-                                <td>
-                                    <strong>{{ servico.nome }}</strong>
-                                    {% if servico.descricao %}
-                                        <br><small class="text-muted">{{ servico.descricao[:60] }}{% if servico.descricao|length > 60 %}...{% endif %}</small>
-                                    {% endif %}
-                                </td>
-                                <td>{{ servico.unidade }}</td>
-                                <td>R$ {{ "%.2f"|format(servico.preco_base) }}</td>
-                                <td>
-                                    <strong class="text-success">R$ {{ "%.2f"|format(servico.preco_final) }}</strong>
-                                    <br><small class="text-muted">{{ servico.margem_lucro }}% margem</small>
-                                </td>
-                                <td>
-                                    {% if servico.total_subservicos > 0 %}
-                                        <span class="badge bg-info">{{ servico.total_subservicos }} itens</span>
-                                    {% else %}
-                                        <span class="text-muted">Nenhum</span>
-                                    {% endif %}
-                                </td>
-                                <td>
-                                    <span class="badge bg-{{ 'success' if servico.status == 'ativo' else 'secondary' }}">
-                                        {{ servico.status.title() }}
-                                    </span>
-                                </td>
-                                <td class="text-center">
-                                    <div class="btn-group btn-group-sm" role="group">
-                                        <a href="{{ url_for('servicos.ver_servico', id=servico.id) }}" 
-                                           class="btn btn-outline-primary" title="Ver Detalhes">
-                                            <i class="fas fa-eye"></i>
-                                        </a>
-                                        <a href="{{ url_for('servicos.editar_servico', id=servico.id) }}" 
-                                           class="btn btn-outline-warning" title="Editar">
-                                            <i class="fas fa-edit"></i>
-                                        </a>
-                                        <button class="btn btn-outline-success" 
-                                                title="Usar em Proposta"
-                                                onclick="usarEmProposta({{ servico.id }}, '{{ servico.nome }}')">
-                                            <i class="fas fa-file-contract"></i>
-                                        </button>
-                                    </div>
-                                </td>
-                            </tr>
-                            {% endfor %}
-                        </tbody>
-                    </table>
-                </div>
-
-                <!-- Paginação -->
-                {% if servicos.pages > 1 %}
-                <nav aria-label="Navegação de páginas">
-                    <ul class="pagination justify-content-center">
-                        {% if servicos.has_prev %}
-                            <li class="page-item">
-                                <a class="page-link" href="{{ url_for('servicos.listar_servicos', page=servicos.prev_num, status=status_filter, search=search) }}">
-                                    Anterior
-                                </a>
-                            </li>
-                        {% endif %}
-                        
-                        {% for page_num in servicos.iter_pages() %}
-                            {% if page_num %}
-                                {% if page_num != servicos.page %}
-                                    <li class="page-item">
-                                        <a class="page-link" href="{{ url_for('servicos.listar_servicos', page=page_num, status=status_filter, search=search) }}">
-                                            {{ page_num }}
-                                        </a>
-                                    </li>
-                                {% else %}
-                                    <li class="page-item active">
-                                        <span class="page-link">{{ page_num }}</span>
-                                    </li>
-                                {% endif %}
+        <div class="rdo-card-body">
+            {% if servicos %}
+            <div class="servicos-grid">
+                {% for servico in servicos %}
+                <div class="servico-card">
+                    <div class="servico-header">
+                        <div class="servico-categoria" style="background-color: {{ servico.categoria.cor_hexadecimal }}">
+                            {{ servico.categoria.nome }}
+                        </div>
+                        <div class="servico-status">
+                            {% if servico.ativo %}
+                            <span class="badge bg-success">Ativo</span>
                             {% else %}
-                                <li class="page-item disabled">
-                                    <span class="page-link">…</span>
-                                </li>
+                            <span class="badge bg-secondary">Inativo</span>
                             {% endif %}
-                        {% endfor %}
+                        </div>
+                    </div>
+                    
+                    <div class="servico-content">
+                        <h5 class="servico-nome">{{ servico.nome }}</h5>
+                        <p class="servico-descricao">{{ servico.descricao or 'Sem descrição' }}</p>
                         
-                        {% if servicos.has_next %}
-                            <li class="page-item">
-                                <a class="page-link" href="{{ url_for('servicos.listar_servicos', page=servicos.next_num, status=status_filter, search=search) }}">
-                                    Próxima
-                                </a>
-                            </li>
-                        {% endif %}
-                    </ul>
-                </nav>
-                {% endif %}
-            {% else %}
-                <div class="text-center py-5">
-                    <i class="fas fa-cogs fa-3x text-muted mb-3"></i>
-                    <h4 class="text-muted">Nenhum serviço encontrado</h4>
-                    <p class="text-muted">
-                        {% if search or status_filter != 'todos' %}
-                            Tente ajustar os filtros de pesquisa.
-                        {% else %}
-                            Comece criando seu primeiro serviço.
-                        {% endif %}
-                    </p>
-                    <a href="{{ url_for('servicos.novo_servico') }}" class="btn btn-primary">
-                        <i class="fas fa-plus"></i> Criar Primeiro Serviço
-                    </a>
+                        <div class="servico-detalhes">
+                            <div class="detalhe-item">
+                                <small class="text-muted">Unidade:</small>
+                                <span class="badge bg-info">{{ servico.unidade_simbolo }}</span>
+                            </div>
+                            <div class="detalhe-item">
+                                <small class="text-muted">Preço Base:</small>
+                                <span class="text-success fw-bold">R$ {{ '{:,.2f}'.format(servico.preco_base).replace(',', ' ').replace('.', ',').replace(' ', '.') }}</span>
+                            </div>
+                            <div class="detalhe-item">
+                                <small class="text-muted">Subatividades:</small>
+                                <span class="badge bg-warning">{{ servico.total_subatividades }}</span>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="servico-actions">
+                        <a href="{{ url_for('servicos.editar_servico', id=servico.id) }}" class="btn-modern btn-warning btn-sm">
+                            <i class="fas fa-edit"></i>
+                            Editar
+                        </a>
+                        <button class="btn-modern btn-info btn-sm" onclick="verSubatividades({{ servico.id }})">
+                            <i class="fas fa-list-ul"></i>
+                            Subatividades
+                        </button>
+                    </div>
                 </div>
+                {% endfor %}
+            </div>
+            {% else %}
+            <div class="empty-state">
+                <div class="empty-icon">
+                    <i class="fas fa-tools"></i>
+                </div>
+                <h4>Nenhum serviço encontrado</h4>
+                <p>{% if busca or categoria_id %}Nenhum serviço corresponde aos filtros aplicados.{% else %}Crie seu primeiro serviço para começar.{% endif %}</p>
+                <a href="{{ url_for('servicos.novo_servico') }}" class="btn-modern btn-primary">
+                    <i class="fas fa-plus"></i>
+                    Criar Primeiro Serviço
+                </a>
+            </div>
             {% endif %}
         </div>
     </div>
 </div>
 
-<script>
-function usarEmProposta(servicoId, servicoNome) {
-    if (confirm(`Deseja usar o serviço "${servicoNome}" em uma nova proposta?`)) {
-        // Redirecionar para criação de proposta com serviço pré-selecionado
-        window.location.href = `/propostas/nova?servico_id=${servicoId}`;
+<!-- CSS Moderno -->
+<style>
+/* Grid de Serviços */
+.servicos-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+    gap: 1.5rem;
+}
+
+.servico-card {
+    background: rgba(255, 255, 255, 0.9);
+    border-radius: 12px;
+    border: 1px solid #e2e8f0;
+    transition: all 0.3s ease;
+    overflow: hidden;
+}
+
+.servico-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.15);
+}
+
+.servico-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 1rem;
+    background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
+}
+
+.servico-categoria {
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: white;
+    padding: 0.25rem 0.75rem;
+    border-radius: 20px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.servico-content {
+    padding: 1.5rem;
+}
+
+.servico-nome {
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: #2d3748;
+    margin-bottom: 0.5rem;
+    line-height: 1.3;
+}
+
+.servico-descricao {
+    color: #718096;
+    font-size: 0.9rem;
+    line-height: 1.4;
+    margin-bottom: 1rem;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+
+.servico-detalhes {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
+    gap: 0.75rem;
+    margin-bottom: 1rem;
+}
+
+.detalhe-item {
+    text-align: center;
+}
+
+.detalhe-item small {
+    display: block;
+    margin-bottom: 0.25rem;
+    font-size: 0.75rem;
+}
+
+.servico-actions {
+    display: flex;
+    gap: 0.5rem;
+    justify-content: center;
+    padding: 1rem;
+    background: rgba(248, 250, 252, 0.5);
+    border-top: 1px solid #e2e8f0;
+}
+
+/* Responsividade */
+@media (max-width: 768px) {
+    .servicos-grid {
+        grid-template-columns: 1fr;
     }
+    
+    .servico-header {
+        flex-direction: column;
+        gap: 0.5rem;
+        text-align: center;
+    }
+    
+    .servico-actions {
+        flex-direction: column;
+    }
+}
+</style>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Animar entrada dos cards
+    setTimeout(() => {
+        document.querySelectorAll('.rdo-card').forEach((card, index) => {
+            setTimeout(() => {
+                card.classList.add('slide-in');
+            }, index * 100);
+        });
+    }, 100);
+});
+
+function limparFiltros() {
+    document.getElementById('busca').value = '';
+    document.getElementById('categoria_id').value = '';
+    document.getElementById('filtrosForm').submit();
+}
+
+function verSubatividades(servicoId) {
+    // TODO: Implementar modal ou página para ver subatividades
+    alert('Funcionalidade de visualização de subatividades será implementada em breve!');
 }
 </script>
 {% endblock %}

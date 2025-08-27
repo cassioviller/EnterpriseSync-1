@@ -69,5 +69,15 @@ def handle_exception(e):
     
     return render_template_string(error_template, error_msg=error_msg, error_trace=error_trace), 500
 
+# Registrar blueprint de serviços
+try:
+    from servicos_blueprint import servicos_bp
+    app.register_blueprint(servicos_bp)
+    print("✅ Blueprint serviços registrado com sucesso")
+except ImportError as e:
+    print(f"⚠️ Blueprint serviços não encontrado: {e}")
+except Exception as e:
+    print(f"❌ Erro ao registrar blueprint serviços: {e}")
+
 if __name__ == "__main__":
     app.run(host='0.0.0.0', port=5000, debug=True)
