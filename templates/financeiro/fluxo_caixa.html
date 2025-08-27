@@ -92,7 +92,7 @@
             </div>
         </div>
         <div class="col-md-4">
-            <div class="card bg-{% if fluxo.saldo_periodo >= 0 %}primary{% else %}warning{% endif %} text-white">
+            <div class="card bg-{% if fluxo.saldo_periodo >= 0 %}primary{% else %}warning{% endif %} {% if fluxo.saldo_periodo >= 0 %}text-white{% else %}text-dark{% endif %}">
                 <div class="card-body text-center">
                     <h5><i class="fas fa-balance-scale me-2"></i>Saldo Período</h5>
                     <h3>R$ {{ "%.2f"|format(fluxo.saldo_periodo) }}</h3>
