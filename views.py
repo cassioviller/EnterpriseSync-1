@@ -104,7 +104,7 @@ def index():
     failure_threshold=2,
     recovery_timeout=60,
     expected_exception=(TimeoutError, Exception),
-    fallback=database_query_fallback
+    fallback=lambda *args, **kwargs: {"error": "Dashboard temporariamente indisponível"}
 )
 def dashboard():
     # REDIRECIONAMENTO BASEADO NO TIPO DE USUÁRIO
@@ -4642,8 +4642,8 @@ def financeiro():
 @main_bp.route('/propostas')
 @admin_required
 def propostas():
-    # Buscar propostas básicas para exibição (por enquanto lista vazia)
-    propostas = []
+    """Alias para compatibilidade - redireciona para módulo consolidado"""
+    print("DEBUG: Redirecionando /propostas para módulo consolidado")
     return redirect(url_for('propostas.index'))
 
 # Rota movida para propostas_views.py blueprint

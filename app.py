@@ -201,13 +201,19 @@ with app.app_context():
     # Modelos de propostas já estão consolidados em models.py
     logging.info("✅ Modelos de propostas importados do arquivo consolidado")
     
-    # Registrar blueprint de propostas
+    # Registrar blueprint de propostas consolidado
     try:
-        from propostas_views import propostas_bp
+        from propostas_consolidated import propostas_bp
         app.register_blueprint(propostas_bp, url_prefix='/propostas')
-        logging.info("✅ Blueprint propostas registrado")
+        logging.info("✅ Blueprint propostas consolidado registrado")
     except ImportError as e:
-        logging.warning(f"⚠️ Blueprint propostas não encontrado: {e}")
+        # Fallback para blueprint antigo
+        try:
+            from propostas_views import propostas_bp
+            app.register_blueprint(propostas_bp, url_prefix='/propostas')
+            logging.info("✅ Blueprint propostas (fallback) registrado")
+        except ImportError as e2:
+            logging.warning(f"⚠️ Blueprint propostas não encontrado: {e} | {e2}")
     except Exception as e:
         logging.error(f"❌ Erro ao registrar blueprint propostas: {e}")
     
