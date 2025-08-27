@@ -1669,6 +1669,13 @@ def rdo_redirect():
     """Redireciona /rdo para a nova lista completa"""
     return redirect(url_for('main.lista_rdos'))
 
+# Redirecionamento adicional para garantir que funcione
+@main_bp.route('/rdo/')
+@login_required  
+def rdo_redirect_slash():
+    """Redireciona /rdo/ para a nova lista completa"""
+    return redirect(url_for('main.lista_rdos'))
+
 @main_bp.route('/rdo/novo')
 @funcionario_required
 def novo_rdo():
