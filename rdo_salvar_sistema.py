@@ -59,49 +59,108 @@ def funcionario_rdo_consolidado():
         return redirect(url_for('main.funcionario_dashboard'))
 
 def processar_salvamento_rdo():
-    """Processa salvamento do RDO usando schema compatível"""
-    admin_id = obter_admin_id()
+    """Processa salvamento do RDO usando schema compatível com logging detalhado"""
+    print("🔍 INÍCIO DO SALVAMENTO RDO")
     
     try:
+        # Passo 1: Obter admin_id
+        admin_id = obter_admin_id()
+        print(f"✅ Admin ID obtido: {admin_id}")
+        
+        # Passo 2: Obter funcionário atual
+        funcionario_id = obter_funcionario_atual()
+        print(f"✅ Funcionário ID obtido: {funcionario_id}")
+        
+        # Verificar se funcionário existe
+        funcionario = Funcionario.query.get(funcionario_id)
+        if not funcionario:
+            print(f"❌ ERRO: Funcionário ID={funcionario_id} não encontrado na base de dados")
+            flash('Erro: Funcionário não encontrado na base de dados. Contacte o administrador.', 'error')
+            return redirect(url_for('rdo_salvar.funcionario_rdo_consolidado'))
+        
+        print(f"✅ Funcionário encontrado: {funcionario.nome} (admin_id={funcionario.admin_id})")
+        
+        # Passo 3: Obter dados do formulário
         dados = request.form.to_dict()
-        logger.debug(f"Dados recebidos para salvamento: {list(dados.keys())}")
+        print(f"✅ Dados recebidos: {len(dados)} campos")
+        print(f"🔍 Campos principais: {[k for k in dados.keys() if not k.startswith('funcionario_') and not k.startswith('subatividade_')]}")
         
         # Verificar se é finalização ou rascunho
         finalizar = dados.get('finalizar_rdo') == 'true'
         status = 'Finalizado' if finalizar else 'Rascunho'
+        print(f"✅ Status definido: {status} (finalizar={finalizar})")
         
-        # Criar novo RDO
+        # Passo 4: Criar novo RDO
+        print("🔍 Criando novo RDO...")
         rdo = RDO()
         rdo.numero_rdo = gerar_numero_rdo_unico()
         rdo.admin_id = admin_id
-        rdo.criado_por_id = obter_funcionario_atual()
+        rdo.criado_por_id = funcionario_id
         
-        # Dados básicos
+        print(f"✅ RDO básico criado - Número: {rdo.numero_rdo}")
+        
+        # Passo 5: Validar e definir dados básicos
+        print("🔍 Definindo dados básicos...")
+        
         if dados.get('data_relatorio'):
-            rdo.data_relatorio = datetime.strptime(dados.get('data_relatorio'), '%Y-%m-%d').date()
+            try:
+                rdo.data_relatorio = datetime.strptime(dados.get('data_relatorio'), '%Y-%m-%d').date()
+                print(f"✅ Data definida: {rdo.data_relatorio}")
+            except ValueError as e:
+                print(f"❌ Erro ao converter data: {e}")
+                rdo.data_relatorio = date.today()
         else:
             rdo.data_relatorio = date.today()
+            print(f"✅ Data padrão definida: {rdo.data_relatorio}")
+        
+        # Validar obra_id
+        obra_id = dados.get('obra_id')
+        if obra_id:
+            try:
+                rdo.obra_id = int(obra_id)
+                obra = Obra.query.get(rdo.obra_id)
+                if not obra:
+                    print(f"❌ ERRO: Obra ID={obra_id} não encontrada")
+                    flash(f'Erro: Obra ID={obra_id} não encontrada', 'error')
+                    return redirect(url_for('rdo_salvar.funcionario_rdo_consolidado'))
+                print(f"✅ Obra validada: {obra.nome}")
+            except ValueError:
+                print(f"❌ ERRO: obra_id inválido: {obra_id}")
+                flash('Erro: ID da obra inválido', 'error')
+                return redirect(url_for('rdo_salvar.funcionario_rdo_consolidado'))
+        else:
+            print("❌ ERRO: obra_id não informado")
+            flash('Erro: Obra não selecionada', 'error')
+            return redirect(url_for('rdo_salvar.funcionario_rdo_consolidado'))
             
-        rdo.obra_id = int(dados.get('obra_id')) if dados.get('obra_id') else None
         rdo.clima_geral = dados.get('clima_geral', '')
         rdo.condicoes_trabalho = dados.get('condicoes_trabalho', '')
-        rdo.comentario_geral = dados.get('observacoes', '')  # Campo do form é 'observacoes'
+        rdo.comentario_geral = dados.get('observacoes', '')
         rdo.status = status
         
-        # Salvar RDO primeiro para obter ID
+        print("✅ Dados básicos definidos")
+        
+        # Passo 6: Salvar RDO principal
+        print("🔍 Salvando RDO principal...")
         db.session.add(rdo)
         db.session.flush()  # Para obter o ID sem commit completo
         
-        logger.debug(f"RDO criado com ID: {rdo.id}, número: {rdo.numero_rdo}")
+        print(f"✅ RDO salvo com ID: {rdo.id}")
         
-        # Processar equipe (compatível com schema atual)
-        processar_equipe_schema_atual(rdo, dados)
+        # Passo 7: Processar equipe
+        print("🔍 Processando equipe...")
+        resultado_equipe = processar_equipe_schema_atual(rdo, dados)
+        print(f"✅ Equipe processada: {resultado_equipe}")
         
-        # Processar subatividades (compatível com schema atual)
-        processar_subatividades_schema_atual(rdo, dados)
+        # Passo 8: Processar subatividades
+        print("🔍 Processando subatividades...")
+        resultado_subatividades = processar_subatividades_schema_atual(rdo, dados)
+        print(f"✅ Subatividades processadas: {resultado_subatividades}")
         
-        # Commit final
+        # Passo 9: Commit final
+        print("🔍 Executando commit final...")
         db.session.commit()
+        print("✅ SALVAMENTO CONCLUÍDO COM SUCESSO!")
         
         if finalizar:
             flash(f'RDO {rdo.numero_rdo} finalizado com sucesso!', 'success')
@@ -111,14 +170,27 @@ def processar_salvamento_rdo():
         return redirect(url_for('main.funcionario_dashboard'))
         
     except Exception as e:
+        print(f"❌ ERRO CRÍTICO NO SALVAMENTO: {str(e)}")
+        print(f"❌ Tipo do erro: {type(e).__name__}")
+        import traceback
+        print(f"❌ Traceback completo:\n{traceback.format_exc()}")
+        
         db.session.rollback()
-        logger.error(f"Erro ao salvar RDO: {str(e)}")
-        flash(f'Erro ao salvar RDO: {str(e)}', 'error')
+        flash(f'ERRO DETALHADO - {type(e).__name__}: {str(e)}', 'error')
         return redirect(url_for('rdo_salvar.funcionario_rdo_consolidado'))
 
 def processar_equipe_schema_atual(rdo, dados):
-    """Processa equipe usando schema atual (funcao_exercida)"""
+    """Processa equipe usando schema atual (funcao_exercida) com logging detalhado"""
+    print("   📋 Iniciando processamento da equipe...")
     funcionarios_processados = 0
+    
+    # Encontrar campos de funcionários
+    campos_funcionarios = [k for k in dados.keys() if k.startswith('funcionario_') and k.endswith('_horas')]
+    print(f"   🔍 Campos de funcionários encontrados: {campos_funcionarios}")
+    
+    if not campos_funcionarios:
+        print("   ⚠️ Nenhum campo de funcionário encontrado nos dados")
+        return "Nenhum funcionário no formulário"
     
     for key, value in dados.items():
         if key.startswith('funcionario_') and key.endswith('_horas'):
@@ -126,9 +198,17 @@ def processar_equipe_schema_atual(rdo, dados):
             
             try:
                 horas = float(value) if value else 0
+                print(f"   🔍 Funcionário {funcionario_id}: {horas} horas")
                 
                 if horas > 0:
                     funcao = dados.get(f'funcionario_{funcionario_id}_funcao', 'Funcionário')
+                    print(f"   ✅ Adicionando funcionário {funcionario_id}: {funcao} - {horas}h")
+                    
+                    # Verificar se funcionário existe
+                    funcionario = Funcionario.query.get(int(funcionario_id))
+                    if not funcionario:
+                        print(f"   ❌ Funcionário ID={funcionario_id} não encontrado")
+                        continue
                     
                     # Usar schema atual com funcao_exercida
                     mao_obra = RDOMaoObra()
@@ -139,18 +219,31 @@ def processar_equipe_schema_atual(rdo, dados):
                     
                     db.session.add(mao_obra)
                     funcionarios_processados += 1
+                    print(f"   ✅ Funcionário {funcionario.nome} adicionado com sucesso")
                     
-                    logger.debug(f"Funcionário adicionado: ID={funcionario_id}, horas={horas}, função={funcao}")
+                else:
+                    print(f"   ⏭️ Funcionário {funcionario_id} ignorado (0 horas)")
                     
             except (ValueError, TypeError) as e:
-                logger.warning(f"Erro ao processar funcionário {funcionario_id}: {e}")
+                print(f"   ❌ Erro ao processar funcionário {funcionario_id}: {e}")
                 continue
     
-    logger.debug(f"Total de funcionários processados: {funcionarios_processados}")
+    resultado = f"{funcionarios_processados} funcionários processados"
+    print(f"   📊 {resultado}")
+    return resultado
 
 def processar_subatividades_schema_atual(rdo, dados):
-    """Processa subatividades usando schema atual (sem subatividade_id)"""
+    """Processa subatividades usando schema atual (sem subatividade_id) com logging detalhado"""
+    print("   📋 Iniciando processamento das subatividades...")
     subatividades_processadas = 0
+    
+    # Encontrar campos de subatividades
+    campos_subatividades = [k for k in dados.keys() if k.startswith('subatividade_') and k.endswith('_percentual')]
+    print(f"   🔍 Campos de subatividades encontrados: {campos_subatividades}")
+    
+    if not campos_subatividades:
+        print("   ⚠️ Nenhum campo de subatividade encontrado nos dados")
+        return "Nenhuma subatividade no formulário"
     
     for key, value in dados.items():
         if key.startswith('subatividade_') and key.endswith('_percentual'):
@@ -158,12 +251,15 @@ def processar_subatividades_schema_atual(rdo, dados):
             
             try:
                 percentual = float(value) if value else 0
+                print(f"   🔍 Subatividade {subatividade_id}: {percentual}%")
                 
                 if percentual > 0:
                     # Obter dados da subatividade
                     subatividade = SubAtividade.query.get(int(subatividade_id))
                     
                     if subatividade:
+                        print(f"   ✅ Subatividade encontrada: {subatividade.nome} (Serviço ID: {subatividade.servico_id})")
+                        
                         # Usar schema atual - sem campo subatividade_id
                         registro = RDOServicoSubatividade()
                         registro.rdo_id = rdo.id
@@ -175,16 +271,21 @@ def processar_subatividades_schema_atual(rdo, dados):
                         
                         db.session.add(registro)
                         subatividades_processadas += 1
+                        print(f"   ✅ Subatividade {subatividade.nome} adicionada: {percentual}%")
                         
-                        logger.debug(f"Subatividade adicionada: {subatividade.nome} = {percentual}%")
                     else:
-                        logger.warning(f"Subatividade ID={subatividade_id} não encontrada")
+                        print(f"   ❌ Subatividade ID={subatividade_id} não encontrada na base de dados")
+                        
+                else:
+                    print(f"   ⏭️ Subatividade {subatividade_id} ignorada (0%)")
                         
             except (ValueError, TypeError) as e:
-                logger.warning(f"Erro ao processar subatividade {subatividade_id}: {e}")
+                print(f"   ❌ Erro ao processar subatividade {subatividade_id}: {e}")
                 continue
     
-    logger.debug(f"Total de subatividades processadas: {subatividades_processadas}")
+    resultado = f"{subatividades_processadas} subatividades processadas"
+    print(f"   📊 {resultado}")
+    return resultado
 
 @rdo_salvar_bp.route('/api/rdo/salvar-rapido', methods=['POST'])
 def salvar_rdo_rapido():
