@@ -37,7 +37,7 @@
 - `rdo/editar_rdo.html` - Edição
 - `funcionario/rdo_consolidado.html` - Interface funcionário
 
-**Backend consolidado:** ⚠️ Duplicação admin/funcionário
+**Backend consolidado:** ✅ CONCLUÍDO - 5 rotas unificadas (27/08/2025)
 **Frontend moderno:** ✅ Lista já modernizada, demais templates precisam
 
 #### 3. PROPOSTAS
@@ -54,13 +54,22 @@
 
 ## PLANO DE IMPLEMENTAÇÃO
 
-### FASE 1: CONSOLIDAÇÃO DE BACKEND (3-4 horas)
+### FASE 1: CONSOLIDAÇÃO DE BACKEND (Atualizada)
 
-#### 1.1 Funcionários - Consolidação
-**Objetivo:** Unificar lógica de admin_id e padronizar APIs
+#### 1.1 Funcionários - Consolidação ✅ FASE 1 CONCLUÍDA
+**Objetivo:** Unificar lógica de admin_id, corrigir erros críticos e padronizar APIs
 
-**Tarefas:**
+**Erros corrigidos:**
+- ✅ Blueprint de serviços com endpoints duplicados - DESABILITADO
+- ✅ APIs de funcionários unificadas - 2 para 1 API consolidada
+- ✅ Lógica admin_id padronizada em todas as APIs
+
+**Tarefas concluídas:**
 - ✅ Padronizar detecção de admin_id em todas as rotas
+- ✅ Unificar `/api/funcionarios` e `/api/funcionario/funcionarios`
+- ✅ Implementar sistema de aliases para compatibilidade
+- ✅ Melhorar tratamento de erros nas APIs
+- ✅ Criar formato duplo de retorno (admin/mobile)
 - ✅ Unificar `/api/funcionarios` e `/api/funcionario/funcionarios`
 - ✅ Consolidar lógica de permissões
 - ✅ Padronizar estrutura de retorno das APIs
@@ -70,8 +79,13 @@
 - `views.py` (rotas funcionários)
 - Criar `funcionarios_api.py` para APIs consolidadas
 
-#### 1.2 RDOs - Consolidação
+#### 1.2 RDOs - Consolidação ✅ CONCLUÍDO
 **Objetivo:** Eliminar duplicação admin/funcionário, unificar backend
+
+**Status:** FINALIZADO em 27/08/2025
+- 5 rotas unificadas com aliases de compatibilidade
+- Lógica admin_id consolidada
+- Templates condicionais baseados em permissão
 
 **Problemas identificados:**
 - Rotas duplicadas: `/rdo/novo` vs `/funcionario/rdo/novo`

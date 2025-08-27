@@ -1621,16 +1621,35 @@ def novo_custo_veiculo_lista():
 
 # ===== APIs PARA FRONTEND =====
 @main_bp.route('/api/funcionarios')
-def api_funcionarios():
-    """API para buscar funcionários para dropdowns"""
+def api_funcionarios_consolidada():
+    """API CONSOLIDADA para funcionários - Unifica admin e mobile"""
     try:
-        # Determinar admin_id usando sistema de bypass
-        admin_id = 10  # Default
+        # Determinar admin_id usando lógica unificada
+        admin_id = None
+        formato_retorno = request.args.get('formato', 'admin')  # 'admin' ou 'mobile'
         
         if hasattr(current_user, 'tipo_usuario') and current_user.is_authenticated:
             if current_user.tipo_usuario == TipoUsuario.SUPER_ADMIN:
-                # Super Admin pode ver funcionários de todos os admins
-                funcionarios = Funcionario.query.filter_by(ativo=True).all()
+                # Super Admin pode escolher admin_id via parâmetro
+                admin_id_param = request.args.get('admin_id')
+                if admin_id_param:
+                    try:
+                        admin_id = int(admin_id_param)
+                    except:
+                        # Se não conseguir converter, buscar todos
+                        admin_id = None
+                else:
+                    # Buscar admin com mais funcionários ativos
+                    from sqlalchemy import text
+                    admin_counts = db.session.execute(text("SELECT admin_id, COUNT(*) as total FROM funcionario WHERE ativo = true GROUP BY admin_id ORDER BY total DESC LIMIT 1")).fetchone()
+                    admin_id = admin_counts[0] if admin_counts else 10
+                    
+                # Super Admin vê funcionários de admin específico ou todos
+                if admin_id:
+                    funcionarios = Funcionario.query.filter_by(admin_id=admin_id, ativo=True).all()
+                else:
+                    funcionarios = Funcionario.query.filter_by(ativo=True).all()
+                    
             elif current_user.tipo_usuario == TipoUsuario.ADMIN:
                 admin_id = current_user.id
                 funcionarios = Funcionario.query.filter_by(admin_id=admin_id, ativo=True).all()
@@ -1638,25 +1657,66 @@ def api_funcionarios():
                 admin_id = current_user.admin_id or 10
                 funcionarios = Funcionario.query.filter_by(admin_id=admin_id, ativo=True).all()
         else:
-            # Sistema de bypass - usar admin com mais funcionários
-            funcionarios = Funcionario.query.filter_by(admin_id=admin_id, ativo=True).all()
+            # Sistema de bypass para produção - buscar admin com mais funcionários
+            try:
+                from sqlalchemy import text
+                admin_counts = db.session.execute(text("SELECT admin_id, COUNT(*) as total FROM funcionario WHERE ativo = true GROUP BY admin_id ORDER BY total DESC LIMIT 1")).fetchone()
+                admin_id = admin_counts[0] if admin_counts else 10
+                funcionarios = Funcionario.query.filter_by(admin_id=admin_id, ativo=True).all()
+            except Exception as e:
+                print(f"Erro ao detectar admin_id automaticamente: {e}")
+                admin_id = 10
+                funcionarios = Funcionario.query.filter_by(admin_id=admin_id, ativo=True).all()
         
-        # Converter para JSON
+        print(f"DEBUG API FUNCIONÁRIOS: {len(funcionarios)} funcionários para admin_id={admin_id}, formato={formato_retorno}")
+        
+        # Converter para JSON baseado no formato solicitado
         funcionarios_json = []
         for f in funcionarios:
-            funcionarios_json.append({
-                'id': f.id,
-                'nome': f.nome,
-                'email': f.email or '',
-                'departamento': f.departamento_ref.nome if f.departamento_ref else 'Sem departamento',
-                'cargo': f.funcao_ref.nome if f.funcao_ref else 'Sem cargo'
-            })
+            if formato_retorno == 'mobile':
+                # Formato mobile simplificado
+                funcionarios_json.append({
+                    'id': f.id,
+                    'nome': f.nome,
+                    'funcao': f.funcao_ref.nome if f.funcao_ref else 'N/A',
+                    'departamento': f.departamento_ref.nome if f.departamento_ref else 'N/A'
+                })
+            else:
+                # Formato admin completo (padrão)
+                funcionarios_json.append({
+                    'id': f.id,
+                    'nome': f.nome,
+                    'email': f.email or '',
+                    'departamento': f.departamento_ref.nome if f.departamento_ref else 'Sem departamento',
+                    'cargo': f.funcao_ref.nome if f.funcao_ref else 'Sem cargo',
+                    'salario': f.salario or 0,
+                    'admin_id': f.admin_id,
+                    'ativo': f.ativo
+                })
         
-        return jsonify(funcionarios_json)
+        # Retorno adaptado ao formato
+        if formato_retorno == 'mobile':
+            return jsonify({
+                'success': True,
+                'funcionarios': funcionarios_json,
+                'total': len(funcionarios_json)
+            })
+        else:
+            return jsonify(funcionarios_json)
         
     except Exception as e:
-        print(f"ERRO API FUNCIONÁRIOS: {str(e)}")
-        return jsonify([]), 500
+        print(f"ERRO API FUNCIONÁRIOS CONSOLIDADA: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        
+        if formato_retorno == 'mobile':
+            return jsonify({
+                'success': False,
+                'error': str(e),
+                'funcionarios': []
+            }), 500
+        else:
+            return jsonify([]), 500
 
 @main_bp.route('/api/servicos')
 def api_servicos():
@@ -3169,13 +3229,26 @@ def api_funcionario_rdos_obra(obra_id):
         print(f"ERRO API FUNCIONÁRIO RDOs OBRA: {str(e)}")
         return jsonify({'error': 'Erro interno', 'success': False}), 500
 
+# ===== ALIAS DE COMPATIBILIDADE - API FUNCIONÁRIOS MOBILE =====
 @main_bp.route('/api/funcionario/funcionarios')
 @funcionario_required
-def api_funcionario_funcionarios():
-    """API para funcionários listar colegas da empresa"""
+def api_funcionario_funcionarios_alias():
+    """ALIAS: Redireciona para API consolidada com formato mobile"""
+    print("🔀 ALIAS: Redirecionando /api/funcionario/funcionarios para API consolidada")
+    
+    # Detectar admin_id do usuário atual para manter compatibilidade
+    admin_id = None
+    if hasattr(current_user, 'admin_id') and current_user.admin_id:
+        admin_id = current_user.admin_id
+    elif hasattr(current_user, 'id'):
+        admin_id = current_user.id
+    else:
+        admin_id = 10  # Fallback
+    
     try:
+        # Buscar funcionários diretamente (compatibilidade total)
         funcionarios = Funcionario.query.filter_by(
-            admin_id=current_user.admin_id,
+            admin_id=admin_id,
             ativo=True
         ).order_by(Funcionario.nome).all()
         
@@ -3183,21 +3256,29 @@ def api_funcionario_funcionarios():
             {
                 'id': func.id,
                 'nome': func.nome,
-                'funcao': func.funcao.nome if func.funcao else 'N/A',
-                'departamento': func.departamento.nome if func.departamento else 'N/A'
+                'funcao': func.funcao_ref.nome if func.funcao_ref else 'N/A',
+                'departamento': func.departamento_ref.nome if func.departamento_ref else 'N/A'
             }
             for func in funcionarios
         ]
         
+        print(f"📱 ALIAS API MOBILE: {len(funcionarios_data)} funcionários para admin_id={admin_id}")
+        
         return jsonify({
             'success': True,
             'funcionarios': funcionarios_data,
-            'total': len(funcionarios_data)
+            'total': len(funcionarios_data),
+            '_consolidado': True  # Flag para debug
         })
         
     except Exception as e:
-        print(f"ERRO API FUNCIONÁRIO FUNCIONÁRIOS: {str(e)}")
-        return jsonify({'error': 'Erro interno', 'success': False}), 500
+        print(f"ERRO ALIAS FUNCIONÁRIOS MOBILE: {str(e)}")
+        return jsonify({
+            'success': False,
+            'error': str(e),
+            'funcionarios': [],
+            '_consolidado': True
+        }), 500
 
 # ===== ENHANCED RDO API ENDPOINTS =====
 

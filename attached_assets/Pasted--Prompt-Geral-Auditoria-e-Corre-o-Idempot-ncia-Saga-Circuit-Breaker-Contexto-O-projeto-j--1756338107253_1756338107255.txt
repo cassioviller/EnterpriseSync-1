@@ -1,0 +1,202 @@
+
+
+Prompt Geral — Auditoria e Correção (Idempotência, Saga, Circuit Breaker)
+
+Contexto:
+O projeto já existe. Faça uma auditoria técnica e correções mínimas e seguras para garantir conformidade com:
+
+1. Idempotência em operações com efeitos colaterais.
+
+
+2. Saga (orquestrada ou coreografada), incluindo compensações, retries e confiabilidade de publicação de eventos.
+
+
+3. Circuit Breaker em chamadas externas/entre serviços.
+
+
+
+Entradas:
+
+Repositório/pasta do projeto: <preencher>
+
+Stack e componentes já usados (linguagem, framework web, mensageria, banco, cache, libs de resiliência): <preencher>
+
+Lista de serviços/módulos e integrações externas que já existem: <preencher>
+
+
+
+---
+
+Regras gerais
+
+Não criar features novas nem mudar contratos públicos.
+
+Não assumir domínio (sem cenários de pagamento, pedidos etc.).
+
+Aplicar refactors cirúrgicos, documentar tudo em AUDIT.md.
+
+Manter testes existentes e acrescentar apenas os necessários à verificação destes três pontos.
+
+
+
+---
+
+Tarefas
+
+(A) Idempotência
+
+1. Descoberta
+
+Mapear todas as rotas/comandos/eventos que causam efeitos colaterais (gravação em banco, publicação em fila, chamadas remotas que alteram estado).
+
+Verificar se já existe chave idempotente (header, campo, token) ou dedup em nível de armazenamento.
+
+
+
+2. Critérios de conformidade
+
+Requisições repetidas com a mesma chave/mesmo conteúdo retornam a mesma resposta e não repetem o efeito.
+
+Se a mesma chave chegar com payload diferente, retornar 409 (ou política equivalente já usada no projeto) e registrar.
+
+Persistência da chave (cache/DB) com: status, hash do payload, resposta cacheada, TTL e auditoria mínima.
+
+Proteções no armazenamento (índices únicos/locks) para evitar duplicação sob concorrência.
+
+
+
+3. Ajustes mínimos
+
+Implementar middleware/componente reutilizável de idempotência e aplicá-lo apenas nos pontos críticos mapeados.
+
+Garantir atomicidade entre gravação do efeito e marcação da chave como concluída.
+
+
+
+
+(B) Saga (orquestrada ou coreografada)
+
+1. Descoberta
+
+Identificar se a coordenação é orquestrada (coordenador explícito) ou coreografada (eventos entre serviços).
+
+Desenhar o fluxo real (estados, eventos, comandos, compensações) com nomes do próprio projeto.
+
+
+
+2. Critérios de conformidade
+
+Para cada etapa que altera estado, existe compensação definida e idempotente.
+
+Retries com backoff e limite; mensagens que esgotam tentativas vão para DLQ (ou mecanismo equivalente já usado).
+
+Publicação confiável de eventos (ex.: Transactional Outbox ou alternativa já presente) para evitar “perda” pós-commit.
+
+Correlation/trace ID propagado entre etapas e logs.
+
+
+
+3. Ajustes mínimos
+
+Adicionar compensações faltantes e idempotência nos handlers.
+
+Introduzir/ajustar outbox ou garantir a semântica equivalente já existente.
+
+Documentar estados, transições e políticas de retry/compensação.
+
+
+
+
+(C) Circuit Breaker
+
+1. Descoberta
+
+Listar todas as chamadas remotas (HTTP/gRPC/DB externo/serviços internos).
+
+Checar timeouts atuais, políticas de retry e existência de breaker.
+
+
+
+2. Critérios de conformidade
+
+Cada cliente remoto crítico possui timeout, Circuit Breaker com estados (closed/open/half-open), resetTimeout e limites de erro.
+
+Fallback controlado (ex.: 503, fila de reprocesso ou degradação funcional definida pelo projeto).
+
+Métricas e logs do breaker expostos/registrados.
+
+
+
+3. Ajustes mínimos
+
+Envolver clientes remotos com breaker (usando a lib já adotada no projeto ou uma leve, sem mudar design público).
+
+Expor config por ambiente (variáveis) para thresholds, timeouts e reset.
+
+
+
+
+
+---
+
+Testes (adicionar/ajustar)
+
+Idempotência
+
+Repetição da mesma operação com a mesma chave retorna mesma resposta e sem duplicar estado.
+
+Mesma chave + payload diferente → 409 (ou política equivalente) e nenhum efeito extra.
+
+
+Saga
+
+Forçar falha em uma etapa intermediária → compensação executada, estado final consistente.
+
+Fluxo “feliz” percorre todas as etapas; mensagens acima do limite vão para DLQ.
+
+
+Circuit Breaker
+
+Induzir lento/erro em um alvo → breaker abre, retorna fallback; após resetTimeout, half-open e fecha se normalizar.
+
+Verificar métricas/logs evidenciando transições.
+
+
+
+
+---
+
+Entregáveis
+
+AUDIT.md com:
+
+Mapa dos pontos verificados (onde há efeito colateral, onde há saga, onde há chamadas remotas).
+
+O que já estava conforme vs. o que foi ajustado.
+
+Decisões de design e trade-offs.
+
+
+Commits pequenos e descritivos; sem quebrar contratos públicos.
+
+Arquivos de configuração de timeouts/breakers/retries por ambiente (atualizar .env.example se existir).
+
+Testes automatizados adicionados/atualizados passando no CI.
+
+
+
+---
+
+Critérios de aceite
+
+Operações críticas não duplicam efeitos sob repetição/concorrência.
+
+Fluxos multi-etapas possuem compensações confiáveis e observáveis.
+
+Chamadas remotas degradam de forma controlada via Circuit Breaker, com telemetria adequada.
+
+
+> Importante: não inventar cenários. Usar terminologia e componentes reais do projeto, mantendo compatibilidade e mudanças mínimas.
+
+
+
