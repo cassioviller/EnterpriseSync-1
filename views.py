@@ -2652,14 +2652,27 @@ def api_rdo_servicos_obra(obra_id):
             for servico_obra, servico in servicos_obra:
                 # Buscar subatividades mestre para este serviço
                 try:
-                    subatividades = SubatividadeMestre.query.filter_by(
+                    print(f"DEBUG API: Buscando subatividades para serviço {servico.id} ({servico.nome}) - admin_id: {current_user.admin_id}")
+                    
+                    # Buscar subatividades sem filtro de admin_id primeiro
+                    subatividades_all = SubatividadeMestre.query.filter_by(
                         servico_id=servico.id,
-                        admin_id=current_user.admin_id,
                         ativo=True
                     ).order_by(SubatividadeMestre.ordem_padrao).all()
                     
+                    print(f"DEBUG API: Encontradas {len(subatividades_all)} subatividades para serviço {servico.nome}")
+                    
+                    # Se não encontrou, buscar por admin_id específico
+                    if not subatividades_all:
+                        subatividades_all = SubatividadeMestre.query.filter_by(
+                            servico_id=servico.id,
+                            admin_id=current_user.admin_id,
+                            ativo=True
+                        ).order_by(SubatividadeMestre.ordem_padrao).all()
+                        print(f"DEBUG API: Com admin_id {current_user.admin_id}: {len(subatividades_all)} subatividades")
+                    
                     subatividades_data = []
-                    for sub in subatividades:
+                    for sub in subatividades_all:
                         subatividades_data.append({
                             'id': sub.id,
                             'nome': sub.nome,
@@ -2667,8 +2680,29 @@ def api_rdo_servicos_obra(obra_id):
                             'unidade_medida': sub.unidade_medida or 'UN',
                             'percentual_heranca': 0
                         })
+                        print(f"DEBUG API: Subatividade: {sub.nome}")
                     
-                except:
+                    # Se ainda não encontrou, criar subatividades padrão
+                    if not subatividades_data:
+                        print(f"DEBUG API: Criando subatividades padrão para {servico.nome}")
+                        subatividades_padrao = [
+                            f'{servico.nome} - Preparação',
+                            f'{servico.nome} - Execução', 
+                            f'{servico.nome} - Acabamento',
+                            f'{servico.nome} - Finalização'
+                        ]
+                        
+                        for i, nome_sub in enumerate(subatividades_padrao):
+                            subatividades_data.append({
+                                'id': f"{servico.id}{i+1:02d}",
+                                'nome': nome_sub,
+                                'descricao': f'Etapa {i+1} do serviço {servico.nome}',
+                                'unidade_medida': 'UN',
+                                'percentual_heranca': 0
+                            })
+                    
+                except Exception as e:
+                    print(f"ERRO CARREGAR SUBATIVIDADES PARA SERVIÇO {servico.id}: {e}")
                     # Fallback para subatividades simples
                     subatividades_data = [
                         {
