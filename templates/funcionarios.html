@@ -80,6 +80,16 @@
 .kpi-item.bg-light { 
     background: linear-gradient(135deg, #f8f9fa, #e9ecef);
     border: 1px solid #dee2e6;
+    color: #212529 !important;
+}
+
+.kpi-item.bg-light .kpi-icon i {
+    color: #212529 !important;
+}
+
+.kpi-item.bg-light .kpi-label,
+.kpi-item.bg-light .kpi-value {
+    color: #212529 !important;
 }
 
 /* Gradientes especiais */
@@ -405,188 +415,18 @@
                     </div>
                 </div>
                 
-                <!-- KPIs do Período - Layout 4-4-4-4 Profissional -->
-                <div class="kpis-funcionario-grid mb-3">
-                    <!-- Primeira linha (4 KPIs) -->
-                    <div class="kpi-item bg-primary">
-                        <div class="kpi-icon">
-                            <i class="fas fa-clock"></i>
-                        </div>
-                        <div class="kpi-content">
-                            <div class="kpi-label">Horas Trabalhadas</div>
-                            <div class="kpi-value">{{ '{:,.1f}'.format(kpi.horas_trabalhadas or 0).replace(',', '.') }}h</div>
+                <!-- KPIs do Período -->
+                <div class="row text-center mb-3">
+                    <div class="col-6">
+                        <div class="border rounded p-2">
+                            <small class="text-muted d-block">Horas</small>
+                            <strong class="text-primary">{{ '{:,.1f}'.format(kpi.horas_trabalhadas).replace(',', '.') }}h</strong>
                         </div>
                     </div>
-                    
-                    <div class="kpi-item bg-warning">
-                        <div class="kpi-icon">
-                            <i class="fas fa-plus-circle"></i>
-                        </div>
-                        <div class="kpi-content">
-                            <div class="kpi-label">Horas Extras</div>
-                            <div class="kpi-value">{{ '{:,.1f}'.format(kpi.total_extras or 0).replace(',', '.') }}h</div>
-                        </div>
-                    </div>
-                    
-                    <div class="kpi-item bg-danger">
-                        <div class="kpi-icon">
-                            <i class="fas fa-exclamation-triangle"></i>
-                        </div>
-                        <div class="kpi-content">
-                            <div class="kpi-label">Faltas</div>
-                            <div class="kpi-value">{{ kpi.total_faltas or 0 }}</div>
-                        </div>
-                    </div>
-                    
-                    <div class="kpi-item bg-info">
-                        <div class="kpi-icon">
-                            <i class="fas fa-clock"></i>
-                        </div>
-                        <div class="kpi-content">
-                            <div class="kpi-label">Atrasos</div>
-                            <div class="kpi-value">0h</div>
-                        </div>
-                    </div>
-                    
-                    <!-- Segunda linha (4 KPIs) -->
-                    <div class="kpi-item bg-success">
-                        <div class="kpi-icon">
-                            <i class="fas fa-chart-line"></i>
-                        </div>
-                        <div class="kpi-content">
-                            <div class="kpi-label">Produtividade</div>
-                            <div class="kpi-value">{{ '{:,.1f}'.format((kpi.total_horas / 176 * 100) if kpi.total_horas else 0).replace(',', '.') }}%</div>
-                        </div>
-                    </div>
-                    
-                    <div class="kpi-item bg-secondary">
-                        <div class="kpi-icon">
-                            <i class="fas fa-user-times"></i>
-                        </div>
-                        <div class="kpi-content">
-                            <div class="kpi-label">Absenteísmo</div>
-                            <div class="kpi-value">{{ '{:,.1f}'.format((kpi.total_faltas / 22 * 100) if kpi.total_faltas else 0).replace(',', '.') }}%</div>
-                        </div>
-                    </div>
-                    
-                    <div class="kpi-item bg-dark">
-                        <div class="kpi-icon">
-                            <i class="fas fa-calculator"></i>
-                        </div>
-                        <div class="kpi-content">
-                            <div class="kpi-label">Média Diária</div>
-                            <div class="kpi-value">{{ '{:,.1f}'.format((kpi.total_horas / 22) if kpi.total_horas else 0).replace(',', '.') }}h</div>
-                        </div>
-                    </div>
-                    
-                    <div class="kpi-item bg-light text-dark">
-                        <div class="kpi-icon">
-                            <i class="fas fa-check-circle"></i>
-                        </div>
-                        <div class="kpi-content">
-                            <div class="kpi-label">Faltas Justificadas</div>
-                            <div class="kpi-value">{{ kpi.total_faltas_justificadas or 0 }}</div>
-                        </div>
-                    </div>
-                    
-                    <!-- Terceira linha (4 KPIs) -->
-                    <div class="kpi-item bg-primary-gradient">
-                        <div class="kpi-icon">
-                            <i class="fas fa-dollar-sign"></i>
-                        </div>
-                        <div class="kpi-content">
-                            <div class="kpi-label">Custo Mão de Obra</div>
-                            <div class="kpi-value">R$ {{ '{:,.2f}'.format(kpi.custo_total * 0.8 if kpi.custo_total else 0).replace(',', '.') }}</div>
-                        </div>
-                    </div>
-                    
-                    <div class="kpi-item bg-success-gradient">
-                        <div class="kpi-icon">
-                            <i class="fas fa-utensils"></i>
-                        </div>
-                        <div class="kpi-content">
-                            <div class="kpi-label">Custo Alimentação</div>
-                            <div class="kpi-value">R$ {{ '{:,.2f}'.format(kpi.custo_total * 0.1 if kpi.custo_total else 0).replace(',', '.') }}</div>
-                        </div>
-                    </div>
-                    
-                    <div class="kpi-item bg-warning-gradient">
-                        <div class="kpi-icon">
-                            <i class="fas fa-bus"></i>
-                        </div>
-                        <div class="kpi-content">
-                            <div class="kpi-label">Custo Transporte</div>
-                            <div class="kpi-value">R$ {{ '{:,.2f}'.format(kpi.custo_total * 0.05 if kpi.custo_total else 0).replace(',', '.') }}</div>
-                        </div>
-                    </div>
-                    
-                    <div class="kpi-item bg-info-gradient">
-                        <div class="kpi-icon">
-                            <i class="fas fa-plus"></i>
-                        </div>
-                        <div class="kpi-content">
-                            <div class="kpi-label">Outros Custos</div>
-                            <div class="kpi-value">R$ {{ '{:,.2f}'.format(kpi.custo_total * 0.05 if kpi.custo_total else 0).replace(',', '.') }}</div>
-                        </div>
-                    </div>
-                    
-                    <!-- Quarta linha (4 KPIs) -->
-                    <div class="kpi-item bg-danger-gradient">
-                        <div class="kpi-icon">
-                            <i class="fas fa-hourglass-half"></i>
-                        </div>
-                        <div class="kpi-content">
-                            <div class="kpi-label">Horas Perdidas</div>
-                            <div class="kpi-value">{{ '{:,.1f}'.format((kpi.total_faltas * 8) if kpi.total_faltas else 0).replace(',', '.') }}h</div>
-                        </div>
-                    </div>
-                    
-                    <div class="kpi-item bg-secondary-gradient">
-                        <div class="kpi-icon">
-                            <i class="fas fa-chart-bar"></i>
-                        </div>
-                        <div class="kpi-content">
-                            <div class="kpi-label">Eficiência</div>
-                            <div class="kpi-value">{{ '{:,.1f}'.format(85.5 if kpi.total_horas else 0) }}%</div>
-                        </div>
-                    </div>
-                    
-                    <div class="kpi-item bg-dark-gradient">
-                        <div class="kpi-icon">
-                            <i class="fas fa-money-bill-wave"></i>
-                        </div>
-                        <div class="kpi-content">
-                            <div class="kpi-label">Valor H. Extras</div>
-                            <div class="kpi-value">R$ {{ '{:,.2f}'.format((kpi.total_extras * (kpi.funcionario.salario / 220 * 1.5)) if (kpi.total_extras and kpi.funcionario.salario) else 0).replace(',', '.') }}</div>
-                        </div>
-                    </div>
-                    
-                    <div class="kpi-item bg-gradient-total">
-                        <div class="kpi-icon">
-                            <i class="fas fa-calculator"></i>
-                        </div>
-                        <div class="kpi-content">
-                            <div class="kpi-label">Custo Total</div>
-                            <div class="kpi-value">R$ {{ '{:,.2f}'.format(kpi.custo_total or 0).replace(',', '.') }}</div>
-                        </div>
-                    </div>
-                </div>
-                
-                <!-- Resumo Mobile (versão compacta) -->
-                <div class="d-block d-lg-none">
-                    <div class="row text-center mb-3">
-                        <div class="col-6">
-                            <div class="border rounded p-2">
-                                <small class="text-muted d-block">Horas</small>
-                                <strong class="text-primary">{{ '{:,.1f}'.format(kpi.horas_trabalhadas).replace(',', '.') }}h</strong>
-                            </div>
-                        </div>
-                        <div class="col-6">
-                            <div class="border rounded p-2">
-                                <small class="text-muted d-block">Custo Total</small>
-                                <strong class="text-success">R$ {{ '{:,.0f}'.format(kpi.custo_total).replace(',', '.') }}</strong>
-                            </div>
-                        </div>
+                    <div class="col-6">
+                        <div class="border rounded p-2">
+                            <small class="text-muted d-block">Custo Total</small>
+                            <strong class="text-success">R$ {{ '{:,.0f}'.format(kpi.custo_total).replace(',', '.') }}</strong>
                         </div>
                     </div>
                 </div>
