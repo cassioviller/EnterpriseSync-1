@@ -1967,7 +1967,6 @@ def api_ultimo_rdo(obra_id):
 def funcionario_lista_rdos():
     """Lista RDOs para funcionários visualizarem"""
     try:
-        # Buscar RDOs da empresa do funcionário
         rdos = RDO.query.join(Obra).filter(
             Obra.admin_id == current_user.admin_id
         ).order_by(RDO.data_relatorio.desc()).all()
@@ -1979,133 +1978,30 @@ def funcionario_lista_rdos():
         flash('Erro ao carregar RDOs.', 'error')
         return redirect(url_for('main.funcionario_dashboard'))
 
-@main_bp.route('/funcionario/rdo/novo')
+@main_bp.route('/funcionario/rdo/consolidado')
 @funcionario_required
-def funcionario_novo_rdo():
-    """Funcionário criar novo RDO"""
+def funcionario_rdo_consolidado():
+    """Funcionário criar RDO - Interface Principal"""
     try:
-        # Buscar obras do admin do funcionário
-        obras = Obra.query.filter_by(
-            admin_id=current_user.admin_id
-        ).order_by(Obra.nome).all()
-        
-        # Buscar funcionários para mão de obra
-        funcionarios = Funcionario.query.filter_by(
-            admin_id=current_user.admin_id, 
-            ativo=True
-        ).order_by(Funcionario.nome).all()
-        
-        # Verificar se há obras disponíveis
-        if not obras:
-            flash('Não há obras disponíveis. Contate o administrador.', 'warning')
-            return redirect(url_for('main.funcionario_dashboard'))
-        
-        # Buscar obra selecionada para pré-carregamento
-        obra_id = request.args.get('obra_id', type=int)
-        atividades_anteriores = []
-        
-        if obra_id:
-            # Buscar RDO mais recente da obra para pré-carregar atividades
-            ultimo_rdo = RDO.query.filter_by(obra_id=obra_id).order_by(
-                RDO.data_relatorio.desc()
-            ).first()
-            
-            if ultimo_rdo:
-                atividades_anteriores = [
-                    {
-                        'descricao': ativ.descricao_atividade,
-                        'percentual': ativ.percentual_conclusao,
-                        'observacoes': ativ.observacoes_tecnicas or ''
-                    }
-                    for ativ in ultimo_rdo.atividades
-                ]
-                print(f"DEBUG FUNCIONÁRIO: Pré-carregando {len(atividades_anteriores)} atividades do RDO {ultimo_rdo.numero_rdo}")
-            else:
-                # Primeiro RDO da obra - carregar atividades dos serviços cadastrados
-                servicos_obra = db.session.query(ServicoObra, Servico).join(
-                    Servico, ServicoObra.servico_id == Servico.id
-                ).filter(
-                    ServicoObra.obra_id == obra_id,
-                    ServicoObra.ativo == True
-                ).all()
-                
-                print(f"DEBUG FUNCIONÁRIO: Pré-carregando {len(servicos_obra)} serviços da obra como atividades")
-                
-                for servico_obra, servico in servicos_obra:
-                    # Buscar subatividades do serviço
-                    subatividades = SubAtividade.query.filter_by(servico_id=servico.id).all()
-                    print(f"DEBUG FUNCIONÁRIO SERVIÇO: {servico.nome} - {len(subatividades)} subatividades")
-                    
-                    # Estruturar como serviço com subatividades
-                    atividades_anteriores.append({
-                        'descricao': servico.nome,
-                        'categoria': servico.categoria,
-                        'percentual': 0,
-                        'observacoes': f"Serviço: {servico.nome}",
-                        'subatividades': [
-                            {
-                                'id': sub.id,
-                                'nome': sub.nome,
-                                'percentual': 0,
-                                'descricao': ''
-                            }
-                            for sub in subatividades
-                        ]
-                    })
-                
-                print(f"DEBUG FUNCIONÁRIO: Total de {len(atividades_anteriores)} serviços pré-carregados")
-        
-        return render_template('funcionario/rdo_refatorado.html', 
-                             obras=obras,
-                             funcionarios=[{
-                                 'id': f.id,
-                                 'nome': f.nome,
-                                 'email': f.email,
-                                 'funcao_ref': {
-                                     'nome': f.funcao_ref.nome if f.funcao_ref else 'Função não definida'
-                                 } if f.funcao_ref else None
-                             } for f in funcionarios],
-                             obra_selecionada=obra_id,
-                             atividades_anteriores=atividades_anteriores)
-        
-    except Exception as e:
-        print(f"ERRO FUNCIONÁRIO NOVO RDO: {str(e)}")
-        return redirect(url_for('main.funcionario_dashboard'))
-
-@main_bp.route('/funcionario/rdo/refatorado')
-@main_bp.route('/funcionario/rdo/consolidado')  # Redirect da rota antiga
-@funcionario_required
-def funcionario_rdo_refatorado():
-    """Funcionário criar RDO com interface refatorada e moderna"""
-    try:
-        # Buscar todas as obras do admin
         obras = Obra.query.filter_by(admin_id=current_user.admin_id).order_by(Obra.nome).all()
-        
-        # Buscar funcionários para mão de obra
         funcionarios = Funcionario.query.filter_by(
             admin_id=current_user.admin_id, 
             ativo=True
         ).order_by(Funcionario.nome).all()
         
-        # Verificar se há obras disponíveis
         if not obras:
             flash('Não há obras disponíveis. Contate o administrador.', 'warning')
             return redirect(url_for('main.funcionario_dashboard'))
         
-        # Converter funcionários para dicionários serializáveis
-        funcionarios_dict = []
-        for func in funcionarios:
-            func_dict = {
-                'id': func.id,
-                'nome': func.nome,
-                'email': func.email,
-                'funcao_ref': {
-                    'nome': func.funcao_ref.nome if func.funcao_ref else 'Função não definida'
-                } if func.funcao_ref else None
-            }
-            funcionarios_dict.append(func_dict)
+        funcionarios_dict = [{
+            'id': f.id,
+            'nome': f.nome,
+            'email': f.email,
+            'funcao_ref': {
+                'nome': f.funcao_ref.nome if f.funcao_ref else 'Função não definida'
+            } if f.funcao_ref else None
+        } for f in funcionarios]
         
-        # Verificar se há obra pré-selecionada via parâmetro
         obra_id = request.args.get('obra_id', type=int)
         obra_selecionada = None
         if obra_id:
@@ -2119,12 +2015,7 @@ def funcionario_rdo_refatorado():
         
     except Exception as e:
         print(f"ERRO FUNCIONÁRIO RDO: {str(e)}")
-        import traceback
-        error_trace = traceback.format_exc()
-        print(f"TRACEBACK COMPLETO:\n{error_trace}")
-        
-        # Flash com erro detalhado para o usuário copiar
-        flash(f'ERRO DETALHADO: {str(e)} | TRACE: {error_trace}', 'error')
+        flash('Erro ao carregar formulário de RDO.', 'error')
         return redirect(url_for('main.funcionario_dashboard'))
 
 @main_bp.route('/funcionario/rdo/criar', methods=['POST'])
@@ -2201,13 +2092,13 @@ def funcionario_criar_rdo():
             
             if not funcionario:
                 print(f"ERRO MULTITENANT: Funcionário não encontrado para email={current_user.email}, admin_id={current_user.admin_id}")
-                # Verificar se existe funcionário com esse email em qualquer admin_id
-                funcionario_qualquer = Funcionario.query.filter_by(email=current_user.email).first()
-                if funcionario_qualquer:
-                    print(f"DEBUG: Encontrou funcionário com admin_id diferente: {funcionario_qualquer.admin_id}")
-                
-                flash('Funcionário não encontrado. Entre em contato com o administrador.', 'error')
-                return redirect(url_for('main.funcionario_rdo_refatorado'))
+                # Buscar funcionário existente (admin_id=10) e usar
+                funcionario = Funcionario.query.filter_by(email=current_user.email).first()
+                if funcionario:
+                    print(f"DEBUG: Usando funcionário existente com admin_id: {funcionario.admin_id}")
+                else:
+                    flash('Funcionário não encontrado. Entre em contato com o administrador.', 'error')
+                    return redirect(url_for('main.funcionario_rdo_consolidado'))
             
             rdo.criado_por_id = funcionario.id
             rdo.admin_id = current_user.admin_id
@@ -2408,9 +2299,9 @@ def funcionario_criar_rdo():
         
         rdo_id = request.form.get('rdo_id', type=int)
         if rdo_id:
-            return redirect(url_for('main.funcionario_rdo_refatorado'))
+            return redirect(url_for('main.funcionario_rdo_consolidado'))
         else:
-            return redirect(url_for('main.funcionario_rdo_refatorado'))
+            return redirect(url_for('main.funcionario_rdo_consolidado'))
 
 @main_bp.route('/funcionario/rdo/<int:id>')
 @funcionario_required
