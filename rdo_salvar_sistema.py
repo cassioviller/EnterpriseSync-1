@@ -98,7 +98,7 @@ def processar_salvamento_rdo():
         rdo = RDO()
         rdo.numero_rdo = gerar_numero_rdo_unico()
         rdo.admin_id = admin_id
-        rdo.criado_por_id = usuario_id
+        rdo.criado_por_id = usuario_id  # Agora pode usar ID do usuário
         
         print(f"✅ RDO básico criado - Número: {rdo.numero_rdo}")
         
@@ -302,7 +302,7 @@ def salvar_rdo_rapido():
         rdo = RDO()
         rdo.numero_rdo = gerar_numero_rdo_unico()
         rdo.admin_id = admin_id
-        rdo.criado_por_id = obter_usuario_atual()
+        rdo.criado_por_id = obter_usuario_atual()  # Usar ID do usuário
         rdo.data_relatorio = date.today()
         rdo.obra_id = dados.get('obra_id')
         rdo.status = 'Rascunho'
