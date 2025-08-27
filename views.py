@@ -10,6 +10,18 @@ import json
 
 main_bp = Blueprint('main', __name__)
 
+def safe_db_operation(operation, default_value=None):
+    """Executa operação no banco com tratamento seguro de transação"""
+    try:
+        return operation()
+    except Exception as e:
+        print(f"ERRO DB OPERATION: {str(e)}")
+        try:
+            db.session.rollback()
+        except:
+            pass
+        return default_value
+
 # Health check endpoint para EasyPanel
 @main_bp.route('/health')
 def health_check():
@@ -424,10 +436,13 @@ def dashboard():
     obras_ativas_count = len(obras_ativas)
     veiculos_disponiveis = 3
     
-    # Adicionar contagem correta de obras ativas
-    obras_ativas_count = Obra.query.filter_by(admin_id=admin_id).filter(
-        Obra.status.in_(['andamento', 'Em andamento', 'ativa', 'planejamento'])
-    ).count()
+    # Adicionar contagem correta de obras ativas com tratamento de erro
+    obras_ativas_count = safe_db_operation(
+        lambda: Obra.query.filter_by(admin_id=admin_id).filter(
+            Obra.status.in_(['andamento', 'Em andamento', 'ativa', 'planejamento'])
+        ).count(),
+        default_value=0
+    )
     
     # Converter dicionários para listas para os gráficos
     funcionarios_dept = [{'nome': k, 'total': v} for k, v in funcionarios_por_departamento.items()]
@@ -437,10 +452,13 @@ def dashboard():
     print(f"DEBUG FINAL - Funcionários por dept: {funcionarios_dept}")
     print(f"DEBUG FINAL - Custos por obra: {custos_recentes}")
     
-    # Buscar obras em andamento para a tabela
-    obras_andamento = Obra.query.filter_by(admin_id=admin_id).filter(
-        Obra.status.in_(['andamento', 'Em andamento', 'ativa', 'planejamento'])
-    ).order_by(Obra.data_inicio.desc()).limit(5).all()
+    # Buscar obras em andamento para a tabela com tratamento de erro
+    obras_andamento = safe_db_operation(
+        lambda: Obra.query.filter_by(admin_id=admin_id).filter(
+            Obra.status.in_(['andamento', 'Em andamento', 'ativa', 'planejamento'])
+        ).order_by(Obra.data_inicio.desc()).limit(5).all(),
+        default_value=[]
+    )
     
     return render_template('dashboard.html',
                          total_funcionarios=total_funcionarios,
