@@ -70,7 +70,7 @@ def extrair_dados_edicao(rdo):
     return dados
 
 def obter_historico_ultimo_rdo(obra_id, data_atual, admin_id):
-    """Obtém dados do último RDO para herança de percentuais"""
+    """Obtém dados do último RDO para herança de percentuais e mão de obra"""
     ultimo_rdo = db.session.query(RDO).filter(
         and_(
             RDO.obra_id == obra_id,
@@ -80,7 +80,7 @@ def obter_historico_ultimo_rdo(obra_id, data_atual, admin_id):
     ).order_by(desc(RDO.data_relatorio)).first()
     
     if not ultimo_rdo:
-        return {'atividades': [], 'origem': 'Nenhum RDO anterior'}
+        return {'atividades': [], 'equipe': [], 'origem': 'Nenhum RDO anterior'}
     
     # Carregar subatividades do último RDO
     subatividades = db.session.query(RDOServicoSubatividade).filter(
@@ -94,8 +94,23 @@ def obter_historico_ultimo_rdo(obra_id, data_atual, admin_id):
             'percentual': float(sub.percentual_conclusao or 0)
         })
     
+    # Carregar mão de obra do último RDO
+    mao_obra = db.session.query(RDOMaoObra).join(Funcionario).filter(
+        RDOMaoObra.rdo_id == ultimo_rdo.id
+    ).all()
+    
+    equipe = []
+    for mo in mao_obra:
+        equipe.append({
+            'funcionario_id': mo.funcionario_id,
+            'funcionario_nome': mo.funcionario.nome,
+            'funcao_exercida': mo.funcao_exercida,
+            'horas_trabalhadas': float(mo.horas_trabalhadas or 8)
+        })
+    
     return {
         'atividades': atividades,
+        'equipe': equipe,
         'origem': f'RDO {ultimo_rdo.numero_rdo} ({ultimo_rdo.data_relatorio.strftime("%d/%m/%Y")})'
     }
 
