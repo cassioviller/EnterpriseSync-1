@@ -2113,8 +2113,11 @@ def funcionario_rdo_refatorado():
     except Exception as e:
         print(f"ERRO FUNCIONÁRIO RDO: {str(e)}")
         import traceback
-        traceback.print_exc()
-        flash('Erro ao carregar formulário de RDO.', 'error')
+        error_trace = traceback.format_exc()
+        print(f"TRACEBACK COMPLETO:\n{error_trace}")
+        
+        # Flash com erro detalhado para o usuário copiar
+        flash(f'ERRO DETALHADO: {str(e)} | TRACE: {error_trace}', 'error')
         return redirect(url_for('main.funcionario_dashboard'))
 
 @main_bp.route('/funcionario/rdo/criar', methods=['POST'])
@@ -2184,18 +2187,22 @@ def funcionario_criar_rdo():
             
             if not funcionario and current_user.email:
                 # Criar funcionário se não existir (para sistema de bypass)
+                print(f"DEBUG: Criando funcionário para {current_user.email} admin_id={current_user.admin_id}")
                 funcionario = Funcionario()
-                funcionario.nome = getattr(current_user, 'nome', current_user.email.split('@')[0])
+                funcionario.nome = getattr(current_user, 'nome', current_user.email.split('@')[0].title())
                 funcionario.email = current_user.email
+                funcionario.cpf = f"000.000.000-{current_user.id:02d}"  # CPF temporário único
                 funcionario.admin_id = current_user.admin_id
                 funcionario.ativo = True
                 funcionario.data_admissao = date.today()
                 db.session.add(funcionario)
                 db.session.flush()
-                print(f"DEBUG: Funcionário criado automaticamente: {funcionario.nome}")
+                print(f"DEBUG: Funcionário criado automaticamente: {funcionario.nome} (ID: {funcionario.id})")
             
             rdo.criado_por_id = funcionario.id if funcionario else current_user.id
             rdo.admin_id = current_user.admin_id
+            
+            print(f"DEBUG: RDO configurado - criado_por_id={rdo.criado_por_id}, admin_id={rdo.admin_id}")
             
             print(f"DEBUG CRIAÇÃO: Criando novo RDO {numero_rdo}")
         
@@ -2224,7 +2231,7 @@ def funcionario_criar_rdo():
         db.session.add(rdo)
         db.session.flush()  # Para obter o ID
         
-        print(f"DEBUG FUNCIONÁRIO: RDO {numero_rdo} criado por funcionário ID {current_user.id}")
+        print(f"DEBUG FUNCIONÁRIO: RDO {rdo.numero_rdo} criado por funcionário ID {current_user.id}")
         
         # Processar atividades (sistema novo de subatividades)
         print("DEBUG: Processando subatividades do formulário...")
@@ -2380,16 +2387,20 @@ def funcionario_criar_rdo():
         db.session.rollback()
         print(f"ERRO FUNCIONÁRIO CRIAR/EDITAR RDO: {str(e)}")
         print(f"DEBUG FORM DATA: {dict(request.form)}")
+        print(f"DEBUG USER DATA: email={current_user.email}, admin_id={current_user.admin_id}")
+        
         import traceback
-        traceback.print_exc()
+        error_trace = traceback.format_exc()
+        print(f"TRACEBACK COMPLETO:\n{error_trace}")
+        
+        # Flash com erro detalhado para debugging
+        flash(f'ERRO DETALHADO: {str(e)} | USER: {current_user.email} | ADMIN_ID: {current_user.admin_id} | TRACE: {error_trace[:500]}...', 'error')
         
         rdo_id = request.form.get('rdo_id', type=int)
         if rdo_id:
-            flash('Erro ao atualizar RDO. Tente novamente.', 'error')
-            return redirect(url_for('main.funcionario_editar_rdo', id=rdo_id))
+            return redirect(url_for('main.funcionario_rdo_refatorado'))
         else:
-            flash('Erro ao criar RDO. Tente novamente.', 'error')
-            return redirect(url_for('main.funcionario_novo_rdo'))
+            return redirect(url_for('main.funcionario_rdo_refatorado'))
 
 @main_bp.route('/funcionario/rdo/<int:id>')
 @funcionario_required
