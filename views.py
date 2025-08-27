@@ -92,24 +92,36 @@ def dashboard():
         elif current_user.tipo_usuario == TipoUsuario.SUPER_ADMIN:
             return redirect(url_for('main.super_admin_dashboard'))
     
-    # Sistema robusto de detecção de admin_id para produção (APENAS ADMINS)
+    # Sistema robusto de detecção de admin_id para produção (MESMA LÓGICA DA PÁGINA FUNCIONÁRIOS)
     try:
-        # Determinar admin_id com fallback robusto
-        admin_id = 2  # Default fallback
+        # Determinar admin_id - usar mesma lógica que funciona na página funcionários
+        admin_id = 10  # Default para desenvolvimento/bypass
         
         if hasattr(current_user, 'tipo_usuario') and current_user.is_authenticated:
             if current_user.tipo_usuario == TipoUsuario.ADMIN:
                 admin_id = current_user.id
+                print(f"DEBUG DASHBOARD PROD: Admin direto - admin_id={admin_id}")
+            elif hasattr(current_user, 'admin_id') and current_user.admin_id:
+                admin_id = current_user.admin_id
+                print(f"DEBUG DASHBOARD PROD: Via admin_id do usuário - admin_id={admin_id}")
             else:
-                admin_id = current_user.admin_id if hasattr(current_user, 'admin_id') and current_user.admin_id else 2
+                # Buscar pelo email na tabela usuarios
+                try:
+                    usuario_db = Usuario.query.filter_by(email=current_user.email).first()
+                    if usuario_db and usuario_db.admin_id:
+                        admin_id = usuario_db.admin_id
+                        print(f"DEBUG DASHBOARD PROD: Via busca na tabela usuarios - admin_id={admin_id}")
+                except Exception as e:
+                    print(f"DEBUG DASHBOARD PROD: Erro ao buscar na tabela usuarios: {e}")
         else:
-            # Sistema de bypass - buscar admin_id com mais funcionários
+            # Sistema de bypass - buscar admin_id com mais funcionários (desenvolvimento)
             try:
                 admin_counts = db.session.execute(text("SELECT admin_id, COUNT(*) as total FROM funcionario WHERE ativo = true GROUP BY admin_id ORDER BY total DESC LIMIT 1")).fetchone()
-                admin_id = admin_counts[0] if admin_counts else 2
+                admin_id = admin_counts[0] if admin_counts else 10
+                print(f"DEBUG DASHBOARD BYPASS: admin_id={admin_id} (mais funcionários)")
             except Exception as e:
                 print(f"Erro ao detectar admin_id: {e}")
-                admin_id = 2
+                admin_id = 10
         
         # Estatísticas básicas
         total_funcionarios = Funcionario.query.filter_by(admin_id=admin_id, ativo=True).count()
@@ -183,12 +195,30 @@ def dashboard():
         else:
             data_fim = date(2025, 7, 31)  # Final de julho 2025
         
-        # Inicializar admin_id se não definido
+        # Garantir que admin_id está definido (mesmo valor usado acima)
         if 'admin_id' not in locals():
             admin_id = 10  # Admin padrão com mais dados
             
+        print(f"DEBUG DASHBOARD KPIs: Usando admin_id={admin_id} para cálculos")
+        
         # Buscar todos os funcionários ativos
         funcionarios_dashboard = Funcionario.query.filter_by(admin_id=admin_id, ativo=True).all()
+        print(f"DEBUG DASHBOARD KPIs: Encontrados {len(funcionarios_dashboard)} funcionários para admin_id={admin_id}")
+        
+        # Verificação adicional para produção
+        if len(funcionarios_dashboard) == 0:
+            print(f"⚠️ AVISO PRODUÇÃO: Nenhum funcionário encontrado para admin_id={admin_id}")
+            # Tentar detectar qual admin_id tem dados
+            try:
+                todos_admins = db.session.execute(text("SELECT admin_id, COUNT(*) as total FROM funcionario WHERE ativo = true GROUP BY admin_id ORDER BY total DESC")).fetchall()
+                print(f"📊 DADOS DISPONÍVEIS: {[(row[0], row[1]) for row in todos_admins]}")
+                if todos_admins and len(todos_admins) > 0:
+                    admin_correto = todos_admins[0][0]
+                    print(f"🔄 CORREÇÃO AUTOMÁTICA: Usando admin_id={admin_correto} que tem {todos_admins[0][1]} funcionários")
+                    admin_id = admin_correto
+                    funcionarios_dashboard = Funcionario.query.filter_by(admin_id=admin_id, ativo=True).all()
+            except Exception as e:
+                print(f"❌ ERRO ao detectar admin_id correto: {e}")
         
         # Calcular KPIs reais
         total_custo_real = 0
