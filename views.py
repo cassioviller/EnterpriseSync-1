@@ -2091,6 +2091,59 @@ def excluir_rdo(id):
         flash('Erro ao excluir RDO.', 'error')
         return redirect(url_for('main.lista_rdos'))
 
+# ===== SISTEMA DE PROPOSTAS =====
+@main_bp.route('/lista_propostas')
+@admin_required
+def lista_propostas():
+    """Lista de propostas"""
+    try:
+        # Importar dentro da função para evitar circular import
+        from models import PropostaTemplate
+        
+        admin_id = current_user.id if current_user.tipo_usuario == TipoUsuario.ADMIN else current_user.admin_id
+        
+        # Buscar propostas do admin
+        propostas = PropostaTemplate.query.filter_by(admin_id=admin_id).order_by(desc(PropostaTemplate.created_at)).all()
+        
+        return render_template('propostas.html', propostas=propostas)
+        
+    except Exception as e:
+        print(f"ERRO PROPOSTAS: {str(e)}")
+        return render_template('propostas.html', propostas=[])
+
+@main_bp.route('/gestao_veiculos')
+@admin_required
+def gestao_veiculos():
+    """Página de gestão de veículos"""
+    try:
+        # Sistema básico de veículos
+        veiculos_mock = []
+        return render_template('veiculos.html', veiculos=veiculos_mock)
+        
+    except Exception as e:
+        print(f"ERRO VEÍCULOS: {str(e)}")
+        return render_template('veiculos.html', veiculos=[])
+
+@main_bp.route('/controle_ponto')
+@admin_required
+def controle_ponto():
+    """Página de controle de ponto"""
+    try:
+        from models import RegistroPonto
+        
+        admin_id = current_user.id if current_user.tipo_usuario == TipoUsuario.ADMIN else current_user.admin_id
+        
+        # Buscar registros recentes
+        registros = RegistroPonto.query.join(Funcionario).filter(
+            Funcionario.admin_id == admin_id
+        ).order_by(desc(RegistroPonto.data_hora)).limit(50).all()
+        
+        return render_template('controle_ponto.html', registros=registros)
+        
+    except Exception as e:
+        print(f"ERRO CONTROLE PONTO: {str(e)}")
+        return render_template('controle_ponto.html', registros=[])
+
 @main_bp.route('/rdo/<int:id>/duplicar', methods=['POST'])
 @admin_required
 def duplicar_rdo(id):

@@ -1,6 +1,6 @@
 {% extends "base_light.html" %}
 
-{% block title %}Controle de Ponto - SIGE{% endblock %}
+{% block title %}Propostas - SIGE{% endblock %}
 
 {% block content %}
 <div class="container-fluid py-4">
@@ -9,12 +9,12 @@
             <!-- Header da página -->
             <div class="d-flex justify-content-between align-items-center mb-4">
                 <div>
-                    <h1 class="h2 mb-1">Controle de Ponto</h1>
-                    <p class="text-muted mb-0">Acompanhe os registros de entrada e saída</p>
+                    <h1 class="h2 mb-1">Propostas Comerciais</h1>
+                    <p class="text-muted mb-0">Gerencie suas propostas comerciais</p>
                 </div>
                 <div>
                     <button class="btn btn-success">
-                        <i class="fas fa-clock me-2"></i>Novo Registro
+                        <i class="fas fa-plus me-2"></i>Nova Proposta
                     </button>
                 </div>
             </div>
@@ -26,10 +26,25 @@
                         <div class="card-body">
                             <div class="d-flex align-items-center">
                                 <div class="flex-shrink-0">
-                                    <i class="fas fa-users text-primary fa-2x"></i>
+                                    <i class="fas fa-file-contract text-primary fa-2x"></i>
                                 </div>
                                 <div class="flex-grow-1 ms-3">
-                                    <div class="text-muted small">Funcionários Hoje</div>
+                                    <div class="text-muted small">Total de Propostas</div>
+                                    <div class="h4 mb-0">{{ propostas|length }}</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card">
+                        <div class="card-body">
+                            <div class="d-flex align-items-center">
+                                <div class="flex-shrink-0">
+                                    <i class="fas fa-clock text-warning fa-2x"></i>
+                                </div>
+                                <div class="flex-grow-1 ms-3">
+                                    <div class="text-muted small">Em Análise</div>
                                     <div class="h4 mb-0">0</div>
                                 </div>
                             </div>
@@ -44,7 +59,7 @@
                                     <i class="fas fa-check-circle text-success fa-2x"></i>
                                 </div>
                                 <div class="flex-grow-1 ms-3">
-                                    <div class="text-muted small">Presentes</div>
+                                    <div class="text-muted small">Aprovadas</div>
                                     <div class="h4 mb-0">0</div>
                                 </div>
                             </div>
@@ -56,26 +71,11 @@
                         <div class="card-body">
                             <div class="d-flex align-items-center">
                                 <div class="flex-shrink-0">
-                                    <i class="fas fa-clock text-warning fa-2x"></i>
+                                    <i class="fas fa-dollar-sign text-info fa-2x"></i>
                                 </div>
                                 <div class="flex-grow-1 ms-3">
-                                    <div class="text-muted small">Atrasos</div>
-                                    <div class="h4 mb-0">0</div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                <div class="col-md-3">
-                    <div class="card">
-                        <div class="card-body">
-                            <div class="d-flex align-items-center">
-                                <div class="flex-shrink-0">
-                                    <i class="fas fa-times-circle text-danger fa-2x"></i>
-                                </div>
-                                <div class="flex-grow-1 ms-3">
-                                    <div class="text-muted small">Faltas</div>
-                                    <div class="h4 mb-0">0</div>
+                                    <div class="text-muted small">Valor Total</div>
+                                    <div class="h4 mb-0">R$ 0,00</div>
                                 </div>
                             </div>
                         </div>
@@ -83,35 +83,44 @@
                 </div>
             </div>
             
-            <!-- Lista de registros -->
+            <!-- Lista de propostas -->
             <div class="card">
                 <div class="card-header">
-                    <h5 class="card-title mb-0">Registros Recentes</h5>
+                    <h5 class="card-title mb-0">Lista de Propostas</h5>
                 </div>
                 <div class="card-body">
-                    {% if registros %}
+                    {% if propostas %}
                     <div class="table-responsive">
                         <table class="table table-hover">
                             <thead>
                                 <tr>
-                                    <th>Funcionário</th>
-                                    <th>Data/Hora</th>
-                                    <th>Tipo</th>
-                                    <th>Local</th>
+                                    <th>ID</th>
+                                    <th>Título</th>
+                                    <th>Cliente</th>
+                                    <th>Valor</th>
                                     <th>Status</th>
+                                    <th>Data</th>
+                                    <th>Ações</th>
                                 </tr>
                             </thead>
                             <tbody>
-                                {% for registro in registros %}
+                                {% for proposta in propostas %}
                                 <tr>
-                                    <td>{{ registro.funcionario.nome if registro.funcionario else 'N/A' }}</td>
-                                    <td>{{ registro.data_hora.strftime('%d/%m/%Y %H:%M') if registro.data_hora else 'N/A' }}</td>
+                                    <td>#{{ proposta.id }}</td>
+                                    <td>{{ proposta.titulo or 'Sem título' }}</td>
+                                    <td>{{ proposta.cliente_nome or 'Cliente' }}</td>
+                                    <td>R$ {{ "%.2f"|format(proposta.valor_total or 0) }}</td>
                                     <td>
-                                        <span class="badge bg-primary">{{ registro.tipo_registro or 'Entrada' }}</span>
+                                        <span class="badge bg-primary">Ativa</span>
                                     </td>
-                                    <td>{{ registro.local_registro or 'Empresa' }}</td>
+                                    <td>{{ proposta.created_at.strftime('%d/%m/%Y') if proposta.created_at else 'N/A' }}</td>
                                     <td>
-                                        <span class="badge bg-success">Confirmado</span>
+                                        <button class="btn btn-sm btn-outline-primary">
+                                            <i class="fas fa-eye"></i>
+                                        </button>
+                                        <button class="btn btn-sm btn-outline-secondary">
+                                            <i class="fas fa-edit"></i>
+                                        </button>
                                     </td>
                                 </tr>
                                 {% endfor %}
@@ -120,9 +129,12 @@
                     </div>
                     {% else %}
                     <div class="text-center py-5">
-                        <i class="fas fa-clock fa-3x text-muted mb-3"></i>
-                        <h5>Nenhum registro encontrado</h5>
-                        <p class="text-muted">Os registros de ponto aparecerão aqui</p>
+                        <i class="fas fa-file-contract fa-3x text-muted mb-3"></i>
+                        <h5>Nenhuma proposta encontrada</h5>
+                        <p class="text-muted">Comece criando sua primeira proposta comercial</p>
+                        <button class="btn btn-success">
+                            <i class="fas fa-plus me-2"></i>Criar Primeira Proposta
+                        </button>
                     </div>
                     {% endif %}
                 </div>
