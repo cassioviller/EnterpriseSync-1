@@ -60,7 +60,9 @@ def funcionario_rdo_consolidado():
 
 def processar_salvamento_rdo():
     """Processa salvamento do RDO usando schema compatível com logging detalhado"""
-    print("🔍 INÍCIO DO SALVAMENTO RDO")
+    print("="*80)
+    print("🔍 INÍCIO DO SALVAMENTO RDO - DEBUG DETALHADO")
+    print("="*80)
     
     try:
         # Passo 1: Obter admin_id
