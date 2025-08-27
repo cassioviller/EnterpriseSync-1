@@ -1,108 +1,558 @@
 {% extends "base.html" %}
 
-{% block title %}Gerenciar RDOs - SIGE{% endblock %}
+{% block title %}Relatórios Diários de Obra{% endblock %}
 
-{% block head %}
+<!-- CSS Moderno para RDO Lista -->
 <style>
-/* Estilização moderna para lista de RDOs */
-.rdo-list-header {
-    background: linear-gradient(135deg, #198754 0%, #20c997 100%);
-    color: white;
-    border-radius: 12px;
-    padding: 2.5rem 2rem;
+/* Sistema de cores e estilo base já definido no base.html */
+#main-content {
+    background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+    min-height: 100vh;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+}
+
+/* Grid de Filtros */
+.filtros-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 1.5rem;
+    margin-bottom: 1.5rem;
+}
+
+/* Grid de Estatísticas */
+.stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 1.5rem;
     margin-bottom: 2rem;
 }
 
-.stats-card {
-    border: none;
+.stat-card {
+    background: rgba(255, 255, 255, 0.9);
     border-radius: 12px;
-    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+    padding: 1.5rem;
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    border: 1px solid #e2e8f0;
+    transition: all 0.3s ease;
+}
+
+.stat-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.1);
+}
+
+.stat-icon {
+    width: 50px;
+    height: 50px;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-size: 1.5rem;
+}
+
+.stat-info h3 {
+    font-size: 1.5rem;
+    font-weight: 700;
+    margin: 0;
+    color: #2d3748;
+}
+
+.stat-info p {
+    margin: 0;
+    color: #718096;
+    font-size: 0.9rem;
+}
+
+/* Container de RDOs */
+.rdos-container {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+    gap: 1.5rem;
+}
+
+.rdos-container.list-view {
+    grid-template-columns: 1fr;
+}
+
+.rdo-item-card {
+    background: rgba(255, 255, 255, 0.9);
+    border-radius: 12px;
+    border: 1px solid #e2e8f0;
     transition: all 0.3s ease;
     overflow: hidden;
 }
 
-.stats-card:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.12);
+.rdo-item-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.15);
 }
 
-.stats-card .card-body {
+.rdo-header {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    padding: 1rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.rdo-number {
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.rdo-content {
     padding: 1.5rem;
 }
 
-.filter-card {
-    background: #f8f9fa;
-    border: 1px solid #dee2e6;
-    border-radius: 12px;
-    padding: 1.5rem;
-    margin-bottom: 2rem;
-}
-
-.rdo-item {
-    border: 1px solid #dee2e6;
-    border-radius: 12px;
-    padding: 1.5rem;
+.rdo-obra {
+    color: #2d3748;
     margin-bottom: 1rem;
-    background: white;
-    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 1.1rem;
 }
 
-.rdo-item:hover {
-    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
-    transform: translateY(-1px);
+.rdo-date {
+    color: #718096;
+    margin-bottom: 1rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
 }
 
-.rdo-status-badge {
-    border-radius: 20px;
-    padding: 0.5rem 1rem;
-    font-weight: 600;
-    font-size: 0.85rem;
+.rdo-stats {
+    display: flex;
+    gap: 1rem;
+    margin-bottom: 1rem;
+    flex-wrap: wrap;
 }
 
-.rdo-progress {
-    height: 6px;
-    border-radius: 3px;
-    background-color: #e9ecef;
-    overflow: hidden;
+.stat-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.25rem;
 }
 
-.rdo-actions .btn {
-    border-radius: 6px;
-    font-weight: 500;
-    transition: all 0.2s ease;
+.stat-item small {
+    color: #718096;
+    font-size: 0.75rem;
 }
 
-.rdo-actions .btn:hover {
-    transform: translateY(-1px);
-}
-
-.empty-state {
-    text-align: center;
-    padding: 4rem 2rem;
-    color: #6c757d;
-}
-
-.empty-state i {
-    font-size: 4rem;
-    margin-bottom: 1.5rem;
-    opacity: 0.3;
-}
-
-.btn-modern {
+.progress-container {
+    background: #f7fafc;
     border-radius: 8px;
-    font-weight: 600;
-    padding: 0.75rem 1.5rem;
-    transition: all 0.2s ease;
+    padding: 0.5rem;
+    margin-top: 1rem;
 }
 
-.btn-modern:hover {
-    transform: translateY(-1px);
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+.progress-bar {
+    height: 6px;
+    background: linear-gradient(90deg, #48bb78, #38b2ac);
+    border-radius: 3px;
+    transition: width 0.3s ease;
+}
+
+.rdo-actions {
+    display: flex;
+    gap: 0.5rem;
+    justify-content: center;
+    padding: 1rem;
+    background: rgba(248, 250, 252, 0.5);
+    border-top: 1px solid #e2e8f0;
+}
+
+.pagination-container {
+    margin-top: 2rem;
+    text-align: center;
+}
+
+.pagination .page-link {
+    border-radius: 8px;
+    margin: 0 0.25rem;
+    border: 1px solid #e2e8f0;
+    color: #4a5568;
+}
+
+.pagination .page-item.active .page-link {
+    background: #667eea;
+    border-color: #667eea;
+}
+
+/* Responsividade */
+@media (max-width: 768px) {
+    .filtros-grid {
+        grid-template-columns: 1fr;
+    }
+    
+    .stats-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+    
+    .rdos-container {
+        grid-template-columns: 1fr;
+    }
+    
+    .rdo-header {
+        flex-direction: column;
+        gap: 0.5rem;
+        text-align: center;
+    }
+    
+    .rdo-stats {
+        justify-content: center;
+    }
+    
+    .rdo-actions {
+        flex-direction: column;
+    }
+}
+
+/* Animações */
+.slide-in {
+    animation: slideInUp 0.6s ease-out forwards;
+}
+
+@keyframes slideInUp {
+    from {
+        opacity: 0;
+        transform: translateY(30px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
 }
 </style>
-{% endblock %}
 
-{% block content %}
+<script>
+function limparFiltros() {
+    document.getElementById('obra_id').value = '';
+    document.querySelector('select[name="status"]').value = '';
+    document.querySelector('input[name="data_inicio"]').value = '';
+    document.querySelector('input[name="data_fim"]').value = '';
+    document.getElementById('filtrosForm').submit();
+}
+
+function toggleVisualizacao() {
+    const container = document.getElementById('rdos-container');
+    const icon = document.getElementById('toggle-icon');
+    const text = document.getElementById('toggle-text');
+    
+    container.classList.toggle('list-view');
+    
+    if (container.classList.contains('list-view')) {
+        icon.className = 'fas fa-th-large';
+        text.textContent = 'Cards';
+    } else {
+        icon.className = 'fas fa-th';
+        text.textContent = 'Grid';
+    }
+}
+
+function duplicarRdo(rdoId) {
+    if (confirm('Deseja duplicar este RDO?')) {
+        window.location.href = `/rdo/${rdoId}/duplicar`;
+    }
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+    // Animar entrada dos cards
+    setTimeout(() => {
+        document.querySelectorAll('.rdo-card, .stat-card').forEach((card, index) => {
+            setTimeout(() => {
+                card.classList.add('slide-in');
+            }, index * 100);
+        });
+    }, 100);
+});
+</script>
+{% endblock %}
+<div class="container-fluid py-4" id="main-content">
+    <!-- Header Principal -->
+    <div class="header-section">
+        <div class="d-flex align-items-center justify-content-between mb-4">
+            <div class="header-info">
+                <div class="header-icon">
+                    <i class="fas fa-clipboard-list"></i>
+                </div>
+                <div>
+                    <h1 class="page-title">Relatórios Diários de Obra</h1>
+                    <p class="page-subtitle">Gerencie e acompanhe todos os RDOs da empresa</p>
+                </div>
+            </div>
+            <div class="header-actions">
+                <a href="/funcionario/rdo/consolidado" class="btn-modern btn-success">
+                    <i class="fas fa-plus"></i>
+                    Novo RDO
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Estatísticas Rápidas -->
+    <div class="stats-grid">
+        <div class="stat-card slide-in">
+            <div class="stat-icon bg-primary">
+                <i class="fas fa-file-alt"></i>
+            </div>
+            <div class="stat-info">
+                <h3>{{ rdos.total }}</h3>
+                <p>Total de RDOs</p>
+            </div>
+        </div>
+        
+        <div class="stat-card slide-in">
+            <div class="stat-icon bg-success">
+                <i class="fas fa-check-circle"></i>
+            </div>
+            <div class="stat-info">
+                <h3>{{ rdos.items|selectattr('status', 'equalto', 'Finalizado')|list|length }}</h3>
+                <p>RDOs Finalizados</p>
+            </div>
+        </div>
+        
+        <div class="stat-card slide-in">
+            <div class="stat-icon bg-warning">
+                <i class="fas fa-edit"></i>
+            </div>
+            <div class="stat-info">
+                <h3>{{ rdos.items|selectattr('status', 'equalto', 'Rascunho')|list|length }}</h3>
+                <p>Em Rascunho</p>
+            </div>
+        </div>
+        
+        <div class="stat-card slide-in">
+            <div class="stat-icon bg-info">
+                <i class="fas fa-building"></i>
+            </div>
+            <div class="stat-info">
+                <h3>{{ obras|length }}</h3>
+                <p>Obras Ativas</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Filtros Avançados -->
+    <div class="rdo-card slide-in">
+        <div class="rdo-card-header">
+            <h3>
+                <i class="fas fa-filter"></i>
+                Filtros Avançados
+            </h3>
+            <button class="btn-modern btn-sm btn-outline" onclick="limparFiltros()">
+                <i class="fas fa-refresh"></i>
+                Limpar
+            </button>
+        </div>
+        <div class="rdo-card-body">
+            <form method="GET" id="filtrosForm">
+                <div class="filtros-grid">
+                    <div class="form-group">
+                        <label class="form-label">
+                            <i class="fas fa-building"></i>
+                            Obra
+                        </label>
+                        <select class="form-control" name="obra_id" id="obra_id">
+                            <option value="">Todas as obras</option>
+                            {% for obra in obras %}
+                            <option value="{{ obra.id }}" {% if filters.obra_id == obra.id %}selected{% endif %}>
+                                {{ obra.nome }}
+                            </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label class="form-label">
+                            <i class="fas fa-flag"></i>
+                            Status
+                        </label>
+                        <select class="form-control" name="status">
+                            <option value="">Todos os status</option>
+                            <option value="Rascunho" {% if filters.status == "Rascunho" %}selected{% endif %}>📝 Rascunho</option>
+                            <option value="Finalizado" {% if filters.status == "Finalizado" %}selected{% endif %}>✅ Finalizado</option>
+                        </select>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label class="form-label">
+                            <i class="fas fa-calendar"></i>
+                            Data Início
+                        </label>
+                        <input type="date" class="form-control" name="data_inicio" value="{{ filters.data_inicio }}">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label class="form-label">
+                            <i class="fas fa-calendar"></i>
+                            Data Fim
+                        </label>
+                        <input type="date" class="form-control" name="data_fim" value="{{ filters.data_fim }}">
+                    </div>
+                </div>
+                
+                <div class="filter-actions">
+                    <button type="submit" class="btn-modern btn-primary">
+                        <i class="fas fa-search"></i>
+                        Filtrar RDOs
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Lista de RDOs -->
+    <div class="rdo-card slide-in">
+        <div class="rdo-card-header">
+            <h3>
+                <i class="fas fa-list"></i>
+                Lista de RDOs ({{ rdos.total }} total)
+            </h3>
+            <div class="header-actions">
+                <button class="btn-modern btn-sm btn-info" onclick="toggleVisualizacao()">
+                    <i class="fas fa-th" id="toggle-icon"></i>
+                    <span id="toggle-text">Grid</span>
+                </button>
+            </div>
+        </div>
+        <div class="rdo-card-body">
+            {% if rdos.items %}
+            <div class="rdos-container" id="rdos-container">
+                {% for rdo in rdos.items %}
+                <div class="rdo-item-card">
+                    <div class="rdo-header">
+                        <div class="rdo-number">
+                            <i class="fas fa-file-alt"></i>
+                            {{ rdo.numero_rdo or 'RDO-' + rdo.id|string }}
+                        </div>
+                        <div class="rdo-status">
+                            <span class="badge 
+                                {% if rdo.status == 'Finalizado' %}bg-success
+                                {% elif rdo.status == 'Rascunho' %}bg-warning
+                                {% else %}bg-info
+                                {% endif %}">{{ rdo.status }}</span>
+                        </div>
+                    </div>
+                    
+                    <div class="rdo-content">
+                        <h5 class="rdo-obra">
+                            <i class="fas fa-building"></i>
+                            {{ rdo.obra.nome }}
+                        </h5>
+                        
+                        <div class="rdo-date">
+                            <i class="fas fa-calendar"></i>
+                            {{ rdo.data_relatorio.strftime('%d/%m/%Y') }}
+                        </div>
+                        
+                        <div class="rdo-stats">
+                            <div class="stat-item">
+                                <small>Subatividades:</small>
+                                <span class="badge bg-primary">{{ rdo.servico_subatividades|length }}</span>
+                            </div>
+                            <div class="stat-item">
+                                <small>Funcionários:</small>
+                                <span class="badge bg-success">{{ rdo.mao_obra|length }}</span>
+                            </div>
+                            <div class="stat-item">
+                                <small>Progresso:</small>
+                                <span class="badge bg-info">{{ rdo.progresso_total or 0 }}%</span>
+                            </div>
+                        </div>
+                        
+                        {% if rdo.progresso_total %}
+                        <div class="progress-container">
+                            <div class="progress-bar" style="width: {{ rdo.progresso_total }}%"></div>
+                        </div>
+                        {% endif %}
+                    </div>
+                    
+                    <div class="rdo-actions">
+                        <a href="{{ url_for('main.visualizar_rdo', id=rdo.id) }}" class="btn-modern btn-info btn-sm">
+                            <i class="fas fa-eye"></i>
+                            Ver
+                        </a>
+                        <a href="{{ url_for('main.editar_rdo', id=rdo.id) }}" class="btn-modern btn-warning btn-sm">
+                            <i class="fas fa-edit"></i>
+                            Editar
+                        </a>
+                        <button class="btn-modern btn-success btn-sm" onclick="duplicarRdo({{ rdo.id }})">
+                            <i class="fas fa-copy"></i>
+                            Duplicar
+                        </button>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+            
+            <!-- Paginação -->
+            {% if rdos.pages > 1 %}
+            <div class="pagination-container">
+                <nav aria-label="Paginação de RDOs">
+                    <ul class="pagination justify-content-center">
+                        {% if rdos.has_prev %}
+                        <li class="page-item">
+                            <a class="page-link" href="{{ url_for('main.lista_rdos', page=rdos.prev_num, **filters) }}">
+                                <i class="fas fa-arrow-left"></i>
+                            </a>
+                        </li>
+                        {% endif %}
+                        
+                        {% for page_num in rdos.iter_pages() %}
+                            {% if page_num %}
+                                {% if page_num != rdos.page %}
+                                <li class="page-item">
+                                    <a class="page-link" href="{{ url_for('main.lista_rdos', page=page_num, **filters) }}">{{ page_num }}</a>
+                                </li>
+                                {% else %}
+                                <li class="page-item active">
+                                    <span class="page-link">{{ page_num }}</span>
+                                </li>
+                                {% endif %}
+                            {% else %}
+                            <li class="page-item disabled">
+                                <span class="page-link">...</span>
+                            </li>
+                            {% endif %}
+                        {% endfor %}
+                        
+                        {% if rdos.has_next %}
+                        <li class="page-item">
+                            <a class="page-link" href="{{ url_for('main.lista_rdos', page=rdos.next_num, **filters) }}">
+                                <i class="fas fa-arrow-right"></i>
+                            </a>
+                        </li>
+                        {% endif %}
+                    </ul>
+                </nav>
+            </div>
+            {% endif %}
+            
+            {% else %}
+            <div class="empty-state">
+                <div class="empty-icon">
+                    <i class="fas fa-clipboard-list"></i>
+                </div>
+                <h4>Nenhum RDO encontrado</h4>
+                <p>{% if filters.obra_id or filters.status or filters.data_inicio or filters.data_fim %}Nenhum RDO corresponde aos filtros aplicados.{% else %}Crie seu primeiro RDO para começar.{% endif %}</p>
+                <a href="/funcionario/rdo/consolidado" class="btn-modern btn-primary">
+                    <i class="fas fa-plus"></i>
+                    Criar Primeiro RDO
+                </a>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
 <div class="container-fluid px-4">
     <!-- Header Moderno -->
     <div class="rdo-list-header">

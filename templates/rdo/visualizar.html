@@ -25,10 +25,12 @@
                 </div>
             </div>
             <div class="header-actions">
+                {% if rdo.status == 'Rascunho' %}
                 <a href="{{ url_for('main.editar_rdo', id=rdo.id) }}" class="btn-modern btn-warning">
                     <i class="fas fa-edit"></i>
                     Editar
                 </a>
+                {% endif %}
                 <a href="{{ url_for('main.lista_rdos') }}" class="btn-modern btn-secondary">
                     <i class="fas fa-arrow-left"></i>
                     Voltar para Lista
@@ -37,567 +39,541 @@
         </div>
         
         <!-- Progress Bar Obra -->
+        {% if rdo.progresso_total %}
         <div class="progress-container">
-            <div class="progress-bar" id="progress-bar" style="width: {{ rdo.progresso_total or 0 }}%"></div>
-            <div class="progress-text">Progresso da Obra: {{ rdo.progresso_total or 0 }}%</div>
+            <div class="progress-bar" style="width: {{ rdo.progresso_total }}%"></div>
+            <div class="progress-text">Progresso da Obra: {{ rdo.progresso_total }}%</div>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- Card Principal do RDO -->
+    <div class="rdo-card slide-in">
+        <div class="rdo-card-header">
+            <div class="d-flex align-items-center justify-content-between">
+                <div class="header-title">
+                    <h3>
+                        <i class="fas fa-clipboard-list"></i>
+                        Detalhes do RDO
+                    </h3>
+                    <div class="header-subtitle">
+                        Relatório completo de {{ rdo.data_relatorio.strftime('%d/%m/%Y') }}
+                    </div>
+                </div>
+                <div class="header-badge">
+                    <span class="status-badge status-{{ rdo.status.lower() }}">
+                        {% if rdo.status == 'Finalizado' %}
+                            <i class="fas fa-check-circle"></i>
+                        {% elif rdo.status == 'Rascunho' %}
+                            <i class="fas fa-edit"></i>
+                        {% endif %}
+                        {{ rdo.status }}
+                    </span>
+                </div>
+            </div>
+            
+            <!-- Ações Rápidas -->
+            <div class="d-flex gap-2 flex-wrap mt-3">
+                {% if rdo.status == 'Rascunho' %}
+                <a href="{{ url_for('main.editar_rdo', id=rdo.id) }}" class="btn-modern btn-warning btn-sm">
+                    <i class="fas fa-edit"></i>Editar
+                </a>
+                <form method="POST" action="{{ url_for('main.finalizar_rdo', id=rdo.id) }}" class="d-inline">
+                    <button type="submit" class="btn-modern btn-success btn-sm" onclick="return confirm('Finalizar este RDO? Após finalizado não poderá ser editado.')">
+                        <i class="fas fa-check"></i>Finalizar
+                    </button>
+                </form>
+                <form method="POST" action="{{ url_for('main.excluir_rdo', id=rdo.id) }}" class="d-inline">
+                    <button type="submit" class="btn-modern btn-danger btn-sm" onclick="return confirm('ATENÇÃO: Excluir este RDO?\n\nEsta ação é IRREVERSÍVEL!')">
+                        <i class="fas fa-trash"></i>Excluir
+                    </button>
+                </form>
+                {% endif %}
+                
+                <form method="POST" action="{{ url_for('main.duplicar_rdo', id=rdo.id) }}" class="d-inline">
+                    <button type="submit" class="btn-modern btn-info btn-sm" onclick="return confirm('Criar uma cópia deste RDO para hoje?')">
+                        <i class="fas fa-copy"></i>Duplicar
+                    </button>
+                </form>
+            </div>
+        </div>
+        
+        <div class="rdo-card-body">
+            <!-- Estatísticas Resumo -->
+            <div class="stats-grid">
+                <div class="stat-item">
+                    <div class="stat-value">{{ rdo.servico_subatividades|length }}</div>
+                    <div class="text-muted">Subatividades</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-value">{{ rdo.mao_obra|length }}</div>
+                    <div class="text-muted">Funcionários</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-value">
+                        {% if rdo.servico_subatividades %}
+                            {{ (rdo.servico_subatividades | sum(attribute='percentual_conclusao') / rdo.servico_subatividades|length) | round(1) }}%
+                        {% else %}
+                            0%
+                        {% endif %}
+                    </div>
+                    <div class="text-muted">Progresso Geral</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-value">
+                        {% set total_horas = rdo.mao_obra | sum(attribute='horas_trabalhadas') %}
+                        {{ total_horas | round(1) }}h
+                    </div>
+                    <div class="text-muted">Horas Trabalhadas</div>
+                </div>
+            </div>
+
+            <!-- Informações Detalhadas -->
+            <div class="row mb-4">
+                <div class="col-lg-6 mb-3">
+                    <div class="info-card">
+                        <h6 class="fw-bold mb-3">
+                            <i class="fas fa-info-circle me-2"></i>Informações Gerais
+                        </h6>
+                        <div class="row g-2">
+                            <div class="col-4"><strong>Obra:</strong></div>
+                            <div class="col-8">{{ rdo.obra.nome }}</div>
+                            
+                            <div class="col-4"><strong>Data:</strong></div>
+                            <div class="col-8">{{ rdo.data_relatorio.strftime('%d/%m/%Y') }}</div>
+                            
+                            <div class="col-4"><strong>Criado por:</strong></div>
+                            <div class="col-8">{{ rdo.criado_por.nome if rdo.criado_por else 'N/A' }}</div>
+                            
+                            <div class="col-4"><strong>Criado em:</strong></div>
+                            <div class="col-8">{{ rdo.created_at.strftime('%d/%m/%Y %H:%M') if rdo.created_at else 'N/A' }}</div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="col-lg-6 mb-3">
+                    <div class="info-card">
+                        <h6 class="fw-bold mb-3">
+                            <i class="fas fa-cloud-sun me-2"></i>Condições Climáticas
+                        </h6>
+                        
+                        {% if rdo.tempo_manha or rdo.tempo_tarde or rdo.tempo_noite or rdo.observacoes_meteorologicas %}
+                        <div class="row g-2">
+                            {% if rdo.tempo_manha %}
+                            <div class="col-4"><strong>Manhã:</strong></div>
+                            <div class="col-8">
+                                <span class="climate-badge bg-{{ 'success' if rdo.tempo_manha == 'Bom' else ('warning' if rdo.tempo_manha == 'Nublado' else 'danger') }}">
+                                    {{ rdo.tempo_manha }}
+                                </span>
+                            </div>
+                            {% endif %}
+                            
+                            {% if rdo.tempo_tarde %}
+                            <div class="col-4"><strong>Tarde:</strong></div>
+                            <div class="col-8">
+                                <span class="climate-badge bg-{{ 'success' if rdo.tempo_tarde == 'Bom' else ('warning' if rdo.tempo_tarde == 'Nublado' else 'danger') }}">
+                                    {{ rdo.tempo_tarde }}
+                                </span>
+                            </div>
+                            {% endif %}
+                            
+                            {% if rdo.tempo_noite %}
+                            <div class="col-4"><strong>Noite:</strong></div>
+                            <div class="col-8">
+                                <span class="climate-badge bg-{{ 'success' if rdo.tempo_noite == 'Bom' else ('warning' if rdo.tempo_noite == 'Nublado' else 'danger') }}">
+                                    {{ rdo.tempo_noite }}
+                                </span>
+                            </div>
+                            {% endif %}
+                            
+                            {% if rdo.observacoes_meteorologicas %}
+                            <div class="col-12 mt-3">
+                                <strong>Observações:</strong>
+                                <p class="mt-1 mb-0">{{ rdo.observacoes_meteorologicas }}</p>
+                            </div>
+                            {% endif %}
+                        </div>
+                        {% else %}
+                        <div class="text-center text-muted py-3">
+                            <i class="fas fa-cloud"></i>
+                            <p class="mb-0">Nenhuma informação climática registrada</p>
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
 
-<!-- CSS Moderno para Visualização -->
+    <!-- Subatividades Executadas -->
+    {% if rdo.servico_subatividades %}
+    <div class="rdo-card slide-in">
+        <div class="rdo-card-header">
+            <h3>
+                <i class="fas fa-tasks"></i>
+                Subatividades Executadas ({{ rdo.servico_subatividades|length }})
+            </h3>
+        </div>
+        <div class="rdo-card-body">
+            <div class="row">
+                {% for subatividade in rdo.servico_subatividades %}
+                <div class="col-md-6 col-lg-4 mb-3">
+                    <div class="subatividade-card">
+                        <div class="subatividade-header">
+                            <h6 class="mb-1">{{ subatividade.nome_subatividade }}</h6>
+                            <div class="progress-badge">{{ subatividade.percentual_conclusao }}%</div>
+                        </div>
+                        
+                        {% if subatividade.descricao_subatividade %}
+                        <p class="subatividade-desc">{{ subatividade.descricao_subatividade }}</p>
+                        {% endif %}
+                        
+                        <div class="progress-modern">
+                            <div class="progress-fill" style="width: {{ subatividade.percentual_conclusao }}%"></div>
+                        </div>
+                        
+                        {% if subatividade.observacoes_tecnicas %}
+                        <div class="subatividade-obs">
+                            <small><strong>Observações:</strong> {{ subatividade.observacoes_tecnicas }}</small>
+                        </div>
+                        {% endif %}
+                        
+                        {% if subatividade.servico %}
+                        <div class="subatividade-servico">
+                            <small class="text-muted">
+                                <i class="fas fa-wrench"></i>
+                                {{ subatividade.servico.nome }}
+                            </small>
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+    {% endif %}
 
-.rdo-card {
-    border: none;
-    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+    <!-- Mão de Obra -->
+    {% if rdo.mao_obra %}
+    <div class="rdo-card slide-in">
+        <div class="rdo-card-header">
+            <h3>
+                <i class="fas fa-users"></i>
+                Mão de Obra ({{ rdo.mao_obra|length }} funcionários)
+            </h3>
+        </div>
+        <div class="rdo-card-body">
+            <div class="row">
+                {% for mao in rdo.mao_obra %}
+                <div class="col-md-6 col-lg-4 mb-3">
+                    <div class="funcionario-card">
+                        <div class="funcionario-header">
+                            <div class="funcionario-avatar">
+                                {% if mao.funcionario.foto %}
+                                <img src="{{ url_for('static', filename='uploads/fotos/' + mao.funcionario.foto) }}" alt="{{ mao.funcionario.nome }}">
+                                {% else %}
+                                <div class="avatar-placeholder">
+                                    <i class="fas fa-user"></i>
+                                </div>
+                                {% endif %}
+                            </div>
+                            <div class="funcionario-info">
+                                <h6>{{ mao.funcionario.nome }}</h6>
+                                <small class="text-muted">{{ mao.funcionario.cargo or 'Funcionário' }}</small>
+                            </div>
+                        </div>
+                        
+                        <div class="funcionario-stats">
+                            <div class="stat-row">
+                                <span><i class="fas fa-clock"></i> Horas:</span>
+                                <strong>{{ mao.horas_trabalhadas }}h</strong>
+                            </div>
+                        </div>
+                        
+                        {% if mao.observacoes %}
+                        <div class="funcionario-obs">
+                            <small><strong>Observações:</strong> {{ mao.observacoes }}</small>
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Comentários Gerais -->
+    {% if rdo.comentario_geral %}
+    <div class="rdo-card slide-in">
+        <div class="rdo-card-header">
+            <h3>
+                <i class="fas fa-comment-alt"></i>
+                Comentários Gerais
+            </h3>
+        </div>
+        <div class="rdo-card-body">
+            <p class="mb-0">{{ rdo.comentario_geral }}</p>
+        </div>
+    </div>
+    {% endif %}
+</div>
+
+<style>
+/* Estilos específicos para visualização do RDO */
+#main-content {
+    background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+    min-height: 100vh;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+}
+
+.progress-container {
+    background: rgba(255, 255, 255, 0.9);
     border-radius: 12px;
-    overflow: hidden;
+    padding: 1rem;
+    margin-bottom: 2rem;
+    border: 1px solid #e2e8f0;
 }
 
-.info-card {
-    background: #f8f9fa;
-    border-radius: 8px;
-    padding: 1.25rem;
-    height: 100%;
-    border-left: 4px solid #198754;
-}
-
-.climate-badge {
-    border-radius: 20px;
-    padding: 0.4rem 0.8rem;
-    font-size: 0.85rem;
-    font-weight: 600;
-}
-
-.progress-modern {
+.progress-bar {
     height: 8px;
-    border-radius: 4px;
-    background-color: #e9ecef;
-    overflow: hidden;
-}
-
-.progress-modern .progress-bar {
+    background: linear-gradient(90deg, #48bb78, #38b2ac);
     border-radius: 4px;
     transition: width 0.3s ease;
 }
 
-.service-card {
-    border: 1px solid #dee2e6;
-    border-radius: 8px;
-    padding: 1rem;
-    margin-bottom: 0.75rem;
-    transition: all 0.2s ease;
-    background: white;
+.progress-text {
+    text-align: center;
+    font-weight: 600;
+    color: #2d3748;
+    margin-top: 0.5rem;
 }
 
-.service-card:hover {
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-    transform: translateY(-1px);
+.status-badge {
+    padding: 0.5rem 1rem;
+    border-radius: 20px;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
 }
 
-.service-header {
-    background: #f8f9fa;
-    margin: -1rem -1rem 0.75rem -1rem;
-    padding: 0.75rem 1rem;
-    border-bottom: 1px solid #dee2e6;
-    border-radius: 8px 8px 0 0;
+.status-finalizado {
+    background: #48bb78;
+    color: white;
 }
 
-.btn-action {
-    border-radius: 6px;
-    font-weight: 500;
-    transition: all 0.2s ease;
-}
-
-.btn-action:hover {
-    transform: translateY(-1px);
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+.status-rascunho {
+    background: #ed8936;
+    color: white;
 }
 
 .stats-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-    gap: 1rem;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 1.5rem;
     margin-bottom: 2rem;
 }
 
 .stat-item {
-    background: white;
-    padding: 1rem;
-    border-radius: 8px;
-    border: 1px solid #dee2e6;
     text-align: center;
+    padding: 1rem;
+    background: rgba(255, 255, 255, 0.7);
+    border-radius: 8px;
+    border: 1px solid #e2e8f0;
 }
 
 .stat-value {
     font-size: 1.5rem;
     font-weight: 700;
-    color: #198754;
+    color: #2d3748;
 }
 
-.empty-state {
-    text-align: center;
-    padding: 3rem 1rem;
-    color: #6c757d;
+.info-card {
+    background: rgba(255, 255, 255, 0.9);
+    border-radius: 8px;
+    padding: 1.25rem;
+    height: 100%;
+    border-left: 4px solid #667eea;
+    border: 1px solid #e2e8f0;
 }
 
-.empty-state i {
-    font-size: 3rem;
+.climate-badge {
+    border-radius: 20px;
+    padding: 0.3rem 0.7rem;
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: white;
+}
+
+.subatividade-card {
+    background: rgba(255, 255, 255, 0.9);
+    border-radius: 12px;
+    padding: 1.25rem;
+    border: 1px solid #e2e8f0;
+    height: 100%;
+    transition: all 0.3s ease;
+}
+
+.subatividade-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.1);
+}
+
+.subatividade-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.75rem;
+}
+
+.progress-badge {
+    background: #667eea;
+    color: white;
+    padding: 0.25rem 0.75rem;
+    border-radius: 15px;
+    font-size: 0.8rem;
+    font-weight: 600;
+}
+
+.subatividade-desc {
+    color: #718096;
+    font-size: 0.9rem;
     margin-bottom: 1rem;
-    opacity: 0.5;
+}
+
+.progress-modern {
+    height: 6px;
+    background: #e2e8f0;
+    border-radius: 3px;
+    overflow: hidden;
+    margin-bottom: 0.75rem;
+}
+
+.progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #667eea, #764ba2);
+    border-radius: 3px;
+    transition: width 0.3s ease;
+}
+
+.subatividade-obs, .subatividade-servico {
+    margin-top: 0.75rem;
+    padding-top: 0.75rem;
+    border-top: 1px solid #f1f5f9;
+}
+
+.funcionario-card {
+    background: rgba(255, 255, 255, 0.9);
+    border-radius: 12px;
+    padding: 1.25rem;
+    border: 1px solid #e2e8f0;
+    height: 100%;
+    transition: all 0.3s ease;
+}
+
+.funcionario-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.1);
+}
+
+.funcionario-header {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    margin-bottom: 1rem;
+}
+
+.funcionario-avatar {
+    width: 50px;
+    height: 50px;
+    border-radius: 50%;
+    overflow: hidden;
+}
+
+.funcionario-avatar img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.avatar-placeholder {
+    width: 100%;
+    height: 100%;
+    background: #e2e8f0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #a0aec0;
+}
+
+.funcionario-info h6 {
+    margin: 0;
+    color: #2d3748;
+}
+
+.funcionario-stats {
+    margin-bottom: 0.75rem;
+}
+
+.stat-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.5rem;
+}
+
+.funcionario-obs {
+    padding-top: 0.75rem;
+    border-top: 1px solid #f1f5f9;
+}
+
+/* Responsividade */
+@media (max-width: 768px) {
+    .stats-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+    
+    .header-actions {
+        flex-direction: column;
+        gap: 0.5rem;
+    }
+    
+    .subatividade-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 0.5rem;
+    }
+}
+
+/* Animações */
+.slide-in {
+    animation: slideInUp 0.6s ease-out forwards;
+}
+
+@keyframes slideInUp {
+    from {
+        opacity: 0;
+        transform: translateY(30px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
 }
 </style>
-{% endblock %}
 
-{% block content %}
-<div class="container-fluid px-4">
-    <!-- Header Section -->
-    <div class="row mb-4">
-        <div class="col-12">
-            <div class="card rdo-card">
-                <div class="rdo-header">
-                    <div class="d-flex justify-content-between align-items-start">
-                        <div>
-                            <h2 class="mb-2">
-                                <i class="fas fa-file-alt me-2"></i>
-                                RDO {{ rdo.numero_rdo }}
-                            </h2>
-                            <div class="d-flex align-items-center gap-3">
-                                {% if rdo.status == 'Finalizado' %}
-                                <span class="badge bg-light text-success fs-6 px-3 py-2">
-                                    <i class="fas fa-check-circle me-1"></i>Finalizado
-                                </span>
-                                {% else %}
-                                <span class="badge bg-warning text-dark fs-6 px-3 py-2">
-                                    <i class="fas fa-edit me-1"></i>Rascunho
-                                </span>
-                                {% endif %}
-                                <span class="text-white-50">{{ rdo.obra.nome }}</span>
-                                <span class="text-white-50">{{ rdo.data_relatorio.strftime('%d/%m/%Y') }}</span>
-                            </div>
-                        </div>
-                        <div class="d-flex gap-2 flex-wrap">
-                            {% if rdo.status == 'Rascunho' %}
-                            <a href="{{ url_for('main.editar_rdo', id=rdo.id) }}" class="btn btn-light btn-action">
-                                <i class="fas fa-edit me-1"></i>Editar
-                            </a>
-                            <form method="POST" action="{{ url_for('main.finalizar_rdo', id=rdo.id) }}" class="d-inline">
-                                <button type="submit" class="btn btn-success btn-action" onclick="return confirm('Finalizar este RDO? Após finalizado não poderá ser editado.')">
-                                    <i class="fas fa-check me-1"></i>Finalizar
-                                </button>
-                            </form>
-                            <form method="POST" action="{{ url_for('main.excluir_rdo', id=rdo.id) }}" class="d-inline">
-                                <button type="submit" class="btn btn-danger btn-action" onclick="return confirm('ATENÇÃO: Excluir este RDO?\n\nEsta ação é IRREVERSÍVEL!')">
-                                    <i class="fas fa-trash me-1"></i>Excluir
-                                </button>
-                            </form>
-                            {% endif %}
-                            
-                            <form method="POST" action="{{ url_for('main.duplicar_rdo', id=rdo.id) }}" class="d-inline">
-                                <button type="submit" class="btn btn-info btn-action" onclick="return confirm('Criar uma cópia deste RDO para hoje?')">
-                                    <i class="fas fa-copy me-1"></i>Duplicar
-                                </button>
-                            </form>
-                            
-                            <a href="{{ url_for('main.lista_rdos') }}" class="btn btn-outline-light btn-action">
-                                <i class="fas fa-arrow-left me-1"></i>Voltar
-                            </a>
-                        </div>
-                    </div>
-                </div>
-                
-                <!-- Estatísticas Resumo -->
-                <div class="card-body">
-                    <div class="stats-grid">
-                        <div class="stat-item">
-                            <div class="stat-value">{{ rdo.servico_subatividades|length }}</div>
-                            <div class="text-muted">Subatividades</div>
-                        </div>
-                        <div class="stat-item">
-                            <div class="stat-value">{{ rdo.mao_obra|length }}</div>
-                            <div class="text-muted">Funcionários</div>
-                        </div>
-                        <div class="stat-item">
-                            <div class="stat-value">
-                                {% if rdo.servico_subatividades %}
-                                    {{ (rdo.servico_subatividades | sum(attribute='percentual_conclusao') / rdo.servico_subatividades|length) | round(1) }}%
-                                {% else %}
-                                    0%
-                                {% endif %}
-                            </div>
-                            <div class="text-muted">Progresso Geral</div>
-                        </div>
-                        <div class="stat-item">
-                            <div class="stat-value">
-                                {% set total_horas = rdo.mao_obra | sum(attribute='horas_trabalhadas') %}
-                                {{ total_horas | round(1) }}h
-                            </div>
-                            <div class="text-muted">Horas Trabalhadas</div>
-                        </div>
-                    </div>
-
-                    <!-- Informações Detalhadas -->
-                    <div class="row mb-4">
-                        <div class="col-lg-6 mb-3">
-                            <div class="info-card">
-                                <h6 class="fw-bold mb-3">
-                                    <i class="fas fa-info-circle me-2"></i>Informações Gerais
-                                </h6>
-                                <div class="row g-2">
-                                    <div class="col-4"><strong>Obra:</strong></div>
-                                    <div class="col-8">{{ rdo.obra.nome }}</div>
-                                    
-                                    <div class="col-4"><strong>Data:</strong></div>
-                                    <div class="col-8">{{ rdo.data_relatorio.strftime('%d/%m/%Y') }}</div>
-                                    
-                                    <div class="col-4"><strong>Criado por:</strong></div>
-                                    <div class="col-8">{{ rdo.criado_por.nome if rdo.criado_por else 'N/A' }}</div>
-                                    
-                                    <div class="col-4"><strong>Criado em:</strong></div>
-                                    <div class="col-8">{{ rdo.created_at.strftime('%d/%m/%Y %H:%M') if rdo.created_at else 'N/A' }}</div>
-                                </div>
-                            </div>
-                        </div>
-                        
-                        <div class="col-lg-6 mb-3">
-                            <div class="info-card">
-                                <h6 class="fw-bold mb-3">
-                                    <i class="fas fa-cloud-sun me-2"></i>Condições Climáticas
-                                </h6>
-                                
-                                {% if rdo.clima_geral or rdo.temperatura_media or rdo.umidade_relativa or rdo.vento_velocidade or rdo.precipitacao or rdo.condicoes_trabalho %}
-                                <div class="row g-2">
-                                    {% if rdo.clima_geral %}
-                                    <div class="col-4"><strong>Clima Geral:</strong></div>
-                                    <div class="col-8">
-                                        <span class="climate-badge bg-{{ 'success' if rdo.clima_geral in ['Ensolarado', 'Bom'] else ('warning' if rdo.clima_geral == 'Nublado' else 'danger') }} text-white">
-                                            {{ rdo.clima_geral }}
-                                        </span>
-                                    </div>
-                                    {% endif %}
-                                    
-                                    {% if rdo.temperatura_media %}
-                                    <div class="col-4"><strong>Temperatura:</strong></div>
-                                    <div class="col-8">
-                                        <i class="fas fa-thermometer-half text-warning me-1"></i>{{ rdo.temperatura_media }}
-                                    </div>
-                                    {% endif %}
-                                    
-                                    {% if rdo.umidade_relativa %}
-                                    <div class="col-4"><strong>Umidade:</strong></div>
-                                    <div class="col-8">
-                                        <i class="fas fa-tint text-info me-1"></i>{{ rdo.umidade_relativa }}%
-                                    </div>
-                                    {% endif %}
-                                    
-                                    {% if rdo.vento_velocidade %}
-                                    <div class="col-4"><strong>Vento:</strong></div>
-                                    <div class="col-8">
-                                        <i class="fas fa-wind text-secondary me-1"></i>{{ rdo.vento_velocidade }}
-                                    </div>
-                                    {% endif %}
-                                    
-                                    {% if rdo.precipitacao %}
-                                    <div class="col-4"><strong>Precipitação:</strong></div>
-                                    <div class="col-8">
-                                        <span class="climate-badge bg-{{ 'success' if rdo.precipitacao == 'Sem chuva' else ('warning' if rdo.precipitacao == 'Garoa' else 'danger') }} text-white">
-                                            {{ rdo.precipitacao }}
-                                        </span>
-                                    </div>
-                                    {% endif %}
-                                    
-                                    {% if rdo.condicoes_trabalho %}
-                                    <div class="col-4"><strong>Condições:</strong></div>
-                                    <div class="col-8">
-                                        <span class="climate-badge bg-{{ 'success' if rdo.condicoes_trabalho in ['Ideais', 'Adequadas'] else ('warning' if rdo.condicoes_trabalho == 'Limitadas' else 'danger') }} text-white">
-                                            {{ rdo.condicoes_trabalho }}
-                                        </span>
-                                    </div>
-                                    {% endif %}
-                                </div>
-                                {% endif %}
-                                
-                                <!-- Compatibilidade com campos antigos -->
-                                {% if rdo.tempo_manha or rdo.tempo_tarde or rdo.tempo_noite %}
-                                <hr class="my-3">
-                                <small class="text-muted fw-bold">Período do Dia:</small>
-                                <div class="row g-2 mt-2">
-                                    {% if rdo.tempo_manha %}
-                                    <div class="col-4"><strong>Manhã:</strong></div>
-                                    <div class="col-8">
-                                        <span class="climate-badge bg-{{ 'success' if rdo.tempo_manha == 'Bom' else ('warning' if rdo.tempo_manha == 'Nublado' else 'danger') }} text-white">
-                                            {{ rdo.tempo_manha }}
-                                        </span>
-                                    </div>
-                                    {% endif %}
-                                    {% if rdo.tempo_tarde %}
-                                    <div class="col-4"><strong>Tarde:</strong></div>
-                                    <div class="col-8">
-                                        <span class="climate-badge bg-{{ 'success' if rdo.tempo_tarde == 'Bom' else ('warning' if rdo.tempo_tarde == 'Nublado' else 'danger') }} text-white">
-                                            {{ rdo.tempo_tarde }}
-                                        </span>
-                                    </div>
-                                    {% endif %}
-                                    {% if rdo.tempo_noite %}
-                                    <div class="col-4"><strong>Noite:</strong></div>
-                                    <div class="col-8">
-                                        <span class="climate-badge bg-{{ 'success' if rdo.tempo_noite == 'Bom' else ('warning' if rdo.tempo_noite == 'Nublado' else 'danger') }} text-white">
-                                            {{ rdo.tempo_noite }}
-                                        </span>
-                                    </div>
-                                    {% endif %}
-                                </div>
-                                {% endif %}
-                                
-                                {% if rdo.observacoes_climaticas or rdo.observacoes_meteorologicas %}
-                                <div class="mt-3 p-2 bg-light rounded">
-                                    <small class="text-muted fw-bold">Observações Climáticas:</small>
-                                    <p class="mb-0 mt-1">{{ rdo.observacoes_climaticas or rdo.observacoes_meteorologicas }}</p>
-                                </div>
-                                {% endif %}
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Serviços e Subatividades Executadas -->
-                    <div class="mb-4">
-                        <h5 class="fw-bold mb-3">
-                            <i class="fas fa-tasks me-2"></i>Serviços e Subatividades Executadas
-                        </h5>
-                        {% if rdo.servico_subatividades %}
-                        <div class="row">
-                            {% for subatividade in rdo.servico_subatividades %}
-                            <div class="col-lg-6 mb-3">
-                                <div class="service-card">
-                                    <div class="service-header">
-                                        <div class="d-flex justify-content-between align-items-center">
-                                            <div>
-                                                <h6 class="fw-bold mb-1">{{ subatividade.servico.nome if subatividade.servico else 'Serviço N/A' }}</h6>
-                                                {% if subatividade.servico and subatividade.servico.descricao %}
-                                                <small class="text-muted">{{ subatividade.servico.descricao }}</small>
-                                                {% endif %}
-                                            </div>
-                                            {% set percentage = subatividade.percentual_conclusao | round(1) %}
-                                            <span class="badge fs-6 px-3 py-2 
-                                                {% if percentage >= 90 %}bg-success
-                                                {% elif percentage >= 70 %}bg-primary
-                                                {% elif percentage >= 50 %}bg-warning text-dark
-                                                {% else %}bg-danger{% endif %}">
-                                                {{ percentage }}%
-                                            </span>
-                                        </div>
-                                    </div>
-                                    
-                                    <div class="mb-3">
-                                        <h6 class="fw-bold text-primary mb-2">{{ subatividade.nome_subatividade }}</h6>
-                                        {% if subatividade.descricao_subatividade %}
-                                        <p class="text-muted mb-3">{{ subatividade.descricao_subatividade }}</p>
-                                        {% endif %}
-                                        
-                                        <div class="progress-modern mb-2">
-                                            <div class="progress-bar 
-                                                {% if percentage >= 90 %}bg-success
-                                                {% elif percentage >= 70 %}bg-primary
-                                                {% elif percentage >= 50 %}bg-warning
-                                                {% else %}bg-danger{% endif %}" 
-                                                 role="progressbar" 
-                                                 style="width: {{ percentage }}%">
-                                            </div>
-                                        </div>
-                                        
-                                        <div class="d-flex justify-content-between text-sm">
-                                            <span class="text-muted">Progresso: {{ percentage }}%</span>
-                                            {% if subatividade.percentual_anterior > 0 %}
-                                            <span class="text-muted">
-                                                Anterior: {{ subatividade.percentual_anterior | round(1) }}%
-                                                {% if subatividade.incremento_dia > 0 %}
-                                                <span class="text-success">(+{{ subatividade.incremento_dia | round(1) }}%)</span>
-                                                {% endif %}
-                                            </span>
-                                            {% endif %}
-                                        </div>
-                                    </div>
-                                    
-                                    {% if subatividade.observacoes_tecnicas %}
-                                    <div class="mt-3 p-2 bg-light rounded">
-                                        <small class="text-muted fw-bold">Observações Técnicas:</small>
-                                        <p class="mb-0 mt-1">{{ subatividade.observacoes_tecnicas }}</p>
-                                    </div>
-                                    {% endif %}
-                                </div>
-                            </div>
-                            {% endfor %}
-                        </div>
-                        {% else %}
-                        <div class="empty-state">
-                            <i class="fas fa-clipboard-list"></i>
-                            <h6>Nenhuma subatividade registrada</h6>
-                            <p>Este RDO ainda não possui subatividades de serviços cadastradas.</p>
-                        </div>
-                        {% endif %}
-                    </div>
-
-                    <!-- Mão de Obra -->
-                    <div class="mb-4">
-                        <h5 class="fw-bold mb-3">
-                            <i class="fas fa-users me-2"></i>Mão de Obra
-                        </h5>
-                        {% if rdo.mao_obra %}
-                        <div class="row">
-                            {% for mao in rdo.mao_obra %}
-                            <div class="col-lg-4 col-md-6 mb-3">
-                                <div class="service-card">
-                                    <div class="d-flex align-items-center">
-                                        <div class="flex-shrink-0">
-                                            <div class="bg-primary text-white rounded-circle d-flex align-items-center justify-content-center" style="width: 50px; height: 50px;">
-                                                <i class="fas fa-user"></i>
-                                            </div>
-                                        </div>
-                                        <div class="flex-grow-1 ms-3">
-                                            <h6 class="fw-bold mb-1">{{ mao.funcionario.nome if mao.funcionario else 'N/A' }}</h6>
-                                            <p class="text-muted mb-1">{{ mao.funcao_exercida }}</p>
-                                            <div class="d-flex align-items-center">
-                                                <i class="fas fa-clock text-success me-1"></i>
-                                                <span class="fw-bold text-success">{{ mao.horas_trabalhadas }}h</span>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                            {% endfor %}
-                        </div>
-                        
-                        <!-- Resumo Total -->
-                        <div class="info-card mt-3">
-                            <div class="d-flex justify-content-between align-items-center">
-                                <span class="fw-bold">Total de Horas Trabalhadas:</span>
-                                <span class="badge bg-success fs-6 px-3 py-2">{{ rdo.mao_obra|sum(attribute='horas_trabalhadas') }}h</span>
-                            </div>
-                        </div>
-                        {% else %}
-                        <div class="empty-state">
-                            <i class="fas fa-users"></i>
-                            <h6>Nenhum funcionário registrado</h6>
-                            <p>Este RDO ainda não possui funcionários alocados.</p>
-                        </div>
-                        {% endif %}
-                    </div>
-
-                    <!-- Equipamentos -->
-                    {% if rdo.equipamentos %}
-                    <div class="mb-4">
-                        <h5 class="fw-bold mb-3">
-                            <i class="fas fa-tools me-2"></i>Equipamentos Utilizados
-                        </h5>
-                        <div class="row">
-                            {% for equipamento in rdo.equipamentos %}
-                            <div class="col-lg-6 mb-3">
-                                <div class="service-card">
-                                    <div class="d-flex justify-content-between align-items-start">
-                                        <div class="flex-grow-1">
-                                            <h6 class="fw-bold mb-2">{{ equipamento.nome_equipamento }}</h6>
-                                            <div class="row g-2 mb-2">
-                                                <div class="col-6">
-                                                    <small class="text-muted">Quantidade:</small>
-                                                    <div class="fw-bold">{{ equipamento.quantidade }} unidades</div>
-                                                </div>
-                                                <div class="col-6">
-                                                    <small class="text-muted">Horas de uso:</small>
-                                                    <div class="fw-bold text-primary">{{ equipamento.horas_uso }}h</div>
-                                                </div>
-                                            </div>
-                                        </div>
-                                        <div class="flex-shrink-0">
-                                            <span class="climate-badge bg-{{ 'success' if equipamento.estado_conservacao == 'Bom' else ('warning' if equipamento.estado_conservacao == 'Regular' else 'danger') }} text-white">
-                                                {{ equipamento.estado_conservacao }}
-                                            </span>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                            {% endfor %}
-                        </div>
-                    </div>
-                    {% endif %}
-
-                    <!-- Ocorrências -->
-                    {% if rdo.ocorrencias_rdo %}
-                    <div class="mb-4">
-                        <h5 class="fw-bold mb-3">
-                            <i class="fas fa-exclamation-triangle me-2 text-warning"></i>Ocorrências
-                        </h5>
-                        {% for ocorrencia in rdo.ocorrencias_rdo %}
-                        <div class="service-card mb-3">
-                            <div class="d-flex align-items-start">
-                                <div class="flex-shrink-0 me-3">
-                                    <div class="bg-warning text-dark rounded-circle d-flex align-items-center justify-content-center" style="width: 40px; height: 40px;">
-                                        <i class="fas fa-exclamation"></i>
-                                    </div>
-                                </div>
-                                <div class="flex-grow-1">
-                                    <h6 class="fw-bold mb-2">{{ ocorrencia.descricao_ocorrencia }}</h6>
-                                    {% if ocorrencia.problemas_identificados %}
-                                    <div class="mb-2">
-                                        <small class="text-muted fw-bold">Problemas identificados:</small>
-                                        <p class="mb-0">{{ ocorrencia.problemas_identificados }}</p>
-                                    </div>
-                                    {% endif %}
-                                    {% if ocorrencia.acoes_corretivas %}
-                                    <div class="p-2 bg-light rounded">
-                                        <small class="text-muted fw-bold">Ações corretivas:</small>
-                                        <p class="mb-0 mt-1">{{ ocorrencia.acoes_corretivas }}</p>
-                                    </div>
-                                    {% endif %}
-                                </div>
-                            </div>
-                        </div>
-                        {% endfor %}
-                    </div>
-                    {% endif %}
-
-                    <!-- Comentário Geral -->
-                    {% if rdo.comentario_geral %}
-                    <div class="mb-4">
-                        <h5 class="fw-bold mb-3">
-                            <i class="fas fa-comment me-2"></i>Comentário Geral
-                        </h5>
-                        <div class="info-card">
-                            <div class="p-3 bg-light rounded">
-                                {{ rdo.comentario_geral }}
-                            </div>
-                        </div>
-                    </div>
-                    {% endif %}
-
-                    <!-- Fotos -->
-                    {% if rdo.fotos %}
-                    <div class="mb-4">
-                        <h5 class="fw-bold mb-3">
-                            <i class="fas fa-camera me-2"></i>Fotos da Obra
-                        </h5>
-                        <div class="row">
-                            {% for foto in rdo.fotos %}
-                            <div class="col-lg-4 col-md-6 mb-3">
-                                <div class="service-card">
-                                    <img src="{{ foto.caminho_arquivo }}" class="img-fluid rounded mb-2" alt="{{ foto.legenda }}" style="width: 100%; height: 200px; object-fit: cover;">
-                                    {% if foto.legenda %}
-                                    <div class="p-2">
-                                        <small class="text-muted">{{ foto.legenda }}</small>
-                                    </div>
-                                    {% endif %}
-                                </div>
-                            </div>
-                            {% endfor %}
-                        </div>
-                    </div>
-                    {% endif %}
-                </div>
-            </div>
-        </div>
-    </div>
-</div>
-
-<style>
-.badge-clima {
-    font-size: 0.9em;
-}
-</style>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Animar entrada dos cards
+    setTimeout(() => {
+        document.querySelectorAll('.rdo-card').forEach((card, index) => {
+            setTimeout(() => {
+                card.classList.add('slide-in');
+            }, index * 100);
+        });
+    }, 100);
+});
+</script>
 {% endblock %}
