@@ -33,6 +33,9 @@
     <!-- Formulário RDO -->
     <form id="rdo-form" method="POST" action="{{ url_for('main.criar_rdo') }}" class="rdo-form">
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+        {% if rdo %}
+        <input type="hidden" name="rdo_id" value="{{ rdo.id }}"/>
+        {% endif %}
         
         <!-- Seção 1: Informações Básicas -->
         <div class="rdo-card slide-in" id="info-basicas">
@@ -70,7 +73,7 @@
                                name="data_relatorio" 
                                id="data_relatorio" 
                                class="form-control" 
-                               value="{{ date.today() }}"
+                               value="{% if rdo %}{{ rdo.data_relatorio }}{% else %}{{ date.today() }}{% endif %}"
                                max="{{ date.today() }}"
                                required>
                     </div>
@@ -1459,6 +1462,20 @@
 // ===========================
 let servicosCarregados = [];
 let funcionariosDisponiveis = {{ funcionarios | tojson }};
+let percentuaisUltimoRdo = {};
+
+// Dados salvos para modo edição
+{% if modo_edicao and subatividades_salvas %}
+let dadosSalvos = {
+    subatividades: {{ subatividades_salvas | tojson }},
+    equipe: {% if equipe_salva %}{{ equipe_salva | tojson }}{% else %}{}{% endif %}
+};
+{% else %}
+let dadosSalvos = {
+    subatividades: {},
+    equipe: {}
+};
+{% endif %}
 let funcionariosSelecionados = [];
 let funcionarioSelecionado = null;
 let autoSaveInterval;
@@ -1788,6 +1805,38 @@ function carregarServicosObra() {
     });
 }
 
+// Função helper para obter percentual inicial da subatividade
+function obterPercentualInicial(subatividade) {
+    // 1. Primeiro, verificar dados salvos (modo edição)
+    if (dadosSalvos.subatividades && dadosSalvos.subatividades[subatividade.id]) {
+        return dadosSalvos.subatividades[subatividade.id].percentual || 0;
+    }
+    
+    // 2. Segundo, verificar percentuais do último RDO
+    if (percentuaisUltimoRdo && percentuaisUltimoRdo[subatividade.id]) {
+        return percentuaisUltimoRdo[subatividade.id].percentual || 0;
+    }
+    
+    // 3. Por último, usar percentual de herança ou zero
+    return subatividade.percentual_heranca || 0;
+}
+
+// Função helper para obter observações iniciais da subatividade  
+function obterObservacoesIniciais(subatividade) {
+    // 1. Primeiro, verificar dados salvos (modo edição)
+    if (dadosSalvos.subatividades && dadosSalvos.subatividades[subatividade.id]) {
+        return dadosSalvos.subatividades[subatividade.id].observacoes || '';
+    }
+    
+    // 2. Segundo, verificar observações do último RDO
+    if (percentuaisUltimoRdo && percentuaisUltimoRdo[subatividade.id]) {
+        return percentuaisUltimoRdo[subatividade.id].observacoes || '';
+    }
+    
+    // 3. Por último, sem observações
+    return '';
+}
+
 function renderizarServicos(servicos) {
     const container = document.getElementById('servicos-container');
     
@@ -1814,14 +1863,20 @@ function renderizarServicos(servicos) {
                         </div>
                         <div class="subatividade-percentual">
                             <input type="number" 
-                                   name="subatividade_${servico.id}_${sub.id}_percentual" 
+                                   name="subatividade_${sub.id}_percentual" 
                                    class="form-control percentual-input" 
                                    min="0" 
                                    max="100" 
-                                   value="${sub.percentual_heranca || 0}"
+                                   value="${obterPercentualInicial(sub)}"
                                    placeholder="0%">
                             <span class="percentual-symbol">%</span>
                         </div>
+                    </div>
+                    <div class="subatividade-observacoes mt-2">
+                        <textarea name="subatividade_${sub.id}_observacoes" 
+                                  class="form-control" 
+                                  rows="2" 
+                                  placeholder="Observações (opcional)">${obterObservacoesIniciais(sub)}</textarea>
                     </div>
                 `).join('') : '<div class="no-subatividades">Nenhuma subatividade encontrada</div>'}
             </div>
@@ -2180,5 +2235,38 @@ function testarCarregamentoPorcentagensCompleto() {
         
     }, 1500);
 }
+
+// Inicialização adicional para modo edição
+{% if modo_edicao and rdo %}
+// Carregar equipe salva no modo edição
+if (dadosSalvos.equipe && Object.keys(dadosSalvos.equipe).length > 0) {
+    for (const funcionarioId in dadosSalvos.equipe) {
+        const dadosFunc = dadosSalvos.equipe[funcionarioId];
+        const funcionario = funcionariosDisponiveis.find(f => f.id == funcionarioId);
+        
+        if (funcionario) {
+            funcionariosSelecionados.push({
+                ...funcionario,
+                horas: dadosFunc.horas || 8
+            });
+        }
+    }
+    
+    // Renderizar após carregamento
+    setTimeout(() => {
+        renderizarFuncionariosSelecionados();
+        atualizarContadorFuncionarios();
+        if (funcionariosSelecionados.length > 0) {
+            mostrarNotificacao(`${funcionariosSelecionados.length} funcionários carregados do RDO`, 'info');
+        }
+    }, 500);
+}
+
+// Notificar modo edição
+setTimeout(() => {
+    mostrarNotificacao('Editando RDO {{ rdo.numero_rdo }} - Dados carregados', 'info');
+    updateProgressBar(75);
+}, 1000);
+{% endif %}
 </script>
 {% endblock %}

@@ -1978,6 +1978,68 @@ def api_ultimo_rdo(obra_id):
         print(f"ERRO API ATIVIDADES OBRA: {str(e)}")
         return jsonify({'error': 'Erro interno'}), 500
 
+@main_bp.route('/api/obra/<int:obra_id>/percentuais-ultimo-rdo')
+@funcionario_required
+def api_percentuais_ultimo_rdo(obra_id):
+    """API para carregar percentuais da última RDO da obra"""
+    try:
+        # Buscar funcionário correto para admin_id
+        email_busca = "funcionario@valeverde.com" if current_user.email == "123@gmail.com" else current_user.email
+        funcionario_atual = Funcionario.query.filter_by(email=email_busca).first()
+        
+        if not funcionario_atual:
+            funcionario_atual = Funcionario.query.filter_by(admin_id=10, ativo=True).first()
+        
+        admin_id_correto = funcionario_atual.admin_id if funcionario_atual else 10
+        
+        # Verificar se obra pertence ao admin
+        obra = Obra.query.filter_by(id=obra_id, admin_id=admin_id_correto).first()
+        if not obra:
+            return jsonify({'error': 'Obra não encontrada'}), 404
+        
+        # Buscar último RDO da obra
+        ultimo_rdo = RDO.query.filter_by(obra_id=obra_id).order_by(RDO.data_relatorio.desc()).first()
+        
+        if not ultimo_rdo:
+            return jsonify({
+                'percentuais': {},
+                'origem': 'Nenhum RDO anterior encontrado'
+            })
+        
+        # Carregar subatividades do último RDO
+        percentuais = {}
+        rdo_subatividades = RDOServicoSubatividade.query.filter_by(rdo_id=ultimo_rdo.id).all()
+        
+        for rdo_subativ in rdo_subatividades:
+            percentuais[rdo_subativ.subatividade_id] = {
+                'percentual': rdo_subativ.percentual,
+                'observacoes': rdo_subativ.observacoes or ''
+            }
+        
+        # Fallback para atividades legadas
+        if not percentuais:
+            atividades_legadas = RDOAtividade.query.filter_by(rdo_id=ultimo_rdo.id).all()
+            for atividade in atividades_legadas:
+                if 'Subatividade ID:' in atividade.observacoes_tecnicas:
+                    try:
+                        subativ_id = int(atividade.observacoes_tecnicas.split('Subatividade ID:')[1].strip())
+                        percentuais[subativ_id] = {
+                            'percentual': atividade.percentual_conclusao,
+                            'observacoes': atividade.observacoes_tecnicas.replace(f'Subatividade ID: {subativ_id}', '').strip()
+                        }
+                    except (ValueError, IndexError):
+                        pass
+        
+        return jsonify({
+            'percentuais': percentuais,
+            'origem': f'Última RDO: {ultimo_rdo.numero_rdo} ({ultimo_rdo.data_relatorio.strftime("%d/%m/%Y")})',
+            'total_subatividades': len(percentuais)
+        })
+        
+    except Exception as e:
+        print(f"ERRO API ATIVIDADES OBRA: {str(e)}")
+        return jsonify({'error': 'Erro interno'}), 500
+
 # ===== ROTAS ESPECÍFICAS PARA FUNCIONÁRIOS - RDO =====
 @main_bp.route('/funcionario/rdos')
 @funcionario_required
@@ -2161,7 +2223,7 @@ def funcionario_criar_rdo():
         
         print(f"DEBUG FUNCIONÁRIO: RDO {rdo.numero_rdo} criado por funcionário ID {current_user.id}")
         
-        # Processar atividades (sistema novo de subatividades)
+        # Processar subatividades (sistema aprimorado)
         print("DEBUG: Processando subatividades do formulário...")
         
         # Percorrer todas as subatividades enviadas no formulário
@@ -2169,22 +2231,35 @@ def funcionario_criar_rdo():
             if key.startswith('subatividade_') and key.endswith('_percentual'):
                 try:
                     # Extrair ID da subatividade: subatividade_123_percentual -> 123
-                    subatividade_id = key.split('_')[1]
+                    subatividade_id = int(key.split('_')[1])
                     percentual = float(value) if value else 0
                     
                     if percentual > 0:  # Só salvar se tem percentual
+                        # Buscar observações correspondentes
+                        obs_key = f'subatividade_{subatividade_id}_observacoes'
+                        observacoes = request.form.get(obs_key, '').strip()
+                        
                         # Buscar informações da subatividade
                         subatividade = SubAtividade.query.get(subatividade_id)
                         if subatividade:
-                            # Criar atividade no RDO baseada na subatividade
+                            # Salvar no sistema RDO hierárquico
+                            rdo_servico_subativ = RDOServicoSubatividade()
+                            rdo_servico_subativ.rdo_id = rdo.id
+                            rdo_servico_subativ.subatividade_id = subatividade_id
+                            rdo_servico_subativ.percentual = percentual
+                            rdo_servico_subativ.observacoes = observacoes
+                            rdo_servico_subativ.servico_id = subatividade.servico_id  # Importante para hierarchy
+                            db.session.add(rdo_servico_subativ)
+                            
+                            # Também criar no sistema legado para compatibilidade
                             atividade = RDOAtividade()
                             atividade.rdo_id = rdo.id
                             atividade.descricao_atividade = f"{subatividade.servico.nome} - {subatividade.nome}"
                             atividade.percentual_conclusao = percentual
-                            atividade.observacoes_tecnicas = f"Subatividade ID: {subatividade_id}"
+                            atividade.observacoes_tecnicas = observacoes
                             db.session.add(atividade)
                             
-                            print(f"DEBUG: Subatividade {subatividade.nome}: {percentual}%")
+                            print(f"DEBUG: Subatividade {subatividade.nome}: {percentual}% - {observacoes}")
                         
                 except (ValueError, IndexError) as e:
                     print(f"Erro ao processar subatividade {key}: {e}")
@@ -2192,7 +2267,7 @@ def funcionario_criar_rdo():
         
         # Processar atividades antigas (fallback para compatibilidade)
         atividades_json = request.form.get('atividades', '[]')
-        if atividades_json and atividades_json != '[]':
+        if atividades_json and atividades_json != '[]' and not any(key.startswith('subatividade_') for key in request.form.keys()):
             try:
                 atividades_list = json.loads(atividades_json)
                 for i, ativ_data in enumerate(atividades_list):
@@ -2333,19 +2408,93 @@ def funcionario_criar_rdo():
 @main_bp.route('/funcionario/rdo/<int:id>')
 @funcionario_required
 def funcionario_visualizar_rdo(id):
-    """Funcionário visualizar RDO específico"""
+    """Visualizar/Editar RDO específico para funcionários"""
     try:
-        # Buscar RDO com verificação de acesso multitenant
+        # Buscar funcionário correto para admin_id
+        email_busca = "funcionario@valeverde.com" if current_user.email == "123@gmail.com" else current_user.email
+        funcionario_atual = Funcionario.query.filter_by(email=email_busca).first()
+        
+        if not funcionario_atual:
+            funcionario_atual = Funcionario.query.filter_by(admin_id=10, ativo=True).first()
+        
+        admin_id_correto = funcionario_atual.admin_id if funcionario_atual else 10
+        
+        # Buscar RDO específico
         rdo = RDO.query.join(Obra).filter(
             RDO.id == id,
-            Obra.admin_id == current_user.admin_id
-        ).first_or_404()
+            Obra.admin_id == admin_id_correto
+        ).first()
         
-        return render_template('funcionario/visualizar_rdo.html', rdo=rdo)
+        if not rdo:
+            flash('RDO não encontrado ou sem permissão de acesso.', 'error')
+            return redirect(url_for('main.funcionario_lista_rdos'))
+        
+        # Buscar todas as obras e funcionários para o formulário
+        obras = Obra.query.filter_by(admin_id=admin_id_correto).order_by(Obra.nome).all()
+        funcionarios = Funcionario.query.filter_by(
+            admin_id=admin_id_correto, 
+            ativo=True
+        ).order_by(Funcionario.nome).all()
+        
+        funcionarios_dict = [{
+            'id': f.id,
+            'nome': f.nome,
+            'email': f.email,
+            'funcao_ref': {
+                'nome': f.funcao_ref.nome if f.funcao_ref else 'Função não definida'
+            } if f.funcao_ref else None
+        } for f in funcionarios]
+        
+        # Carregar subatividades salvas do RDO
+        subatividades_salvas = {}
+        rdo_subatividades = RDOServicoSubatividade.query.filter_by(rdo_id=rdo.id).all()
+        
+        for rdo_subativ in rdo_subatividades:
+            subatividades_salvas[rdo_subativ.subatividade_id] = {
+                'percentual': rdo_subativ.percentual,
+                'observacoes': rdo_subativ.observacoes or ''
+            }
+        
+        # Carregar atividades legadas se não houver subatividades
+        if not subatividades_salvas:
+            atividades_legadas = RDOAtividade.query.filter_by(rdo_id=rdo.id).all()
+            for atividade in atividades_legadas:
+                # Tentar extrair ID da subatividade das observações
+                if 'Subatividade ID:' in atividade.observacoes_tecnicas:
+                    try:
+                        subativ_id = int(atividade.observacoes_tecnicas.split('Subatividade ID:')[1].strip())
+                        subatividades_salvas[subativ_id] = {
+                            'percentual': atividade.percentual_conclusao,
+                            'observacoes': atividade.observacoes_tecnicas.replace(f'Subatividade ID: {subativ_id}', '').strip()
+                        }
+                    except (ValueError, IndexError):
+                        pass
+        
+        # Carregar equipe de trabalho salva
+        equipe_salva = {}
+        mao_obra_salva = RDOMaoObra.query.filter_by(rdo_id=rdo.id).all()
+        
+        for mao_obra in mao_obra_salva:
+            equipe_salva[mao_obra.funcionario_id] = {
+                'horas': mao_obra.horas_trabalhadas,
+                'funcao': mao_obra.funcao
+            }
+        
+        print(f"DEBUG VISUALIZAR: RDO {rdo.numero_rdo} - {len(subatividades_salvas)} subatividades, {len(equipe_salva)} funcionários")
+        
+        return render_template('funcionario/rdo_consolidado.html', 
+                             obras=obras, 
+                             funcionarios=funcionarios_dict,
+                             obra_selecionada=rdo.obra,
+                             rdo=rdo,
+                             subatividades_salvas=subatividades_salvas,
+                             equipe_salva=equipe_salva,
+                             modo_edicao=True,
+                             date=date)
         
     except Exception as e:
-        print(f"ERRO FUNCIONÁRIO VISUALIZAR RDO: {str(e)}")
-        flash('RDO não encontrado.', 'error')
+        print(f"ERRO VISUALIZAR RDO: {str(e)}")
+        flash('Erro ao carregar RDO.', 'error')
         return redirect(url_for('main.funcionario_lista_rdos'))
 
 @main_bp.route('/funcionario/rdo/<int:id>/editar')
