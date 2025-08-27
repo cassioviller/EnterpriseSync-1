@@ -158,6 +158,38 @@ console.log('Initializing RDO with light theme...');
     font-weight: 400;
 }
 
+.header-actions {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+}
+
+.header-actions .btn-light {
+    background: rgba(255, 255, 255, 0.95);
+    border: 2px solid rgba(255, 255, 255, 0.5);
+    color: var(--primary-green);
+    padding: 1rem 2rem;
+    border-radius: var(--border-radius);
+    text-decoration: none;
+    font-weight: 700;
+    font-size: 1rem;
+    transition: var(--transition);
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    box-shadow: var(--shadow-md);
+    backdrop-filter: blur(10px);
+}
+
+.header-actions .btn-light:hover {
+    background: rgba(255, 255, 255, 1);
+    border-color: var(--primary-green);
+    color: var(--primary-green);
+    text-decoration: none;
+    transform: translateY(-3px);
+    box-shadow: var(--shadow-lg);
+}
+
 .btn-voltar {
     background: rgba(255, 255, 255, 0.2);
     backdrop-filter: blur(10px);
@@ -810,9 +842,14 @@ console.log('Initializing RDO with light theme...');
                     <p>Sistema moderno de acompanhamento e gestão de RDOs</p>
                 </div>
             </div>
-            <a href="{{ url_for('main.dashboard') }}" class="btn-voltar">
-                <i class="fas fa-arrow-left"></i> Voltar
-            </a>
+            <div class="header-actions">
+                <a href="{{ url_for('main.novo_rdo') }}" class="btn btn-light btn-lg me-3">
+                    <i class="fas fa-plus me-2"></i>Criar Novo RDO
+                </a>
+                <a href="{{ url_for('main.dashboard') }}" class="btn-voltar">
+                    <i class="fas fa-arrow-left"></i> Voltar
+                </a>
+            </div>
         </div>
     </div>
 
