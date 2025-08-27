@@ -1645,7 +1645,9 @@ def rdo_lista_unificada():
                     ).all()
                     
                     if subatividades:
-                        progresso_real = sum(sub.percentual_conclusao or 0 for sub in subatividades) / len(subatividades)
+                        # Calcular média das subatividades (máximo 100%)
+                        soma_percentuais = sum(min(sub.percentual_conclusao or 0, 100) for sub in subatividades)
+                        progresso_real = min(soma_percentuais / len(subatividades), 100)
                     else:
                         progresso_real = 0
                     
@@ -1676,7 +1678,7 @@ def rdo_lista_unificada():
         
         print(f"DEBUG LISTA RDOs: {rdos.total} RDOs encontrados para admin_id={admin_id}")
         if rdos.items:
-            print(f"DEBUG: Mostrando página {page} com {len(rdos.items)} RDOs")
+            print(f"DEBUG: Mostrando página {rdos.page} com {len(rdos.items)} RDOs")
             for rdo in rdos.items[:3]:
                 print(f"DEBUG RDO {rdo.id}: {len(rdo.servico_subatividades)} subatividades, {len(rdo.mao_obra)} funcionários, {rdo.progresso_total}% progresso")
         
@@ -1690,7 +1692,7 @@ def rdo_lista_unificada():
                                  'data_inicio': data_inicio,
                                  'data_fim': data_fim,
                                  'funcionario_id': funcionario_filter,
-                                 'order_by': order_by
+                                 'order_by': 'data_desc'
                              })
         
     except Exception as e:
@@ -1773,7 +1775,7 @@ def rdo_lista_unificada():
 def excluir_rdo(rdo_id):
     """Excluir RDO e todas suas dependências"""
     try:
-        admin_id = get_admin_id()
+        admin_id = current_user.id if current_user.tipo_usuario == TipoUsuario.ADMIN else current_user.admin_id
         
         # Buscar RDO
         rdo = db.session.query(RDO).join(Obra).filter(
@@ -1783,7 +1785,7 @@ def excluir_rdo(rdo_id):
         
         if not rdo:
             flash('RDO não encontrado.', 'error')
-            return redirect(url_for('main.rdo_lista'))
+            return redirect(url_for('main.rdo_lista_unificada'))
         
         # Excluir dependências em ordem
         db.session.query(RDOMaoObra).filter(RDOMaoObra.rdo_id == rdo_id).delete()
@@ -1795,13 +1797,13 @@ def excluir_rdo(rdo_id):
         db.session.commit()
         
         flash('RDO excluído com sucesso.', 'success')
-        return redirect(url_for('main.rdo_lista'))
+        return redirect(url_for('main.rdo_lista_unificada'))
         
     except Exception as e:
         db.session.rollback()
         print(f"Erro ao excluir RDO {rdo_id}: {str(e)}")
         flash('Erro ao excluir RDO. Tente novamente.', 'error')
-        return redirect(url_for('main.rdo_lista'))
+        return redirect(url_for('main.rdo_lista_unificada'))
 
 @main_bp.route('/rdo/novo')
 @funcionario_required
@@ -2088,7 +2090,7 @@ def visualizar_rdo(id):
         print(f"DEBUG SUBATIVIDADES: {len(subatividades)} encontradas")
         print(f"DEBUG MÃO DE OBRA: {len(rdo.mao_obra)} funcionários")
         
-        return render_template('rdo/visualizar.html', rdo=rdo, subatividades=subatividades)
+        return render_template('rdo/visualizar_rdo.html', rdo=rdo, subatividades=subatividades)
         
     except Exception as e:
         print(f"ERRO VISUALIZAR RDO: {str(e)}")
@@ -2334,12 +2336,12 @@ def editar_rdo(id):
             Obra.admin_id == admin_id
         ).first_or_404()
         
-        return render_template('rdo/editar.html', rdo=rdo)
+        return render_template('rdo/editar_rdo.html', rdo=rdo)
         
     except Exception as e:
         print(f"ERRO EDITAR RDO: {str(e)}")
         flash('Erro ao carregar RDO para edição.', 'error')
-        return redirect(url_for('main.lista_rdos'))
+        return redirect(url_for('main.rdo_lista_unificada'))
 
 @main_bp.route('/rdo/api/ultimo-rdo/<int:obra_id>')
 def api_ultimo_rdo(obra_id):

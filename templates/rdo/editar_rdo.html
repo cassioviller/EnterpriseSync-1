@@ -1,0 +1,251 @@
+{% extends "base_completo.html" %}
+
+{% block title %}Editar RDO {{ rdo.numero_rdo }} - SIGE{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h1 class="h3">
+                <i class="fas fa-edit"></i> Editar RDO {{ rdo.numero_rdo }}
+            </h1>
+            <div class="btn-group">
+                <a href="{{ url_for('main.visualizar_rdo', id=rdo.id) }}" class="btn btn-outline-secondary">
+                    <i class="fas fa-arrow-left"></i> Cancelar
+                </a>
+                <button type="submit" form="form-editar-rdo" class="btn btn-success">
+                    <i class="fas fa-save"></i> Salvar Alterações
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Formulário de Edição -->
+<form id="form-editar-rdo" method="POST" action="{{ url_for('main.atualizar_rdo', id=rdo.id) }}">
+    <div class="card mb-4">
+        <div class="card-header">
+            <h5 class="mb-0">
+                <i class="fas fa-info-circle"></i> Informações Básicas
+            </h5>
+        </div>
+        <div class="card-body">
+            <div class="row">
+                <div class="col-md-6">
+                    <label class="form-label">Data do Relatório:</label>
+                    <input type="date" class="form-control" name="data_relatorio" 
+                           value="{{ rdo.data_relatorio.strftime('%Y-%m-%d') }}" required>
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label">Status:</label>
+                    <select class="form-select" name="status">
+                        <option value="Rascunho" {% if rdo.status == 'Rascunho' %}selected{% endif %}>
+                            Rascunho
+                        </option>
+                        <option value="Finalizado" {% if rdo.status == 'Finalizado' %}selected{% endif %}>
+                            Finalizado
+                        </option>
+                    </select>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Condições Meteorológicas -->
+    <div class="card mb-4">
+        <div class="card-header">
+            <h5 class="mb-0">
+                <i class="fas fa-cloud-sun"></i> Condições Meteorológicas
+            </h5>
+        </div>
+        <div class="card-body">
+            <div class="row">
+                <div class="col-md-4">
+                    <label class="form-label">Manhã:</label>
+                    <select class="form-select" name="tempo_manha">
+                        <option value="Bom" {% if rdo.tempo_manha == 'Bom' %}selected{% endif %}>Bom</option>
+                        <option value="Chuvoso" {% if rdo.tempo_manha == 'Chuvoso' %}selected{% endif %}>Chuvoso</option>
+                        <option value="Nublado" {% if rdo.tempo_manha == 'Nublado' %}selected{% endif %}>Nublado</option>
+                    </select>
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label">Tarde:</label>
+                    <select class="form-select" name="tempo_tarde">
+                        <option value="Bom" {% if rdo.tempo_tarde == 'Bom' %}selected{% endif %}>Bom</option>
+                        <option value="Chuvoso" {% if rdo.tempo_tarde == 'Chuvoso' %}selected{% endif %}>Chuvoso</option>
+                        <option value="Nublado" {% if rdo.tempo_tarde == 'Nublado' %}selected{% endif %}>Nublado</option>
+                    </select>
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label">Noite:</label>
+                    <select class="form-select" name="tempo_noite">
+                        <option value="Bom" {% if rdo.tempo_noite == 'Bom' %}selected{% endif %}>Bom</option>
+                        <option value="Chuvoso" {% if rdo.tempo_noite == 'Chuvoso' %}selected{% endif %}>Chuvoso</option>
+                        <option value="Nublado" {% if rdo.tempo_noite == 'Nublado' %}selected{% endif %}>Nublado</option>
+                    </select>
+                </div>
+            </div>
+            <div class="row mt-3">
+                <div class="col-12">
+                    <label class="form-label">Observações Meteorológicas:</label>
+                    <textarea class="form-control" name="observacoes_meteorologicas" rows="2" 
+                              placeholder="Observações sobre as condições meteorológicas...">{{ rdo.observacoes_meteorologicas or '' }}</textarea>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Serviços e Subatividades -->
+    <div class="card mb-4">
+        <div class="card-header">
+            <h5 class="mb-0">
+                <i class="fas fa-tasks"></i> Serviços e Subatividades
+            </h5>
+        </div>
+        <div class="card-body">
+            <div id="servicos-container">
+                {% if rdo.servico_subatividades %}
+                    {% for subatividade in rdo.servico_subatividades %}
+                    <div class="subatividade-item border rounded p-3 mb-3">
+                        <div class="row">
+                            <div class="col-md-5">
+                                <label class="form-label">Nome da Subatividade:</label>
+                                <input type="text" class="form-control" 
+                                       name="subatividade_nome_{{ loop.index0 }}" 
+                                       value="{{ subatividade.nome_subatividade }}" 
+                                       placeholder="Ex: Concretagem, Armação, etc.">
+                            </div>
+                            <div class="col-md-2">
+                                <label class="form-label">Progresso (%):</label>
+                                <input type="number" class="form-control" 
+                                       name="subatividade_percentual_{{ loop.index0 }}" 
+                                       value="{{ subatividade.percentual_conclusao|int }}" 
+                                       min="0" max="100" step="1">
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label">Observações Técnicas:</label>
+                                <input type="text" class="form-control" 
+                                       name="subatividade_obs_{{ loop.index0 }}" 
+                                       value="{{ subatividade.observacoes_tecnicas or '' }}" 
+                                       placeholder="Observações técnicas...">
+                            </div>
+                            <div class="col-md-1 d-flex align-items-end">
+                                <button type="button" class="btn btn-outline-danger btn-sm" 
+                                        onclick="removeSubatividade(this)">
+                                    <i class="fas fa-trash"></i>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                {% else %}
+                    <div class="alert alert-info">
+                        <i class="fas fa-info-circle"></i> 
+                        Nenhuma subatividade encontrada. Use o botão abaixo para adicionar.
+                    </div>
+                {% endif %}
+            </div>
+            <button type="button" class="btn btn-outline-primary" onclick="addSubatividade()">
+                <i class="fas fa-plus"></i> Adicionar Subatividade
+            </button>
+        </div>
+    </div>
+
+    <!-- Mão de Obra -->
+    <div class="card mb-4">
+        <div class="card-header">
+            <h5 class="mb-0">
+                <i class="fas fa-users"></i> Mão de Obra
+            </h5>
+        </div>
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-bordered">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Funcionário</th>
+                            <th>Função</th>
+                            <th>Horas Trabalhadas</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% if rdo.mao_obra %}
+                            {% for mo in rdo.mao_obra %}
+                            <tr>
+                                <td>{{ mo.funcionario.nome if mo.funcionario else 'Funcionário removido' }}</td>
+                                <td>{{ mo.funcao_exercida or 'Não informado' }}</td>
+                                <td>{{ mo.horas_trabalhadas or 0 }}h</td>
+                            </tr>
+                            {% endfor %}
+                        {% else %}
+                            <tr>
+                                <td colspan="3" class="text-center text-muted">
+                                    Nenhum funcionário registrado
+                                </td>
+                            </tr>
+                        {% endif %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Comentários Gerais -->
+    <div class="card mb-4">
+        <div class="card-header">
+            <h5 class="mb-0">
+                <i class="fas fa-comment"></i> Comentários Gerais
+            </h5>
+        </div>
+        <div class="card-body">
+            <textarea class="form-control" name="comentario_geral" rows="4" 
+                      placeholder="Comentários gerais sobre o andamento dos trabalhos...">{{ rdo.comentario_geral or '' }}</textarea>
+        </div>
+    </div>
+
+</form>
+
+<script>
+function addSubatividade() {
+    const container = document.getElementById('servicos-container');
+    const index = container.children.length;
+    
+    const html = `
+        <div class="subatividade-item border rounded p-3 mb-3">
+            <div class="row">
+                <div class="col-md-5">
+                    <label class="form-label">Nome da Subatividade:</label>
+                    <input type="text" class="form-control" 
+                           name="subatividade_nome_${index}" 
+                           placeholder="Ex: Concretagem, Armação, etc.">
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label">Progresso (%):</label>
+                    <input type="number" class="form-control" 
+                           name="subatividade_percentual_${index}" 
+                           value="0" min="0" max="100" step="1">
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label">Observações Técnicas:</label>
+                    <input type="text" class="form-control" 
+                           name="subatividade_obs_${index}" 
+                           placeholder="Observações técnicas...">
+                </div>
+                <div class="col-md-1 d-flex align-items-end">
+                    <button type="button" class="btn btn-outline-danger btn-sm" 
+                            onclick="removeSubatividade(this)">
+                        <i class="fas fa-trash"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    container.insertAdjacentHTML('beforeend', html);
+}
+
+function removeSubatividade(button) {
+    button.closest('.subatividade-item').remove();
+}
+</script>
+{% endblock %}
