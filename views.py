@@ -2677,7 +2677,7 @@ def api_rdo_servicos_obra(obra_id):
                             'id': sub.id,
                             'nome': sub.nome,
                             'descricao': sub.descricao or '',
-                            'unidade_medida': sub.unidade_medida or 'UN',
+                            'unidade_medida': 'UN',  # Campo fixo, não existe na tabela
                             'percentual_heranca': 0
                         })
                         print(f"DEBUG API: Subatividade: {sub.nome}")
