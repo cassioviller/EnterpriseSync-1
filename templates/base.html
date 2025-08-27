@@ -1,0 +1,1237 @@
+<!DOCTYPE html>
+<html lang="pt-BR" data-bs-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <meta name="theme-color" content="#0d6efd">
+    <link rel="manifest" href="/static/manifest.json">
+    <title>{% block title %}SIGE - Estruturas do Vale{% endblock %}</title>
+    
+    <!-- Bootstrap CSS -->
+    <link href="https://cdn.replit.com/agent/bootstrap-agent-dark-theme.min.css" rel="stylesheet">
+    
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    
+    <!-- jQuery (primeiro) -->
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    
+    <!-- DataTables CSS -->
+    <link rel="stylesheet" href="https://cdn.datatables.net/1.13.6/css/dataTables.bootstrap5.min.css">
+    
+
+    
+    <!-- Custom CSS -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
+    
+    <!-- Global Theme Styling -->
+    <style>
+        /* ===== DARK MODE (Default) ===== */
+        html[data-bs-theme="dark"] body {
+            background-color: #1a1a1a !important;
+            color: #ffffff !important;
+        }
+
+        html[data-bs-theme="dark"] .card {
+            background-color: #2d3748 !important;
+            border-color: #4a5568 !important;
+            color: #ffffff !important;
+        }
+
+        html[data-bs-theme="dark"] .card-header {
+            background-color: #374151 !important;
+            border-color: #4a5568 !important;
+            color: #ffffff !important;
+        }
+
+        html[data-bs-theme="dark"] .card-body {
+            background-color: #2d3748 !important;
+            color: #ffffff !important;
+        }
+
+        html[data-bs-theme="dark"] .form-control,
+        html[data-bs-theme="dark"] .form-select,
+        html[data-bs-theme="dark"] input[type="text"],
+        html[data-bs-theme="dark"] input[type="email"],
+        html[data-bs-theme="dark"] input[type="password"],
+        html[data-bs-theme="dark"] input[type="tel"],
+        html[data-bs-theme="dark"] input[type="date"],
+        html[data-bs-theme="dark"] input[type="datetime-local"],
+        html[data-bs-theme="dark"] input[type="number"],
+        html[data-bs-theme="dark"] input[type="search"],
+        html[data-bs-theme="dark"] textarea,
+        html[data-bs-theme="dark"] select {
+            background-color: #000000 !important;
+            color: #ffffff !important;
+            border: 1px solid #4a5568 !important;
+        }
+
+        html[data-bs-theme="dark"] .form-control:focus,
+        html[data-bs-theme="dark"] .form-select:focus,
+        html[data-bs-theme="dark"] input[type="text"]:focus,
+        html[data-bs-theme="dark"] input[type="email"]:focus,
+        html[data-bs-theme="dark"] input[type="password"]:focus,
+        html[data-bs-theme="dark"] input[type="tel"]:focus,
+        html[data-bs-theme="dark"] input[type="date"]:focus,
+        html[data-bs-theme="dark"] input[type="datetime-local"]:focus,
+        html[data-bs-theme="dark"] input[type="number"]:focus,
+        html[data-bs-theme="dark"] input[type="search"]:focus,
+        html[data-bs-theme="dark"] textarea:focus,
+        html[data-bs-theme="dark"] select:focus {
+            background-color: #000000 !important;
+            color: #ffffff !important;
+            border: 1px solid #667eea !important;
+            box-shadow: 0 0 0 0.2rem rgba(102, 126, 234, 0.25) !important;
+        }
+
+        html[data-bs-theme="dark"] .form-control::placeholder,
+        html[data-bs-theme="dark"] input::placeholder,
+        html[data-bs-theme="dark"] textarea::placeholder {
+            color: #a0aec0 !important;
+        }
+
+        html[data-bs-theme="dark"] .form-control[readonly],
+        html[data-bs-theme="dark"] input[readonly],
+        html[data-bs-theme="dark"] textarea[readonly] {
+            background-color: #1a1a1a !important;
+            color: #a0aec0 !important;
+            opacity: 0.8;
+        }
+
+        html[data-bs-theme="dark"] .input-group-text {
+            background-color: #374151 !important;
+            color: #ffffff !important;
+            border: 1px solid #4a5568 !important;
+        }
+
+        html[data-bs-theme="dark"] option {
+            background-color: #000000 !important;
+            color: #ffffff !important;
+        }
+
+        html[data-bs-theme="dark"] .form-label {
+            color: #ffffff !important;
+        }
+
+        html[data-bs-theme="dark"] .text-muted {
+            color: #a0aec0 !important;
+        }
+
+        html[data-bs-theme="dark"] .table {
+            color: #ffffff !important;
+            background-color: #2d3748 !important;
+        }
+
+        html[data-bs-theme="dark"] .table th,
+        html[data-bs-theme="dark"] .table td {
+            color: #ffffff !important;
+            background-color: #2d3748 !important;
+            border-color: #4a5568 !important;
+        }
+
+        html[data-bs-theme="dark"] .table thead th {
+            background-color: #374151 !important;
+            color: #ffffff !important;
+            border-color: #4a5568 !important;
+        }
+
+        html[data-bs-theme="dark"] .table-striped > tbody > tr:nth-of-type(odd) > td,
+        html[data-bs-theme="dark"] .table-striped > tbody > tr:nth-of-type(odd) > th {
+            background-color: #374151 !important;
+            color: #ffffff !important;
+        }
+
+        html[data-bs-theme="dark"] .table-striped > tbody > tr:nth-of-type(even) > td,
+        html[data-bs-theme="dark"] .table-striped > tbody > tr:nth-of-type(even) > th {
+            background-color: #2d3748 !important;
+            color: #ffffff !important;
+        }
+
+        html[data-bs-theme="dark"] .table-hover > tbody > tr:hover > td,
+        html[data-bs-theme="dark"] .table-hover > tbody > tr:hover > th {
+            background-color: #4a5568 !important;
+            color: #ffffff !important;
+        }
+
+        html[data-bs-theme="dark"] .navbar-brand,
+        html[data-bs-theme="dark"] .nav-link {
+            color: #ffffff !important;
+        }
+
+        /* ===== LIGHT MODE ===== */
+        html[data-bs-theme="light"] body {
+            background-color: #ffffff !important;
+            color: #333333 !important;
+        }
+
+        html[data-bs-theme="light"] .card {
+            background-color: #ffffff !important;
+            border-color: #dee2e6 !important;
+            color: #333333 !important;
+        }
+
+        html[data-bs-theme="light"] .card-header {
+            background-color: #f8f9fa !important;
+            border-color: #dee2e6 !important;
+            color: #333333 !important;
+        }
+
+        html[data-bs-theme="light"] .card-body {
+            background-color: #ffffff !important;
+            color: #333333 !important;
+        }
+
+        html[data-bs-theme="light"] .form-control,
+        html[data-bs-theme="light"] .form-select,
+        html[data-bs-theme="light"] input[type="text"],
+        html[data-bs-theme="light"] input[type="email"],
+        html[data-bs-theme="light"] input[type="password"],
+        html[data-bs-theme="light"] input[type="tel"],
+        html[data-bs-theme="light"] input[type="date"],
+        html[data-bs-theme="light"] input[type="datetime-local"],
+        html[data-bs-theme="light"] input[type="number"],
+        html[data-bs-theme="light"] input[type="search"],
+        html[data-bs-theme="light"] textarea,
+        html[data-bs-theme="light"] select {
+            background-color: #ffffff !important;
+            color: #333333 !important;
+            border: 1px solid #dee2e6 !important;
+        }
+
+        html[data-bs-theme="light"] .form-control:focus,
+        html[data-bs-theme="light"] .form-select:focus,
+        html[data-bs-theme="light"] input[type="text"]:focus,
+        html[data-bs-theme="light"] input[type="email"]:focus,
+        html[data-bs-theme="light"] input[type="password"]:focus,
+        html[data-bs-theme="light"] input[type="tel"]:focus,
+        html[data-bs-theme="light"] input[type="date"]:focus,
+        html[data-bs-theme="light"] input[type="datetime-local"]:focus,
+        html[data-bs-theme="light"] input[type="number"]:focus,
+        html[data-bs-theme="light"] input[type="search"]:focus,
+        html[data-bs-theme="light"] textarea:focus,
+        html[data-bs-theme="light"] select:focus {
+            background-color: #ffffff !important;
+            color: #333333 !important;
+            border: 1px solid #86b7fe !important;
+            box-shadow: 0 0 0 0.2rem rgba(13, 110, 253, 0.25) !important;
+        }
+
+        html[data-bs-theme="light"] .form-control::placeholder,
+        html[data-bs-theme="light"] input::placeholder,
+        html[data-bs-theme="light"] textarea::placeholder {
+            color: #6c757d !important;
+        }
+
+        html[data-bs-theme="light"] .form-control[readonly],
+        html[data-bs-theme="light"] input[readonly],
+        html[data-bs-theme="light"] textarea[readonly] {
+            background-color: #e9ecef !important;
+            color: #6c757d !important;
+            opacity: 1;
+        }
+
+        html[data-bs-theme="light"] .input-group-text {
+            background-color: #e9ecef !important;
+            color: #495057 !important;
+            border: 1px solid #dee2e6 !important;
+        }
+
+        html[data-bs-theme="light"] option {
+            background-color: #ffffff !important;
+            color: #333333 !important;
+        }
+
+        html[data-bs-theme="light"] .form-label {
+            color: #333333 !important;
+        }
+
+        html[data-bs-theme="light"] .text-muted {
+            color: #6c757d !important;
+        }
+
+        html[data-bs-theme="light"] .table {
+            color: #333333 !important;
+            background-color: #ffffff !important;
+        }
+
+        html[data-bs-theme="light"] .table th,
+        html[data-bs-theme="light"] .table td {
+            color: #333333 !important;
+            background-color: #ffffff !important;
+            border-color: #dee2e6 !important;
+        }
+
+        html[data-bs-theme="light"] .table thead th {
+            background-color: #f8f9fa !important;
+            color: #333333 !important;
+            border-color: #dee2e6 !important;
+        }
+
+        html[data-bs-theme="light"] .table-striped > tbody > tr:nth-of-type(odd) > td,
+        html[data-bs-theme="light"] .table-striped > tbody > tr:nth-of-type(odd) > th {
+            background-color: #f8f9fa !important;
+            color: #333333 !important;
+        }
+
+        html[data-bs-theme="light"] .table-striped > tbody > tr:nth-of-type(even) > td,
+        html[data-bs-theme="light"] .table-striped > tbody > tr:nth-of-type(even) > th {
+            background-color: #ffffff !important;
+            color: #333333 !important;
+        }
+
+        html[data-bs-theme="light"] .table-hover > tbody > tr:hover > td,
+        html[data-bs-theme="light"] .table-hover > tbody > tr:hover > th {
+            background-color: #e9ecef !important;
+            color: #333333 !important;
+        }
+
+        html[data-bs-theme="light"] .table-dark {
+            background-color: #f8f9fa !important;
+            color: #333333 !important;
+        }
+
+        html[data-bs-theme="light"] .table-dark th,
+        html[data-bs-theme="light"] .table-dark td {
+            background-color: #f8f9fa !important;
+            color: #333333 !important;
+            border-color: #dee2e6 !important;
+        }
+
+        html[data-bs-theme="light"] .navbar {
+            background-color: #ffffff !important;
+            border-bottom: 1px solid #dee2e6 !important;
+        }
+
+        html[data-bs-theme="light"] .navbar-brand,
+        html[data-bs-theme="light"] .nav-link {
+            color: #333333 !important;
+        }
+
+        html[data-bs-theme="light"] .navbar-toggler {
+            border-color: #dee2e6 !important;
+        }
+
+        html[data-bs-theme="light"] .dropdown-menu {
+            background-color: #ffffff !important;
+            border-color: #dee2e6 !important;
+        }
+
+        html[data-bs-theme="light"] .dropdown-item {
+            color: #333333 !important;
+        }
+
+        html[data-bs-theme="light"] .dropdown-item:hover {
+            background-color: #f8f9fa !important;
+            color: #333333 !important;
+        }
+
+        /* Theme toggle button styles */
+        .navbar .btn-outline-secondary {
+            color: #6c757d !important;
+            border-color: #6c757d !important;
+        }
+
+        .navbar .btn-outline-secondary:hover {
+            color: #fff !important;
+            background-color: #6c757d !important;
+            border-color: #6c757d !important;
+        }
+
+        html[data-bs-theme="light"] .navbar .btn-outline-secondary {
+            color: #495057 !important;
+            border-color: #495057 !important;
+        }
+
+        html[data-bs-theme="light"] .navbar .btn-outline-secondary:hover {
+            color: #fff !important;
+            background-color: #495057 !important;
+            border-color: #495057 !important;
+        }
+
+        /* Fix for footer in light mode */
+        html[data-bs-theme="light"] footer {
+            background-color: #f8f9fa !important;
+            color: #333333 !important;
+        }
+
+        /* DataTables styling */
+        html[data-bs-theme="dark"] .dataTables_wrapper {
+            color: #ffffff !important;
+        }
+
+        html[data-bs-theme="light"] .dataTables_wrapper {
+            color: #333333 !important;
+        }
+
+        html[data-bs-theme="dark"] .dataTables_wrapper .dataTables_filter input {
+            background-color: #000000 !important;
+            color: #ffffff !important;
+            border: 1px solid #4a5568 !important;
+        }
+
+        html[data-bs-theme="light"] .dataTables_wrapper .dataTables_filter input {
+            background-color: #ffffff !important;
+            color: #333333 !important;
+            border: 1px solid #dee2e6 !important;
+        }
+
+        html[data-bs-theme="dark"] .dataTables_wrapper .dataTables_length select {
+            background-color: #000000 !important;
+            color: #ffffff !important;
+            border: 1px solid #4a5568 !important;
+        }
+
+        html[data-bs-theme="light"] .dataTables_wrapper .dataTables_length select {
+            background-color: #ffffff !important;
+            color: #333333 !important;
+            border: 1px solid #dee2e6 !important;
+        }
+
+        /* Alert styling */
+        html[data-bs-theme="light"] .alert {
+            color: #333333 !important;
+        }
+
+        html[data-bs-theme="dark"] .alert {
+            color: #ffffff !important;
+        }
+
+        /* Modal styling */
+        html[data-bs-theme="light"] .modal-content {
+            background-color: #ffffff !important;
+            color: #333333 !important;
+        }
+
+        html[data-bs-theme="dark"] .modal-content {
+            background-color: #2d3748 !important;
+            color: #ffffff !important;
+        }
+
+        html[data-bs-theme="light"] .modal-header {
+            background-color: #f8f9fa !important;
+            border-bottom-color: #dee2e6 !important;
+        }
+
+        html[data-bs-theme="dark"] .modal-header {
+            background-color: #374151 !important;
+            border-bottom-color: #4a5568 !important;
+        }
+
+        /* Button styling for both themes */
+        html[data-bs-theme="light"] .btn-primary {
+            background-color: #0d6efd !important;
+            border-color: #0d6efd !important;
+            color: #ffffff !important;
+        }
+
+        html[data-bs-theme="light"] .btn-primary:hover {
+            background-color: #0b5ed7 !important;
+            border-color: #0a58ca !important;
+        }
+
+        html[data-bs-theme="light"] .btn-secondary {
+            background-color: #6c757d !important;
+            border-color: #6c757d !important;
+            color: #ffffff !important;
+        }
+
+        html[data-bs-theme="light"] .btn-secondary:hover {
+            background-color: #5c636a !important;
+            border-color: #565e64 !important;
+        }
+
+        html[data-bs-theme="light"] .btn-success {
+            background-color: #198754 !important;
+            border-color: #198754 !important;
+            color: #ffffff !important;
+        }
+
+        html[data-bs-theme="light"] .btn-success:hover {
+            background-color: #157347 !important;
+            border-color: #146c43 !important;
+        }
+
+        html[data-bs-theme="light"] .btn-danger {
+            background-color: #dc3545 !important;
+            border-color: #dc3545 !important;
+            color: #ffffff !important;
+        }
+
+        html[data-bs-theme="light"] .btn-danger:hover {
+            background-color: #bb2d3b !important;
+            border-color: #b02a37 !important;
+        }
+
+        html[data-bs-theme="light"] .btn-warning {
+            background-color: #ffc107 !important;
+            border-color: #ffc107 !important;
+            color: #000000 !important;
+        }
+
+        html[data-bs-theme="light"] .btn-warning:hover {
+            background-color: #ffca2c !important;
+            border-color: #ffc720 !important;
+        }
+
+        html[data-bs-theme="light"] .btn-info {
+            background-color: #0dcaf0 !important;
+            border-color: #0dcaf0 !important;
+            color: #000000 !important;
+        }
+
+        html[data-bs-theme="light"] .btn-info:hover {
+            background-color: #31d2f2 !important;
+            border-color: #25cff2 !important;
+        }
+
+        /* Outline buttons for light mode */
+        html[data-bs-theme="light"] .btn-outline-primary {
+            color: #0d6efd !important;
+            border-color: #0d6efd !important;
+            background-color: transparent !important;
+        }
+
+        html[data-bs-theme="light"] .btn-outline-primary:hover {
+            background-color: #0d6efd !important;
+            border-color: #0d6efd !important;
+            color: #ffffff !important;
+        }
+
+        html[data-bs-theme="light"] .btn-outline-secondary {
+            color: #6c757d !important;
+            border-color: #6c757d !important;
+            background-color: transparent !important;
+        }
+
+        html[data-bs-theme="light"] .btn-outline-secondary:hover {
+            background-color: #6c757d !important;
+            border-color: #6c757d !important;
+            color: #ffffff !important;
+        }
+
+        /* Dark theme buttons (maintain current styling) */
+        html[data-bs-theme="dark"] .btn-primary {
+            background-color: #0d6efd !important;
+            border-color: #0d6efd !important;
+        }
+
+        html[data-bs-theme="dark"] .btn-secondary {
+            background-color: #6c757d !important;
+            border-color: #6c757d !important;
+        }
+
+        html[data-bs-theme="dark"] .btn-success {
+            background-color: #198754 !important;
+            border-color: #198754 !important;
+        }
+
+        html[data-bs-theme="dark"] .btn-danger {
+            background-color: #dc3545 !important;
+            border-color: #dc3545 !important;
+        }
+
+        /* Badge styling */
+        html[data-bs-theme="light"] .badge {
+            color: #ffffff !important;
+        }
+
+        html[data-bs-theme="light"] .badge-primary {
+            background-color: #0d6efd !important;
+        }
+
+        html[data-bs-theme="light"] .badge-secondary {
+            background-color: #6c757d !important;
+        }
+
+        html[data-bs-theme="light"] .badge-success {
+            background-color: #198754 !important;
+        }
+
+        html[data-bs-theme="light"] .badge-danger {
+            background-color: #dc3545 !important;
+        }
+
+        html[data-bs-theme="light"] .badge-warning {
+            background-color: #ffc107 !important;
+            color: #000000 !important;
+        }
+
+        html[data-bs-theme="light"] .badge-info {
+            background-color: #0dcaf0 !important;
+            color: #000000 !important;
+        }
+
+        /* Progress bars */
+        html[data-bs-theme="light"] .progress {
+            background-color: #e9ecef !important;
+        }
+
+        html[data-bs-theme="dark"] .progress {
+            background-color: #374151 !important;
+        }
+
+        /* Pagination */
+        html[data-bs-theme="light"] .pagination .page-link {
+            background-color: #ffffff !important;
+            border-color: #dee2e6 !important;
+            color: #0d6efd !important;
+        }
+
+        html[data-bs-theme="light"] .pagination .page-item.active .page-link {
+            background-color: #0d6efd !important;
+            border-color: #0d6efd !important;
+            color: #ffffff !important;
+        }
+
+        html[data-bs-theme="dark"] .pagination .page-link {
+            background-color: #2d3748 !important;
+            border-color: #4a5568 !important;
+            color: #ffffff !important;
+        }
+
+        html[data-bs-theme="dark"] .pagination .page-item.active .page-link {
+            background-color: #0d6efd !important;
+            border-color: #0d6efd !important;
+        }
+
+        /* Breadcrumb */
+        html[data-bs-theme="light"] .breadcrumb {
+            background-color: #f8f9fa !important;
+        }
+
+        html[data-bs-theme="light"] .breadcrumb-item a {
+            color: #0d6efd !important;
+        }
+
+        html[data-bs-theme="dark"] .breadcrumb {
+            background-color: #374151 !important;
+        }
+
+        html[data-bs-theme="dark"] .breadcrumb-item a {
+            color: #ffffff !important;
+        }
+
+        /* List group */
+        html[data-bs-theme="light"] .list-group-item {
+            background-color: #ffffff !important;
+            border-color: #dee2e6 !important;
+            color: #333333 !important;
+        }
+
+        html[data-bs-theme="dark"] .list-group-item {
+            background-color: #2d3748 !important;
+            border-color: #4a5568 !important;
+            color: #ffffff !important;
+        }
+
+        /* Accordion */
+        html[data-bs-theme="light"] .accordion-item {
+            background-color: #ffffff !important;
+            border-color: #dee2e6 !important;
+        }
+
+        html[data-bs-theme="light"] .accordion-button {
+            background-color: #f8f9fa !important;
+            color: #333333 !important;
+        }
+
+        html[data-bs-theme="dark"] .accordion-item {
+            background-color: #2d3748 !important;
+            border-color: #4a5568 !important;
+        }
+
+        html[data-bs-theme="dark"] .accordion-button {
+            background-color: #374151 !important;
+            color: #ffffff !important;
+        }
+
+        /* Estilos para navegação em duas linhas */
+        .navbar-nav-two-rows .nav-link {
+            transition: all 0.2s ease;
+            border-radius: 0.375rem;
+            font-weight: 500;
+            font-size: 0.9rem;
+        }
+
+        .navbar-nav-two-rows .nav-link:hover {
+            background-color: rgba(13, 110, 253, 0.1);
+            transform: translateY(-1px);
+        }
+
+        .navbar-nav-two-rows .dropdown-menu {
+            border: none;
+            box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15);
+            border-radius: 0.5rem;
+            margin-top: 0.25rem;
+        }
+
+        /* Espaçamento uniforme para navegação */
+        .nav-spacing {
+            gap: 0.75rem !important;
+        }
+
+        /* Ajuste para modo escuro */
+        html[data-bs-theme="dark"] .navbar-nav-two-rows .nav-link:hover {
+            background-color: rgba(255, 255, 255, 0.1);
+        }
+    </style>
+</head>
+<body>
+    <!-- Navigation -->
+    <nav class="navbar navbar-expand-lg">
+        <div class="container-fluid">
+            <a class="navbar-brand fw-bold d-flex align-items-center" href="{% if current_user.is_authenticated and current_user.tipo_usuario.name == 'FUNCIONARIO' %}{{ url_for('main.funcionario_dashboard') }}{% else %}{{ url_for('main.dashboard') }}{% endif %}">
+                <i class="fas fa-building me-2"></i><span>SIGE</span>
+            </a>
+            
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            
+            <div class="collapse navbar-collapse" id="navbarNav">
+                {% if current_user.is_authenticated and current_user.tipo_usuario.name == 'SUPER_ADMIN' %}
+                    <!-- Super Admin Menu - Apenas Cadastro de Admins -->
+                    <ul class="navbar-nav me-auto">
+                        <li class="nav-item">
+                            <a class="nav-link" href="{{ url_for('main.super_admin_dashboard') }}">
+                                <i class="fas fa-users-cog me-1"></i> Gerenciar Administradores
+                            </a>
+                        </li>
+                    </ul>
+                {% elif current_user.is_authenticated and current_user.tipo_usuario.name == 'ADMIN' %}
+                    <!-- Navegação em duas linhas centralizadas -->
+                    <div class="w-100 d-flex flex-column align-items-center py-2 navbar-nav-two-rows">
+                        <!-- Primeira Linha -->
+                        <div class="d-flex flex-wrap align-items-center justify-content-center mb-3 nav-spacing">
+                            <a class="nav-link px-3 py-2" href="{{ url_for('main.dashboard') }}" style="white-space: nowrap;">
+                                <i class="fas fa-home me-2"></i> Dashboard
+                            </a>
+                            
+                            <a class="nav-link px-3 py-2" href="{{ url_for('main.funcionarios') }}" style="white-space: nowrap;">
+                                <i class="fas fa-users me-2"></i> Funcionários
+                            </a>
+                            
+                            <div class="nav-item dropdown">
+                                <a class="nav-link dropdown-toggle px-3 py-2" href="#" role="button" data-bs-toggle="dropdown" style="white-space: nowrap;">
+                                    <i class="fas fa-briefcase me-2"></i> Comercial
+                                </a>
+                                <ul class="dropdown-menu">
+                                    <li><a class="dropdown-item" href="{{ url_for('propostas.index') }}">
+                                        <i class="fas fa-file-contract me-2"></i> Propostas
+                                    </a></li>
+                                    <li><a class="dropdown-item" href="{{ url_for('propostas.nova_proposta') }}">
+                                        <i class="fas fa-plus me-2"></i> Nova Proposta
+                                    </a></li>
+                                    <li><hr class="dropdown-divider"></li>
+                                    <li><a class="dropdown-item" href="{{ url_for('templates.dashboard') }}">
+                                        <i class="fas fa-layer-group me-2"></i> Templates
+                                    </a></li>
+                                    <li><a class="dropdown-item" href="{{ url_for('templates.novo_template') }}">
+                                        <i class="fas fa-plus-circle me-2"></i> Novo Template
+                                    </a></li>
+                                </ul>
+                            </div>
+                            
+                            <a class="nav-link px-3 py-2" href="{{ url_for('main.equipes') }}" style="white-space: nowrap;">
+                                <i class="fas fa-users-cog me-2"></i> Equipes
+                            </a>
+                            
+                            <div class="nav-item dropdown">
+                                <a class="nav-link dropdown-toggle px-3 py-2" href="#" role="button" data-bs-toggle="dropdown" style="white-space: nowrap;">
+                                    <i class="fas fa-warehouse me-2"></i> Almoxarifado
+                                </a>
+                                <ul class="dropdown-menu">
+                                    <li><a class="dropdown-item" href="{{ url_for('almoxarifado.dashboard') }}">
+                                        <i class="fas fa-tachometer-alt me-2"></i> Dashboard
+                                    </a></li>
+                                    <li><a class="dropdown-item" href="{{ url_for('almoxarifado.listar_produtos') }}">
+                                        <i class="fas fa-boxes me-2"></i> Produtos
+                                    </a></li>
+                                    <li><a class="dropdown-item" href="{{ url_for('almoxarifado.listar_movimentacoes_estoque') }}">
+                                        <i class="fas fa-exchange-alt me-2"></i> Movimentações
+                                    </a></li>
+                                    <li><a class="dropdown-item" href="{{ url_for('almoxarifado.listar_categorias') }}">
+                                        <i class="fas fa-tags me-2"></i> Categorias
+                                    </a></li>
+                                    <li><a class="dropdown-item" href="{{ url_for('almoxarifado.listar_fornecedores') }}">
+                                        <i class="fas fa-truck me-2"></i> Fornecedores
+                                    </a></li>
+                                    <li><a class="dropdown-item" href="{{ url_for('almoxarifado.listar_notas_fiscais') }}">
+                                        <i class="fas fa-file-invoice me-2"></i> Notas Fiscais
+                                    </a></li>
+                                </ul>
+                            </div>
+                            
+                            <div class="nav-item dropdown">
+                                <a class="nav-link dropdown-toggle px-3 py-2" href="#" role="button" data-bs-toggle="dropdown" style="white-space: nowrap;">
+                                    <i class="fas fa-building me-2"></i> Obras
+                                </a>
+                                <ul class="dropdown-menu">
+                                    <li><a class="dropdown-item" href="{{ url_for('main.obras') }}">
+                                        <i class="fas fa-building me-2"></i> Todas as Obras
+                                    </a></li>
+                                    <li><hr class="dropdown-divider"></li>
+                                    <li><a class="dropdown-item" href="/rdo">
+                                        <i class="fas fa-list me-2"></i> Lista de RDOs
+                                    </a></li>
+                                    <li><a class="dropdown-item" href="/funcionario/rdo/consolidado">
+                                        <i class="fas fa-plus me-2"></i> Novo RDO
+                                    </a></li>
+                                </ul>
+                            </div>
+                            
+                            <div class="nav-item dropdown">
+                                <a class="nav-link dropdown-toggle px-3 py-2" href="#" role="button" data-bs-toggle="dropdown" style="white-space: nowrap;">
+                                    <i class="fas fa-cog me-2"></i> Configurações
+                                </a>
+                                <ul class="dropdown-menu">
+                                    <li><a class="dropdown-item" href="{{ url_for('configuracoes.empresa') }}">
+                                        <i class="fas fa-building me-2"></i> Empresa
+                                    </a></li>
+                                    <li><hr class="dropdown-divider"></li>
+                                    <li><a class="dropdown-item" href="{{ url_for('main.usuarios') }}">
+                                        <i class="fas fa-key me-2"></i> Acessos
+                                    </a></li>
+                                    <li><hr class="dropdown-divider"></li>
+                                    <li><a class="dropdown-item" href="{{ url_for('main.departamentos') }}">
+                                        <i class="fas fa-sitemap me-2"></i> Departamentos
+                                    </a></li>
+                                    <li><a class="dropdown-item" href="{{ url_for('main.funcoes') }}">
+                                        <i class="fas fa-user-tie me-2"></i> Funções
+                                    </a></li>
+                                    <li><a class="dropdown-item" href="{{ url_for('main.horarios') }}">
+                                        <i class="fas fa-clock me-2"></i> Horários de Trabalho
+                                    </a></li>
+                                    <li><a class="dropdown-item" href="{{ url_for('main.servicos') }}">
+                                        <i class="fas fa-tools me-2"></i> Serviços
+                                    </a></li>
+                                </ul>
+                            </div>
+                        </div>
+                        
+                        <!-- Segunda Linha -->
+                        <div class="d-flex flex-wrap align-items-center justify-content-center nav-spacing">
+                            <a class="nav-link px-3 py-2" href="{{ url_for('main.veiculos') }}" style="white-space: nowrap;">
+                                <i class="fas fa-truck me-2"></i> Veículos
+                            </a>
+                            
+                            <a class="nav-link px-3 py-2" href="{{ url_for('alimentacao.listar_alimentacao') }}" style="white-space: nowrap;">
+                                <i class="fas fa-utensils me-2"></i> Alimentação
+                            </a>
+                            
+                            <a class="nav-link px-3 py-2" href="{{ url_for('main.financeiro') }}" style="white-space: nowrap;">
+                                <i class="fas fa-dollar-sign me-2"></i> Financeiro
+                            </a>
+                            
+                            <a class="nav-link px-3 py-2" href="/folha-pagamento/dashboard" style="white-space: nowrap;">
+                                <i class="fas fa-money-check-alt me-2"></i> Folha de Pagamento
+                            </a>
+                            
+                            <a class="nav-link px-3 py-2" href="/contabilidade/dashboard" style="white-space: nowrap;">
+                                <i class="fas fa-calculator me-2"></i> Contabilidade
+                            </a>
+                            
+                            <a class="nav-link px-3 py-2" href="{{ url_for('main.relatorios') }}" style="white-space: nowrap;">
+                                <i class="fas fa-chart-bar me-2"></i> Relatórios
+                            </a>
+                        </div>
+                    </div>
+                {% else %}
+                    <!-- Funcionario Menu - Focado em RDO -->
+                    <ul class="navbar-nav me-auto">
+                        <li class="nav-item">
+                            <a class="nav-link" href="{{ url_for('main.funcionario_dashboard') }}">
+                                <i class="fas fa-home me-1"></i> Dashboard RDO
+                            </a>
+                        </li>
+                        
+                        <li class="nav-item dropdown">
+                            <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown">
+                                <i class="fas fa-file-alt me-1"></i> RDOs
+                            </a>
+                            <ul class="dropdown-menu">
+                                <li><a class="dropdown-item" href="/rdo">
+                                    <i class="fas fa-list me-2"></i> Lista de RDOs
+                                </a></li>
+                                <li><a class="dropdown-item" href="/funcionario/rdo/consolidado">
+                                    <i class="fas fa-plus me-2"></i> Novo RDO
+                                </a></li>
+                            </ul>
+                        </li>
+                        
+                        <li class="nav-item">
+                            <a class="nav-link" href="{{ url_for('main.veiculos') }}">
+                                <i class="fas fa-truck me-1"></i> Uso de Veículo
+                            </a>
+                        </li>
+                    </ul>
+                {% endif %}
+                
+                <ul class="navbar-nav">
+                    <li class="nav-item">
+                        <button class="btn btn-outline-secondary me-2" id="theme-toggle" onclick="toggleTheme()" title="Alternar tema">
+                            <i class="fas fa-sun"></i>
+                        </button>
+                    </li>
+                    <li class="nav-item dropdown">
+                        <a class="nav-link dropdown-toggle" href="#" id="navbarDropdown" role="button" data-bs-toggle="dropdown">
+                            <i class="fas fa-user me-1"></i> {{ current_user.nome }}
+                            {% if current_user.is_authenticated and current_user.tipo_usuario.name == 'SUPER_ADMIN' %}
+                                <span class="badge bg-warning ms-1">Super Admin</span>
+                            {% elif current_user.is_authenticated and current_user.tipo_usuario.name == 'ADMIN' %}
+                                <span class="badge bg-primary ms-1">Admin</span>
+                            {% else %}
+                                <span class="badge bg-secondary ms-1">Funcionário</span>
+                            {% endif %}
+                        </a>
+                        <ul class="dropdown-menu">
+                            {% if current_user.is_authenticated and current_user.tipo_usuario.name == 'SUPER_ADMIN' %}
+                                <li><a class="dropdown-item" href="{{ url_for('main.dashboard') }}">
+                                    <i class="fas fa-crown me-2"></i> Painel Super Admin
+                                </a></li>
+                            {% elif current_user.is_authenticated and current_user.tipo_usuario.name == 'ADMIN' %}
+                                <li><a class="dropdown-item" href="{{ url_for('main.dashboard') }}">
+                                    <i class="fas fa-users-cog me-2"></i> Gerenciar Acessos
+                                </a></li>
+                            {% endif %}
+                            <li><hr class="dropdown-divider"></li>
+                            <li><a class="dropdown-item" href="{{ url_for('main.logout') }}">
+                                <i class="fas fa-sign-out-alt me-2"></i> Sair
+                            </a></li>
+                        </ul>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+    
+    <!-- Main Content -->
+    <main class="container mt-4">
+        <!-- Flash Messages -->
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="alert alert-{{ 'danger' if category == 'error' else 'success' }} alert-dismissible fade show" role="alert">
+                        {{ message }}
+                        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                    </div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+        
+        {% block content %}{% endblock %}
+    </main>
+    
+    <!-- Footer -->
+    <footer class="text-center py-3 mt-5">
+        <div class="container">
+            <p class="mb-0">&copy; 2024 SIGE - Estruturas do Vale. Todos os direitos reservados.</p>
+        </div>
+    </footer>
+    
+    <!-- Bootstrap JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    
+    <!-- jQuery -->
+    <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+    
+    <!-- DataTables JS -->
+    <script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
+    <script src="https://cdn.datatables.net/1.13.6/js/dataTables.bootstrap5.min.js"></script>
+    
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    
+    <!-- Custom JS -->
+    <script src="{{ url_for('static', filename='js/charts.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/app.js') }}"></script>
+    <script src="{{ url_for('static', filename='images/avatar-generator.js') }}"></script>
+    
+    <!-- Theme Toggle Script -->
+    <script>
+        // Theme management
+        const getStoredTheme = () => localStorage.getItem('theme');
+        const setStoredTheme = theme => localStorage.setItem('theme', theme);
+        const getPreferredTheme = () => {
+            const storedTheme = getStoredTheme();
+            if (storedTheme) {
+                return storedTheme;
+            }
+            return 'dark'; // Default to dark theme
+        };
+
+        const setTheme = theme => {
+            if (theme === 'auto') {
+                document.documentElement.setAttribute('data-bs-theme', (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'));
+            } else {
+                document.documentElement.setAttribute('data-bs-theme', theme);
+            }
+            
+            // Update theme toggle button
+            const themeToggle = document.querySelector('#theme-toggle');
+            if (themeToggle) {
+                const icon = themeToggle.querySelector('i');
+                if (theme === 'light') {
+                    icon.className = 'fas fa-moon';
+                    themeToggle.setAttribute('title', 'Alternar para modo escuro');
+                } else {
+                    icon.className = 'fas fa-sun';
+                    themeToggle.setAttribute('title', 'Alternar para modo claro');
+                }
+            }
+        };
+
+        // Initialize theme on page load
+        setTheme(getPreferredTheme());
+
+        // Theme toggle function
+        function toggleTheme() {
+            const currentTheme = document.documentElement.getAttribute('data-bs-theme') || 'dark';
+            const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
+            setStoredTheme(newTheme);
+            setTheme(newTheme);
+            
+            // Force update all form fields immediately
+            applyThemeToFields(newTheme);
+            
+            // Force reload to ensure all styles are applied correctly
+            setTimeout(() => {
+                window.location.reload();
+            }, 100);
+        }
+
+        // Apply theme to form fields and other elements
+        function applyThemeToFields(theme) {
+            // Form fields
+            const formSelectors = '.form-control, .form-select, input[type="text"], input[type="email"], input[type="password"], input[type="tel"], input[type="date"], input[type="datetime-local"], input[type="number"], input[type="search"], textarea, select';
+            const formElements = document.querySelectorAll(formSelectors);
+            
+            formElements.forEach(el => {
+                if (theme === 'dark') {
+                    el.style.backgroundColor = '#000000';
+                    el.style.color = '#ffffff';
+                    el.style.borderColor = '#4a5568';
+                } else {
+                    el.style.backgroundColor = '#ffffff';
+                    el.style.color = '#333333';
+                    el.style.borderColor = '#dee2e6';
+                }
+            });
+
+            // Cards
+            const cards = document.querySelectorAll('.card');
+            cards.forEach(card => {
+                if (theme === 'dark') {
+                    card.style.backgroundColor = '#2d3748';
+                    card.style.borderColor = '#4a5568';
+                    card.style.color = '#ffffff';
+                } else {
+                    card.style.backgroundColor = '#ffffff';
+                    card.style.borderColor = '#dee2e6';
+                    card.style.color = '#333333';
+                }
+            });
+
+            // Card headers
+            const cardHeaders = document.querySelectorAll('.card-header');
+            cardHeaders.forEach(header => {
+                if (theme === 'dark') {
+                    header.style.backgroundColor = '#374151';
+                    header.style.borderColor = '#4a5568';
+                    header.style.color = '#ffffff';
+                } else {
+                    header.style.backgroundColor = '#f8f9fa';
+                    header.style.borderColor = '#dee2e6';
+                    header.style.color = '#333333';
+                }
+            });
+
+            // Tables
+            const tables = document.querySelectorAll('.table');
+            tables.forEach(table => {
+                if (theme === 'dark') {
+                    table.style.color = '#ffffff';
+                    table.style.backgroundColor = '#2d3748';
+                } else {
+                    table.style.color = '#333333';
+                    table.style.backgroundColor = '#ffffff';
+                }
+            });
+
+            // Table cells
+            const tableCells = document.querySelectorAll('.table th, .table td');
+            tableCells.forEach(cell => {
+                if (theme === 'dark') {
+                    cell.style.color = '#ffffff';
+                    cell.style.backgroundColor = '#2d3748';
+                    cell.style.borderColor = '#4a5568';
+                } else {
+                    cell.style.color = '#333333';
+                    cell.style.backgroundColor = '#ffffff';
+                    cell.style.borderColor = '#dee2e6';
+                }
+            });
+
+            // Table headers
+            const tableHeaders = document.querySelectorAll('.table thead th');
+            tableHeaders.forEach(header => {
+                if (theme === 'dark') {
+                    header.style.backgroundColor = '#374151';
+                    header.style.color = '#ffffff';
+                    header.style.borderColor = '#4a5568';
+                } else {
+                    header.style.backgroundColor = '#f8f9fa';
+                    header.style.color = '#333333';
+                    header.style.borderColor = '#dee2e6';
+                }
+            });
+
+            // Navbar
+            const navbar = document.querySelector('.navbar');
+            if (navbar) {
+                if (theme === 'dark') {
+                    navbar.style.backgroundColor = '#1a1a1a';
+                } else {
+                    navbar.style.backgroundColor = '#ffffff';
+                    navbar.style.borderBottom = '1px solid #dee2e6';
+                }
+            }
+
+            // Footer
+            const footer = document.querySelector('footer');
+            if (footer) {
+                if (theme === 'dark') {
+                    footer.style.backgroundColor = '#1a1a1a';
+                    footer.style.color = '#ffffff';
+                } else {
+                    footer.style.backgroundColor = '#f8f9fa';
+                    footer.style.color = '#333333';
+                }
+            }
+        }
+
+        // Função para corrigir imagens quebradas
+        function corrigirImagemQuebrada(img) {
+            if (img.dataset.nome) {
+                // Gerar avatar SVG baseado no nome
+                const nome = img.dataset.nome;
+                const iniciais = obterIniciais(nome).toUpperCase();
+                const cor = gerarCorPorNome(nome);
+                
+                const svg = `data:image/svg+xml;base64,${btoa(`
+                    <svg width="120" height="120" xmlns="http://www.w3.org/2000/svg">
+                        <circle cx="60" cy="60" r="60" fill="${cor}"/>
+                        <text x="60" y="68" font-family="Arial" font-size="40" 
+                              font-weight="bold" text-anchor="middle" fill="white">${iniciais}</text>
+                    </svg>
+                `)}`;
+                
+                img.src = svg;
+                img.onerror = null; // Evitar loop infinito
+            } else {
+                img.src = '/static/images/default-avatar.svg';
+            }
+        }
+        
+        function obterIniciais(nome) {
+            const palavras = nome.trim().split(' ');
+            if (palavras.length >= 2) {
+                return palavras[0][0] + palavras[palavras.length - 1][0];
+            }
+            return palavras[0].substring(0, 2);
+        }
+        
+        function gerarCorPorNome(nome) {
+            let hash = 0;
+            for (let i = 0; i < nome.length; i++) {
+                hash = nome.charCodeAt(i) + ((hash << 5) - hash);
+            }
+            
+            const cores = [
+                '#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd',
+                '#8c564b', '#e377c2', '#7f7f7f', '#bcbd22', '#17becf',
+                '#3498db', '#e74c3c', '#2ecc71', '#f39c12', '#9b59b6'
+            ];
+            
+            return cores[Math.abs(hash) % cores.length];
+        }
+
+        // Initialize theme when DOM is ready
+        document.addEventListener('DOMContentLoaded', () => {
+            const theme = getPreferredTheme();
+            setTheme(theme);
+            
+            // Apply theme to form fields on page load
+            setTimeout(() => {
+                applyThemeToFields(theme);
+            }, 200);
+            
+            // Set default date filters
+            setDefaultDateFilters();
+        });
+
+        // Set default date filters to beginning of current month and today
+        function setDefaultDateFilters() {
+            const dataInicioInputs = document.querySelectorAll('input[name="data_inicio"]');
+            const dataFimInputs = document.querySelectorAll('input[name="data_fim"]');
+            
+            // Get current date
+            const today = new Date();
+            const firstDayOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+            
+            // Format dates as YYYY-MM-DD
+            const todayStr = today.toISOString().split('T')[0];
+            const firstDayStr = firstDayOfMonth.toISOString().split('T')[0];
+            
+            // Set values if inputs are empty
+            dataInicioInputs.forEach(input => {
+                if (!input.value) {
+                    input.value = firstDayStr;
+                }
+            });
+            
+            dataFimInputs.forEach(input => {
+                if (!input.value) {
+                    input.value = todayStr;
+                }
+            });
+        }
+
+        // Date range helper functions
+        function setDateRange(type) {
+            const dataInicioInput = document.querySelector('input[name="data_inicio"]');
+            const dataFimInput = document.querySelector('input[name="data_fim"]');
+            
+            if (!dataInicioInput || !dataFimInput) return;
+            
+            const today = new Date();
+            let startDate, endDate = today;
+            
+            switch(type) {
+                case 'ultimo_mes':
+                    startDate = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+                    endDate = new Date(today.getFullYear(), today.getMonth(), 0);
+                    break;
+                case 'ultimos_3_meses':
+                    startDate = new Date(today.getFullYear(), today.getMonth() - 3, 1);
+                    break;
+                case 'ano_atual':
+                    startDate = new Date(today.getFullYear(), 0, 1);
+                    break;
+                case 'mes_atual':
+                default:
+                    startDate = new Date(today.getFullYear(), today.getMonth(), 1);
+                    break;
+            }
+            
+            dataInicioInput.value = startDate.toISOString().split('T')[0];
+            dataFimInput.value = endDate.toISOString().split('T')[0];
+        }
+    </script>
+    
+    {% block scripts %}{% endblock %}
+</body>
+</html>

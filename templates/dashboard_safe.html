@@ -1,0 +1,198 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard - SIGE{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- Cabeçalho -->
+    <div class="row">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h1 class="h3">
+                    <i class="fas fa-tachometer-alt"></i> Dashboard - Versão Segura para Produção
+                </h1>
+            </div>
+        </div>
+    </div>
+
+    <!-- KPIs Principais -->
+    <div class="row mb-4">
+        <div class="col-md-3">
+            <div class="card bg-primary text-white">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between">
+                        <div>
+                            <h4 class="mb-0">{{ total_funcionarios|default(0) }}</h4>
+                            <p class="mb-0">Funcionários Ativos</p>
+                        </div>
+                        <div class="align-self-center">
+                            <i class="fas fa-users fa-2x"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-3">
+            <div class="card bg-success text-white">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between">
+                        <div>
+                            <h4 class="mb-0">{{ total_obras|default(0) }}</h4>
+                            <p class="mb-0">Obras Ativas</p>
+                        </div>
+                        <div class="align-self-center">
+                            <i class="fas fa-building fa-2x"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-3">
+            <div class="card bg-info text-white">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between">
+                        <div>
+                            <h4 class="mb-0">{{ total_veiculos|default(0) }}</h4>
+                            <p class="mb-0">Veículos</p>
+                        </div>
+                        <div class="align-self-center">
+                            <i class="fas fa-truck fa-2x"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-3">
+            <div class="card bg-warning text-dark">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between">
+                        <div>
+                            <h4 class="mb-0">R$ {{ "%.2f"|format(custos_mes|default(0)) }}</h4>
+                            <p class="mb-0">Custos do Mês</p>
+                        </div>
+                        <div class="align-self-center">
+                            <i class="fas fa-money-bill-wave fa-2x"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Funcionários Recentes -->
+    <div class="row mb-4">
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-users"></i> Funcionários Recentes
+                    </h5>
+                </div>
+                <div class="card-body">
+                    {% if funcionarios_recentes %}
+                        <div class="list-group list-group-flush">
+                            {% for func in funcionarios_recentes %}
+                            <div class="list-group-item d-flex justify-content-between align-items-center">
+                                <div class="d-flex align-items-center">
+                                    <img src="{{ obter_foto_funcionario(func) }}" 
+                                         alt="Foto {{ func.nome }}" 
+                                         class="rounded-circle me-3" 
+                                         width="40" height="40"
+                                         onerror="this.src='data:image/svg+xml,<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"40\" height=\"40\" viewBox=\"0 0 40 40\"><rect width=\"40\" height=\"40\" fill=\"%23007bff\"/><text x=\"20\" y=\"25\" font-family=\"Arial\" font-size=\"14\" font-weight=\"bold\" text-anchor=\"middle\" fill=\"white\">{{ func.nome[:1] }}</text></svg>'">
+                                    <div>
+                                        <h6 class="mb-0">{{ func.nome }}</h6>
+                                        <small class="text-muted">{{ func.funcao.nome if func.funcao else 'Função não definida' }}</small>
+                                    </div>
+                                </div>
+                                <span class="badge bg-{{ 'success' if func.ativo else 'danger' }}">
+                                    {{ 'Ativo' if func.ativo else 'Inativo' }}
+                                </span>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    {% else %}
+                        <p class="text-muted">Nenhum funcionário encontrado.</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Estatísticas Resumidas -->
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-chart-bar"></i> Estatísticas Gerais
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="row text-center">
+                        <div class="col-4">
+                            <h4 class="text-primary">{{ "%.1f"|format(eficiencia_geral|default(0)) }}%</h4>
+                            <small class="text-muted">Eficiência Geral</small>
+                        </div>
+                        <div class="col-4">
+                            <h4 class="text-success">{{ "%.1f"|format(produtividade_obra|default(0)) }}%</h4>
+                            <small class="text-muted">Produtividade</small>
+                        </div>
+                        <div class="col-4">
+                            <h4 class="text-info">{{ funcionarios_ativos|default(0) }}</h4>
+                            <small class="text-muted">Funcionários Ativos</small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Obras Ativas -->
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-building"></i> Obras em Andamento
+                    </h5>
+                </div>
+                <div class="card-body">
+                    {% if obras_ativas %}
+                        <div class="table-responsive">
+                            <table class="table table-hover">
+                                <thead>
+                                    <tr>
+                                        <th>Nome da Obra</th>
+                                        <th>Cliente</th>
+                                        <th>Status</th>
+                                        <th>Valor</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for obra in obras_ativas %}
+                                    <tr>
+                                        <td><strong>{{ obra.nome }}</strong></td>
+                                        <td>{{ obra.cliente }}</td>
+                                        <td>
+                                            <span class="badge bg-info">{{ obra.status }}</span>
+                                        </td>
+                                        <td>
+                                            <span class="text-success">
+                                                R$ {{ "%.2f"|format(obra.valor_total|default(0)) }}
+                                            </span>
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    {% else %}
+                        <p class="text-muted">Nenhuma obra ativa no momento.</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

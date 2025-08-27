@@ -1,0 +1,186 @@
+{% extends "base.html" %}
+
+{% block title %}Obras - SIGE{% endblock %}
+
+{% block content %}
+<!-- Cabeçalho da Página -->
+<div class="container-fluid mt-4 mb-4">
+    <div class="row">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center">
+                <h1 class="page-title">
+                    <i class="fas fa-hard-hat"></i> Obras
+                </h1>
+                <div class="d-flex gap-2">
+                    <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#obraModal">
+                        <i class="fas fa-plus"></i> Nova Obra
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Filtros Simplificados -->
+<div class="card mb-4">
+    <div class="card-header">
+        <h5 class="card-title mb-0">
+            <i class="fas fa-filter"></i> Filtros de Obras
+        </h5>
+    </div>
+    <div class="card-body">
+        <div class="mb-3">
+            <label class="form-label fw-bold">Filtros Rápidos por Status:</label>
+            <div class="btn-group flex-wrap" role="group">
+                <a href="{{ url_for('main.obras') }}" class="btn btn-outline-primary">
+                    <i class="fas fa-list"></i> Todas
+                </a>
+                <a href="{{ url_for('main.obras', status='Planejamento') }}" class="btn btn-outline-info">
+                    <i class="fas fa-drafting-compass"></i> Planejamento
+                </a>
+                <a href="{{ url_for('main.obras', status='Em Andamento') }}" class="btn btn-outline-warning">
+                    <i class="fas fa-play-circle"></i> Em Andamento
+                </a>
+                <a href="{{ url_for('main.obras', status='Concluída') }}" class="btn btn-outline-success">
+                    <i class="fas fa-check-circle"></i> Concluídas
+                </a>
+                <a href="{{ url_for('main.obras', status='Pausada') }}" class="btn btn-outline-secondary">
+                    <i class="fas fa-pause-circle"></i> Pausadas
+                </a>
+                <a href="{{ url_for('main.obras', status='Cancelada') }}" class="btn btn-outline-danger">
+                    <i class="fas fa-times-circle"></i> Canceladas
+                </a>
+            </div>
+        </div>
+
+        <form method="GET" id="filtroForm">
+            <div class="row align-items-end">
+                <div class="col-md-4">
+                    <label for="nome" class="form-label">Buscar por Nome</label>
+                    <div class="input-group">
+                        <span class="input-group-text"><i class="fas fa-search"></i></span>
+                        <input type="text" class="form-control" id="nome" name="nome" 
+                               placeholder="Digite o nome da obra...">
+                    </div>
+                </div>
+                
+                <div class="col-md-2">
+                    <label for="status" class="form-label">Status</label>
+                    <select class="form-select" id="status" name="status">
+                        <option value="">Todos</option>
+                        <option value="Planejamento">Planejamento</option>
+                        <option value="Em Andamento">Em Andamento</option>
+                        <option value="Concluída">Concluída</option>
+                        <option value="Pausada">Pausada</option>
+                        <option value="Cancelada">Cancelada</option>
+                    </select>
+                </div>
+                
+                <div class="col-md-4">
+                    <label for="cliente" class="form-label">Cliente</label>
+                    <div class="input-group">
+                        <span class="input-group-text"><i class="fas fa-user"></i></span>
+                        <input type="text" class="form-control" id="cliente" name="cliente" 
+                               placeholder="Digite o nome do cliente...">
+                    </div>
+                </div>
+                
+                <div class="col-md-2">
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-search"></i> Filtrar
+                    </button>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Lista de Obras -->
+<div class="card">
+    <div class="card-header">
+        <h5 class="card-title mb-0">
+            <i class="fas fa-list"></i> Lista de Obras
+            <span class="badge bg-primary ms-2">{{ obras|length }}</span>
+        </h5>
+    </div>
+    <div class="card-body">
+        {% if obras %}
+            <div class="table-responsive">
+                <table class="table table-hover">
+                    <thead>
+                        <tr>
+                            <th>Nome</th>
+                            <th>Cliente</th>
+                            <th>Status</th>
+                            <th>Data Início</th>
+                            <th>Orçamento</th>
+                            <th>Ações</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for obra in obras %}
+                        <tr>
+                            <td>
+                                <strong>{{ obra.nome }}</strong>
+                                {% if obra.descricao %}
+                                <br><small class="text-muted">{{ obra.descricao[:50] }}...</small>
+                                {% endif %}
+                            </td>
+                            <td>{{ obra.cliente or 'Não informado' }}</td>
+                            <td>
+                                {% set status_class = {
+                                    'Planejamento': 'info',
+                                    'Em Andamento': 'warning',
+                                    'Concluída': 'success',
+                                    'Pausada': 'secondary',
+                                    'Cancelada': 'danger'
+                                } %}
+                                <span class="badge bg-{{ status_class.get(obra.status, 'secondary') }}">
+                                    {{ obra.status or 'Indefinido' }}
+                                </span>
+                            </td>
+                            <td>
+                                {% if obra.data_inicio %}
+                                    {{ obra.data_inicio.strftime('%d/%m/%Y') }}
+                                {% else %}
+                                    <span class="text-muted">Não definida</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if obra.orcamento %}
+                                    <span class="text-success fw-bold">R$ {{ "%.2f"|format(obra.orcamento) }}</span>
+                                {% else %}
+                                    <span class="text-muted">Não informado</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <div class="btn-group btn-group-sm">
+                                    <button class="btn btn-outline-primary" title="Ver Detalhes">
+                                        <i class="fas fa-eye"></i>
+                                    </button>
+                                    <button class="btn btn-outline-warning" title="Editar">
+                                        <i class="fas fa-edit"></i>
+                                    </button>
+                                    <button class="btn btn-outline-info" title="RDO">
+                                        <i class="fas fa-file-alt"></i>
+                                    </button>
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        {% else %}
+            <div class="text-center py-5">
+                <i class="fas fa-hard-hat fa-3x text-muted mb-3"></i>
+                <h5 class="text-muted">Nenhuma obra encontrada</h5>
+                <p class="text-muted">Clique em "Nova Obra" para começar a gerenciar seus projetos.</p>
+                <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#obraModal">
+                    <i class="fas fa-plus"></i> Criar primeira obra
+                </button>
+            </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

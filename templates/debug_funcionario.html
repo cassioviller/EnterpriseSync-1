@@ -1,0 +1,162 @@
+{% extends "base.html" %}
+
+{% block title %}Debug Sistema Funcionário - SIGE{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header bg-warning">
+                    <h5 class="mb-0">
+                        <i class="fas fa-bug me-2"></i>Sistema de Debug - Funcionário RDO
+                    </h5>
+                </div>
+                
+                <div class="card-body">
+                    <!-- Login Test -->
+                    <div class="mb-4">
+                        <h6>1. Teste de Login Funcionário</h6>
+                        <div class="d-flex gap-2">
+                            <a href="/test-login-funcionario" class="btn btn-primary">
+                                <i class="fas fa-sign-in-alt me-1"></i>Login Teste (Desktop)
+                            </a>
+                            <a href="/test-login-funcionario" class="btn btn-success" 
+                               onclick="this.style.userAgent='Mozilla/5.0 (iPhone; CPU iPhone OS 14_0 like Mac OS X)'">
+                                <i class="fas fa-mobile-alt me-1"></i>Login Teste (Mobile)
+                            </a>
+                            <a href="/logout" class="btn btn-outline-danger">
+                                <i class="fas fa-sign-out-alt me-1"></i>Logout
+                            </a>
+                        </div>
+                        <small class="text-muted">
+                            Email: funcionario.teste@valeverde.com | Senha: 123456
+                        </small>
+                    </div>
+
+                    <!-- Dashboard Tests -->
+                    <div class="mb-4">
+                        <h6>2. Dashboards Funcionário</h6>
+                        <div class="d-flex gap-2">
+                            <a href="/funcionario-dashboard" class="btn btn-outline-primary">
+                                <i class="fas fa-desktop me-1"></i>Dashboard Desktop
+                            </a>
+                            <a href="/funcionario-mobile" class="btn btn-outline-success">
+                                <i class="fas fa-mobile-alt me-1"></i>Dashboard Mobile
+                            </a>
+                        </div>
+                    </div>
+
+                    <!-- RDO Creation Tests -->
+                    <div class="mb-4">
+                        <h6>3. Criação de RDO</h6>
+                        <div class="d-flex gap-2">
+                            <a href="/funcionario/criar-rdo-teste" class="btn btn-warning">
+                                <i class="fas fa-flask me-1"></i>Criar RDO Teste
+                            </a>
+                            <a href="/funcionario/rdo/novo" class="btn btn-outline-primary">
+                                <i class="fas fa-plus me-1"></i>Novo RDO Manual
+                            </a>
+                            <a href="/rdo" class="btn btn-outline-secondary">
+                                <i class="fas fa-list me-1"></i>Listar RDOs
+                            </a>
+                        </div>
+                    </div>
+
+                    <!-- API Tests -->
+                    <div class="mb-4">
+                        <h6>4. APIs Funcionário</h6>
+                        <div class="d-flex gap-2">
+                            <button onclick="testAPI('/api/funcionario/obras')" class="btn btn-outline-info">
+                                <i class="fas fa-building me-1"></i>API Obras
+                            </button>
+                            <button onclick="testAPI('/api/funcionario/funcionarios')" class="btn btn-outline-info">
+                                <i class="fas fa-users me-1"></i>API Funcionários
+                            </button>
+                            <button onclick="testAPI('/api/verificar-acesso')" class="btn btn-outline-warning">
+                                <i class="fas fa-shield-alt me-1"></i>Verificar Acesso
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Status Info -->
+                    <div class="mb-4">
+                        <h6>5. Informações do Sistema</h6>
+                        <div id="system-info">
+                            <div class="spinner-border spinner-border-sm" role="status">
+                                <span class="visually-hidden">Carregando...</span>
+                            </div>
+                            Carregando informações...
+                        </div>
+                    </div>
+
+                    <!-- Test Results -->
+                    <div class="mb-4">
+                        <h6>6. Resultados dos Testes</h6>
+                        <div id="test-results" class="border p-3 bg-light">
+                            <small class="text-muted">Resultados aparecerão aqui...</small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function testAPI(endpoint) {
+    const resultsDiv = document.getElementById('test-results');
+    resultsDiv.innerHTML = `<div class="text-info">Testando ${endpoint}...</div>`;
+    
+    fetch(endpoint)
+        .then(response => response.json())
+        .then(data => {
+            resultsDiv.innerHTML = `
+                <div class="text-success mb-2">✅ Sucesso - ${endpoint}</div>
+                <pre class="bg-dark text-light p-2 rounded">${JSON.stringify(data, null, 2)}</pre>
+            `;
+        })
+        .catch(error => {
+            resultsDiv.innerHTML = `
+                <div class="text-danger mb-2">❌ Erro - ${endpoint}</div>
+                <div class="alert alert-danger">${error.message}</div>
+            `;
+        });
+}
+
+// Load system info on page load
+document.addEventListener('DOMContentLoaded', function() {
+    fetch('/api/verificar-acesso')
+        .then(response => response.json())
+        .then(data => {
+            const infoDiv = document.getElementById('system-info');
+            if (data.success) {
+                infoDiv.innerHTML = `
+                    <div class="alert alert-success">
+                        <strong>Status Multitenant:</strong> ${data.multitenant_status}<br>
+                        <strong>Admin ID:</strong> ${data.user_info.admin_id}<br>
+                        <strong>Email:</strong> ${data.user_info.email}<br>
+                        <strong>Tipo:</strong> ${data.user_info.tipo_usuario}<br>
+                        <strong>Obras Acesso:</strong> ${data.access_summary.obras_acesso}<br>
+                        <strong>Funcionários:</strong> ${data.access_summary.funcionarios_acesso}<br>
+                        <strong>RDOs:</strong> ${data.access_summary.rdos_acesso}
+                    </div>
+                `;
+            } else {
+                infoDiv.innerHTML = `
+                    <div class="alert alert-warning">
+                        Erro ao carregar informações. Faça login como funcionário.
+                    </div>
+                `;
+            }
+        })
+        .catch(error => {
+            document.getElementById('system-info').innerHTML = `
+                <div class="alert alert-danger">
+                    Erro: ${error.message}. Verifique se está logado como funcionário.
+                </div>
+            `;
+        });
+});
+</script>
+{% endblock %}

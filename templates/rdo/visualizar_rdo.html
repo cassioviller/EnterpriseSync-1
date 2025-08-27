@@ -1,0 +1,386 @@
+{% extends "base.html" %}
+
+{% block title %}RDO {{ rdo.numero_rdo }} - SIGE{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h1 class="h3">
+                <i class="fas fa-clipboard-list"></i> RDO {{ rdo.numero_rdo }}
+            </h1>
+            <div class="btn-group">
+                <a href="/rdo" class="btn btn-outline-secondary">
+                    <i class="fas fa-arrow-left"></i> Voltar
+                </a>
+                <a href="{{ url_for('main.editar_rdo', id=rdo.id) }}" class="btn btn-outline-warning">
+                    <i class="fas fa-edit"></i> Editar
+                </a>
+                <button class="btn btn-outline-success" onclick="gerarPDF()">
+                    <i class="fas fa-file-pdf"></i> Gerar PDF
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Informações Gerais -->
+<div class="card mb-4">
+    <div class="card-header">
+        <h5 class="mb-0">
+            <i class="fas fa-info-circle"></i> Informações Gerais
+        </h5>
+    </div>
+    <div class="card-body">
+        <div class="row">
+            <div class="col-md-3">
+                <label class="form-label fw-bold">Número do RDO:</label>
+                <p class="mb-0">{{ rdo.numero_rdo }}</p>
+            </div>
+            <div class="col-md-3">
+                <label class="form-label fw-bold">Data do Relatório:</label>
+                <p class="mb-0">{{ rdo.data_relatorio.strftime('%d/%m/%Y') }}</p>
+            </div>
+            <div class="col-md-3">
+                <label class="form-label fw-bold">Obra:</label>
+                <p class="mb-0">
+                    <i class="fas fa-hard-hat text-primary me-1"></i>
+                    {{ rdo.obra.nome }}
+                </p>
+            </div>
+            <div class="col-md-3">
+                <label class="form-label fw-bold">Status:</label>
+                <p class="mb-0">
+                    {% if rdo.status == 'Finalizado' %}
+                        <span class="badge bg-success">
+                            <i class="fas fa-check-circle me-1"></i>Finalizado
+                        </span>
+                    {% else %}
+                        <span class="badge bg-warning">
+                            <i class="fas fa-edit me-1"></i>Rascunho
+                        </span>
+                    {% endif %}
+                </p>
+            </div>
+        </div>
+        <div class="row mt-3">
+            <div class="col-md-6">
+                <label class="form-label fw-bold">Criado por:</label>
+                <p class="mb-0">
+                    <i class="fas fa-user text-success me-1"></i>
+                    {{ rdo.criado_por.nome }}
+                </p>
+            </div>
+            <div class="col-md-6">
+                <label class="form-label fw-bold">Data de Criação:</label>
+                <p class="mb-0">{{ rdo.created_at.strftime('%d/%m/%Y às %H:%M') }}</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Condições Climáticas -->
+<div class="card mb-4">
+    <div class="card-header">
+        <h5 class="mb-0">
+            <i class="fas fa-cloud-sun"></i> Condições Climáticas
+        </h5>
+    </div>
+    <div class="card-body">
+        <div class="row">
+            <div class="col-md-4">
+                <label class="form-label fw-bold">Tempo da Manhã:</label>
+                <p class="mb-0">{{ rdo.tempo_manha or '-' }}</p>
+            </div>
+            <div class="col-md-4">
+                <label class="form-label fw-bold">Tempo da Tarde:</label>
+                <p class="mb-0">{{ rdo.tempo_tarde or '-' }}</p>
+            </div>
+            <div class="col-md-4">
+                <label class="form-label fw-bold">Tempo da Noite:</label>
+                <p class="mb-0">{{ rdo.tempo_noite or '-' }}</p>
+            </div>
+        </div>
+        {% if rdo.observacoes_meteorologicas %}
+        <div class="row mt-3">
+            <div class="col-12">
+                <label class="form-label fw-bold">Observações Meteorológicas:</label>
+                <div class="border rounded p-3 bg-light">
+                    {{ rdo.observacoes_meteorologicas }}
+                </div>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Mão de Obra -->
+<div class="card mb-4">
+    <div class="card-header">
+        <h5 class="mb-0">
+            <i class="fas fa-users"></i> Mão de Obra
+        </h5>
+    </div>
+    <div class="card-body">
+        {% if rdo.mao_obra %}
+        <div class="table-responsive">
+            <table class="table table-striped">
+                <thead>
+                    <tr>
+                        <th>Funcionário</th>
+                        <th>Função Exercida</th>
+                        <th>Horas Trabalhadas</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for mao_obra in rdo.mao_obra %}
+                    <tr>
+                        <td>
+                            <i class="fas fa-user text-primary me-1"></i>
+                            {{ mao_obra.funcionario.nome }}
+                        </td>
+                        <td>{{ mao_obra.funcao_exercida }}</td>
+                        <td>{{ mao_obra.horas_trabalhadas }}h</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        <div class="row mt-3">
+            <div class="col-md-6">
+                <div class="bg-light rounded p-3">
+                    <strong>Total de Funcionários:</strong> {{ rdo.mao_obra|length }}
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="bg-light rounded p-3">
+                    <strong>Total de Horas:</strong> {{ rdo.mao_obra|sum(attribute='horas_trabalhadas') }}h
+                </div>
+            </div>
+        </div>
+        {% else %}
+        <div class="text-muted text-center py-3">
+            <i class="fas fa-info-circle"></i> Nenhuma mão de obra registrada.
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Equipamentos -->
+<div class="card mb-4">
+    <div class="card-header">
+        <h5 class="mb-0">
+            <i class="fas fa-tools"></i> Equipamentos
+        </h5>
+    </div>
+    <div class="card-body">
+        {% if rdo.equipamentos %}
+        <div class="table-responsive">
+            <table class="table table-striped">
+                <thead>
+                    <tr>
+                        <th>Equipamento</th>
+                        <th>Quantidade</th>
+                        <th>Horas de Uso</th>
+                        <th>Estado</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for equipamento in rdo.equipamentos %}
+                    <tr>
+                        <td>
+                            <i class="fas fa-tools text-warning me-1"></i>
+                            {{ equipamento.nome_equipamento }}
+                        </td>
+                        <td>{{ equipamento.quantidade }}</td>
+                        <td>{{ equipamento.horas_uso }}h</td>
+                        <td>
+                            {% if equipamento.estado_conservacao == 'Excelente' %}
+                                <span class="badge bg-success">{{ equipamento.estado_conservacao }}</span>
+                            {% elif equipamento.estado_conservacao == 'Bom' %}
+                                <span class="badge bg-primary">{{ equipamento.estado_conservacao }}</span>
+                            {% elif equipamento.estado_conservacao == 'Regular' %}
+                                <span class="badge bg-warning">{{ equipamento.estado_conservacao }}</span>
+                            {% else %}
+                                <span class="badge bg-danger">{{ equipamento.estado_conservacao }}</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="text-muted text-center py-3">
+            <i class="fas fa-info-circle"></i> Nenhum equipamento registrado.
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Atividades Executadas -->
+<div class="card mb-4">
+    <div class="card-header">
+        <h5 class="mb-0">
+            <i class="fas fa-tasks"></i> Atividades Executadas
+        </h5>
+    </div>
+    <div class="card-body">
+        {% if rdo.atividades %}
+        {% for atividade in rdo.atividades %}
+        <div class="border rounded p-3 mb-3">
+            <div class="row">
+                <div class="col-md-8">
+                    <h6 class="fw-bold">Descrição da Atividade:</h6>
+                    <p>{{ atividade.descricao_atividade }}</p>
+                    {% if atividade.observacoes_tecnicas %}
+                    <h6 class="fw-bold">Observações Técnicas:</h6>
+                    <p class="text-muted">{{ atividade.observacoes_tecnicas }}</p>
+                    {% endif %}
+                </div>
+                <div class="col-md-4">
+                    <h6 class="fw-bold">Progresso:</h6>
+                    <div class="progress mb-2">
+                        <div class="progress-bar" role="progressbar" 
+                             style="width: {{ atividade.percentual_conclusao }}%"
+                             aria-valuenow="{{ atividade.percentual_conclusao }}" 
+                             aria-valuemin="0" aria-valuemax="100">
+                            {{ atividade.percentual_conclusao }}%
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+        {% else %}
+        <div class="text-muted text-center py-3">
+            <i class="fas fa-info-circle"></i> Nenhuma atividade registrada.
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Ocorrências -->
+<div class="card mb-4">
+    <div class="card-header">
+        <h5 class="mb-0">
+            <i class="fas fa-exclamation-triangle"></i> Ocorrências
+        </h5>
+    </div>
+    <div class="card-body">
+        {% if rdo.ocorrencias_rdo %}
+        {% for ocorrencia in rdo.ocorrencias_rdo %}
+        <div class="border rounded p-3 mb-3 border-warning">
+            <h6 class="fw-bold text-warning">
+                <i class="fas fa-exclamation-triangle me-1"></i>
+                Ocorrência #{{ loop.index }}
+            </h6>
+            <div class="row">
+                <div class="col-12 mb-3">
+                    <h6 class="fw-bold">Descrição:</h6>
+                    <p>{{ ocorrencia.descricao_ocorrencia }}</p>
+                </div>
+                {% if ocorrencia.problemas_identificados %}
+                <div class="col-md-6">
+                    <h6 class="fw-bold">Problemas Identificados:</h6>
+                    <p class="text-muted">{{ ocorrencia.problemas_identificados }}</p>
+                </div>
+                {% endif %}
+                {% if ocorrencia.acoes_corretivas %}
+                <div class="col-md-6">
+                    <h6 class="fw-bold">Ações Corretivas:</h6>
+                    <p class="text-success">{{ ocorrencia.acoes_corretivas }}</p>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+        {% endfor %}
+        {% else %}
+        <div class="text-muted text-center py-3">
+            <i class="fas fa-info-circle"></i> Nenhuma ocorrência registrada.
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Fotos -->
+<div class="card mb-4">
+    <div class="card-header">
+        <h5 class="mb-0">
+            <i class="fas fa-camera"></i> Galeria de Fotos
+        </h5>
+    </div>
+    <div class="card-body">
+        {% if rdo.fotos %}
+        <div class="row">
+            {% for foto in rdo.fotos %}
+            <div class="col-md-3 mb-3">
+                <div class="card">
+                    <img src="{{ foto.caminho_arquivo }}" 
+                         class="card-img-top" 
+                         style="height: 200px; object-fit: cover; cursor: pointer;"
+                         onclick="abrirModal('{{ foto.caminho_arquivo }}', '{{ foto.legenda or foto.nome_arquivo }}')"
+                         alt="{{ foto.legenda or foto.nome_arquivo }}">
+                    {% if foto.legenda %}
+                    <div class="card-body p-2">
+                        <small class="text-muted">{{ foto.legenda }}</small>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="text-muted text-center py-3">
+            <i class="fas fa-info-circle"></i> Nenhuma foto anexada.
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Comentários Gerais -->
+{% if rdo.comentario_geral %}
+<div class="card mb-4">
+    <div class="card-header">
+        <h5 class="mb-0">
+            <i class="fas fa-comment"></i> Comentários Gerais
+        </h5>
+    </div>
+    <div class="card-body">
+        <div class="bg-light rounded p-3">
+            {{ rdo.comentario_geral }}
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<!-- Modal para exibir fotos em tamanho maior -->
+<div class="modal fade" id="fotoModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="fotoModalLabel">Foto</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body text-center">
+                <img id="fotoModalImg" src="" class="img-fluid" alt="">
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function abrirModal(src, legenda) {
+    document.getElementById('fotoModalImg').src = src;
+    document.getElementById('fotoModalLabel').textContent = legenda;
+    new bootstrap.Modal(document.getElementById('fotoModal')).show();
+}
+
+function gerarPDF() {
+    // Placeholder para função de geração de PDF
+    alert('Funcionalidade de geração de PDF será implementada em breve.');
+}
+</script>
+{% endblock %}
