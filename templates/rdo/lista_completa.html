@@ -225,8 +225,22 @@
 /* ===== GRID DE CARDS MODERNOS ===== */
 .rdos-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(400px, 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(380px, 1fr));
     gap: 2rem;
+    
+    /* Responsivo */
+    @media (max-width: 768px) {
+        grid-template-columns: 1fr;
+        gap: 1.5rem;
+    }
+    
+    @media (min-width: 769px) and (max-width: 1200px) {
+        grid-template-columns: repeat(2, 1fr);
+    }
+    
+    @media (min-width: 1201px) {
+        grid-template-columns: repeat(3, 1fr);
+    }
 }
 
 .rdo-card {
@@ -241,6 +255,7 @@
 .rdo-card:hover {
     transform: translateY(-8px);
     box-shadow: 0 20px 60px rgba(0, 0, 0, 0.15);
+    transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .rdo-card-header {
@@ -416,17 +431,31 @@
 }
 
 .progress-bar {
-    height: 8px;
+    height: 10px;
     background: #e9ecef;
-    border-radius: 4px;
+    border-radius: 8px;
     overflow: hidden;
+    position: relative;
 }
 
 .progress-fill {
     height: 100%;
-    background: linear-gradient(90deg, #28a745, #20c997);
-    border-radius: 4px;
-    transition: width 0.3s ease;
+    background: linear-gradient(90deg, #2d5a27, #4a7c59, #28a745);
+    border-radius: 8px;
+    transition: width 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+    position: relative;
+    box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.progress-fill::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 50%;
+    background: linear-gradient(to bottom, rgba(255, 255, 255, 0.3), transparent);
+    border-radius: 8px 8px 0 0;
 }
 
 .rdo-stats {
@@ -622,6 +651,14 @@
         transform: translateY(0);
     }
 }
+
+/* Animações escalonadas para os cards de RDO */
+.rdo-card:nth-child(1) { animation-delay: 0.1s; }
+.rdo-card:nth-child(2) { animation-delay: 0.2s; }
+.rdo-card:nth-child(3) { animation-delay: 0.3s; }
+.rdo-card:nth-child(4) { animation-delay: 0.4s; }
+.rdo-card:nth-child(5) { animation-delay: 0.5s; }
+.rdo-card:nth-child(6) { animation-delay: 0.6s; }
 </style>
 {% endblock %}
 
@@ -768,9 +805,9 @@
 
     <!-- Grid de Cards Modernos -->
     {% if rdos.items %}
-    <div class="rdos-grid fade-in">
+    <div class="rdos-grid">
         {% for rdo in rdos.items %}
-        <div class="rdo-card">
+        <div class="rdo-card fade-in">
             <div class="rdo-card-header">
                 <div class="rdo-id-section">
                     <span class="rdo-badge">RDO</span>
