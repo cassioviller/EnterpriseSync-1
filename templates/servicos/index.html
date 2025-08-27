@@ -1,0 +1,946 @@
+{% extends "base.html" %}
+
+{% block title %}Gestão de Serviços{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4" id="main-content">
+    <!-- Header Principal -->
+    <div class="header-section">
+        <div class="d-flex align-items-center justify-content-between mb-4">
+            <div class="header-info">
+                <div class="header-icon">
+                    <i class="fas fa-wrench"></i>
+                </div>
+                <div>
+                    <h1 class="page-title">Gestão de Serviços</h1>
+                    <p class="page-subtitle">Gerencie serviços e suas subatividades</p>
+                </div>
+            </div>
+            <div class="header-actions">
+                <button class="btn-modern btn-success" onclick="abrirModalServico()">
+                    <i class="fas fa-plus"></i>
+                    Novo Serviço
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Estatísticas Rápidas -->
+    <div class="stats-grid">
+        <div class="stat-card slide-in">
+            <div class="stat-icon bg-primary">
+                <i class="fas fa-wrench"></i>
+            </div>
+            <div class="stat-info">
+                <h3>{{ servicos|length }}</h3>
+                <p>Total de Serviços</p>
+            </div>
+        </div>
+        
+        <div class="stat-card slide-in">
+            <div class="stat-icon bg-success">
+                <i class="fas fa-check-circle"></i>
+            </div>
+            <div class="stat-info">
+                <h3>{{ servicos|selectattr('ativo', 'equalto', True)|list|length }}</h3>
+                <p>Serviços Ativos</p>
+            </div>
+        </div>
+        
+        <div class="stat-card slide-in">
+            <div class="stat-icon bg-info">
+                <i class="fas fa-tasks"></i>
+            </div>
+            <div class="stat-info">
+                <h3>{{ total_subatividades }}</h3>
+                <p>Total Subatividades</p>
+            </div>
+        </div>
+        
+        <div class="stat-card slide-in">
+            <div class="stat-icon bg-warning">
+                <i class="fas fa-folder"></i>
+            </div>
+            <div class="stat-info">
+                <h3>{{ categorias|length }}</h3>
+                <p>Categorias</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Filtros Avançados -->
+    <div class="rdo-card slide-in">
+        <div class="rdo-card-header">
+            <h3>
+                <i class="fas fa-filter"></i>
+                Filtros Avançados
+            </h3>
+            <button class="btn-modern btn-sm btn-outline" onclick="limparFiltros()">
+                <i class="fas fa-refresh"></i>
+                Limpar
+            </button>
+        </div>
+        <div class="rdo-card-body">
+            <form method="GET" id="filtrosForm">
+                <div class="filtros-grid">
+                    <div class="form-group">
+                        <label class="form-label">
+                            <i class="fas fa-folder"></i>
+                            Categoria
+                        </label>
+                        <select class="form-control" name="categoria" id="categoria">
+                            <option value="">Todas as categorias</option>
+                            {% for cat in categorias %}
+                            <option value="{{ cat }}" {% if request.args.get('categoria') == cat %}selected{% endif %}>
+                                {{ cat }}
+                            </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label class="form-label">
+                            <i class="fas fa-flag"></i>
+                            Status
+                        </label>
+                        <select class="form-control" name="status">
+                            <option value="">Todos os status</option>
+                            <option value="ativo" {% if request.args.get('status') == "ativo" %}selected{% endif %}>✅ Ativo</option>
+                            <option value="inativo" {% if request.args.get('status') == "inativo" %}selected{% endif %}>❌ Inativo</option>
+                        </select>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label class="form-label">
+                            <i class="fas fa-search"></i>
+                            Buscar
+                        </label>
+                        <input type="text" class="form-control" name="busca" value="{{ request.args.get('busca', '') }}" placeholder="Nome do serviço...">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label class="form-label">
+                            <i class="fas fa-ruler"></i>
+                            Unidade
+                        </label>
+                        <select class="form-control" name="unidade">
+                            <option value="">Todas as unidades</option>
+                            <option value="m²" {% if request.args.get('unidade') == "m²" %}selected{% endif %}>m²</option>
+                            <option value="m³" {% if request.args.get('unidade') == "m³" %}selected{% endif %}>m³</option>
+                            <option value="m" {% if request.args.get('unidade') == "m" %}selected{% endif %}>m</option>
+                            <option value="kg" {% if request.args.get('unidade') == "kg" %}selected{% endif %}>kg</option>
+                            <option value="un" {% if request.args.get('unidade') == "un" %}selected{% endif %}>un</option>
+                        </select>
+                    </div>
+                </div>
+                
+                <div class="filter-actions">
+                    <button type="submit" class="btn-modern btn-primary">
+                        <i class="fas fa-search"></i>
+                        Filtrar Serviços
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Lista de Serviços -->
+    <div class="rdo-card slide-in">
+        <div class="rdo-card-header">
+            <h3>
+                <i class="fas fa-list"></i>
+                Lista de Serviços ({{ servicos|length }} total)
+            </h3>
+            <div class="header-actions">
+                <button class="btn-modern btn-sm btn-info" onclick="toggleVisualizacao()">
+                    <i class="fas fa-th" id="toggle-icon"></i>
+                    <span id="toggle-text">Grid</span>
+                </button>
+            </div>
+        </div>
+        <div class="rdo-card-body">
+            {% if servicos %}
+            <div class="servicos-container" id="servicos-container">
+                {% for servico in servicos %}
+                <div class="servico-item-card">
+                    <div class="servico-header">
+                        <div class="servico-info">
+                            <h5>{{ servico.nome }}</h5>
+                            <span class="badge 
+                                {% if servico.ativo %}bg-success
+                                {% else %}bg-danger
+                                {% endif %}">
+                                {% if servico.ativo %}Ativo{% else %}Inativo{% endif %}
+                            </span>
+                        </div>
+                        <div class="servico-categoria">
+                            <span class="category-badge">{{ servico.categoria or 'Sem categoria' }}</span>
+                        </div>
+                    </div>
+                    
+                    <div class="servico-content">
+                        {% if servico.descricao %}
+                        <p class="servico-desc">{{ servico.descricao[:100] }}{% if servico.descricao|length > 100 %}...{% endif %}</p>
+                        {% endif %}
+                        
+                        <div class="servico-details">
+                            <div class="detail-item">
+                                <i class="fas fa-ruler"></i>
+                                <span>{{ servico.unidade_medida or servico.unidade_simbolo or 'N/A' }}</span>
+                            </div>
+                            {% if servico.preco_unitario %}
+                            <div class="detail-item">
+                                <i class="fas fa-dollar-sign"></i>
+                                <span>R$ {{ '{:,.2f}'.format(servico.preco_unitario).replace(',', 'X').replace('.', ',').replace('X', '.') }}</span>
+                            </div>
+                            {% endif %}
+                            <div class="detail-item">
+                                <i class="fas fa-tasks"></i>
+                                <span>{{ servico.subatividades|length }} subatividades</span>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="servico-actions">
+                        <button class="btn-modern btn-info btn-sm" onclick="verSubatividades({{ servico.id }})">
+                            <i class="fas fa-eye"></i>
+                            Ver
+                        </button>
+                        <button class="btn-modern btn-warning btn-sm" onclick="editarServico({{ servico.id }})">
+                            <i class="fas fa-edit"></i>
+                            Editar
+                        </button>
+                        <button class="btn-modern btn-success btn-sm" onclick="gerenciarSubatividades({{ servico.id }})">
+                            <i class="fas fa-tasks"></i>
+                            Subatividades
+                        </button>
+                        <button class="btn-modern btn-danger btn-sm" onclick="excluirServico({{ servico.id }})">
+                            <i class="fas fa-trash"></i>
+                            Excluir
+                        </button>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+            
+            {% else %}
+            <div class="empty-state">
+                <div class="empty-icon">
+                    <i class="fas fa-wrench"></i>
+                </div>
+                <h4>Nenhum serviço encontrado</h4>
+                <p>{% if request.args.get('categoria') or request.args.get('status') or request.args.get('busca') %}Nenhum serviço corresponde aos filtros aplicados.{% else %}Crie seu primeiro serviço para começar.{% endif %}</p>
+                <button class="btn-modern btn-primary" onclick="abrirModalServico()">
+                    <i class="fas fa-plus"></i>
+                    Criar Primeiro Serviço
+                </button>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<!-- Modal Serviço -->
+<div class="modal fade" id="servicoModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="fas fa-wrench"></i>
+                    <span id="modal-title">Novo Serviço</span>
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form id="servicoForm" action="/servicos" method="POST">
+                <div class="modal-body">
+                    <input type="hidden" id="servico_id" name="servico_id">
+                    
+                    <div class="row">
+                        <div class="col-md-8 mb-3">
+                            <label class="form-label">
+                                <i class="fas fa-tag"></i>
+                                Nome do Serviço *
+                            </label>
+                            <input type="text" class="form-control" id="nome" name="nome" required>
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <label class="form-label">
+                                <i class="fas fa-folder"></i>
+                                Categoria
+                            </label>
+                            <select class="form-control" id="categoria_servico" name="categoria">
+                                <option value="">Selecione...</option>
+                                <option value="Estrutura">Estrutura</option>
+                                <option value="Alvenaria">Alvenaria</option>
+                                <option value="Acabamento">Acabamento</option>
+                                <option value="Instalações">Instalações</option>
+                                <option value="Outros">Outros</option>
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label">
+                            <i class="fas fa-file-alt"></i>
+                            Descrição
+                        </label>
+                        <textarea class="form-control" id="descricao" name="descricao" rows="3"></textarea>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-4 mb-3">
+                            <label class="form-label">
+                                <i class="fas fa-ruler"></i>
+                                Unidade de Medida
+                            </label>
+                            <select class="form-control" id="unidade_medida" name="unidade_medida">
+                                <option value="">Selecione...</option>
+                                <option value="m²">m² - Metro quadrado</option>
+                                <option value="m³">m³ - Metro cúbico</option>
+                                <option value="m">m - Metro linear</option>
+                                <option value="kg">kg - Quilograma</option>
+                                <option value="un">un - Unidade</option>
+                                <option value="h">h - Hora</option>
+                            </select>
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <label class="form-label">
+                                <i class="fas fa-dollar-sign"></i>
+                                Preço Unitário
+                            </label>
+                            <input type="number" class="form-control" id="preco_unitario" name="preco_unitario" step="0.01" min="0">
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <label class="form-label">
+                                <i class="fas fa-toggle-on"></i>
+                                Status
+                            </label>
+                            <select class="form-control" id="ativo" name="ativo">
+                                <option value="True">Ativo</option>
+                                <option value="False">Inativo</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-save"></i>
+                        Salvar Serviço
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Subatividades -->
+<div class="modal fade" id="subatividadesModal" tabindex="-1">
+    <div class="modal-dialog modal-xl">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="fas fa-tasks"></i>
+                    Gerenciar Subatividades - <span id="servico-nome"></span>
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <!-- Abas -->
+                <ul class="nav nav-tabs" id="subatividadesTabs" role="tablist">
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link active" id="lista-tab" data-bs-toggle="tab" data-bs-target="#lista" type="button" role="tab">
+                            <i class="fas fa-list"></i>
+                            Lista de Subatividades
+                        </button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link" id="nova-tab" data-bs-toggle="tab" data-bs-target="#nova" type="button" role="tab">
+                            <i class="fas fa-plus"></i>
+                            Nova Subatividade
+                        </button>
+                    </li>
+                </ul>
+                
+                <div class="tab-content" id="subatividadesTabsContent">
+                    <!-- Aba Lista -->
+                    <div class="tab-pane fade show active" id="lista" role="tabpanel">
+                        <div class="table-responsive mt-3">
+                            <table class="table table-hover" id="subatividadesTable">
+                                <thead class="table-dark">
+                                    <tr>
+                                        <th>Nome</th>
+                                        <th>Descrição</th>
+                                        <th>Ordem</th>
+                                        <th>Status</th>
+                                        <th>Ações</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="subatividadesTableBody">
+                                    <!-- Preenchido dinamicamente -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                    
+                    <!-- Aba Nova Subatividade -->
+                    <div class="tab-pane fade" id="nova" role="tabpanel">
+                        <form id="subatividadeForm" class="mt-3">
+                            <input type="hidden" id="subatividade_servico_id" name="servico_id">
+                            <input type="hidden" id="subatividade_id" name="subatividade_id">
+                            
+                            <div class="row">
+                                <div class="col-md-8 mb-3">
+                                    <label class="form-label">
+                                        <i class="fas fa-tag"></i>
+                                        Nome da Subatividade *
+                                    </label>
+                                    <input type="text" class="form-control" id="subatividade_nome" name="nome" required>
+                                </div>
+                                <div class="col-md-4 mb-3">
+                                    <label class="form-label">
+                                        <i class="fas fa-sort-numeric-up"></i>
+                                        Ordem
+                                    </label>
+                                    <input type="number" class="form-control" id="ordem_padrao" name="ordem_padrao" value="1" min="1">
+                                </div>
+                            </div>
+                            
+                            <div class="mb-3">
+                                <label class="form-label">
+                                    <i class="fas fa-file-alt"></i>
+                                    Descrição
+                                </label>
+                                <textarea class="form-control" id="subatividade_descricao" name="descricao" rows="3"></textarea>
+                            </div>
+                            
+                            <div class="row">
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label">
+                                        <i class="fas fa-toggle-on"></i>
+                                        Status
+                                    </label>
+                                    <select class="form-control" id="subatividade_ativo" name="ativo">
+                                        <option value="True">Ativo</option>
+                                        <option value="False">Inativo</option>
+                                    </select>
+                                </div>
+                            </div>
+                            
+                            <div class="d-flex gap-2">
+                                <button type="submit" class="btn btn-primary">
+                                    <i class="fas fa-save"></i>
+                                    Salvar Subatividade
+                                </button>
+                                <button type="button" class="btn btn-secondary" onclick="limparFormSubatividade()">
+                                    <i class="fas fa-refresh"></i>
+                                    Limpar
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+/* Sistema de cores e estilo base já definido no base.html */
+#main-content {
+    background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+    min-height: 100vh;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+}
+
+/* Grid de Filtros */
+.filtros-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 1.5rem;
+    margin-bottom: 1.5rem;
+}
+
+/* Grid de Estatísticas */
+.stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 1.5rem;
+    margin-bottom: 2rem;
+}
+
+.stat-card {
+    background: rgba(255, 255, 255, 0.9);
+    border-radius: 12px;
+    padding: 1.5rem;
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    border: 1px solid #e2e8f0;
+    transition: all 0.3s ease;
+}
+
+.stat-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.1);
+}
+
+.stat-icon {
+    width: 50px;
+    height: 50px;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-size: 1.5rem;
+}
+
+.stat-info h3 {
+    font-size: 1.5rem;
+    font-weight: 700;
+    margin: 0;
+    color: #2d3748;
+}
+
+.stat-info p {
+    margin: 0;
+    color: #718096;
+    font-size: 0.9rem;
+}
+
+/* Container de Serviços */
+.servicos-container {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+    gap: 1.5rem;
+}
+
+.servicos-container.list-view {
+    grid-template-columns: 1fr;
+}
+
+.servico-item-card {
+    background: rgba(255, 255, 255, 0.9);
+    border-radius: 12px;
+    border: 1px solid #e2e8f0;
+    transition: all 0.3s ease;
+    overflow: hidden;
+}
+
+.servico-item-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.15);
+}
+
+.servico-header {
+    background: linear-gradient(135deg, #4c6ef5 0%, #9775fa 100%);
+    color: white;
+    padding: 1rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.servico-info h5 {
+    margin: 0;
+    font-weight: 600;
+}
+
+.category-badge {
+    background: rgba(255, 255, 255, 0.2);
+    padding: 0.25rem 0.75rem;
+    border-radius: 15px;
+    font-size: 0.8rem;
+    font-weight: 500;
+}
+
+.servico-content {
+    padding: 1.5rem;
+}
+
+.servico-desc {
+    color: #718096;
+    margin-bottom: 1rem;
+}
+
+.servico-details {
+    display: flex;
+    gap: 1rem;
+    margin-bottom: 1rem;
+    flex-wrap: wrap;
+}
+
+.detail-item {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    color: #4a5568;
+    font-size: 0.9rem;
+}
+
+.servico-actions {
+    display: flex;
+    gap: 0.5rem;
+    justify-content: center;
+    padding: 1rem;
+    background: rgba(248, 250, 252, 0.5);
+    border-top: 1px solid #e2e8f0;
+    flex-wrap: wrap;
+}
+
+/* Abas de Subatividades */
+.nav-tabs .nav-link {
+    border-radius: 8px 8px 0 0;
+    border: 1px solid transparent;
+    color: #6c757d;
+}
+
+.nav-tabs .nav-link.active {
+    background: #4c6ef5;
+    color: white;
+    border-color: #4c6ef5;
+}
+
+.nav-tabs .nav-link:hover {
+    background: #f8f9fa;
+    border-color: #dee2e6;
+}
+
+/* Tabela Subatividades */
+#subatividadesTable {
+    margin-bottom: 0;
+}
+
+#subatividadesTable th {
+    background: #4c6ef5;
+    color: white;
+    border: none;
+}
+
+.btn-inline {
+    padding: 0.25rem 0.5rem;
+    font-size: 0.75rem;
+    margin: 0 0.125rem;
+}
+
+/* Responsividade */
+@media (max-width: 768px) {
+    .filtros-grid {
+        grid-template-columns: 1fr;
+    }
+    
+    .stats-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+    
+    .servicos-container {
+        grid-template-columns: 1fr;
+    }
+    
+    .servico-header {
+        flex-direction: column;
+        gap: 0.5rem;
+        text-align: center;
+    }
+    
+    .servico-details {
+        justify-content: center;
+    }
+    
+    .servico-actions {
+        flex-direction: column;
+    }
+}
+
+/* Animações */
+.slide-in {
+    animation: slideInUp 0.6s ease-out forwards;
+}
+
+@keyframes slideInUp {
+    from {
+        opacity: 0;
+        transform: translateY(30px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+</style>
+
+<script>
+let servicoAtual = null;
+
+function limparFiltros() {
+    document.getElementById('categoria').value = '';
+    document.querySelector('select[name="status"]').value = '';
+    document.querySelector('input[name="busca"]').value = '';
+    document.querySelector('select[name="unidade"]').value = '';
+    document.getElementById('filtrosForm').submit();
+}
+
+function toggleVisualizacao() {
+    const container = document.getElementById('servicos-container');
+    const icon = document.getElementById('toggle-icon');
+    const text = document.getElementById('toggle-text');
+    
+    container.classList.toggle('list-view');
+    
+    if (container.classList.contains('list-view')) {
+        icon.className = 'fas fa-th-large';
+        text.textContent = 'Cards';
+    } else {
+        icon.className = 'fas fa-th';
+        text.textContent = 'Grid';
+    }
+}
+
+function abrirModalServico(id = null) {
+    servicoAtual = id;
+    const modal = new bootstrap.Modal(document.getElementById('servicoModal'));
+    
+    if (id) {
+        // Editar serviço existente
+        document.getElementById('modal-title').textContent = 'Editar Serviço';
+        document.getElementById('servicoForm').action = `/servicos/${id}/editar`;
+        carregarDadosServico(id);
+    } else {
+        // Novo serviço
+        document.getElementById('modal-title').textContent = 'Novo Serviço';
+        document.getElementById('servicoForm').action = '/servicos';
+        limparFormServico();
+    }
+    
+    modal.show();
+}
+
+function limparFormServico() {
+    document.getElementById('servico_id').value = '';
+    document.getElementById('nome').value = '';
+    document.getElementById('categoria_servico').value = '';
+    document.getElementById('descricao').value = '';
+    document.getElementById('unidade_medida').value = '';
+    document.getElementById('preco_unitario').value = '';
+    document.getElementById('ativo').value = 'True';
+}
+
+function carregarDadosServico(id) {
+    fetch(`/servicos/${id}/dados`)
+        .then(response => response.json())
+        .then(data => {
+            document.getElementById('servico_id').value = data.id;
+            document.getElementById('nome').value = data.nome;
+            document.getElementById('categoria_servico').value = data.categoria || '';
+            document.getElementById('descricao').value = data.descricao || '';
+            document.getElementById('unidade_medida').value = data.unidade_medida || '';
+            document.getElementById('preco_unitario').value = data.preco_unitario || '';
+            document.getElementById('ativo').value = data.ativo ? 'True' : 'False';
+        })
+        .catch(error => {
+            console.error('Erro ao carregar dados do serviço:', error);
+            alert('Erro ao carregar dados do serviço');
+        });
+}
+
+function editarServico(id) {
+    abrirModalServico(id);
+}
+
+function excluirServico(id) {
+    if (confirm('Tem certeza que deseja excluir este serviço? Esta ação não pode ser desfeita.')) {
+        fetch(`/servicos/${id}/excluir`, {
+            method: 'DELETE',
+            headers: {
+                'Content-Type': 'application/json',
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                location.reload();
+            } else {
+                alert(data.message || 'Erro ao excluir serviço');
+            }
+        })
+        .catch(error => {
+            console.error('Erro ao excluir serviço:', error);
+            alert('Erro ao excluir serviço');
+        });
+    }
+}
+
+function gerenciarSubatividades(id) {
+    servicoAtual = id;
+    const modal = new bootstrap.Modal(document.getElementById('subatividadesModal'));
+    
+    // Carregar nome do serviço
+    fetch(`/servicos/${id}/dados`)
+        .then(response => response.json())
+        .then(data => {
+            document.getElementById('servico-nome').textContent = data.nome;
+            document.getElementById('subatividade_servico_id').value = id;
+        });
+    
+    carregarSubatividades(id);
+    modal.show();
+}
+
+function carregarSubatividades(servicoId) {
+    fetch(`/servicos/${servicoId}/subatividades`)
+        .then(response => response.json())
+        .then(data => {
+            const tbody = document.getElementById('subatividadesTableBody');
+            tbody.innerHTML = '';
+            
+            data.forEach(sub => {
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td>${sub.nome}</td>
+                    <td>${sub.descricao || '-'}</td>
+                    <td>${sub.ordem_padrao}</td>
+                    <td>
+                        <span class="badge ${sub.ativo ? 'bg-success' : 'bg-danger'}">
+                            ${sub.ativo ? 'Ativo' : 'Inativo'}
+                        </span>
+                    </td>
+                    <td>
+                        <button class="btn btn-warning btn-inline" onclick="editarSubatividade(${sub.id})">
+                            <i class="fas fa-edit"></i>
+                        </button>
+                        <button class="btn btn-danger btn-inline" onclick="excluirSubatividade(${sub.id})">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                    </td>
+                `;
+                tbody.appendChild(row);
+            });
+        })
+        .catch(error => {
+            console.error('Erro ao carregar subatividades:', error);
+        });
+}
+
+function editarSubatividade(id) {
+    fetch(`/subatividades/${id}/dados`)
+        .then(response => response.json())
+        .then(data => {
+            document.getElementById('subatividade_id').value = data.id;
+            document.getElementById('subatividade_nome').value = data.nome;
+            document.getElementById('subatividade_descricao').value = data.descricao || '';
+            document.getElementById('ordem_padrao').value = data.ordem_padrao;
+            document.getElementById('subatividade_ativo').value = data.ativo ? 'True' : 'False';
+            
+            // Ativar aba de nova subatividade
+            const tab = new bootstrap.Tab(document.getElementById('nova-tab'));
+            tab.show();
+        })
+        .catch(error => {
+            console.error('Erro ao carregar subatividade:', error);
+        });
+}
+
+function excluirSubatividade(id) {
+    if (confirm('Tem certeza que deseja excluir esta subatividade?')) {
+        fetch(`/subatividades/${id}/excluir`, {
+            method: 'DELETE',
+            headers: {
+                'Content-Type': 'application/json',
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                carregarSubatividades(servicoAtual);
+            } else {
+                alert(data.message || 'Erro ao excluir subatividade');
+            }
+        })
+        .catch(error => {
+            console.error('Erro ao excluir subatividade:', error);
+        });
+    }
+}
+
+function limparFormSubatividade() {
+    document.getElementById('subatividade_id').value = '';
+    document.getElementById('subatividade_nome').value = '';
+    document.getElementById('subatividade_descricao').value = '';
+    document.getElementById('ordem_padrao').value = '1';
+    document.getElementById('subatividade_ativo').value = 'True';
+}
+
+function verSubatividades(id) {
+    gerenciarSubatividades(id);
+}
+
+// Eventos de formulário
+document.getElementById('servicoForm').addEventListener('submit', function(e) {
+    e.preventDefault();
+    
+    const formData = new FormData(this);
+    const url = this.action;
+    const method = servicoAtual ? 'PUT' : 'POST';
+    
+    fetch(url, {
+        method: method,
+        body: formData
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            location.reload();
+        } else {
+            alert(data.message || 'Erro ao salvar serviço');
+        }
+    })
+    .catch(error => {
+        console.error('Erro ao salvar serviço:', error);
+        alert('Erro ao salvar serviço');
+    });
+});
+
+document.getElementById('subatividadeForm').addEventListener('submit', function(e) {
+    e.preventDefault();
+    
+    const formData = new FormData(this);
+    const subatividadeId = document.getElementById('subatividade_id').value;
+    const url = subatividadeId ? `/subatividades/${subatividadeId}/editar` : '/subatividades';
+    const method = subatividadeId ? 'PUT' : 'POST';
+    
+    fetch(url, {
+        method: method,
+        body: formData
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            limparFormSubatividade();
+            carregarSubatividades(servicoAtual);
+            
+            // Voltar para aba de lista
+            const tab = new bootstrap.Tab(document.getElementById('lista-tab'));
+            tab.show();
+        } else {
+            alert(data.message || 'Erro ao salvar subatividade');
+        }
+    })
+    .catch(error => {
+        console.error('Erro ao salvar subatividade:', error);
+        alert('Erro ao salvar subatividade');
+    });
+});
+
+document.addEventListener('DOMContentLoaded', function() {
+    // Animar entrada dos cards
+    setTimeout(() => {
+        document.querySelectorAll('.rdo-card, .stat-card').forEach((card, index) => {
+            setTimeout(() => {
+                card.classList.add('slide-in');
+            }, index * 100);
+        });
+    }, 100);
+});
+</script>
+{% endblock %}

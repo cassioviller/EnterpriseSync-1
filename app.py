@@ -186,15 +186,7 @@ with app.app_context():
     except Exception as e:
         logging.error(f"❌ Erro ao registrar blueprint templates: {e}")
     
-    # Registrar blueprint de serviços
-    try:
-        from servicos_views import servicos_bp
-        app.register_blueprint(servicos_bp, url_prefix='/servicos')
-        logging.info("✅ Blueprint serviços registrado")
-    except ImportError as e:
-        logging.warning(f"⚠️ Blueprint serviços não encontrado: {e}")
-    except Exception as e:
-        logging.error(f"❌ Erro ao registrar blueprint serviços: {e}")
+    # Blueprint de serviços será registrado em main.py para evitar conflitos
     
     # Registrar blueprint de alimentação
     try:
