@@ -4,24 +4,20 @@
 
 {% block styles %}
 <style>
-/* ===== DESIGN SYSTEM MODERNO ===== */
+/* ===== DESIGN SYSTEM CONSOLIDADO ===== */
 :root {
     --primary-green: #198754;
     --dark-green: #145a3e;
     --light-green: #d1e7dd;
-    --white: #ffffff;
     --gray-50: #f8f9fa;
     --gray-100: #e9ecef;
     --gray-200: #dee2e6;
     --gray-600: #6c757d;
     --gray-900: #212529;
-    --blue: #0d6efd;
-    --yellow: #ffc107;
-    --red: #dc3545;
     --shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
     --shadow-lg: 0 10px 25px rgba(0, 0, 0, 0.15);
     --border-radius: 12px;
-    --transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    --transition: all 0.3s ease;
 }
 
 /* ===== CONTAINER PRINCIPAL ===== */
@@ -33,7 +29,7 @@
 
 /* ===== HEADER MODERNO ===== */
 .page-header {
-    background: linear-gradient(135deg, var(--primary-green) 0%, var(--dark-green) 100%);
+    background: linear-gradient(135deg, var(--primary-green), var(--dark-green));
     color: white;
     padding: 2.5rem 0;
     margin: -1.5rem -1.5rem 2rem -1.5rem;
@@ -130,24 +126,20 @@
     font-size: 1.2rem;
 }
 
-.stat-content {
-    flex: 1;
-}
-
-.stat-number {
+.stat-content .stat-number {
     font-size: 2rem;
     font-weight: 700;
     color: var(--gray-900);
     line-height: 1;
 }
 
-.stat-label {
+.stat-content .stat-label {
     font-size: 0.9rem;
     color: var(--gray-600);
     margin-top: 0.25rem;
 }
 
-/* ===== FILTROS MODERNOS ===== */
+/* ===== FILTROS ===== */
 .filters-container {
     background: white;
     padding: 1.5rem;
@@ -331,7 +323,7 @@
 
 .progress-header {
     display: flex;
-    justify-content: between;
+    justify-content: space-between;
     align-items: center;
     margin-bottom: 0.5rem;
 }
@@ -476,16 +468,6 @@
     color: var(--gray-900);
 }
 
-/* ===== ANIMAÇÕES ===== */
-.fade-in {
-    animation: fadeIn 0.6s ease-out forwards;
-}
-
-@keyframes fadeIn {
-    from { opacity: 0; transform: translateY(20px); }
-    to { opacity: 1; transform: translateY(0); }
-}
-
 /* ===== RESPONSIVIDADE ===== */
 @media (max-width: 768px) {
     .rdo-container { padding: 1rem; }
@@ -502,7 +484,7 @@
 {% block content %}
 <div class="rdo-container">
     <!-- Header Moderno -->
-    <div class="page-header fade-in">
+    <div class="page-header">
         <div class="header-content">
             <div class="header-info">
                 <div class="header-icon">
@@ -520,7 +502,7 @@
     </div>
 
     <!-- Dashboard de Estatísticas -->
-    <div class="stats-dashboard fade-in">
+    <div class="stats-dashboard">
         <div class="stat-card">
             <div class="stat-icon">
                 <i class="fas fa-clipboard-list"></i>
@@ -564,8 +546,8 @@
         </div>
     </div>
 
-    <!-- Filtros Modernos -->
-    <div class="filters-container fade-in">
+    <!-- Filtros -->
+    <div class="filters-container">
         <div class="filters-header">
             <i class="fas fa-filter"></i>
             <h3>Filtros e Ordenação</h3>
@@ -641,7 +623,7 @@
     {% if rdos.items %}
     <div class="rdos-grid">
         {% for rdo in rdos.items %}
-        <div class="rdo-card fade-in">
+        <div class="rdo-card">
             <div class="rdo-card-header">
                 <div class="rdo-id-section">
                     <span class="rdo-badge">RDO</span>
@@ -708,10 +690,10 @@
     
     <!-- Paginação -->
     {% if rdos.pages > 1 %}
-    <div class="pagination-container fade-in">
+    <div class="pagination-container">
         <nav class="pagination">
             {% if rdos.has_prev %}
-            <a class="page-btn" href="{{ url_for('main.rdo_lista_unificada', page=rdos.prev_num, **filters) }}">
+            <a class="page-btn" href="/rdo?page={{ rdos.prev_num }}{% for key, value in filters.items() %}&{{ key }}={{ value }}{% endfor %}">
                 <i class="fas fa-arrow-left"></i> Anterior
             </a>
             {% else %}
@@ -723,7 +705,7 @@
             {% for page_num in rdos.iter_pages() %}
                 {% if page_num %}
                     {% if page_num != rdos.page %}
-                    <a class="page-btn" href="{{ url_for('main.rdo_lista_unificada', page=page_num, **filters) }}">{{ page_num }}</a>
+                    <a class="page-btn" href="/rdo?page={{ page_num }}{% for key, value in filters.items() %}&{{ key }}={{ value }}{% endfor %}">{{ page_num }}</a>
                     {% else %}
                     <button class="page-btn active">{{ page_num }}</button>
                     {% endif %}
@@ -733,7 +715,7 @@
             {% endfor %}
             
             {% if rdos.has_next %}
-            <a class="page-btn" href="{{ url_for('main.rdo_lista_unificada', page=rdos.next_num, **filters) }}">
+            <a class="page-btn" href="/rdo?page={{ rdos.next_num }}{% for key, value in filters.items() %}&{{ key }}={{ value }}{% endfor %}">
                 Próximo <i class="fas fa-arrow-right"></i>
             </a>
             {% else %}
@@ -747,7 +729,7 @@
     
     {% else %}
     <!-- Estado vazio -->
-    <div class="empty-state fade-in">
+    <div class="empty-state">
         <i class="fas fa-clipboard-list"></i>
         <h3>Nenhuma RDO encontrada</h3>
         <p>{% if filters.obra_id or filters.status or filters.data_inicio or filters.data_fim %}Nenhuma RDO corresponde aos filtros aplicados.{% else %}Crie sua primeira RDO para começar o acompanhamento da obra.{% endif %}</p>
@@ -771,17 +753,5 @@ function limparFiltros() {
     });
     form.submit();
 }
-
-document.addEventListener('DOMContentLoaded', function() {
-    // Animar entrada dos cards
-    setTimeout(() => {
-        document.querySelectorAll('.fade-in').forEach((element, index) => {
-            setTimeout(() => {
-                element.style.opacity = '1';
-                element.style.transform = 'translateY(0)';
-            }, index * 100);
-        });
-    }, 100);
-});
 </script>
 {% endblock %}

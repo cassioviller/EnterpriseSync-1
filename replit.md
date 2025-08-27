@@ -22,7 +22,7 @@ The system is built with a Flask backend, SQLAlchemy ORM, and PostgreSQL databas
 -   **Core Modules:**
     -   **Proposal Management:** Reusable templates (`PropostaTemplate`), automatic calculations, categorization, and filtering. Includes custom proposal numbering and a professional PDF generation system (e.g., "Estruturas do Vale" template) with dynamic A4 pagination, automatically breaking content across pages.
     -   **Employee Management:** Full registration with photo support, automated time clocking, and overtime/lateness calculation.
-    -   **Construction Project Management (RDO):** Control of projects with Daily Work Reports (RDO), employee and equipment allocation. Features a completely modernized card-based interface (`lista_completa.html`) with gradient headers, statistics dashboard, advanced filtering, and responsive design. All legacy templates cleaned up for maintainability.
+    -   **Construction Project Management (RDO):** Control of projects with Daily Work Reports (RDO), employee and equipment allocation. Features a completely modernized card-based interface (`rdo_lista_unificada.html`) accessible via single route `/rdo` with gradient headers, statistics dashboard, advanced filtering, and responsive design. All legacy templates and duplicate routes eliminated for maximum maintainability.
     -   **Payroll:** Automatic calculation based on time clock records and configurable salaries.
 -   **Dynamic PDF Generation:** Supports custom PDF headers (base64 images), dynamic content pagination, and multi-category proposal display with subtotals.
 -   **Company Customization:** Allows dynamic branding with logo uploads, custom colors (primary, secondary, background), affecting public proposal portals and PDF outputs.
