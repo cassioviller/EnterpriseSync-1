@@ -112,5 +112,32 @@ def obter_admin_id():
 
 def obter_funcionario_atual():
     """Função utilitária para obter funcionário atual"""
-    # Retornar funcionário ID 101 (Cássio Viller Silva de Azevedo)
-    return 101
+    # Verificar se funcionário existe para o email do usuário logado
+    try:
+        from models import Funcionario
+        funcionario = Funcionario.query.filter_by(
+            email='cassiovillerde@gmail.com', 
+            admin_id=10, 
+            ativo=True
+        ).first()
+        
+        if funcionario:
+            print(f"✅ Funcionário encontrado: {funcionario.nome} (ID={funcionario.id})")
+            return funcionario.id
+        else:
+            # Usar funcionário padrão ativo do admin_id=10
+            funcionario_padrao = Funcionario.query.filter_by(
+                admin_id=10, 
+                ativo=True
+            ).first()
+            
+            if funcionario_padrao:
+                print(f"⚠️ Usando funcionário padrão: {funcionario_padrao.nome} (ID={funcionario_padrao.id})")
+                return funcionario_padrao.id
+            else:
+                print("❌ Nenhum funcionário ativo encontrado para admin_id=10")
+                return None
+                
+    except Exception as e:
+        print(f"❌ Erro ao obter funcionário: {e}")
+        return 101  # Fallback
