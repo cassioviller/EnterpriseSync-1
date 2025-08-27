@@ -1,9 +1,9 @@
-{% extends "base.html" %}
+{% extends "base_light.html" %}
 
 {% block head %}
 <script>
-// Remover dark theme temporariamente para esta página
-document.documentElement.removeAttribute('data-bs-theme');
+// Garantir light theme para RDO
+console.log('Initializing RDO with light theme...');
 </script>
 {% endblock %}
 
@@ -11,27 +11,10 @@ document.documentElement.removeAttribute('data-bs-theme');
 
 {% block styles %}
 <style>
-/* ===== OVERRIDE TOTAL DARK MODE - FORÇA ESTILOS ===== */
-* {
-    -webkit-appearance: none !important;
-    -moz-appearance: none !important;
-    appearance: none !important;
-}
-
+/* ===== BASE LIGHT THEME GARANTIDO ===== */
 body {
     background-color: #f8f9fa !important;
     color: #212529 !important;
-}
-
-/* Override completo Bootstrap dark theme */
-html[data-bs-theme="dark"] body,
-html[data-bs-theme="dark"] .container,
-html[data-bs-theme="dark"] .container-fluid,
-html[data-bs-theme="dark"] .rdo-container,
-html[data-bs-theme="dark"] .rdo-container * {
-    background-color: unset !important;
-    color: unset !important;
-    border-color: unset !important;
 }
 
 /* ===== DESIGN SYSTEM MODERNO PROFISSIONAL ===== */
