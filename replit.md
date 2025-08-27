@@ -12,11 +12,13 @@ SIGE (Sistema de Gestão Empresarial) is a multi-tenant business management syst
 - Design limpo e profissional com gradientes e animações suaves
 - Template unificado em todas as páginas do sistema
 - Contraste adequado de texto (valores em preto) para melhor legibilidade
+- Proteção robusta contra erros de transação de banco de dados
+- Scripts automatizados para deploy de correções críticas em produção
 
 ## System Architecture
 The system is built with a Flask backend, SQLAlchemy ORM, and PostgreSQL database, with Jinja2 templates and Bootstrap for the frontend. Deployment is managed via Docker on Replit. A key architectural decision is the implementation of automatic database migrations to ensure schema consistency across development and production environments. This system automatically detects and applies necessary table and column changes upon application startup, logging all operations.
 
-**Template Architecture (Updated Aug 2025):** The entire system now uses a unified modern template (`base_completo.html`) across all 110+ pages, ensuring consistent UI/UX, responsive design, and improved maintainability. All modules have been migrated from the legacy `base.html` template.
+**Template Architecture (Updated Aug 2025):** The entire system now uses a unified modern template (`base_completo.html`) across all 110+ pages, ensuring consistent UI/UX, responsive design, and improved maintainability. All modules have been migrated from the legacy `base.html` template. Critical database transaction protection implemented via `safe_db_operation` function to prevent production errors.
 
 **Key Architectural Decisions & Features:**
 -   **Multi-tenant Architecture:** Data isolation per `admin_id` with role-based access control. Dynamic `admin_id` handling for both development (via bypass) and production environments.
