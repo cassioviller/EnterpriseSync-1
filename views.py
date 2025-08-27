@@ -1563,7 +1563,6 @@ def api_servicos():
 @main_bp.route('/rdo')
 @main_bp.route('/rdo/')
 @main_bp.route('/rdo/lista')
-@main_bp.route('/funcionario/rdos')
 @login_required
 def rdo_lista_unificada():
     """Lista RDOs com controle de acesso e design moderno"""
@@ -1945,7 +1944,7 @@ def visualizar_rdo(id):
         
         if not rdo:
             flash('RDO não encontrado ou sem permissão de acesso.', 'error')
-            return redirect(url_for('main.funcionario_lista_rdos'))
+            return redirect('/rdo')
         
         # Buscar subatividades do RDO
         subatividades = RDOServicoSubatividade.query.filter_by(rdo_id=rdo.id).all()
@@ -1959,7 +1958,7 @@ def visualizar_rdo(id):
     except Exception as e:
         print(f"ERRO VISUALIZAR RDO: {str(e)}")
         flash('RDO não encontrado ou sem permissão de acesso.', 'error')
-        return redirect(url_for('main.funcionario_lista_rdos'))
+        return redirect('/rdo')
 
 @main_bp.route('/rdo/<int:id>/finalizar', methods=['POST'])
 @admin_required
@@ -2393,7 +2392,7 @@ def funcionario_criar_rdo():
             
             if not rdo:
                 flash('RDO não encontrado ou sem permissão de acesso.', 'error')
-                return redirect(url_for('main.funcionario_lista_rdos'))
+                return redirect('/rdo')
             
             if rdo.status != 'Rascunho':
                 flash('Apenas RDOs em rascunho podem ser editados.', 'warning')
@@ -2689,7 +2688,7 @@ def funcionario_visualizar_rdo(id):
         
         if not rdo:
             flash('RDO não encontrado ou sem permissão de acesso.', 'error')
-            return redirect(url_for('main.funcionario_lista_rdos'))
+            return redirect('/rdo')
         
         # Buscar todas as obras e funcionários para o formulário
         obras = Obra.query.filter_by(admin_id=admin_id_correto).order_by(Obra.nome).all()
@@ -2745,7 +2744,7 @@ def funcionario_visualizar_rdo(id):
     except Exception as e:
         print(f"ERRO VISUALIZAR RDO: {str(e)}")
         flash('Erro ao carregar RDO.', 'error')
-        return redirect(url_for('main.funcionario_lista_rdos'))
+        return redirect('/rdo')
 
 @main_bp.route('/funcionario/rdo/<int:id>/editar')
 @funcionario_required
@@ -2774,7 +2773,7 @@ def funcionario_editar_rdo(id):
     except Exception as e:
         print(f"ERRO FUNCIONÁRIO EDITAR RDO: {str(e)}")
         flash('RDO não encontrado.', 'error')
-        return redirect(url_for('main.funcionario_lista_rdos'))
+        return redirect('/rdo')
 
 @main_bp.route('/funcionario/obras')
 @funcionario_required
