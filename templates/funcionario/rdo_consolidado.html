@@ -1821,21 +1821,7 @@ function obterPercentualInicial(subatividade) {
     return subatividade.percentual_heranca || 0;
 }
 
-// Função helper para obter observações iniciais da subatividade  
-function obterObservacoesIniciais(subatividade) {
-    // 1. Primeiro, verificar dados salvos (modo edição)
-    if (dadosSalvos.subatividades && dadosSalvos.subatividades[subatividade.id]) {
-        return dadosSalvos.subatividades[subatividade.id].observacoes || '';
-    }
-    
-    // 2. Segundo, verificar observações do último RDO
-    if (percentuaisUltimoRdo && percentuaisUltimoRdo[subatividade.id]) {
-        return percentuaisUltimoRdo[subatividade.id].observacoes || '';
-    }
-    
-    // 3. Por último, sem observações
-    return '';
-}
+// Função removida - observações não são mais necessárias
 
 function renderizarServicos(servicos) {
     const container = document.getElementById('servicos-container');
@@ -1871,12 +1857,6 @@ function renderizarServicos(servicos) {
                                    placeholder="0%">
                             <span class="percentual-symbol">%</span>
                         </div>
-                    </div>
-                    <div class="subatividade-observacoes mt-2">
-                        <textarea name="subatividade_${sub.id}_observacoes" 
-                                  class="form-control" 
-                                  rows="2" 
-                                  placeholder="Observações (opcional)">${obterObservacoesIniciais(sub)}</textarea>
                     </div>
                 `).join('') : '<div class="no-subatividades">Nenhuma subatividade encontrada</div>'}
             </div>
