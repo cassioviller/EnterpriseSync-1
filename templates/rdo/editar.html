@@ -1,0 +1,227 @@
+{% extends "base.html" %}
+
+{% block title %}Editar RDO {{ rdo.numero_rdo }} - SIGE{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">
+                        <i class="fas fa-edit me-2"></i>
+                        Editar RDO {{ rdo.numero_rdo }}
+                        <span class="badge bg-warning ms-2">{{ rdo.status }}</span>
+                    </h5>
+                    <div>
+                        <a href="{{ url_for('main.visualizar_rdo', id=rdo.id) }}" class="btn btn-outline-secondary me-2">
+                            <i class="fas fa-eye me-1"></i>Visualizar
+                        </a>
+                        <a href="{{ url_for('main.lista_rdos') }}" class="btn btn-outline-secondary">
+                            <i class="fas fa-arrow-left me-1"></i>Voltar à Lista
+                        </a>
+                    </div>
+                </div>
+                
+                <div class="card-body">
+                    <div class="alert alert-info">
+                        <i class="fas fa-info-circle me-2"></i>
+                        <strong>Modo Administrador:</strong> Para editar este RDO de forma completa, 
+                        recomendamos usar a <a href="{{ url_for('main.funcionario_editar_rdo', id=rdo.id) }}" class="alert-link">interface completa de edição</a>.
+                    </div>
+                    
+                    <!-- Informações Básicas -->
+                    <form method="POST" action="{{ url_for('main.atualizar_rdo', id=rdo.id) }}">
+                        <div class="row mb-4">
+                            <div class="col-md-6">
+                                <h6 class="text-muted mb-3">Informações Básicas</h6>
+                                
+                                <div class="mb-3">
+                                    <label for="data_relatorio" class="form-label">Data do Relatório</label>
+                                    <input type="date" class="form-control" id="data_relatorio" name="data_relatorio" 
+                                           value="{{ rdo.data_relatorio.strftime('%Y-%m-%d') }}" required>
+                                </div>
+                                
+                                <div class="mb-3">
+                                    <label for="obra_id" class="form-label">Obra</label>
+                                    <select class="form-select" id="obra_id" name="obra_id" required disabled>
+                                        <option value="{{ rdo.obra.id }}">{{ rdo.obra.nome }}</option>
+                                    </select>
+                                    <input type="hidden" name="obra_id" value="{{ rdo.obra.id }}">
+                                    <small class="form-text text-muted">A obra não pode ser alterada após a criação</small>
+                                </div>
+                                
+                                <div class="mb-3">
+                                    <label for="status" class="form-label">Status</label>
+                                    <select class="form-select" id="status" name="status">
+                                        <option value="Rascunho" {% if rdo.status == 'Rascunho' %}selected{% endif %}>Rascunho</option>
+                                        <option value="Finalizado" {% if rdo.status == 'Finalizado' %}selected{% endif %}>Finalizado</option>
+                                    </select>
+                                </div>
+                            </div>
+                            
+                            <div class="col-md-6">
+                                <h6 class="text-muted mb-3">Condições Climáticas</h6>
+                                
+                                <div class="row">
+                                    <div class="col-md-4 mb-3">
+                                        <label for="tempo_manha" class="form-label">Manhã</label>
+                                        <select class="form-select" id="tempo_manha" name="tempo_manha">
+                                            <option value="Bom" {% if rdo.tempo_manha == 'Bom' %}selected{% endif %}>☀️ Bom</option>
+                                            <option value="Nublado" {% if rdo.tempo_manha == 'Nublado' %}selected{% endif %}>☁️ Nublado</option>
+                                            <option value="Chuva" {% if rdo.tempo_manha == 'Chuva' %}selected{% endif %}>🌧️ Chuva</option>
+                                            <option value="Forte Chuva" {% if rdo.tempo_manha == 'Forte Chuva' %}selected{% endif %}>⛈️ Forte Chuva</option>
+                                        </select>
+                                    </div>
+                                    
+                                    <div class="col-md-4 mb-3">
+                                        <label for="tempo_tarde" class="form-label">Tarde</label>
+                                        <select class="form-select" id="tempo_tarde" name="tempo_tarde">
+                                            <option value="Bom" {% if rdo.tempo_tarde == 'Bom' %}selected{% endif %}>☀️ Bom</option>
+                                            <option value="Nublado" {% if rdo.tempo_tarde == 'Nublado' %}selected{% endif %}>☁️ Nublado</option>
+                                            <option value="Chuva" {% if rdo.tempo_tarde == 'Chuva' %}selected{% endif %}>🌧️ Chuva</option>
+                                            <option value="Forte Chuva" {% if rdo.tempo_tarde == 'Forte Chuva' %}selected{% endif %}>⛈️ Forte Chuva</option>
+                                        </select>
+                                    </div>
+                                    
+                                    <div class="col-md-4 mb-3">
+                                        <label for="tempo_noite" class="form-label">Noite</label>
+                                        <select class="form-select" id="tempo_noite" name="tempo_noite">
+                                            <option value="Bom" {% if rdo.tempo_noite == 'Bom' %}selected{% endif %}>☀️ Bom</option>
+                                            <option value="Nublado" {% if rdo.tempo_noite == 'Nublado' %}selected{% endif %}>☁️ Nublado</option>
+                                            <option value="Chuva" {% if rdo.tempo_noite == 'Chuva' %}selected{% endif %}>🌧️ Chuva</option>
+                                            <option value="Forte Chuva" {% if rdo.tempo_noite == 'Forte Chuva' %}selected{% endif %}>⛈️ Forte Chuva</option>
+                                        </select>
+                                    </div>
+                                </div>
+                                
+                                <div class="mb-3">
+                                    <label for="observacoes_meteorologicas" class="form-label">Observações Meteorológicas</label>
+                                    <textarea class="form-control" id="observacoes_meteorologicas" name="observacoes_meteorologicas" 
+                                              rows="2" placeholder="Detalhes sobre o clima...">{{ rdo.observacoes_meteorologicas or '' }}</textarea>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Comentário Geral -->
+                        <div class="mb-4">
+                            <h6 class="text-muted mb-3">Comentário Geral</h6>
+                            <textarea class="form-control" id="comentario_geral" name="comentario_geral" 
+                                      rows="3" placeholder="Comentários gerais sobre o trabalho realizado...">{{ rdo.comentario_geral or '' }}</textarea>
+                        </div>
+                        
+                        <!-- Resumo Atual -->
+                        <div class="row mb-4">
+                            <div class="col-md-6">
+                                <h6 class="text-muted mb-3">Atividades Registradas</h6>
+                                {% if rdo.atividades %}
+                                <div class="list-group">
+                                    {% for atividade in rdo.atividades %}
+                                    <div class="list-group-item">
+                                        <div class="d-flex justify-content-between align-items-center">
+                                            <div>
+                                                <h6 class="mb-1">{{ atividade.nome_subatividade }}</h6>
+                                                {% if atividade.observacoes_tecnicas %}
+                                                <small class="text-muted">{{ atividade.observacoes_tecnicas }}</small>
+                                                {% endif %}
+                                            </div>
+                                            <span class="badge bg-primary">{{ atividade.percentual_conclusao }}%</span>
+                                        </div>
+                                    </div>
+                                    {% endfor %}
+                                </div>
+                                {% else %}
+                                <div class="text-center py-3 text-muted">
+                                    <i class="fas fa-clipboard-list fa-2x mb-2"></i>
+                                    <p>Nenhuma atividade registrada</p>
+                                </div>
+                                {% endif %}
+                            </div>
+                            
+                            <div class="col-md-6">
+                                <h6 class="text-muted mb-3">Equipe de Trabalho</h6>
+                                {% if rdo.mao_obra %}
+                                <div class="list-group">
+                                    {% for mao in rdo.mao_obra %}
+                                    <div class="list-group-item">
+                                        <div class="d-flex justify-content-between align-items-center">
+                                            <div>
+                                                <h6 class="mb-1">{{ mao.funcionario.nome }}</h6>
+                                                {% if mao.observacoes %}
+                                                <small class="text-muted">{{ mao.observacoes }}</small>
+                                                {% endif %}
+                                            </div>
+                                            <span class="badge bg-secondary">{{ mao.horas_trabalhadas }}h</span>
+                                        </div>
+                                    </div>
+                                    {% endfor %}
+                                </div>
+                                {% else %}
+                                <div class="text-center py-3 text-muted">
+                                    <i class="fas fa-users fa-2x mb-2"></i>
+                                    <p>Nenhum funcionário registrado</p>
+                                </div>
+                                {% endif %}
+                            </div>
+                        </div>
+                        
+                        <!-- Botões de Ação -->
+                        <div class="d-flex justify-content-between">
+                            <div>
+                                <a href="{{ url_for('main.funcionario_editar_rdo', id=rdo.id) }}" class="btn btn-info">
+                                    <i class="fas fa-edit me-1"></i>Edição Completa
+                                </a>
+                            </div>
+                            
+                            <div>
+                                <button type="submit" class="btn btn-primary me-2">
+                                    <i class="fas fa-save me-1"></i>Salvar Alterações
+                                </button>
+                                
+                                {% if rdo.status == 'Rascunho' %}
+                                <button type="submit" name="finalizar" value="true" class="btn btn-success me-2"
+                                        onclick="return confirm('Finalizar este RDO? Não poderá ser editado depois.')">
+                                    <i class="fas fa-check me-1"></i>Salvar e Finalizar
+                                </button>
+                                {% endif %}
+                                
+                                <a href="{{ url_for('main.visualizar_rdo', id=rdo.id) }}" class="btn btn-outline-secondary">
+                                    <i class="fas fa-times me-1"></i>Cancelar
+                                </a>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+.badge-clima {
+    font-size: 0.85em;
+    padding: 0.5rem 0.75rem;
+}
+
+.alert-link {
+    text-decoration: none;
+    font-weight: bold;
+}
+
+.alert-link:hover {
+    text-decoration: underline;
+}
+
+.list-group-item {
+    border-left: 4px solid #198754;
+}
+
+.list-group-item:first-child {
+    border-top-left-radius: 0;
+}
+
+.list-group-item:last-child {
+    border-bottom-left-radius: 0;
+}
+</style>
+{% endblock %}

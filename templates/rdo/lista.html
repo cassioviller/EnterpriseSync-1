@@ -1,19 +1,19 @@
 {% extends "base.html" %}
 
-{% block title %}Dashboard do Funcionário - RDO{% endblock %}
+{% block title %}Gerenciar RDOs - SIGE{% endblock %}
 
 {% block content %}
 <div class="container-fluid">
-    <!-- Header do Dashboard do Funcionário -->
+    <!-- Header -->
     <div class="row mb-4">
         <div class="col-12">
             <div class="d-flex justify-content-between align-items-center">
                 <div>
-                    <h2 class="mb-1">Dashboard do Funcionário</h2>
-                    <p class="text-muted mb-0">
-                        <i class="fas fa-user me-1"></i>
-                        Bem-vindo, {{ current_user.nome if current_user.nome else 'Funcionário' }}
-                    </p>
+                    <h2 class="mb-1">
+                        <i class="fas fa-clipboard-list me-2"></i>
+                        Relatórios Diários de Obra (RDO)
+                    </h2>
+                    <p class="text-muted mb-0">Gerencie todos os RDOs da empresa</p>
                 </div>
                 <div>
                     <a href="{{ url_for('main.novo_rdo') }}" class="btn btn-primary btn-lg">
@@ -24,48 +24,69 @@
         </div>
     </div>
 
-    <!-- Cards de Estatísticas Rápidas -->
+    <!-- Cards de Estatísticas -->
     <div class="row mb-4">
-        <div class="col-md-4">
+        <div class="col-md-3">
             <div class="card bg-primary text-white">
                 <div class="card-body">
                     <div class="d-flex justify-content-between">
                         <div>
-                            <h6 class="card-title">RDOs Registrados</h6>
+                            <h6 class="card-title">Total de RDOs</h6>
                             <h3 class="mb-0">{{ rdos.total if rdos else 0 }}</h3>
                         </div>
                         <div class="align-self-center">
-                            <i class="fas fa-file-alt fa-2x opacity-50"></i>
+                            <i class="fas fa-file-alt fa-2x opacity-75"></i>
                         </div>
                     </div>
                 </div>
             </div>
         </div>
-        <div class="col-md-4">
+        <div class="col-md-3">
             <div class="card bg-success text-white">
                 <div class="card-body">
                     <div class="d-flex justify-content-between">
                         <div>
-                            <h6 class="card-title">Obras Disponíveis</h6>
-                            <h3 class="mb-0">{{ obras|length if obras else 0 }}</h3>
+                            <h6 class="card-title">RDOs Finalizados</h6>
+                            <h3 class="mb-0">
+                                {% set finalizados = rdos.items | selectattr('status', 'equalto', 'Finalizado') | list %}
+                                {{ finalizados | length }}
+                            </h3>
                         </div>
                         <div class="align-self-center">
-                            <i class="fas fa-building fa-2x opacity-50"></i>
+                            <i class="fas fa-check-circle fa-2x opacity-75"></i>
                         </div>
                     </div>
                 </div>
             </div>
         </div>
-        <div class="col-md-4">
+        <div class="col-md-3">
+            <div class="card bg-warning text-white">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between">
+                        <div>
+                            <h6 class="card-title">Rascunhos</h6>
+                            <h3 class="mb-0">
+                                {% set rascunhos = rdos.items | selectattr('status', 'equalto', 'Rascunho') | list %}
+                                {{ rascunhos | length }}
+                            </h3>
+                        </div>
+                        <div class="align-self-center">
+                            <i class="fas fa-edit fa-2x opacity-75"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
             <div class="card bg-info text-white">
                 <div class="card-body">
                     <div class="d-flex justify-content-between">
                         <div>
-                            <h6 class="card-title">Acesso</h6>
-                            <h5 class="mb-0">Funcionário</h5>
+                            <h6 class="card-title">Obras Ativas</h6>
+                            <h3 class="mb-0">{{ obras|length if obras else 0 }}</h3>
                         </div>
                         <div class="align-self-center">
-                            <i class="fas fa-user-shield fa-2x opacity-50"></i>
+                            <i class="fas fa-building fa-2x opacity-75"></i>
                         </div>
                     </div>
                 </div>
@@ -191,6 +212,43 @@
                                                 <i class="fas fa-edit"></i>
                                             </a>
                                             {% endif %}
+                                            
+                                            <!-- Dropdown para mais ações -->
+                                            <div class="btn-group btn-group-sm">
+                                                <button type="button" class="btn btn-outline-secondary dropdown-toggle dropdown-toggle-split" 
+                                                        data-bs-toggle="dropdown" aria-expanded="false" title="Mais ações">
+                                                    <i class="fas fa-ellipsis-v"></i>
+                                                </button>
+                                                <ul class="dropdown-menu">
+                                                    <li>
+                                                        <form method="POST" action="{{ url_for('main.duplicar_rdo', id=rdo.id) }}" class="d-inline w-100">
+                                                            <button type="submit" class="dropdown-item" 
+                                                                    onclick="return confirm('Deseja criar uma cópia deste RDO para hoje?')">
+                                                                <i class="fas fa-copy me-2"></i>Duplicar
+                                                            </button>
+                                                        </form>
+                                                    </li>
+                                                    {% if rdo.status == 'Rascunho' %}
+                                                    <li><hr class="dropdown-divider"></li>
+                                                    <li>
+                                                        <form method="POST" action="{{ url_for('main.finalizar_rdo', id=rdo.id) }}" class="d-inline w-100">
+                                                            <button type="submit" class="dropdown-item text-success" 
+                                                                    onclick="return confirm('Finalizar este RDO? Não poderá ser editado depois.')">
+                                                                <i class="fas fa-check me-2"></i>Finalizar
+                                                            </button>
+                                                        </form>
+                                                    </li>
+                                                    <li>
+                                                        <form method="POST" action="{{ url_for('main.excluir_rdo', id=rdo.id) }}" class="d-inline w-100">
+                                                            <button type="submit" class="dropdown-item text-danger" 
+                                                                    onclick="return confirm('⚠️ EXCLUIR permanentemente este RDO?\n\nEsta ação não pode ser desfeita!')">
+                                                                <i class="fas fa-trash me-2"></i>Excluir
+                                                            </button>
+                                                        </form>
+                                                    </li>
+                                                    {% endif %}
+                                                </ul>
+                                            </div>
                                         </div>
                                     </td>
                                 </tr>
@@ -201,23 +259,32 @@
                     
                     <!-- Paginação -->
                     {% if rdos.pages > 1 %}
-                    <nav aria-label="Paginação RDOs">
+                    <nav aria-label="Paginação RDOs" class="mt-4">
                         <ul class="pagination justify-content-center">
-                            {% if rdos.has_prev %}
+                            <!-- Primeira página -->
+                            {% if rdos.page > 1 %}
                             <li class="page-item">
-                                <a class="page-link" href="{{ url_for('main.lista_rdos', page=rdos.prev_num, **filters) }}">
-                                    Anterior
+                                <a class="page-link" href="{{ url_for('main.lista_rdos', page=1, **filters) }}">
+                                    <i class="fas fa-angle-double-left"></i>
                                 </a>
                             </li>
                             {% endif %}
                             
+                            <!-- Página anterior -->
+                            {% if rdos.has_prev %}
+                            <li class="page-item">
+                                <a class="page-link" href="{{ url_for('main.lista_rdos', page=rdos.prev_num, **filters) }}">
+                                    <i class="fas fa-angle-left"></i>
+                                </a>
+                            </li>
+                            {% endif %}
+                            
+                            <!-- Páginas numéricas -->
                             {% for page_num in rdos.iter_pages() %}
                                 {% if page_num %}
                                     {% if page_num != rdos.page %}
                                     <li class="page-item">
-                                        <a class="page-link" href="{{ url_for('main.lista_rdos', page=page_num, **filters) }}">
-                                            {{ page_num }}
-                                        </a>
+                                        <a class="page-link" href="{{ url_for('main.lista_rdos', page=page_num, **filters) }}">{{ page_num }}</a>
                                     </li>
                                     {% else %}
                                     <li class="page-item active">
@@ -231,10 +298,20 @@
                                 {% endif %}
                             {% endfor %}
                             
+                            <!-- Próxima página -->
                             {% if rdos.has_next %}
                             <li class="page-item">
                                 <a class="page-link" href="{{ url_for('main.lista_rdos', page=rdos.next_num, **filters) }}">
-                                    Próximo
+                                    <i class="fas fa-angle-right"></i>
+                                </a>
+                            </li>
+                            {% endif %}
+                            
+                            <!-- Última página -->
+                            {% if rdos.page < rdos.pages %}
+                            <li class="page-item">
+                                <a class="page-link" href="{{ url_for('main.lista_rdos', page=rdos.pages, **filters) }}">
+                                    <i class="fas fa-angle-double-right"></i>
                                 </a>
                             </li>
                             {% endif %}
@@ -243,15 +320,16 @@
                     {% endif %}
                     
                     {% else %}
+                    <!-- Estado vazio -->
                     <div class="text-center py-5">
                         <i class="fas fa-file-alt fa-3x text-muted mb-3"></i>
                         <h5 class="text-muted">Nenhum RDO encontrado</h5>
                         <p class="text-muted">
                             {% if filters.obra_id or filters.status or filters.data_inicio or filters.data_fim %}
-                            Tente ajustar os filtros ou 
-                            <a href="{{ url_for('main.lista_rdos') }}">limpar todos os filtros</a>.
+                                Tente ajustar os filtros ou 
+                                <a href="{{ url_for('main.lista_rdos') }}">limpar busca</a>
                             {% else %}
-                            Comece criando seu primeiro RDO.
+                                Comece criando um novo RDO
                             {% endif %}
                         </p>
                         <a href="{{ url_for('main.novo_rdo') }}" class="btn btn-primary">
@@ -264,4 +342,29 @@
         </div>
     </div>
 </div>
+
+<style>
+.badge-clima {
+    font-size: 0.75em;
+}
+
+.table th {
+    border-top: none;
+    font-weight: 600;
+    background-color: #f8f9fa;
+}
+
+.btn-group-sm .btn {
+    padding: 0.25rem 0.5rem;
+}
+
+.opacity-75 {
+    opacity: 0.75;
+}
+
+.card-title {
+    font-size: 0.875rem;
+    font-weight: 500;
+}
+</style>
 {% endblock %}

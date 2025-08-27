@@ -1852,36 +1852,6 @@ def visualizar_rdo(id):
         flash('RDO não encontrado ou sem permissão de acesso.', 'error')
         return redirect(url_for('main.lista_rdos'))
 
-@main_bp.route('/rdo/<int:id>/editar')
-@admin_required
-def editar_rdo(id):
-    """Editar RDO com controle de acesso"""
-    try:
-        admin_id = current_user.id if current_user.tipo_usuario == TipoUsuario.ADMIN else current_user.admin_id
-        
-        # Buscar RDO com verificação de acesso
-        rdo = RDO.query.join(Obra).filter(
-            RDO.id == id,
-            Obra.admin_id == admin_id
-        ).first_or_404()
-        
-        # Verificar se pode editar (só rascunhos)
-        if rdo.status == 'Finalizado':
-            flash('RDO finalizado não pode ser editado.', 'warning')
-            return redirect(url_for('main.visualizar_rdo', id=id))
-        
-        # Buscar dados para edição
-        funcionarios = Funcionario.query.filter_by(admin_id=admin_id, ativo=True).order_by(Funcionario.nome).all()
-        
-        return render_template('rdo/editar.html', 
-                             rdo=rdo,
-                             funcionarios=funcionarios)
-        
-    except Exception as e:
-        print(f"ERRO EDITAR RDO: {str(e)}")
-        flash('RDO não encontrado ou sem permissão de acesso.', 'error')
-        return redirect(url_for('main.lista_rdos'))
-
 @main_bp.route('/rdo/<int:id>/finalizar', methods=['POST'])
 @admin_required
 def finalizar_rdo(id):
@@ -1911,6 +1881,221 @@ def finalizar_rdo(id):
         db.session.rollback()
         print(f"ERRO FINALIZAR RDO: {str(e)}")
         flash('Erro ao finalizar RDO.', 'error')
+        return redirect(url_for('main.lista_rdos'))
+
+@main_bp.route('/rdo/<int:id>/excluir', methods=['POST'])
+@admin_required
+def excluir_rdo(id):
+    """Excluir RDO com controle de acesso"""
+    try:
+        admin_id = current_user.id if current_user.tipo_usuario == TipoUsuario.ADMIN else current_user.admin_id
+        
+        # Buscar RDO com verificação de acesso
+        rdo = RDO.query.join(Obra).filter(
+            RDO.id == id,
+            Obra.admin_id == admin_id
+        ).first_or_404()
+        
+        # Verificar se pode excluir (só rascunhos)
+        if rdo.status == 'Finalizado':
+            flash('RDO finalizado não pode ser excluído. Apenas rascunhos podem ser removidos.', 'warning')
+            return redirect(url_for('main.visualizar_rdo', id=id))
+        
+        numero_rdo = rdo.numero_rdo
+        
+        # Excluir relacionamentos primeiro
+        # Excluir subatividades
+        RDOServicoSubatividade.query.filter_by(rdo_id=id).delete()
+        
+        # Excluir mão de obra
+        RDOMaoObra.query.filter_by(rdo_id=id).delete()
+        
+        # Excluir equipamentos se existir
+        try:
+            RDOEquipamento.query.filter_by(rdo_id=id).delete()
+        except:
+            pass  # Tabela pode não existir
+        
+        # Excluir ocorrências se existir
+        try:
+            RDOOcorrencia.query.filter_by(rdo_id=id).delete()
+        except:
+            pass  # Tabela pode não existir
+        
+        # Excluir o RDO principal
+        db.session.delete(rdo)
+        db.session.commit()
+        
+        flash(f'RDO {numero_rdo} excluído com sucesso!', 'success')
+        return redirect(url_for('main.lista_rdos'))
+        
+    except Exception as e:
+        db.session.rollback()
+        print(f"ERRO EXCLUIR RDO: {str(e)}")
+        flash('Erro ao excluir RDO.', 'error')
+        return redirect(url_for('main.lista_rdos'))
+
+@main_bp.route('/rdo/<int:id>/duplicar', methods=['POST'])
+@admin_required
+def duplicar_rdo(id):
+    """Duplicar RDO existente"""
+    try:
+        admin_id = current_user.id if current_user.tipo_usuario == TipoUsuario.ADMIN else current_user.admin_id
+        
+        # Buscar RDO original com verificação de acesso
+        rdo_original = RDO.query.join(Obra).filter(
+            RDO.id == id,
+            Obra.admin_id == admin_id
+        ).first_or_404()
+        
+        # Criar novo RDO baseado no original
+        novo_rdo = RDO()
+        novo_rdo.obra_id = rdo_original.obra_id
+        novo_rdo.data_relatorio = date.today()  # Data atual
+        novo_rdo.numero_rdo = gerar_numero_rdo(rdo_original.obra_id, novo_rdo.data_relatorio)
+        
+        # Buscar funcionário correspondente ao usuário logado
+        funcionario = Funcionario.query.filter_by(
+            email=current_user.email, 
+            admin_id=current_user.admin_id
+        ).first()
+        if funcionario:
+            novo_rdo.criado_por_id = funcionario.id
+        
+        # Copiar dados climáticos
+        novo_rdo.tempo_manha = rdo_original.tempo_manha
+        novo_rdo.tempo_tarde = rdo_original.tempo_tarde
+        novo_rdo.tempo_noite = rdo_original.tempo_noite
+        novo_rdo.observacoes_meteorologicas = rdo_original.observacoes_meteorologicas
+        
+        # Sempre começar como rascunho
+        novo_rdo.status = 'Rascunho'
+        novo_rdo.comentario_geral = f'Duplicado de {rdo_original.numero_rdo}'
+        
+        db.session.add(novo_rdo)
+        db.session.flush()  # Para obter o ID
+        
+        # Duplicar subatividades
+        subatividades_originais = RDOServicoSubatividade.query.filter_by(
+            rdo_id=rdo_original.id
+        ).all()
+        
+        for sub_original in subatividades_originais:
+            nova_sub = RDOServicoSubatividade()
+            nova_sub.rdo_id = novo_rdo.id
+            nova_sub.servico_id = sub_original.servico_id
+            nova_sub.nome_subatividade = sub_original.nome_subatividade
+            nova_sub.descricao_subatividade = sub_original.descricao_subatividade
+            nova_sub.percentual_conclusao = sub_original.percentual_conclusao
+            nova_sub.observacoes_tecnicas = sub_original.observacoes_tecnicas
+            nova_sub.ordem_execucao = sub_original.ordem_execucao
+            nova_sub.admin_id = current_user.admin_id
+            
+            db.session.add(nova_sub)
+        
+        # Duplicar mão de obra
+        mao_obra_original = RDOMaoObra.query.filter_by(
+            rdo_id=rdo_original.id
+        ).all()
+        
+        for mao_original in mao_obra_original:
+            nova_mao = RDOMaoObra()
+            nova_mao.rdo_id = novo_rdo.id
+            nova_mao.funcionario_id = mao_original.funcionario_id
+            nova_mao.horas_trabalhadas = mao_original.horas_trabalhadas
+            nova_mao.observacoes = mao_original.observacoes
+            
+            db.session.add(nova_mao)
+        
+        db.session.commit()
+        
+        flash(f'RDO duplicado com sucesso! Novo RDO: {novo_rdo.numero_rdo}', 'success')
+        return redirect(url_for('main.editar_rdo', id=novo_rdo.id))
+        
+    except Exception as e:
+        db.session.rollback()
+        print(f"ERRO DUPLICAR RDO: {str(e)}")
+        flash('Erro ao duplicar RDO.', 'error')
+        return redirect(url_for('main.lista_rdos'))
+
+@main_bp.route('/rdo/<int:id>/atualizar', methods=['POST'])
+@admin_required
+def atualizar_rdo(id):
+    """Atualizar dados básicos do RDO"""
+    try:
+        admin_id = current_user.id if current_user.tipo_usuario == TipoUsuario.ADMIN else current_user.admin_id
+        
+        # Buscar RDO com verificação de acesso
+        rdo = RDO.query.join(Obra).filter(
+            RDO.id == id,
+            Obra.admin_id == admin_id
+        ).first_or_404()
+        
+        # Atualizar dados básicos
+        data_relatorio = datetime.strptime(request.form.get('data_relatorio'), '%Y-%m-%d').date()
+        
+        # Verificar se já existe outro RDO para esta obra/data (excluindo o atual)
+        rdo_existente = RDO.query.filter(
+            RDO.obra_id == rdo.obra_id,
+            RDO.data_relatorio == data_relatorio,
+            RDO.id != id
+        ).first()
+        
+        if rdo_existente:
+            flash(f'Já existe outro RDO ({rdo_existente.numero_rdo}) para esta obra na data {data_relatorio.strftime("%d/%m/%Y")}.', 'warning')
+            return redirect(url_for('main.editar_rdo', id=id))
+        
+        # Atualizar campos
+        rdo.data_relatorio = data_relatorio
+        rdo.status = request.form.get('status', rdo.status)
+        rdo.tempo_manha = request.form.get('tempo_manha', rdo.tempo_manha)
+        rdo.tempo_tarde = request.form.get('tempo_tarde', rdo.tempo_tarde)
+        rdo.tempo_noite = request.form.get('tempo_noite', rdo.tempo_noite)
+        rdo.observacoes_meteorologicas = request.form.get('observacoes_meteorologicas', '')
+        rdo.comentario_geral = request.form.get('comentario_geral', '')
+        
+        # Se mudou para data diferente, atualizar número do RDO
+        if rdo.data_relatorio != data_relatorio:
+            rdo.numero_rdo = gerar_numero_rdo(rdo.obra_id, data_relatorio)
+        
+        # Verificar se deve finalizar
+        finalizar = request.form.get('finalizar') == 'true'
+        if finalizar and rdo.status == 'Rascunho':
+            rdo.status = 'Finalizado'
+        
+        db.session.commit()
+        
+        if finalizar:
+            flash(f'RDO {rdo.numero_rdo} atualizado e finalizado com sucesso!', 'success')
+        else:
+            flash(f'RDO {rdo.numero_rdo} atualizado com sucesso!', 'success')
+        
+        return redirect(url_for('main.visualizar_rdo', id=id))
+        
+    except Exception as e:
+        db.session.rollback()
+        print(f"ERRO ATUALIZAR RDO: {str(e)}")
+        flash('Erro ao atualizar RDO.', 'error')
+        return redirect(url_for('main.editar_rdo', id=id))
+
+@main_bp.route('/rdo/<int:id>/editar')
+@admin_required
+def editar_rdo(id):
+    """Interface administrativa para editar RDO"""
+    try:
+        admin_id = current_user.id if current_user.tipo_usuario == TipoUsuario.ADMIN else current_user.admin_id
+        
+        # Buscar RDO com verificação de acesso
+        rdo = RDO.query.join(Obra).filter(
+            RDO.id == id,
+            Obra.admin_id == admin_id
+        ).first_or_404()
+        
+        return render_template('rdo/editar.html', rdo=rdo)
+        
+    except Exception as e:
+        print(f"ERRO EDITAR RDO: {str(e)}")
+        flash('Erro ao carregar RDO para edição.', 'error')
         return redirect(url_for('main.lista_rdos'))
 
 @main_bp.route('/rdo/api/ultimo-rdo/<int:obra_id>')
