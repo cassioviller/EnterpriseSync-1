@@ -112,14 +112,37 @@
                         </a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link" href="{{ url_for('main.obras') }}">
-                            <i class="fas fa-hammer me-1"></i> Obras
-                        </a>
-                    </li>
-                    <li class="nav-item">
                         <a class="nav-link" href="{{ url_for('main.funcionarios') }}">
                             <i class="fas fa-users me-1"></i> Funcionários
                         </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ url_for('main.obras') }}">
+                            <i class="fas fa-hard-hat me-1"></i> Obras
+                        </a>
+                    </li>
+                    <li class="nav-item dropdown">
+                        <a class="nav-link dropdown-toggle" href="#" id="navbarDropdownGestao" role="button" data-bs-toggle="dropdown">
+                            <i class="fas fa-cogs me-1"></i> Gestão
+                        </a>
+                        <ul class="dropdown-menu">
+                            <li><a class="dropdown-item" href="{{ url_for('propostas.dashboard') }}">
+                                <i class="fas fa-file-contract me-1"></i> Propostas
+                            </a></li>
+                            <li><a class="dropdown-item" href="{{ url_for('main.alimentacao') }}">
+                                <i class="fas fa-utensils me-1"></i> Alimentação
+                            </a></li>
+                            <li><a class="dropdown-item" href="{{ url_for('main.veiculos') }}">
+                                <i class="fas fa-car me-1"></i> Veículos
+                            </a></li>
+                            <li><a class="dropdown-item" href="{{ url_for('main.controle_ponto') }}">
+                                <i class="fas fa-clock me-1"></i> Ponto
+                            </a></li>
+                            <li><hr class="dropdown-divider"></li>
+                            <li><a class="dropdown-item" href="{{ url_for('configuracoes.index') }}">
+                                <i class="fas fa-cog me-1"></i> Configurações
+                            </a></li>
+                        </ul>
                     </li>
                 </ul>
                 
