@@ -1,17 +1,37 @@
 {% extends "base.html" %}
 
+{% block head %}
+<script>
+// Remover dark theme temporariamente para esta página
+document.documentElement.removeAttribute('data-bs-theme');
+</script>
+{% endblock %}
+
 {% block title %}Lista de RDOs - SIGE{% endblock %}
 
 {% block styles %}
 <style>
-/* ===== OVERRIDE DARK MODE E DESIGN SYSTEM MODERNO ===== */
+/* ===== OVERRIDE TOTAL DARK MODE - FORÇA ESTILOS ===== */
+* {
+    -webkit-appearance: none !important;
+    -moz-appearance: none !important;
+    appearance: none !important;
+}
+
+body {
+    background-color: #f8f9fa !important;
+    color: #212529 !important;
+}
+
+/* Override completo Bootstrap dark theme */
+html[data-bs-theme="dark"] body,
+html[data-bs-theme="dark"] .container,
+html[data-bs-theme="dark"] .container-fluid,
 html[data-bs-theme="dark"] .rdo-container,
-html[data-bs-theme="dark"] .rdo-container *,
-.rdo-container,
-.rdo-container * {
-    color: initial !important;
-    background-color: initial !important;
-    border-color: initial !important;
+html[data-bs-theme="dark"] .rdo-container * {
+    background-color: unset !important;
+    color: unset !important;
+    border-color: unset !important;
 }
 
 /* ===== DESIGN SYSTEM MODERNO PROFISSIONAL ===== */
@@ -63,19 +83,20 @@ html[data-bs-theme="dark"] .rdo-container *,
     max-width: 1400px;
     margin: 0 auto;
     padding: 0;
-    background: var(--gray-50) !important;
+    background: #f8f9fa !important;
     min-height: 100vh;
-    color: var(--gray-800) !important;
+    color: #212529 !important;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif !important;
 }
 
 /* ===== HEADER MODERNO COM GRADIENTE ===== */
 .page-header {
-    background: var(--gradient-primary);
-    color: white;
-    padding: 3rem 0;
+    background: linear-gradient(135deg, #198754 0%, #20c997 50%, #0d6efd 100%) !important;
+    color: white !important;
+    padding: 3rem 0 !important;
     margin: 0 0 3rem 0;
-    border-radius: 0 0 var(--border-radius-xl) var(--border-radius-xl);
-    box-shadow: var(--shadow-xl);
+    border-radius: 0 0 24px 24px !important;
+    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25) !important;
     position: relative;
     overflow: hidden;
 }
@@ -169,18 +190,18 @@ html[data-bs-theme="dark"] .rdo-container *,
 }
 
 .stat-card {
-    background: var(--white) !important;
+    background: #ffffff !important;
     padding: 2rem;
-    border-radius: var(--border-radius-lg);
-    box-shadow: var(--shadow-md);
-    border: 1px solid var(--gray-200) !important;
+    border-radius: 20px !important;
+    box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 6px 10px -5px rgba(0, 0, 0, 0.04) !important;
+    border: 1px solid #e5e7eb !important;
     display: flex;
     align-items: center;
     gap: 1.5rem;
-    transition: var(--transition);
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
     position: relative;
     overflow: hidden;
-    color: var(--gray-800) !important;
+    color: #374151 !important;
 }
 
 .stat-card::before {
@@ -200,12 +221,12 @@ html[data-bs-theme="dark"] .rdo-container *,
 }
 
 .stat-icon {
-    background: var(--gradient-primary);
-    color: white;
+    background: linear-gradient(135deg, #20c997 0%, #198754 100%) !important;
+    color: white !important;
     padding: 1.25rem;
-    border-radius: 50%;
+    border-radius: 50% !important;
     font-size: 1.5rem;
-    box-shadow: var(--shadow-md);
+    box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1) !important;
     min-width: 70px;
     height: 70px;
     display: flex;
@@ -218,31 +239,31 @@ html[data-bs-theme="dark"] .rdo-container *,
 }
 
 .stat-content .stat-number {
-    font-size: 2.5rem;
-    font-weight: 800;
-    color: var(--gray-800);
+    font-size: 2.5rem !important;
+    font-weight: 800 !important;
+    color: #374151 !important;
     line-height: 1;
     margin-bottom: 0.5rem;
 }
 
 .stat-content .stat-label {
-    font-size: 1rem;
-    color: var(--gray-600);
-    font-weight: 500;
+    font-size: 1rem !important;
+    color: #6b7280 !important;
+    font-weight: 500 !important;
     text-transform: uppercase;
     letter-spacing: 0.5px;
 }
 
 /* ===== SEÇÃO DE FILTROS PROFISSIONAL ===== */
 .filters-container {
-    background: var(--white) !important;
+    background: #ffffff !important;
     padding: 2rem;
-    border-radius: var(--border-radius-lg);
-    box-shadow: var(--shadow-md);
+    border-radius: 20px !important;
+    box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1) !important;
     margin: 0 2rem 3rem 2rem;
-    border: 1px solid var(--gray-200) !important;
+    border: 1px solid #e5e7eb !important;
     position: relative;
-    color: var(--gray-800) !important;
+    color: #374151 !important;
 }
 
 .filters-container::before {
