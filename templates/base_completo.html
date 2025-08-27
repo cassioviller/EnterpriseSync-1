@@ -190,6 +190,39 @@
             color: #212529 !important; /* Força texto escuro específico */
         }
         
+        /* Forçar texto escuro nos valores específicos dos KPIs - CARDS PROBLEMÁTICOS */
+        .card.bg-light, .card.bg-white, .card.bg-transparent {
+            color: #212529 !important;
+        }
+        
+        .card.bg-light *, .card.bg-white *, .card.bg-transparent * {
+            color: #212529 !important;
+        }
+        
+        /* CARDS SEM BACKGROUND COLORIDO - forçar texto escuro */
+        .card:not(.bg-primary):not(.bg-success):not(.bg-danger):not(.bg-info):not(.bg-warning):not(.bg-secondary):not(.bg-dark),
+        .card.bg-light, .card.bg-white, .card {
+            color: #212529 !important;
+        }
+        
+        .card:not(.bg-primary):not(.bg-success):not(.bg-danger):not(.bg-info):not(.bg-warning):not(.bg-secondary):not(.bg-dark) h1,
+        .card:not(.bg-primary):not(.bg-success):not(.bg-danger):not(.bg-info):not(.bg-warning):not(.bg-secondary):not(.bg-dark) h2,
+        .card:not(.bg-primary):not(.bg-success):not(.bg-danger):not(.bg-info):not(.bg-warning):not(.bg-secondary):not(.bg-dark) h3,
+        .card:not(.bg-primary):not(.bg-success):not(.bg-danger):not(.bg-info):not(.bg-warning):not(.bg-secondary):not(.bg-dark) h4,
+        .card:not(.bg-primary):not(.bg-success):not(.bg-danger):not(.bg-info):not(.bg-warning):not(.bg-secondary):not(.bg-dark) h5,
+        .card:not(.bg-primary):not(.bg-success):not(.bg-danger):not(.bg-info):not(.bg-warning):not(.bg-secondary):not(.bg-dark) h6,
+        .card.bg-light h1, .card.bg-light h2, .card.bg-light h3, .card.bg-light h4, .card.bg-light h5, .card.bg-light h6,
+        .card.bg-white h1, .card.bg-white h2, .card.bg-white h3, .card.bg-white h4, .card.bg-white h5, .card.bg-white h6,
+        .card h1, .card h2, .card h3, .card h4, .card h5, .card h6 {
+            color: #212529 !important;
+        }
+        
+        /* FORÇA ESPECIFICAMENTE NÚMEROS/VALORES EM PRETO */
+        .card.bg-light strong, .card.bg-white strong, .card strong:not(.text-success):not(.text-danger):not(.text-primary):not(.text-warning):not(.text-info),
+        .card.bg-light .text-muted, .card.bg-white .text-muted {
+            color: #212529 !important;
+        }
+        
         .text-warning {
             color: #856404 !important; /* Warning mais escuro para melhor contraste */
         }
