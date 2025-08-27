@@ -95,33 +95,51 @@ def dashboard():
     # Sistema robusto de detecção de admin_id para produção (MESMA LÓGICA DA PÁGINA FUNCIONÁRIOS)
     try:
         # Determinar admin_id - usar mesma lógica que funciona na página funcionários
-        admin_id = 10  # Default para desenvolvimento/bypass
+        admin_id = None  # Vamos detectar dinamicamente
+        
+        # DIAGNÓSTICO COMPLETO PARA PRODUÇÃO
+        print(f"🔍 DASHBOARD DEBUG PRODUÇÃO:")
+        print(f"  - current_user.is_authenticated: {getattr(current_user, 'is_authenticated', False)}")
+        print(f"  - current_user.email: {getattr(current_user, 'email', 'N/A')}")
+        print(f"  - current_user.tipo_usuario: {getattr(current_user, 'tipo_usuario', 'N/A')}")
+        print(f"  - current_user.admin_id: {getattr(current_user, 'admin_id', 'N/A')}")
+        print(f"  - current_user.id: {getattr(current_user, 'id', 'N/A')}")
         
         if hasattr(current_user, 'tipo_usuario') and current_user.is_authenticated:
             if current_user.tipo_usuario == TipoUsuario.ADMIN:
                 admin_id = current_user.id
-                print(f"DEBUG DASHBOARD PROD: Admin direto - admin_id={admin_id}")
+                print(f"✅ DEBUG DASHBOARD PROD: Admin direto - admin_id={admin_id}")
             elif hasattr(current_user, 'admin_id') and current_user.admin_id:
                 admin_id = current_user.admin_id
-                print(f"DEBUG DASHBOARD PROD: Via admin_id do usuário - admin_id={admin_id}")
+                print(f"✅ DEBUG DASHBOARD PROD: Via admin_id do usuário - admin_id={admin_id}")
             else:
                 # Buscar pelo email na tabela usuarios
                 try:
                     usuario_db = Usuario.query.filter_by(email=current_user.email).first()
                     if usuario_db and usuario_db.admin_id:
                         admin_id = usuario_db.admin_id
-                        print(f"DEBUG DASHBOARD PROD: Via busca na tabela usuarios - admin_id={admin_id}")
+                        print(f"✅ DEBUG DASHBOARD PROD: Via busca na tabela usuarios - admin_id={admin_id}")
+                    else:
+                        print(f"⚠️ DASHBOARD PROD: Usuário não encontrado na tabela usuarios ou sem admin_id")
                 except Exception as e:
-                    print(f"DEBUG DASHBOARD PROD: Erro ao buscar na tabela usuarios: {e}")
-        else:
-            # Sistema de bypass - buscar admin_id com mais funcionários (desenvolvimento)
+                    print(f"❌ DEBUG DASHBOARD PROD: Erro ao buscar na tabela usuarios: {e}")
+        
+        # Se ainda não encontrou admin_id, detectar automaticamente
+        if admin_id is None:
             try:
-                admin_counts = db.session.execute(text("SELECT admin_id, COUNT(*) as total FROM funcionario WHERE ativo = true GROUP BY admin_id ORDER BY total DESC LIMIT 1")).fetchone()
-                admin_id = admin_counts[0] if admin_counts else 10
-                print(f"DEBUG DASHBOARD BYPASS: admin_id={admin_id} (mais funcionários)")
+                # Buscar admin_id com mais funcionários ativos (desenvolvimento e produção)
+                admin_counts = db.session.execute(text("SELECT admin_id, COUNT(*) as total FROM funcionario WHERE ativo = true GROUP BY admin_id ORDER BY total DESC")).fetchall()
+                print(f"📊 DADOS DISPONÍVEIS POR ADMIN_ID: {[(row[0], row[1]) for row in admin_counts]}")
+                
+                if admin_counts and len(admin_counts) > 0:
+                    admin_id = admin_counts[0][0]
+                    print(f"🔄 DETECÇÃO AUTOMÁTICA: Usando admin_id={admin_id} (tem {admin_counts[0][1]} funcionários)")
+                else:
+                    admin_id = 1  # Fallback absoluto
+                    print(f"🆘 FALLBACK FINAL: admin_id={admin_id}")
             except Exception as e:
-                print(f"Erro ao detectar admin_id: {e}")
-                admin_id = 10
+                print(f"❌ Erro ao detectar admin_id automaticamente: {e}")
+                admin_id = 1  # Fallback absoluto
         
         # Estatísticas básicas
         total_funcionarios = Funcionario.query.filter_by(admin_id=admin_id, ativo=True).count()
@@ -199,24 +217,62 @@ def dashboard():
         if 'admin_id' not in locals():
             admin_id = 10  # Admin padrão com mais dados
             
-        print(f"DEBUG DASHBOARD KPIs: Usando admin_id={admin_id} para cálculos")
+        print(f"✅ DEBUG DASHBOARD KPIs: Usando admin_id={admin_id} para cálculos")
         
-        # Buscar todos os funcionários ativos
+        # Verificar estrutura completa do banco para diagnóstico
+        try:
+            # Diagnóstico completo do banco de dados
+            print(f"🔍 DIAGNÓSTICO COMPLETO DO BANCO DE DADOS:")
+            
+            # Total de funcionários por admin_id
+            funcionarios_por_admin = db.session.execute(
+                text("SELECT admin_id, COUNT(*) as total, COUNT(CASE WHEN ativo = true THEN 1 END) as ativos FROM funcionario GROUP BY admin_id ORDER BY admin_id")
+            ).fetchall()
+            print(f"  📊 FUNCIONÁRIOS POR ADMIN: {[(row[0], row[1], row[2]) for row in funcionarios_por_admin]}")
+            
+            # Total de obras por admin_id
+            obras_por_admin = db.session.execute(
+                text("SELECT admin_id, COUNT(*) as total FROM obra GROUP BY admin_id ORDER BY admin_id")
+            ).fetchall()
+            print(f"  🏗️ OBRAS POR ADMIN: {[(row[0], row[1]) for row in obras_por_admin]}")
+            
+            # Total de registros de ponto
+            registros_ponto = db.session.execute(
+                text("SELECT COUNT(*) FROM registro_ponto WHERE data_registro >= '2025-07-01' AND data_registro <= '2025-07-31'")
+            ).fetchone()
+            print(f"  ⏰ REGISTROS DE PONTO (Jul/2025): {registros_ponto[0] if registros_ponto else 0}")
+            
+            # Total de custos de veículos
+            custos_veiculo = db.session.execute(
+                text("SELECT COUNT(*), COALESCE(SUM(valor), 0) FROM custo_veiculo WHERE data_custo >= '2025-07-01' AND data_custo <= '2025-07-31'")
+            ).fetchone()
+            print(f"  🚗 CUSTOS VEÍCULOS (Jul/2025): {custos_veiculo[0] if custos_veiculo else 0} registros, R$ {custos_veiculo[1] if custos_veiculo else 0}")
+            
+            # Total de alimentação
+            alimentacao = db.session.execute(
+                text("SELECT COUNT(*), COALESCE(SUM(valor), 0) FROM registro_alimentacao WHERE data >= '2025-07-01' AND data <= '2025-07-31'")
+            ).fetchone()
+            print(f"  🍽️ ALIMENTAÇÃO (Jul/2025): {alimentacao[0] if alimentacao else 0} registros, R$ {alimentacao[1] if alimentacao else 0}")
+            
+        except Exception as e:
+            print(f"❌ ERRO no diagnóstico do banco: {e}")
+        
+        # Buscar todos os funcionários ativos para o admin_id detectado
         funcionarios_dashboard = Funcionario.query.filter_by(admin_id=admin_id, ativo=True).all()
-        print(f"DEBUG DASHBOARD KPIs: Encontrados {len(funcionarios_dashboard)} funcionários para admin_id={admin_id}")
+        print(f"✅ DEBUG DASHBOARD KPIs: Encontrados {len(funcionarios_dashboard)} funcionários para admin_id={admin_id}")
         
-        # Verificação adicional para produção
+        # Se não encontrou funcionários, buscar o admin_id com mais dados
         if len(funcionarios_dashboard) == 0:
             print(f"⚠️ AVISO PRODUÇÃO: Nenhum funcionário encontrado para admin_id={admin_id}")
-            # Tentar detectar qual admin_id tem dados
             try:
                 todos_admins = db.session.execute(text("SELECT admin_id, COUNT(*) as total FROM funcionario WHERE ativo = true GROUP BY admin_id ORDER BY total DESC")).fetchall()
-                print(f"📊 DADOS DISPONÍVEIS: {[(row[0], row[1]) for row in todos_admins]}")
+                print(f"📊 TODOS OS ADMINS DISPONÍVEIS: {[(row[0], row[1]) for row in todos_admins]}")
                 if todos_admins and len(todos_admins) > 0:
                     admin_correto = todos_admins[0][0]
-                    print(f"🔄 CORREÇÃO AUTOMÁTICA: Usando admin_id={admin_correto} que tem {todos_admins[0][1]} funcionários")
+                    print(f"🔄 CORREÇÃO AUTOMÁTICA: Mudando de admin_id={admin_id} para admin_id={admin_correto} (tem {todos_admins[0][1]} funcionários)")
                     admin_id = admin_correto
                     funcionarios_dashboard = Funcionario.query.filter_by(admin_id=admin_id, ativo=True).all()
+                    print(f"✅ APÓS CORREÇÃO: {len(funcionarios_dashboard)} funcionários encontrados")
             except Exception as e:
                 print(f"❌ ERRO ao detectar admin_id correto: {e}")
         
