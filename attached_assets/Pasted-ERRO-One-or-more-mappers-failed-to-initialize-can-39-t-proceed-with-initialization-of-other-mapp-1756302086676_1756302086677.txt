@@ -1,0 +1,37 @@
+ERRO: One or more mappers failed to initialize - can&#39;t proceed with initialization of other mappers. Triggering mapper: &#39;Mapper[CategoriaServico(categoria_servico)]&#39;. Original exception was: Multiple classes found for path &#34;Servico&#34; in the registry of this declarative base. Please use a fully module-qualified path.
+
+TRACE:
+Traceback (most recent call last):
+  File &#34;/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/flask/app.py&#34;, line 917, in full_dispatch_request
+    rv = self.dispatch_request()
+         ^^^^^^^^^^^^^^^^^^^^^^^
+  File &#34;/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/flask/app.py&#34;, line 902, in dispatch_request
+    return self.ensure_sync(self.view_functions[rule.endpoint])(**view_args)  # type: ignore[no-any-return]
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File &#34;/home/runner/workspace/views.py&#34;, line 428, in dashboard
+    obras_ativas_count = Obra.query.filter_by(admin_id=admin_id).filter(
+                         ^^^^^^^^^^
+  File &#34;/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/flask_sqlalchemy/model.py&#34;, line 22, in __get__
+    return cls.query_class(
+           ^^^^^^^^^^^^^^^^
+  File &#34;/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/sqlalchemy/orm/query.py&#34;, line 276, in __init__
+    self._set_entities(entities)
+  File &#34;/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/sqlalchemy/orm/query.py&#34;, line 288, in _set_entities
+    self._raw_columns = [
+                        ^
+  File &#34;/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/sqlalchemy/orm/query.py&#34;, line 289, in &lt;listcomp&gt;
+    coercions.expect(
+  File &#34;/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/sqlalchemy/sql/coercions.py&#34;, line 388, in expect
+    insp._post_inspect
+  File &#34;/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/sqlalchemy/util/langhelpers.py&#34;, line 1338, in __get__
+    obj.__dict__[self.__name__] = result = self.fget(obj)
+                                           ^^^^^^^^^^^^^^
+  File &#34;/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/sqlalchemy/orm/mapper.py&#34;, line 2724, in _post_inspect
+    self._check_configure()
+  File &#34;/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/sqlalchemy/orm/mapper.py&#34;, line 2401, in _check_configure
+    _configure_registries({self.registry}, cascade=True)
+  File &#34;/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/sqlalchemy/orm/mapper.py&#34;, line 4214, in _configure_registries
+    _do_configure_registries(registries, cascade)
+  File &#34;/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/sqlalchemy/orm/mapper.py&#34;, line 4251, in _do_configure_registries
+    raise e
+sqlalchemy.exc.InvalidRequestError: One or more mappers failed to initialize - can&#39;t proceed with initialization of other mappers. Triggering mapper: &#39;Mapper[CategoriaServico(categoria_servico)]&#39;. Original exception was: Multiple classes found for path &#34;Servico&#34; in the registry of this declarative base. Please use a fully module-qualified path.

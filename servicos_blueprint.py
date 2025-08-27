@@ -7,7 +7,7 @@ from flask import Blueprint, render_template, request, redirect, url_for, flash,
 from datetime import datetime, date
 from sqlalchemy import and_, desc, asc
 from app import db
-from models_servicos import CategoriaServico, Servico, SubatividadeServico, ServicoObra, TabelaPreco, ItemTabelaPreco
+from models_servicos import CategoriaServico, ServicoGestao, SubatividadeServico, ServicoObraGestao, TabelaPreco, ItemTabelaPreco
 from models import Obra
 import logging
 
@@ -29,25 +29,25 @@ def dashboard():
         
         # Estatísticas gerais
         total_categorias = CategoriaServico.query.filter_by(admin_id=admin_id, ativo=True).count()
-        total_servicos = Servico.query.filter_by(admin_id=admin_id, ativo=True).count()
+        total_servicos = ServicoGestao.query.filter_by(admin_id=admin_id, ativo=True).count()
         total_subatividades = SubatividadeServico.query.filter_by(admin_id=admin_id, ativo=True).count()
         total_tabelas = TabelaPreco.query.filter_by(admin_id=admin_id, ativo=True).count()
         
         # Serviços mais utilizados nas obras
         servicos_populares = db.session.query(
-            Servico.nome,
-            db.func.count(ServicoObra.id).label('total_obras')
-        ).join(ServicoObra).filter(
-            Servico.admin_id == admin_id,
-            ServicoObra.admin_id == admin_id
-        ).group_by(Servico.id, Servico.nome).order_by(desc('total_obras')).limit(5).all()
+            ServicoGestao.nome,
+            db.func.count(ServicoObraGestao.id).label('total_obras')
+        ).join(ServicoObraGestao).filter(
+            ServicoGestao.admin_id == admin_id,
+            ServicoObraGestao.admin_id == admin_id
+        ).group_by(ServicoGestao.id, ServicoGestao.nome).order_by(desc('total_obras')).limit(5).all()
         
         # Categorias com mais serviços
         categorias_stats = db.session.query(
             CategoriaServico.nome,
             CategoriaServico.cor_hexadecimal,
-            db.func.count(Servico.id).label('total_servicos')
-        ).outerjoin(Servico).filter(
+            db.func.count(ServicoGestao.id).label('total_servicos')
+        ).outerjoin(ServicoGestao).filter(
             CategoriaServico.admin_id == admin_id,
             CategoriaServico.ativo == True
         ).group_by(CategoriaServico.id).order_by(desc('total_servicos')).all()
@@ -77,7 +77,7 @@ def listar_categorias():
         
         # Contar serviços por categoria
         for categoria in categorias:
-            categoria.total_servicos = Servico.query.filter_by(categoria_id=categoria.id, ativo=True).count()
+            categoria.total_servicos = ServicoGestao.query.filter_by(categoria_id=categoria.id, ativo=True).count()
         
         return render_template('servicos/listar_categorias.html', categorias=categorias)
     except Exception as e:
@@ -148,16 +148,16 @@ def listar_servicos():
         busca = request.args.get('busca', '').strip()
         
         # Query base
-        query = Servico.query.filter_by(admin_id=admin_id)
+        query = ServicoGestao.query.filter_by(admin_id=admin_id)
         
         # Aplicar filtros
         if categoria_id:
             query = query.filter_by(categoria_id=categoria_id)
         
         if busca:
-            query = query.filter(Servico.nome.ilike(f'%{busca}%'))
+            query = query.filter(ServicoGestao.nome.ilike(f'%{busca}%'))
         
-        servicos = query.order_by(Servico.nome).all()
+        servicos = query.order_by(ServicoGestao.nome).all()
         categorias = CategoriaServico.query.filter_by(admin_id=admin_id, ativo=True).order_by(CategoriaServico.nome).all()
         
         return render_template('servicos/listar_servicos.html', 
@@ -177,7 +177,7 @@ def novo_servico():
     
     if request.method == 'POST':
         try:
-            servico = Servico()
+            servico = ServicoGestao()
             servico.nome = request.form['nome']
             servico.descricao = request.form.get('descricao', '')
             servico.categoria_id = request.form['categoria_id']
@@ -221,7 +221,7 @@ def novo_servico():
 def editar_servico(id):
     """Editar serviço existente"""
     admin_id = get_admin_id()
-    servico = Servico.query.filter_by(id=id, admin_id=admin_id).first_or_404()
+    servico = ServicoGestao.query.filter_by(id=id, admin_id=admin_id).first_or_404()
     
     if request.method == 'POST':
         try:
