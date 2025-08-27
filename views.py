@@ -2176,8 +2176,26 @@ def funcionario_criar_rdo():
             rdo.numero_rdo = numero_rdo
             rdo.obra_id = obra_id
             rdo.data_relatorio = data_relatorio
-            rdo.criado_por_id = current_user.id  # ID do usuário que criou
-            rdo.admin_id = current_user.admin_id  # Para isolamento multi-tenant
+            # Para funcionários, buscar ou criar registro na tabela funcionario
+            funcionario = Funcionario.query.filter_by(
+                email=current_user.email, 
+                admin_id=current_user.admin_id
+            ).first()
+            
+            if not funcionario and current_user.email:
+                # Criar funcionário se não existir (para sistema de bypass)
+                funcionario = Funcionario()
+                funcionario.nome = getattr(current_user, 'nome', current_user.email.split('@')[0])
+                funcionario.email = current_user.email
+                funcionario.admin_id = current_user.admin_id
+                funcionario.ativo = True
+                funcionario.data_admissao = date.today()
+                db.session.add(funcionario)
+                db.session.flush()
+                print(f"DEBUG: Funcionário criado automaticamente: {funcionario.nome}")
+            
+            rdo.criado_por_id = funcionario.id if funcionario else current_user.id
+            rdo.admin_id = current_user.admin_id
             
             print(f"DEBUG CRIAÇÃO: Criando novo RDO {numero_rdo}")
         
