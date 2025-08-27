@@ -1,4 +1,12 @@
 from app import app
+
+# Registrar sistema de visualização e edição RDO
+try:
+    from rdo_viewer_editor import rdo_viewer_bp
+    app.register_blueprint(rdo_viewer_bp, url_prefix='/')
+    print("✅ Sistema de visualização RDO registrado")
+except ImportError as e:
+    print(f"⚠️ Sistema RDO viewer não encontrado: {e}")
 from flask import flash, redirect, url_for, render_template_string
 import traceback
 import logging

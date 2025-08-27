@@ -1,210 +1,279 @@
 {% extends "base.html" %}
 
-{% block title %}RDO {{ rdo.numero_rdo }} - Funcionário - SIGE{% endblock %}
+{% block title %}Visualizar RDO {{ rdo.numero_rdo }} - SIGE{% endblock %}
 
 {% block content %}
 <div class="container-fluid">
     <div class="row">
         <div class="col-12">
-            <div class="card">
+            <!-- Header -->
+            <div class="card mb-4">
                 <div class="card-header d-flex justify-content-between align-items-center">
-                    <h5 class="mb-0">
-                        <i class="fas fa-file-alt me-2"></i>
-                        RDO {{ rdo.numero_rdo }}
-                        {% if rdo.status == 'Finalizado' %}
-                        <span class="badge bg-success ms-2">Finalizado</span>
-                        {% else %}
-                        <span class="badge bg-warning ms-2">Rascunho</span>
-                        {% endif %}
-                    </h5>
+                    <h4 class="mb-0">
+                        <i class="fas fa-eye me-2"></i>RDO {{ rdo.numero_rdo }}
+                    </h4>
                     <div>
-                        {% if rdo.status == 'Rascunho' %}
-                        <a href="{{ url_for('main.funcionario_editar_rdo', id=rdo.id) }}" class="btn btn-outline-primary me-2">
-                            <i class="fas fa-edit me-1"></i>Editar RDO
+                        <a href="{{ url_for('rdo_viewer.editar_rdo', rdo_id=rdo.id) }}" 
+                           class="btn btn-warning me-2">
+                            <i class="fas fa-edit me-1"></i>Editar
                         </a>
-                        {% endif %}
-                        <a href="{{ url_for('main.funcionario_lista_rdos') }}" class="btn btn-outline-secondary">
+                        <a href="{{ url_for('rdo_viewer.listar_rdos') }}" 
+                           class="btn btn-outline-secondary">
                             <i class="fas fa-arrow-left me-1"></i>Voltar à Lista
                         </a>
                     </div>
                 </div>
-                
-                <div class="card-body">
-                    <!-- Informações Gerais -->
-                    <div class="row mb-4">
-                        <div class="col-md-6">
-                            <h6 class="text-muted">Informações Gerais</h6>
-                            <table class="table table-borderless table-sm">
-                                <tr>
-                                    <td><strong>Obra:</strong></td>
-                                    <td>{{ rdo.obra.nome }}</td>
-                                </tr>
-                                <tr>
-                                    <td><strong>Data:</strong></td>
-                                    <td>{{ rdo.data_relatorio.strftime('%d/%m/%Y') }}</td>
-                                </tr>
-                                <tr>
-                                    <td><strong>Criado por:</strong></td>
-                                    <td>{{ rdo.criado_por.nome if rdo.criado_por else 'N/A' }}</td>
-                                </tr>
-                                <tr>
-                                    <td><strong>Criado em:</strong></td>
-                                    <td>{{ rdo.created_at.strftime('%d/%m/%Y %H:%M') if rdo.created_at else 'N/A' }}</td>
-                                </tr>
-                            </table>
+            </div>
+
+            <div class="row">
+                <!-- Informações Básicas -->
+                <div class="col-md-6">
+                    <div class="card mb-4">
+                        <div class="card-header">
+                            <h5 class="mb-0"><i class="fas fa-info-circle me-2"></i>Informações Básicas</h5>
                         </div>
-                        
-                        <div class="col-md-6">
-                            <h6 class="text-muted">Condições Climáticas</h6>
-                            <table class="table table-borderless table-sm">
-                                <tr>
-                                    <td><strong>Clima:</strong></td>
-                                    <td>{{ rdo.clima or 'N/A' }}</td>
-                                </tr>
-                                <tr>
-                                    <td><strong>Temperatura:</strong></td>
-                                    <td>{{ rdo.temperatura or 'N/A' }}</td>
-                                </tr>
-                                <tr>
-                                    <td><strong>Observações:</strong></td>
-                                    <td>{{ rdo.condicoes_climaticas or 'N/A' }}</td>
-                                </tr>
-                            </table>
+                        <div class="card-body">
+                            <div class="row">
+                                <div class="col-sm-6">
+                                    <strong>Data:</strong><br>
+                                    {{ rdo.data_relatorio.strftime('%d/%m/%Y') if rdo.data_relatorio else 'N/A' }}
+                                </div>
+                                <div class="col-sm-6">
+                                    <strong>Status:</strong><br>
+                                    {% if rdo.status == 'Finalizado' %}
+                                    <span class="badge bg-success">{{ rdo.status }}</span>
+                                    {% else %}
+                                    <span class="badge bg-warning">{{ rdo.status or 'Rascunho' }}</span>
+                                    {% endif %}
+                                </div>
+                            </div>
+                            <div class="mt-3">
+                                <strong>Obra:</strong><br>
+                                {{ rdo.obra.nome if rdo.obra else 'N/A' }}
+                            </div>
+                            {% if rdo.criado_por %}
+                            <div class="mt-3">
+                                <strong>Criado por:</strong><br>
+                                {{ rdo.criado_por.nome }}
+                            </div>
+                            {% endif %}
                         </div>
                     </div>
+                </div>
 
-                    <!-- Atividades Executadas -->
-                    {% if rdo.atividades %}
-                    <div class="mb-4">
-                        <h6 class="text-muted mb-3">Atividades Executadas</h6>
-                        <div class="table-responsive">
-                            <table class="table table-striped">
-                                <thead>
-                                    <tr>
-                                        <th>Descrição</th>
-                                        <th width="120">% Conclusão</th>
-                                        <th>Observações</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {% for atividade in rdo.atividades %}
-                                    <tr>
-                                        <td>{{ atividade.descricao_atividade }}</td>
-                                        <td>
-                                            <div class="progress" style="height: 25px;">
+                <!-- Condições Climáticas -->
+                <div class="col-md-6">
+                    <div class="card mb-4">
+                        <div class="card-header">
+                            <h5 class="mb-0"><i class="fas fa-cloud me-2"></i>Condições de Trabalho</h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="row">
+                                <div class="col-sm-6">
+                                    <strong>Clima Geral:</strong><br>
+                                    {{ rdo.clima_geral or 'Não informado' }}
+                                </div>
+                                <div class="col-sm-6">
+                                    <strong>Condições:</strong><br>
+                                    {{ rdo.condicoes_trabalho or 'Não informado' }}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Equipe de Trabalho -->
+            {% if rdo.mao_obra_dados %}
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="fas fa-users me-2"></i>Equipe de Trabalho</h5>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-striped">
+                            <thead>
+                                <tr>
+                                    <th>Funcionário</th>
+                                    <th>Função</th>
+                                    <th>Horas Trabalhadas</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for mao_obra in rdo.mao_obra_dados %}
+                                <tr>
+                                    <td>{{ mao_obra.funcionario.nome if mao_obra.funcionario else 'Funcionário não encontrado' }}</td>
+                                    <td>{{ mao_obra.funcao_exercida }}</td>
+                                    <td>{{ mao_obra.horas_trabalhadas }}h</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    <div class="mt-3">
+                        <strong>Total de Horas:</strong>
+                        {{ rdo.mao_obra_dados|map(attribute='horas_trabalhadas')|sum }}h
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+
+            <!-- Atividades Executadas -->
+            {% if rdo.subatividades_dados %}
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="fas fa-tasks me-2"></i>Atividades Executadas</h5>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-striped">
+                            <thead>
+                                <tr>
+                                    <th>Atividade</th>
+                                    <th>Progresso</th>
+                                    <th>Observações Técnicas</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for sub_ativ in rdo.subatividades_dados %}
+                                <tr>
+                                    <td>{{ sub_ativ.nome_subatividade }}</td>
+                                    <td>
+                                        <div class="d-flex align-items-center">
+                                            <div class="progress me-2" style="width: 100px; height: 20px;">
                                                 <div class="progress-bar" role="progressbar" 
-                                                     style="width: {{ atividade.percentual_conclusao }}%">
-                                                    {{ atividade.percentual_conclusao }}%
+                                                     style="width: {{ sub_ativ.percentual_conclusao or 0 }}%"
+                                                     aria-valuenow="{{ sub_ativ.percentual_conclusao or 0 }}" 
+                                                     aria-valuemin="0" aria-valuemax="100">
                                                 </div>
                                             </div>
-                                        </td>
-                                        <td>{{ atividade.observacoes_tecnicas or '-' }}</td>
-                                    </tr>
-                                    {% endfor %}
-                                </tbody>
-                            </table>
-                        </div>
+                                            <span>{{ sub_ativ.percentual_conclusao or 0 }}%</span>
+                                        </div>
+                                    </td>
+                                    <td>{{ sub_ativ.observacoes_tecnicas or 'Sem observações' }}</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
                     </div>
-                    {% endif %}
+                    <div class="mt-3">
+                        <strong>Progresso Médio:</strong>
+                        {% set percentuais = rdo.subatividades_dados|map(attribute='percentual_conclusao')|list %}
+                        {% if percentuais %}
+                            {{ ((percentuais|sum) / (percentuais|length))|round(1) }}%
+                        {% else %}
+                            0%
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+            {% endif %}
 
-                    <!-- Mão de Obra -->
-                    {% if rdo.mao_obra %}
-                    <div class="mb-4">
-                        <h6 class="text-muted mb-3">Mão de Obra Utilizada</h6>
-                        <div class="table-responsive">
-                            <table class="table table-striped">
-                                <thead>
-                                    <tr>
-                                        <th>Funcionário</th>
-                                        <th>Função</th>
-                                        <th>Horas Trabalhadas</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {% for mao_obra in rdo.mao_obra %}
-                                    <tr>
-                                        <td>{{ mao_obra.funcionario.nome if mao_obra.funcionario else 'N/A' }}</td>
-                                        <td>{{ mao_obra.funcao_exercida }}</td>
-                                        <td>{{ mao_obra.horas_trabalhadas }}h</td>
-                                    </tr>
-                                    {% endfor %}
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
-                    {% endif %}
+            <!-- Comentários Gerais -->
+            {% if rdo.comentario_geral %}
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="fas fa-comment me-2"></i>Comentários Gerais</h5>
+                </div>
+                <div class="card-body">
+                    <p class="mb-0">{{ rdo.comentario_geral }}</p>
+                </div>
+            </div>
+            {% endif %}
 
-                    <!-- Equipamentos -->
-                    {% if rdo.equipamentos %}
-                    <div class="mb-4">
-                        <h6 class="text-muted mb-3">Equipamentos Utilizados</h6>
-                        <div class="table-responsive">
-                            <table class="table table-striped">
-                                <thead>
-                                    <tr>
-                                        <th>Nome</th>
-                                        <th>Quantidade</th>
-                                        <th>Horas de Uso</th>
-                                        <th>Estado</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {% for equipamento in rdo.equipamentos %}
-                                    <tr>
-                                        <td>{{ equipamento.nome_equipamento }}</td>
-                                        <td>{{ equipamento.quantidade }}</td>
-                                        <td>{{ equipamento.horas_uso }}h</td>
-                                        <td>
-                                            {% if equipamento.estado_conservacao == 'Bom' %}
-                                            <span class="badge bg-success">{{ equipamento.estado_conservacao }}</span>
-                                            {% elif equipamento.estado_conservacao == 'Regular' %}
-                                            <span class="badge bg-warning">{{ equipamento.estado_conservacao }}</span>
-                                            {% else %}
-                                            <span class="badge bg-danger">{{ equipamento.estado_conservacao }}</span>
-                                            {% endif %}
-                                        </td>
-                                    </tr>
-                                    {% endfor %}
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
-                    {% endif %}
-
-                    <!-- Ocorrências -->
-                    {% if rdo.ocorrencias %}
-                    <div class="mb-4">
-                        <h6 class="text-muted mb-3">Ocorrências e Problemas</h6>
-                        {% for ocorrencia in rdo.ocorrencias %}
-                        <div class="card mb-3">
-                            <div class="card-body">
-                                <h6 class="card-title">{{ ocorrencia.descricao_ocorrencia }}</h6>
-                                {% if ocorrencia.problemas_identificados %}
-                                <p class="card-text"><strong>Problemas:</strong> {{ ocorrencia.problemas_identificados }}</p>
-                                {% endif %}
-                                {% if ocorrencia.acoes_corretivas %}
-                                <p class="card-text"><strong>Ações Corretivas:</strong> {{ ocorrencia.acoes_corretivas }}</p>
-                                {% endif %}
-                            </div>
-                        </div>
-                        {% endfor %}
-                    </div>
-                    {% endif %}
-
-                    <!-- Comentário Geral -->
-                    {% if rdo.comentario_geral %}
-                    <div class="mb-4">
-                        <h6 class="text-muted mb-3">Observações Gerais</h6>
-                        <div class="card">
-                            <div class="card-body">
-                                {{ rdo.comentario_geral }}
-                            </div>
-                        </div>
-                    </div>
-                    {% endif %}
+            <!-- Ações -->
+            <div class="card">
+                <div class="card-body text-center">
+                    <a href="{{ url_for('rdo_viewer.editar_rdo', rdo_id=rdo.id) }}" 
+                       class="btn btn-warning me-2">
+                        <i class="fas fa-edit me-1"></i>Editar RDO
+                    </a>
+                    <button type="button" class="btn btn-danger me-2" 
+                            onclick="confirmarExclusao({{ rdo.id }})">
+                        <i class="fas fa-trash me-1"></i>Excluir RDO
+                    </button>
+                    <a href="{{ url_for('rdo_viewer.listar_rdos') }}" 
+                       class="btn btn-outline-secondary">
+                        <i class="fas fa-list me-1"></i>Ver Todos os RDOs
+                    </a>
                 </div>
             </div>
         </div>
     </div>
 </div>
+
+<!-- Modal de Confirmação de Exclusão -->
+<div class="modal fade" id="modalExclusao" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Confirmar Exclusão</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p>Tem certeza que deseja excluir este RDO?</p>
+                <p><strong>Esta ação não pode ser desfeita!</strong></p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-danger" onclick="excluirRDO()">
+                    <i class="fas fa-trash me-1"></i>Excluir
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+let rdoParaExcluir = null;
+
+function confirmarExclusao(rdoId) {
+    rdoParaExcluir = rdoId;
+    new bootstrap.Modal(document.getElementById('modalExclusao')).show();
+}
+
+function excluirRDO() {
+    if (!rdoParaExcluir) return;
+    
+    fetch(`/rdo/${rdoParaExcluir}/deletar`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': getCookie('csrf_token')
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            // Mostrar sucesso e redirecionar
+            alert('RDO excluído com sucesso!');
+            window.location.href = '{{ url_for("rdo_viewer.listar_rdos") }}';
+        } else {
+            alert('Erro ao excluir RDO: ' + data.message);
+        }
+    })
+    .catch(error => {
+        console.error('Erro:', error);
+        alert('Erro ao excluir RDO');
+    })
+    .finally(() => {
+        bootstrap.Modal.getInstance(document.getElementById('modalExclusao')).hide();
+    });
+}
+
+function getCookie(name) {
+    let cookieValue = null;
+    if (document.cookie && document.cookie !== '') {
+        const cookies = document.cookie.split(';');
+        for (let i = 0; i < cookies.length; i++) {
+            const cookie = cookies[i].trim();
+            if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                break;
+            }
+        }
+    }
+    return cookieValue;
+}
+</script>
 {% endblock %}
