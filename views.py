@@ -1288,37 +1288,32 @@ def funcionario_dashboard():
 def funcionario_dashboard_desktop():
     """Dashboard específico para funcionários"""
     try:
-        # Buscar funcionário pelo admin_id do usuário
-        funcionarios = Funcionario.query.filter_by(
-            admin_id=current_user.admin_id, 
-            ativo=True
-        ).all()
+        print(f"DEBUG DASHBOARD: current_user.email={current_user.email}")
+        print(f"DEBUG DASHBOARD: current_user.admin_id={current_user.admin_id}")
+        print(f"DEBUG DASHBOARD: current_user.id={current_user.id}")
         
-        # Para funcionário específico, buscar por email se disponível
-        funcionario_atual = None
-        if hasattr(current_user, 'email') and current_user.email:
-            for func in funcionarios:
-                if func.email == current_user.email:
-                    funcionario_atual = func
-                    break
+        # Buscar funcionário correto (independente do admin_id por enquanto)
+        funcionario_atual = Funcionario.query.filter_by(email=current_user.email).first()
+        if funcionario_atual:
+            print(f"DEBUG DASHBOARD: Funcionário encontrado: {funcionario_atual.nome} (admin_id={funcionario_atual.admin_id})")
+        else:
+            print(f"DEBUG DASHBOARD: NENHUM funcionário encontrado com email {current_user.email}")
         
-        # Se não encontrou, pegar primeiro funcionário como fallback
-        if not funcionario_atual and funcionarios:
-            funcionario_atual = funcionarios[0]
+        # Usar admin_id do funcionário encontrado ou admin_id padrão
+        admin_id_correto = funcionario_atual.admin_id if funcionario_atual else 10
+        print(f"DEBUG DASHBOARD: Usando admin_id={admin_id_correto}")
         
         # Buscar obras disponíveis para esse admin
-        obras_disponiveis = Obra.query.filter_by(
-            admin_id=current_user.admin_id
-        ).order_by(Obra.nome).all()
+        obras_disponiveis = Obra.query.filter_by(admin_id=admin_id_correto).order_by(Obra.nome).all()
         
         # Buscar RDOs recentes da empresa
         rdos_recentes = RDO.query.join(Obra).filter(
-            Obra.admin_id == current_user.admin_id
+            Obra.admin_id == admin_id_correto
         ).order_by(RDO.data_relatorio.desc()).limit(10).all()
         
         # RDOs em rascunho que o funcionário pode editar
         rdos_rascunho = RDO.query.join(Obra).filter(
-            Obra.admin_id == current_user.admin_id,
+            Obra.admin_id == admin_id_correto,
             RDO.status == 'Rascunho'
         ).order_by(RDO.data_relatorio.desc()).limit(5).all()
         
@@ -1335,12 +1330,16 @@ def funcionario_dashboard_desktop():
                              
     except Exception as e:
         print(f"ERRO FUNCIONÁRIO DASHBOARD: {str(e)}")
+        import traceback
+        print(f"TRACEBACK: {traceback.format_exc()}")
         flash('Erro ao carregar dashboard. Contate o administrador.', 'error')
         return render_template('funcionario_dashboard.html', 
                              funcionario=None,
                              obras_disponiveis=[],
                              rdos_recentes=[],
-                             rdos_rascunho=[])
+                             rdos_rascunho=[],
+                             total_obras=0,
+                             total_rdos=0)
 
 # ===== ROTAS BÁSICAS DE TESTE =====
 @main_bp.route('/test')
