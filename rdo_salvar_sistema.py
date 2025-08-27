@@ -257,20 +257,24 @@ def processar_subatividades_schema_atual(rdo, dados):
                 print(f"   🔍 Subatividade {subatividade_id}: {percentual}%")
                 
                 if percentual > 0:
-                    # Obter dados da subatividade
-                    subatividade = SubAtividade.query.get(int(subatividade_id))
+                    # Buscar na tabela correta: subatividade_mestre
+                    subatividade = db.session.execute(
+                        db.text("SELECT id, nome, servico_id FROM subatividade_mestre WHERE id = :id"),
+                        {"id": int(subatividade_id)}
+                    ).fetchone()
                     
                     if subatividade:
                         print(f"   ✅ Subatividade encontrada: {subatividade.nome} (Serviço ID: {subatividade.servico_id})")
                         
-                        # Usar schema atual - sem campo subatividade_id
+                        # Criar registro na tabela rdo_servico_subatividade
                         registro = RDOServicoSubatividade()
                         registro.rdo_id = rdo.id
                         registro.servico_id = subatividade.servico_id
                         registro.nome_subatividade = subatividade.nome
-                        registro.percentual_conclusao = percentual  # Campo correto do schema
-                        registro.observacoes_tecnicas = ''  # Sem observações específicas
+                        registro.percentual_conclusao = percentual
+                        registro.observacoes_tecnicas = dados.get(f'subatividade_{subatividade_id}_observacao', '')
                         registro.admin_id = rdo.admin_id
+                        registro.ativo = True
                         
                         db.session.add(registro)
                         subatividades_processadas += 1
