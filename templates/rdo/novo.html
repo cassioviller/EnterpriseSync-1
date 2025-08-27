@@ -1,24 +1,45 @@
 {% extends "base.html" %}
 
-{% block title %}Novo RDO - SIGE{% endblock %}
+{% block title %}Novo RDO - Sistema Moderno{% endblock %}
 
 {% block content %}
-<div class="container-fluid">
-    <div class="row">
-        <div class="col-12">
-            <div class="card">
-                <div class="card-header d-flex justify-content-between align-items-center">
-                    <h5 class="mb-0">
-                        <i class="fas fa-file-alt me-2"></i>
-                        Novo Relatório Diário de Obra (RDO)
-                    </h5>
-                    <a href="{{ url_for('main.lista_rdos') }}" class="btn btn-outline-secondary">
-                        <i class="fas fa-arrow-left me-1"></i>Voltar à Lista
-                    </a>
+<div class="container-fluid py-4" id="main-content">
+    <!-- Header Principal -->
+    <div class="header-section">
+        <div class="d-flex align-items-center justify-content-between mb-4">
+            <div class="header-info">
+                <div class="header-icon">
+                    <i class="fas fa-clipboard-list"></i>
                 </div>
-                
-                <div class="card-body">
-                    <form action="{% if current_user.tipo_usuario.name == 'FUNCIONARIO' %}{{ url_for('main.funcionario_criar_rdo') }}{% else %}{{ url_for('main.criar_rdo') }}{% endif %}" method="POST" id="form-rdo">
+                <div>
+                    <h1 class="page-title">Novo Relatório Diário de Obra (RDO)</h1>
+                    <p class="page-subtitle">Sistema moderno e intuitivo para registro de atividades diárias</p>
+                </div>
+            </div>
+            <div class="header-actions">
+                <a href="{{ url_for('main.lista_rdos') }}" class="btn-modern btn-secondary">
+                    <i class="fas fa-arrow-left"></i>
+                    Voltar para Lista
+                </a>
+            </div>
+        </div>
+        
+        <!-- Progress Bar -->
+        <div class="progress-container">
+            <div class="progress-bar" id="progress-bar" style="width: 0%"></div>
+        </div>
+    </div>
+
+    <!-- Formulário RDO -->
+    <div class="rdo-card slide-in">
+        <div class="rdo-card-header">
+            <h3>
+                <i class="fas fa-info-circle"></i>
+                Informações do RDO
+            </h3>
+        </div>
+        <div class="rdo-card-body">
+            <form action="{% if current_user.tipo_usuario.name == 'FUNCIONARIO' %}{{ url_for('main.funcionario_criar_rdo') }}{% else %}{{ url_for('main.criar_rdo') }}{% endif %}" method="POST" id="form-rdo">
                         <!-- Dados Básicos -->
                         <div class="row mb-4">
                             <div class="col-md-6">
