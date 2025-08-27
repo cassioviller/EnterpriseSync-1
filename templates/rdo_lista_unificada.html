@@ -788,9 +788,9 @@
                 <i class="fas fa-chart-line"></i>
             </div>
             <div class="stat-content">
-                {% set total_progress = rdos.items|sum(attribute='progresso_total')|default(0) %}
-                {% set avg_progress = (total_progress / rdos.items|length)|round(1) if rdos.items else 0 %}
-                <div class="stat-number">{{ avg_progress }}%</div>
+                {% set total_progress = rdos.items|map(attribute='progresso_total')|select('number')|sum %}
+                {% set avg_progress = (total_progress / rdos.items|length)|round(1) if rdos.items and rdos.items|length > 0 else 0 %}
+                <div class="stat-number">{{ "%.1f"|format(avg_progress) }}%</div>
                 <div class="stat-label">Progresso Médio</div>
             </div>
         </div>
@@ -903,10 +903,10 @@
                 <div class="rdo-progress">
                     <div class="progress-header">
                         <span>Progresso Geral</span>
-                        <strong>{{ rdo.progresso_total }}%</strong>
+                        <strong>{{ "%.1f"|format(rdo.progresso_total|default(0)) }}%</strong>
                     </div>
                     <div class="progress-bar">
-                        <div class="progress-fill" style="width: {{ rdo.progresso_total }}%"></div>
+                        <div class="progress-fill" style="width: {{ rdo.progresso_total|default(0) }}%"></div>
                     </div>
                 </div>
                 
@@ -921,7 +921,7 @@
                     </div>
                     <div class="stat-item">
                         <i class="fas fa-clock"></i>
-                        <span>{{ "%.1f"|format(rdo.horas_totais) }}h</span>
+                        <span>{{ "%.1f"|format(rdo.horas_totais|default(0)) }}h</span>
                     </div>
                 </div>
             </div>
@@ -978,19 +978,20 @@
     {% endif %}
     
     {% else %}
-    <!-- Estado vazio -->
+    <!-- Estado vazio elegante -->
     <div class="empty-state">
         <i class="fas fa-clipboard-list"></i>
         <h3>Nenhuma RDO encontrada</h3>
-        <p>{% if filters.obra_id or filters.status or filters.data_inicio or filters.data_fim %}Nenhuma RDO corresponde aos filtros aplicados.{% else %}Crie sua primeira RDO para começar o acompanhamento da obra.{% endif %}</p>
-        <a href="{{ url_for('main.funcionario_rdo_consolidado') }}" class="btn-action primary" style="display: inline-flex; margin-top: 1rem;">
-            <i class="fas fa-plus"></i> Criar RDO
+        <p>{% if filters.obra_id or filters.status or filters.data_inicio or filters.data_fim or filters.funcionario_id %}Nenhuma RDO corresponde aos filtros aplicados. Tente ajustar os critérios de busca.{% else %}Crie sua primeira RDO para começar o acompanhamento das obras e atividades.{% endif %}</p>
+        <a href="{{ url_for('main.funcionario_rdo_consolidado') }}" class="btn-action primary" style="display: inline-flex; margin-top: 2rem; padding: 1rem 2rem;">
+            <i class="fas fa-plus"></i> Criar Nova RDO
         </a>
     </div>
     {% endif %}
 </div>
 
 <script>
+// Função para limpar filtros
 function limparFiltros() {
     const form = document.getElementById('filtrosForm');
     const inputs = form.querySelectorAll('input, select');
@@ -1003,5 +1004,53 @@ function limparFiltros() {
     });
     form.submit();
 }
+
+// Animações suaves para carregamento
+document.addEventListener('DOMContentLoaded', function() {
+    // Adicionar classe de animação para cards
+    const cards = document.querySelectorAll('.rdo-card, .stat-card');
+    cards.forEach((card, index) => {
+        card.style.animationDelay = `${index * 0.1}s`;
+        card.classList.add('fade-in');
+    });
+    
+    // Efeito de contagem para números nas estatísticas
+    const statNumbers = document.querySelectorAll('.stat-number');
+    statNumbers.forEach(stat => {
+        const finalValue = parseFloat(stat.textContent);
+        if (!isNaN(finalValue)) {
+            let currentValue = 0;
+            const increment = finalValue / 20;
+            const timer = setInterval(() => {
+                currentValue += increment;
+                if (currentValue >= finalValue) {
+                    currentValue = finalValue;
+                    clearInterval(timer);
+                }
+                stat.textContent = stat.textContent.includes('%') 
+                    ? `${currentValue.toFixed(1)}%` 
+                    : Math.round(currentValue);
+            }, 50);
+        }
+    });
+});
+
+// Adicionar classes CSS para animações
+const style = document.createElement('style');
+style.textContent = `
+    .fade-in {
+        animation: fadeInUp 0.6s ease-out forwards;
+        opacity: 0;
+        transform: translateY(20px);
+    }
+    
+    @keyframes fadeInUp {
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+`;
+document.head.appendChild(style);
 </script>
 {% endblock %}
