@@ -40,8 +40,8 @@ def login():
             elif user.tipo_usuario == TipoUsuario.ADMIN:
                 return redirect(url_for('main.dashboard'))
             else:
-                # Funcionários são redirecionados para dashboard de RDO
-                return redirect(url_for('main.lista_rdos'))
+                # Funcionários são redirecionados para RDO consolidado
+                return redirect(url_for('main.funcionario_rdo_refatorado'))
         else:
             flash('Email/Username ou senha inválidos.', 'danger')
     
@@ -58,8 +58,8 @@ def logout():
 def index():
     if current_user.is_authenticated:
         if current_user.tipo_usuario == TipoUsuario.FUNCIONARIO:
-            print(f"DEBUG INDEX: Funcionário {current_user.email} redirecionado para dashboard funcionário")
-            return redirect(url_for('main.funcionario_dashboard'))
+            print(f"DEBUG INDEX: Funcionário {current_user.email} redirecionado para RDO consolidado")
+            return redirect(url_for('main.funcionario_rdo_refatorado'))
         elif current_user.tipo_usuario == TipoUsuario.SUPER_ADMIN:
             return redirect(url_for('main.super_admin_dashboard'))
         else:
@@ -74,7 +74,7 @@ def dashboard():
         # FUNCIONÁRIO - SEMPRE vai para dashboard específico (SEGURANÇA CRÍTICA)
         if current_user.tipo_usuario == TipoUsuario.FUNCIONARIO:
             print(f"DEBUG DASHBOARD: Funcionário {current_user.email} BLOQUEADO do dashboard admin - redirecionado")
-            return redirect(url_for('main.funcionario_dashboard'))
+            return redirect(url_for('main.funcionario_rdo_refatorado'))
             
         # SUPER ADMIN - vai para dashboard específico
         elif current_user.tipo_usuario == TipoUsuario.SUPER_ADMIN:
