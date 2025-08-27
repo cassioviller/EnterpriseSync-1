@@ -2186,27 +2186,30 @@ def funcionario_criar_rdo():
             rdo.numero_rdo = numero_rdo
             rdo.obra_id = obra_id
             rdo.data_relatorio = data_relatorio
+            # DEBUG: Informações do usuário atual
+            print(f"DEBUG MULTITENANT: current_user.email={current_user.email}")
+            print(f"DEBUG MULTITENANT: current_user.admin_id={current_user.admin_id}")
+            print(f"DEBUG MULTITENANT: current_user.id={current_user.id}")
+            
             # Para funcionários, buscar ou criar registro na tabela funcionario
             funcionario = Funcionario.query.filter_by(
                 email=current_user.email, 
                 admin_id=current_user.admin_id
             ).first()
             
-            if not funcionario and current_user.email:
-                # Criar funcionário se não existir (para sistema de bypass)
-                print(f"DEBUG: Criando funcionário para {current_user.email} admin_id={current_user.admin_id}")
-                funcionario = Funcionario()
-                funcionario.nome = getattr(current_user, 'nome', current_user.email.split('@')[0].title())
-                funcionario.email = current_user.email
-                funcionario.cpf = f"000.000.000-{current_user.id:02d}"  # CPF temporário único
-                funcionario.admin_id = current_user.admin_id
-                funcionario.ativo = True
-                funcionario.data_admissao = date.today()
-                db.session.add(funcionario)
-                db.session.flush()
-                print(f"DEBUG: Funcionário criado automaticamente: {funcionario.nome} (ID: {funcionario.id})")
+            print(f"DEBUG MULTITENANT: Funcionário encontrado: {funcionario.nome if funcionario else 'NENHUM'}")
             
-            rdo.criado_por_id = funcionario.id if funcionario else current_user.id
+            if not funcionario:
+                print(f"ERRO MULTITENANT: Funcionário não encontrado para email={current_user.email}, admin_id={current_user.admin_id}")
+                # Verificar se existe funcionário com esse email em qualquer admin_id
+                funcionario_qualquer = Funcionario.query.filter_by(email=current_user.email).first()
+                if funcionario_qualquer:
+                    print(f"DEBUG: Encontrou funcionário com admin_id diferente: {funcionario_qualquer.admin_id}")
+                
+                flash('Funcionário não encontrado. Entre em contato com o administrador.', 'error')
+                return redirect(url_for('main.funcionario_rdo_refatorado'))
+            
+            rdo.criado_por_id = funcionario.id
             rdo.admin_id = current_user.admin_id
             
             print(f"DEBUG: RDO configurado - criado_por_id={rdo.criado_por_id}, admin_id={rdo.admin_id}")
