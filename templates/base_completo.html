@@ -249,16 +249,13 @@
                             <i class="fas fa-file-contract me-1"></i> Propostas
                         </a>
                         <ul class="dropdown-menu">
-                            <li><a class="dropdown-item" href="{{ url_for('propostas.dashboard') }}">
+                            <li><a class="dropdown-item" href="/propostas/dashboard">
                                 <i class="fas fa-chart-bar me-1"></i> Dashboard
                             </a></li>
-                            <li><a class="dropdown-item" href="{{ url_for('propostas.listar') }}">
-                                <i class="fas fa-list me-1"></i> Listar Propostas
-                            </a></li>
-                            <li><a class="dropdown-item" href="{{ url_for('propostas.nova') }}">
+                            <li><a class="dropdown-item" href="{{ url_for('propostas.nova_proposta') }}">
                                 <i class="fas fa-plus me-1"></i> Nova Proposta
                             </a></li>
-                            <li><a class="dropdown-item" href="{{ url_for('templates.listar') }}">
+                            <li><a class="dropdown-item" href="{{ url_for('templates.listar_templates') }}">
                                 <i class="fas fa-templates me-1"></i> Templates
                             </a></li>
                         </ul>
@@ -276,7 +273,7 @@
                             <li><a class="dropdown-item" href="/contabilidade/dashboard">
                                 <i class="fas fa-calculator me-1"></i> Contabilidade
                             </a></li>
-                            <li><a class="dropdown-item" href="{{ url_for('main.outros_custos') }}">
+                            <li><a class="dropdown-item" href="/outros-custos">
                                 <i class="fas fa-coins me-1"></i> Outros Custos
                             </a></li>
                         </ul>
@@ -291,7 +288,7 @@
                     
                     <!-- Alimentação -->
                     <li class="nav-item">
-                        <a class="nav-link" href="{{ url_for('main.alimentacao') }}">
+                        <a class="nav-link" href="/alimentacao">
                             <i class="fas fa-utensils me-1"></i> Alimentação
                         </a>
                     </li>
@@ -337,19 +334,19 @@
                                 <i class="fas fa-tachometer-alt me-1"></i> Dashboard
                             </a></li>
                             <li><hr class="dropdown-divider"></li>
-                            <li><a class="dropdown-item" href="{{ url_for('configuracoes.index') }}">
+                            <li><a class="dropdown-item" href="/configuracoes">
                                 <i class="fas fa-cog me-1"></i> Configurações
                             </a></li>
-                            <li><a class="dropdown-item" href="{{ url_for('configuracoes.empresa') }}">
+                            <li><a class="dropdown-item" href="/configuracoes/empresa">
                                 <i class="fas fa-building me-1"></i> Empresa
                             </a></li>
-                            <li><a class="dropdown-item" href="{{ url_for('configuracoes.departamentos') }}">
+                            <li><a class="dropdown-item" href="/configuracoes/departamentos">
                                 <i class="fas fa-sitemap me-1"></i> Departamentos
                             </a></li>
-                            <li><a class="dropdown-item" href="{{ url_for('configuracoes.funcoes') }}">
+                            <li><a class="dropdown-item" href="/configuracoes/funcoes">
                                 <i class="fas fa-user-tag me-1"></i> Funções
                             </a></li>
-                            <li><a class="dropdown-item" href="{{ url_for('configuracoes.horarios') }}">
+                            <li><a class="dropdown-item" href="/configuracoes/horarios">
                                 <i class="fas fa-clock me-1"></i> Horários
                             </a></li>
                             <li><hr class="dropdown-divider"></li>
