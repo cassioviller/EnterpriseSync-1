@@ -1,0 +1,629 @@
+# Prompt: Aplicar Design Moderno na Lista de RDOs
+
+## Objetivo
+Transformar a atual lista básica de RDOs em uma interface moderna, profissional e visualmente atrativa, mantendo todas as funcionalidades existentes.
+
+## 1. Header da Página - Substituir Completamente
+
+**Remover:** O título simples atual
+**Implementar:** Header moderno com gradiente
+
+```html
+<div class="page-header">
+    <div class="header-content">
+        <div class="header-icon">
+            <i class="fas fa-clipboard-list"></i>
+        </div>
+        <div class="header-text">
+            <h1>Relatórios Diários de Obra</h1>
+            <p>Histórico completo de RDOs da empresa</p>
+        </div>
+    </div>
+    <div class="header-actions">
+        <button class="btn-voltar" onclick="history.back()">
+            <i class="fas fa-arrow-left"></i> Voltar
+        </button>
+    </div>
+</div>
+```
+
+**CSS do Header:**
+```css
+.page-header {
+    background: linear-gradient(135deg, #2d5a27 0%, #4a7c59 100%);
+    color: white;
+    padding: 2.5rem 2rem;
+    border-radius: 12px;
+    margin-bottom: 2rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    box-shadow: 0 4px 20px rgba(45, 90, 39, 0.3);
+}
+
+.header-content {
+    display: flex;
+    align-items: center;
+    gap: 1.5rem;
+}
+
+.header-icon {
+    font-size: 3rem;
+    opacity: 0.9;
+}
+
+.header-text h1 {
+    margin: 0;
+    font-size: 2.2rem;
+    font-weight: 700;
+    text-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.header-text p {
+    margin: 0.5rem 0 0 0;
+    opacity: 0.9;
+    font-size: 1.1rem;
+}
+
+.btn-voltar {
+    background: rgba(255, 255, 255, 0.15);
+    border: 2px solid rgba(255, 255, 255, 0.3);
+    color: white;
+    padding: 1rem 2rem;
+    border-radius: 10px;
+    cursor: pointer;
+    font-weight: 600;
+    transition: all 0.3s ease;
+    font-size: 1rem;
+}
+
+.btn-voltar:hover {
+    background: rgba(255, 255, 255, 0.25);
+    transform: translateY(-2px);
+}
+```
+
+## 2. Cards de Estatísticas - Adicionar Acima da Lista
+
+**Implementar:** Dashboard com métricas
+
+```html
+<div class="stats-dashboard">
+    <div class="stat-card">
+        <div class="stat-icon">
+            <i class="fas fa-clipboard-list"></i>
+        </div>
+        <div class="stat-content">
+            <div class="stat-number">8</div>
+            <div class="stat-label">Total de RDOs</div>
+        </div>
+    </div>
+    
+    <div class="stat-card">
+        <div class="stat-icon">
+            <i class="fas fa-check-circle"></i>
+        </div>
+        <div class="stat-content">
+            <div class="stat-number">3</div>
+            <div class="stat-label">Finalizadas</div>
+        </div>
+    </div>
+    
+    <div class="stat-card">
+        <div class="stat-icon">
+            <i class="fas fa-clock"></i>
+        </div>
+        <div class="stat-content">
+            <div class="stat-number">1</div>
+            <div class="stat-label">Em Andamento</div>
+        </div>
+    </div>
+    
+    <div class="stat-card">
+        <div class="stat-icon">
+            <i class="fas fa-chart-line"></i>
+        </div>
+        <div class="stat-content">
+            <div class="stat-number">67%</div>
+            <div class="stat-label">Progresso Médio</div>
+        </div>
+    </div>
+</div>
+```
+
+**CSS das Estatísticas:**
+```css
+.stats-dashboard {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 1.5rem;
+    margin-bottom: 2rem;
+}
+
+.stat-card {
+    background: white;
+    padding: 2rem;
+    border-radius: 16px;
+    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.08);
+    display: flex;
+    align-items: center;
+    gap: 1.5rem;
+    transition: all 0.3s ease;
+    border: 1px solid rgba(0, 0, 0, 0.05);
+}
+
+.stat-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 15px 40px rgba(0, 0, 0, 0.12);
+}
+
+.stat-icon {
+    width: 70px;
+    height: 70px;
+    background: linear-gradient(135deg, #2d5a27, #4a7c59);
+    border-radius: 16px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-size: 2rem;
+}
+
+.stat-number {
+    font-size: 2.5rem;
+    font-weight: 800;
+    color: #2d5a27;
+    line-height: 1;
+    margin-bottom: 0.5rem;
+}
+
+.stat-label {
+    color: #6c757d;
+    font-weight: 600;
+    font-size: 1rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+```
+
+## 3. Seção de Filtros - Modernizar
+
+**Substituir:** Os filtros atuais básicos
+**Implementar:** Filtros com design moderno
+
+```html
+<div class="filters-container">
+    <div class="filters-header">
+        <h3><i class="fas fa-filter"></i> Filtros e Ordenação</h3>
+    </div>
+    <div class="filters-content">
+        <div class="filter-group">
+            <label>Obra</label>
+            <select class="modern-select">
+                <option>Todas as obras</option>
+                <option>Galpão Industrial</option>
+            </select>
+        </div>
+        
+        <div class="filter-group">
+            <label>Status</label>
+            <select class="modern-select">
+                <option>Todos os status</option>
+                <option>Finalizado</option>
+                <option>Em Andamento</option>
+            </select>
+        </div>
+        
+        <div class="filter-group">
+            <label>Funcionário</label>
+            <select class="modern-select">
+                <option>Todos os funcionários</option>
+                <option>Cássio Viller</option>
+            </select>
+        </div>
+        
+        <div class="filter-group">
+            <label>Período</label>
+            <div class="date-range">
+                <input type="date" class="modern-date">
+                <span>até</span>
+                <input type="date" class="modern-date">
+            </div>
+        </div>
+        
+        <div class="filter-actions">
+            <button class="btn-filter">
+                <i class="fas fa-search"></i> Filtrar
+            </button>
+            <button class="btn-clear">
+                <i class="fas fa-times"></i> Limpar
+            </button>
+        </div>
+    </div>
+</div>
+```
+
+**CSS dos Filtros:**
+```css
+.filters-container {
+    background: white;
+    border-radius: 16px;
+    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.08);
+    margin-bottom: 2rem;
+    overflow: hidden;
+}
+
+.filters-header {
+    background: linear-gradient(135deg, #f8f9fa, #e9ecef);
+    padding: 1.5rem 2rem;
+    border-bottom: 1px solid #e9ecef;
+}
+
+.filters-header h3 {
+    margin: 0;
+    color: #2d5a27;
+    font-weight: 700;
+    font-size: 1.3rem;
+}
+
+.filters-content {
+    padding: 2rem;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 1.5rem;
+    align-items: end;
+}
+
+.filter-group label {
+    display: block;
+    margin-bottom: 0.5rem;
+    color: #495057;
+    font-weight: 600;
+    font-size: 0.9rem;
+}
+
+.modern-select, .modern-date {
+    width: 100%;
+    padding: 1rem 1.5rem;
+    border: 2px solid #e9ecef;
+    border-radius: 10px;
+    background: white;
+    font-size: 1rem;
+    transition: all 0.3s ease;
+}
+
+.modern-select:focus, .modern-date:focus {
+    outline: none;
+    border-color: #2d5a27;
+    box-shadow: 0 0 0 3px rgba(45, 90, 39, 0.1);
+}
+
+.date-range {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.date-range span {
+    color: #6c757d;
+    font-weight: 500;
+}
+
+.filter-actions {
+    display: flex;
+    gap: 1rem;
+}
+
+.btn-filter, .btn-clear {
+    padding: 1rem 2rem;
+    border: none;
+    border-radius: 10px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.btn-filter {
+    background: #2d5a27;
+    color: white;
+}
+
+.btn-filter:hover {
+    background: #1e3d1b;
+    transform: translateY(-2px);
+}
+
+.btn-clear {
+    background: #6c757d;
+    color: white;
+}
+
+.btn-clear:hover {
+    background: #545b62;
+}
+```
+
+## 4. Lista de RDOs - Transformar em Cards Modernos
+
+**Substituir:** A lista atual simples
+**Implementar:** Cards com design profissional
+
+```html
+<div class="rdos-grid">
+    <div class="rdo-card">
+        <div class="rdo-card-header">
+            <div class="rdo-id-section">
+                <span class="rdo-badge">RDO</span>
+                <h3 class="rdo-number">2025-011</h3>
+            </div>
+            <div class="rdo-status">
+                <span class="status-badge finalizado">Finalizado</span>
+            </div>
+        </div>
+        
+        <div class="rdo-card-body">
+            <div class="rdo-date">
+                <i class="fas fa-calendar"></i>
+                <span>29/08/2025</span>
+            </div>
+            
+            <div class="rdo-creator">
+                <i class="fas fa-user"></i>
+                <span>Cássio Viller Silva de Azevedo</span>
+            </div>
+            
+            <div class="rdo-obra">
+                <i class="fas fa-building"></i>
+                <span>Galpão Industrial Estruturas Metálicas</span>
+            </div>
+            
+            <div class="rdo-progress">
+                <div class="progress-header">
+                    <span>Progresso Geral</span>
+                    <strong>61.7%</strong>
+                </div>
+                <div class="progress-bar">
+                    <div class="progress-fill" style="width: 61.7%"></div>
+                </div>
+            </div>
+            
+            <div class="rdo-stats">
+                <div class="stat-item">
+                    <i class="fas fa-tasks"></i>
+                    <span>6 subatividades</span>
+                </div>
+                <div class="stat-item">
+                    <i class="fas fa-users"></i>
+                    <span>1 funcionário</span>
+                </div>
+            </div>
+        </div>
+        
+        <div class="rdo-card-footer">
+            <button class="btn-action primary">
+                <i class="fas fa-eye"></i> Visualizar
+            </button>
+            <button class="btn-action secondary">
+                <i class="fas fa-edit"></i> Editar
+            </button>
+        </div>
+    </div>
+    
+    <!-- Repetir para outras RDOs -->
+</div>
+```
+
+**CSS dos Cards:**
+```css
+.rdos-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(400px, 1fr));
+    gap: 2rem;
+}
+
+.rdo-card {
+    background: white;
+    border-radius: 20px;
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.08);
+    overflow: hidden;
+    transition: all 0.4s ease;
+    border: 1px solid rgba(0, 0, 0, 0.05);
+}
+
+.rdo-card:hover {
+    transform: translateY(-8px);
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.15);
+}
+
+.rdo-card-header {
+    background: linear-gradient(135deg, #f8f9fa, #e9ecef);
+    padding: 2rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.rdo-id-section {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+}
+
+.rdo-badge {
+    background: #2d5a27;
+    color: white;
+    padding: 0.5rem 1rem;
+    border-radius: 20px;
+    font-weight: 700;
+    font-size: 0.8rem;
+    letter-spacing: 1px;
+}
+
+.rdo-number {
+    margin: 0;
+    font-size: 1.8rem;
+    font-weight: 800;
+    color: #2d5a27;
+}
+
+.status-badge {
+    padding: 0.5rem 1.5rem;
+    border-radius: 25px;
+    font-weight: 700;
+    font-size: 0.9rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.status-badge.finalizado {
+    background: #28a745;
+    color: white;
+}
+
+.status-badge.andamento {
+    background: #17a2b8;
+    color: white;
+}
+
+.rdo-card-body {
+    padding: 2rem;
+}
+
+.rdo-date, .rdo-creator, .rdo-obra {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+    padding: 1rem;
+    background: #f8f9fa;
+    border-radius: 12px;
+}
+
+.rdo-date i, .rdo-creator i, .rdo-obra i {
+    color: #2d5a27;
+    font-size: 1.2rem;
+    width: 20px;
+}
+
+.rdo-progress {
+    margin-bottom: 1.5rem;
+}
+
+.progress-header {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 1rem;
+    font-weight: 600;
+}
+
+.progress-header strong {
+    color: #2d5a27;
+    font-size: 1.2rem;
+}
+
+.progress-bar {
+    height: 12px;
+    background: #e9ecef;
+    border-radius: 6px;
+    overflow: hidden;
+}
+
+.progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #28a745, #20c997);
+    border-radius: 6px;
+    transition: width 0.5s ease;
+}
+
+.rdo-stats {
+    display: flex;
+    gap: 2rem;
+}
+
+.stat-item {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    color: #6c757d;
+    font-weight: 500;
+}
+
+.stat-item i {
+    color: #2d5a27;
+}
+
+.rdo-card-footer {
+    padding: 1.5rem 2rem;
+    background: #f8f9fa;
+    display: flex;
+    gap: 1rem;
+}
+
+.btn-action {
+    flex: 1;
+    padding: 1rem 1.5rem;
+    border: none;
+    border-radius: 12px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    font-size: 1rem;
+}
+
+.btn-action.primary {
+    background: #2d5a27;
+    color: white;
+}
+
+.btn-action.primary:hover {
+    background: #1e3d1b;
+    transform: translateY(-2px);
+}
+
+.btn-action.secondary {
+    background: #007bff;
+    color: white;
+}
+
+.btn-action.secondary:hover {
+    background: #0056b3;
+    transform: translateY(-2px);
+}
+```
+
+## 5. Responsividade
+
+```css
+@media (max-width: 768px) {
+    .page-header {
+        flex-direction: column;
+        gap: 1.5rem;
+        text-align: center;
+    }
+    
+    .stats-dashboard {
+        grid-template-columns: repeat(2, 1fr);
+    }
+    
+    .filters-content {
+        grid-template-columns: 1fr;
+    }
+    
+    .rdos-grid {
+        grid-template-columns: 1fr;
+    }
+    
+    .rdo-card-header {
+        flex-direction: column;
+        gap: 1rem;
+    }
+    
+    .rdo-stats {
+        flex-direction: column;
+        gap: 1rem;
+    }
+}
+```
+
+## Resultado Final
+Uma interface moderna, profissional e visualmente atrativa que transforma completamente a aparência atual, mantendo todas as funcionalidades existentes mas com um design de alta qualidade.
