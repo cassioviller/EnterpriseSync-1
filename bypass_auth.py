@@ -33,7 +33,7 @@ class MockCurrentUser:
     
     @property
     def id(self):
-        return 15  # ID do funcionário teste
+        return 43  # ID do usuário funcionário real
     
     @property
     def admin_id(self):
@@ -45,7 +45,7 @@ class MockCurrentUser:
     
     @property
     def nome(self):
-        return 'Funcionário Teste Vale Verde'
+        return 'João Silva Santos'
     
     @property
     def tipo_usuario(self):
