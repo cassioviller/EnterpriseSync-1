@@ -2,91 +2,200 @@
 
 {% block title %}Gerenciar RDOs - SIGE{% endblock %}
 
+{% block head %}
+<style>
+/* Estilização moderna para lista de RDOs */
+.rdo-list-header {
+    background: linear-gradient(135deg, #198754 0%, #20c997 100%);
+    color: white;
+    border-radius: 12px;
+    padding: 2.5rem 2rem;
+    margin-bottom: 2rem;
+}
+
+.stats-card {
+    border: none;
+    border-radius: 12px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+    transition: all 0.3s ease;
+    overflow: hidden;
+}
+
+.stats-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.12);
+}
+
+.stats-card .card-body {
+    padding: 1.5rem;
+}
+
+.filter-card {
+    background: #f8f9fa;
+    border: 1px solid #dee2e6;
+    border-radius: 12px;
+    padding: 1.5rem;
+    margin-bottom: 2rem;
+}
+
+.rdo-item {
+    border: 1px solid #dee2e6;
+    border-radius: 12px;
+    padding: 1.5rem;
+    margin-bottom: 1rem;
+    background: white;
+    transition: all 0.2s ease;
+}
+
+.rdo-item:hover {
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+    transform: translateY(-1px);
+}
+
+.rdo-status-badge {
+    border-radius: 20px;
+    padding: 0.5rem 1rem;
+    font-weight: 600;
+    font-size: 0.85rem;
+}
+
+.rdo-progress {
+    height: 6px;
+    border-radius: 3px;
+    background-color: #e9ecef;
+    overflow: hidden;
+}
+
+.rdo-actions .btn {
+    border-radius: 6px;
+    font-weight: 500;
+    transition: all 0.2s ease;
+}
+
+.rdo-actions .btn:hover {
+    transform: translateY(-1px);
+}
+
+.empty-state {
+    text-align: center;
+    padding: 4rem 2rem;
+    color: #6c757d;
+}
+
+.empty-state i {
+    font-size: 4rem;
+    margin-bottom: 1.5rem;
+    opacity: 0.3;
+}
+
+.btn-modern {
+    border-radius: 8px;
+    font-weight: 600;
+    padding: 0.75rem 1.5rem;
+    transition: all 0.2s ease;
+}
+
+.btn-modern:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+</style>
+{% endblock %}
+
 {% block content %}
-<div class="container-fluid">
-    <!-- Header -->
-    <div class="row mb-4">
-        <div class="col-12">
-            <div class="d-flex justify-content-between align-items-center">
-                <div>
-                    <h2 class="mb-1">
-                        <i class="fas fa-clipboard-list me-2"></i>
-                        Relatórios Diários de Obra (RDO)
-                    </h2>
-                    <p class="text-muted mb-0">Gerencie todos os RDOs da empresa</p>
-                </div>
-                <div>
-                    <a href="{{ url_for('main.novo_rdo') }}" class="btn btn-primary btn-lg">
-                        <i class="fas fa-plus me-2"></i>Novo RDO
-                    </a>
-                </div>
+<div class="container-fluid px-4">
+    <!-- Header Moderno -->
+    <div class="rdo-list-header">
+        <div class="d-flex justify-content-between align-items-center">
+            <div>
+                <h2 class="mb-2">
+                    <i class="fas fa-clipboard-list me-3"></i>
+                    Relatórios Diários de Obra
+                </h2>
+                <p class="mb-0 opacity-75">Gerencie e acompanhe todos os RDOs da empresa</p>
+            </div>
+            <div>
+                <a href="{{ url_for('main.novo_rdo') }}" class="btn btn-light btn-modern">
+                    <i class="fas fa-plus me-2"></i>Novo RDO
+                </a>
             </div>
         </div>
     </div>
 
-    <!-- Cards de Estatísticas -->
+    <!-- Cards de Estatísticas Modernos -->
     <div class="row mb-4">
-        <div class="col-md-3">
-            <div class="card bg-primary text-white">
+        <div class="col-lg-3 col-md-6 mb-3">
+            <div class="card stats-card bg-primary text-white">
                 <div class="card-body">
-                    <div class="d-flex justify-content-between">
+                    <div class="d-flex justify-content-between align-items-center">
                         <div>
-                            <h6 class="card-title">Total de RDOs</h6>
-                            <h3 class="mb-0">{{ rdos.total if rdos else 0 }}</h3>
+                            <h6 class="card-title opacity-75 mb-1">Total de RDOs</h6>
+                            <h2 class="mb-0 fw-bold">{{ rdos.total if rdos else 0 }}</h2>
                         </div>
-                        <div class="align-self-center">
-                            <i class="fas fa-file-alt fa-2x opacity-75"></i>
+                        <div class="flex-shrink-0">
+                            <div class="bg-white bg-opacity-25 rounded-circle p-3">
+                                <i class="fas fa-file-alt fa-2x"></i>
+                            </div>
                         </div>
                     </div>
                 </div>
             </div>
         </div>
-        <div class="col-md-3">
-            <div class="card bg-success text-white">
+        
+        <div class="col-lg-3 col-md-6 mb-3">
+            <div class="card stats-card bg-success text-white">
                 <div class="card-body">
-                    <div class="d-flex justify-content-between">
+                    <div class="d-flex justify-content-between align-items-center">
                         <div>
-                            <h6 class="card-title">RDOs Finalizados</h6>
-                            <h3 class="mb-0">
+                            <h6 class="card-title opacity-75 mb-1">RDOs Finalizados</h6>
+                            <h2 class="mb-0 fw-bold">
                                 {% set finalizados = rdos.items | selectattr('status', 'equalto', 'Finalizado') | list %}
                                 {{ finalizados | length }}
-                            </h3>
+                            </h2>
                         </div>
-                        <div class="align-self-center">
-                            <i class="fas fa-check-circle fa-2x opacity-75"></i>
+                        <div class="flex-shrink-0">
+                            <div class="bg-white bg-opacity-25 rounded-circle p-3">
+                                <i class="fas fa-check-circle fa-2x"></i>
+                            </div>
                         </div>
                     </div>
                 </div>
             </div>
         </div>
-        <div class="col-md-3">
-            <div class="card bg-warning text-white">
+        
+        <div class="col-lg-3 col-md-6 mb-3">
+            <div class="card stats-card bg-warning text-white">
                 <div class="card-body">
-                    <div class="d-flex justify-content-between">
+                    <div class="d-flex justify-content-between align-items-center">
                         <div>
-                            <h6 class="card-title">Rascunhos</h6>
-                            <h3 class="mb-0">
+                            <h6 class="card-title opacity-75 mb-1">Em Rascunho</h6>
+                            <h2 class="mb-0 fw-bold">
                                 {% set rascunhos = rdos.items | selectattr('status', 'equalto', 'Rascunho') | list %}
                                 {{ rascunhos | length }}
-                            </h3>
+                            </h2>
                         </div>
-                        <div class="align-self-center">
-                            <i class="fas fa-edit fa-2x opacity-75"></i>
+                        <div class="flex-shrink-0">
+                            <div class="bg-white bg-opacity-25 rounded-circle p-3">
+                                <i class="fas fa-edit fa-2x"></i>
+                            </div>
                         </div>
                     </div>
                 </div>
             </div>
         </div>
-        <div class="col-md-3">
-            <div class="card bg-info text-white">
+        
+        <div class="col-lg-3 col-md-6 mb-3">
+            <div class="card stats-card bg-info text-white">
                 <div class="card-body">
-                    <div class="d-flex justify-content-between">
+                    <div class="d-flex justify-content-between align-items-center">
                         <div>
-                            <h6 class="card-title">Obras Ativas</h6>
-                            <h3 class="mb-0">{{ obras|length if obras else 0 }}</h3>
+                            <h6 class="card-title opacity-75 mb-1">Obras Ativas</h6>
+                            <h2 class="mb-0 fw-bold">{{ obras|length if obras else 0 }}</h2>
                         </div>
-                        <div class="align-self-center">
-                            <i class="fas fa-building fa-2x opacity-75"></i>
+                        <div class="flex-shrink-0">
+                            <div class="bg-white bg-opacity-25 rounded-circle p-3">
+                                <i class="fas fa-building fa-2x"></i>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -94,277 +203,199 @@
         </div>
     </div>
 
-    <div class="row">
-        <div class="col-12">
-            <div class="card">
-                <div class="card-header d-flex justify-content-between align-items-center">
-                    <h5 class="mb-0">
-                        <i class="fas fa-file-alt me-2"></i>
-                        Meus Relatórios Diários de Obra
-                    </h5>
-                    <a href="{{ url_for('main.novo_rdo') }}" class="btn btn-primary">
-                        <i class="fas fa-plus me-1"></i>Novo RDO
-                    </a>
+    <!-- Filtros Modernos -->
+    <div class="filter-card">
+        <h6 class="fw-bold mb-3">
+            <i class="fas fa-filter me-2"></i>Filtros Avançados
+        </h6>
+        <form method="GET" action="{{ url_for('main.lista_rdos') }}">
+            <div class="row g-3">
+                <div class="col-lg-3 col-md-6">
+                    <label class="form-label fw-bold">Obra</label>
+                    <select name="obra" class="form-select">
+                        <option value="">Todas as Obras</option>
+                        {% for obra in obras %}
+                        <option value="{{ obra.id }}" {{ 'selected' if request.args.get('obra') == obra.id|string else '' }}>
+                            {{ obra.nome }}
+                        </option>
+                        {% endfor %}
+                    </select>
                 </div>
                 
-                <!-- Filtros -->
-                <div class="card-body border-bottom">
-                    <form method="GET" class="row g-3">
-                        <div class="col-md-3">
-                            <label for="obra_id" class="form-label">Obra</label>
-                            <select class="form-select" id="obra_id" name="obra_id">
-                                <option value="">Todas as obras</option>
-                                {% for obra in obras %}
-                                <option value="{{ obra.id }}" 
-                                        {% if filters.obra_id == obra.id %}selected{% endif %}>
-                                    {{ obra.nome }}
-                                </option>
-                                {% endfor %}
-                            </select>
-                        </div>
-                        
-                        <div class="col-md-2">
-                            <label for="status" class="form-label">Status</label>
-                            <select class="form-select" id="status" name="status">
-                                <option value="">Todos</option>
-                                <option value="Rascunho" {% if filters.status == 'Rascunho' %}selected{% endif %}>
-                                    Rascunho
-                                </option>
-                                <option value="Finalizado" {% if filters.status == 'Finalizado' %}selected{% endif %}>
-                                    Finalizado
-                                </option>
-                            </select>
-                        </div>
-                        
-                        <div class="col-md-2">
-                            <label for="data_inicio" class="form-label">Data Início</label>
-                            <input type="date" class="form-control" id="data_inicio" name="data_inicio" 
-                                   value="{{ filters.data_inicio }}">
-                        </div>
-                        
-                        <div class="col-md-2">
-                            <label for="data_fim" class="form-label">Data Fim</label>
-                            <input type="date" class="form-control" id="data_fim" name="data_fim" 
-                                   value="{{ filters.data_fim }}">
-                        </div>
-                        
-                        <div class="col-md-3 d-flex align-items-end">
-                            <button type="submit" class="btn btn-outline-primary me-2">
-                                <i class="fas fa-search me-1"></i>Filtrar
-                            </button>
-                            <a href="{{ url_for('main.lista_rdos') }}" class="btn btn-outline-secondary">
-                                <i class="fas fa-times me-1"></i>Limpar
-                            </a>
-                        </div>
-                    </form>
+                <div class="col-lg-2 col-md-6">
+                    <label class="form-label fw-bold">Status</label>
+                    <select name="status" class="form-select">
+                        <option value="">Todos</option>
+                        <option value="Rascunho" {{ 'selected' if request.args.get('status') == 'Rascunho' else '' }}>Rascunho</option>
+                        <option value="Finalizado" {{ 'selected' if request.args.get('status') == 'Finalizado' else '' }}>Finalizado</option>
+                    </select>
                 </div>
                 
-                <div class="card-body">
-                    {% if rdos.items %}
-                    <div class="table-responsive">
-                        <table class="table table-hover">
-                            <thead>
-                                <tr>
-                                    <th>Número RDO</th>
-                                    <th>Obra</th>
-                                    <th>Data</th>
-                                    <th>Status</th>
-                                    <th>Criado por</th>
-                                    <th>Atividades</th>
-                                    <th>Funcionários</th>
-                                    <th>Ações</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {% for rdo in rdos.items %}
-                                <tr>
-                                    <td>
-                                        <a href="{{ url_for('main.visualizar_rdo', id=rdo.id) }}" 
-                                           class="text-decoration-none">
-                                            <strong>{{ rdo.numero_rdo }}</strong>
-                                        </a>
-                                    </td>
-                                    <td>{{ rdo.obra.nome }}</td>
-                                    <td>{{ rdo.data_relatorio.strftime('%d/%m/%Y') }}</td>
-                                    <td>
-                                        {% if rdo.status == 'Finalizado' %}
-                                        <span class="badge bg-success">Finalizado</span>
-                                        {% else %}
-                                        <span class="badge bg-warning">Rascunho</span>
-                                        {% endif %}
-                                    </td>
-                                    <td>{{ rdo.criado_por.nome if rdo.criado_por else 'N/A' }}</td>
-                                    <td>
-                                        <span class="badge bg-info">{{ rdo.servico_subatividades|length }}</span>
-                                    </td>
-                                    <td>
-                                        <span class="badge bg-secondary">{{ rdo.mao_obra|length }}</span>
-                                    </td>
-                                    <td>
-                                        <div class="btn-group btn-group-sm">
-                                            <a href="{{ url_for('main.visualizar_rdo', id=rdo.id) }}" 
-                                               class="btn btn-outline-primary" title="Visualizar">
-                                                <i class="fas fa-eye"></i>
-                                            </a>
-                                            {% if rdo.status == 'Rascunho' %}
-                                            <a href="{{ url_for('main.editar_rdo', id=rdo.id) }}" 
-                                               class="btn btn-outline-warning" title="Editar">
-                                                <i class="fas fa-edit"></i>
-                                            </a>
-                                            {% endif %}
-                                            
-                                            <!-- Dropdown para mais ações -->
-                                            <div class="btn-group btn-group-sm">
-                                                <button type="button" class="btn btn-outline-secondary dropdown-toggle dropdown-toggle-split" 
-                                                        data-bs-toggle="dropdown" aria-expanded="false" title="Mais ações">
-                                                    <i class="fas fa-ellipsis-v"></i>
-                                                </button>
-                                                <ul class="dropdown-menu">
-                                                    <li>
-                                                        <form method="POST" action="{{ url_for('main.duplicar_rdo', id=rdo.id) }}" class="d-inline w-100">
-                                                            <button type="submit" class="dropdown-item" 
-                                                                    onclick="return confirm('Deseja criar uma cópia deste RDO para hoje?')">
-                                                                <i class="fas fa-copy me-2"></i>Duplicar
-                                                            </button>
-                                                        </form>
-                                                    </li>
-                                                    {% if rdo.status == 'Rascunho' %}
-                                                    <li><hr class="dropdown-divider"></li>
-                                                    <li>
-                                                        <form method="POST" action="{{ url_for('main.finalizar_rdo', id=rdo.id) }}" class="d-inline w-100">
-                                                            <button type="submit" class="dropdown-item text-success" 
-                                                                    onclick="return confirm('Finalizar este RDO? Não poderá ser editado depois.')">
-                                                                <i class="fas fa-check me-2"></i>Finalizar
-                                                            </button>
-                                                        </form>
-                                                    </li>
-                                                    <li>
-                                                        <form method="POST" action="{{ url_for('main.excluir_rdo', id=rdo.id) }}" class="d-inline w-100">
-                                                            <button type="submit" class="dropdown-item text-danger" 
-                                                                    onclick="return confirm('⚠️ EXCLUIR permanentemente este RDO?\n\nEsta ação não pode ser desfeita!')">
-                                                                <i class="fas fa-trash me-2"></i>Excluir
-                                                            </button>
-                                                        </form>
-                                                    </li>
-                                                    {% endif %}
-                                                </ul>
-                                            </div>
-                                        </div>
-                                    </td>
-                                </tr>
-                                {% endfor %}
-                            </tbody>
-                        </table>
-                    </div>
-                    
-                    <!-- Paginação -->
-                    {% if rdos.pages > 1 %}
-                    <nav aria-label="Paginação RDOs" class="mt-4">
-                        <ul class="pagination justify-content-center">
-                            <!-- Primeira página -->
-                            {% if rdos.page > 1 %}
-                            <li class="page-item">
-                                <a class="page-link" href="{{ url_for('main.lista_rdos', page=1, **filters) }}">
-                                    <i class="fas fa-angle-double-left"></i>
-                                </a>
-                            </li>
-                            {% endif %}
-                            
-                            <!-- Página anterior -->
-                            {% if rdos.has_prev %}
-                            <li class="page-item">
-                                <a class="page-link" href="{{ url_for('main.lista_rdos', page=rdos.prev_num, **filters) }}">
-                                    <i class="fas fa-angle-left"></i>
-                                </a>
-                            </li>
-                            {% endif %}
-                            
-                            <!-- Páginas numéricas -->
-                            {% for page_num in rdos.iter_pages() %}
-                                {% if page_num %}
-                                    {% if page_num != rdos.page %}
-                                    <li class="page-item">
-                                        <a class="page-link" href="{{ url_for('main.lista_rdos', page=page_num, **filters) }}">{{ page_num }}</a>
-                                    </li>
-                                    {% else %}
-                                    <li class="page-item active">
-                                        <span class="page-link">{{ page_num }}</span>
-                                    </li>
-                                    {% endif %}
-                                {% else %}
-                                <li class="page-item disabled">
-                                    <span class="page-link">...</span>
-                                </li>
-                                {% endif %}
-                            {% endfor %}
-                            
-                            <!-- Próxima página -->
-                            {% if rdos.has_next %}
-                            <li class="page-item">
-                                <a class="page-link" href="{{ url_for('main.lista_rdos', page=rdos.next_num, **filters) }}">
-                                    <i class="fas fa-angle-right"></i>
-                                </a>
-                            </li>
-                            {% endif %}
-                            
-                            <!-- Última página -->
-                            {% if rdos.page < rdos.pages %}
-                            <li class="page-item">
-                                <a class="page-link" href="{{ url_for('main.lista_rdos', page=rdos.pages, **filters) }}">
-                                    <i class="fas fa-angle-double-right"></i>
-                                </a>
-                            </li>
-                            {% endif %}
-                        </ul>
-                    </nav>
-                    {% endif %}
-                    
-                    {% else %}
-                    <!-- Estado vazio -->
-                    <div class="text-center py-5">
-                        <i class="fas fa-file-alt fa-3x text-muted mb-3"></i>
-                        <h5 class="text-muted">Nenhum RDO encontrado</h5>
-                        <p class="text-muted">
-                            {% if filters.obra_id or filters.status or filters.data_inicio or filters.data_fim %}
-                                Tente ajustar os filtros ou 
-                                <a href="{{ url_for('main.lista_rdos') }}">limpar busca</a>
-                            {% else %}
-                                Comece criando um novo RDO
-                            {% endif %}
-                        </p>
-                        <a href="{{ url_for('main.novo_rdo') }}" class="btn btn-primary">
-                            <i class="fas fa-plus me-1"></i>Criar Primeiro RDO
+                <div class="col-lg-2 col-md-6">
+                    <label class="form-label fw-bold">Data Início</label>
+                    <input type="date" name="data_inicio" class="form-control" value="{{ request.args.get('data_inicio', '') }}">
+                </div>
+                
+                <div class="col-lg-2 col-md-6">
+                    <label class="form-label fw-bold">Data Fim</label>
+                    <input type="date" name="data_fim" class="form-control" value="{{ request.args.get('data_fim', '') }}">
+                </div>
+                
+                <div class="col-lg-3 col-md-12">
+                    <label class="form-label">&nbsp;</label>
+                    <div class="d-flex gap-2">
+                        <button type="submit" class="btn btn-primary btn-modern flex-grow-1">
+                            <i class="fas fa-search me-1"></i>Filtrar
+                        </button>
+                        <a href="{{ url_for('main.lista_rdos') }}" class="btn btn-outline-secondary btn-modern">
+                            <i class="fas fa-times"></i>
                         </a>
                     </div>
-                    {% endif %}
                 </div>
             </div>
+        </form>
+    </div>
+
+    <!-- Lista de RDOs Modernizada -->
+    <div class="row">
+        <div class="col-12">
+            {% if rdos and rdos.items %}
+            <!-- Itens de RDO com Design Moderno -->
+            {% for rdo in rdos.items %}
+            <div class="rdo-item">
+                <div class="d-flex justify-content-between align-items-start">
+                    <div class="flex-grow-1">
+                        <div class="d-flex align-items-center mb-2">
+                            <h5 class="mb-0 me-3">
+                                <i class="fas fa-file-alt me-2 text-primary"></i>
+                                {{ rdo.numero_rdo }}
+                            </h5>
+                            <span class="rdo-status-badge 
+                                {% if rdo.status == 'Finalizado' %}bg-success text-white
+                                {% else %}bg-warning text-dark{% endif %}">
+                                {% if rdo.status == 'Finalizado' %}
+                                <i class="fas fa-check-circle me-1"></i>Finalizado
+                                {% else %}
+                                <i class="fas fa-edit me-1"></i>Rascunho
+                                {% endif %}
+                            </span>
+                        </div>
+                        
+                        <div class="row g-3 mb-3">
+                            <div class="col-lg-3 col-md-6">
+                                <small class="text-muted fw-bold">Obra:</small>
+                                <div class="fw-bold">{{ rdo.obra.nome }}</div>
+                            </div>
+                            <div class="col-lg-2 col-md-6">
+                                <small class="text-muted fw-bold">Data:</small>
+                                <div class="fw-bold">{{ rdo.data_relatorio.strftime('%d/%m/%Y') }}</div>
+                            </div>
+                            <div class="col-lg-2 col-md-6">
+                                <small class="text-muted fw-bold">Subatividades:</small>
+                                <div class="fw-bold text-primary">{{ rdo.servico_subatividades|length }}</div>
+                            </div>
+                            <div class="col-lg-2 col-md-6">
+                                <small class="text-muted fw-bold">Funcionários:</small>
+                                <div class="fw-bold text-info">{{ rdo.mao_obra|length }}</div>
+                            </div>
+                            <div class="col-lg-3 col-md-12">
+                                <small class="text-muted fw-bold">Progresso Geral:</small>
+                                {% if rdo.servico_subatividades %}
+                                    {% set progresso = (rdo.servico_subatividades | sum(attribute='percentual_conclusao') / rdo.servico_subatividades|length) | round(1) %}
+                                {% else %}
+                                    {% set progresso = 0 %}
+                                {% endif %}
+                                <div class="d-flex align-items-center mt-1">
+                                    <div class="rdo-progress flex-grow-1 me-2">
+                                        <div class="progress-bar 
+                                            {% if progresso >= 90 %}bg-success
+                                            {% elif progresso >= 70 %}bg-primary
+                                            {% elif progresso >= 50 %}bg-warning
+                                            {% else %}bg-danger{% endif %}" 
+                                             style="width: {{ progresso }}%">
+                                        </div>
+                                    </div>
+                                    <span class="fw-bold">{{ progresso }}%</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="rdo-actions ms-3">
+                        <div class="d-flex gap-2 flex-wrap">
+                            <a href="{{ url_for('main.visualizar_rdo', id=rdo.id) }}" class="btn btn-outline-primary btn-sm">
+                                <i class="fas fa-eye me-1"></i>Ver
+                            </a>
+                            {% if rdo.status == 'Rascunho' %}
+                            <a href="{{ url_for('main.editar_rdo', id=rdo.id) }}" class="btn btn-warning btn-sm">
+                                <i class="fas fa-edit me-1"></i>Editar
+                            </a>
+                            {% endif %}
+                            <form method="POST" action="{{ url_for('main.duplicar_rdo', id=rdo.id) }}" class="d-inline">
+                                <button type="submit" class="btn btn-info btn-sm" onclick="return confirm('Duplicar este RDO para hoje?')">
+                                    <i class="fas fa-copy me-1"></i>Duplicar
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+            {% else %}
+            <div class="empty-state">
+                <i class="fas fa-clipboard-list"></i>
+                <h4>Nenhum RDO encontrado</h4>
+                <p>Não há relatórios diários de obra cadastrados com os filtros selecionados.</p>
+                <a href="{{ url_for('main.novo_rdo') }}" class="btn btn-primary btn-modern mt-3">
+                    <i class="fas fa-plus me-2"></i>Criar Primeiro RDO
+                </a>
+            </div>
+            {% endif %}
+            
+            <!-- Paginação Moderna -->
+            {% if rdos and rdos.pages > 1 %}
+            <div class="d-flex justify-content-center mt-4">
+                <nav aria-label="Navegação dos RDOs">
+                    <ul class="pagination">
+                        {% if rdos.has_prev %}
+                        <li class="page-item">
+                            <a class="page-link btn-modern" href="{{ url_for('main.lista_rdos', page=rdos.prev_num, **request.args) }}">
+                                <i class="fas fa-chevron-left"></i>
+                            </a>
+                        </li>
+                        {% endif %}
+                        
+                        {% for page_num in rdos.iter_pages() %}
+                            {% if page_num %}
+                                {% if page_num != rdos.page %}
+                                <li class="page-item">
+                                    <a class="page-link btn-modern" href="{{ url_for('main.lista_rdos', page=page_num, **request.args) }}">{{ page_num }}</a>
+                                </li>
+                                {% else %}
+                                <li class="page-item active">
+                                    <span class="page-link bg-primary border-primary">{{ page_num }}</span>
+                                </li>
+                                {% endif %}
+                            {% else %}
+                            <li class="page-item disabled">
+                                <span class="page-link">...</span>
+                            </li>
+                            {% endif %}
+                        {% endfor %}
+                        
+                        {% if rdos.has_next %}
+                        <li class="page-item">
+                            <a class="page-link btn-modern" href="{{ url_for('main.lista_rdos', page=rdos.next_num, **request.args) }}">
+                                <i class="fas fa-chevron-right"></i>
+                            </a>
+                        </li>
+                        {% endif %}
+                    </ul>
+                </nav>
+            </div>
+            {% endif %}
         </div>
     </div>
 </div>
-
-<style>
-.badge-clima {
-    font-size: 0.75em;
-}
-
-.table th {
-    border-top: none;
-    font-weight: 600;
-    background-color: #f8f9fa;
-}
-
-.btn-group-sm .btn {
-    padding: 0.25rem 0.5rem;
-}
-
-.opacity-75 {
-    opacity: 0.75;
-}
-
-.card-title {
-    font-size: 0.875rem;
-    font-weight: 500;
-}
-</style>
+{% endblock %}
 {% endblock %}
