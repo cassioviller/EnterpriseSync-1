@@ -694,19 +694,24 @@ class OutroCusto(db.Model):
 
 class RDOServicoSubatividade(db.Model):
     """
-    Modelo otimizado para subatividades dos serviços no RDO
-    Compatível com o sistema hierárquico atual
+    Modelo compatível com a estrutura real do database
     """
     __tablename__ = 'rdo_servico_subatividade'
     
     id = db.Column(db.Integer, primary_key=True)
     rdo_id = db.Column(db.Integer, db.ForeignKey('rdo.id'), nullable=False)
-    subatividade_id = db.Column(db.Integer, db.ForeignKey('subatividade.id'), nullable=False)
-    servico_id = db.Column(db.Integer, db.ForeignKey('servico.id'), nullable=True)  # Opcional para compatibilidade
+    servico_id = db.Column(db.Integer, db.ForeignKey('servico.id'), nullable=False)
     
-    # Dados de progresso
-    percentual = db.Column(db.Float, default=0.0)  # Campo padrão usado pelo sistema
-    observacoes = db.Column(db.Text)  # Campo padrão usado pelo sistema
+    # Campos conforme estrutura real do database
+    nome_subatividade = db.Column(db.String(255), nullable=False)
+    descricao_subatividade = db.Column(db.Text)
+    percentual_conclusao = db.Column(db.Float, default=0.0)
+    percentual_anterior = db.Column(db.Float, default=0.0)
+    incremento_dia = db.Column(db.Float, default=0.0)
+    observacoes_tecnicas = db.Column(db.Text)
+    ordem_execucao = db.Column(db.Integer)
+    ativo = db.Column(db.Boolean, default=True)
+    admin_id = db.Column(db.Integer, nullable=False)
     
     # Controle de tempo
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
@@ -716,14 +721,25 @@ class RDOServicoSubatividade(db.Model):
     rdo = db.relationship('RDO', backref='servico_subatividades')
     servico = db.relationship('Servico', backref='rdo_subatividades')
     
-    # Índices para performance
-    __table_args__ = (
-        db.Index('idx_rdo_subatividade', 'rdo_id', 'subatividade_id'),
-        db.Index('idx_rdo_servico', 'rdo_id', 'servico_id'),
-    )
+    # Propriedades de compatibilidade
+    @property
+    def percentual(self):
+        return self.percentual_conclusao
+    
+    @percentual.setter
+    def percentual(self, value):
+        self.percentual_conclusao = value
+    
+    @property
+    def observacoes(self):
+        return self.observacoes_tecnicas
+    
+    @observacoes.setter
+    def observacoes(self, value):
+        self.observacoes_tecnicas = value
     
     def __repr__(self):
-        return f'<RDOServicoSubatividade RDO:{self.rdo_id} Sub:{self.subatividade_id} - {self.percentual}%>'
+        return f'<RDOServicoSubatividade RDO:{self.rdo_id} Servico:{self.servico_id} - {self.percentual_conclusao}%>'
 
 
 class SubatividadeMestre(db.Model):
