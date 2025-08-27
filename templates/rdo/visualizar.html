@@ -74,67 +74,154 @@
                         <div class="col-md-6">
                             <h6 class="text-muted">Condições Climáticas</h6>
                             <table class="table table-borderless table-sm">
+                                {% if rdo.clima_geral %}
+                                <tr>
+                                    <td><strong>Clima Geral:</strong></td>
+                                    <td>
+                                        <span class="badge badge-clima bg-{{ 'success' if rdo.clima_geral in ['Ensolarado', 'Bom'] else ('warning' if rdo.clima_geral == 'Nublado' else 'danger') }}">
+                                            {{ rdo.clima_geral }}
+                                        </span>
+                                    </td>
+                                </tr>
+                                {% endif %}
+                                {% if rdo.temperatura_media %}
+                                <tr>
+                                    <td><strong>Temperatura:</strong></td>
+                                    <td>{{ rdo.temperatura_media }}</td>
+                                </tr>
+                                {% endif %}
+                                {% if rdo.umidade_relativa %}
+                                <tr>
+                                    <td><strong>Umidade:</strong></td>
+                                    <td>{{ rdo.umidade_relativa }}%</td>
+                                </tr>
+                                {% endif %}
+                                {% if rdo.vento_velocidade %}
+                                <tr>
+                                    <td><strong>Vento:</strong></td>
+                                    <td>{{ rdo.vento_velocidade }}</td>
+                                </tr>
+                                {% endif %}
+                                {% if rdo.precipitacao %}
+                                <tr>
+                                    <td><strong>Precipitação:</strong></td>
+                                    <td>
+                                        <span class="badge badge-clima bg-{{ 'success' if rdo.precipitacao == 'Sem chuva' else ('warning' if rdo.precipitacao == 'Garoa' else 'danger') }}">
+                                            {{ rdo.precipitacao }}
+                                        </span>
+                                    </td>
+                                </tr>
+                                {% endif %}
+                                {% if rdo.condicoes_trabalho %}
+                                <tr>
+                                    <td><strong>Condições de Trabalho:</strong></td>
+                                    <td>
+                                        <span class="badge badge-clima bg-{{ 'success' if rdo.condicoes_trabalho in ['Ideais', 'Adequadas'] else ('warning' if rdo.condicoes_trabalho == 'Limitadas' else 'danger') }}">
+                                            {{ rdo.condicoes_trabalho }}
+                                        </span>
+                                    </td>
+                                </tr>
+                                {% endif %}
+                                
+                                <!-- Compatibilidade com campos antigos -->
+                                {% if rdo.tempo_manha or rdo.tempo_tarde or rdo.tempo_noite %}
+                                <tr>
+                                    <td colspan="2"><hr class="my-2"><small class="text-muted">Período do Dia:</small></td>
+                                </tr>
+                                {% if rdo.tempo_manha %}
                                 <tr>
                                     <td><strong>Manhã:</strong></td>
                                     <td>
                                         <span class="badge badge-clima bg-{{ 'success' if rdo.tempo_manha == 'Bom' else ('warning' if rdo.tempo_manha == 'Nublado' else 'danger') }}">
-                                            {{ rdo.tempo_manha or 'N/A' }}
+                                            {{ rdo.tempo_manha }}
                                         </span>
                                     </td>
                                 </tr>
+                                {% endif %}
+                                {% if rdo.tempo_tarde %}
                                 <tr>
                                     <td><strong>Tarde:</strong></td>
                                     <td>
                                         <span class="badge badge-clima bg-{{ 'success' if rdo.tempo_tarde == 'Bom' else ('warning' if rdo.tempo_tarde == 'Nublado' else 'danger') }}">
-                                            {{ rdo.tempo_tarde or 'N/A' }}
+                                            {{ rdo.tempo_tarde }}
                                         </span>
                                     </td>
                                 </tr>
+                                {% endif %}
+                                {% if rdo.tempo_noite %}
                                 <tr>
                                     <td><strong>Noite:</strong></td>
                                     <td>
                                         <span class="badge badge-clima bg-{{ 'success' if rdo.tempo_noite == 'Bom' else ('warning' if rdo.tempo_noite == 'Nublado' else 'danger') }}">
-                                            {{ rdo.tempo_noite or 'N/A' }}
+                                            {{ rdo.tempo_noite }}
                                         </span>
                                     </td>
                                 </tr>
+                                {% endif %}
+                                {% endif %}
                             </table>
                             
-                            {% if rdo.observacoes_meteorologicas %}
+                            {% if rdo.observacoes_climaticas or rdo.observacoes_meteorologicas %}
                             <div class="mt-2">
-                                <small class="text-muted"><strong>Observações Meteorológicas:</strong></small>
-                                <p class="mb-0">{{ rdo.observacoes_meteorologicas }}</p>
+                                <small class="text-muted"><strong>Observações Climáticas:</strong></small>
+                                <p class="mb-0">{{ rdo.observacoes_climaticas or rdo.observacoes_meteorologicas }}</p>
                             </div>
                             {% endif %}
                         </div>
                     </div>
 
-                    <!-- Atividades Executadas -->
+                    <!-- Serviços e Subatividades Executadas -->
                     <div class="mb-4">
-                        <h6 class="text-muted">Atividades Executadas</h6>
-                        {% if rdo.atividades %}
+                        <h6 class="text-muted">Serviços e Subatividades Executadas</h6>
+                        {% if rdo.servico_subatividades %}
                         <div class="table-responsive">
                             <table class="table table-bordered">
                                 <thead class="table-light">
                                     <tr>
-                                        <th style="width: 50%">Descrição</th>
+                                        <th style="width: 25%">Serviço</th>
+                                        <th style="width: 30%">Subatividade</th>
                                         <th style="width: 15%">% Conclusão</th>
-                                        <th style="width: 35%">Observações Técnicas</th>
+                                        <th style="width: 30%">Observações Técnicas</th>
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    {% for atividade in rdo.atividades %}
+                                    {% for subatividade in rdo.servico_subatividades %}
                                     <tr>
-                                        <td>{{ atividade.descricao_atividade }}</td>
                                         <td>
-                                            <div class="progress" style="height: 20px;">
-                                                <div class="progress-bar bg-primary" role="progressbar" 
-                                                     style="width: {{ atividade.percentual_conclusao }}%">
-                                                    {{ atividade.percentual_conclusao }}%
+                                            <strong>{{ subatividade.servico.nome if subatividade.servico else 'N/A' }}</strong>
+                                            {% if subatividade.servico and subatividade.servico.descricao %}
+                                            <br><small class="text-muted">{{ subatividade.servico.descricao }}</small>
+                                            {% endif %}
+                                        </td>
+                                        <td>
+                                            <strong>{{ subatividade.nome_subatividade }}</strong>
+                                            {% if subatividade.descricao_subatividade %}
+                                            <br><small class="text-muted">{{ subatividade.descricao_subatividade }}</small>
+                                            {% endif %}
+                                        </td>
+                                        <td>
+                                            <div class="progress" style="height: 25px;">
+                                                {% set percentage = subatividade.percentual_conclusao | round(1) %}
+                                                <div class="progress-bar 
+                                                    {% if percentage >= 90 %}bg-success
+                                                    {% elif percentage >= 70 %}bg-primary
+                                                    {% elif percentage >= 50 %}bg-warning
+                                                    {% else %}bg-danger{% endif %}" 
+                                                     role="progressbar" 
+                                                     style="width: {{ percentage }}%">
+                                                    {{ percentage }}%
                                                 </div>
                                             </div>
+                                            {% if subatividade.percentual_anterior > 0 %}
+                                            <small class="text-muted">
+                                                Anterior: {{ subatividade.percentual_anterior | round(1) }}%
+                                                {% if subatividade.incremento_dia > 0 %}
+                                                | +{{ subatividade.incremento_dia | round(1) }}%
+                                                {% endif %}
+                                            </small>
+                                            {% endif %}
                                         </td>
-                                        <td>{{ atividade.observacoes_tecnicas or '-' }}</td>
+                                        <td>{{ subatividade.observacoes_tecnicas or '-' }}</td>
                                     </tr>
                                     {% endfor %}
                                 </tbody>

@@ -1546,8 +1546,13 @@ def lista_rdos():
         data_inicio = request.args.get('data_inicio', '')
         data_fim = request.args.get('data_fim', '')
         
-        # Base query
-        query = RDO.query.join(Obra).filter(Obra.admin_id == admin_id)
+        # Base query com carregamento dos relacionamentos
+        query = RDO.query.options(
+            db.joinedload(RDO.obra),
+            db.joinedload(RDO.criado_por),
+            db.joinedload(RDO.servico_subatividades),
+            db.joinedload(RDO.mao_obra)
+        ).join(Obra).filter(Obra.admin_id == admin_id)
         
         # Aplicar filtros
         if obra_filter:
@@ -1564,6 +1569,12 @@ def lista_rdos():
         rdos = query.order_by(RDO.data_relatorio.desc()).paginate(
             page=page, per_page=20, error_out=False
         )
+        
+        print(f"DEBUG LISTA RDOs: {rdos.total} RDOs encontrados para admin_id={admin_id}")
+        if rdos.items:
+            print(f"DEBUG: Mostrando página {page} com {len(rdos.items)} RDOs")
+            for rdo in rdos.items[:3]:  # Mostrar apenas os 3 primeiros para debug
+                print(f"DEBUG RDO {rdo.id}: {len(rdo.servico_subatividades)} subatividades, {len(rdo.mao_obra)} funcionários")
         
         # Obras disponíveis para filtro
         obras = Obra.query.filter_by(admin_id=admin_id).order_by(Obra.nome).all()
@@ -1839,11 +1850,20 @@ def visualizar_rdo(id):
     try:
         admin_id = current_user.id if current_user.tipo_usuario == TipoUsuario.ADMIN else current_user.admin_id
         
-        # Buscar RDO com verificação de acesso
-        rdo = RDO.query.join(Obra).filter(
+        # Buscar RDO com verificação de acesso e carregamento dos relacionamentos
+        rdo = RDO.query.options(
+            db.joinedload(RDO.obra),
+            db.joinedload(RDO.criado_por),
+            db.joinedload(RDO.servico_subatividades).joinedload(RDOServicoSubatividade.servico),
+            db.joinedload(RDO.mao_obra).joinedload(RDOMaoObra.funcionario)
+        ).join(Obra).filter(
             RDO.id == id,
             Obra.admin_id == admin_id
         ).first_or_404()
+        
+        print(f"DEBUG VISUALIZAR RDO: ID={id}, Número={rdo.numero_rdo}")
+        print(f"DEBUG SUBATIVIDADES: {len(rdo.servico_subatividades)} encontradas")
+        print(f"DEBUG MÃO DE OBRA: {len(rdo.mao_obra)} funcionários")
         
         return render_template('rdo/visualizar.html', rdo=rdo)
         

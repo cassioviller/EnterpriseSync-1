@@ -113,19 +113,27 @@
                         <!-- Resumo Atual -->
                         <div class="row mb-4">
                             <div class="col-md-6">
-                                <h6 class="text-muted mb-3">Atividades Registradas</h6>
-                                {% if rdo.atividades %}
+                                <h6 class="text-muted mb-3">Serviços e Subatividades Registradas</h6>
+                                {% if rdo.servico_subatividades %}
                                 <div class="list-group">
-                                    {% for atividade in rdo.atividades %}
+                                    {% for subatividade in rdo.servico_subatividades %}
                                     <div class="list-group-item">
                                         <div class="d-flex justify-content-between align-items-center">
                                             <div>
-                                                <h6 class="mb-1">{{ atividade.nome_subatividade }}</h6>
-                                                {% if atividade.observacoes_tecnicas %}
-                                                <small class="text-muted">{{ atividade.observacoes_tecnicas }}</small>
+                                                <h6 class="mb-1">{{ subatividade.nome_subatividade }}</h6>
+                                                {% if subatividade.servico %}
+                                                <small class="text-primary">{{ subatividade.servico.nome }}</small><br>
+                                                {% endif %}
+                                                {% if subatividade.observacoes_tecnicas %}
+                                                <small class="text-muted">{{ subatividade.observacoes_tecnicas }}</small>
                                                 {% endif %}
                                             </div>
-                                            <span class="badge bg-primary">{{ atividade.percentual_conclusao }}%</span>
+                                            <div class="text-end">
+                                                <span class="badge bg-primary">{{ subatividade.percentual_conclusao | round(1) }}%</span>
+                                                {% if subatividade.incremento_dia > 0 %}
+                                                <br><small class="text-success">+{{ subatividade.incremento_dia | round(1) }}%</small>
+                                                {% endif %}
+                                            </div>
                                         </div>
                                     </div>
                                     {% endfor %}
@@ -133,7 +141,7 @@
                                 {% else %}
                                 <div class="text-center py-3 text-muted">
                                     <i class="fas fa-clipboard-list fa-2x mb-2"></i>
-                                    <p>Nenhuma atividade registrada</p>
+                                    <p>Nenhuma subatividade registrada</p>
                                 </div>
                                 {% endif %}
                             </div>
