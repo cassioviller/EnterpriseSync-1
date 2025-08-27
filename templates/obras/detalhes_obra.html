@@ -1,132 +1,151 @@
 {% extends "base.html" %}
 
-{% block title %}{{ obra.nome }} - Detalhes da Obra - SIGE{% endblock %}
+{% block title %}{{ obra.nome }} - Detalhes da Obra - Sistema Moderno{% endblock %}
 
 {% block content %}
-<div class="row">
-    <div class="col-12">
-        <div class="d-flex justify-content-between align-items-center mb-4">
-            <h1 class="h3">
-                <i class="fas fa-hard-hat"></i> {{ obra.nome }}
-            </h1>
-            <div class="btn-group">
-                <a href="{{ url_for('main.obras') }}" class="btn btn-outline-secondary">
-                    <i class="fas fa-arrow-left"></i> Voltar
+<div class="container-fluid py-4" id="main-content">
+    <!-- Header Principal da Obra -->
+    <div class="header-section">
+        <div class="d-flex align-items-center justify-content-between mb-4">
+            <div class="header-info">
+                <div class="header-icon">
+                    <i class="fas fa-hard-hat"></i>
+                </div>
+                <div>
+                    <h1 class="page-title">{{ obra.nome }}</h1>
+                    <p class="page-subtitle">
+                        <span class="badge 
+                            {% if obra.status == 'Concluída' %}bg-success
+                            {% elif obra.status == 'Em andamento' %}bg-primary
+                            {% elif obra.status == 'Pausada' %}bg-warning
+                            {% else %}bg-secondary
+                            {% endif %}">{{ obra.status }}</span> |
+                        <i class="fas fa-map-marker-alt"></i> {{ obra.endereco or 'Endereço não informado' }}
+                    </p>
+                </div>
+            </div>
+            <div class="header-actions">
+                <a href="{{ url_for('main.novo_rdo', obra_id=obra.id) }}" class="btn-modern btn-success">
+                    <i class="fas fa-plus"></i>
+                    Novo RDO
                 </a>
-                <a href="{{ url_for('main.editar_obra', id=obra.id) }}" class="btn btn-outline-warning">
-                    <i class="fas fa-edit"></i> Editar
+                <a href="{{ url_for('main.editar_obra', id=obra.id) }}" class="btn-modern btn-warning">
+                    <i class="fas fa-edit"></i>
+                    Editar
+                </a>
+                <a href="{{ url_for('main.obras') }}" class="btn-modern btn-secondary">
+                    <i class="fas fa-arrow-left"></i>
+                    Voltar
                 </a>
             </div>
         </div>
+        
+        <!-- Progress Bar da Obra -->
+        <div class="progress-obra-container">
+            <div class="d-flex align-items-center gap-3 mb-2">
+                <h5 class="mb-0">Progresso da Obra</h5>
+                <span class="badge bg-primary fs-6">{{ obra.progresso_conclusao or 0 }}%</span>
+            </div>
+            <div class="progress-bar-obra">
+                <div class="progress-fill" style="width: {{ obra.progresso_conclusao or 0 }}%"></div>
+            </div>
+            <div class="progress-details">
+                <small class="text-muted">
+                    Baseado no último RDO registrado • 
+                    {% if rdos %}
+                        {{ rdos|length }} RDOs registrados
+                    {% else %}
+                        Nenhum RDO registrado ainda
+                    {% endif %}
+                </small>
+            </div>
+        </div>
     </div>
-</div>
 
-<!-- Filtros de Data -->
-<div class="row mb-4">
-    <div class="col-12">
-        <div class="card border-primary">
-            <div class="card-header bg-primary text-white">
-                <h5 class="mb-0">
-                    <i class="fas fa-calendar-alt"></i> Filtros de Período
-                </h5>
-            </div>
-            <div class="card-body">
-                <form method="GET" action="{{ url_for('main.detalhes_obra', id=obra.id) }}" id="filtroForm">
-                    <div class="row align-items-end">
-                        <div class="col-md-3">
-                            <label for="data_inicio" class="form-label">Data de Início</label>
-                            <input type="date" class="form-control" id="data_inicio" name="data_inicio" 
-                                   value="{{ data_inicio.strftime('%Y-%m-%d') if data_inicio else '' }}">
-                        </div>
-                        <div class="col-md-3">
-                            <label for="data_fim" class="form-label">Data de Fim</label>
-                            <input type="date" class="form-control" id="data_fim" name="data_fim" 
-                                   value="{{ data_fim.strftime('%Y-%m-%d') if data_fim else '' }}">
-                        </div>
-                        <div class="col-md-6">
-                            <div class="btn-group w-100">
-                                <button type="submit" class="btn btn-primary">
-                                    <i class="fas fa-search"></i> Filtrar
-                                </button>
-                                <button type="button" class="btn btn-outline-secondary" onclick="filtroRapido(7)">
-                                    7 dias
-                                </button>
-                                <button type="button" class="btn btn-outline-secondary" onclick="filtroRapido(30)">
-                                    30 dias
-                                </button>
-                                <button type="button" class="btn btn-outline-secondary" onclick="filtroRapido(90)">
-                                    3 meses
-                                </button>
-                                <button type="button" class="btn btn-outline-warning" onclick="limparFiltros()">
-                                    Limpar
-                                </button>
-                            </div>
-                        </div>
+    <!-- Filtros Modernos -->
+    <div class="rdo-card slide-in" id="filtros-section">
+        <div class="rdo-card-header">
+            <h3>
+                <i class="fas fa-calendar-alt"></i>
+                Filtros de Período
+            </h3>
+        </div>
+        <div class="rdo-card-body">
+            <form method="GET" action="{{ url_for('main.detalhes_obra', id=obra.id) }}" id="filtroForm">
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label class="form-label" for="data_inicio">
+                            <i class="fas fa-calendar"></i>
+                            Data de Início
+                        </label>
+                        <input type="date" class="form-control" id="data_inicio" name="data_inicio" 
+                               value="{{ data_inicio.strftime('%Y-%m-%d') if data_inicio else '' }}">
                     </div>
-                </form>
-            </div>
+                    <div class="form-group">
+                        <label class="form-label" for="data_fim">
+                            <i class="fas fa-calendar"></i>
+                            Data de Fim
+                        </label>
+                        <input type="date" class="form-control" id="data_fim" name="data_fim" 
+                               value="{{ data_fim.strftime('%Y-%m-%d') if data_fim else '' }}">
+                    </div>
+                </div>
+                <div class="filter-actions">
+                    <button type="submit" class="btn-modern btn-primary">
+                        <i class="fas fa-search"></i>
+                        Filtrar
+                    </button>
+                    <button type="button" class="btn-modern btn-outline" onclick="filtroRapido(7)">7 dias</button>
+                    <button type="button" class="btn-modern btn-outline" onclick="filtroRapido(30)">30 dias</button>
+                    <button type="button" class="btn-modern btn-outline" onclick="filtroRapido(90)">3 meses</button>
+                    <button type="button" class="btn-modern btn-warning" onclick="limparFiltros()">Limpar</button>
+                </div>
+            </form>
         </div>
     </div>
-</div>
 
-<!-- KPIs da Obra no Período -->
-<div class="row mb-4">
-    <div class="col-lg-3 col-md-6 mb-3">
-        <div class="card border-success">
-            <div class="card-body text-center">
-                <div class="d-flex align-items-center justify-content-center mb-2">
-                    <i class="fas fa-dollar-sign fa-2x text-success me-2"></i>
-                    <div>
-                        <h3 class="text-success mb-0">R$ {{ '{:,.2f}'.format(kpis.custo_total if kpis and kpis.custo_total else 0).replace(',', ' ').replace('.', ',').replace(' ', '.') }}</h3>
-                        <small class="text-muted">Custo Total</small>
-                    </div>
-                </div>
+    <!-- KPIs Modernos -->
+    <div class="kpis-grid">
+        <div class="kpi-card kpi-success">
+            <div class="kpi-icon">
+                <i class="fas fa-dollar-sign"></i>
+            </div>
+            <div class="kpi-content">
+                <h3>R$ {{ '{:,.2f}'.format(kpis.custo_total if kpis and kpis.custo_total else 0).replace(',', ' ').replace('.', ',').replace(' ', '.') }}</h3>
+                <p>Custo Total</p>
+            </div>
+        </div>
+        
+        <div class="kpi-card kpi-info">
+            <div class="kpi-icon">
+                <i class="fas fa-calendar-check"></i>
+            </div>
+            <div class="kpi-content">
+                <h3>{{ kpis.dias_trabalhados if kpis else 0 }}</h3>
+                <p>Dias Trabalhados</p>
+            </div>
+        </div>
+        
+        <div class="kpi-card kpi-warning">
+            <div class="kpi-icon">
+                <i class="fas fa-clock"></i>
+            </div>
+            <div class="kpi-content">
+                <h3>{{ '{:.1f}'.format(kpis.total_horas if kpis and kpis.total_horas else 0) }}h</h3>
+                <p>Total de Horas</p>
+            </div>
+        </div>
+        
+        <div class="kpi-card kpi-primary">
+            <div class="kpi-icon">
+                <i class="fas fa-users"></i>
+            </div>
+            <div class="kpi-content">
+                <h3>{{ kpis.funcionarios_periodo if kpis else 0 }}</h3>
+                <p>Funcionários</p>
             </div>
         </div>
     </div>
-    
-    <div class="col-lg-3 col-md-6 mb-3">
-        <div class="card border-info">
-            <div class="card-body text-center">
-                <div class="d-flex align-items-center justify-content-center mb-2">
-                    <i class="fas fa-calendar-check fa-2x text-info me-2"></i>
-                    <div>
-                        <h3 class="text-info mb-0">{{ kpis.dias_trabalhados }}</h3>
-                        <small class="text-muted">Dias Trabalhados</small>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-    
-    <div class="col-lg-3 col-md-6 mb-3">
-        <div class="card border-warning">
-            <div class="card-body text-center">
-                <div class="d-flex align-items-center justify-content-center mb-2">
-                    <i class="fas fa-clock fa-2x text-warning me-2"></i>
-                    <div>
-                        <h3 class="text-warning mb-0">{{ '{:.2f}'.format(kpis.total_horas if kpis and kpis.total_horas else 0) }}h</h3>
-                        <small class="text-muted">Total de Horas</small>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-    
-    <div class="col-lg-3 col-md-6 mb-3">
-        <div class="card border-primary">
-            <div class="card-body text-center">
-                <div class="d-flex align-items-center justify-content-center mb-2">
-                    <i class="fas fa-users fa-2x text-primary me-2"></i>
-                    <div>
-                        <h3 class="text-primary mb-0">{{ kpis.funcionarios_periodo }}</h3>
-                        <small class="text-muted">Funcionários</small>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-</div>
 
 <!-- Detalhamento dos Custos -->
 <div class="row mb-4">
@@ -689,21 +708,623 @@
     </div>
 </div>
 
-<!-- RDOs Recentes -->
-<div class="card mb-4">
-    <div class="card-header d-flex justify-content-between align-items-center">
-        <h5 class="mb-0">
-            <i class="fas fa-clock"></i> RDOs Recentes
-        </h5>
-        <button class="btn btn-sm btn-outline-primary" onclick="alert('RDO em desenvolvimento')">
-            Ver Todos
-        </button>
+    <!-- Seção RDOs Modernos -->
+    <div class="rdo-card slide-in" id="rdos-section">
+        <div class="rdo-card-header">
+            <h3>
+                <i class="fas fa-clipboard-list"></i>
+                Relatórios Diários (RDO)
+            </h3>
+            <div class="header-actions">
+                <a href="{{ url_for('main.novo_rdo', obra_id=obra.id) }}" class="btn-modern btn-success">
+                    <i class="fas fa-plus"></i>
+                    Novo RDO
+                </a>
+                <a href="{{ url_for('main.lista_rdos') }}?obra_id={{ obra.id }}" class="btn-modern btn-info">
+                    <i class="fas fa-list"></i>
+                    Ver Todos
+                </a>
+            </div>
+        </div>
+        <div class="rdo-card-body">
+            {% if rdos %}
+            <div class="rdos-list">
+                {% for rdo in rdos %}
+                <div class="rdo-item">
+                    <div class="rdo-item-header">
+                        <div class="d-flex align-items-center gap-2">
+                            <div class="rdo-icon">
+                                <i class="fas fa-file-alt"></i>
+                            </div>
+                            <div>
+                                <h6 class="mb-0">{{ rdo.numero_rdo or 'RDO-' + rdo.id|string }}</h6>
+                                <small class="text-muted">{{ rdo.data_relatorio.strftime('%d/%m/%Y') }}</small>
+                            </div>
+                        </div>
+                        <div class="rdo-status">
+                            <span class="badge {% if rdo.status == 'Finalizado' %}bg-success{% else %}bg-warning{% endif %}">
+                                {{ rdo.status }}
+                            </span>
+                        </div>
+                    </div>
+                    
+                    {% if rdo.progresso_conclusao %}
+                    <div class="rdo-progress">
+                        <div class="progress-label">
+                            <span>Progresso: {{ rdo.progresso_conclusao }}%</span>
+                        </div>
+                        <div class="progress-bar-container">
+                            <div class="progress-bar-fill" style="width: {{ rdo.progresso_conclusao }}%"></div>
+                        </div>
+                    </div>
+                    {% endif %}
+                    
+                    <div class="rdo-actions">
+                        <a href="{{ url_for('main.visualizar_rdo', id=rdo.id) }}" class="btn-modern btn-info btn-sm">
+                            <i class="fas fa-eye"></i>
+                            Visualizar
+                        </a>
+                        <a href="{{ url_for('main.editar_rdo', id=rdo.id) }}" class="btn-modern btn-warning btn-sm">
+                            <i class="fas fa-edit"></i>
+                            Editar
+                        </a>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+            {% else %}
+            <div class="empty-state">
+                <div class="empty-icon">
+                    <i class="fas fa-clipboard-list"></i>
+                </div>
+                <h4>Nenhum RDO encontrado</h4>
+                <p>Não existem relatórios diários para esta obra ainda.</p>
+                <a href="{{ url_for('main.novo_rdo', obra_id=obra.id) }}" class="btn-modern btn-primary">
+                    <i class="fas fa-plus"></i>
+                    Criar Primeiro RDO
+                </a>
+            </div>
+            {% endif %}
+        </div>
     </div>
-    <div class="card-body">
-        {% if rdos_recentes %}
-        <div class="table-responsive">
-            <table class="table table-hover">
-                <thead>
+</div>
+
+<!-- CSS Moderno -->
+<style>
+/* Reset e Base */
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+#main-content {
+    background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+    min-height: 100vh;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+}
+
+/* Header Principal */
+.header-section {
+    background: rgba(255, 255, 255, 0.95);
+    backdrop-filter: blur(10px);
+    border-radius: 16px;
+    padding: 2rem;
+    margin-bottom: 2rem;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.header-info {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+}
+
+.header-icon {
+    width: 60px;
+    height: 60px;
+    background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+    border-radius: 16px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-size: 1.5rem;
+    box-shadow: 0 4px 16px rgba(240, 147, 251, 0.3);
+}
+
+.page-title {
+    font-size: 1.75rem;
+    font-weight: 700;
+    color: #2d3748;
+    margin-bottom: 0.25rem;
+    line-height: 1.2;
+}
+
+.page-subtitle {
+    color: #718096;
+    font-size: 0.9rem;
+    margin: 0;
+}
+
+.header-actions {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+}
+
+/* Progress Bar da Obra */
+.progress-obra-container {
+    margin-top: 1.5rem;
+    padding-top: 1.5rem;
+    border-top: 1px solid rgba(0, 0, 0, 0.1);
+}
+
+.progress-bar-obra {
+    width: 100%;
+    height: 8px;
+    background: rgba(0, 0, 0, 0.1);
+    border-radius: 4px;
+    overflow: hidden;
+    margin-bottom: 0.5rem;
+}
+
+.progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #48bb78 0%, #38a169 100%);
+    transition: width 0.3s ease;
+    border-radius: 4px;
+}
+
+.progress-details {
+    margin-top: 0.5rem;
+}
+
+/* Cards RDO */
+.rdo-card {
+    background: rgba(255, 255, 255, 0.95);
+    backdrop-filter: blur(10px);
+    border-radius: 16px;
+    margin-bottom: 1.5rem;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    transition: all 0.3s ease;
+    opacity: 0;
+    transform: translateY(20px);
+}
+
+.rdo-card.slide-in {
+    animation: slideIn 0.6s ease forwards;
+}
+
+@keyframes slideIn {
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.rdo-card-header {
+    padding: 1.5rem;
+    border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+    background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
+    border-radius: 16px 16px 0 0;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.rdo-card-header h3 {
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: #2d3748;
+    margin: 0;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.rdo-card-header h3 i {
+    color: #f093fb;
+}
+
+.rdo-card-body {
+    padding: 1.5rem;
+}
+
+/* KPIs Grid */
+.kpis-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 1rem;
+    margin-bottom: 2rem;
+}
+
+.kpi-card {
+    background: rgba(255, 255, 255, 0.95);
+    backdrop-filter: blur(10px);
+    border-radius: 16px;
+    padding: 1.5rem;
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    transition: all 0.3s ease;
+}
+
+.kpi-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.15);
+}
+
+.kpi-icon {
+    width: 50px;
+    height: 50px;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.25rem;
+    color: white;
+}
+
+.kpi-success .kpi-icon { background: linear-gradient(135deg, #48bb78 0%, #38a169 100%); }
+.kpi-info .kpi-icon { background: linear-gradient(135deg, #4299e1 0%, #3182ce 100%); }
+.kpi-warning .kpi-icon { background: linear-gradient(135deg, #ed8936 0%, #dd6b20 100%); }
+.kpi-primary .kpi-icon { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); }
+
+.kpi-content h3 {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: #2d3748;
+    margin-bottom: 0.25rem;
+}
+
+.kpi-content p {
+    color: #718096;
+    font-size: 0.875rem;
+    margin: 0;
+}
+
+/* Form Grid */
+.form-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 1rem;
+    margin-bottom: 1rem;
+}
+
+.form-group {
+    margin-bottom: 1rem;
+}
+
+.form-label {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-weight: 500;
+    color: #4a5568;
+    margin-bottom: 0.5rem;
+    font-size: 0.875rem;
+}
+
+.form-label i {
+    color: #f093fb;
+    width: 16px;
+}
+
+.form-control {
+    width: 100%;
+    padding: 0.75rem;
+    border: 2px solid #e2e8f0;
+    border-radius: 8px;
+    font-size: 0.875rem;
+    transition: all 0.2s ease;
+    background: white;
+}
+
+.form-control:focus {
+    outline: none;
+    border-color: #f093fb;
+    box-shadow: 0 0 0 3px rgba(240, 147, 251, 0.1);
+}
+
+/* Filter Actions */
+.filter-actions {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+    margin-top: 1rem;
+}
+
+/* Botões Modernos */
+.btn-modern {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.75rem 1.5rem;
+    border: none;
+    border-radius: 8px;
+    font-weight: 500;
+    font-size: 0.875rem;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    text-decoration: none;
+    min-width: 120px;
+    justify-content: center;
+}
+
+.btn-sm {
+    padding: 0.5rem 1rem;
+    font-size: 0.8rem;
+    min-width: 90px;
+}
+
+.btn-primary {
+    background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+    color: white;
+    box-shadow: 0 4px 16px rgba(240, 147, 251, 0.3);
+}
+
+.btn-primary:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(240, 147, 251, 0.4);
+}
+
+.btn-secondary {
+    background: #e2e8f0;
+    color: #4a5568;
+    border: 1px solid #cbd5e0;
+}
+
+.btn-secondary:hover {
+    background: #cbd5e0;
+    transform: translateY(-1px);
+}
+
+.btn-success {
+    background: linear-gradient(135deg, #48bb78 0%, #38a169 100%);
+    color: white;
+    box-shadow: 0 4px 16px rgba(72, 187, 120, 0.3);
+}
+
+.btn-success:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(72, 187, 120, 0.4);
+}
+
+.btn-info {
+    background: linear-gradient(135deg, #4299e1 0%, #3182ce 100%);
+    color: white;
+    box-shadow: 0 4px 16px rgba(66, 153, 225, 0.3);
+}
+
+.btn-info:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(66, 153, 225, 0.4);
+}
+
+.btn-warning {
+    background: linear-gradient(135deg, #ed8936 0%, #dd6b20 100%);
+    color: white;
+    box-shadow: 0 4px 16px rgba(237, 137, 54, 0.3);
+}
+
+.btn-warning:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(237, 137, 54, 0.4);
+}
+
+.btn-outline {
+    background: rgba(255, 255, 255, 0.9);
+    color: #4a5568;
+    border: 1px solid #cbd5e0;
+}
+
+.btn-outline:hover {
+    background: rgba(240, 147, 251, 0.1);
+    border-color: #f093fb;
+    color: #f093fb;
+}
+
+/* RDOs List */
+.rdos-list {
+    display: grid;
+    gap: 1rem;
+}
+
+.rdo-item {
+    background: rgba(255, 255, 255, 0.8);
+    border-radius: 12px;
+    padding: 1rem;
+    border: 1px solid #e2e8f0;
+    transition: all 0.3s ease;
+}
+
+.rdo-item:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.1);
+}
+
+.rdo-item-header {
+    display: flex;
+    align-items: center;
+    justify-content: between;
+    margin-bottom: 1rem;
+}
+
+.rdo-icon {
+    width: 40px;
+    height: 40px;
+    background: linear-gradient(135deg, #4299e1 0%, #3182ce 100%);
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-size: 1rem;
+}
+
+.rdo-status {
+    margin-left: auto;
+}
+
+.rdo-progress {
+    margin: 1rem 0;
+}
+
+.progress-label {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.5rem;
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: #4a5568;
+}
+
+.progress-bar-container {
+    width: 100%;
+    height: 6px;
+    background: #e2e8f0;
+    border-radius: 3px;
+    overflow: hidden;
+}
+
+.progress-bar-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #48bb78 0%, #38a169 100%);
+    transition: width 0.3s ease;
+    border-radius: 3px;
+}
+
+.rdo-actions {
+    display: flex;
+    gap: 0.5rem;
+    justify-content: flex-end;
+}
+
+/* Empty State */
+.empty-state {
+    text-align: center;
+    padding: 3rem 1rem;
+}
+
+.empty-icon {
+    width: 80px;
+    height: 80px;
+    background: linear-gradient(135deg, #e2e8f0 0%, #cbd5e0 100%);
+    border-radius: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 2rem;
+    color: #718096;
+    margin: 0 auto 1rem;
+}
+
+.empty-state h4 {
+    color: #2d3748;
+    margin-bottom: 0.5rem;
+}
+
+.empty-state p {
+    color: #718096;
+    margin-bottom: 1.5rem;
+}
+
+/* Responsividade */
+@media (max-width: 768px) {
+    .header-info {
+        flex-direction: column;
+        text-align: center;
+        gap: 0.5rem;
+    }
+    
+    .header-actions {
+        justify-content: center;
+        margin-top: 1rem;
+    }
+    
+    .form-grid {
+        grid-template-columns: 1fr;
+    }
+    
+    .kpis-grid {
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    }
+    
+    .page-title {
+        font-size: 1.5rem;
+    }
+    
+    .header-section {
+        padding: 1.5rem;
+    }
+    
+    .rdo-card-body {
+        padding: 1rem;
+    }
+    
+    .filter-actions {
+        justify-content: center;
+    }
+    
+    .rdo-item-header {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 0.5rem;
+    }
+    
+    .rdo-status {
+        margin-left: 0;
+        align-self: flex-start;
+    }
+    
+    .rdo-actions {
+        justify-content: center;
+    }
+}
+
+/* Animações de entrada */
+.rdo-card:nth-child(1) { animation-delay: 0.1s; }
+.rdo-card:nth-child(2) { animation-delay: 0.2s; }
+.rdo-card:nth-child(3) { animation-delay: 0.3s; }
+.rdo-card:nth-child(4) { animation-delay: 0.4s; }
+</style>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Animar entrada dos cards
+    setTimeout(() => {
+        document.querySelectorAll('.rdo-card').forEach((card, index) => {
+            setTimeout(() => {
+                card.classList.add('slide-in');
+            }, index * 100);
+        });
+    }, 100);
+    
+    // Funções de filtro rápido
+    window.filtroRapido = function(dias) {
+        const hoje = new Date();
+        const dataFim = hoje.toISOString().split('T')[0];
+        const dataInicio = new Date(hoje.setDate(hoje.getDate() - dias)).toISOString().split('T')[0];
+        
+        document.getElementById('data_inicio').value = dataInicio;
+        document.getElementById('data_fim').value = dataFim;
+        document.getElementById('filtroForm').submit();
+    };
+    
+    window.limparFiltros = function() {
+        document.getElementById('data_inicio').value = '';
+        document.getElementById('data_fim').value = '';
+        document.getElementById('filtroForm').submit();
+    };
+});
+</script>
+{% endblock %}
                     <tr>
                         <th>Número RDO</th>
                         <th>Data</th>
