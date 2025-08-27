@@ -2018,6 +2018,16 @@ def funcionario_rdo_consolidado():
         flash('Erro ao carregar formulário de RDO.', 'error')
         return redirect(url_for('main.funcionario_dashboard'))
 
+# Alias para compatibilidade - Rota limpa para novo RDO
+@main_bp.route('/funcionario/rdo/novo')
+@funcionario_required
+def funcionario_rdo_novo():
+    """Funcionário criar novo RDO - Redirect para consolidado"""
+    obra_id = request.args.get('obra_id', type=int)
+    if obra_id:
+        return redirect(url_for('main.funcionario_rdo_consolidado', obra_id=obra_id))
+    return redirect(url_for('main.funcionario_rdo_consolidado'))
+
 @main_bp.route('/funcionario/rdo/criar', methods=['POST'])
 @funcionario_required
 def funcionario_criar_rdo():
