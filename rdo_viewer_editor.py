@@ -276,22 +276,31 @@ def processar_subatividades_schema_atual(rdo, dados):
     # Processar subatividades
     for key, value in dados.items():
         if key.startswith('subatividade_') and key.endswith('_percentual'):
-            subatividade_id = key.replace('subatividade_', '').replace('_percentual', '')
+            # Extrair ID da subatividade do formulário
+            subatividade_identificador = key.replace('subatividade_', '').replace('_percentual', '')
             percentual = float(value) if value else 0
             
             if percentual > 0:
-                observacoes = dados.get(f'subatividade_{subatividade_id}_observacoes', '')
+                observacoes = dados.get(f'subatividade_{subatividade_identificador}_observacoes', '')
                 
-                # Para schema atual, precisamos do nome da subatividade
-                subatividade = SubatividadeMestre.query.get(int(subatividade_id))
+                # Tentar buscar subatividade mestre pelo ID
+                try:
+                    subatividade_id = int(subatividade_identificador)
+                    subatividade = SubatividadeMestre.query.get(subatividade_id)
+                    nome_subatividade = subatividade.nome if subatividade else f'Subatividade {subatividade_identificador}'
+                    servico_id = subatividade.servico_id if subatividade else None
+                except (ValueError, TypeError):
+                    # Se não for um ID numérico, usar como nome direto
+                    nome_subatividade = subatividade_identificador.replace('_', ' ').title()
+                    servico_id = None
                 
-                # Usar schema atual
+                # Criar registro usando schema atual
                 registro = RDOServicoSubatividade()
                 registro.rdo_id = rdo.id
-                registro.servico_id = subatividade.servico_id if subatividade else None
-                registro.nome_subatividade = subatividade.nome if subatividade else f'Subatividade {subatividade_id}'
-                registro.percentual_conclusao = percentual  # Campo correto do schema
-                registro.observacoes_tecnicas = observacoes  # Campo correto do schema
+                registro.servico_id = servico_id
+                registro.nome_subatividade = nome_subatividade
+                registro.percentual_conclusao = percentual
+                registro.observacoes_tecnicas = observacoes
                 registro.admin_id = obter_admin_id()
                 db.session.add(registro)
 

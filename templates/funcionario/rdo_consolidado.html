@@ -2162,24 +2162,21 @@ function testarCarregamentoPorcentagensCompleto() {
                 servicosCards.forEach(card => {
                     const servicoTitulo = card.querySelector('.servico-title h4').textContent.trim();
                     
-                    // Buscar atividade correspondente no último RDO
-                    const atividadeCorrespondente = data.atividades.find(ativ => 
-                        ativ.descricao.toLowerCase().includes(servicoTitulo.toLowerCase()) ||
-                        servicoTitulo.toLowerCase().includes(ativ.descricao.toLowerCase())
-                    );
-                    
-                    if (atividadeCorrespondente) {
-                        // Aplicar porcentagem a todas as subatividades do serviço
-                        const subatividadesInputs = card.querySelectorAll('.percentual-input');
-                        subatividadesInputs.forEach(input => {
-                            input.value = atividadeCorrespondente.percentual;
-                            // Trigger do evento change para aplicar validações
-                            input.dispatchEvent(new Event('change'));
-                        });
+                    // Buscar atividade correspondente no último RDO por nome exato da subatividade
+                    const subatividadeInputs = card.querySelectorAll('.percentual-input');
+                    subatividadeInputs.forEach(input => {
+                        const subatividadeNome = input.closest('.subatividade-item').querySelector('.subatividade-nome').textContent.trim();
+                        const atividadeCorrespondente = data.atividades.find(ativ => 
+                            ativ.descricao.toLowerCase() === subatividadeNome.toLowerCase()
+                        );
                         
-                        atividadesAplicadas++;
-                        console.log(`✅ Aplicada porcentagem ${atividadeCorrespondente.percentual}% para "${servicoTitulo}"`);
-                    }
+                        if (atividadeCorrespondente) {
+                            input.value = atividadeCorrespondente.percentual;
+                            input.dispatchEvent(new Event('change'));
+                            atividadesAplicadas++;
+                            console.log(`✅ Aplicada porcentagem ${atividadeCorrespondente.percentual}% para "${subatividadeNome}"`);
+                        }
+                    });
                 });
                 
                 updateProgressBar(100);
