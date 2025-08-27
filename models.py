@@ -518,11 +518,20 @@ class RDOMaoObra(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     rdo_id = db.Column(db.Integer, db.ForeignKey('rdo.id'), nullable=False)
     funcionario_id = db.Column(db.Integer, db.ForeignKey('funcionario.id'), nullable=False)
-    funcao_exercida = db.Column(db.String(100), nullable=False)
+    funcao = db.Column(db.String(100), nullable=False)  # Campo padrão usado pelo sistema
     horas_trabalhadas = db.Column(db.Float, nullable=False)
     
     # Relacionamentos
     funcionario = db.relationship('Funcionario', backref='rdos_mao_obra', overlaps="rdos_mao_obra")
+    
+    # Compatibilidade com código legado
+    @property
+    def funcao_exercida(self):
+        return self.funcao
+    
+    @funcao_exercida.setter
+    def funcao_exercida(self, value):
+        self.funcao = value
 
 
 class RDOEquipamento(db.Model):
@@ -685,33 +694,19 @@ class OutroCusto(db.Model):
 
 class RDOServicoSubatividade(db.Model):
     """
-    Modelo aprimorado para subatividades dos serviços no RDO
-    Implementa a hierarquia: Obra -> Serviço -> Subatividade -> % Conclusão
+    Modelo otimizado para subatividades dos serviços no RDO
+    Compatível com o sistema hierárquico atual
     """
     __tablename__ = 'rdo_servico_subatividade'
     
     id = db.Column(db.Integer, primary_key=True)
     rdo_id = db.Column(db.Integer, db.ForeignKey('rdo.id'), nullable=False)
-    servico_id = db.Column(db.Integer, db.ForeignKey('servico.id'), nullable=False)
+    subatividade_id = db.Column(db.Integer, db.ForeignKey('subatividade.id'), nullable=False)
+    servico_id = db.Column(db.Integer, db.ForeignKey('servico.id'), nullable=True)  # Opcional para compatibilidade
     
-    # Dados da subatividade
-    nome_subatividade = db.Column(db.String(200), nullable=False)
-    descricao_subatividade = db.Column(db.Text)
-    percentual_conclusao = db.Column(db.Float, default=0.0)  # 0.0 a 100.0
-    
-    # Herança automática do RDO anterior
-    percentual_anterior = db.Column(db.Float, default=0.0)  # Para auditoria e histórico
-    incremento_dia = db.Column(db.Float, default=0.0)  # Progresso do dia
-    
-    # Observações técnicas específicas
-    observacoes_tecnicas = db.Column(db.Text)
-    
-    # Metadados
-    ordem_execucao = db.Column(db.Integer, default=0)  # Ordem dentro do serviço
-    ativo = db.Column(db.Boolean, default=True)
-    
-    # Multi-tenant
-    admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False)
+    # Dados de progresso
+    percentual = db.Column(db.Float, default=0.0)  # Campo padrão usado pelo sistema
+    observacoes = db.Column(db.Text)  # Campo padrão usado pelo sistema
     
     # Controle de tempo
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
@@ -720,31 +715,15 @@ class RDOServicoSubatividade(db.Model):
     # Relacionamentos
     rdo = db.relationship('RDO', backref='servico_subatividades')
     servico = db.relationship('Servico', backref='rdo_subatividades')
-    admin = db.relationship('Usuario', backref='rdo_subatividades_administradas')
     
     # Índices para performance
     __table_args__ = (
-        db.Index('idx_rdo_servico_subativ', 'rdo_id', 'servico_id'),
-        db.Index('idx_subativ_admin', 'admin_id'),
+        db.Index('idx_rdo_subatividade', 'rdo_id', 'subatividade_id'),
+        db.Index('idx_rdo_servico', 'rdo_id', 'servico_id'),
     )
     
     def __repr__(self):
-        return f'<RDOServicoSubatividade {self.nome_subatividade} - {self.percentual_conclusao}%>'
-    
-    def to_dict(self):
-        """Converter para dicionário para API"""
-        return {
-            'id': self.id,
-            'nome_subatividade': self.nome_subatividade,
-            'descricao_subatividade': self.descricao_subatividade,
-            'percentual_conclusao': self.percentual_conclusao,
-            'percentual_anterior': self.percentual_anterior,
-            'incremento_dia': self.incremento_dia,
-            'observacoes_tecnicas': self.observacoes_tecnicas,
-            'ordem_execucao': self.ordem_execucao,
-            'servico_id': self.servico_id,
-            'servico_nome': self.servico.nome if self.servico else None
-        }
+        return f'<RDOServicoSubatividade RDO:{self.rdo_id} Sub:{self.subatividade_id} - {self.percentual}%>'
 
 
 class SubatividadeMestre(db.Model):
