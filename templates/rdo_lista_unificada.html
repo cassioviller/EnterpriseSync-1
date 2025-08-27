@@ -4,6 +4,16 @@
 
 {% block styles %}
 <style>
+/* ===== OVERRIDE DARK MODE E DESIGN SYSTEM MODERNO ===== */
+html[data-bs-theme="dark"] .rdo-container,
+html[data-bs-theme="dark"] .rdo-container *,
+.rdo-container,
+.rdo-container * {
+    color: initial !important;
+    background-color: initial !important;
+    border-color: initial !important;
+}
+
 /* ===== DESIGN SYSTEM MODERNO PROFISSIONAL ===== */
 :root {
     --primary-green: #198754;
@@ -53,8 +63,9 @@
     max-width: 1400px;
     margin: 0 auto;
     padding: 0;
-    background: var(--gray-50);
+    background: var(--gray-50) !important;
     min-height: 100vh;
+    color: var(--gray-800) !important;
 }
 
 /* ===== HEADER MODERNO COM GRADIENTE ===== */
@@ -158,17 +169,18 @@
 }
 
 .stat-card {
-    background: var(--white);
+    background: var(--white) !important;
     padding: 2rem;
     border-radius: var(--border-radius-lg);
     box-shadow: var(--shadow-md);
-    border: 1px solid var(--gray-200);
+    border: 1px solid var(--gray-200) !important;
     display: flex;
     align-items: center;
     gap: 1.5rem;
     transition: var(--transition);
     position: relative;
     overflow: hidden;
+    color: var(--gray-800) !important;
 }
 
 .stat-card::before {
@@ -223,13 +235,14 @@
 
 /* ===== SEÇÃO DE FILTROS PROFISSIONAL ===== */
 .filters-container {
-    background: var(--white);
+    background: var(--white) !important;
     padding: 2rem;
     border-radius: var(--border-radius-lg);
     box-shadow: var(--shadow-md);
     margin: 0 2rem 3rem 2rem;
-    border: 1px solid var(--gray-200);
+    border: 1px solid var(--gray-200) !important;
     position: relative;
+    color: var(--gray-800) !important;
 }
 
 .filters-container::before {
@@ -278,12 +291,13 @@
 .modern-select, .modern-date {
     width: 100%;
     padding: 1rem;
-    border: 2px solid var(--gray-300);
+    border: 2px solid var(--gray-300) !important;
     border-radius: var(--border-radius);
     font-size: 1rem;
     transition: var(--transition);
-    background: var(--white);
+    background: var(--white) !important;
     box-shadow: var(--shadow-sm);
+    color: var(--gray-800) !important;
 }
 
 .modern-select:focus, .modern-date:focus {
@@ -357,13 +371,14 @@
 }
 
 .rdo-card {
-    background: var(--white);
+    background: var(--white) !important;
     border-radius: var(--border-radius-lg);
     box-shadow: var(--shadow-md);
-    border: 1px solid var(--gray-200);
+    border: 1px solid var(--gray-200) !important;
     overflow: hidden;
     transition: var(--transition);
     position: relative;
+    color: var(--gray-800) !important;
 }
 
 .rdo-card::before {
