@@ -518,7 +518,7 @@ class RDOMaoObra(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     rdo_id = db.Column(db.Integer, db.ForeignKey('rdo.id'), nullable=False)
     funcionario_id = db.Column(db.Integer, db.ForeignKey('funcionario.id'), nullable=False)
-    funcao = db.Column(db.String(100), nullable=False)  # Campo padrão usado pelo sistema
+    funcao_exercida = db.Column(db.String(100), nullable=False)  # Nome correto do database
     horas_trabalhadas = db.Column(db.Float, nullable=False)
     
     # Relacionamentos
@@ -526,12 +526,12 @@ class RDOMaoObra(db.Model):
     
     # Compatibilidade com código legado
     @property
-    def funcao_exercida(self):
-        return self.funcao
+    def funcao(self):
+        return self.funcao_exercida
     
-    @funcao_exercida.setter
-    def funcao_exercida(self, value):
-        self.funcao = value
+    @funcao.setter
+    def funcao(self, value):
+        self.funcao_exercida = value
 
 
 class RDOEquipamento(db.Model):
