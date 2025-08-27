@@ -2165,13 +2165,12 @@ function testarCarregamentoPorcentagensCompleto() {
     fetch(`/rdo/api/ultimo-rdo/${obraId}`)
         .then(response => response.json())
         .then(data => {
-            let atividadesAplicadas = 0;
-            let funcionariosAplicados = 0;
-            
-            // 1. APLICAR PORCENTAGENS DAS SUBATIVIDADES
             if (data.atividades && data.atividades.length > 0) {
+                // Aplicar porcentagens reais aos serviços carregados
                 const servicosContainer = document.getElementById('servicos-container');
                 const servicosCards = servicosContainer.querySelectorAll('.servico-card');
+                
+                let atividadesAplicadas = 0;
                 
                 // Para cada serviço carregado, tentar aplicar porcentagem do último RDO
                 servicosCards.forEach(card => {
@@ -2194,58 +2193,21 @@ function testarCarregamentoPorcentagensCompleto() {
                     });
                 });
                 
-            }
-            
-            // 2. APLICAR MÃO DE OBRA DO ÚLTIMO RDO
-            if (data.equipe && data.equipe.length > 0) {
-                console.log('🔄 Aplicando equipe do último RDO:', data.equipe);
+                updateProgressBar(100);
                 
-                // Limpar funcionários atuais
-                funcionariosSelecionados = [];
+                if (atividadesAplicadas > 0) {
+                    mostrarNotificacao(
+                        `✅ Porcentagens do último RDO aplicadas em ${atividadesAplicadas} serviços`, 
+                        'success'
+                    );
+                } else {
+                    mostrarNotificacao(
+                        '⚠️ Nenhuma correspondência encontrada com o último RDO', 
+                        'warning'
+                    );
+                }
                 
-                // Adicionar funcionários do último RDO
-                data.equipe.forEach(maoObra => {
-                    const funcionario = funcionariosDisponiveis.find(f => f.id == maoObra.funcionario_id);
-                    if (funcionario) {
-                        funcionariosSelecionados.push({
-                            ...funcionario,
-                            horas: maoObra.horas_trabalhadas || 8,
-                            funcao: maoObra.funcao_exercida || funcionario.funcao_ref?.nome || 'Funcionário'
-                        });
-                        funcionariosAplicados++;
-                        console.log(`✅ Funcionário adicionado: ${funcionario.nome} - ${maoObra.horas_trabalhadas}h`);
-                    }
-                });
-                
-                // Renderizar funcionários carregados
-                renderizarFuncionariosSelecionados();
-                atualizarContadorFuncionarios();
-            }
-            
-            updateProgressBar(100);
-            
-            // Mensagem final
-            let mensagem = [];
-            if (atividadesAplicadas > 0) {
-                mensagem.push(`${atividadesAplicadas} subatividades`);
-            }
-            if (funcionariosAplicados > 0) {
-                mensagem.push(`${funcionariosAplicados} funcionários`);
-            }
-            
-            if (mensagem.length > 0) {
-                mostrarNotificacao(
-                    `✅ Dados do último RDO aplicados: ${mensagem.join(' e ')}`, 
-                    'success'
-                );
-            } else {
-                mostrarNotificacao(
-                    '⚠️ Nenhum dado encontrado no último RDO', 
-                    'warning'
-                );
-            }
-            
-            console.log(`TESTE COMPLETO: ${atividadesAplicadas} subatividades + ${funcionariosAplicados} funcionários aplicados`);
+                console.log(`TESTE COMPLETO: Dados do último RDO aplicados - ${atividadesAplicadas} serviços atualizados`);
             } else {
                 mostrarNotificacao('ℹ️ Nenhum RDO anterior encontrado para esta obra', 'info');
                 console.log('INFO: Primeira vez criando RDO para esta obra');
