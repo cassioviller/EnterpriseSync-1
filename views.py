@@ -1643,7 +1643,6 @@ def rdo_lista_unificada():
                         'numero_rdo': rdo.numero_rdo,
                         'data_relatorio': rdo.data_relatorio,
                         'status': rdo.status,
-                        'observacoes_gerais': rdo.observacoes_gerais or '',
                         'obra_id': rdo.obra_id,
                         'progresso_total': round(progresso_real, 1),
                         'horas_totais': round(horas_reais, 1),
@@ -1750,6 +1749,41 @@ def rdo_lista_unificada():
 # ===== ROTAS ESPECÍFICAS PARA FUNCIONÁRIOS - RDO =====
 
 
+
+@main_bp.route('/rdo/excluir/<int:rdo_id>', methods=['POST'])
+@funcionario_required
+def excluir_rdo(rdo_id):
+    """Excluir RDO e todas suas dependências"""
+    try:
+        admin_id = get_admin_id()
+        
+        # Buscar RDO
+        rdo = db.session.query(RDO).join(Obra).filter(
+            RDO.id == rdo_id, 
+            Obra.admin_id == admin_id
+        ).first()
+        
+        if not rdo:
+            flash('RDO não encontrado.', 'error')
+            return redirect(url_for('main.rdo_lista'))
+        
+        # Excluir dependências em ordem
+        db.session.query(RDOMaoObra).filter(RDOMaoObra.rdo_id == rdo_id).delete()
+        db.session.query(RDOServicoSubatividade).filter(RDOServicoSubatividade.rdo_id == rdo_id).delete()
+        db.session.query(RDOOcorrencia).filter(RDOOcorrencia.rdo_id == rdo_id).delete()
+        
+        # Excluir RDO
+        db.session.delete(rdo)
+        db.session.commit()
+        
+        flash('RDO excluído com sucesso.', 'success')
+        return redirect(url_for('main.rdo_lista'))
+        
+    except Exception as e:
+        db.session.rollback()
+        print(f"Erro ao excluir RDO {rdo_id}: {str(e)}")
+        flash('Erro ao excluir RDO. Tente novamente.', 'error')
+        return redirect(url_for('main.rdo_lista'))
 
 @main_bp.route('/rdo/novo')
 @funcionario_required
@@ -2074,9 +2108,9 @@ def finalizar_rdo(id):
         flash('Erro ao finalizar RDO.', 'error')
         return redirect(url_for('main.lista_rdos'))
 
-@main_bp.route('/rdo/<int:id>/excluir', methods=['POST'])
+@main_bp.route('/rdo/<int:id>/excluir_old', methods=['POST'])
 @admin_required
-def excluir_rdo(id):
+def excluir_rdo_old(id):
     """Excluir RDO com controle de acesso"""
     try:
         admin_id = current_user.id if current_user.tipo_usuario == TipoUsuario.ADMIN else current_user.admin_id
