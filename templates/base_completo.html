@@ -174,7 +174,7 @@
             padding: 16px 20px !important;
         }
         
-        /* ===== CORREÇÕES DE CONTRASTE ===== */
+        /* ===== CORREÇÕES DE CONTRASTE COMPLETAS ===== */
         .bg-warning {
             color: #212529 !important; /* Força texto escuro em fundo warning */
         }
@@ -183,8 +183,47 @@
             color: #212529 !important; /* Aplica a todos os elementos filhos */
         }
         
+        .bg-warning .card-title,
+        .bg-warning h1, .bg-warning h2, .bg-warning h3, 
+        .bg-warning h4, .bg-warning h5, .bg-warning h6,
+        .bg-warning .card-text, .bg-warning .text-white {
+            color: #212529 !important; /* Força texto escuro específico */
+        }
+        
         .text-warning {
             color: #856404 !important; /* Warning mais escuro para melhor contraste */
+        }
+        
+        /* Força texto escuro em cards específicos que podem ter problemas */
+        .card.bg-light, .card.bg-white {
+            color: #212529 !important;
+        }
+        
+        .card.bg-light *, .card.bg-white * {
+            color: #212529 !important;
+        }
+        
+        /* Correção para valores/números em KPIs */
+        .kpi-value, .card-body h1, .card-body h2, .card-body h3, .card-body h4 {
+            font-weight: 700 !important;
+            font-size: 1.8rem !important;
+        }
+        
+        /* Força texto escuro específico para números em backgrounds claros */
+        .bg-light .card-body h1, .bg-light .card-body h2, .bg-light .card-body h3, .bg-light .card-body h4,
+        .bg-white .card-body h1, .bg-white .card-body h2, .bg-white .card-body h3, .bg-white .card-body h4,
+        .bg-light .card-title, .bg-white .card-title {
+            color: #212529 !important;
+        }
+        
+        /* Melhora legibilidade geral dos cards */
+        .card {
+            transition: all 0.3s ease !important;
+        }
+        
+        .card:hover {
+            transform: translateY(-2px) !important;
+            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15) !important;
         }
         
         /* ===== RESPONSIVIDADE MOBILE-FIRST ===== */
