@@ -2055,7 +2055,7 @@ def funcionario_novo_rdo():
                 
                 print(f"DEBUG FUNCIONÁRIO: Total de {len(atividades_anteriores)} serviços pré-carregados")
         
-        return render_template('funcionario/novo_rdo.html', 
+        return render_template('funcionario/rdo_refatorado.html', 
                              obras=obras,
                              funcionarios=funcionarios,
                              obra_selecionada=obra_id,
