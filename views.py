@@ -108,12 +108,40 @@ def dashboard():
             admin_id=admin_id, ativo=True
         ).order_by(desc(Funcionario.created_at)).limit(5).all()
         
-        # Obras ativas - corrigido status
+        # Obras ativas com progresso baseado em RDOs
         obras_ativas = Obra.query.filter_by(
             admin_id=admin_id
         ).filter(
             Obra.status.in_(['andamento', 'Em andamento', 'ativa', 'planejamento'])
         ).order_by(desc(Obra.created_at)).limit(5).all()
+        
+        # Calcular progresso de cada obra baseado no RDO mais recente
+        for obra in obras_ativas:
+            try:
+                # Buscar o RDO mais recente da obra
+                rdo_mais_recente = RDO.query.filter_by(
+                    obra_id=obra.id
+                ).order_by(desc(RDO.data_relatorio)).first()
+                
+                if rdo_mais_recente and rdo_mais_recente.servico_subatividades:
+                    # Calcular progresso médio das subatividades
+                    total_percentual = sum(
+                        sub.percentual_conclusao for sub in rdo_mais_recente.servico_subatividades
+                    )
+                    progresso = round(total_percentual / len(rdo_mais_recente.servico_subatividades), 1)
+                    obra.progresso_atual = min(progresso, 100)  # Max 100%
+                    obra.data_ultimo_rdo = rdo_mais_recente.data_relatorio
+                    obra.total_subatividades = len(rdo_mais_recente.servico_subatividades)
+                else:
+                    obra.progresso_atual = 0
+                    obra.data_ultimo_rdo = None
+                    obra.total_subatividades = 0
+                    
+            except Exception as e:
+                print(f"Erro ao calcular progresso da obra {obra.id}: {e}")
+                obra.progresso_atual = 0
+                obra.data_ultimo_rdo = None
+                obra.total_subatividades = 0
     except Exception as e:
         # Log do erro para debug
         print(f"ERRO NO DASHBOARD: {str(e)}")
