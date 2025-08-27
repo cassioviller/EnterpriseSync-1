@@ -1514,6 +1514,12 @@ function configurarEventListeners() {
     const obraSelect = document.getElementById('obra_id');
     if (obraSelect) {
         obraSelect.addEventListener('change', carregarServicosObra);
+        
+        // Auto-carregar se obra já estiver selecionada (especialmente no modo edição)
+        if (obraSelect.value) {
+            console.log('AUTO-CARREGANDO serviços da obra:', obraSelect.value);
+            setTimeout(() => carregarServicosObra(), 500);
+        }
     }
 }
 
@@ -1792,6 +1798,14 @@ function carregarServicosObra() {
         }
         
         renderizarServicos(servicos);
+        
+        // Para modo edição, aplicar dados salvos após carregar serviços
+        {% if modo_edicao and subatividades_salvas %}
+        setTimeout(() => {
+            aplicarDadosSalvosEdicao();
+        }, 200);
+        {% endif %}
+        
         updateProgressBar(50);
     }).catch(error => {
         console.error('Erro ao carregar dados:', error);
@@ -2204,6 +2218,42 @@ function testarCarregamentoPorcentagensCompleto() {
             mostrarNotificacao('❌ Erro ao carregar dados do último RDO', 'error');
             updateProgressBar(0);
         });
+}
+
+// Função para aplicar dados salvos no modo edição
+function aplicarDadosSalvosEdicao() {
+    console.log('APLICANDO dados salvos no modo edição:', dadosSalvos.subatividades);
+    
+    if (!dadosSalvos.subatividades || Object.keys(dadosSalvos.subatividades).length === 0) {
+        console.log('Nenhum dado de subatividade salvo para aplicar');
+        return;
+    }
+    
+    let aplicados = 0;
+    
+    // Aplicar percentuais salvos por nome da subatividade
+    for (const nomeSubatividade in dadosSalvos.subatividades) {
+        const dadosSalvo = dadosSalvos.subatividades[nomeSubatividade];
+        
+        // Buscar input pelo nome da subatividade
+        const inputs = document.querySelectorAll('input[name*="percentual"]');
+        inputs.forEach(input => {
+            const container = input.closest('.subatividade-item');
+            if (container) {
+                const nomeElement = container.querySelector('.subatividade-nome');
+                if (nomeElement && nomeElement.textContent.trim() === nomeSubatividade) {
+                    input.value = dadosSalvo.percentual || 0;
+                    aplicados++;
+                    console.log(`✅ Aplicado ${dadosSalvo.percentual}% para "${nomeSubatividade}"`);
+                }
+            }
+        });
+    }
+    
+    if (aplicados > 0) {
+        mostrarNotificacao(`${aplicados} subatividades carregadas do RDO salvo`, 'success');
+        console.log(`EDIÇÃO: ${aplicados} subatividades carregadas com sucesso`);
+    }
 }
 
 // Inicialização adicional para modo edição
