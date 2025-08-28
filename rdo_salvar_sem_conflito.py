@@ -152,69 +152,63 @@ def salvar_rdo_flexivel():
                 except (ValueError, TypeError):
                     continue
         
-        # Processar serviços flexíveis (todos os campos que começam com 'servico_')
-        servicos_processados = {}
+        # Processar subatividades (campos do tipo 'subatividade_{id}')
+        subatividades_processadas = {}
         for campo, valor in request.form.items():
-            if campo.startswith('servico_') and valor:
+            if campo.startswith('subatividade_') and valor:
                 try:
-                    # Parse do campo: servico_{nome_servico}_{indice_subatividade}
-                    partes = campo.replace('servico_', '').split('_')
-                    if len(partes) >= 2:
-                        nome_servico = '_'.join(partes[:-1])  # Tudo exceto último elemento
-                        indice_sub = partes[-1]  # Último elemento
+                    # Parse do campo: subatividade_{subatividade_mestre_id}
+                    subatividade_id = int(campo.replace('subatividade_', ''))
+                    percentual = float(valor) if valor else 0.0
+                    
+                    if percentual > 0:  # Só salvar se percentual > 0
+                        subatividades_processadas[subatividade_id] = percentual
+                        logger.debug(f"Subatividade {subatividade_id}: {percentual}%")
                         
-                        percentual = float(valor) if valor else 0.0
-                        
-                        if nome_servico not in servicos_processados:
-                            servicos_processados[nome_servico] = {}
-                        
-                        servicos_processados[nome_servico][indice_sub] = percentual
-                        
-                except (ValueError, IndexError):
+                except (ValueError, TypeError):
                     continue
         
-        # Salvar serviços no RDOServicoSubatividade
+        # Salvar subatividades no RDOServicoSubatividade
         if rdo_existente:
-            # Limpar serviços existentes
+            # Limpar subatividades existentes
             RDOServicoSubatividade.query.filter_by(rdo_id=rdo.id).delete()
         
-        # Mapeamento de nomes de serviços para subatividades
-        MAPEAMENTO_SUBATIVIDADES = {
-            'estrutura_metálica': [
-                'Montagem de Formas', 'Armação de Ferro', 'Concretagem',
-                'Cura do Concreto', 'Desmontagem'
-            ],
-            'manta_pvc': [
-                'Preparação da Superfície', 'Aplicação do Primer', 
-                'Instalação da Manta', 'Acabamento e Vedação', 'Teste de Estanqueidade'
-            ],
-            'beiral_metálico': [
-                'Medição e Marcação', 'Corte das Peças', 
-                'Fixação dos Suportes', 'Instalação do Beiral'
-            ]
-        }
+        # Importar modelo SubatividadeMestre para buscar detalhes
+        from models import SubatividadeMestre
         
-        for nome_servico, subatividades in servicos_processados.items():
-            subatividades_nomes = MAPEAMENTO_SUBATIVIDADES.get(nome_servico, [])
-            
-            for indice_str, percentual in subatividades.items():
-                try:
-                    indice = int(indice_str)
-                    if 0 <= indice < len(subatividades_nomes):
-                        nome_subatividade = subatividades_nomes[indice]
-                        
-                        rdo_servico = RDOServicoSubatividade(
-                            rdo_id=rdo.id,
-                            servico=nome_servico.replace('_', ' ').title(),
-                            subatividade=nome_subatividade,
-                            percentual_concluido=percentual,
-                            observacoes=''
-                        )
-                        db.session.add(rdo_servico)
-                        logger.debug(f"Serviço salvo: {nome_servico} - {nome_subatividade}: {percentual}%")
-                        
-                except (ValueError, IndexError):
-                    continue
+        subatividades_salvas = 0
+        for subatividade_id, percentual in subatividades_processadas.items():
+            try:
+                # Buscar dados da subatividade mestre
+                subatividade_mestre = SubatividadeMestre.query.filter_by(
+                    id=subatividade_id,
+                    admin_id=admin_id,
+                    ativo=True
+                ).first()
+                
+                if subatividade_mestre:
+                    # Criar registro na tabela RDOServicoSubatividade com campos corretos
+                    rdo_subatividade = RDOServicoSubatividade(
+                        rdo_id=rdo.id,
+                        servico_id=subatividade_mestre.servico_id,
+                        nome_subatividade=subatividade_mestre.nome,
+                        descricao_subatividade=subatividade_mestre.descricao,
+                        percentual_conclusao=percentual,
+                        observacoes_tecnicas=f'Executado em {percentual}% - {data_relatorio}',
+                        admin_id=admin_id,
+                        ativo=True
+                    )
+                    db.session.add(rdo_subatividade)
+                    subatividades_salvas += 1
+                    logger.info(f"✅ Subatividade salva: {subatividade_mestre.nome} - {percentual}%")
+                else:
+                    logger.warning(f"⚠️ Subatividade mestre {subatividade_id} não encontrada")
+                    
+            except Exception as e:
+                logger.error(f"❌ Erro ao salvar subatividade {subatividade_id}: {e}")
+                continue
+        
+        logger.info(f"💾 Total de {subatividades_salvas} subatividades salvas no RDO")
         
         # Confirmar salvamento
         db.session.commit()

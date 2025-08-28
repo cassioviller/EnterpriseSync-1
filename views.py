@@ -3869,11 +3869,12 @@ def api_test_ultimo_rdo_dados(obra_id):
                 if ultimo_rdo:
                     rdo_subatividade = RDOServicoSubatividade.query.filter_by(
                         rdo_id=ultimo_rdo.id,
-                        subatividade_mestre_id=subatividade.id
+                        servico_id=subatividade.servico_id,
+                        nome_subatividade=subatividade.nome
                     ).first()
                     
                     if rdo_subatividade:
-                        percentual_executado = float(rdo_subatividade.percentual_executado or 0)
+                        percentual_executado = float(rdo_subatividade.percentual_conclusao or 0)
                 
                 subatividades_data.append({
                     'id': subatividade.id,
@@ -3904,7 +3905,7 @@ def api_test_ultimo_rdo_dados(obra_id):
         if ultimo_rdo:
             response_data['ultimo_rdo'] = {
                 'id': ultimo_rdo.id,
-                'data': ultimo_rdo.data.strftime('%d/%m/%Y') if ultimo_rdo.data else 'N/A'
+                'data': ultimo_rdo.data_relatorio.strftime('%d/%m/%Y') if ultimo_rdo.data_relatorio else 'N/A'
             }
         
         return jsonify(response_data)
