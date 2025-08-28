@@ -2345,30 +2345,46 @@ def visualizar_rdo(id):
         peso_por_subatividade = 0
         
         try:
-            # PASSO 1: Contar TODAS as subatividades diferentes que já foram executadas nesta obra
-            # Buscar todas as combinações únicas de servico_id + nome_subatividade da obra
-            from sqlalchemy import distinct
+            # PASSO 1: Buscar TODAS as subatividades PLANEJADAS da obra (cadastro)
+            # Buscar serviços cadastrados para esta obra
+            from models import ServicoObra, SubatividadeMestre
             
-            subatividades_unicas = db.session.query(
-                distinct(RDOServicoSubatividade.servico_id),
-                distinct(RDOServicoSubatividade.nome_subatividade)
-            ).join(
-                RDO, RDOServicoSubatividade.rdo_id == RDO.id
-            ).filter(
-                RDO.obra_id == rdo.obra_id
-            ).all()
+            servicos_da_obra = ServicoObra.query.filter_by(obra_id=rdo.obra_id).all()
             
-            # Contar combinações únicas reais
-            combinacoes_unicas = set()
-            todas_subatividades_obra = db.session.query(RDOServicoSubatividade).join(
-                RDO, RDOServicoSubatividade.rdo_id == RDO.id
-            ).filter(RDO.obra_id == rdo.obra_id).all()
+            total_subatividades_obra = 0
+            servicos_encontrados = []
             
-            for sub in todas_subatividades_obra:
-                chave_unica = f"{sub.servico_id}_{sub.nome_subatividade}"
-                combinacoes_unicas.add(chave_unica)
+            # Para cada serviço da obra, buscar suas subatividades no cadastro mestre
+            for servico_obra in servicos_da_obra:
+                subatividades_servico = SubatividadeMestre.query.filter_by(
+                    servico_id=servico_obra.servico_id
+                ).all()
+                
+                total_subatividades_obra += len(subatividades_servico)
+                servicos_encontrados.append({
+                    'servico_id': servico_obra.servico_id,
+                    'subatividades': len(subatividades_servico)
+                })
             
-            total_subatividades_obra = len(combinacoes_unicas)
+            print(f"DEBUG SERVIÇOS CADASTRADOS NA OBRA: {len(servicos_da_obra)}")
+            print(f"DEBUG DETALHES SERVIÇOS: {servicos_encontrados}")
+            print(f"DEBUG TOTAL SUBATIVIDADES PLANEJADAS: {total_subatividades_obra}")
+            
+            # Se não há serviços cadastrados, usar fallback das subatividades já executadas
+            if total_subatividades_obra == 0:
+                print("FALLBACK: Usando subatividades executadas como base")
+                # Buscar todas as combinações únicas já executadas
+                subatividades_query = db.session.query(
+                    RDOServicoSubatividade.servico_id,
+                    RDOServicoSubatividade.nome_subatividade
+                ).join(RDO).filter(RDO.obra_id == rdo.obra_id).distinct().all()
+                
+                combinacoes_unicas = set()
+                for servico_id, nome_subatividade in subatividades_query:
+                    combinacoes_unicas.add(f"{servico_id}_{nome_subatividade}")
+                
+                total_subatividades_obra = len(combinacoes_unicas)
+                print(f"DEBUG FALLBACK TOTAL: {total_subatividades_obra}")
             
             print(f"DEBUG TOTAL SUBATIVIDADES DIFERENTES DA OBRA: {total_subatividades_obra}")
             print(f"DEBUG COMBINAÇÕES: {combinacoes_unicas}")
@@ -2378,25 +2394,25 @@ def visualizar_rdo(id):
                 peso_por_subatividade = 100.0 / total_subatividades_obra
                 print(f"DEBUG PESO POR SUBATIVIDADE: {peso_por_subatividade:.2f}%")
                 
-                # PASSO 3: Buscar progresso mais recente de cada subatividade única
-                progresso_por_subatividade = {}
-                
-                # Ordenar por data para pegar o mais recente de cada subatividade
-                subatividades_ordenadas = db.session.query(RDOServicoSubatividade).join(
-                    RDO, RDOServicoSubatividade.rdo_id == RDO.id
+                # PASSO 3: Buscar progresso das subatividades executadas vs planejadas
+                subatividades_executadas = db.session.query(RDOServicoSubatividade).join(
+                    RDO
                 ).filter(
                     RDO.obra_id == rdo.obra_id
                 ).order_by(RDO.data_relatorio.desc()).all()
                 
-                for sub in subatividades_ordenadas:
+                progresso_por_subatividade = {}
+                for sub in subatividades_executadas:
                     chave_subatividade = f"{sub.servico_id}_{sub.nome_subatividade}"
                     
-                    # Manter apenas o primeiro (mais recente) de cada subatividade
+                    # Manter apenas o progresso mais recente de cada subatividade
                     if chave_subatividade not in progresso_por_subatividade:
                         progresso_por_subatividade[chave_subatividade] = sub.percentual_conclusao or 0
                 
-                # PASSO 4: Calcular progresso real da obra
+                # PASSO 4: Calcular progresso real da obra considerando TODAS as planejadas
                 progresso_acumulado = 0.0
+                
+                # Cada subatividade executada contribui com seu percentual × peso
                 for chave, percentual in progresso_por_subatividade.items():
                     contribuicao = (percentual / 100.0) * peso_por_subatividade
                     progresso_acumulado += contribuicao
@@ -2404,10 +2420,15 @@ def visualizar_rdo(id):
                 progresso_obra = round(progresso_acumulado, 1)
                 
                 print(f"DEBUG PROGRESSO DETALHADO:")
-                print(f"  - Total subatividades diferentes da obra: {total_subatividades_obra}")
-                print(f"  - Subatividades com progresso: {len(progresso_por_subatividade)}")
+                print(f"  - Subatividades PLANEJADAS (cadastro): {total_subatividades_obra}")
+                print(f"  - Subatividades EXECUTADAS: {len(progresso_por_subatividade)}")
                 print(f"  - Peso por subatividade: {peso_por_subatividade:.2f}%")
                 print(f"  - Progresso final da obra: {progresso_obra}%")
+                
+                # Mostrar quais subatividades faltam executar
+                subatividades_faltam = total_subatividades_obra - len(progresso_por_subatividade)
+                if subatividades_faltam > 0:
+                    print(f"  - Subatividades ainda não iniciadas: {subatividades_faltam}")
             
         except Exception as e:
             print(f"ERRO CÁLCULO PROGRESSO OBRA: {str(e)}")
