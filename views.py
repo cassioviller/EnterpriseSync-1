@@ -2844,23 +2844,25 @@ def funcionario_rdo_consolidado():
         
         print(f"DEBUG: Mostrando página {page} com {len(rdos_processados)} RDOs")
         
-        # Usar o template da lista RDO que estava funcionando
-        return render_template('rdo_lista_unificada.html',
+        # Usar o template correto do consolidado
+        obras_disponiveis = Obra.query.filter_by(admin_id=admin_id_correto, ativo=True).all()
+        funcionarios_disponiveis = Funcionario.query.filter_by(admin_id=admin_id_correto, ativo=True).all()
+        
+        return render_template('funcionario/rdo/consolidado.html',
                              rdos=rdos_processados,
+                             obras=obras_disponiveis,
+                             funcionarios=funcionarios_disponiveis,
                              pagination=rdos_paginated,
                              total_rdos=rdos_paginated.total,
+                             total_funcionarios=len(funcionarios_disponiveis),
+                             total_equipamentos=0,
+                             total_ocorrencias=0,
                              page=page,
                              admin_id=admin_id_correto,
-                             obras=[],
-                             funcionarios=[],
-                             filters={
-                                 'obra_id': None,
-                                 'status': None,
-                                 'data_inicio': None,
-                                 'data_fim': None,
-                                 'funcionario_id': None,
-                                 'order_by': 'data_desc'
-                             })
+                             obra_id=None,
+                             status=None,
+                             data_inicio=None,
+                             data_fim=None)
         
     except Exception as e:
         print(f"ERRO RDO CONSOLIDADO: {str(e)}")
