@@ -16,6 +16,14 @@ try:
 except ImportError as e:
     print(f"⚠️ API serviços flexíveis não encontrada: {e}")
 
+# Registrar salvamento RDO sem conflito
+try:
+    from rdo_salvar_sem_conflito import rdo_sem_conflito_bp
+    app.register_blueprint(rdo_sem_conflito_bp, url_prefix='/')
+    print("✅ Sistema RDO sem conflito registrado")
+except ImportError as e:
+    print(f"⚠️ Sistema RDO sem conflito não encontrado: {e}")
+
 # Registrar sistema de visualização RDO  
 try:
     from rdo_viewer_editor import rdo_viewer_bp

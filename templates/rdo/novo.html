@@ -277,7 +277,7 @@
                 </h3>
             </div>
             <div class="rdo-card-body">
-                <form method="POST" action="{{ url_for('main.criar_rdo') }}" id="formNovoRDO">
+                <form method="POST" action="/salvar-rdo-flexivel" id="formNovoRDO">
                     <div class="filtros-grid">
                         <div class="form-group">
                             <label class="form-label">
@@ -403,11 +403,11 @@
                     </a>
                     
                     <div class="d-flex gap-3">
-                        <button type="button" class="btn-modern btn-outline" onclick="salvarRascunho()">
-                            <i class="fas fa-save"></i>
-                            Salvar Rascunho
+                        <button type="button" class="btn-modern btn-outline" onclick="testarUltimoRDO()">
+                            <i class="fas fa-flask"></i>
+                            Testar Último RDO
                         </button>
-                        <button type="submit" form="formNovoRDO" class="btn-modern btn-success">
+                        <button type="submit" form="formNovoRDO" class="btn-modern btn-success" id="btnFinalizarRDO">
                             <i class="fas fa-check"></i>
                             Finalizar RDO
                         </button>
