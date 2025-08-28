@@ -437,6 +437,34 @@ console.log('Initializing RDO view with light theme...');
     transition: width 0.3s ease;
 }
 
+/* Estilo para subatividades não executadas */
+.subatividade-card.not-executed {
+    background: #f8f9fa !important;
+    border-left: 4px solid #6c757d;
+    opacity: 0.7;
+}
+
+.subatividade-card.not-executed .subatividade-nome {
+    color: #6c757d !important;
+}
+
+.subatividade-status {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-top: 0.5rem;
+    font-size: 0.85rem;
+}
+
+.progress-badge.bg-secondary {
+    background-color: #6c757d !important;
+    color: white;
+}
+
+.progress-fill.bg-secondary {
+    background-color: #6c757d !important;
+}
+
 .subatividade-servico {
     display: flex;
     align-items: center;
@@ -693,7 +721,7 @@ console.log('Initializing RDO view with light theme...');
                 <div class="info-header-icon">
                     <i class="fas fa-tasks"></i>
                 </div>
-                <h3>Subatividades Executadas no Dia ({{ total_subatividades }})</h3>
+                <h3>Panorama Completo da Obra - Subatividades ({{ total_subatividades }} executadas)</h3>
             </div>
             <div class="subatividades-section">
                 {% for servico_id, grupo in subatividades_por_servico.items() %}
@@ -711,6 +739,7 @@ console.log('Initializing RDO view with light theme...');
                         {{ (grupo.servico.nome|upper) if grupo.servico else 'SERVIÇO NÃO DEFINIDO' }}
                     </h4>
                     <div class="subatividades-grid">
+                        <!-- SUBATIVIDADES EXECUTADAS -->
                         {% for subatividade in grupo.subatividades %}
                         <div class="subatividade-card">
                             <div class="subatividade-header">
@@ -722,6 +751,25 @@ console.log('Initializing RDO view with light theme...');
                             </div>
                         </div>
                         {% endfor %}
+                        
+                        <!-- SUBATIVIDADES NÃO EXECUTADAS (0%) -->
+                        {% if grupo.subatividades_nao_executadas %}
+                            {% for subatividade_nao_exec in grupo.subatividades_nao_executadas %}
+                            <div class="subatividade-card not-executed">
+                                <div class="subatividade-header">
+                                    <h4 class="subatividade-nome">{{ subatividade_nao_exec.nome_subatividade }}</h4>
+                                    <div class="progress-badge bg-secondary">0%</div>
+                                </div>
+                                <div class="progress-bar">
+                                    <div class="progress-fill bg-secondary" style="width: 0%"></div>
+                                </div>
+                                <div class="subatividade-status">
+                                    <i class="fas fa-clock text-muted"></i>
+                                    <span class="text-muted">Aguardando execução</span>
+                                </div>
+                            </div>
+                            {% endfor %}
+                        {% endif %}
                     </div>
                 </div>
                 {% endfor %}

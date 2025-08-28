@@ -2386,8 +2386,18 @@ def visualizar_rdo(id):
                 total_subatividades_obra = len(combinacoes_unicas)
                 print(f"DEBUG FALLBACK TOTAL: {total_subatividades_obra}")
             
-            print(f"DEBUG TOTAL SUBATIVIDADES DIFERENTES DA OBRA: {total_subatividades_obra}")
-            print(f"DEBUG COMBINAÇÕES: {combinacoes_unicas}")
+            print(f"DEBUG TOTAL SUBATIVIDADES PLANEJADAS DA OBRA: {total_subatividades_obra}")
+            
+            # Definir combinacoes_unicas para todos os casos
+            combinacoes_unicas = set()
+            if total_subatividades_obra == 0:
+                # Já definido acima no bloco if
+                pass
+            else:
+                # Para quando há serviços cadastrados, criar conjunto vazio para compatibilidade
+                combinacoes_unicas = set()
+            
+            print(f"DEBUG COMBINAÇÕES: {len(combinacoes_unicas)} encontradas")
             
             if total_subatividades_obra > 0:
                 # PASSO 2: Calcular peso de cada subatividade
@@ -2446,15 +2456,60 @@ def visualizar_rdo(id):
         print(f"DEBUG SUBATIVIDADES: {len(subatividades)} encontradas")
         print(f"DEBUG MÃO DE OBRA: {len(funcionarios)} funcionários")
         
-        # Agrupar subatividades por serviço para exibição organizada
+        # NOVA LÓGICA: Mostrar TODOS os serviços da obra (executados + não executados)
         subatividades_por_servico = {}
+        
+        # PASSO 1: Adicionar todos os serviços CADASTRADOS na obra (mesmo que não executados)
+        try:
+            servicos_cadastrados = ServicoObra.query.filter_by(obra_id=rdo.obra_id).all()
+            
+            for servico_obra in servicos_cadastrados:
+                servico = Servico.query.get(servico_obra.servico_id)
+                if servico:
+                    # Buscar subatividades mestre deste serviço
+                    subatividades_mestre = SubatividadeMestre.query.filter_by(
+                        servico_id=servico.id
+                    ).limit(10).all()  # Limitar para não sobrecarregar
+                    
+                    subatividades_por_servico[servico.id] = {
+                        'servico': servico,
+                        'subatividades': [],
+                        'subatividades_nao_executadas': []
+                    }
+                    
+                    # Adicionar subatividades não executadas com 0%
+                    for sub_mestre in subatividades_mestre:
+                        # Verificar se já foi executada
+                        ja_executada = any(
+                            sub.nome_subatividade == sub_mestre.nome for sub in subatividades 
+                            if sub.servico_id == servico.id
+                        )
+                        
+                        if not ja_executada:
+                            # Criar objeto mock para subatividade não executada
+                            mock_sub = type('MockSubatividade', (), {
+                                'nome_subatividade': sub_mestre.nome,
+                                'percentual_conclusao': 0,
+                                'observacoes': 'Não executada',
+                                'executada': False,
+                                'servico_id': servico.id,
+                                'servico': servico
+                            })()
+                            subatividades_por_servico[servico.id]['subatividades_nao_executadas'].append(mock_sub)
+                    
+        except Exception as e:
+            print(f"ERRO AO BUSCAR SERVIÇOS CADASTRADOS: {e}")
+        
+        # PASSO 2: Adicionar subatividades EXECUTADAS
         for sub in subatividades:
             servico_id = sub.servico_id
             if servico_id not in subatividades_por_servico:
                 subatividades_por_servico[servico_id] = {
                     'servico': sub.servico,
-                    'subatividades': []
+                    'subatividades': [],
+                    'subatividades_nao_executadas': []
                 }
+            sub.executada = True  # Marcar como executada
             subatividades_por_servico[servico_id]['subatividades'].append(sub)
         
         return render_template('rdo/visualizar_rdo_moderno.html', 
