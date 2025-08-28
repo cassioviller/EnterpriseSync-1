@@ -860,7 +860,7 @@ console.log('Initializing RDO with light theme...');
                 <i class="fas fa-clipboard-list"></i>
             </div>
             <div class="stat-content">
-                <div class="stat-number">{{ rdos.total }}</div>
+                <div class="stat-number">{{ total_rdos|default(rdos|length) }}</div>
                 <div class="stat-label">Total de RDOs</div>
             </div>
         </div>
@@ -870,7 +870,7 @@ console.log('Initializing RDO with light theme...');
                 <i class="fas fa-check-circle"></i>
             </div>
             <div class="stat-content">
-                <div class="stat-number">{{ rdos.items|selectattr('status', 'equalto', 'Finalizado')|list|length }}</div>
+                <div class="stat-number">{{ rdos|selectattr('rdo.status', 'equalto', 'Finalizado')|list|length }}</div>
                 <div class="stat-label">Finalizadas</div>
             </div>
         </div>
@@ -880,7 +880,7 @@ console.log('Initializing RDO with light theme...');
                 <i class="fas fa-clock"></i>
             </div>
             <div class="stat-content">
-                <div class="stat-number">{{ rdos.items|selectattr('status', 'equalto', 'Em Andamento')|list|length }}</div>
+                <div class="stat-number">{{ rdos|selectattr('rdo.status', 'equalto', 'Rascunho')|list|length }}</div>
                 <div class="stat-label">Em Andamento</div>
             </div>
         </div>
@@ -890,8 +890,8 @@ console.log('Initializing RDO with light theme...');
                 <i class="fas fa-chart-line"></i>
             </div>
             <div class="stat-content">
-                {% set total_progress = rdos.items|map(attribute='progresso_total')|select('number')|sum %}
-                {% set avg_progress = (total_progress / rdos.items|length)|round(1) if rdos.items and rdos.items|length > 0 else 0 %}
+                {% set total_progress = rdos|map(attribute='progresso_medio')|select('number')|sum %}
+                {% set avg_progress = (total_progress / rdos|length)|round(1) if rdos and rdos|length > 0 else 0 %}
                 <div class="stat-number">{{ "%.1f"|format(avg_progress) }}%</div>
                 <div class="stat-label">Progresso Médio</div>
             </div>
@@ -972,9 +972,10 @@ console.log('Initializing RDO with light theme...');
     </div>
 
     <!-- Grid de Cards RDO -->
-    {% if rdos.items %}
+    {% if rdos %}
     <div class="rdos-grid">
-        {% for rdo in rdos.items %}
+        {% for rdo_data in rdos %}
+        {% set rdo = rdo_data.rdo if rdo_data.rdo else rdo_data %}
         <div class="rdo-card">
             <div class="rdo-card-header">
                 <div class="rdo-title-section">
@@ -1009,25 +1010,25 @@ console.log('Initializing RDO with light theme...');
                 <div class="rdo-progress">
                     <div class="progress-header">
                         <span>Progresso Geral</span>
-                        <strong>{{ "%.1f"|format(rdo.progresso_total|default(0)) }}%</strong>
+                        <strong>{{ "%.1f"|format(rdo_data.progresso_medio|default(0)) }}%</strong>
                     </div>
                     <div class="progress-bar">
-                        <div class="progress-fill" style="width: {{ rdo.progresso_total|default(0) }}%"></div>
+                        <div class="progress-fill" style="width: {{ rdo_data.progresso_medio|default(0) }}%"></div>
                     </div>
                 </div>
                 
                 <div class="rdo-stats">
                     <div class="stat-item">
                         <i class="fas fa-tasks"></i>
-                        <span>{{ rdo.servico_subatividades|length }} atividades</span>
+                        <span>{{ rdo_data.total_subatividades|default(0) }} atividades</span>
                     </div>
                     <div class="stat-item">
                         <i class="fas fa-users"></i>
-                        <span>{{ rdo.mao_obra|length }} funcionários</span>
+                        <span>{{ rdo_data.total_funcionarios|default(0) }} funcionários</span>
                     </div>
                     <div class="stat-item">
                         <i class="fas fa-clock"></i>
-                        <span>{{ "%.1f"|format(rdo.horas_totais|default(0)) }}h</span>
+                        <span>{{ "%.1f"|format(rdo_data.total_subatividades|default(0)) }}h</span>
                     </div>
                 </div>
             </div>
@@ -1045,7 +1046,7 @@ console.log('Initializing RDO with light theme...');
     </div>
     
     <!-- Paginação -->
-    {% if rdos.pages > 1 %}
+    {% if pagination and pagination.pages > 1 %}
     <div class="pagination-container">
         <nav class="pagination">
             {% if rdos.has_prev %}
