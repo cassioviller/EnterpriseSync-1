@@ -2466,10 +2466,15 @@ def visualizar_rdo(id):
             for servico_obra in servicos_cadastrados:
                 servico = Servico.query.get(servico_obra.servico_id)
                 if servico:
-                    # Buscar subatividades mestre deste serviço
+                    # Buscar subatividades mestre ÚNICAS e RELEVANTES deste serviço
                     subatividades_mestre = SubatividadeMestre.query.filter_by(
                         servico_id=servico.id
-                    ).limit(10).all()  # Limitar para não sobrecarregar
+                    ).filter(
+                        SubatividadeMestre.nome != 'Etapa Intermediária',
+                        SubatividadeMestre.nome != 'Preparação Inicial',
+                        SubatividadeMestre.nome.notlike('%Genérica%'),
+                        SubatividadeMestre.nome.notlike('%Padrão%')
+                    ).distinct().limit(5).all()  # Máximo 5 subatividades por serviço
                     
                     subatividades_por_servico[servico.id] = {
                         'servico': servico,
@@ -2477,28 +2482,75 @@ def visualizar_rdo(id):
                         'subatividades_nao_executadas': []
                     }
                     
-                    # Adicionar subatividades não executadas com 0%
-                    for sub_mestre in subatividades_mestre:
-                        # Verificar se já foi executada
-                        ja_executada = any(
-                            sub.nome_subatividade == sub_mestre.nome for sub in subatividades 
-                            if sub.servico_id == servico.id
-                        )
+                    # Criar subatividades específicas baseadas no nome do serviço se não há no cadastro
+                    if not subatividades_mestre:
+                        subatividades_especificas = []
                         
-                        if not ja_executada:
-                            # Criar objeto mock para subatividade não executada
-                            mock_sub = type('MockSubatividade', (), {
-                                'nome_subatividade': sub_mestre.nome,
-                                'percentual_conclusao': 0,
-                                'observacoes': 'Não executada',
-                                'executada': False,
-                                'servico_id': servico.id,
-                                'servico': servico
-                            })()
-                            subatividades_por_servico[servico.id]['subatividades_nao_executadas'].append(mock_sub)
+                        if 'estrutura' in servico.nome.lower() or 'metálica' in servico.nome.lower():
+                            subatividades_especificas = [
+                                f"Montagem de {servico.nome}",
+                                f"Soldagem de {servico.nome}",
+                                f"Acabamento de {servico.nome}"
+                            ]
+                        elif 'cobertura' in servico.nome.lower() or 'telhado' in servico.nome.lower():
+                            subatividades_especificas = [
+                                f"Instalação de {servico.nome}",
+                                f"Vedação de {servico.nome}",
+                                f"Acabamento de {servico.nome}"
+                            ]
+                        elif 'beiral' in servico.nome.lower():
+                            subatividades_especificas = [
+                                f"Preparação do {servico.nome}",
+                                f"Instalação do {servico.nome}",
+                                f"Finalização do {servico.nome}"
+                            ]
+                        else:
+                            # Subatividades genéricas apenas se necessário
+                            subatividades_especificas = [
+                                f"Execução de {servico.nome}",
+                                f"Controle de {servico.nome}"
+                            ]
+                        
+                        # Criar apenas subatividades que não foram executadas
+                        for nome_sub in subatividades_especificas:
+                            ja_executada = any(
+                                sub.nome_subatividade == nome_sub for sub in subatividades 
+                                if sub.servico_id == servico.id
+                            )
+                            
+                            if not ja_executada:
+                                mock_sub = type('MockSubatividade', (), {
+                                    'nome_subatividade': nome_sub,
+                                    'percentual_conclusao': 0,
+                                    'observacoes': 'Não executada',
+                                    'executada': False,
+                                    'servico_id': servico.id,
+                                    'servico': servico
+                                })()
+                                subatividades_por_servico[servico.id]['subatividades_nao_executadas'].append(mock_sub)
+                    
+                    else:
+                        # Usar subatividades do cadastro, mas filtradas
+                        for sub_mestre in subatividades_mestre:
+                            ja_executada = any(
+                                sub.nome_subatividade == sub_mestre.nome for sub in subatividades 
+                                if sub.servico_id == servico.id
+                            )
+                            
+                            if not ja_executada:
+                                mock_sub = type('MockSubatividade', (), {
+                                    'nome_subatividade': sub_mestre.nome,
+                                    'percentual_conclusao': 0,
+                                    'observacoes': 'Não executada',
+                                    'executada': False,
+                                    'servico_id': servico.id,
+                                    'servico': servico
+                                })()
+                                subatividades_por_servico[servico.id]['subatividades_nao_executadas'].append(mock_sub)
                     
         except Exception as e:
             print(f"ERRO AO BUSCAR SERVIÇOS CADASTRADOS: {e}")
+            print(f"DEBUG: Será usado fallback com subatividades executadas apenas")
         
         # PASSO 2: Adicionar subatividades EXECUTADAS
         for sub in subatividades:
