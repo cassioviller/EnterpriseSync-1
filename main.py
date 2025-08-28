@@ -8,6 +8,14 @@ try:
 except ImportError as e:
     print(f"⚠️ Sistema RDO salvar não encontrado: {e}")
 
+# Registrar API de serviços flexíveis
+try:
+    from api_servicos_flexivel import api_servicos_bp
+    app.register_blueprint(api_servicos_bp, url_prefix='/')
+    print("✅ API de serviços flexíveis registrada")
+except ImportError as e:
+    print(f"⚠️ API serviços flexíveis não encontrada: {e}")
+
 # Registrar sistema de visualização RDO  
 try:
     from rdo_viewer_editor import rdo_viewer_bp

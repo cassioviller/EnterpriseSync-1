@@ -427,17 +427,102 @@ function testarUltimoRDO() {
         return;
     }
     
-    // Simular carregamento de dados do último RDO
+    // Carregar serviços dinamicamente da API
+    carregarServicosDaObra(obraId);
+}
+
+function carregarServicosDaObra(obraId) {
     const container = document.getElementById('servicos-container');
     container.innerHTML = `
         <div class="text-center p-4">
             <div class="spinner-border text-success" role="status">
                 <span class="visually-hidden">Carregando...</span>
             </div>
-            <p class="mt-2 text-muted">Carregando serviços e subatividades...</p>
+            <p class="mt-2 text-muted">Carregando serviços flexíveis da obra...</p>
         </div>
     `;
     
+    // Fazer requisição para API de serviços flexíveis
+    fetch(`/api/obras/${obraId}/servicos`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                renderizarServicosFlexiveis(data);
+            } else {
+                // Fallback para template padrão
+                renderizarTemplatePadrao();
+            }
+        })
+        .catch(error => {
+            console.error('Erro ao carregar serviços:', error);
+            renderizarTemplatePadrao();
+        });
+}
+
+function renderizarServicosFlexiveis(data) {
+    const container = document.getElementById('servicos-container');
+    
+    let html = `
+        <div class="alert alert-success">
+            <i class="fas fa-check-circle"></i>
+            Serviços carregados: ${data.template_usado} (${data.total_servicos} serviços, ${data.total_subatividades} subatividades)
+        </div>
+    `;
+    
+    data.servicos.forEach((servico, index) => {
+        const servicoId = servico.nome.toLowerCase().replace(/\s+/g, '_');
+        const isAberto = index === 0; // Primeiro serviço aberto por padrão
+        
+        html += `
+            <div class="servico-card mb-3">
+                <div class="servico-header" onclick="toggleServico('${servicoId}')">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <h5 class="mb-0">${servico.nome}</h5>
+                            <span class="badge bg-${servico.cor_badge}">${servico.categoria}</span>
+                        </div>
+                        <div>
+                            <span class="text-muted me-2">${servico.subatividades.length} subatividades</span>
+                            <i class="fas fa-chevron-${isAberto ? 'up' : 'down'}" id="chevron-${servicoId}"></i>
+                        </div>
+                    </div>
+                </div>
+                <div class="servico-body ${isAberto ? '' : 'collapse'}" id="body-${servicoId}">
+                    <div class="row">
+        `;
+        
+        servico.subatividades.forEach((subatividade, subIndex) => {
+            const valorPadrao = (index === 0 && subIndex < 2) ? 100 : 0; // Primeiras 2 do primeiro serviço = 100%
+            
+            html += `
+                <div class="col-md-6 mb-3">
+                    <label class="form-label">${subatividade}</label>
+                    <div class="input-group">
+                        <input type="number" 
+                               class="form-control" 
+                               name="servico_${servicoId}_${subIndex}"
+                               value="${valorPadrao}" 
+                               step="0.1" 
+                               min="0" 
+                               max="100">
+                        <span class="input-group-text">%</span>
+                    </div>
+                </div>
+            `;
+        });
+        
+        html += `
+                    </div>
+                </div>
+            </div>
+        `;
+    });
+    
+    container.innerHTML = html;
+}
+
+function renderizarTemplatePadrao() {
+    // Fallback para o template original
     setTimeout(() => {
         container.innerHTML = `
             <div class="alert alert-success">

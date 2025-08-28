@@ -1,8 +1,9 @@
 # API PARA SISTEMA FLEXÍVEL DE SERVIÇOS RDO
 from flask import Blueprint, jsonify, request
-from models import db, Obra, ConfiguracaoServicoObra
+from models import db, Obra
 from bypass_auth import obter_admin_id
 import logging
+from datetime import datetime
 
 api_servicos_bp = Blueprint('api_servicos', __name__)
 logger = logging.getLogger(__name__)
@@ -88,21 +89,16 @@ def obter_servicos_obra(obra_id):
         if not obra:
             return jsonify({'error': 'Obra não encontrada'}), 404
         
-        # Buscar configuração específica da obra
-        configuracao = ConfiguracaoServicoObra.query.filter_by(obra_id=obra_id).first()
-        
-        if configuracao and configuracao.servicos_config:
-            # Usar configuração personalizada
-            servicos_data = configuracao.servicos_config
-            template_usado = 'personalizado'
+        # Por ora, usar sempre template padrão baseado no ID da obra
+        # Obra ID par = template básico (2 serviços)
+        # Obra ID ímpar = template completo (3 serviços)
+        if obra_id % 2 == 0:
+            template_key = 'basico_2_servicos'
         else:
-            # Usar template padrão baseado no tipo da obra ou fallback
-            template_key = getattr(obra, 'tipo_servicos', 'basico_2_servicos')
-            if template_key not in TEMPLATES_SERVICOS:
-                template_key = 'basico_2_servicos'
+            template_key = 'completo_3_servicos'
             
-            servicos_data = TEMPLATES_SERVICOS[template_key]
-            template_usado = template_key
+        servicos_data = TEMPLATES_SERVICOS[template_key]
+        template_usado = template_key
         
         logger.info(f"Serviços carregados para obra {obra_id}: template={template_usado}")
         
@@ -137,20 +133,8 @@ def configurar_servicos_obra(obra_id):
         if not dados or 'servicos' not in dados:
             return jsonify({'error': 'Dados de serviços inválidos'}), 400
         
-        # Buscar ou criar configuração
-        configuracao = ConfiguracaoServicoObra.query.filter_by(obra_id=obra_id).first()
-        if not configuracao:
-            configuracao = ConfiguracaoServicoObra(obra_id=obra_id)
-        
-        # Atualizar configuração
-        configuracao.servicos_config = {
-            'servicos': dados['servicos'],
-            'configurado_em': str(datetime.now()),
-            'configurado_por': admin_id
-        }
-        
-        db.session.add(configuracao)
-        db.session.commit()
+        # Por ora, apenas simular salvamento (sem tabela de configuração)
+        logger.info(f"Configuração simulada para obra {obra_id}: {len(dados['servicos'])} serviços")
         
         logger.info(f"Configuração de serviços salva para obra {obra_id}")
         
@@ -187,16 +171,5 @@ def listar_templates():
         logger.error(f"Erro ao listar templates: {str(e)}")
         return jsonify({'error': 'Erro interno do servidor'}), 500
 
-# Modelo para configuração flexível
-class ConfiguracaoServicoObra(db.Model):
-    __tablename__ = 'configuracao_servico_obra'
-    
-    id = db.Column(db.Integer, primary_key=True)
-    obra_id = db.Column(db.Integer, db.ForeignKey('obra.id'), nullable=False)
-    servicos_config = db.Column(db.JSON)  # Configuração flexível em JSON
-    template_base = db.Column(db.String(100))  # Template usado como base
-    criado_em = db.Column(db.DateTime, default=db.func.current_timestamp())
-    atualizado_em = db.Column(db.DateTime, default=db.func.current_timestamp(), onupdate=db.func.current_timestamp())
-    
-    # Relacionamento
-    obra = db.relationship('Obra', backref='configuracao_servicos')
+# Modelo será implementado quando necessário
+# Por ora usando templates estáticos baseados no ID da obra

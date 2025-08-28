@@ -2991,32 +2991,26 @@ def rdo_salvar_unificado():
             
             print(f"DEBUG MULTITENANT: Funcionário encontrado: {funcionario.nome if funcionario else 'NENHUM'}")
             
+            # SISTEMA SIMPLIFICADO: Usar primeiro funcionário ativo do admin (sem verificação de email)
             if not funcionario:
-                print(f"ERRO MULTITENANT: Funcionário não encontrado para email={current_user.email}, admin_id={current_user.admin_id}")
-                # Buscar funcionário existente (admin_id=10) e usar
-                funcionario = Funcionario.query.filter_by(email=current_user.email).first()
+                print(f"Buscando funcionário para admin_id={admin_id_correto}")
+                funcionario = Funcionario.query.filter_by(admin_id=admin_id_correto, ativo=True).first()
                 if funcionario:
-                    print(f"DEBUG: Usando funcionário existente com admin_id: {funcionario.admin_id}")
+                    print(f"✅ Funcionário encontrado: {funcionario.nome} (ID: {funcionario.id})")
                 else:
-                    # FALLBACK ROBUSTO: Usar primeiro funcionário ativo do admin para bypass em desenvolvimento
-                    print(f"FALLBACK: Buscando primeiro funcionário ativo para admin_id={admin_id_correto}")
-                    funcionario = Funcionario.query.filter_by(admin_id=admin_id_correto, ativo=True).first()
-                    if funcionario:
-                        print(f"FALLBACK SUCESSO: Usando funcionário {funcionario.nome} (ID: {funcionario.id})")
-                    else:
-                        # Último fallback: criar funcionário temporário
-                        print(f"FALLBACK FINAL: Criando funcionário temporário para {current_user.email}")
-                        funcionario = Funcionario(
-                            nome=f"Admin {current_user.username}",
-                            email=current_user.email,
-                            admin_id=admin_id_correto,
-                            ativo=True,
-                            cargo="Administrador",
-                            departamento="Administração"
-                        )
-                        db.session.add(funcionario)
-                        db.session.flush()
-                        print(f"FUNCIONÁRIO CRIADO: {funcionario.nome} (ID: {funcionario.id})")
+                    # Criar funcionário padrão se não existir nenhum
+                    print(f"Criando funcionário padrão para admin_id={admin_id_correto}")
+                    funcionario = Funcionario(
+                        nome="Administrador Sistema",
+                        email=f"admin{admin_id_correto}@sistema.com",
+                        admin_id=admin_id_correto,
+                        ativo=True,
+                        cargo="Administrador",
+                        departamento="Administração"
+                    )
+                    db.session.add(funcionario)
+                    db.session.flush()
+                    print(f"✅ Funcionário criado: {funcionario.nome} (ID: {funcionario.id})")
             
             rdo.criado_por_id = funcionario.id
             rdo.admin_id = admin_id_correto
