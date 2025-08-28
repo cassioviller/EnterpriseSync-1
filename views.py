@@ -2141,7 +2141,7 @@ def criar_rdo():
         obra = Obra.query.filter_by(id=obra_id, admin_id=admin_id).first()
         if not obra:
             flash('Obra não encontrada ou sem permissão de acesso.', 'error')
-            return redirect(url_for('main.novo_rdo'))
+            return redirect(url_for('main.rdo_novo_unificado'))
         
         # Verificar se já existe RDO para esta obra/data
         rdo_existente = RDO.query.filter_by(obra_id=obra_id, data_relatorio=data_relatorio).first()
