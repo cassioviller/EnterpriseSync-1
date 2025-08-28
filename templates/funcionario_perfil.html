@@ -353,7 +353,7 @@
 
                 <!-- Tabela de Registros -->
                 <div class="table-responsive">
-                    <table class="table table-striped" id="pontoTable">
+                    <table class="table table-striped" id="pontoTable" data-datatable="false">
                         <thead>
                             <tr>
                                 <th>Data</th>
@@ -558,7 +558,7 @@
             </div>
             <div class="card-body">
                 <div class="table-responsive">
-                    <table class="table table-striped" id="outrosCustosTable">
+                    <table class="table table-striped" id="outrosCustosTable" data-datatable="false">
                         <thead>
                             <tr>
                                 <th>Data</th>
@@ -647,7 +647,7 @@
             </div>
             <div class="card-body">
                 <div class="table-responsive">
-                    <table class="table table-striped" id="alimentacaoTable">
+                    <table class="table table-striped" id="alimentacaoTable" data-datatable="false">
                         <thead>
                             <tr>
                                 <th>Data</th>
@@ -2056,38 +2056,62 @@ function excluirAlimentacao(id) {
 }
 
 $(document).ready(function() {
-    // Inicializar DataTables
-    $('#pontoTable').DataTable({
-        language: { url: '//cdn.datatables.net/plug-ins/1.13.6/i18n/pt-BR.json' },
-        order: [[0, 'desc']],
-        pageLength: 25,
-        lengthMenu: [10, 25, 50, 100],
-        dom: 'lBfrtip',
-        buttons: [
-            {
-                extend: 'pageLength',
-                text: 'Registros por página'
-            }
-        ]
-    });
+    // Inicializar DataTables apenas se as tabelas existem e têm dados
+    try {
+        if ($('#pontoTable').length && $('#pontoTable tbody tr').length > 0) {
+            $('#pontoTable').DataTable({
+                language: { url: '//cdn.datatables.net/plug-ins/1.13.6/i18n/pt-BR.json' },
+                order: [[0, 'desc']],
+                pageLength: 25,
+                lengthMenu: [10, 25, 50, 100],
+                dom: 'lBfrtip',
+                buttons: [
+                    {
+                        extend: 'pageLength',
+                        text: 'Registros por página'
+                    }
+                ]
+            });
+        }
+    } catch (e) {
+        console.warn('Erro ao inicializar pontoTable:', e);
+    }
     
-    $('#ocorrenciasTable').DataTable({
-        language: { url: '//cdn.datatables.net/plug-ins/1.13.6/i18n/pt-BR.json' },
-        order: [[1, 'desc']],
-        pageLength: 10
-    });
+    try {
+        if ($('#ocorrenciasTable').length && $('#ocorrenciasTable tbody tr').length > 0) {
+            $('#ocorrenciasTable').DataTable({
+                language: { url: '//cdn.datatables.net/plug-ins/1.13.6/i18n/pt-BR.json' },
+                order: [[1, 'desc']],
+                pageLength: 10
+            });
+        }
+    } catch (e) {
+        console.warn('Erro ao inicializar ocorrenciasTable:', e);
+    }
     
-    $('#alimentacaoTable').DataTable({
-        language: { url: '//cdn.datatables.net/plug-ins/1.13.6/i18n/pt-BR.json' },
-        order: [[0, 'desc']],
-        pageLength: 10
-    });
+    try {
+        if ($('#alimentacaoTable').length && $('#alimentacaoTable tbody tr').length > 0) {
+            $('#alimentacaoTable').DataTable({
+                language: { url: '//cdn.datatables.net/plug-ins/1.13.6/i18n/pt-BR.json' },
+                order: [[0, 'desc']],
+                pageLength: 10
+            });
+        }
+    } catch (e) {
+        console.warn('Erro ao inicializar alimentacaoTable:', e);
+    }
     
-    $('#outrosCustosTable').DataTable({
-        language: { url: '//cdn.datatables.net/plug-ins/1.13.6/i18n/pt-BR.json' },
-        order: [[0, 'desc']],
-        pageLength: 10
-    });
+    try {
+        if ($('#outrosCustosTable').length && $('#outrosCustosTable tbody tr').length > 0) {
+            $('#outrosCustosTable').DataTable({
+                language: { url: '//cdn.datatables.net/plug-ins/1.13.6/i18n/pt-BR.json' },
+                order: [[0, 'desc']],
+                pageLength: 10
+            });
+        }
+    } catch (e) {
+        console.warn('Erro ao inicializar outrosCustosTable:', e);
+    }
     
     // Definir data padrão nos formulários
     const today = new Date().toISOString().slice(0, 10);

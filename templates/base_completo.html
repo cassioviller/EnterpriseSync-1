@@ -777,14 +777,23 @@
         $(document).ready(function() {
             console.log('Initializing SIGE application...');
             
-            // Inicializar DataTables se existir
+            // Inicializar DataTables apenas para tabelas específicas com dados
             if ($.fn.DataTable) {
-                $('.table').DataTable({
-                    "language": {
-                        "url": "//cdn.datatables.net/plug-ins/1.13.6/i18n/pt-BR.json"
-                    },
-                    "pageLength": 25,
-                    "responsive": true
+                // Só inicializar tabelas que têm dados e estrutura adequada
+                $('.table[data-datatable="true"]').each(function() {
+                    try {
+                        if ($(this).find('tbody tr').length > 0 && !$(this).find('tbody tr td[colspan]').length) {
+                            $(this).DataTable({
+                                "language": {
+                                    "url": "//cdn.datatables.net/plug-ins/1.13.6/i18n/pt-BR.json"
+                                },
+                                "pageLength": 25,
+                                "responsive": true
+                            });
+                        }
+                    } catch (e) {
+                        console.warn('Erro ao inicializar DataTable para tabela:', this.id, e);
+                    }
                 });
             }
             
