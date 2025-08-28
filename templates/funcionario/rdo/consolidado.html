@@ -21,7 +21,7 @@
                     <i class="fas fa-building"></i>
                     Obras
                 </a>
-                <a href="/funcionario/rdo/novo" class="btn-modern btn-success">
+                <a href="/funcionario/rdo/consolidado" class="btn-modern btn-success">
                     <i class="fas fa-plus"></i>
                     Novo RDO
                 </a>
@@ -160,51 +160,51 @@
         <div class="rdo-card-body">
             {% if rdos %}
             <div class="rdos-container" id="rdos-container">
-                {% for item in rdos %}
-                {% set rdo = item.rdo %}
-                {% set obra = item.obra %}
+                {% for rdo in rdos %}
                 <div class="rdo-item-card">
                     <div class="rdo-header">
                         <div class="rdo-date">
                             <i class="fas fa-calendar"></i>
-                            {{ rdo.data_relatorio.strftime('%d/%m/%Y') }}
+                            {{ rdo.data.strftime('%d/%m/%Y') }}
                         </div>
-                        <div class="rdo-status">
-                            <span class="badge bg-{{ item.status_cor }}">{{ rdo.status }}</span>
+                        <div class="rdo-clima">
+                            {% if rdo.clima == 'Sol' %}☀️{% elif rdo.clima == 'Chuva' %}🌧️{% elif rdo.clima == 'Nublado' %}☁️{% else %}⛅{% endif %}
+                            {{ rdo.clima }}
                         </div>
                     </div>
                     
                     <div class="rdo-content">
                         <h5 class="rdo-obra">
                             <i class="fas fa-building"></i>
-                            {{ obra.nome }}
+                            {{ rdo.obra.nome }}
                         </h5>
-                        <div class="rdo-numero">
-                            <small class="text-muted">{{ rdo.numero_rdo }}</small>
-                        </div>
                         
                         <div class="rdo-stats">
                             <div class="stat-item">
-                                <small>Subatividades:</small>
-                                <span class="badge bg-primary">{{ item.total_subatividades }}</span>
-                            </div>
-                            <div class="stat-item">
                                 <small>Funcionários:</small>
-                                <span class="badge bg-success">{{ item.total_funcionarios }}</span>
+                                <span class="badge bg-primary">{{ rdo.mao_obra|length }}</span>
                             </div>
                             <div class="stat-item">
-                                <small>Progresso:</small>
-                                <span class="badge bg-info">{{ item.progresso_medio }}%</span>
+                                <small>Equipamentos:</small>
+                                <span class="badge bg-success">{{ rdo.equipamentos|length }}</span>
+                            </div>
+                            <div class="stat-item">
+                                <small>Ocorrências:</small>
+                                <span class="badge bg-warning">{{ rdo.ocorrencias|length }}</span>
                             </div>
                         </div>
                         
-                        {% if rdo.clima_geral %}
-                        <div class="rdo-clima">
-                            <small class="text-muted">Clima:</small>
-                            <span class="clima-info">{{ rdo.clima_geral }}</span>
-                            {% if rdo.temperatura_media %}
-                            <span class="temp-info">{{ rdo.temperatura_media }}</span>
-                            {% endif %}
+                        {% if rdo.servicos_executados %}
+                        <div class="rdo-servicos">
+                            <small class="text-muted">Serviços:</small>
+                            <div class="servicos-tags">
+                                {% for servico in rdo.servicos_executados[:3] %}
+                                <span class="servico-tag">{{ servico.servico.nome }}</span>
+                                {% endfor %}
+                                {% if rdo.servicos_executados|length > 3 %}
+                                <span class="mais-servicos">+{{ rdo.servicos_executados|length - 3 }}</span>
+                                {% endif %}
+                            </div>
                         </div>
                         {% endif %}
                     </div>
@@ -214,11 +214,15 @@
                             <i class="fas fa-eye"></i>
                             Ver
                         </a>
-                        {% if rdo.status == 'Rascunho' %}
-                        <a href="/funcionario/rdo/novo?obra_id={{ obra.id }}" class="btn-modern btn-warning btn-sm">
+                        <a href="/rdo/{{ rdo.id }}/editar" class="btn-modern btn-warning btn-sm">
                             <i class="fas fa-edit"></i>
                             Editar
                         </a>
+                        {% if rdo.fotos|length > 0 %}
+                        <button class="btn-modern btn-success btn-sm" onclick="verFotos({{ rdo.id }})">
+                            <i class="fas fa-images"></i>
+                            Fotos ({{ rdo.fotos|length }})
+                        </button>
                         {% endif %}
                     </div>
                 </div>
@@ -231,7 +235,7 @@
                 </div>
                 <h4>Nenhum RDO encontrado</h4>
                 <p>{% if obra_id or data_inicio or data_fim %}Nenhum RDO corresponde aos filtros aplicados.{% else %}Crie seu primeiro RDO para começar.{% endif %}</p>
-                <a href="/funcionario/rdo/novo" class="btn-modern btn-primary">
+                <a href="/funcionario/rdo/consolidado" class="btn-modern btn-primary">
                     <i class="fas fa-plus"></i>
                     Criar Primeiro RDO
                 </a>
@@ -331,7 +335,7 @@
 }
 
 .rdo-header {
-    background: linear-gradient(135deg, #198754 0%, #155724 100%);
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
     color: white;
     padding: 1rem;
     display: flex;
@@ -344,31 +348,11 @@
     display: flex;
     align-items: center;
     gap: 0.5rem;
-    font-size: 1.1rem;
-}
-
-.rdo-status {
-    font-size: 0.9rem;
-}
-
-.rdo-numero {
-    margin-bottom: 0.5rem;
-    font-weight: 500;
 }
 
 .rdo-clima {
-    margin-top: 0.5rem;
-}
-
-.clima-info {
-    font-weight: 500;
-    color: #2d3748;
-}
-
-.temp-info {
-    margin-left: 0.5rem;
-    color: #718096;
     font-size: 0.9rem;
+    opacity: 0.9;
 }
 
 .rdo-content {
