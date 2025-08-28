@@ -860,7 +860,7 @@ console.log('Initializing RDO with light theme...');
                 <i class="fas fa-clipboard-list"></i>
             </div>
             <div class="stat-content">
-                <div class="stat-number">{{ total_rdos|default(rdos|length) }}</div>
+                <div class="stat-number">{{ total_rdos|default(0) }}</div>
                 <div class="stat-label">Total de RDOs</div>
             </div>
         </div>
@@ -870,7 +870,13 @@ console.log('Initializing RDO with light theme...');
                 <i class="fas fa-check-circle"></i>
             </div>
             <div class="stat-content">
-                <div class="stat-number">{{ rdos|selectattr('rdo.status', 'equalto', 'Finalizado')|list|length }}</div>
+                <div class="stat-number">
+                    {% if rdos and rdos is iterable and rdos is not string %}
+                        {{ rdos|selectattr('rdo.status', 'equalto', 'Finalizado')|list|length }}
+                    {% else %}
+                        0
+                    {% endif %}
+                </div>
                 <div class="stat-label">Finalizadas</div>
             </div>
         </div>
@@ -880,7 +886,13 @@ console.log('Initializing RDO with light theme...');
                 <i class="fas fa-clock"></i>
             </div>
             <div class="stat-content">
-                <div class="stat-number">{{ rdos|selectattr('rdo.status', 'equalto', 'Rascunho')|list|length }}</div>
+                <div class="stat-number">
+                    {% if rdos and rdos is iterable and rdos is not string %}
+                        {{ rdos|selectattr('rdo.status', 'equalto', 'Rascunho')|list|length }}
+                    {% else %}
+                        0
+                    {% endif %}
+                </div>
                 <div class="stat-label">Em Andamento</div>
             </div>
         </div>
@@ -890,8 +902,15 @@ console.log('Initializing RDO with light theme...');
                 <i class="fas fa-chart-line"></i>
             </div>
             <div class="stat-content">
-                {% set total_progress = rdos|map(attribute='progresso_medio')|select('number')|sum %}
-                {% set avg_progress = (total_progress / rdos|length)|round(1) if rdos and rdos|length > 0 else 0 %}
+                {% set avg_progress = 0 %}
+                {% if rdos %}
+                    {% if rdos is iterable and rdos is not string %}
+                        {% set total_progress = rdos|map(attribute='progresso_medio')|select('number')|sum %}
+                        {% set avg_progress = (total_progress / rdos|length)|round(1) if rdos|length > 0 else 0 %}
+                    {% else %}
+                        {% set avg_progress = 0 %}
+                    {% endif %}
+                {% endif %}
                 <div class="stat-number">{{ "%.1f"|format(avg_progress) }}%</div>
                 <div class="stat-label">Progresso Médio</div>
             </div>
@@ -972,7 +991,7 @@ console.log('Initializing RDO with light theme...');
     </div>
 
     <!-- Grid de Cards RDO -->
-    {% if rdos %}
+    {% if rdos and rdos is iterable and rdos is not string and rdos|length > 0 %}
     <div class="rdos-grid">
         {% for rdo_data in rdos %}
         {% set rdo = rdo_data.rdo if rdo_data.rdo else rdo_data %}
