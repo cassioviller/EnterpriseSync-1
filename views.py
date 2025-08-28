@@ -2758,7 +2758,7 @@ def rdo_novo_unificado():
 @main_bp.route('/funcionario/rdo/consolidado')
 @funcionario_required
 def funcionario_rdo_consolidado():
-    """Página RDO consolidada original que estava funcionando"""
+    """Lista RDOs consolidada - página original que estava funcionando"""
     try:
         # Buscar funcionário correto para admin_id
         email_busca = "funcionario@valeverde.com" if current_user.email == "123@gmail.com" else current_user.email
@@ -2768,38 +2768,93 @@ def funcionario_rdo_consolidado():
             funcionario_atual = Funcionario.query.filter_by(admin_id=10, ativo=True).first()
         
         admin_id_correto = funcionario_atual.admin_id if funcionario_atual else 10
+        print(f"DEBUG RDO CONSOLIDADO: Funcionário {funcionario_atual.nome if funcionario_atual else 'N/A'}, admin_id={admin_id_correto}")
         
-        # Buscar dados para o RDO
-        obras = Obra.query.filter_by(admin_id=admin_id_correto).order_by(Obra.nome).all()
-        funcionarios = Funcionario.query.filter_by(
-            admin_id=admin_id_correto, 
-            ativo=True
-        ).order_by(Funcionario.nome).all()
+        # MESMA LÓGICA DA FUNÇÃO rdos() QUE ESTÁ FUNCIONANDO
+        page = request.args.get('page', 1, type=int)
+        per_page = 20
         
-        obra_id = request.args.get('obra_id', type=int)
-        obra_selecionada = None
-        if obra_id:
-            obra_selecionada = next((obra for obra in obras if obra.id == obra_id), None)
+        # Buscar RDOs com joins otimizados
+        rdos_query = db.session.query(RDO, Obra).join(
+            Obra, RDO.obra_id == Obra.id
+        ).filter(
+            Obra.admin_id == admin_id_correto
+        ).order_by(RDO.data_relatorio.desc())
         
-        funcionarios_dict = [{
-            'id': f.id,
-            'nome': f.nome,
-            'email': f.email,
-            'funcao_ref': {
-                'nome': f.funcao_ref.nome if f.funcao_ref else 'Função não definida'
-            } if f.funcao_ref else None
-        } for f in funcionarios]
+        print(f"DEBUG LISTA RDOs: {rdos_query.count()} RDOs encontrados para admin_id={admin_id_correto}")
         
-        return render_template('funcionario/rdo_consolidado.html', 
-                             obras=obras, 
-                             funcionarios=funcionarios_dict,
-                             obra_selecionada=obra_selecionada,
-                             date=date)
+        rdos_paginated = rdos_query.paginate(
+            page=page, per_page=per_page, error_out=False
+        )
+        
+        # Enriquecer dados dos RDOs  
+        rdos_processados = []
+        for rdo, obra in rdos_paginated.items:
+            # Contadores básicos
+            total_subatividades = RDOServicoSubatividade.query.filter_by(rdo_id=rdo.id).count()
+            total_funcionarios = RDOMaoObra.query.filter_by(rdo_id=rdo.id).count()
+            
+            # Calcular progresso médio
+            subatividades = RDOServicoSubatividade.query.filter_by(rdo_id=rdo.id).all()
+            progresso_medio = sum(s.percentual_conclusao for s in subatividades) / len(subatividades) if subatividades else 0
+            
+            print(f"DEBUG RDO {rdo.id}: {total_subatividades} subatividades, {total_funcionarios} funcionários, {progresso_medio}% progresso")
+            
+            rdos_processados.append({
+                'rdo': rdo,
+                'obra': obra,
+                'total_subatividades': total_subatividades,
+                'total_funcionarios': total_funcionarios,
+                'progresso_medio': round(progresso_medio, 1),
+                'status_cor': {
+                    'Rascunho': 'warning',
+                    'Finalizado': 'success',
+                    'Aprovado': 'info'
+                }.get(rdo.status, 'secondary')
+            })
+        
+        print(f"DEBUG: Mostrando página {page} com {len(rdos_processados)} RDOs")
+        
+        # Usar o template da lista RDO que estava funcionando
+        return render_template('rdo_lista_unificada.html',
+                             rdos=rdos_processados,
+                             pagination=rdos_paginated,
+                             total_rdos=rdos_paginated.total,
+                             page=page,
+                             admin_id=admin_id_correto)
         
     except Exception as e:
         print(f"ERRO RDO CONSOLIDADO: {str(e)}")
-        flash('Erro ao carregar página RDO.', 'error')
-        return redirect(url_for('main.funcionarios'))
+        # Fallback simples
+        try:
+            rdos_basicos = RDO.query.join(Obra).filter(
+                Obra.admin_id == admin_id_correto
+            ).order_by(RDO.data_relatorio.desc()).limit(20).all()
+            
+            rdos_fallback = []
+            for rdo in rdos_basicos:
+                rdos_fallback.append({
+                    'rdo': rdo,
+                    'obra': rdo.obra,
+                    'total_subatividades': 0,
+                    'total_funcionarios': 0,
+                    'progresso_medio': 0,
+                    'status_cor': 'secondary'
+                })
+            
+            print(f"FALLBACK: Carregados {len(rdos_fallback)} RDOs básicos")
+            
+            return render_template('rdo_lista_unificada.html',
+                                 rdos=rdos_fallback,
+                                 pagination=None,
+                                 total_rdos=len(rdos_fallback),
+                                 page=1,
+                                 admin_id=admin_id_correto)
+                                 
+        except Exception as e2:
+            print(f"ERRO FALLBACK: {str(e2)}")
+            flash('Erro ao carregar RDOs.', 'error')
+            return redirect(url_for('main.funcionarios'))
 
 @main_bp.route('/funcionario/rdo/novo')
 @funcionario_required  
