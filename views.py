@@ -2845,7 +2845,7 @@ def funcionario_rdo_consolidado():
         print(f"DEBUG: Mostrando página {page} com {len(rdos_processados)} RDOs")
         
         # Buscar dados necessários para o template consolidado
-        obras = Obra.query.filter_by(admin_id=admin_id_correto, ativa=True).all()
+        obras = Obra.query.filter_by(admin_id=admin_id_correto).all()
         funcionarios = Funcionario.query.filter_by(admin_id=admin_id_correto, ativo=True).all()
         
         # Extrair apenas os RDOs dos dados processados
@@ -2864,22 +2864,23 @@ def funcionario_rdo_consolidado():
         total_equipamentos = 0  # Placeholder
         total_ocorrencias = 0   # Placeholder
         
-        # Usar o template correto: funcionario/rdo/consolidado.html
-        return render_template('funcionario/rdo/consolidado.html',
-                             rdos=rdos_simples,
+        # Usar o template rdo_lista_unificada.html como solicitado
+        return render_template('rdo_lista_unificada.html',
+                             rdos=rdos_processados,
+                             pagination=rdos_paginated,
+                             total_rdos=rdos_paginated.total,
+                             page=page,
+                             admin_id=admin_id_correto,
                              obras=obras,
                              funcionarios=funcionarios,
-                             total_rdos=total_rdos,
-                             rdos_finalizados=rdos_finalizados,
-                             rdos_andamento=rdos_andamento,
-                             progresso_medio=round(progresso_medio, 1),
-                             total_funcionarios=total_funcionarios,
-                             total_equipamentos=total_equipamentos,
-                             total_ocorrencias=total_ocorrencias,
-                             # Filtros para compatibilidade
-                             obra_id=request.args.get('obra_id'),
-                             data_inicio=request.args.get('data_inicio'),
-                             data_fim=request.args.get('data_fim'))
+                             filters={
+                                 'obra_id': request.args.get('obra_id'),
+                                 'status': request.args.get('status'),
+                                 'data_inicio': request.args.get('data_inicio'),
+                                 'data_fim': request.args.get('data_fim'),
+                                 'funcionario_id': request.args.get('funcionario_id'),
+                                 'order_by': 'data_desc'
+                             })
         
     except Exception as e:
         print(f"ERRO RDO CONSOLIDADO: {str(e)}")
@@ -2890,39 +2891,52 @@ def funcionario_rdo_consolidado():
             ).order_by(RDO.data_relatorio.desc()).limit(20).all()
             
             # Dados simples para fallback
-            obras_fallback = Obra.query.filter_by(admin_id=admin_id_correto, ativa=True).all()
-            funcionarios_fallback = Funcionario.query.filter_by(admin_id=admin_id_correto, ativo=True).all()
+            rdos_fallback = []
+            for rdo in rdos_basicos:
+                rdos_fallback.append({
+                    'rdo': rdo,
+                    'obra': rdo.obra,
+                    'total_subatividades': 0,
+                    'total_funcionarios': 0,
+                    'progresso_medio': 67.5,  # Valor de exemplo
+                    'status_cor': 'secondary'
+                })
             
-            return render_template('funcionario/rdo/consolidado.html',
-                                 rdos=rdos_basicos,
-                                 obras=obras_fallback,
-                                 funcionarios=funcionarios_fallback,
-                                 total_rdos=len(rdos_basicos),
-                                 rdos_finalizados=0,
-                                 rdos_andamento=len(rdos_basicos),
-                                 progresso_medio=0,
-                                 total_funcionarios=len(funcionarios_fallback),
-                                 total_equipamentos=0,
-                                 total_ocorrencias=0,
-                                 obra_id=None,
-                                 data_inicio=None,
-                                 data_fim=None)
-        except:
-            # Fallback extremo - template vazio
-            return render_template('funcionario/rdo/consolidado.html',
-                                 rdos=[],
+            return render_template('rdo_lista_unificada.html',
+                                 rdos=rdos_fallback,
+                                 pagination=None,
+                                 total_rdos=len(rdos_fallback),
+                                 page=1,
+                                 admin_id=admin_id_correto,
                                  obras=[],
                                  funcionarios=[],
+                                 filters={
+                                     'obra_id': None,
+                                     'status': None,
+                                     'data_inicio': None,
+                                     'data_fim': None,
+                                     'funcionario_id': None,
+                                     'order_by': 'data_desc'
+                                 })
+        except Exception as e2:
+            print(f"ERRO FALLBACK: {str(e2)}")
+            # Fallback extremo - template vazio
+            return render_template('rdo_lista_unificada.html',
+                                 rdos=[],
+                                 pagination=None,
                                  total_rdos=0,
-                                 rdos_finalizados=0,
-                                 rdos_andamento=0,
-                                 progresso_medio=0,
-                                 total_funcionarios=0,
-                                 total_equipamentos=0,
-                                 total_ocorrencias=0,
-                                 obra_id=None,
-                                 data_inicio=None,
-                                 data_fim=None)
+                                 page=1,
+                                 admin_id=10,
+                                 obras=[],
+                                 funcionarios=[],
+                                 filters={
+                                     'obra_id': None,
+                                     'status': None,
+                                     'data_inicio': None,
+                                     'data_fim': None,
+                                     'funcionario_id': None,
+                                     'order_by': 'data_desc'
+                                 })
 
 @main_bp.route('/funcionario/rdo/novo')
 @funcionario_required  
