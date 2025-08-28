@@ -667,15 +667,15 @@ console.log('Initializing RDO view with light theme...');
                 {% for subatividade in subatividades %}
                 <div class="subatividade-card">
                     <div class="subatividade-header">
-                        <h4 class="subatividade-nome">{{ subatividade.subatividade_mestre.nome if subatividade.subatividade_mestre else 'Subatividade' }}</h4>
-                        <div class="progress-badge">{{ "%.1f"|format(subatividade.percentual_concluido) }}%</div>
+                        <h4 class="subatividade-nome">{{ subatividade.nome_subatividade or 'Subatividade' }}</h4>
+                        <div class="progress-badge">{{ "%.1f"|format(subatividade.percentual_conclusao or 0) }}%</div>
                     </div>
                     <div class="progress-bar">
-                        <div class="progress-fill" style="width: {{ subatividade.percentual_concluido }}%"></div>
+                        <div class="progress-fill" style="width: {{ subatividade.percentual_conclusao or 0 }}%"></div>
                     </div>
                     <div class="subatividade-servico">
                         <i class="fas fa-wrench"></i>
-                        <span>{{ subatividade.servico_mestre.nome if subatividade.servico_mestre else 'Serviço não definido' }}</span>
+                        <span>{{ subatividade.servico.nome if subatividade.servico else 'Serviço não definido' }}</span>
                     </div>
                 </div>
                 {% endfor %}

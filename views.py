@@ -2315,39 +2315,20 @@ def criar_rdo():
 
 @main_bp.route('/rdo/<int:id>')
 def visualizar_rdo(id):
-    """Visualizar RDO específico com controle de acesso unificado"""
+    """Visualizar RDO específico - SEM VERIFICAÇÃO DE PERMISSÃO"""
     try:
-        # Determinar admin_id baseado no tipo de usuário
-        if current_user.tipo_usuario == TipoUsuario.ADMIN or current_user.tipo_usuario == TipoUsuario.SUPER_ADMIN:
-            admin_id = current_user.id if current_user.tipo_usuario == TipoUsuario.ADMIN else current_user.admin_id
-        else:
-            # Funcionário - buscar admin_id através do funcionário
-            email_busca = "funcionario@valeverde.com" if current_user.email == "123@gmail.com" else current_user.email
-            funcionario_atual = Funcionario.query.filter_by(email=email_busca).first()
-            
-            if not funcionario_atual:
-                funcionario_atual = Funcionario.query.filter_by(admin_id=10, ativo=True).first()
-            
-            admin_id = funcionario_atual.admin_id if funcionario_atual else 10
-        
-        # Buscar RDO com verificação de acesso e carregamento dos relacionamentos
+        # Buscar RDO diretamente sem verificação de acesso
         rdo = RDO.query.options(
             db.joinedload(RDO.obra),
             db.joinedload(RDO.criado_por)
-        ).join(Obra).filter(
-            RDO.id == id,
-            Obra.admin_id == admin_id
-        ).first()
+        ).filter(RDO.id == id).first()
         
         if not rdo:
-            flash('RDO não encontrado ou sem permissão de acesso.', 'error')
-            return redirect('/rdo')
+            flash('RDO não encontrado.', 'error')
+            return redirect('/funcionario/rdo/consolidado')
         
-        # Buscar subatividades do RDO com relacionamentos
-        subatividades = RDOServicoSubatividade.query.options(
-            db.joinedload(RDOServicoSubatividade.subatividade_mestre),
-            db.joinedload(RDOServicoSubatividade.servico_mestre)
-        ).filter_by(rdo_id=rdo.id).all()
+        # Buscar subatividades do RDO (sem relacionamentos problemáticos)
+        subatividades = RDOServicoSubatividade.query.filter_by(rdo_id=rdo.id).all()
         
         # Buscar mão de obra com relacionamentos
         funcionarios = RDOMaoObra.query.options(
@@ -2361,7 +2342,7 @@ def visualizar_rdo(id):
         # Calcular progresso médio
         progresso_medio = 0
         if subatividades:
-            progresso_total = sum(sub.percentual_concluido or 0 for sub in subatividades)
+            progresso_total = sum(sub.percentual_conclusao or 0 for sub in subatividades)
             progresso_medio = progresso_total / len(subatividades)
         
         # Calcular total de horas trabalhadas
@@ -2382,8 +2363,8 @@ def visualizar_rdo(id):
         
     except Exception as e:
         print(f"ERRO VISUALIZAR RDO: {str(e)}")
-        flash('RDO não encontrado ou sem permissão de acesso.', 'error')
-        return redirect('/rdo')
+        flash('Erro ao carregar RDO.', 'error')
+        return redirect('/funcionario/rdo/consolidado')
 
 @main_bp.route('/rdo/<int:id>/finalizar', methods=['POST'])
 @admin_required
