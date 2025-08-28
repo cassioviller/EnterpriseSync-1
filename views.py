@@ -2785,7 +2785,6 @@ def rdo_novo_unificado():
 
 # Aliases para compatibilidade com rotas antigas
 @main_bp.route('/funcionario/rdo/consolidado')
-@funcionario_required
 def funcionario_rdo_consolidado():
     """Lista RDOs consolidada - página original que estava funcionando"""
     try:
