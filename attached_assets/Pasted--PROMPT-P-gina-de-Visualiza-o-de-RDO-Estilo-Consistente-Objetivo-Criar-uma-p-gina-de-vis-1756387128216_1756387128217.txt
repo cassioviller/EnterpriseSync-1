@@ -1,0 +1,196 @@
+# PROMPT: Página de Visualização de RDO - Estilo Consistente
+
+## Objetivo
+Criar uma página de visualização/detalhes de RDO que mantenha **exatamente o mesmo estilo visual** da página de listagem, mas mostrando informações detalhadas de uma RDO específica.
+
+## Estilo Visual a Manter (Da Listagem)
+
+### HEADER PRINCIPAL:
+- Gradiente verde/azul idêntico
+- Ícone de clipboard à esquerda
+- Título e subtítulo em branco
+- Botão "Voltar" no canto direito
+- Bordas arredondadas e sombra
+
+### CARDS DE ESTATÍSTICAS:
+- Mesmo formato dos cards da listagem
+- Ícones circulares coloridos
+- Números grandes e labels
+- Sombras e hover effects
+
+### SEÇÕES ORGANIZADAS:
+- Cards brancos com bordas arredondadas
+- Headers de seção com ícones
+- Espaçamento consistente
+- Sombras sutis
+
+## Estrutura da Página de Visualização
+
+### 1. HEADER DA PÁGINA
+```
+┌─────────────────────────────────────────────────────────────┐
+│ 📋 RDO RDO-2025-011                           [← Voltar]    │
+│    Obra: Galpão Industrial | Data: 29/08/2025 | Finalizado │
+└─────────────────────────────────────────────────────────────┘
+```
+
+**Especificações:**
+- Mesmo gradiente verde/azul da listagem
+- Título: "RDO RDO-2025-011" (branco, grande)
+- Subtítulo: Informações básicas da RDO
+- Botão "Voltar" idêntico ao da listagem
+
+### 2. CARDS DE ESTATÍSTICAS (4 cards)
+```
+┌─────────────┐ ┌─────────────┐ ┌─────────────┐ ┌─────────────┐
+│ 📋    6     │ │ 👥    2     │ │ 📊  61.7%   │ │ ⏰  16.0h   │
+│ Subativid.  │ │ Funcionár.  │ │ Progresso   │ │ Horas Trab. │
+└─────────────┘ └─────────────┘ └─────────────┘ └─────────────┘
+```
+
+**Cards:**
+1. **Subatividades:** Número total de subatividades
+2. **Funcionários:** Quantidade de funcionários
+3. **Progresso Geral:** Porcentagem média
+4. **Horas Trabalhadas:** Total de horas
+
+### 3. SEÇÃO INFORMAÇÕES BÁSICAS
+```
+┌─────────────────────────────────────────────────────────────┐
+│ ℹ️ Informações Básicas                                       │
+├─────────────────────────────────────────────────────────────┤
+│ Obra:        Galpão Industrial Estruturas Metálicas        │
+│ Data:        29/08/2025                                     │
+│ Criado por:  Cássio Viller Silva de Azevedo               │
+│ Criado em:   27/08/2025 13:29                             │
+│ Status:      [Finalizado]                                   │
+└─────────────────────────────────────────────────────────────┘
+```
+
+### 4. SEÇÃO CONDIÇÕES CLIMÁTICAS
+```
+┌─────────────────────────────────────────────────────────────┐
+│ 🌤️ Condições Climáticas                                     │
+├─────────────────────────────────────────────────────────────┤
+│              ☁️                                             │
+│    Nenhuma informação climática registrada                 │
+└─────────────────────────────────────────────────────────────┘
+```
+
+### 5. SEÇÃO SUBATIVIDADES EXECUTADAS
+```
+┌─────────────────────────────────────────────────────────────┐
+│ 📋 Subatividades Executadas (6)                            │
+├─────────────────────────────────────────────────────────────┤
+│ ┌─────────────────┐ ┌─────────────────┐ ┌─────────────────┐ │
+│ │ Preparação Inic.│ │ Preparação Inic.│ │ Cura do Concr.  │ │
+│ │ [30.0%]         │ │ [60.0%]         │ │ [10.0%]         │ │
+│ │ ████████░░░░░░░░│ │ ████████████░░░░│ │ ██░░░░░░░░░░░░░░│ │
+│ │ 🔧 Beiral Met.  │ │ 🔧 Manta PVC    │ │ 🔧 Estrut. Met. │ │
+│ └─────────────────┘ └─────────────────┘ └─────────────────┘ │
+│                                                             │
+│ ┌─────────────────┐ ┌─────────────────┐ ┌─────────────────┐ │
+│ │ Concretagem     │ │ Armação de Ferro│ │ Montagem Formas │ │
+│ │ [70.0%]         │ │ [100.0%]        │ │ [100.0%]        │ │
+│ │ ██████████████░░│ │ ████████████████│ │ ████████████████│ │
+│ │ 🔧 Estrut. Met. │ │ 🔧 Estrut. Met. │ │ 🔧 Estrut. Met. │ │
+│ └─────────────────┘ └─────────────────┘ └─────────────────┘ │
+└─────────────────────────────────────────────────────────────┘
+```
+
+**Especificações dos Cards de Subatividade:**
+- Nome da subatividade no topo
+- Porcentagem em badge colorido
+- Barra de progresso visual
+- Nome do serviço com ícone embaixo
+- Grid responsivo (3 colunas desktop, 1 mobile)
+
+### 6. SEÇÃO MÃO DE OBRA
+```
+┌─────────────────────────────────────────────────────────────┐
+│ 👥 Mão de Obra (2 funcionários)                            │
+├─────────────────────────────────────────────────────────────┤
+│ ┌─────────────────────────────┐ ┌─────────────────────────┐ │
+│ │ 👤 Carlos Pereira Lima      │ │ 👤 Caio Fabio Silva     │ │
+│ │    Funcionário              │ │    Funcionário          │ │
+│ │    ⏰ 8.0h                  │ │    ⏰ 8.0h              │ │
+│ └─────────────────────────────┘ └─────────────────────────┘ │
+└─────────────────────────────────────────────────────────────┘
+```
+
+## Cores e Estilo (Idêntico à Listagem)
+
+### PALETA DE CORES:
+- **Header:** Gradiente verde/azul (#2d5a27 → #4a7c59 → azul)
+- **Cards:** Fundo branco (#ffffff)
+- **Ícones:** Verde (#2d5a27)
+- **Texto principal:** #495057
+- **Texto secundário:** #6c757d
+- **Badges:** Verde (#28a745), Azul (#007bff), etc.
+
+### ELEMENTOS VISUAIS:
+- **Bordas arredondadas:** 12px em todos os cards
+- **Sombras:** 0 4px 6px rgba(0, 0, 0, 0.1)
+- **Espaçamento:** 2rem entre seções
+- **Hover effects:** translateY(-2px) + sombra maior
+
+## Responsividade
+
+### DESKTOP:
+- Cards de estatísticas: 4 colunas
+- Subatividades: 3 colunas
+- Mão de obra: 2 colunas
+
+### TABLET:
+- Cards de estatísticas: 2 colunas
+- Subatividades: 2 colunas
+- Mão de obra: 1 coluna
+
+### MOBILE:
+- Tudo em coluna única
+- Cards menores mas mantendo informações
+
+## Navegação
+
+### BOTÃO VOLTAR:
+- Mesmo estilo da listagem
+- Retorna para `/rdo` (lista de RDOs)
+- Posicionado no header
+
+### BOTÕES DE AÇÃO (Opcionais):
+- "Editar RDO" (se tiver permissão)
+- "Duplicar RDO"
+- "Gerar PDF"
+
+## Dados Dinâmicos
+
+### INFORMAÇÕES DA RDO:
+- ID da RDO (ex: RDO-2025-011)
+- Nome da obra
+- Data da RDO
+- Funcionário criador
+- Status (Finalizado/Em Andamento)
+
+### ESTATÍSTICAS CALCULADAS:
+- Total de subatividades
+- Número de funcionários
+- Progresso médio (calculado das subatividades)
+- Total de horas trabalhadas
+
+### SUBATIVIDADES:
+- Nome da subatividade
+- Porcentagem de conclusão
+- Serviço relacionado
+- Barra de progresso visual
+
+## Resultado Final
+
+Uma página que parece uma **extensão natural** da listagem de RDOs, mantendo:
+- ✅ Mesmo header com gradiente
+- ✅ Mesmos cards de estatísticas
+- ✅ Mesma organização visual
+- ✅ Mesmas cores e espaçamentos
+- ✅ Mesma tipografia e ícones
+
+Mas mostrando **detalhes específicos** da RDO selecionada de forma organizada e profissional.
+

@@ -1,0 +1,716 @@
+{% extends "base_completo.html" %}
+
+{% block head %}
+<script>
+// Garantir light theme para RDO
+console.log('Initializing RDO view with light theme...');
+</script>
+{% endblock %}
+
+{% block title %}{{ rdo.numero_rdo }} - Detalhes - SIGE{% endblock %}
+
+{% block styles %}
+<style>
+/* ===== OVERRIDE ESPECÍFICO PARA RDO ===== */
+.rdo-container {
+    background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%) !important;
+    min-height: 100vh;
+    padding-top: 2rem;
+}
+
+.rdo-container,
+.rdo-container * {
+    color: #212529 !important;
+}
+
+.rdo-container .card,
+.rdo-container .stat-card,
+.rdo-container .info-card {
+    background: rgba(255, 255, 255, 0.95) !important;
+    border: 1px solid rgba(222, 226, 230, 0.8) !important;
+    backdrop-filter: blur(10px);
+}
+
+/* ===== DESIGN SYSTEM MODERNO PROFISSIONAL ===== */
+:root {
+    --primary-green: #2d5a27;
+    --dark-green: #145a3e;
+    --light-green: #d1e7dd;
+    --accent-green: #4a7c59;
+    --blue-primary: #0d6efd;
+    --blue-light: #e7f3ff;
+    --yellow-warning: #ffc107;
+    --yellow-light: #fff3cd;
+    --red-danger: #dc3545;
+    --red-light: #f8d7da;
+    --white: #ffffff;
+    --gray-50: #f8f9fa;
+    --gray-100: #e9ecef;
+    --gray-200: #dee2e6;
+    --gray-300: #ced4da;
+    --gray-400: #adb5bd;
+    --gray-500: #6c757d;
+    --gray-600: #495057;
+    --gray-700: #343a40;
+    --gray-800: #212529;
+    --gray-900: #000000;
+    
+    /* Sombras Profissionais */
+    --shadow-sm: 0 2px 4px rgba(0, 0, 0, 0.06);
+    --shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    --shadow-md: 0 6px 12px rgba(0, 0, 0, 0.12);
+    --shadow-lg: 0 10px 25px rgba(0, 0, 0, 0.15);
+    --shadow-xl: 0 20px 40px rgba(0, 0, 0, 0.2);
+    
+    /* Bordas e Transições */
+    --border-radius: 16px;
+    --border-radius-lg: 20px;
+    --border-radius-xl: 24px;
+    --transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    --transition-fast: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    
+    /* Gradientes */
+    --gradient-primary: linear-gradient(135deg, var(--primary-green) 0%, var(--accent-green) 50%, var(--blue-primary) 100%);
+    --gradient-card: linear-gradient(135deg, var(--white) 0%, var(--gray-50) 100%);
+    --gradient-success: linear-gradient(135deg, #28a745 0%, var(--primary-green) 100%);
+}
+
+/* ===== CONTAINER PRINCIPAL ===== */
+.rdo-container {
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 0;
+    background: #f8f9fa !important;
+    min-height: 100vh;
+    color: #212529 !important;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif !important;
+}
+
+/* ===== HEADER MODERNO COM GRADIENTE ===== */
+.page-header {
+    background: var(--gradient-primary) !important;
+    color: white !important;
+    padding: 3rem 0 !important;
+    margin: 0 0 3rem 0;
+    border-radius: 0 0 24px 24px !important;
+    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25) !important;
+    position: relative;
+    overflow: hidden;
+}
+
+.page-header::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: linear-gradient(45deg, rgba(255,255,255,0.1) 0%, transparent 50%);
+    pointer-events: none;
+}
+
+.header-content {
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 0 2rem;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    position: relative;
+    z-index: 1;
+}
+
+.header-left {
+    display: flex;
+    align-items: center;
+    gap: 1.5rem;
+}
+
+.header-icon {
+    width: 60px;
+    height: 60px;
+    background: rgba(255, 255, 255, 0.2);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 2rem;
+    color: white;
+    backdrop-filter: blur(10px);
+}
+
+.header-text h1 {
+    margin: 0;
+    font-size: 2.5rem;
+    font-weight: 800;
+    letter-spacing: -1px;
+    color: white !important;
+}
+
+.header-text p {
+    margin: 0.5rem 0 0 0;
+    font-size: 1.2rem;
+    font-weight: 500;
+    opacity: 0.9;
+    color: white !important;
+}
+
+.btn-voltar {
+    background: rgba(255, 255, 255, 0.2);
+    color: white !important;
+    border: 2px solid rgba(255, 255, 255, 0.3);
+    padding: 1rem 2rem;
+    border-radius: var(--border-radius);
+    font-weight: 700;
+    font-size: 1.1rem;
+    text-decoration: none;
+    backdrop-filter: blur(10px);
+    transition: var(--transition);
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.btn-voltar:hover {
+    background: rgba(255, 255, 255, 0.3);
+    color: white !important;
+    text-decoration: none;
+    transform: translateY(-2px);
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.2);
+}
+
+/* ===== CARDS DE ESTATÍSTICAS ===== */
+.stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 2rem;
+    margin: 0 2rem 3rem 2rem;
+}
+
+.stat-card {
+    background: var(--white) !important;
+    border-radius: var(--border-radius-lg);
+    padding: 2.5rem;
+    box-shadow: var(--shadow-md);
+    border: 1px solid var(--gray-200) !important;
+    display: flex;
+    align-items: center;
+    gap: 2rem;
+    transition: var(--transition);
+    position: relative;
+    overflow: hidden;
+    color: var(--gray-800) !important;
+}
+
+.stat-card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 5px;
+    background: var(--gradient-primary);
+}
+
+.stat-card:hover {
+    transform: translateY(-8px);
+    box-shadow: var(--shadow-xl);
+}
+
+.stat-icon {
+    width: 70px;
+    height: 70px;
+    background: var(--gradient-primary);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.8rem;
+    color: white;
+    box-shadow: var(--shadow-md);
+}
+
+.stat-content {
+    flex: 1;
+}
+
+.stat-number {
+    font-size: 2.5rem;
+    font-weight: 800;
+    color: var(--gray-800) !important;
+    line-height: 1;
+    margin-bottom: 0.5rem;
+}
+
+.stat-label {
+    font-size: 1rem;
+    color: var(--gray-600) !important;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+/* ===== SEÇÕES DE INFORMAÇÕES ===== */
+.info-section {
+    margin: 0 2rem 3rem 2rem;
+}
+
+.info-card {
+    background: var(--white) !important;
+    border-radius: var(--border-radius-lg);
+    box-shadow: var(--shadow-md);
+    border: 1px solid var(--gray-200) !important;
+    overflow: hidden;
+    color: var(--gray-800) !important;
+}
+
+.info-header {
+    background: var(--gradient-card);
+    padding: 2rem;
+    border-bottom: 2px solid var(--gray-200);
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+}
+
+.info-header-icon {
+    width: 50px;
+    height: 50px;
+    background: var(--primary-green);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.5rem;
+    color: white;
+    box-shadow: var(--shadow-sm);
+}
+
+.info-header h3 {
+    margin: 0;
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: var(--gray-800) !important;
+}
+
+.info-body {
+    padding: 2rem;
+}
+
+.info-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1rem 0;
+    border-bottom: 1px solid var(--gray-200);
+}
+
+.info-row:last-child {
+    border-bottom: none;
+}
+
+.info-label {
+    font-weight: 600;
+    color: var(--gray-600) !important;
+    font-size: 1rem;
+}
+
+.info-value {
+    font-weight: 500;
+    color: var(--gray-800) !important;
+    font-size: 1rem;
+}
+
+.status-badge {
+    padding: 0.5rem 1rem;
+    border-radius: 25px;
+    font-size: 0.9rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.status-finalizado { 
+    background: var(--gradient-success); 
+    color: white;
+}
+.status-em-andamento { 
+    background: linear-gradient(135deg, var(--yellow-warning), #ffb700);
+    color: white;
+}
+.status-rascunho { 
+    background: linear-gradient(135deg, var(--gray-400), var(--gray-500));
+    color: white;
+}
+
+/* ===== GRID DE SUBATIVIDADES ===== */
+.subatividades-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 1.5rem;
+    padding: 2rem;
+}
+
+.subatividade-card {
+    background: var(--white) !important;
+    border-radius: var(--border-radius);
+    padding: 1.5rem;
+    box-shadow: var(--shadow-sm);
+    border: 1px solid var(--gray-200) !important;
+    transition: var(--transition);
+    color: var(--gray-800) !important;
+}
+
+.subatividade-card:hover {
+    transform: translateY(-4px);
+    box-shadow: var(--shadow-md);
+}
+
+.subatividade-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 1rem;
+}
+
+.subatividade-nome {
+    font-weight: 700;
+    color: var(--gray-800) !important;
+    font-size: 1rem;
+    margin: 0;
+    flex: 1;
+}
+
+.progress-badge {
+    background: var(--primary-green);
+    color: white;
+    padding: 0.25rem 0.75rem;
+    border-radius: 15px;
+    font-size: 0.8rem;
+    font-weight: 700;
+    margin-left: 1rem;
+}
+
+.progress-bar {
+    height: 8px;
+    background: var(--gray-300);
+    border-radius: 4px;
+    overflow: hidden;
+    margin-bottom: 1rem;
+}
+
+.progress-fill {
+    height: 100%;
+    background: var(--gradient-primary);
+    border-radius: 4px;
+    transition: width 0.8s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.subatividade-servico {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.9rem;
+    color: var(--gray-600) !important;
+    font-weight: 500;
+}
+
+/* ===== GRID DE FUNCIONÁRIOS ===== */
+.funcionarios-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+    gap: 1.5rem;
+    padding: 2rem;
+}
+
+.funcionario-card {
+    background: var(--white) !important;
+    border-radius: var(--border-radius);
+    padding: 1.5rem;
+    box-shadow: var(--shadow-sm);
+    border: 1px solid var(--gray-200) !important;
+    transition: var(--transition);
+    color: var(--gray-800) !important;
+    text-align: center;
+}
+
+.funcionario-card:hover {
+    transform: translateY(-4px);
+    box-shadow: var(--shadow-md);
+}
+
+.funcionario-avatar {
+    width: 60px;
+    height: 60px;
+    background: var(--gradient-primary);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.5rem;
+    color: white;
+    margin: 0 auto 1rem auto;
+    box-shadow: var(--shadow-sm);
+}
+
+.funcionario-nome {
+    font-weight: 700;
+    color: var(--gray-800) !important;
+    font-size: 1.1rem;
+    margin-bottom: 0.5rem;
+}
+
+.funcionario-funcao {
+    color: var(--gray-600) !important;
+    font-size: 0.9rem;
+    margin-bottom: 1rem;
+}
+
+.funcionario-horas {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    font-weight: 600;
+    color: var(--primary-green) !important;
+}
+
+/* ===== ESTADO VAZIO ===== */
+.empty-state {
+    text-align: center;
+    padding: 3rem;
+    color: var(--gray-600) !important;
+}
+
+.empty-state i {
+    font-size: 3rem;
+    margin-bottom: 1rem;
+    color: var(--gray-400) !important;
+}
+
+.empty-state h4 {
+    color: var(--gray-700) !important;
+    margin-bottom: 0.5rem;
+}
+
+/* ===== RESPONSIVIDADE ===== */
+@media (max-width: 768px) {
+    .header-content { 
+        flex-direction: column; 
+        gap: 2rem; 
+        text-align: center;
+    }
+    .header-text h1 { font-size: 2rem; }
+    .header-text p { font-size: 1rem; }
+    .stats-grid { 
+        grid-template-columns: 1fr; 
+        margin: 0 1rem 2rem 1rem;
+    }
+    .info-section { margin: 0 1rem 2rem 1rem; }
+    .subatividades-grid { 
+        grid-template-columns: 1fr; 
+        padding: 1rem;
+    }
+    .funcionarios-grid { 
+        grid-template-columns: 1fr; 
+        padding: 1rem;
+    }
+}
+
+@media (max-width: 480px) {
+    .stat-card { padding: 1.5rem; }
+    .info-body { padding: 1.5rem; }
+    .info-row { 
+        flex-direction: column; 
+        align-items: flex-start; 
+        gap: 0.5rem;
+    }
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="rdo-container">
+    <!-- Header da Página -->
+    <div class="page-header">
+        <div class="header-content">
+            <div class="header-left">
+                <div class="header-icon">
+                    <i class="fas fa-clipboard-list"></i>
+                </div>
+                <div class="header-text">
+                    <h1>RDO {{ rdo.numero_rdo }}</h1>
+                    <p>{{ rdo.obra.nome }} | {{ rdo.data_relatorio.strftime('%d/%m/%Y') }} | {{ rdo.status }}</p>
+                </div>
+            </div>
+            <div class="header-right">
+                <a href="{{ url_for('main.funcionario_rdo_consolidado') }}" class="btn-voltar">
+                    <i class="fas fa-arrow-left"></i> Voltar
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Cards de Estatísticas -->
+    <div class="stats-grid">
+        <div class="stat-card">
+            <div class="stat-icon">
+                <i class="fas fa-clipboard-list"></i>
+            </div>
+            <div class="stat-content">
+                <div class="stat-number">{{ total_subatividades }}</div>
+                <div class="stat-label">Subatividades</div>
+            </div>
+        </div>
+        
+        <div class="stat-card">
+            <div class="stat-icon">
+                <i class="fas fa-users"></i>
+            </div>
+            <div class="stat-content">
+                <div class="stat-number">{{ total_funcionarios }}</div>
+                <div class="stat-label">Funcionários</div>
+            </div>
+        </div>
+        
+        <div class="stat-card">
+            <div class="stat-icon">
+                <i class="fas fa-chart-line"></i>
+            </div>
+            <div class="stat-content">
+                <div class="stat-number">{{ "%.1f"|format(progresso_medio) }}%</div>
+                <div class="stat-label">Progresso Geral</div>
+            </div>
+        </div>
+        
+        <div class="stat-card">
+            <div class="stat-icon">
+                <i class="fas fa-clock"></i>
+            </div>
+            <div class="stat-content">
+                <div class="stat-number">{{ "%.1f"|format(total_horas_trabalhadas) }}h</div>
+                <div class="stat-label">Horas Trabalhadas</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Seção Informações Básicas -->
+    <div class="info-section">
+        <div class="info-card">
+            <div class="info-header">
+                <div class="info-header-icon">
+                    <i class="fas fa-info-circle"></i>
+                </div>
+                <h3>Informações Básicas</h3>
+            </div>
+            <div class="info-body">
+                <div class="info-row">
+                    <span class="info-label">Obra:</span>
+                    <span class="info-value">{{ rdo.obra.nome }}</span>
+                </div>
+                <div class="info-row">
+                    <span class="info-label">Data:</span>
+                    <span class="info-value">{{ rdo.data_relatorio.strftime('%d/%m/%Y') }}</span>
+                </div>
+                <div class="info-row">
+                    <span class="info-label">Criado por:</span>
+                    <span class="info-value">{{ rdo.criado_por.nome if rdo.criado_por else 'Sistema' }}</span>
+                </div>
+                <div class="info-row">
+                    <span class="info-label">Criado em:</span>
+                    <span class="info-value">{{ rdo.created_at.strftime('%d/%m/%Y %H:%M') if rdo.created_at else 'N/A' }}</span>
+                </div>
+                <div class="info-row">
+                    <span class="info-label">Status:</span>
+                    <span class="status-badge status-{{ rdo.status|lower|replace(' ', '-') }}">{{ rdo.status }}</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Seção Condições Climáticas -->
+    <div class="info-section">
+        <div class="info-card">
+            <div class="info-header">
+                <div class="info-header-icon">
+                    <i class="fas fa-cloud-sun"></i>
+                </div>
+                <h3>Condições Climáticas</h3>
+            </div>
+            <div class="info-body">
+                {% if rdo.clima %}
+                    <div class="info-row">
+                        <span class="info-label">Clima:</span>
+                        <span class="info-value">{{ rdo.clima }}</span>
+                    </div>
+                {% else %}
+                    <div class="empty-state">
+                        <i class="fas fa-cloud"></i>
+                        <h4>Nenhuma informação climática registrada</h4>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Seção Subatividades Executadas -->
+    {% if subatividades %}
+    <div class="info-section">
+        <div class="info-card">
+            <div class="info-header">
+                <div class="info-header-icon">
+                    <i class="fas fa-tasks"></i>
+                </div>
+                <h3>Subatividades Executadas ({{ total_subatividades }})</h3>
+            </div>
+            <div class="subatividades-grid">
+                {% for subatividade in subatividades %}
+                <div class="subatividade-card">
+                    <div class="subatividade-header">
+                        <h4 class="subatividade-nome">{{ subatividade.subatividade_mestre.nome if subatividade.subatividade_mestre else 'Subatividade' }}</h4>
+                        <div class="progress-badge">{{ "%.1f"|format(subatividade.percentual_concluido) }}%</div>
+                    </div>
+                    <div class="progress-bar">
+                        <div class="progress-fill" style="width: {{ subatividade.percentual_concluido }}%"></div>
+                    </div>
+                    <div class="subatividade-servico">
+                        <i class="fas fa-wrench"></i>
+                        <span>{{ subatividade.servico_mestre.nome if subatividade.servico_mestre else 'Serviço não definido' }}</span>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Seção Mão de Obra -->
+    {% if funcionarios %}
+    <div class="info-section">
+        <div class="info-card">
+            <div class="info-header">
+                <div class="info-header-icon">
+                    <i class="fas fa-users"></i>
+                </div>
+                <h3>Mão de Obra ({{ total_funcionarios }} funcionários)</h3>
+            </div>
+            <div class="funcionarios-grid">
+                {% for funcionario in funcionarios %}
+                <div class="funcionario-card">
+                    <div class="funcionario-avatar">
+                        <i class="fas fa-user"></i>
+                    </div>
+                    <div class="funcionario-nome">{{ funcionario.funcionario.nome if funcionario.funcionario else 'Funcionário' }}</div>
+                    <div class="funcionario-funcao">{{ funcionario.funcionario.funcao_ref.nome if funcionario.funcionario and funcionario.funcionario.funcao_ref else 'Funcionário' }}</div>
+                    <div class="funcionario-horas">
+                        <i class="fas fa-clock"></i>
+                        <span>{{ "%.1f"|format(funcionario.horas_trabalhadas) }}h</span>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

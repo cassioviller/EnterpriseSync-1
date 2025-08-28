@@ -2314,7 +2314,6 @@ def criar_rdo():
         return redirect(url_for('main.novo_rdo'))
 
 @main_bp.route('/rdo/<int:id>')
-@login_required
 def visualizar_rdo(id):
     """Visualizar RDO específico com controle de acesso unificado"""
     try:
@@ -2344,14 +2343,42 @@ def visualizar_rdo(id):
             flash('RDO não encontrado ou sem permissão de acesso.', 'error')
             return redirect('/rdo')
         
-        # Buscar subatividades do RDO
-        subatividades = RDOServicoSubatividade.query.filter_by(rdo_id=rdo.id).all()
+        # Buscar subatividades do RDO com relacionamentos
+        subatividades = RDOServicoSubatividade.query.options(
+            db.joinedload(RDOServicoSubatividade.subatividade_mestre),
+            db.joinedload(RDOServicoSubatividade.servico_mestre)
+        ).filter_by(rdo_id=rdo.id).all()
+        
+        # Buscar mão de obra com relacionamentos
+        funcionarios = RDOMaoObra.query.options(
+            db.joinedload(RDOMaoObra.funcionario)
+        ).filter_by(rdo_id=rdo.id).all()
+        
+        # Calcular estatísticas
+        total_subatividades = len(subatividades)
+        total_funcionarios = len(funcionarios)
+        
+        # Calcular progresso médio
+        progresso_medio = 0
+        if subatividades:
+            progresso_total = sum(sub.percentual_concluido or 0 for sub in subatividades)
+            progresso_medio = progresso_total / len(subatividades)
+        
+        # Calcular total de horas trabalhadas
+        total_horas_trabalhadas = sum(func.horas_trabalhadas or 0 for func in funcionarios)
         
         print(f"DEBUG VISUALIZAR RDO: ID={id}, Número={rdo.numero_rdo}")
         print(f"DEBUG SUBATIVIDADES: {len(subatividades)} encontradas")
-        print(f"DEBUG MÃO DE OBRA: {len(rdo.mao_obra)} funcionários")
+        print(f"DEBUG MÃO DE OBRA: {len(funcionarios)} funcionários")
         
-        return render_template('rdo/visualizar_rdo.html', rdo=rdo, subatividades=subatividades)
+        return render_template('rdo/visualizar_rdo_moderno.html', 
+                             rdo=rdo, 
+                             subatividades=subatividades,
+                             funcionarios=funcionarios,
+                             total_subatividades=total_subatividades,
+                             total_funcionarios=total_funcionarios,
+                             progresso_medio=progresso_medio,
+                             total_horas_trabalhadas=total_horas_trabalhadas)
         
     except Exception as e:
         print(f"ERRO VISUALIZAR RDO: {str(e)}")
