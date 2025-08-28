@@ -152,20 +152,21 @@ def salvar_rdo_flexivel():
                 except (ValueError, TypeError):
                     continue
         
+        # Processar subatividades recebidas do formulário
         # Processar subatividades (campos do tipo 'subatividade_{id}')
         subatividades_processadas = {}
         for campo, valor in request.form.items():
-            if campo.startswith('subatividade_') and valor:
+            if campo.startswith('subatividade_'):
                 try:
                     # Parse do campo: subatividade_{subatividade_mestre_id}
                     subatividade_id = int(campo.replace('subatividade_', ''))
                     percentual = float(valor) if valor else 0.0
                     
-                    if percentual > 0:  # Só salvar se percentual > 0
-                        subatividades_processadas[subatividade_id] = percentual
-                        logger.debug(f"Subatividade {subatividade_id}: {percentual}%")
+                    # Salvar TODOS os valores, incluindo 0 para rastreamento completo
+                    subatividades_processadas[subatividade_id] = percentual
                         
-                except (ValueError, TypeError):
+                except (ValueError, TypeError) as e:
+                    logger.error(f"❌ Erro ao processar campo {campo}: {e}")
                     continue
         
         # Salvar subatividades no RDOServicoSubatividade
