@@ -1,0 +1,241 @@
+# PROMPT: Validação dos Relacionamentos Serviços → Subatividades → Obras → RDO
+
+## Verificação da Cadeia de Relacionamentos
+
+### FLUXO CORRETO QUE DEVE FUNCIONAR:
+
+1. **Cadastro de Serviços** → Criar serviços (ex: "Estrutura Metálica")
+2. **Cadastro de Subatividades** → Vincular subatividades ao serviço (ex: "Montagem de Formas" pertence a "Estrutura Metálica")
+3. **Cadastro de Obra** → Selecionar quais serviços serão executados na obra
+4. **Criação de RDO** → Mostrar APENAS as subatividades dos serviços selecionados para aquela obra
+5. **Visualização de RDO** → Exibir as mesmas subatividades, agrupadas por serviço
+
+## Validações Necessárias
+
+### 1. VALIDAÇÃO: Cadastro de Serviços e Subatividades
+
+**Verificar se está correto:**
+```sql
+-- Tabela de Serviços
+SELECT id, nome FROM servicos;
+-- Resultado esperado:
+-- 1 | Estrutura Metálica
+-- 2 | Cobertura
+-- 3 | Acabamento
+
+-- Tabela de Subatividades (vinculadas aos serviços)
+SELECT id, nome, servico_id FROM subatividades;
+-- Resultado esperado:
+-- 1 | Montagem de Formas | 1 (Estrutura Metálica)
+-- 2 | Armação de Ferro   | 1 (Estrutura Metálica)
+-- 3 | Concretagem        | 1 (Estrutura Metálica)
+-- 4 | Instalação Telhas  | 2 (Cobertura)
+-- 5 | Cura do Concreto   | 2 (Cobertura)
+-- 6 | Pintura Externa    | 3 (Acabamento)
+```
+
+### 2. VALIDAÇÃO: Relacionamento Obra → Serviços
+
+**Verificar se está correto:**
+```sql
+-- Tabela de Obras
+SELECT id, nome FROM obras;
+-- Resultado esperado:
+-- 1 | Galpão Industrial Estruturas Metálicas
+
+-- Tabela de relacionamento Obra-Serviços
+SELECT obra_id, servico_id FROM obra_servicos;
+-- Resultado esperado (se obra 1 tem serviços 1 e 2):
+-- 1 | 1 (Estrutura Metálica)
+-- 1 | 2 (Cobertura)
+-- (Serviço 3 - Acabamento não está nesta obra)
+```
+
+### 3. VALIDAÇÃO: Criação de RDO - Carregar Subatividades Corretas
+
+**Função que deve funcionar corretamente:**
+```python
+def get_subatividades_para_rdo(obra_id):
+    """
+    Retorna APENAS as subatividades dos serviços 
+    que estão vinculados à obra específica
+    """
+    
+    # 1. Buscar serviços da obra
+    servicos_da_obra = db.session.query(Servico)\
+        .join(ObraServico)\
+        .filter(ObraServico.obra_id == obra_id)\
+        .all()
+    
+    # 2. Buscar subatividades desses serviços
+    subatividades_por_servico = {}
+    
+    for servico in servicos_da_obra:
+        subatividades = db.session.query(Subatividade)\
+            .filter(Subatividade.servico_id == servico.id)\
+            .all()
+        
+        subatividades_por_servico[servico] = subatividades
+    
+    return subatividades_por_servico
+
+# TESTE: Para obra_id = 1
+# Deve retornar:
+# {
+#   Servico(id=1, nome="Estrutura Metálica"): [
+#     Subatividade(nome="Montagem de Formas"),
+#     Subatividade(nome="Armação de Ferro"),
+#     Subatividade(nome="Concretagem")
+#   ],
+#   Servico(id=2, nome="Cobertura"): [
+#     Subatividade(nome="Instalação Telhas"),
+#     Subatividade(nome="Cura do Concreto")
+#   ]
+# }
+# NÃO deve incluir subatividades do serviço "Acabamento"
+```
+
+### 4. VALIDAÇÃO: Visualização de RDO - Mostrar Dados Corretos
+
+**Função que deve carregar dados da RDO:**
+```python
+def get_dados_rdo_visualizacao(rdo_id):
+    """
+    Carrega dados da RDO agrupados por serviço,
+    mostrando apenas subatividades que foram executadas
+    """
+    
+    # 1. Buscar a RDO
+    rdo = RDO.query.get(rdo_id)
+    
+    # 2. Buscar subatividades executadas nesta RDO
+    subatividades_rdo = db.session.query(SubatividadeRDO)\
+        .filter(SubatividadeRDO.rdo_id == rdo_id)\
+        .all()
+    
+    # 3. Agrupar por serviço
+    dados_por_servico = {}
+    
+    for sub_rdo in subatividades_rdo:
+        subatividade = sub_rdo.subatividade
+        servico = subatividade.servico
+        
+        if servico not in dados_por_servico:
+            dados_por_servico[servico] = []
+        
+        dados_por_servico[servico].append({
+            'subatividade': subatividade,
+            'porcentagem': sub_rdo.porcentagem
+        })
+    
+    return {
+        'rdo': rdo,
+        'dados_por_servico': dados_por_servico
+    }
+```
+
+## Testes de Consistência
+
+### TESTE 1: Criação de RDO
+**Cenário:** Criar RDO para obra que tem serviços "Estrutura Metálica" e "Cobertura"
+
+**Resultado esperado:**
+- Deve mostrar subatividades: Montagem de Formas, Armação de Ferro, Concretagem, Instalação Telhas, Cura do Concreto
+- NÃO deve mostrar: Pintura Externa (pertence ao serviço "Acabamento" que não está na obra)
+
+### TESTE 2: Visualização de RDO
+**Cenário:** Visualizar RDO onde foram executadas 3 subatividades
+
+**Resultado esperado:**
+- Deve mostrar APENAS as 3 subatividades executadas
+- Agrupadas pelos serviços corretos
+- Com as porcentagens salvas na RDO
+
+### TESTE 3: Cálculo de Progresso
+**Cenário:** Obra com 2 serviços (5 subatividades total), executou 2 subatividades
+
+**Resultado esperado:**
+- Progresso da obra: 40% (2/5 × 100%)
+- Não deve considerar subatividades de serviços que não estão na obra
+
+## Estrutura de Banco Correta
+
+### TABELAS NECESSÁRIAS:
+```sql
+-- 1. Serviços
+CREATE TABLE servicos (
+    id INT PRIMARY KEY,
+    nome VARCHAR(255) NOT NULL
+);
+
+-- 2. Subatividades (vinculadas aos serviços)
+CREATE TABLE subatividades (
+    id INT PRIMARY KEY,
+    nome VARCHAR(255) NOT NULL,
+    servico_id INT NOT NULL,
+    FOREIGN KEY (servico_id) REFERENCES servicos(id)
+);
+
+-- 3. Obras
+CREATE TABLE obras (
+    id INT PRIMARY KEY,
+    nome VARCHAR(255) NOT NULL
+);
+
+-- 4. Relacionamento Obra-Serviços (quais serviços cada obra terá)
+CREATE TABLE obra_servicos (
+    obra_id INT NOT NULL,
+    servico_id INT NOT NULL,
+    PRIMARY KEY (obra_id, servico_id),
+    FOREIGN KEY (obra_id) REFERENCES obras(id),
+    FOREIGN KEY (servico_id) REFERENCES servicos(id)
+);
+
+-- 5. RDOs
+CREATE TABLE rdos (
+    id INT PRIMARY KEY,
+    obra_id INT NOT NULL,
+    data DATE NOT NULL,
+    funcionario_id INT NOT NULL,
+    FOREIGN KEY (obra_id) REFERENCES obras(id)
+);
+
+-- 6. Subatividades executadas em cada RDO
+CREATE TABLE subatividades_rdo (
+    id INT PRIMARY KEY,
+    rdo_id INT NOT NULL,
+    subatividade_id INT NOT NULL,
+    porcentagem DECIMAL(5,2) NOT NULL,
+    FOREIGN KEY (rdo_id) REFERENCES rdos(id),
+    FOREIGN KEY (subatividade_id) REFERENCES subatividades(id)
+);
+```
+
+## Validação Final - Checklist
+
+### ✅ VERIFICAR SE:
+
+**Cadastro:**
+- [ ] Serviços estão cadastrados corretamente
+- [ ] Subatividades estão vinculadas aos serviços corretos
+- [ ] Obras têm os serviços corretos selecionados
+
+**Criação de RDO:**
+- [ ] Mostra APENAS subatividades dos serviços da obra
+- [ ] Agrupa subatividades por serviço
+- [ ] Permite preencher porcentagens
+- [ ] Salva dados na tabela subatividades_rdo
+
+**Visualização de RDO:**
+- [ ] Carrega APENAS subatividades executadas na RDO
+- [ ] Agrupa por serviço corretamente
+- [ ] Mostra porcentagens salvas
+- [ ] Calcula progresso baseado em TODAS as subatividades da obra
+
+**Cálculo de Progresso:**
+- [ ] Conta total de subatividades da obra (não do sistema todo)
+- [ ] Calcula peso proporcional correto
+- [ ] Considera apenas última porcentagem de cada subatividade
+
+Se algum desses pontos não estiver funcionando, o relacionamento precisa ser corrigido.
+
