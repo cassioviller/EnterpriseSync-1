@@ -2345,21 +2345,26 @@ def visualizar_rdo(id):
         peso_por_subatividade = 0
         
         try:
-            # PASSO 1: Contar total de subatividades da obra (de todas as RDOs)
-            total_subatividades_obra = db.session.query(RDOServicoSubatividade).join(
-                RDO, RDOServicoSubatividade.rdo_id == RDO.id
-            ).filter(RDO.obra_id == rdo.obra_id).count()
+            # PASSO 1: Calcular total TEÓRICO de subatividades da obra
+            # Buscar todos os serviços que podem existir na obra baseado no sistema flexível
+            from api_servicos_flexivel import get_servicos_obra_flexivel
             
-            print(f"DEBUG TOTAL SUBATIVIDADES OBRA: {total_subatividades_obra}")
+            # Usar o sistema flexível para determinar quantas subatividades a obra deveria ter
+            servicos_teoricos = get_servicos_obra_flexivel(rdo.obra_id)
+            
+            total_subatividades_obra = 0
+            for servico in servicos_teoricos:
+                total_subatividades_obra += len(servico.get('subatividades', []))
+            
+            print(f"DEBUG TOTAL SUBATIVIDADES TEÓRICAS OBRA: {total_subatividades_obra}")
             
             if total_subatividades_obra > 0:
                 # PASSO 2: Calcular peso de cada subatividade
                 peso_por_subatividade = 100.0 / total_subatividades_obra
                 print(f"DEBUG PESO POR SUBATIVIDADE: {peso_por_subatividade:.2f}%")
                 
-                # PASSO 3: Buscar progresso mais recente de cada subatividade da obra
-                # Buscar todas as subatividades já executadas na obra (histórico completo)
-                subatividades_obra_completas = db.session.query(RDOServicoSubatividade).join(
+                # PASSO 3: Buscar progresso das subatividades já executadas
+                subatividades_executadas = db.session.query(RDOServicoSubatividade).join(
                     RDO, RDOServicoSubatividade.rdo_id == RDO.id
                 ).filter(
                     RDO.obra_id == rdo.obra_id
@@ -2367,14 +2372,14 @@ def visualizar_rdo(id):
                 
                 # Manter apenas o progresso mais recente de cada subatividade única
                 progresso_por_subatividade = {}
-                for sub in subatividades_obra_completas:
-                    # Usar combinação servico_id + nome_subatividade como chave única
+                for sub in subatividades_executadas:
                     chave_subatividade = f"{sub.servico_id}_{sub.nome_subatividade}"
                     
                     if chave_subatividade not in progresso_por_subatividade:
                         progresso_por_subatividade[chave_subatividade] = sub.percentual_conclusao or 0
                 
-                # PASSO 4: Calcular progresso total da obra
+                # PASSO 4: Calcular progresso real da obra
+                # Considera apenas as subatividades que foram executadas
                 progresso_acumulado = 0.0
                 for chave, percentual in progresso_por_subatividade.items():
                     contribuicao = (percentual / 100.0) * peso_por_subatividade
@@ -2383,7 +2388,8 @@ def visualizar_rdo(id):
                 progresso_obra = round(progresso_acumulado, 1)
                 
                 print(f"DEBUG PROGRESSO DETALHADO:")
-                print(f"  - Subatividades únicas com progresso: {len(progresso_por_subatividade)}")
+                print(f"  - Total subatividades teóricas: {total_subatividades_obra}")
+                print(f"  - Subatividades executadas: {len(progresso_por_subatividade)}")
                 print(f"  - Peso por subatividade: {peso_por_subatividade:.2f}%")
                 print(f"  - Progresso final da obra: {progresso_obra}%")
             
