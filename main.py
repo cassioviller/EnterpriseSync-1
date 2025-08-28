@@ -88,5 +88,13 @@ def handle_exception(e):
 #     print(f"❌ Erro ao registrar blueprint serviços: {e}")
 print("⚠️ Blueprint serviços temporariamente desabilitado para correções")
 
+# Registrar health check
+try:
+    from health import health_bp
+    app.register_blueprint(health_bp)
+    print("✅ Health check registrado")
+except ImportError as e:
+    print(f"⚠️ Health check não encontrado: {e}")
+
 if __name__ == "__main__":
     app.run(host='0.0.0.0', port=5000, debug=True)

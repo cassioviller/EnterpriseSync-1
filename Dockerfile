@@ -54,8 +54,7 @@ USER sige
 ENV FLASK_ENV=production \
     PORT=5000 \
     PYTHONPATH=/app \
-    PYTHONUNBUFFERED=1 \
-    DATABASE_URL=postgresql://sige:sige@viajey_sige:5432/sige?sslmode=disable
+    PYTHONUNBUFFERED=1
 
 # Expor porta
 EXPOSE 5000
