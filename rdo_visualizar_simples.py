@@ -52,10 +52,42 @@ def visualizar_rdo_simples(id):
         total_funcionarios = len(funcionarios)
         total_horas_trabalhadas = sum(f.horas_trabalhadas or 0 for f in funcionarios)
         
-        # Progresso simplificado
-        progresso_obra = 100.0 if total_subatividades > 0 else 0
-        total_subatividades_obra = total_subatividades
-        peso_por_subatividade = 100.0 / max(total_subatividades, 1)
+        # Progresso baseado na nova lógica corrigida
+        try:
+            # Buscar total de subatividades planejadas para a obra
+            from models import ServicoObra, SubatividadeMestre
+            servicos_da_obra = ServicoObra.query.filter_by(obra_id=rdo.obra_id).all()
+            total_subatividades_obra = 0
+            
+            for servico_obra in servicos_da_obra:
+                subatividades_servico = SubatividadeMestre.query.filter_by(
+                    servico_id=servico_obra.servico_id
+                ).all()
+                total_subatividades_obra += len(subatividades_servico)
+            
+            # Fallback: usar subatividades únicas executadas
+            if total_subatividades_obra == 0:
+                subatividades_unicas = db.session.query(
+                    RDOServicoSubatividade.servico_id,
+                    RDOServicoSubatividade.nome_subatividade
+                ).join(RDO).filter(RDO.obra_id == rdo.obra_id).distinct().all()
+                total_subatividades_obra = len(subatividades_unicas)
+            
+            # Calcular progresso: soma dos percentuais / total de subatividades
+            if total_subatividades_obra > 0:
+                soma_percentuais = sum(sub.percentual_conclusao or 0 for sub in subatividades)
+                progresso_obra = round(soma_percentuais / total_subatividades_obra, 1)
+                peso_por_subatividade = 100.0 / total_subatividades_obra
+            else:
+                progresso_obra = 0
+                peso_por_subatividade = 0
+                
+        except Exception as e:
+            print(f"ERRO CÁLCULO PROGRESSO SIMPLES: {str(e)}")
+            # Fallback básico
+            progresso_obra = 0
+            total_subatividades_obra = total_subatividades
+            peso_por_subatividade = 100.0 / max(total_subatividades, 1)
         
         print(f"DEBUG SIMPLES: RDO {id} - {len(subatividades)} subatividades executadas")
         print(f"DEBUG SIMPLES: {len(subatividades_por_servico)} serviços diferentes")

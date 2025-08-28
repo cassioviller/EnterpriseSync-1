@@ -2419,20 +2419,25 @@ def visualizar_rdo(id):
                     if chave_subatividade not in progresso_por_subatividade:
                         progresso_por_subatividade[chave_subatividade] = sub.percentual_conclusao or 0
                 
-                # PASSO 4: Calcular progresso real da obra considerando TODAS as planejadas
-                progresso_acumulado = 0.0
+                # PASSO 4: Calcular progresso real da obra - LÓGICA CORRIGIDA
+                # Exemplo: 3 serviços com 2,4,4 subatividades = 10 subatividades total
+                # 1 subatividade com 100% = 10% da obra (100/10)
+                # 2 subatividades: 1 com 100% + 1 com 50% = 15% da obra ((100+50)/10)
                 
-                # Cada subatividade executada contribui com seu percentual × peso
+                progresso_total_pontos = 0.0
+                
+                # Somar TODOS os percentuais das subatividades executadas
                 for chave, percentual in progresso_por_subatividade.items():
-                    contribuicao = (percentual / 100.0) * peso_por_subatividade
-                    progresso_acumulado += contribuicao
+                    progresso_total_pontos += percentual
                 
-                progresso_obra = round(progresso_acumulado, 1)
+                # Progresso da obra = soma dos percentuais / total de subatividades planejadas
+                progresso_obra = round(progresso_total_pontos / total_subatividades_obra, 1)
                 
-                print(f"DEBUG PROGRESSO DETALHADO:")
+                print(f"DEBUG PROGRESSO DETALHADO (LÓGICA CORRIGIDA):")
                 print(f"  - Subatividades PLANEJADAS (cadastro): {total_subatividades_obra}")
                 print(f"  - Subatividades EXECUTADAS: {len(progresso_por_subatividade)}")
-                print(f"  - Peso por subatividade: {peso_por_subatividade:.2f}%")
+                print(f"  - Soma total dos percentuais: {progresso_total_pontos}%")
+                print(f"  - Fórmula: {progresso_total_pontos} ÷ {total_subatividades_obra} = {progresso_obra}%")
                 print(f"  - Progresso final da obra: {progresso_obra}%")
                 
                 # Mostrar quais subatividades faltam executar
@@ -2442,12 +2447,18 @@ def visualizar_rdo(id):
             
         except Exception as e:
             print(f"ERRO CÁLCULO PROGRESSO OBRA: {str(e)}")
-            # Fallback para cálculo simples baseado no dia atual
+            # Fallback para cálculo simples baseado no dia atual - LÓGICA CORRIGIDA
             if subatividades:
-                progresso_total = sum(sub.percentual_conclusao or 0 for sub in subatividades)
-                progresso_obra = progresso_total / len(subatividades)
-                total_subatividades_obra = len(subatividades)
-                peso_por_subatividade = 100.0 / len(subatividades)
+                # Buscar todas as subatividades únicas já executadas na obra como total
+                subatividades_unicas = db.session.query(
+                    RDOServicoSubatividade.servico_id,
+                    RDOServicoSubatividade.nome_subatividade
+                ).join(RDO).filter(RDO.obra_id == rdo.obra_id).distinct().all()
+                
+                total_subatividades_obra = len(subatividades_unicas)
+                progresso_total_pontos = sum(sub.percentual_conclusao or 0 for sub in subatividades)
+                progresso_obra = round(progresso_total_pontos / total_subatividades_obra, 1) if total_subatividades_obra > 0 else 0
+                peso_por_subatividade = 100.0 / total_subatividades_obra if total_subatividades_obra > 0 else 0
         
         # Calcular total de horas trabalhadas
         total_horas_trabalhadas = sum(func.horas_trabalhadas or 0 for func in funcionarios)
@@ -4575,13 +4586,12 @@ def api_rdo_progresso_obra(obra_id):
         if not obra:
             return jsonify({'success': False, 'error': 'Obra não encontrada'}), 404
         
-        # Calcular progresso baseado nas atividades dos RDOs
-        atividades = db.session.query(RDOAtividade).join(RDO).filter(
-            RDO.obra_id == obra_id,
-            RDO.status == 'Finalizado'
+        # Calcular progresso baseado nas subatividades dos RDOs - LÓGICA CORRIGIDA
+        subatividades = db.session.query(RDOServicoSubatividade).join(RDO).filter(
+            RDO.obra_id == obra_id
         ).all()
         
-        if not atividades:
+        if not subatividades:
             return jsonify({
                 'success': True,
                 'progresso_geral': 0,
@@ -4589,32 +4599,57 @@ def api_rdo_progresso_obra(obra_id):
                 'atividades_detalhes': {}
             })
         
-        # Agrupar por tipo de atividade e pegar maior percentual
-        atividades_max = {}
-        for atividade in atividades:
-            desc = atividade.descricao_atividade.lower().strip()
-            if desc not in atividades_max:
-                atividades_max[desc] = {
-                    'percentual': atividade.percentual_conclusao,
-                    'descricao_original': atividade.descricao_atividade,
-                    'ultima_atualizacao': atividade.rdo_ref.data_relatorio.isoformat()
+        # Buscar total de subatividades planejadas para a obra
+        try:
+            from models import ServicoObra, SubatividadeMestre
+            servicos_da_obra = ServicoObra.query.filter_by(obra_id=obra_id).all()
+            total_subatividades_planejadas = 0
+            
+            for servico_obra in servicos_da_obra:
+                subatividades_servico = SubatividadeMestre.query.filter_by(
+                    servico_id=servico_obra.servico_id
+                ).all()
+                total_subatividades_planejadas += len(subatividades_servico)
+            
+            # Fallback: usar subatividades únicas executadas
+            if total_subatividades_planejadas == 0:
+                subatividades_unicas = db.session.query(
+                    RDOServicoSubatividade.servico_id,
+                    RDOServicoSubatividade.nome_subatividade
+                ).join(RDO).filter(RDO.obra_id == obra_id).distinct().all()
+                total_subatividades_planejadas = len(subatividades_unicas)
+                
+        except Exception:
+            total_subatividades_planejadas = len(set(f"{s.servico_id}_{s.nome_subatividade}" for s in subatividades))
+        
+        if total_subatividades_planejadas == 0:
+            return jsonify({'success': True, 'progresso_geral': 0, 'total_atividades': 0})
+        
+        # Agrupar por subatividade única e pegar maior percentual
+        subatividades_max = {}
+        for sub in subatividades:
+            chave = f"{sub.servico_id}_{sub.nome_subatividade}"
+            if chave not in subatividades_max:
+                subatividades_max[chave] = {
+                    'percentual': sub.percentual_conclusao or 0,
+                    'descricao_original': sub.nome_subatividade,
+                    'ultima_atualizacao': sub.rdo.data_relatorio.isoformat() if hasattr(sub, 'rdo') else ''
                 }
             else:
-                if atividade.percentual_conclusao > atividades_max[desc]['percentual']:
-                    atividades_max[desc] = {
-                        'percentual': atividade.percentual_conclusao,
-                        'descricao_original': atividade.descricao_atividade,
-                        'ultima_atualizacao': atividade.rdo_ref.data_relatorio.isoformat()
-                    }
+                if (sub.percentual_conclusao or 0) > subatividades_max[chave]['percentual']:
+                    subatividades_max[chave]['percentual'] = sub.percentual_conclusao or 0
         
-        # Calcular média ponderada
-        progresso_medio = sum(item['percentual'] for item in atividades_max.values()) / len(atividades_max)
+        # Calcular progresso usando nova fórmula: soma dos percentuais / total de subatividades
+        soma_percentuais = sum(item['percentual'] for item in subatividades_max.values())
+        progresso_medio = soma_percentuais / total_subatividades_planejadas
         
         return jsonify({
             'success': True,
             'progresso_geral': round(progresso_medio, 2),
-            'total_atividades': len(atividades_max),
-            'atividades_detalhes': atividades_max
+            'total_atividades': total_subatividades_planejadas,
+            'subatividades_executadas': len(subatividades_max),
+            'atividades_detalhes': subatividades_max,
+            'formula': f"{soma_percentuais} ÷ {total_subatividades_planejadas} = {round(progresso_medio, 2)}%"
         })
         
     except Exception as e:

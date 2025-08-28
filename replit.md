@@ -22,6 +22,12 @@ SIGE (Sistema de Gestão Empresarial) is a multi-tenant business management syst
 ## Implementation Priority (August 2025)
 **✅ PROJETO CONCLUÍDO E PRONTO PARA PRODUÇÃO (28/08/2025)**
 
+**Última Atualização: 28/08/2025 - 14:32**
+- ✅ **CORREÇÃO CRÍTICA:** Cálculo de progresso da obra corrigido conforme especificação do usuário
+  - Nova fórmula: `Progresso = (Soma dos percentuais das subatividades) ÷ (Total de subatividades planejadas)`
+  - Exemplo: 3 serviços (2,4,4 subatividades = 10 total) → 1 sub 100% = 10%, 2 subs (100%+50%) = 15%
+  - Implementado em: `visualizar_rdo()` e `api_rdo_progresso_obra()`
+
 **Status Final da Implementação:**
 1. ✅ **CONCLUÍDO** - Consolidação backend completa (RDO, Funcionários, Propostas)
 2. ✅ **CONCLUÍDO** - Design moderno unificado (template base_completo.html)
