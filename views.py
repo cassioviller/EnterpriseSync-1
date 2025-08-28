@@ -2339,11 +2339,47 @@ def visualizar_rdo(id):
         total_subatividades = len(subatividades)
         total_funcionarios = len(funcionarios)
         
-        # Calcular progresso médio
-        progresso_medio = 0
-        if subatividades:
-            progresso_total = sum(sub.percentual_conclusao or 0 for sub in subatividades)
-            progresso_medio = progresso_total / len(subatividades)
+        # Calcular progresso real da obra (não só do dia)
+        progresso_obra = 0
+        try:
+            # Buscar TODOS os serviços da obra para cálculo correto
+            from sqlalchemy import distinct
+            todos_servicos_obra = db.session.query(distinct(RDOServicoSubatividade.servico_id)).filter(
+                db.exists().where(
+                    db.and_(
+                        RDO.obra_id == rdo.obra_id,
+                        RDOServicoSubatividade.rdo_id == RDO.id
+                    )
+                )
+            ).all()
+            
+            total_servicos_obra = len(todos_servicos_obra)
+            
+            if total_servicos_obra > 0 and subatividades:
+                # Agrupar subatividades por serviço para cálculo correto
+                servicos_no_dia = {}
+                for sub in subatividades:
+                    servico_id = sub.servico_id
+                    if servico_id not in servicos_no_dia:
+                        servicos_no_dia[servico_id] = []
+                    servicos_no_dia[servico_id].append(sub.percentual_conclusao or 0)
+                
+                # Calcular progresso médio por serviço executado
+                progresso_servicos_executados = 0
+                for servico_id, percentuais in servicos_no_dia.items():
+                    progresso_servicos_executados += sum(percentuais) / len(percentuais)
+                
+                # Progresso real da obra considerando todos os serviços
+                progresso_obra = progresso_servicos_executados / total_servicos_obra
+                
+                print(f"DEBUG PROGRESSO: {len(servicos_no_dia)} serviços no dia de {total_servicos_obra} total")
+            
+        except Exception as e:
+            print(f"ERRO CÁLCULO PROGRESSO: {str(e)}")
+            # Fallback para cálculo simples
+            if subatividades:
+                progresso_total = sum(sub.percentual_conclusao or 0 for sub in subatividades)
+                progresso_obra = progresso_total / len(subatividades)
         
         # Calcular total de horas trabalhadas
         total_horas_trabalhadas = sum(func.horas_trabalhadas or 0 for func in funcionarios)
@@ -2352,13 +2388,25 @@ def visualizar_rdo(id):
         print(f"DEBUG SUBATIVIDADES: {len(subatividades)} encontradas")
         print(f"DEBUG MÃO DE OBRA: {len(funcionarios)} funcionários")
         
+        # Agrupar subatividades por serviço para exibição organizada
+        subatividades_por_servico = {}
+        for sub in subatividades:
+            servico_id = sub.servico_id
+            if servico_id not in subatividades_por_servico:
+                subatividades_por_servico[servico_id] = {
+                    'servico': sub.servico,
+                    'subatividades': []
+                }
+            subatividades_por_servico[servico_id]['subatividades'].append(sub)
+        
         return render_template('rdo/visualizar_rdo_moderno.html', 
                              rdo=rdo, 
                              subatividades=subatividades,
+                             subatividades_por_servico=subatividades_por_servico,
                              funcionarios=funcionarios,
                              total_subatividades=total_subatividades,
                              total_funcionarios=total_funcionarios,
-                             progresso_medio=progresso_medio,
+                             progresso_obra=progresso_obra,
                              total_horas_trabalhadas=total_horas_trabalhadas)
         
     except Exception as e:

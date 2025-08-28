@@ -1,0 +1,204 @@
+# PROMPT: Correções na Visualização de RDO
+
+## Problemas Identificados e Correções
+
+### 1. PROBLEMA: Gradientes Dificultam Visualização
+**Correção:** Remover gradientes das barras de progresso e usar cores sólidas.
+
+**ANTES (Problemático):**
+- Barras com gradiente verde (#28a745 → #20c997)
+- Dificulta leitura das porcentagens
+
+**DEPOIS (Correto):**
+- Barras com cor sólida verde (#28a745)
+- Fundo cinza claro (#e9ecef)
+- Contraste claro para melhor legibilidade
+
+### 2. PROBLEMA: Cálculo Errado da Porcentagem Geral
+**Situação:** A obra tem mais serviços além dos executados no dia, então 100% das subatividades executadas ≠ 100% da obra.
+
+**Correção do Cálculo:**
+- Se a obra tem 3 serviços total
+- E só 1 serviço foi executado no dia
+- Então máximo seria 33,3% da obra (não 100%)
+
+**Fórmula Correta:**
+```
+Progresso da Obra = (Soma das porcentagens de TODOS os serviços da obra) / (Número total de serviços da obra)
+```
+
+**Exemplo:**
+- Obra tem 3 serviços: Estrutura Metálica, Cobertura, Acabamento
+- No dia só trabalhou em Estrutura Metálica (100% das subatividades deste serviço)
+- Progresso da obra = 100% ÷ 3 = 33,3%
+
+### 3. PROBLEMA: Subatividades Misturadas
+**Correção:** Agrupar subatividades por serviço com headers separados.
+
+## Estrutura Corrigida
+
+### SEÇÃO SUBATIVIDADES EXECUTADAS (Agrupadas por Serviço)
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│ 📋 Subatividades Executadas no Dia (4)                     │
+├─────────────────────────────────────────────────────────────┤
+│                                                             │
+│ 🔧 ESTRUTURA METÁLICA                                       │
+│ ┌─────────────────┐ ┌─────────────────┐ ┌─────────────────┐ │
+│ │ Montagem Formas │ │ Armação de Ferro│ │ Concretagem     │ │
+│ │ 100%            │ │ 100%            │ │ 70%             │ │
+│ │ ████████████████│ │ ████████████████│ │ ██████████████░░│ │
+│ └─────────────────┘ └─────────────────┘ └─────────────────┘ │
+│                                                             │
+│ 🏠 COBERTURA                                                │
+│ ┌─────────────────┐                                         │
+│ │ Cura do Concreto│                                         │
+│ │ 10%             │                                         │
+│ │ ██░░░░░░░░░░░░░░│                                         │
+│ └─────────────────┘                                         │
+└─────────────────────────────────────────────────────────────┘
+```
+
+### ESPECIFICAÇÕES DOS GRUPOS:
+
+**Header do Serviço:**
+- Ícone específico do serviço
+- Nome do serviço em MAIÚSCULO
+- Cor: Verde escuro (#2d5a27)
+- Tamanho: 1.1rem, negrito
+- Margin: 2rem acima, 1rem abaixo
+
+**Cards de Subatividades:**
+- Fundo branco
+- Borda: 1px solid #e9ecef
+- Sem gradientes nas barras
+- Porcentagem em cor sólida
+
+### CARDS DE ESTATÍSTICAS CORRIGIDOS:
+
+```
+┌─────────────┐ ┌─────────────┐ ┌─────────────┐ ┌─────────────┐
+│ 📋    4     │ │ 👥    1     │ │ 📊  33.3%   │ │ ⏰  8.0h    │
+│ Subativid.  │ │ Funcionár.  │ │ Progresso   │ │ Horas Trab. │
+│ Executadas  │ │             │ │ da Obra     │ │             │
+└─────────────┘ └─────────────┘ └─────────────┘ └─────────────┘
+```
+
+**Correções:**
+1. **Subatividades:** Mostrar apenas as executadas NO DIA
+2. **Progresso:** Calcular baseado em TODA a obra, não só no dia
+3. **Label:** "Progresso da Obra" (não "Progresso Geral")
+
+## Cálculo Detalhado do Progresso
+
+### LÓGICA DE CÁLCULO:
+
+**Passo 1:** Identificar todos os serviços da obra
+```
+Obra "Galpão Industrial" tem:
+- Estrutura Metálica
+- Cobertura  
+- Acabamento
+Total: 3 serviços
+```
+
+**Passo 2:** Calcular progresso de cada serviço
+```
+Estrutura Metálica: 90% (média das subatividades deste serviço)
+Cobertura: 5% (média das subatividades deste serviço)
+Acabamento: 0% (não iniciado)
+```
+
+**Passo 3:** Calcular progresso da obra
+```
+Progresso da Obra = (90% + 5% + 0%) ÷ 3 = 31.7%
+```
+
+## Cores Sem Gradiente
+
+### BARRAS DE PROGRESSO:
+- **Preenchimento:** #28a745 (verde sólido)
+- **Fundo:** #e9ecef (cinza claro)
+- **Altura:** 8px
+- **Bordas:** Arredondadas 4px
+
+### BADGES DE PORCENTAGEM:
+- **Fundo:** #007bff (azul sólido)
+- **Texto:** Branco
+- **Sem gradientes ou efeitos**
+
+### ÍCONES DE SERVIÇO:
+- **Estrutura Metálica:** 🔧 ou <i class="fas fa-hammer"></i>
+- **Cobertura:** 🏠 ou <i class="fas fa-home"></i>
+- **Acabamento:** 🎨 ou <i class="fas fa-paint-brush"></i>
+
+## Layout dos Grupos de Serviços
+
+### ESTRUTURA HTML:
+```html
+<div class="subatividades-section">
+    <h3>📋 Subatividades Executadas no Dia (4)</h3>
+    
+    <!-- Grupo 1: Estrutura Metálica -->
+    <div class="servico-group">
+        <h4 class="servico-header">
+            <i class="fas fa-hammer"></i> ESTRUTURA METÁLICA
+        </h4>
+        <div class="subatividades-grid">
+            <!-- Cards das subatividades deste serviço -->
+        </div>
+    </div>
+    
+    <!-- Grupo 2: Cobertura -->
+    <div class="servico-group">
+        <h4 class="servico-header">
+            <i class="fas fa-home"></i> COBERTURA
+        </h4>
+        <div class="subatividades-grid">
+            <!-- Cards das subatividades deste serviço -->
+        </div>
+    </div>
+</div>
+```
+
+### CSS DOS GRUPOS:
+```css
+.servico-group {
+    margin-bottom: 2rem;
+}
+
+.servico-header {
+    color: #2d5a27;
+    font-size: 1.1rem;
+    font-weight: 700;
+    margin: 2rem 0 1rem 0;
+    padding: 0.75rem 0;
+    border-bottom: 2px solid #e9ecef;
+}
+
+.subatividades-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 1rem;
+}
+
+/* Barras sem gradiente */
+.progress-fill {
+    background: #28a745; /* Cor sólida */
+    height: 100%;
+    border-radius: 4px;
+    transition: width 0.3s ease;
+}
+```
+
+## Resultado Final
+
+✅ **Melhor Legibilidade:** Sem gradientes que atrapalham a leitura
+✅ **Cálculo Correto:** Progresso baseado em toda a obra (33.3% não 100%)
+✅ **Organização Clara:** Subatividades agrupadas por serviço
+✅ **Headers Informativos:** Cada serviço tem seu próprio grupo
+✅ **Cores Sólidas:** Barras e badges com cores simples e legíveis
+
+A página fica mais profissional, organizada e com informações corretas sobre o progresso real da obra.
+
