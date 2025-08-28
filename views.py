@@ -3792,15 +3792,21 @@ def api_test_rdo_servicos_obra(obra_id):
             
             subatividades_data = [sub.to_dict() for sub in subatividades]
             
+            # Calcular percentual com segurança
+            quantidade_executada = float(servico_obra.quantidade_executada or 0)
+            quantidade_planejada = float(servico_obra.quantidade_planejada or 0)
+            percentual_obra = round((quantidade_executada / quantidade_planejada * 100) if quantidade_planejada > 0 else 0, 2)
+            
             servico_data = {
                 'id': servico.id,
                 'nome': servico.nome,
                 'descricao': servico.descricao,
                 'categoria': servico.categoria,
-                'quantidade_planejada': float(servico_obra.quantidade_planejada or 0),
-                'quantidade_executada': float(servico_obra.quantidade_executada or 0),
-                'percentual_obra': round((servico_obra.quantidade_executada / servico_obra.quantidade_planejada * 100) if servico_obra.quantidade_planejada > 0 else 0, 2),
-                'subatividades': subatividades_data
+                'quantidade_planejada': quantidade_planejada,
+                'quantidade_executada': quantidade_executada,
+                'percentual_obra': percentual_obra,
+                'subatividades': subatividades_data,
+                'total_subatividades': len(subatividades_data)
             }
             servicos_data.append(servico_data)
         
