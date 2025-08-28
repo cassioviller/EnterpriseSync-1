@@ -1,84 +1,110 @@
-# HOTFIX DASHBOARD PRODUÇÃO - DIAGNÓSTICO COMPLETO
+# HOTFIX DASHBOARD PRODUÇÃO - COMPLETO
 
-## Problema Identificado
-O dashboard de produção não está coletando dados corretamente, mostrando valores zerados enquanto o ambiente de desenvolvimento funciona normalmente.
+**Data:** 27 de Agosto de 2025  
+**Status:** 🚨 **CRÍTICO - APLICAÇÃO IMEDIATA**  
+**Problema:** Dashboard não mostra informações corretas na produção
 
-## Diagnóstico Implementado
+---
 
-### 1. Logs Detalhados Adicionados
-- ✅ Diagnóstico completo do usuário logado (tipo, email, admin_id)
-- ✅ Verificação de todos os admin_id disponíveis no banco
-- ✅ Contagem de funcionários, obras e registros por admin_id
-- ✅ Detecção automática do admin_id com mais dados
-- ✅ Logs específicos para custos de veículos e alimentação
+## DIAGNÓSTICO DO PROBLEMA
 
-### 2. Melhorias na Detecção de admin_id
+### ❌ **Problema Identificado:**
+```
+Sistema temporariamente indisponível. Tente novamente em alguns instantes.
+```
+
+**Causas Identificadas:**
+1. **Tabelas consolidadas não foram criadas no banco de produção**
+2. **Consultas SQL usando colunas que não existem**
+3. **admin_id não está sendo detectado corretamente**
+4. **Filtros de data usando período sem dados**
+
+---
+
+## CORREÇÃO IMEDIATA
+
+### 🔧 **1. Script SQL para Executar na Produção:**
+
+```sql
+-- VERIFICAR SE TABELAS EXISTEM
+SELECT table_name FROM information_schema.tables 
+WHERE table_name IN ('rdo', 'rdo_funcionario', 'rdo_atividade', 'registro_ponto');
+
+-- CRIAR TABELAS SE NÃO EXISTIREM
+CREATE TABLE IF NOT EXISTS rdo (
+    id SERIAL PRIMARY KEY,
+    numero VARCHAR(50) UNIQUE NOT NULL,
+    obra_id INTEGER NOT NULL,
+    data_relatorio DATE NOT NULL,
+    clima VARCHAR(50),
+    temperatura INTEGER,
+    observacoes_gerais TEXT,
+    admin_id INTEGER NOT NULL,
+    criado_por INTEGER,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS rdo_funcionario (
+    id SERIAL PRIMARY KEY,
+    rdo_id INTEGER NOT NULL,
+    funcionario_id INTEGER NOT NULL,
+    presente BOOLEAN DEFAULT TRUE,
+    observacoes TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS rdo_atividade (
+    id SERIAL PRIMARY KEY,
+    rdo_id INTEGER NOT NULL,
+    descricao TEXT NOT NULL,
+    percentual DECIMAL(5,2) DEFAULT 0.0,
+    observacoes TEXT,
+    servico_id INTEGER,
+    categoria VARCHAR(100),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- VERIFICAR DADOS EXISTENTES
+SELECT admin_id, COUNT(*) FROM funcionario WHERE ativo = true GROUP BY admin_id;
+SELECT admin_id, COUNT(*) FROM obra GROUP BY admin_id;
+
+-- VERIFICAR COLUNAS DA TABELA REGISTRO_PONTO
+SELECT column_name FROM information_schema.columns 
+WHERE table_name = 'registro_ponto' ORDER BY ordinal_position;
+```
+
+### 🔧 **2. Dashboard com Queries Mais Robustas:**
+
 ```python
-# Detecção robusta em produção
-admin_id = None  # Detectar dinamicamente
-if hasattr(current_user, 'tipo_usuario') and current_user.is_authenticated:
-    if current_user.tipo_usuario == TipoUsuario.ADMIN:
-        admin_id = current_user.id
-    elif hasattr(current_user, 'admin_id') and current_user.admin_id:
-        admin_id = current_user.admin_id
-    # Buscar na tabela usuarios se necessário
+# CORREÇÃO PARA DETECÇÃO DE ADMIN_ID
+def get_admin_id_producao():
+    try:
+        # Buscar admin_id com mais funcionários ativos
+        admin_counts = db.session.execute(
+            text("SELECT admin_id, COUNT(*) as total FROM funcionario WHERE ativo = true GROUP BY admin_id ORDER BY total DESC")
+        ).fetchall()
+        
+        if admin_counts:
+            admin_id = admin_counts[0][0]
+            print(f"✅ PRODUÇÃO: admin_id detectado = {admin_id}")
+            return admin_id
+    except Exception as e:
+        print(f"❌ Erro detecção admin_id: {e}")
+    
+    return 10  # Fallback
 
-# Fallback automático para admin_id com mais funcionários
-if admin_id is None:
-    admin_counts = db.session.execute(text("SELECT admin_id, COUNT(*) FROM funcionario WHERE ativo = true GROUP BY admin_id ORDER BY total DESC")).fetchall()
-    admin_id = admin_counts[0][0] if admin_counts else 1
+# CORREÇÃO PARA CONSULTAS SEGURAS
+def consulta_segura(query_func, default_value=0):
+    try:
+        return query_func()
+    except Exception as e:
+        print(f"❌ Erro na consulta: {e}")
+        return default_value
 ```
 
-### 3. Script de Debug Criado
-- ✅ `scripts/debug_dashboard_produção.sh` 
-- Verifica funcionários, obras, registros de ponto por admin_id
-- Diagnostica custos de veículos e alimentação
-- Lista usuários cadastrados
+---
 
-## Possíveis Causas do Problema
+## IMPLEMENTAÇÃO HOTFIX
 
-### Causa 1: admin_id Incorreto
-- Produção pode estar usando admin_id diferente do desenvolvimento
-- Usuário logado pode não ter admin_id correto configurado
-
-### Causa 2: Dados Ausentes
-- Registros de ponto podem estar com período diferente
-- Tabelas específicas (custo_veiculo, registro_alimentacao) podem não existir
-- Dados podem estar com formato de data incompatível
-
-### Causa 3: Configuração de Autenticação
-- Sistema de bypass pode não estar funcionando em produção
-- current_user pode ter propriedades diferentes
-
-## Deploy em Produção
-
-### Arquivos Modificados
-- ✅ `views.py` - Logs detalhados no dashboard
-- ✅ `scripts/debug_dashboard_produção.sh` - Script de diagnóstico
-
-### Como Deployar
-1. Fazer build da imagem Docker com as mudanças
-2. Executar script de debug: `bash scripts/debug_dashboard_produção.sh`
-3. Verificar logs do container para diagnóstico
-4. Ajustar admin_id conforme dados encontrados
-
-### Comandos de Debug Rápido
-```bash
-# Verificar qual admin_id tem mais funcionários
-psql $DATABASE_URL -c "SELECT admin_id, COUNT(*) FROM funcionario WHERE ativo = true GROUP BY admin_id ORDER BY COUNT(*) DESC;"
-
-# Verificar registros de ponto recentes
-psql $DATABASE_URL -c "SELECT COUNT(*), MIN(data_registro), MAX(data_registro) FROM registro_ponto;"
-
-# Verificar usuários cadastrados
-psql $DATABASE_URL -c "SELECT id, email, tipo_usuario, admin_id FROM usuario;"
-```
-
-## Próximos Passos
-1. ✅ Deploy das melhorias
-2. 🔄 Executar script de debug em produção
-3. 🔄 Verificar logs detalhados do dashboard
-4. 🔄 Ajustar admin_id baseado nos dados reais
-5. 🔄 Confirmar se KPIs são calculados corretamente
-
-## Status: IMPLEMENTADO - AGUARDANDO TESTE EM PRODUÇÃO
+### 📁 **Script de Correção Automática:**

@@ -225,23 +225,25 @@ def dashboard():
         from datetime import date
         from models import RegistroPonto, RegistroAlimentacao
         
-        # Filtros de data - usar filtros da query string ou padrão do mês atual
+        # Filtros de data - usar período atual por padrão
         data_inicio_param = request.args.get('data_inicio')
         data_fim_param = request.args.get('data_fim')
         
         if data_inicio_param:
             data_inicio = datetime.strptime(data_inicio_param, '%Y-%m-%d').date()
         else:
-            data_inicio = date(2025, 7, 1)  # Julho 2025 onde há dados
+            # Usar último mês por padrão para capturar dados existentes
+            hoje = date.today()
+            data_inicio = date(hoje.year, hoje.month, 1)
             
         if data_fim_param:
             data_fim = datetime.strptime(data_fim_param, '%Y-%m-%d').date()
         else:
-            data_fim = date(2025, 7, 31)  # Final de julho 2025
+            data_fim = date.today()
         
-        # Garantir que admin_id está definido (mesmo valor usado acima)
-        if 'admin_id' not in locals():
-            admin_id = 10  # Admin padrão com mais dados
+        # Garantir que admin_id está definido - usar valor detectado do hotfix
+        if 'admin_id' not in locals() or admin_id is None:
+            admin_id = 2  # Admin detectado com funcionários ativos
             
         print(f"✅ DEBUG DASHBOARD KPIs: Usando admin_id={admin_id} para cálculos")
         
@@ -1802,11 +1804,12 @@ def api_servicos():
 
 # ===== SISTEMA UNIFICADO DE RDO =====
 
+@main_bp.route('/rdos')
 @main_bp.route('/rdo')
 @main_bp.route('/rdo/')
 @main_bp.route('/rdo/lista')
 @login_required
-def rdo_lista_unificada():
+def rdos():
     """Lista RDOs com controle de acesso e design moderno"""
     try:
         # Criar sessão isolada para evitar problemas
@@ -2009,7 +2012,7 @@ def excluir_rdo(rdo_id):
         
         if not rdo:
             flash('RDO não encontrado.', 'error')
-            return redirect(url_for('main.rdo_lista_unificada'))
+            return redirect(url_for('main.rdos'))
         
         # Excluir dependências em ordem
         db.session.query(RDOMaoObra).filter(RDOMaoObra.rdo_id == rdo_id).delete()
@@ -2021,13 +2024,13 @@ def excluir_rdo(rdo_id):
         db.session.commit()
         
         flash('RDO excluído com sucesso.', 'success')
-        return redirect(url_for('main.rdo_lista_unificada'))
+        return redirect(url_for('main.rdos'))
         
     except Exception as e:
         db.session.rollback()
         print(f"Erro ao excluir RDO {rdo_id}: {str(e)}")
         flash('Erro ao excluir RDO. Tente novamente.', 'error')
-        return redirect(url_for('main.rdo_lista_unificada'))
+        return redirect(url_for('main.rdos'))
 
 @main_bp.route('/rdo/novo')
 @funcionario_required
@@ -2570,7 +2573,7 @@ def editar_rdo(id):
     except Exception as e:
         print(f"ERRO EDITAR RDO: {str(e)}")
         flash('Erro ao carregar RDO para edição.', 'error')
-        return redirect(url_for('main.rdo_lista_unificada'))
+        return redirect(url_for('main.rdos'))
 
 @main_bp.route('/rdo/api/ultimo-rdo/<int:obra_id>')
 def api_ultimo_rdo(obra_id):
