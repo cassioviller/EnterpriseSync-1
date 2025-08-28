@@ -2116,7 +2116,7 @@ def novo_rdo():
         
     except Exception as e:
         print(f"ERRO NOVO RDO: {str(e)}")
-        return redirect(url_for('main.lista_rdos'))
+        return redirect(url_for('main.rdos'))
 
 @main_bp.route('/rdo/criar', methods=['POST'])
 @funcionario_required
@@ -2355,7 +2355,7 @@ def finalizar_rdo(id):
         db.session.rollback()
         print(f"ERRO FINALIZAR RDO: {str(e)}")
         flash('Erro ao finalizar RDO.', 'error')
-        return redirect(url_for('main.lista_rdos'))
+        return redirect(url_for('main.rdos'))
 
 @main_bp.route('/rdo/<int:id>/excluir_old', methods=['POST'])
 @admin_required
@@ -2401,13 +2401,13 @@ def excluir_rdo_old(id):
         db.session.commit()
         
         flash(f'RDO {numero_rdo} excluído com sucesso!', 'success')
-        return redirect(url_for('main.lista_rdos'))
+        return redirect(url_for('main.rdos'))
         
     except Exception as e:
         db.session.rollback()
         print(f"ERRO EXCLUIR RDO: {str(e)}")
         flash('Erro ao excluir RDO.', 'error')
-        return redirect(url_for('main.lista_rdos'))
+        return redirect(url_for('main.rdos'))
 
 @main_bp.route('/rdo/<int:id>/duplicar', methods=['POST'])
 @admin_required
@@ -2490,7 +2490,7 @@ def duplicar_rdo(id):
         db.session.rollback()
         print(f"ERRO DUPLICAR RDO: {str(e)}")
         flash('Erro ao duplicar RDO.', 'error')
-        return redirect(url_for('main.lista_rdos'))
+        return redirect(url_for('main.rdos'))
 
 @main_bp.route('/rdo/<int:id>/atualizar', methods=['POST'])
 @admin_required

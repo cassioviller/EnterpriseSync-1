@@ -121,6 +121,54 @@ CREATE TABLE IF NOT EXISTS registro_ponto (
     tipo_local VARCHAR(50) DEFAULT 'obra'
 );
 
+-- CRIAR TABELAS RDO CONSOLIDADAS
+CREATE TABLE IF NOT EXISTS rdo (
+    id SERIAL PRIMARY KEY,
+    numero VARCHAR(50) UNIQUE NOT NULL,
+    obra_id INTEGER NOT NULL,
+    data_relatorio DATE NOT NULL,
+    clima VARCHAR(50),
+    temperatura INTEGER,
+    observacoes_gerais TEXT,
+    admin_id INTEGER NOT NULL,
+    criado_por INTEGER,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS rdo_funcionario (
+    id SERIAL PRIMARY KEY,
+    rdo_id INTEGER NOT NULL,
+    funcionario_id INTEGER NOT NULL,
+    presente BOOLEAN DEFAULT TRUE,
+    observacoes TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS rdo_atividade (
+    id SERIAL PRIMARY KEY,
+    rdo_id INTEGER NOT NULL,
+    descricao TEXT NOT NULL,
+    percentual DECIMAL(5,2) DEFAULT 0.0,
+    observacoes TEXT,
+    servico_id INTEGER,
+    categoria VARCHAR(100),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS rdo_ocorrencia (
+    id SERIAL PRIMARY KEY,
+    rdo_id INTEGER NOT NULL,
+    tipo_ocorrencia VARCHAR(50) NOT NULL,
+    descricao TEXT NOT NULL,
+    severidade VARCHAR(20) DEFAULT 'baixa',
+    responsavel_acao VARCHAR(200),
+    prazo_resolucao DATE,
+    status_resolucao VARCHAR(50) DEFAULT 'pendente',
+    observacoes_resolucao TEXT,
+    criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
 -- CRIAR TABELA CONFIGURACAO_EMPRESA SEM FOREIGN KEY
 CREATE TABLE IF NOT EXISTS configuracao_empresa (
     id SERIAL PRIMARY KEY,
@@ -445,6 +493,10 @@ ALTER TABLE funcionario ADD COLUMN IF NOT EXISTS email VARCHAR(120);
 CREATE INDEX IF NOT EXISTS idx_obra_token_cliente ON obra(token_cliente);
 CREATE INDEX IF NOT EXISTS idx_funcionario_admin_id ON funcionario(admin_id);
 CREATE INDEX IF NOT EXISTS idx_obra_admin_id ON obra(admin_id);
+CREATE INDEX IF NOT EXISTS idx_rdo_obra_data ON rdo(obra_id, data_relatorio);
+CREATE INDEX IF NOT EXISTS idx_rdo_admin_id ON rdo(admin_id);
+CREATE INDEX IF NOT EXISTS idx_rdo_funcionario_rdo_id ON rdo_funcionario(rdo_id);
+CREATE INDEX IF NOT EXISTS idx_rdo_atividade_rdo_id ON rdo_atividade(rdo_id);
 EOSQL
 
 # Verificação final

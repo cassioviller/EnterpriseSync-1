@@ -1,0 +1,262 @@
+{% extends "base_completo.html" %}
+{% block title %}Novo RDO - SIGE{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <div class="row">
+        <div class="col-12">
+            <div class="card shadow-sm">
+                <div class="card-header bg-primary text-white">
+                    <h4 class="mb-0">
+                        <i class="fas fa-plus-circle me-2"></i>
+                        Novo RDO (Relatório Diário de Obra)
+                    </h4>
+                </div>
+                <div class="card-body">
+                    <form method="POST" action="{{ url_for('main.criar_rdo') }}" id="formNovoRDO">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="obra_id" class="form-label">Obra *</label>
+                                    <select class="form-select" id="obra_id" name="obra_id" required>
+                                        <option value="">Selecione uma obra</option>
+                                        {% for obra in obras %}
+                                        <option value="{{ obra.id }}" 
+                                                {% if obra_selecionada and obra.id == obra_selecionada %}selected{% endif %}>
+                                            {{ obra.nome }}
+                                        </option>
+                                        {% endfor %}
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="data_relatorio" class="form-label">Data do Relatório *</label>
+                                    <input type="date" class="form-control" id="data_relatorio" name="data_relatorio" 
+                                           value="{{ moment().strftime('%Y-%m-%d') if moment else '' }}" required>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="clima" class="form-label">Clima</label>
+                                    <select class="form-select" id="clima" name="clima">
+                                        <option value="ensolarado">☀️ Ensolarado</option>
+                                        <option value="parcialmente_nublado">⛅ Parcialmente Nublado</option>
+                                        <option value="nublado">☁️ Nublado</option>
+                                        <option value="chuva_leve">🌦️ Chuva Leve</option>
+                                        <option value="chuva_forte">🌧️ Chuva Forte</option>
+                                        <option value="tempestade">⛈️ Tempestade</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="temperatura" class="form-label">Temperatura (°C)</label>
+                                    <input type="number" class="form-control" id="temperatura" name="temperatura" 
+                                           placeholder="Ex: 25" min="-10" max="50">
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="observacoes_gerais" class="form-label">Observações Gerais</label>
+                            <textarea class="form-control" id="observacoes_gerais" name="observacoes_gerais" 
+                                      rows="3" placeholder="Observações sobre o dia de trabalho..."></textarea>
+                        </div>
+
+                        <!-- Seção de Funcionários -->
+                        <div class="card mb-4">
+                            <div class="card-header">
+                                <h5 class="mb-0">👥 Funcionários Presentes</h5>
+                            </div>
+                            <div class="card-body">
+                                <div class="row" id="funcionarios-container">
+                                    {% for funcionario in funcionarios %}
+                                    <div class="col-md-4 mb-2">
+                                        <div class="form-check">
+                                            <input class="form-check-input" type="checkbox" 
+                                                   name="funcionarios[]" value="{{ funcionario.id }}" 
+                                                   id="func_{{ funcionario.id }}">
+                                            <label class="form-check-label" for="func_{{ funcionario.id }}">
+                                                {{ funcionario.nome }}
+                                            </label>
+                                        </div>
+                                    </div>
+                                    {% endfor %}
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Seção de Atividades -->
+                        <div class="card mb-4">
+                            <div class="card-header d-flex justify-content-between align-items-center">
+                                <h5 class="mb-0">🔧 Atividades Executadas</h5>
+                                <button type="button" class="btn btn-sm btn-outline-primary" onclick="adicionarAtividade()">
+                                    <i class="fas fa-plus"></i> Adicionar Atividade
+                                </button>
+                            </div>
+                            <div class="card-body">
+                                <div id="atividades-container">
+                                    {% if atividades_anteriores %}
+                                        {% for atividade in atividades_anteriores %}
+                                        <div class="atividade-item border p-3 mb-3">
+                                            <div class="row">
+                                                <div class="col-md-8">
+                                                    <label class="form-label">Descrição da Atividade</label>
+                                                    <input type="text" class="form-control" 
+                                                           name="atividades[descricao][]" 
+                                                           value="{{ atividade.descricao }}" required>
+                                                </div>
+                                                <div class="col-md-3">
+                                                    <label class="form-label">Percentual (%)</label>
+                                                    <input type="number" class="form-control" 
+                                                           name="atividades[percentual][]" 
+                                                           value="{{ atividade.percentual }}" 
+                                                           min="0" max="100" step="0.1">
+                                                </div>
+                                                <div class="col-md-1">
+                                                    <label class="form-label">&nbsp;</label>
+                                                    <button type="button" class="btn btn-outline-danger btn-sm d-block" 
+                                                            onclick="removerAtividade(this)">
+                                                        <i class="fas fa-trash"></i>
+                                                    </button>
+                                                </div>
+                                            </div>
+                                            <div class="mt-2">
+                                                <label class="form-label">Observações</label>
+                                                <textarea class="form-control" name="atividades[observacoes][]" 
+                                                          rows="2" placeholder="Observações sobre a atividade...">{{ atividade.observacoes }}</textarea>
+                                            </div>
+                                        </div>
+                                        {% endfor %}
+                                    {% else %}
+                                    <div class="atividade-item border p-3 mb-3">
+                                        <div class="row">
+                                            <div class="col-md-8">
+                                                <label class="form-label">Descrição da Atividade</label>
+                                                <input type="text" class="form-control" 
+                                                       name="atividades[descricao][]" 
+                                                       placeholder="Ex: Concretagem da laje" required>
+                                            </div>
+                                            <div class="col-md-3">
+                                                <label class="form-label">Percentual (%)</label>
+                                                <input type="number" class="form-control" 
+                                                       name="atividades[percentual][]" 
+                                                       placeholder="0" min="0" max="100" step="0.1">
+                                            </div>
+                                            <div class="col-md-1">
+                                                <label class="form-label">&nbsp;</label>
+                                                <button type="button" class="btn btn-outline-danger btn-sm d-block" 
+                                                        onclick="removerAtividade(this)">
+                                                    <i class="fas fa-trash"></i>
+                                                </button>
+                                            </div>
+                                        </div>
+                                        <div class="mt-2">
+                                            <label class="form-label">Observações</label>
+                                            <textarea class="form-control" name="atividades[observacoes][]" 
+                                                      rows="2" placeholder="Observações sobre a atividade..."></textarea>
+                                        </div>
+                                    </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Botões de Ação -->
+                        <div class="row">
+                            <div class="col-12">
+                                <div class="d-flex justify-content-between">
+                                    <a href="{{ url_for('main.rdos') }}" class="btn btn-secondary">
+                                        <i class="fas fa-arrow-left me-2"></i>Voltar
+                                    </a>
+                                    <button type="submit" class="btn btn-primary">
+                                        <i class="fas fa-save me-2"></i>Salvar RDO
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function adicionarAtividade() {
+    const container = document.getElementById('atividades-container');
+    const atividadeHtml = `
+        <div class="atividade-item border p-3 mb-3">
+            <div class="row">
+                <div class="col-md-8">
+                    <label class="form-label">Descrição da Atividade</label>
+                    <input type="text" class="form-control" 
+                           name="atividades[descricao][]" 
+                           placeholder="Ex: Montagem de estrutura" required>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">Percentual (%)</label>
+                    <input type="number" class="form-control" 
+                           name="atividades[percentual][]" 
+                           placeholder="0" min="0" max="100" step="0.1">
+                </div>
+                <div class="col-md-1">
+                    <label class="form-label">&nbsp;</label>
+                    <button type="button" class="btn btn-outline-danger btn-sm d-block" 
+                            onclick="removerAtividade(this)">
+                        <i class="fas fa-trash"></i>
+                    </button>
+                </div>
+            </div>
+            <div class="mt-2">
+                <label class="form-label">Observações</label>
+                <textarea class="form-control" name="atividades[observacoes][]" 
+                          rows="2" placeholder="Observações sobre a atividade..."></textarea>
+            </div>
+        </div>
+    `;
+    container.insertAdjacentHTML('beforeend', atividadeHtml);
+}
+
+function removerAtividade(button) {
+    const container = document.getElementById('atividades-container');
+    if (container.children.length > 1) {
+        button.closest('.atividade-item').remove();
+    } else {
+        alert('Deve haver pelo menos uma atividade.');
+    }
+}
+
+// Validação do formulário
+document.getElementById('formNovoRDO').addEventListener('submit', function(e) {
+    const obraId = document.getElementById('obra_id').value;
+    const dataRelatorio = document.getElementById('data_relatorio').value;
+    
+    if (!obraId || !dataRelatorio) {
+        e.preventDefault();
+        alert('Por favor, preencha todos os campos obrigatórios.');
+        return false;
+    }
+    
+    // Verificar se pelo menos uma atividade foi preenchida
+    const descricoes = document.querySelectorAll('input[name="atividades[descricao][]"]');
+    let temAtividade = false;
+    
+    descricoes.forEach(function(input) {
+        if (input.value.trim() !== '') {
+            temAtividade = true;
+        }
+    });
+    
+    if (!temAtividade) {
+        e.preventDefault();
+        alert('Por favor, adicione pelo menos uma atividade.');
+        return false;
+    }
+});
+</script>
+{% endblock %}
