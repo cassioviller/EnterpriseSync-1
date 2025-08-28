@@ -2844,45 +2844,23 @@ def funcionario_rdo_consolidado():
         
         print(f"DEBUG: Mostrando página {page} com {len(rdos_processados)} RDOs")
         
-        # Converter para formato esperado pelo template consolidado
-        rdos_simples = []
-        for item in rdos_processados:
-            rdo = item['rdo']
-            obra = item['obra']
-            
-            # Buscar funcionários e progresso
-            mao_obra = RDOMaoObra.query.filter_by(rdo_id=rdo.id).all()
-            funcionario_criador = rdo.criado_por if rdo.criado_por else (mao_obra[0].funcionario if mao_obra else None)
-            
-            # Criar objeto RDO com dados necessários para o template
-            rdo_obj = type('RDO', (), {
-                'id': rdo.id,
-                'obra': obra,
-                'data_relatorio': rdo.data_relatorio,
-                'created_at': rdo.created_at,
-                'criado_por': funcionario_criador,
-                'mao_obra': mao_obra,
-                'progresso_geral': item.get('progresso_medio', 67.5)
-            })()
-            
-            rdos_simples.append(rdo_obj)
-        
-        # Buscar obras e estatísticas para o template
-        obras = Obra.query.filter_by(admin_id=admin_id_correto).all()
-        total_funcionarios = len(set([mo.funcionario_id for rdo in rdos_simples for mo in rdo.mao_obra]))
-        
-        print(f"DEBUG: Renderizando template consolidado com {len(rdos_simples)} RDOs")
-        
-        # Usar o template consolidado onde implementei os cards
-        return render_template('funcionario/rdo/consolidado.html',
-                             rdos=rdos_simples,
-                             obras=obras,
-                             total_funcionarios=total_funcionarios,
-                             total_equipamentos=0,
-                             total_ocorrencias=0,
-                             obra_id=None,
-                             data_inicio=None,
-                             data_fim=None)
+        # Usar o template da lista RDO que estava funcionando
+        return render_template('rdo_lista_unificada.html',
+                             rdos=rdos_processados,
+                             pagination=rdos_paginated,
+                             total_rdos=rdos_paginated.total,
+                             page=page,
+                             admin_id=admin_id_correto,
+                             obras=[],
+                             funcionarios=[],
+                             filters={
+                                 'obra_id': None,
+                                 'status': None,
+                                 'data_inicio': None,
+                                 'data_fim': None,
+                                 'funcionario_id': None,
+                                 'order_by': 'data_desc'
+                             })
         
     except Exception as e:
         print(f"ERRO RDO CONSOLIDADO: {str(e)}")
