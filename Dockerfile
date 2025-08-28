@@ -43,8 +43,8 @@ COPY . .
 RUN mkdir -p /app/static/fotos /app/logs && \
     chown -R sige:sige /app
 
-# Copiar script de entrada para EasyPanel
-COPY docker-entrypoint-easypanel-final.sh /app/docker-entrypoint.sh
+# Copiar script de entrada para EasyPanel (versão corrigida para produção)
+COPY docker-entrypoint-producao-corrigido.sh /app/docker-entrypoint.sh
 RUN chmod +x /app/docker-entrypoint.sh
 
 # Mudar para usuário não-root

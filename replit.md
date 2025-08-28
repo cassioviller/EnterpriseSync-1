@@ -16,6 +16,8 @@ SIGE (Sistema de Gestão Empresarial) is a multi-tenant business management syst
 - Scripts automatizados para deploy de correções críticas em produção
 - Código de produção limpo, separado de testes para performance otimizada
 - Testes dedicados estruturados para validação contínua dos módulos consolidados
+- Links RDO devem apontar para rota moderna `/funcionario/rdo/consolidado` com funcionalidades completas
+- Ambiente de produção com 80 tabelas deve ser preservado durante migrações
 
 ## Implementation Priority (August 2025)
 **✅ PROJETO CONCLUÍDO E PRONTO PARA PRODUÇÃO (28/08/2025)**
@@ -40,6 +42,7 @@ SIGE (Sistema de Gestão Empresarial) is a multi-tenant business management syst
 - **Scripts:** ✅ build.sh, verify_deploy.py, production_config.py
 - **Health Check:** ✅ Endpoint /health funcional
 - **Documentação:** ✅ DEPLOY_INSTRUCTIONS_FINAL.md completa
+- **HOTFIX PRODUÇÃO:** ✅ Script corrigido para ambientes com 80 tabelas (`docker-entrypoint-producao-corrigido.sh`)
 
 ## System Architecture
 The system is built with a Flask backend, SQLAlchemy ORM, and PostgreSQL database, with Jinja2 templates and Bootstrap for the frontend. Deployment is managed via Docker on Replit. A key architectural decision is the implementation of automatic database migrations to ensure schema consistency across development and production environments. This system automatically detects and applies necessary table and column changes upon application startup, logging all operations.
