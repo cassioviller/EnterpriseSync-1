@@ -14,6 +14,8 @@ SIGE (Sistema de Gestão Empresarial) is a multi-tenant business management syst
 - Contraste adequado de texto (valores em preto) para melhor legibilidade
 - Proteção robusta contra erros de transação de banco de dados
 - Scripts automatizados para deploy de correções críticas em produção
+- Código de produção limpo, separado de testes para performance otimizada
+- Testes dedicados estruturados para validação contínua dos módulos consolidados
 
 ## Implementation Priority (August 2025)
 **Ordem de prioridade para funcionalidades e design:**

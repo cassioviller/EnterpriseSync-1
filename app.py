@@ -115,13 +115,7 @@ except ImportError:
 app.register_blueprint(main_bp)
 app.register_blueprint(production_bp, url_prefix='/prod')
 
-# Register test error route for debugging
-try:
-    from test_error_route import test_bp
-    app.register_blueprint(test_bp, url_prefix='/test')
-    logging.info("✅ Blueprint de teste de erro registrado")
-except ImportError:
-    logging.warning("⚠️ Blueprint de teste não encontrado")
+# Test routes removed for production cleanliness
 
 # Register error handlers
 register_error_handlers(app)
@@ -237,42 +231,15 @@ with app.app_context():
     except Exception as e:
         logging.error(f"❌ Erro ao registrar blueprint configurações: {e}")
     
-    # Migrate photos if necessary
-    try:
-        import base64
-        funcionarios_sem_base64 = Funcionario.query.filter(
-            Funcionario.foto.isnot(None),
-            Funcionario.foto_base64.is_(None)
-        ).all()
-        
-        migrados = 0
-        for funcionario in funcionarios_sem_base64:
-            try:
-                caminho_foto = os.path.join('static', funcionario.foto)
-                if os.path.exists(caminho_foto) and caminho_foto.endswith('.svg'):
-                    with open(caminho_foto, 'r', encoding='utf-8') as f:
-                        svg_content = f.read()
-                    svg_base64 = base64.b64encode(svg_content.encode('utf-8')).decode('utf-8')
-                    funcionario.foto_base64 = f"data:image/svg+xml;base64,{svg_base64}"
-                    migrados += 1
-            except Exception:
-                pass
-        
-        if migrados > 0:
-            db.session.commit()
-            logging.info(f"✅ {migrados} fotos migradas para base64")
-        else:
-            logging.info("✅ Fotos já estão em base64")
-            
-    except Exception as e:
-        logging.error(f"Erro na migração de fotos: {e}")
-
-    # Importar bypass de autenticação para desenvolvimento
-    try:
-        import bypass_auth
-        logging.info("🔓 Sistema de bypass de autenticação carregado")
-    except Exception as e:
-        logging.error(f"Erro ao carregar bypass: {e}")
+    # Photo migration moved to migrations.py for cleaner app initialization
+    
+    # Development authentication bypass (disabled in production)
+    if os.environ.get('FLASK_ENV') != 'production':
+        try:
+            import bypass_auth
+            logging.info("🔓 Sistema de bypass de autenticação carregado")
+        except Exception as e:
+            logging.error(f"Erro ao carregar bypass: {e}")
 
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=5000)
