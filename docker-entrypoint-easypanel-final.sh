@@ -121,17 +121,23 @@ CREATE TABLE IF NOT EXISTS registro_ponto (
     tipo_local VARCHAR(50) DEFAULT 'obra'
 );
 
--- CRIAR TABELAS RDO CONSOLIDADAS
+-- CRIAR TABELAS RDO CONSOLIDADAS - COMPATÍVEL COM MODELS.PY
 CREATE TABLE IF NOT EXISTS rdo (
     id SERIAL PRIMARY KEY,
-    numero VARCHAR(50) UNIQUE NOT NULL,
+    numero_rdo VARCHAR(50) UNIQUE NOT NULL,
     obra_id INTEGER NOT NULL,
     data_relatorio DATE NOT NULL,
-    clima VARCHAR(50),
-    temperatura INTEGER,
-    observacoes_gerais TEXT,
+    clima_geral VARCHAR(50),
+    temperatura_media VARCHAR(10),
+    umidade_relativa INTEGER,
+    vento_velocidade VARCHAR(20),
+    precipitacao VARCHAR(20),
+    condicoes_trabalho VARCHAR(50),
+    observacoes_climaticas TEXT,
+    comentario_geral TEXT,
+    status VARCHAR(20) DEFAULT 'Rascunho',
     admin_id INTEGER NOT NULL,
-    criado_por INTEGER,
+    criado_por_id INTEGER,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
@@ -377,6 +383,29 @@ fi
 # Remover foreign keys problemáticas e adicionar colunas que podem estar faltando
 echo "🔧 Removendo constraints problemáticas e atualizando schema..."
 psql "$DATABASE_URL" << 'EOSQL' || true
+
+-- ATUALIZAR TABELA RDO PARA COMPATIBILIDADE COM MODELS.PY
+ALTER TABLE rdo ADD COLUMN IF NOT EXISTS numero_rdo VARCHAR(50);
+ALTER TABLE rdo ADD COLUMN IF NOT EXISTS clima_geral VARCHAR(50);
+ALTER TABLE rdo ADD COLUMN IF NOT EXISTS temperatura_media VARCHAR(10);
+ALTER TABLE rdo ADD COLUMN IF NOT EXISTS umidade_relativa INTEGER;
+ALTER TABLE rdo ADD COLUMN IF NOT EXISTS vento_velocidade VARCHAR(20);
+ALTER TABLE rdo ADD COLUMN IF NOT EXISTS precipitacao VARCHAR(20);
+ALTER TABLE rdo ADD COLUMN IF NOT EXISTS condicoes_trabalho VARCHAR(50);
+ALTER TABLE rdo ADD COLUMN IF NOT EXISTS observacoes_climaticas TEXT;
+ALTER TABLE rdo ADD COLUMN IF NOT EXISTS comentario_geral TEXT;
+ALTER TABLE rdo ADD COLUMN IF NOT EXISTS status VARCHAR(20) DEFAULT 'Rascunho';
+ALTER TABLE rdo ADD COLUMN IF NOT EXISTS criado_por_id INTEGER;
+
+-- Migrar dados existentes se houver
+UPDATE rdo SET numero_rdo = numero WHERE numero_rdo IS NULL AND numero IS NOT NULL;
+UPDATE rdo SET clima_geral = clima WHERE clima_geral IS NULL AND clima IS NOT NULL;
+UPDATE rdo SET comentario_geral = observacoes_gerais WHERE comentario_geral IS NULL AND observacoes_gerais IS NOT NULL;
+UPDATE rdo SET criado_por_id = criado_por WHERE criado_por_id IS NULL AND criado_por IS NOT NULL;
+
+-- CORRIGIR TABELA PROPOSTAS_COMERCIAIS PARA TER ADMIN_ID
+ALTER TABLE propostas_comerciais ADD COLUMN IF NOT EXISTS admin_id INTEGER NOT NULL DEFAULT 10;
+
 -- REMOVER FOREIGN KEY CONSTRAINTS PROBLEMÁTICAS
 DO $$
 BEGIN
