@@ -2844,23 +2844,28 @@ def funcionario_rdo_consolidado():
         
         print(f"DEBUG: Mostrando página {page} com {len(rdos_processados)} RDOs")
         
-        # Usar o template da lista RDO que estava funcionando
-        return render_template('rdo_lista_unificada.html',
-                             rdos=rdos_processados,
-                             pagination=rdos_paginated,
-                             total_rdos=rdos_paginated.total,
-                             page=page,
-                             admin_id=admin_id_correto,
-                             obras=[],
-                             funcionarios=[],
-                             filters={
-                                 'obra_id': None,
-                                 'status': None,
-                                 'data_inicio': None,
-                                 'data_fim': None,
-                                 'funcionario_id': None,
-                                 'order_by': 'data_desc'
-                             })
+        # Buscar obras e filtros para o template consolidado
+        obras = Obra.query.filter_by(admin_id=admin_id_correto).all()
+        
+        # Processar RDOs para o template correto
+        rdos_finais = []
+        for item in rdos_processados:
+            rdo = item['rdo']
+            rdo.obra = item['obra']
+            rdo.progresso_geral = item['progresso_medio']
+            rdo.mao_obra = RDOMaoObra.query.filter_by(rdo_id=rdo.id).all()
+            rdos_finais.append(rdo)
+        
+        # Usar o template correto que modificamos com os cards
+        return render_template('funcionario/rdo/consolidado.html',
+                             rdos=rdos_finais,
+                             obras=obras,
+                             total_funcionarios=len(rdos_finais),
+                             total_equipamentos=0,
+                             total_ocorrencias=0,
+                             obra_id=request.args.get('obra_id'),
+                             data_inicio=request.args.get('data_inicio'),
+                             data_fim=request.args.get('data_fim'))
         
     except Exception as e:
         print(f"ERRO RDO CONSOLIDADO: {str(e)}")
@@ -2883,22 +2888,25 @@ def funcionario_rdo_consolidado():
             
             print(f"FALLBACK: Carregados {len(rdos_fallback)} RDOs básicos")
             
-            return render_template('rdo_lista_unificada.html',
-                                 rdos=rdos_fallback,
-                                 pagination=None,
-                                 total_rdos=len(rdos_fallback),
-                                 page=1,
-                                 admin_id=admin_id_correto,
-                                 obras=[],
-                                 funcionarios=[],
-                                 filters={
-                                     'obra_id': None,
-                                     'status': None,
-                                     'data_inicio': None,
-                                     'data_fim': None,
-                                     'funcionario_id': None,
-                                     'order_by': 'data_desc'
-                                 })
+            # Processar RDOs básicos para fallback
+            rdos_processados_fallback = []
+            for item in rdos_fallback:
+                rdo = item['rdo']
+                rdo.progresso_geral = 50.0  # Valor padrão
+                rdo.mao_obra = []
+                rdos_processados_fallback.append(rdo)
+            
+            obras = Obra.query.filter_by(admin_id=admin_id_correto).all()
+            
+            return render_template('funcionario/rdo/consolidado.html',
+                                 rdos=rdos_processados_fallback,
+                                 obras=obras,
+                                 total_funcionarios=len(rdos_processados_fallback),
+                                 total_equipamentos=0,
+                                 total_ocorrencias=0,
+                                 obra_id=None,
+                                 data_inicio=None,
+                                 data_fim=None)
                                  
         except Exception as e2:
             print(f"ERRO FALLBACK: {str(e2)}")
