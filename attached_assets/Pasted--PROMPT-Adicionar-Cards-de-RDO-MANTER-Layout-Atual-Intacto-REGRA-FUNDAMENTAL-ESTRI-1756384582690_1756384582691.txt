@@ -1,0 +1,146 @@
+# PROMPT: Adicionar Cards de RDO - MANTER Layout Atual Intacto
+
+## ⚠️ REGRA FUNDAMENTAL
+**É ESTRITAMENTE PROIBIDO alterar o layout/template atual da página.**
+
+O layout atual está PERFEITO e deve ser mantido exatamente como está:
+- ✅ Header com gradiente verde/azul
+- ✅ Cards de estatísticas (Total, Finalizadas, Em Andamento, Progresso)
+- ✅ Seção de filtros organizada
+- ✅ Área para lista de RDOs
+
+## PROBLEMA ATUAL
+A página está funcionando perfeitamente, mas na área onde deveriam aparecer os cards das RDOs, aparece apenas:
+- Ícone de clipboard
+- Texto "Nenhuma RDO encontrada"
+- Botão "CRIAR NOVA RDO"
+
+## SOLUÇÃO NECESSÁRIA
+**APENAS** substituir a área de "Nenhuma RDO encontrada" pelos cards das RDOs quando existirem dados.
+
+## ESTRUTURA DOS CARDS (Para Área Vazia)
+
+### Localização:
+Substituir a div que contém "Nenhuma RDO encontrada" por um grid de cards.
+
+### Estrutura de Cada Card:
+```
+┌─────────────────────────────────────────────┐
+│  GALPÃO INDUSTRIAL ESTRUTURAS METÁLICAS     │  ← Nome da obra (NEGRITO)
+│  29/08/2025                                 │  ← Data
+│                                             │
+│  ████████████████████░░░░ 67.5%             │  ← Barra + porcentagem
+│                                             │
+│  👤 Cássio Viller Silva de Azevedo          │  ← Funcionário
+│                                             │
+│  [Ver Detalhes]  [Editar RDO]              │  ← Botões
+└─────────────────────────────────────────────┘
+```
+
+### Especificações do Card:
+
+**1. NOME DA OBRA (Topo)**
+- Texto grande e **negrito**
+- Cor: #2d5a27 (verde escuro)
+- Tamanho: 1.3rem
+- Font-weight: 700
+
+**2. DATA (Segunda linha)**
+- Texto menor
+- Cor: #6c757d (cinza)
+- Tamanho: 0.9rem
+- Formato: DD/MM/AAAA
+
+**3. BARRA DE PROGRESSO (Centro)**
+- Altura: 8px
+- Cor da barra: Gradiente verde (#28a745 → #20c997)
+- Fundo: #e9ecef
+- Bordas arredondadas
+- Porcentagem ao lado: 1.2rem, negrito, cor #2d5a27
+
+**4. FUNCIONÁRIO (Inferior)**
+- Ícone: 👤 ou <i class="fas fa-user"></i>
+- Cor: #495057
+- Tamanho: 0.95rem
+
+**5. BOTÕES (Rodapé)**
+- "Ver Detalhes": background #28a745, cor branca
+- "Editar RDO": background #007bff, cor branca
+- Padding: 0.5rem 1rem
+- Border-radius: 6px
+
+### CSS do Card:
+```css
+.rdo-card {
+    background: white;
+    border-radius: 12px;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    padding: 1.5rem;
+    margin-bottom: 1rem;
+    transition: transform 0.3s ease;
+}
+
+.rdo-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 15px rgba(0, 0, 0, 0.15);
+}
+```
+
+### Grid dos Cards:
+- **Desktop:** 3 cards por linha
+- **Tablet:** 2 cards por linha
+- **Mobile:** 1 card por linha
+- **Gap:** 1.5rem entre cards
+
+## DADOS DE EXEMPLO
+
+Para testar, usar estes dados de exemplo:
+
+**Card 1:**
+- Obra: "Galpão Industrial Estruturas Metálicas"
+- Data: "29/08/2025"
+- Progresso: 67.5%
+- Funcionário: "Cássio Viller Silva de Azevedo"
+
+**Card 2:**
+- Obra: "Residencial Vila Nova Fase 2"
+- Data: "28/08/2025"
+- Progresso: 45.2%
+- Funcionário: "João Silva Santos"
+
+**Card 3:**
+- Obra: "Comercial Centro Empresarial"
+- Data: "27/08/2025"
+- Progresso: 89.7%
+- Funcionário: "Maria Oliveira Costa"
+
+## CONDIÇÃO DE EXIBIÇÃO
+
+**SE existirem RDOs:**
+- Mostrar grid de cards
+- Ocultar mensagem "Nenhuma RDO encontrada"
+
+**SE NÃO existirem RDOs:**
+- Manter mensagem atual "Nenhuma RDO encontrada"
+- Manter botão "CRIAR NOVA RDO"
+
+## O QUE NÃO PODE SER ALTERADO
+
+❌ Header com gradiente
+❌ Cards de estatísticas (Total, Finalizadas, etc.)
+❌ Seção de filtros
+❌ Cores do tema
+❌ Layout geral da página
+❌ Navegação superior
+❌ Botões "Criar Novo RDO" e "Voltar"
+
+## O QUE DEVE SER ADICIONADO
+
+✅ APENAS os cards de RDO na área vazia
+✅ Grid responsivo para os cards
+✅ Estrutura condicional (mostrar cards OU mensagem vazia)
+
+## RESULTADO ESPERADO
+
+Página idêntica à atual, mas com cards de RDO aparecendo na área que atualmente mostra "Nenhuma RDO encontrada", mantendo todo o resto exatamente igual.
+
