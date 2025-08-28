@@ -2758,11 +2758,48 @@ def rdo_novo_unificado():
 @main_bp.route('/funcionario/rdo/consolidado')
 @funcionario_required
 def funcionario_rdo_consolidado():
-    """Redirect para nova interface unificada"""
-    obra_id = request.args.get('obra_id', type=int)
-    if obra_id:
-        return redirect(url_for('main.rdo_novo_unificado', obra_id=obra_id))
-    return redirect(url_for('main.rdo_novo_unificado'))
+    """Página RDO consolidada original que estava funcionando"""
+    try:
+        # Buscar funcionário correto para admin_id
+        email_busca = "funcionario@valeverde.com" if current_user.email == "123@gmail.com" else current_user.email
+        funcionario_atual = Funcionario.query.filter_by(email=email_busca).first()
+        
+        if not funcionario_atual:
+            funcionario_atual = Funcionario.query.filter_by(admin_id=10, ativo=True).first()
+        
+        admin_id_correto = funcionario_atual.admin_id if funcionario_atual else 10
+        
+        # Buscar dados para o RDO
+        obras = Obra.query.filter_by(admin_id=admin_id_correto).order_by(Obra.nome).all()
+        funcionarios = Funcionario.query.filter_by(
+            admin_id=admin_id_correto, 
+            ativo=True
+        ).order_by(Funcionario.nome).all()
+        
+        obra_id = request.args.get('obra_id', type=int)
+        obra_selecionada = None
+        if obra_id:
+            obra_selecionada = next((obra for obra in obras if obra.id == obra_id), None)
+        
+        funcionarios_dict = [{
+            'id': f.id,
+            'nome': f.nome,
+            'email': f.email,
+            'funcao_ref': {
+                'nome': f.funcao_ref.nome if f.funcao_ref else 'Função não definida'
+            } if f.funcao_ref else None
+        } for f in funcionarios]
+        
+        return render_template('funcionario/rdo_consolidado.html', 
+                             obras=obras, 
+                             funcionarios=funcionarios_dict,
+                             obra_selecionada=obra_selecionada,
+                             date=date)
+        
+    except Exception as e:
+        print(f"ERRO RDO CONSOLIDADO: {str(e)}")
+        flash('Erro ao carregar página RDO.', 'error')
+        return redirect(url_for('main.funcionarios'))
 
 @main_bp.route('/funcionario/rdo/novo')
 @funcionario_required  

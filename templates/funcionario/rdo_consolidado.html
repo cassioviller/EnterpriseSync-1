@@ -31,7 +31,7 @@
     </div>
 
     <!-- Formulário RDO -->
-    <form id="rdo-form" method="POST" action="{{ url_for('rdo_salvar.funcionario_rdo_consolidado') }}" class="rdo-form">
+    <form id="rdo-form" method="POST" action="{{ url_for('main.rdo_salvar_unificado') }}" class="rdo-form">
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
         {% if rdo %}
         <input type="hidden" name="rdo_id" value="{{ rdo.id }}"/>
