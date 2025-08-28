@@ -1,0 +1,222 @@
+# PROMPT: Correção do Cálculo de Porcentagem da Obra
+
+## Fórmula Correta de Cálculo
+
+### LÓGICA FUNDAMENTAL:
+O progresso da obra deve ser baseado no **total de subatividades da obra**, não no número de serviços.
+
+### EXEMPLO PRÁTICO:
+
+**Obra com 3 serviços:**
+- Serviço A: 2 subatividades
+- Serviço B: 4 subatividades  
+- Serviço C: 4 subatividades
+- **Total da obra: 10 subatividades**
+
+**Cálculo do peso de cada subatividade:**
+```
+Peso por subatividade = 100% ÷ 10 subatividades = 10% cada
+```
+
+**Se completar 1 subatividade:**
+```
+Progresso da obra = 1 × 10% = 10%
+```
+
+## Implementação do Cálculo
+
+### PASSO 1: Contar Total de Subatividades da Obra
+```python
+def calcular_total_subatividades_obra(obra_id):
+    # Buscar todos os serviços da obra
+    servicos_obra = get_servicos_da_obra(obra_id)
+    
+    total_subatividades = 0
+    for servico in servicos_obra:
+        subatividades_servico = get_subatividades_do_servico(servico.id)
+        total_subatividades += len(subatividades_servico)
+    
+    return total_subatividades
+
+# Exemplo: obra tem 10 subatividades no total
+```
+
+### PASSO 2: Calcular Peso de Cada Subatividade
+```python
+def calcular_peso_subatividade(obra_id):
+    total_subatividades = calcular_total_subatividades_obra(obra_id)
+    peso_por_subatividade = 100.0 / total_subatividades
+    return peso_por_subatividade
+
+# Exemplo: 100% ÷ 10 = 10% por subatividade
+```
+
+### PASSO 3: Calcular Progresso Atual da Obra
+```python
+def calcular_progresso_obra(obra_id):
+    # Buscar TODAS as RDOs da obra (não só a atual)
+    todas_rdos_obra = get_todas_rdos_da_obra(obra_id)
+    
+    # Buscar a RDO mais recente para cada subatividade
+    progresso_por_subatividade = {}
+    
+    for rdo in todas_rdos_obra:
+        subatividades_rdo = get_subatividades_rdo(rdo.id)
+        for sub_rdo in subatividades_rdo:
+            # Manter sempre a porcentagem mais recente
+            subatividade_id = sub_rdo.subatividade_id
+            if (subatividade_id not in progresso_por_subatividade or 
+                rdo.data > progresso_por_subatividade[subatividade_id]['data']):
+                progresso_por_subatividade[subatividade_id] = {
+                    'porcentagem': sub_rdo.porcentagem,
+                    'data': rdo.data
+                }
+    
+    # Calcular progresso total
+    peso_por_subatividade = calcular_peso_subatividade(obra_id)
+    progresso_total = 0.0
+    
+    for subatividade_id, dados in progresso_por_subatividade.items():
+        porcentagem_subatividade = dados['porcentagem']
+        contribuicao = (porcentagem_subatividade / 100.0) * peso_por_subatividade
+        progresso_total += contribuicao
+    
+    return round(progresso_total, 1)
+```
+
+## Exemplos Práticos de Cálculo
+
+### EXEMPLO 1: Obra Simples
+**Configuração:**
+- 3 serviços: A(2 sub), B(4 sub), C(4 sub) = 10 subatividades total
+- Peso por subatividade: 10%
+
+**Cenário 1:** Completou 1 subatividade (100%)
+```
+Progresso = 1 × (100% × 10%) = 10%
+```
+
+**Cenário 2:** Completou 3 subatividades (100% cada)
+```
+Progresso = 3 × (100% × 10%) = 30%
+```
+
+**Cenário 3:** Progresso parcial
+- Subatividade 1: 50% completa
+- Subatividade 2: 100% completa
+- Subatividade 3: 25% completa
+```
+Progresso = (50% × 10%) + (100% × 10%) + (25% × 10%)
+Progresso = 5% + 10% + 2.5% = 17.5%
+```
+
+### EXEMPLO 2: Obra Complexa
+**Configuração:**
+- 5 serviços: A(3), B(5), C(2), D(6), E(4) = 20 subatividades total
+- Peso por subatividade: 5%
+
+**Cenário:** Completou 7 subatividades (100% cada)
+```
+Progresso = 7 × (100% × 5%) = 35%
+```
+
+## Implementação na Interface
+
+### CARD DE PROGRESSO GERAL:
+```html
+<div class="stat-card">
+    <div class="stat-icon">
+        <i class="fas fa-chart-line"></i>
+    </div>
+    <div class="stat-content">
+        <div class="stat-number">{{ progresso_obra }}%</div>
+        <div class="stat-label">Progresso da Obra</div>
+        <div class="stat-detail">{{ subatividades_completas }}/{{ total_subatividades }} subatividades</div>
+    </div>
+</div>
+```
+
+### DETALHAMENTO DO CÁLCULO:
+```html
+<div class="calculo-detalhado">
+    <h4>Detalhamento do Progresso</h4>
+    <p>Total de subatividades na obra: {{ total_subatividades }}</p>
+    <p>Peso por subatividade: {{ peso_por_subatividade }}%</p>
+    <p>Subatividades com progresso: {{ subatividades_com_progresso }}</p>
+    <p>Progresso atual: {{ progresso_obra }}%</p>
+</div>
+```
+
+## Validação do Cálculo
+
+### TESTE 1: Obra Vazia
+```
+Total subatividades: 10
+Subatividades completas: 0
+Progresso esperado: 0%
+```
+
+### TESTE 2: Obra Completa
+```
+Total subatividades: 10
+Subatividades completas: 10 (todas 100%)
+Progresso esperado: 100%
+```
+
+### TESTE 3: Obra Parcial
+```
+Total subatividades: 10
+Subatividades: 3 completas (100%) + 2 parciais (50% cada)
+Cálculo: (3 × 10%) + (2 × 50% × 10%) = 30% + 10% = 40%
+Progresso esperado: 40%
+```
+
+## Código de Implementação
+
+### FUNÇÃO PRINCIPAL:
+```python
+def get_progresso_obra_completo(obra_id):
+    # 1. Contar total de subatividades
+    total_subatividades = calcular_total_subatividades_obra(obra_id)
+    
+    # 2. Calcular peso por subatividade
+    peso_por_subatividade = 100.0 / total_subatividades
+    
+    # 3. Buscar progresso atual de cada subatividade
+    progresso_atual = calcular_progresso_obra(obra_id)
+    
+    # 4. Contar subatividades com algum progresso
+    subatividades_com_progresso = contar_subatividades_com_progresso(obra_id)
+    
+    return {
+        'progresso_percentual': progresso_atual,
+        'total_subatividades': total_subatividades,
+        'peso_por_subatividade': peso_por_subatividade,
+        'subatividades_com_progresso': subatividades_com_progresso
+    }
+```
+
+### USO NO TEMPLATE:
+```python
+# Na view da página
+obra_progresso = get_progresso_obra_completo(obra_id)
+
+return render_template('rdo_visualizacao.html',
+    progresso_obra=obra_progresso['progresso_percentual'],
+    total_subatividades=obra_progresso['total_subatividades'],
+    peso_subatividade=obra_progresso['peso_por_subatividade']
+)
+```
+
+## Resultado Final
+
+✅ **Cálculo Preciso:** Baseado no total real de subatividades da obra
+✅ **Distribuição Justa:** Cada subatividade tem peso proporcional
+✅ **Progresso Real:** Reflete o avanço verdadeiro da obra
+✅ **Fácil Validação:** Lógica simples de entender e verificar
+
+**Exemplo Final:**
+- Obra com 10 subatividades total
+- Completou 3 subatividades = 30% da obra
+- Cada subatividade vale exatamente 10% do progresso total
+

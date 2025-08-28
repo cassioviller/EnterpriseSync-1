@@ -2339,47 +2339,62 @@ def visualizar_rdo(id):
         total_subatividades = len(subatividades)
         total_funcionarios = len(funcionarios)
         
-        # Calcular progresso real da obra (não só do dia)
+        # Calcular progresso real da obra baseado no total de subatividades (fórmula correta)
         progresso_obra = 0
+        total_subatividades_obra = 0
+        peso_por_subatividade = 0
+        
         try:
-            # Buscar TODOS os serviços da obra para cálculo correto
-            from sqlalchemy import distinct
-            todos_servicos_obra = db.session.query(distinct(RDOServicoSubatividade.servico_id)).filter(
-                db.exists().where(
-                    db.and_(
-                        RDO.obra_id == rdo.obra_id,
-                        RDOServicoSubatividade.rdo_id == RDO.id
-                    )
-                )
-            ).all()
+            # PASSO 1: Contar total de subatividades da obra (de todas as RDOs)
+            total_subatividades_obra = db.session.query(RDOServicoSubatividade).join(
+                RDO, RDOServicoSubatividade.rdo_id == RDO.id
+            ).filter(RDO.obra_id == rdo.obra_id).count()
             
-            total_servicos_obra = len(todos_servicos_obra)
+            print(f"DEBUG TOTAL SUBATIVIDADES OBRA: {total_subatividades_obra}")
             
-            if total_servicos_obra > 0 and subatividades:
-                # Agrupar subatividades por serviço para cálculo correto
-                servicos_no_dia = {}
-                for sub in subatividades:
-                    servico_id = sub.servico_id
-                    if servico_id not in servicos_no_dia:
-                        servicos_no_dia[servico_id] = []
-                    servicos_no_dia[servico_id].append(sub.percentual_conclusao or 0)
+            if total_subatividades_obra > 0:
+                # PASSO 2: Calcular peso de cada subatividade
+                peso_por_subatividade = 100.0 / total_subatividades_obra
+                print(f"DEBUG PESO POR SUBATIVIDADE: {peso_por_subatividade:.2f}%")
                 
-                # Calcular progresso médio por serviço executado
-                progresso_servicos_executados = 0
-                for servico_id, percentuais in servicos_no_dia.items():
-                    progresso_servicos_executados += sum(percentuais) / len(percentuais)
+                # PASSO 3: Buscar progresso mais recente de cada subatividade da obra
+                # Buscar todas as subatividades já executadas na obra (histórico completo)
+                subatividades_obra_completas = db.session.query(RDOServicoSubatividade).join(
+                    RDO, RDOServicoSubatividade.rdo_id == RDO.id
+                ).filter(
+                    RDO.obra_id == rdo.obra_id
+                ).order_by(RDO.data_relatorio.desc()).all()
                 
-                # Progresso real da obra considerando todos os serviços
-                progresso_obra = progresso_servicos_executados / total_servicos_obra
+                # Manter apenas o progresso mais recente de cada subatividade única
+                progresso_por_subatividade = {}
+                for sub in subatividades_obra_completas:
+                    # Usar combinação servico_id + nome_subatividade como chave única
+                    chave_subatividade = f"{sub.servico_id}_{sub.nome_subatividade}"
+                    
+                    if chave_subatividade not in progresso_por_subatividade:
+                        progresso_por_subatividade[chave_subatividade] = sub.percentual_conclusao or 0
                 
-                print(f"DEBUG PROGRESSO: {len(servicos_no_dia)} serviços no dia de {total_servicos_obra} total")
+                # PASSO 4: Calcular progresso total da obra
+                progresso_acumulado = 0.0
+                for chave, percentual in progresso_por_subatividade.items():
+                    contribuicao = (percentual / 100.0) * peso_por_subatividade
+                    progresso_acumulado += contribuicao
+                
+                progresso_obra = round(progresso_acumulado, 1)
+                
+                print(f"DEBUG PROGRESSO DETALHADO:")
+                print(f"  - Subatividades únicas com progresso: {len(progresso_por_subatividade)}")
+                print(f"  - Peso por subatividade: {peso_por_subatividade:.2f}%")
+                print(f"  - Progresso final da obra: {progresso_obra}%")
             
         except Exception as e:
-            print(f"ERRO CÁLCULO PROGRESSO: {str(e)}")
-            # Fallback para cálculo simples
+            print(f"ERRO CÁLCULO PROGRESSO OBRA: {str(e)}")
+            # Fallback para cálculo simples baseado no dia atual
             if subatividades:
                 progresso_total = sum(sub.percentual_conclusao or 0 for sub in subatividades)
                 progresso_obra = progresso_total / len(subatividades)
+                total_subatividades_obra = len(subatividades)
+                peso_por_subatividade = 100.0 / len(subatividades)
         
         # Calcular total de horas trabalhadas
         total_horas_trabalhadas = sum(func.horas_trabalhadas or 0 for func in funcionarios)
@@ -2407,6 +2422,8 @@ def visualizar_rdo(id):
                              total_subatividades=total_subatividades,
                              total_funcionarios=total_funcionarios,
                              progresso_obra=progresso_obra,
+                             total_subatividades_obra=total_subatividades_obra,
+                             peso_por_subatividade=peso_por_subatividade,
                              total_horas_trabalhadas=total_horas_trabalhadas)
         
     except Exception as e:

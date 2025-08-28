@@ -33,10 +33,10 @@ console.log('Initializing RDO view with light theme...');
 
 /* ===== DESIGN SYSTEM MODERNO PROFISSIONAL ===== */
 :root {
-    --primary-green: #2d5a27;
-    --dark-green: #145a3e;
-    --light-green: #d1e7dd;
-    --accent-green: #4a7c59;
+    --primary-green: #008b3a;
+    --dark-green: #000000;
+    --light-green: #f8f9fa;
+    --accent-green: #333333;
     --blue-primary: #0d6efd;
     --blue-light: #e7f3ff;
     --yellow-warning: #ffc107;
@@ -70,7 +70,7 @@ console.log('Initializing RDO view with light theme...');
     --transition-fast: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
     
     /* Gradientes */
-    --gradient-primary: linear-gradient(135deg, var(--primary-green) 0%, var(--accent-green) 50%, var(--blue-primary) 100%);
+    --gradient-primary: linear-gradient(135deg, #008b3a 0%, #000000 50%, #333333 100%);
     --gradient-card: linear-gradient(135deg, var(--white) 0%, var(--gray-50) 100%);
     --gradient-success: linear-gradient(135deg, #28a745 0%, var(--primary-green) 100%);
 }
@@ -250,6 +250,13 @@ console.log('Initializing RDO view with light theme...');
     letter-spacing: 0.5px;
 }
 
+.stat-detail {
+    font-size: 0.8rem;
+    color: var(--gray-500) !important;
+    font-weight: 500;
+    margin-top: 0.25rem;
+}
+
 /* ===== SEÇÕES DE INFORMAÇÕES ===== */
 .info-section {
     margin: 0 2rem 3rem 2rem;
@@ -353,7 +360,7 @@ console.log('Initializing RDO view with light theme...');
 }
 
 .servico-header {
-    color: #2d5a27 !important;
+    color: #000000 !important;
     font-size: 1.1rem;
     font-weight: 700;
     margin: 2rem 0 1rem 0;
@@ -604,6 +611,7 @@ console.log('Initializing RDO view with light theme...');
             <div class="stat-content">
                 <div class="stat-number">{{ "%.1f"|format(progresso_obra) }}%</div>
                 <div class="stat-label">Progresso da Obra</div>
+                <div class="stat-detail">{{ total_subatividades_obra }} subatividades total</div>
             </div>
         </div>
         
