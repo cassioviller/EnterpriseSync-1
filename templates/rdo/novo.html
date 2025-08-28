@@ -194,6 +194,53 @@
         transform: translateY(0);
     }
 }
+
+/* Estilos para serviços expansíveis */
+.servico-card {
+    border: 1px solid #e2e8f0;
+    border-radius: 12px;
+    overflow: hidden;
+    background: white;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.servico-header {
+    background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+    padding: 1rem 1.5rem;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.servico-header:hover {
+    background: linear-gradient(135deg, #e9ecef 0%, #dee2e6 100%);
+}
+
+.servico-body {
+    padding: 1.5rem;
+    border-top: 1px solid #e2e8f0;
+    transition: all 0.3s ease;
+}
+
+.servico-body.collapse {
+    display: none;
+}
+
+.badge {
+    font-size: 0.75rem;
+    padding: 0.25rem 0.5rem;
+}
+
+/* Modal autocomplete */
+.list-group-item-action:hover {
+    background-color: #f8f9fa;
+}
+
+#sugestoesFuncionarios {
+    max-height: 300px;
+    overflow-y: auto;
+    border: 1px solid #dee2e6;
+    border-radius: 8px;
+}
 </style>
 {% endblock %}
 
@@ -397,47 +444,145 @@ function testarUltimoRDO() {
                 <i class="fas fa-check-circle"></i>
                 Dados do último RDO carregados com sucesso!
             </div>
-            <div class="card">
-                <div class="card-header bg-success text-white">
-                    <h5 class="mb-0">Estrutura Metálica</h5>
-                    <span class="badge bg-light text-dark">estrutural</span>
+            
+            <!-- Estrutura Metálica -->
+            <div class="servico-card mb-3">
+                <div class="servico-header" onclick="toggleServico('estrutura')">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <h5 class="mb-0">Estrutura Metálica</h5>
+                            <span class="badge bg-success">estrutural</span>
+                        </div>
+                        <div>
+                            <span class="text-muted me-2">4 subatividades</span>
+                            <i class="fas fa-chevron-down" id="chevron-estrutura"></i>
+                        </div>
+                    </div>
                 </div>
-                <div class="card-body">
+                <div class="servico-body" id="body-estrutura">
                     <div class="row">
-                        <div class="col-md-6">
-                            <div class="mb-3">
-                                <label class="form-label">Montagem de Formas</label>
-                                <div class="input-group">
-                                    <input type="number" class="form-control" value="100" step="0.1">
-                                    <span class="input-group-text">%</span>
-                                </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Montagem de Formas</label>
+                            <div class="input-group">
+                                <input type="number" class="form-control" value="100" step="0.1" min="0" max="100">
+                                <span class="input-group-text">%</span>
                             </div>
                         </div>
-                        <div class="col-md-6">
-                            <div class="mb-3">
-                                <label class="form-label">Armação de Ferro</label>
-                                <div class="input-group">
-                                    <input type="number" class="form-control" value="100" step="0.1">
-                                    <span class="input-group-text">%</span>
-                                </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Armação de Ferro</label>
+                            <div class="input-group">
+                                <input type="number" class="form-control" value="100" step="0.1" min="0" max="100">
+                                <span class="input-group-text">%</span>
                             </div>
                         </div>
-                        <div class="col-md-6">
-                            <div class="mb-3">
-                                <label class="form-label">Concretagem</label>
-                                <div class="input-group">
-                                    <input type="number" class="form-control" value="70" step="0.1">
-                                    <span class="input-group-text">%</span>
-                                </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Concretagem</label>
+                            <div class="input-group">
+                                <input type="number" class="form-control" value="70" step="0.1" min="0" max="100">
+                                <span class="input-group-text">%</span>
                             </div>
                         </div>
-                        <div class="col-md-6">
-                            <div class="mb-3">
-                                <label class="form-label">Cura do Concreto</label>
-                                <div class="input-group">
-                                    <input type="number" class="form-control" value="10" step="0.1">
-                                    <span class="input-group-text">%</span>
-                                </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Cura do Concreto</label>
+                            <div class="input-group">
+                                <input type="number" class="form-control" value="10" step="0.1" min="0" max="100">
+                                <span class="input-group-text">%</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Manta PVC -->
+            <div class="servico-card mb-3">
+                <div class="servico-header" onclick="toggleServico('manta')">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <h5 class="mb-0">Manta PVC</h5>
+                            <span class="badge bg-info">cobertura</span>
+                        </div>
+                        <div>
+                            <span class="text-muted me-2">4 subatividades</span>
+                            <i class="fas fa-chevron-down" id="chevron-manta"></i>
+                        </div>
+                    </div>
+                </div>
+                <div class="servico-body collapse" id="body-manta">
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Preparação da Superfície</label>
+                            <div class="input-group">
+                                <input type="number" class="form-control" value="0" step="0.1" min="0" max="100">
+                                <span class="input-group-text">%</span>
+                            </div>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Aplicação do Primer</label>
+                            <div class="input-group">
+                                <input type="number" class="form-control" value="0" step="0.1" min="0" max="100">
+                                <span class="input-group-text">%</span>
+                            </div>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Instalação da Manta</label>
+                            <div class="input-group">
+                                <input type="number" class="form-control" value="0" step="0.1" min="0" max="100">
+                                <span class="input-group-text">%</span>
+                            </div>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Acabamento e Vedação</label>
+                            <div class="input-group">
+                                <input type="number" class="form-control" value="0" step="0.1" min="0" max="100">
+                                <span class="input-group-text">%</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Beiral Metálico -->
+            <div class="servico-card mb-3">
+                <div class="servico-header" onclick="toggleServico('beiral')">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <h5 class="mb-0">Beiral Metálico</h5>
+                            <span class="badge bg-warning text-dark">acabamento</span>
+                        </div>
+                        <div>
+                            <span class="text-muted me-2">4 subatividades</span>
+                            <i class="fas fa-chevron-down" id="chevron-beiral"></i>
+                        </div>
+                    </div>
+                </div>
+                <div class="servico-body collapse" id="body-beiral">
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Medição e Marcação</label>
+                            <div class="input-group">
+                                <input type="number" class="form-control" value="0" step="0.1" min="0" max="100">
+                                <span class="input-group-text">%</span>
+                            </div>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Corte das Peças</label>
+                            <div class="input-group">
+                                <input type="number" class="form-control" value="0" step="0.1" min="0" max="100">
+                                <span class="input-group-text">%</span>
+                            </div>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Fixação dos Suportes</label>
+                            <div class="input-group">
+                                <input type="number" class="form-control" value="0" step="0.1" min="0" max="100">
+                                <span class="input-group-text">%</span>
+                            </div>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Instalação do Beiral</label>
+                            <div class="input-group">
+                                <input type="number" class="form-control" value="0" step="0.1" min="0" max="100">
+                                <span class="input-group-text">%</span>
                             </div>
                         </div>
                     </div>
@@ -447,38 +592,124 @@ function testarUltimoRDO() {
     }, 1500);
 }
 
+// Lista de funcionários disponíveis para autocomplete
+const funcionariosDisponiveis = [
+    { id: 1, nome: 'João Silva Santos', funcao: 'Soldador', departamento: 'Engenharia' },
+    { id: 2, nome: 'Maria Oliveira Costa', funcao: 'Engenheira Civil', departamento: 'Engenharia' },
+    { id: 3, nome: 'Carlos Alberto Pereira', funcao: 'Pedreiro', departamento: 'Construção Civil' },
+    { id: 4, nome: 'Ana Paula Rodrigues', funcao: 'Arquiteta', departamento: 'Arquitetura' },
+    { id: 5, nome: 'Pedro Henrique Lima', funcao: 'Eletricista', departamento: 'Elétrica' },
+    { id: 6, nome: 'Juliana Santos Alves', funcao: 'Pintora', departamento: 'Acabamento' },
+    { id: 7, nome: 'Roberto Carlos Silva', funcao: 'Carpinteiro', departamento: 'Madeiramento' },
+    { id: 8, nome: 'Fernanda Souza Costa', funcao: 'Encanadora', departamento: 'Hidráulica' }
+];
+
+let funcionariosSelecionados = [];
+
 function adicionarFuncionario() {
-    const container = document.getElementById('funcionarios-container');
-    const funcionarioHtml = `
-        <div class="funcionario-item card mb-3">
-            <div class="card-body">
-                <div class="row align-items-center">
-                    <div class="col-md-8">
-                        <h6 class="mb-1">João Silva Santos</h6>
-                        <small class="text-muted">Soldador - Engenharia</small>
+    // Mostrar modal de seleção com autocomplete
+    mostrarModalFuncionario();
+}
+
+function mostrarModalFuncionario() {
+    const modalHtml = `
+        <div class="modal fade" id="modalFuncionario" tabindex="-1">
+            <div class="modal-dialog">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title">
+                            <i class="fas fa-user-plus"></i>
+                            Adicionar Funcionário
+                        </h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                     </div>
-                    <div class="col-md-4 text-end">
-                        <button class="btn btn-sm btn-outline-danger" onclick="removerFuncionario(this)">
-                            <i class="fas fa-times"></i>
-                        </button>
+                    <div class="modal-body">
+                        <div class="mb-3">
+                            <label class="form-label">Buscar Funcionário</label>
+                            <input type="text" class="form-control" id="buscarFuncionario" 
+                                   placeholder="Digite o nome do funcionário..." 
+                                   autocomplete="off">
+                            <div id="sugestoesFuncionarios" class="list-group mt-2" style="display: none;"></div>
+                        </div>
                     </div>
                 </div>
             </div>
         </div>
     `;
     
-    if (container.querySelector('.text-center')) {
-        container.innerHTML = funcionarioHtml;
-    } else {
-        container.insertAdjacentHTML('beforeend', funcionarioHtml);
-    }
+    // Remover modal existente se houver
+    const modalExistente = document.getElementById('modalFuncionario');
+    if (modalExistente) modalExistente.remove();
+    
+    document.body.insertAdjacentHTML('beforeend', modalHtml);
+    
+    // Inicializar modal
+    const modal = new bootstrap.Modal(document.getElementById('modalFuncionario'));
+    modal.show();
+    
+    // Configurar autocomplete
+    configurarAutocompleteFuncionario();
 }
 
-function removerFuncionario(btn) {
-    btn.closest('.funcionario-item').remove();
+function configurarAutocompleteFuncionario() {
+    const input = document.getElementById('buscarFuncionario');
+    const sugestoes = document.getElementById('sugestoesFuncionarios');
     
+    input.addEventListener('input', function() {
+        const termo = this.value.toLowerCase().trim();
+        
+        if (termo.length < 2) {
+            sugestoes.style.display = 'none';
+            return;
+        }
+        
+        const funcionariosFiltrados = funcionariosDisponiveis.filter(f => 
+            !funcionariosSelecionados.some(fs => fs.id === f.id) &&
+            (f.nome.toLowerCase().includes(termo) || 
+             f.funcao.toLowerCase().includes(termo) ||
+             f.departamento.toLowerCase().includes(termo))
+        );
+        
+        if (funcionariosFiltrados.length === 0) {
+            sugestoes.innerHTML = '<div class="list-group-item text-muted">Nenhum funcionário encontrado</div>';
+            sugestoes.style.display = 'block';
+            return;
+        }
+        
+        sugestoes.innerHTML = funcionariosFiltrados.map(f => `
+            <div class="list-group-item list-group-item-action" onclick="selecionarFuncionario(${f.id})">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <h6 class="mb-1">${f.nome}</h6>
+                        <small class="text-muted">${f.funcao} - ${f.departamento}</small>
+                    </div>
+                    <i class="fas fa-plus text-success"></i>
+                </div>
+            </div>
+        `).join('');
+        
+        sugestoes.style.display = 'block';
+    });
+    
+    input.focus();
+}
+
+function selecionarFuncionario(funcionarioId) {
+    const funcionario = funcionariosDisponiveis.find(f => f.id === funcionarioId);
+    if (!funcionario) return;
+    
+    funcionariosSelecionados.push(funcionario);
+    atualizarListaFuncionarios();
+    
+    // Fechar modal
+    const modal = bootstrap.Modal.getInstance(document.getElementById('modalFuncionario'));
+    modal.hide();
+}
+
+function atualizarListaFuncionarios() {
     const container = document.getElementById('funcionarios-container');
-    if (!container.querySelector('.funcionario-item')) {
+    
+    if (funcionariosSelecionados.length === 0) {
         container.innerHTML = `
             <div class="text-center p-4">
                 <i class="fas fa-user-plus fa-3x text-muted mb-3"></i>
@@ -486,7 +717,31 @@ function removerFuncionario(btn) {
                 <p class="small text-muted">Use o botão "Adicionar Funcionário" para incluir colaboradores</p>
             </div>
         `;
+        return;
     }
+    
+    container.innerHTML = funcionariosSelecionados.map(f => `
+        <div class="funcionario-item card mb-3">
+            <div class="card-body">
+                <div class="row align-items-center">
+                    <div class="col-md-8">
+                        <h6 class="mb-1">${f.nome}</h6>
+                        <small class="text-muted">${f.funcao} - ${f.departamento}</small>
+                    </div>
+                    <div class="col-md-4 text-end">
+                        <button class="btn btn-sm btn-outline-danger" onclick="removerFuncionario(${f.id})">
+                            <i class="fas fa-times"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `).join('');
+}
+
+function removerFuncionario(funcionarioId) {
+    funcionariosSelecionados = funcionariosSelecionados.filter(f => f.id !== funcionarioId);
+    atualizarListaFuncionarios();
 }
 
 function salvarRascunho() {
@@ -502,6 +757,22 @@ function salvarRascunho() {
             btn.disabled = false;
         }, 2000);
     }, 1000);
+}
+
+// Função para expandir/colapsar serviços
+function toggleServico(servicoId) {
+    const body = document.getElementById(`body-${servicoId}`);
+    const chevron = document.getElementById(`chevron-${servicoId}`);
+    
+    if (body.classList.contains('collapse')) {
+        body.classList.remove('collapse');
+        chevron.classList.remove('fa-chevron-down');
+        chevron.classList.add('fa-chevron-up');
+    } else {
+        body.classList.add('collapse');
+        chevron.classList.remove('fa-chevron-up');
+        chevron.classList.add('fa-chevron-down');
+    }
 }
 
 // Inicialização
