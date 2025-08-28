@@ -971,87 +971,129 @@ console.log('Initializing RDO with light theme...');
         </div>
     </div>
 
-    <!-- Grid de Cards RDO - Design Conforme Especificação -->
-    {% if rdos %}
+    <!-- Grid de Cards RDO -->
+    {% if rdos.items %}
     <div class="rdos-grid">
-        {% for rdo_item in rdos %}
+        {% for rdo in rdos.items %}
         <div class="rdo-card">
-            <!-- Nome da obra (NEGRITO, grande, topo) -->
             <div class="rdo-card-header">
                 <div class="rdo-title-section">
-                    <h3 class="rdo-obra-nome" style="font-size: 1.3rem; font-weight: bold; color: #2d5a27; margin-bottom: 0.5rem;">
-                        {{ rdo_item.obra.nome|upper }}
-                    </h3>
-                    <!-- Data (menor, cinza) -->
-                    <p style="font-size: 0.9rem; color: #6c757d; margin-bottom: 1rem;">
-                        📅 {{ rdo_item.data_formatada }}
-                    </p>
+                    <h3 class="rdo-obra-nome">{{ rdo.obra.nome }}</h3>
+                </div>
+                <div class="rdo-header-actions">
+                    <div class="rdo-status">
+                        <span class="status-badge status-{{ rdo.status|lower|replace(' ', '-') }}">{{ rdo.status }}</span>
+                    </div>
+                    <button class="btn-delete-rdo" onclick="confirmarExclusao({{ rdo.id }})" title="Excluir RDO">
+                        <i class="fas fa-trash"></i>
+                    </button>
                 </div>
             </div>
             
             <div class="rdo-card-body">
-                <!-- Progresso da obra (centro, com destaque) -->
-                <div class="rdo-progress-section" style="margin-bottom: 1rem;">
-                    <div class="progress-visual" style="display: flex; align-items: center; gap: 1rem; margin-bottom: 1rem;">
-                        <!-- Barra de progresso visual -->
-                        <div class="progress-bar-visual" style="flex: 1; height: 10px; background: #e9ecef; border-radius: 5px; overflow: hidden;">
-                            <div class="progress-fill-visual" 
-                                 style="height: 100%; background: linear-gradient(90deg, #28a745, #20c997); width: {{ rdo_item.progresso }}%; transition: width 0.8s ease;">
-                            </div>
-                        </div>
-                        <!-- Porcentagem grande -->
-                        <div class="progress-percentage" style="font-size: 1.2rem; font-weight: bold; color: #2d5a27;">
-                            {{ rdo_item.progresso }}%
-                        </div>
+                <div class="rdo-date">
+                    <i class="fas fa-calendar"></i>
+                    <span>{{ rdo.data_relatorio.strftime('%d/%m/%Y') }}</span>
+                </div>
+                
+                <div class="rdo-creator">
+                    <i class="fas fa-user"></i>
+                    <span>{{ rdo.criado_por.nome if rdo.criado_por else 'Sistema' }}</span>
+                </div>
+                
+                <div class="rdo-obra">
+                    <i class="fas fa-building"></i>
+                    <span>{{ rdo.obra.nome }}</span>
+                </div>
+                
+                <div class="rdo-progress">
+                    <div class="progress-header">
+                        <span>Progresso Geral</span>
+                        <strong>{{ "%.1f"|format(rdo.progresso_total|default(0)) }}%</strong>
+                    </div>
+                    <div class="progress-bar">
+                        <div class="progress-fill" style="width: {{ rdo.progresso_total|default(0) }}%"></div>
                     </div>
                 </div>
                 
-                <!-- Funcionário (com ícone) -->
-                <div class="rdo-funcionario" style="margin-bottom: 1.5rem;">
-                    <p style="font-size: 0.95rem; color: #495057; display: flex; align-items: center; gap: 0.5rem;">
-                        👤 {{ rdo_item.funcionario.nome if rdo_item.funcionario else 'Sistema Administrativo' }}
-                    </p>
+                <div class="rdo-stats">
+                    <div class="stat-item">
+                        <i class="fas fa-tasks"></i>
+                        <span>{{ rdo.servico_subatividades|length }} atividades</span>
+                    </div>
+                    <div class="stat-item">
+                        <i class="fas fa-users"></i>
+                        <span>{{ rdo.mao_obra|length }} funcionários</span>
+                    </div>
+                    <div class="stat-item">
+                        <i class="fas fa-clock"></i>
+                        <span>{{ "%.1f"|format(rdo.horas_totais|default(0)) }}h</span>
+                    </div>
                 </div>
-                
-                <!-- Botões de ação (rodapé) -->
-                <div class="rdo-card-footer" style="display: flex; gap: 1rem; justify-content: space-between;">
-                    <a href="{{ url_for('main.rdo_ver', id=rdo_item.rdo.id) }}" 
-                       class="btn-modern btn-success" 
-                       style="flex: 1; text-align: center; padding: 0.75rem; font-size: 0.9rem; border-radius: 8px;">
-                        Ver Detalhes
-                    </a>
-                    <a href="{{ url_for('main.rdo_editar', id=rdo_item.rdo.id) }}" 
-                       class="btn-modern btn-primary" 
-                       style="flex: 1; text-align: center; padding: 0.75rem; font-size: 0.9rem; border-radius: 8px;">
-                        Editar RDO
-                    </a>
-                </div>
+            </div>
+            
+            <div class="rdo-card-footer">
+                <a href="{{ url_for('main.visualizar_rdo', id=rdo.id) }}" class="btn-action primary">
+                    <i class="fas fa-eye"></i> Visualizar
+                </a>
+                <a href="{{ url_for('main.funcionario_rdo_consolidado') }}?rdo_id={{ rdo.id }}" class="btn-action secondary">
+                    <i class="fas fa-edit"></i> Editar
+                </a>
             </div>
         </div>
         {% endfor %}
     </div>
+    
+    <!-- Paginação -->
+    {% if rdos.pages > 1 %}
+    <div class="pagination-container">
+        <nav class="pagination">
+            {% if rdos.has_prev %}
+            <a class="page-btn" href="/rdo?page={{ rdos.prev_num }}{% for key, value in filters.items() %}&{{ key }}={{ value }}{% endfor %}">
+                <i class="fas fa-arrow-left"></i> Anterior
+            </a>
+            {% else %}
+            <button class="page-btn" disabled>
+                <i class="fas fa-arrow-left"></i> Anterior
+            </button>
+            {% endif %}
+            
+            {% for page_num in rdos.iter_pages() %}
+                {% if page_num %}
+                    {% if page_num != rdos.page %}
+                    <a class="page-btn" href="/rdo?page={{ page_num }}{% for key, value in filters.items() %}&{{ key }}={{ value }}{% endfor %}">{{ page_num }}</a>
+                    {% else %}
+                    <button class="page-btn active">{{ page_num }}</button>
+                    {% endif %}
+                {% else %}
+                <span class="page-btn" style="border: none; background: none;">...</span>
+                {% endif %}
+            {% endfor %}
+            
+            {% if rdos.has_next %}
+            <a class="page-btn" href="/rdo?page={{ rdos.next_num }}{% for key, value in filters.items() %}&{{ key }}={{ value }}{% endfor %}">
+                Próximo <i class="fas fa-arrow-right"></i>
+            </a>
+            {% else %}
+            <button class="page-btn" disabled>
+                Próximo <i class="fas fa-arrow-right"></i>
+            </button>
+            {% endif %}
+        </nav>
+    </div>
+    {% endif %}
+    
     {% else %}
-    <!-- Estado vazio -->
+    <!-- Estado vazio elegante -->
     <div class="empty-state">
-        <div class="empty-icon">
-            <i class="fas fa-clipboard-list"></i>
-        </div>
-        <h3>Nenhum RDO encontrado</h3>
-        <p>Ainda não há relatórios diários de obra registrados ou os filtros não retornaram resultados.</p>
-        <a href="{{ url_for('main.rdo_novo_unificado') }}" class="btn-modern btn-primary">
-            <i class="fas fa-plus"></i>
-            Criar Primeiro RDO
+        <i class="fas fa-clipboard-list"></i>
+        <h3>Nenhuma RDO encontrada</h3>
+        <p>{% if filters.obra_id or filters.status or filters.data_inicio or filters.data_fim or filters.funcionario_id %}Nenhuma RDO corresponde aos filtros aplicados. Tente ajustar os critérios de busca.{% else %}Crie sua primeira RDO para começar o acompanhamento das obras e atividades.{% endif %}</p>
+        <a href="{{ url_for('main.funcionario_rdo_consolidado') }}" class="btn-action primary" style="display: inline-flex; margin-top: 2rem; padding: 1rem 2rem;">
+            <i class="fas fa-plus"></i> Criar Nova RDO
         </a>
     </div>
     {% endif %}
-</div>
-                    </a>
-                    <a href="{{ url_for('main.rdo_editar', id=rdo_item.rdo.id) }}" 
-                       class="btn-modern btn-primary" 
-                       style="flex: 1; text-align: center; padding: 0.75rem; font-size: 0.9rem; border-radius: 8px;">
-                        Editar RDO
-                    </a>
-
 </div>
 
 <script>
