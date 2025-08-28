@@ -5210,8 +5210,14 @@ def servicos():
     try:
         admin_id = current_user.id if current_user.tipo_usuario == TipoUsuario.ADMIN else current_user.admin_id
         
-        # Buscar todos os serviços
+        # Buscar todos os serviços com suas subatividades
         servicos = Servico.query.order_by(Servico.categoria, Servico.nome).all()
+        
+        # Para cada serviço, carregar subatividades
+        for servico in servicos:
+            servico.subatividades = SubatividadeMestre.query.filter_by(
+                servico_id=servico.id, ativo=True
+            ).order_by(SubatividadeMestre.ordem_padrao).all()
         
         return render_template('configuracoes/servicos.html', servicos=servicos)
         
@@ -5268,6 +5274,109 @@ def novo_servico():
             flash('Erro ao criar serviço.', 'error')
     
     return render_template('configuracoes/novo_servico.html')
+
+@main_bp.route('/servicos/<int:servico_id>')
+@admin_required
+def ver_servico(servico_id):
+    """Visualizar detalhes do serviço"""
+    try:
+        servico = Servico.query.get_or_404(servico_id)
+        
+        # Buscar subatividades do serviço
+        subatividades = SubatividadeMestre.query.filter_by(
+            servico_id=servico_id, ativo=True
+        ).order_by(SubatividadeMestre.ordem_padrao).all()
+        
+        return render_template('configuracoes/ver_servico.html', 
+                             servico=servico, subatividades=subatividades)
+        
+    except Exception as e:
+        print(f"ERRO VER SERVIÇO: {str(e)}")
+        flash('Erro ao carregar serviço.', 'error')
+        return redirect(url_for('main.servicos'))
+
+@main_bp.route('/servicos/<int:servico_id>/editar', methods=['GET', 'POST'])
+@admin_required
+def editar_servico(servico_id):
+    """Editar serviço existente"""
+    try:
+        servico = Servico.query.get_or_404(servico_id)
+        
+        if request.method == 'POST':
+            servico.nome = request.form.get('nome')
+            servico.categoria = request.form.get('categoria')
+            servico.unidade_medida = request.form.get('unidade_medida')
+            servico.descricao = request.form.get('descricao', '')
+            servico.custo_unitario = float(request.form.get('custo_unitario', 0))
+            
+            # Validações básicas
+            if not servico.nome or not servico.categoria or not servico.unidade_medida:
+                flash('Nome, categoria e unidade de medida são obrigatórios.', 'error')
+                return render_template('configuracoes/editar_servico.html', servico=servico)
+            
+            db.session.commit()
+            flash(f'Serviço "{servico.nome}" atualizado com sucesso!', 'success')
+            return redirect(url_for('main.servicos'))
+            
+        return render_template('configuracoes/editar_servico.html', servico=servico)
+        
+    except Exception as e:
+        db.session.rollback()
+        print(f"ERRO EDITAR SERVIÇO: {str(e)}")
+        flash('Erro ao editar serviço.', 'error')
+        return redirect(url_for('main.servicos'))
+
+@main_bp.route('/servicos/<int:servico_id>/toggle', methods=['POST'])
+@admin_required
+def toggle_servico(servico_id):
+    """Alternar status ativo/inativo do serviço"""
+    try:
+        servico = Servico.query.get_or_404(servico_id)
+        data = request.get_json()
+        
+        servico.ativo = data.get('ativo', True)
+        db.session.commit()
+        
+        status = 'ativado' if servico.ativo else 'desativado'
+        return jsonify({
+            'success': True,
+            'message': f'Serviço {status} com sucesso',
+            'ativo': servico.ativo
+        })
+        
+    except Exception as e:
+        db.session.rollback()
+        print(f"ERRO TOGGLE SERVIÇO: {str(e)}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@main_bp.route('/servicos/<int:servico_id>/subatividades/api')
+@admin_required
+def api_servico_subatividades(servico_id):
+    """API para carregar subatividades de um serviço"""
+    try:
+        servico = Servico.query.get_or_404(servico_id)
+        
+        # Buscar subatividades do serviço
+        subatividades = SubatividadeMestre.query.filter_by(
+            servico_id=servico_id, ativo=True
+        ).order_by(SubatividadeMestre.ordem_padrao).all()
+        
+        subatividades_data = [sub.to_dict() for sub in subatividades]
+        
+        return jsonify({
+            'success': True,
+            'servico': {
+                'id': servico.id,
+                'nome': servico.nome,
+                'categoria': servico.categoria
+            },
+            'subatividades': subatividades_data,
+            'total': len(subatividades_data)
+        })
+        
+    except Exception as e:
+        print(f"ERRO API SUBATIVIDADES: {str(e)}")
+        return jsonify({'success': False, 'error': str(e)}), 500
 
 @main_bp.route('/relatorios')
 @admin_required

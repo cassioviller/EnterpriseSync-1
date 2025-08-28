@@ -1,0 +1,226 @@
+{% extends "base_completo.html" %}
+
+{% block title %}{{ servico.nome }} - SIGE{% endblock %}
+
+{% block content %}
+<div class="container-fluid px-4">
+    <div class="row">
+        <div class="col-12">
+            <!-- Breadcrumb -->
+            <nav aria-label="breadcrumb" class="mb-4">
+                <ol class="breadcrumb">
+                    <li class="breadcrumb-item">
+                        <a href="{{ url_for('main.dashboard') }}">
+                            <i class="fas fa-home me-1"></i> Dashboard
+                        </a>
+                    </li>
+                    <li class="breadcrumb-item">
+                        <a href="{{ url_for('main.servicos') }}">Serviços</a>
+                    </li>
+                    <li class="breadcrumb-item active">{{ servico.nome }}</li>
+                </ol>
+            </nav>
+
+            <!-- Header -->
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h2>
+                    <i class="fas fa-tools me-2"></i> {{ servico.nome }}
+                </h2>
+                <div class="btn-group">
+                    <a href="{{ url_for('main.editar_servico', servico_id=servico.id) }}" 
+                       class="btn btn-warning">
+                        <i class="fas fa-edit me-1"></i> Editar
+                    </a>
+                    <a href="{{ url_for('main.servicos') }}" class="btn btn-secondary">
+                        <i class="fas fa-arrow-left me-1"></i> Voltar
+                    </a>
+                </div>
+            </div>
+
+            <div class="row">
+                <!-- Informações do Serviço -->
+                <div class="col-lg-6 mb-4">
+                    <div class="card">
+                        <div class="card-header">
+                            <h5 class="mb-0">
+                                <i class="fas fa-info-circle me-2"></i> Informações Básicas
+                            </h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="row">
+                                <div class="col-sm-6 mb-3">
+                                    <label class="form-label text-muted">Nome do Serviço</label>
+                                    <p class="fw-bold">{{ servico.nome }}</p>
+                                </div>
+                                <div class="col-sm-6 mb-3">
+                                    <label class="form-label text-muted">Categoria</label>
+                                    <p>
+                                        <span class="badge bg-secondary">
+                                            {{ servico.categoria or 'Sem categoria' }}
+                                        </span>
+                                    </p>
+                                </div>
+                                <div class="col-sm-6 mb-3">
+                                    <label class="form-label text-muted">Unidade de Medida</label>
+                                    <p class="fw-bold">{{ servico.unidade_medida }}</p>
+                                </div>
+                                <div class="col-sm-6 mb-3">
+                                    <label class="form-label text-muted">Custo Unitário</label>
+                                    <p class="fw-bold text-success">
+                                        R$ {{ "%.2f"|format(servico.custo_unitario or 0) }}
+                                    </p>
+                                </div>
+                                <div class="col-12 mb-3">
+                                    <label class="form-label text-muted">Status</label>
+                                    <p>
+                                        {% if servico.ativo %}
+                                        <span class="badge bg-success">
+                                            <i class="fas fa-check me-1"></i> Ativo
+                                        </span>
+                                        {% else %}
+                                        <span class="badge bg-danger">
+                                            <i class="fas fa-times me-1"></i> Inativo
+                                        </span>
+                                        {% endif %}
+                                    </p>
+                                </div>
+                                {% if servico.descricao %}
+                                <div class="col-12">
+                                    <label class="form-label text-muted">Descrição</label>
+                                    <p>{{ servico.descricao }}</p>
+                                </div>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Subatividades -->
+                <div class="col-lg-6 mb-4">
+                    <div class="card">
+                        <div class="card-header d-flex justify-content-between align-items-center">
+                            <h5 class="mb-0">
+                                <i class="fas fa-tasks me-2"></i> 
+                                Subatividades ({{ subatividades|length }})
+                            </h5>
+                            <button type="button" class="btn btn-sm btn-primary" 
+                                    onclick="novaSubatividade({{ servico.id }})">
+                                <i class="fas fa-plus me-1"></i> Nova
+                            </button>
+                        </div>
+                        <div class="card-body">
+                            {% if subatividades %}
+                            <div class="table-responsive">
+                                <table class="table table-sm">
+                                    <thead>
+                                        <tr>
+                                            <th>Ordem</th>
+                                            <th>Nome</th>
+                                            <th>Complexidade</th>
+                                            <th>Duração</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for sub in subatividades %}
+                                        <tr>
+                                            <td>
+                                                <span class="badge bg-primary">{{ sub.ordem_padrao }}</span>
+                                            </td>
+                                            <td>
+                                                <strong>{{ sub.nome }}</strong>
+                                                {% if sub.descricao %}
+                                                <br><small class="text-muted">{{ sub.descricao }}</small>
+                                                {% endif %}
+                                            </td>
+                                            <td>
+                                                <span class="badge bg-secondary">
+                                                    Nível {{ sub.complexidade }}
+                                                </span>
+                                            </td>
+                                            <td>
+                                                <span class="text-info fw-bold">
+                                                    {{ sub.duracao_estimada_horas }}h
+                                                </span>
+                                            </td>
+                                        </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                            {% else %}
+                            <div class="text-center py-4">
+                                <i class="fas fa-tasks fa-3x text-muted mb-3"></i>
+                                <h6 class="text-muted">Nenhuma subatividade cadastrada</h6>
+                                <p class="text-muted mb-3">
+                                    Este serviço ainda não possui subatividades definidas.
+                                </p>
+                                <button type="button" class="btn btn-primary btn-sm" 
+                                        onclick="novaSubatividade({{ servico.id }})">
+                                    <i class="fas fa-plus me-1"></i> Criar Primera Subatividade
+                                </button>
+                            </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Estatísticas -->
+            <div class="row">
+                <div class="col-12">
+                    <div class="card">
+                        <div class="card-header">
+                            <h5 class="mb-0">
+                                <i class="fas fa-chart-bar me-2"></i> Estatísticas de Uso
+                            </h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="row text-center">
+                                <div class="col-md-3 mb-3">
+                                    <div class="p-3 border rounded">
+                                        <h4 class="text-primary mb-1">{{ subatividades|length }}</h4>
+                                        <small class="text-muted">Subatividades</small>
+                                    </div>
+                                </div>
+                                <div class="col-md-3 mb-3">
+                                    <div class="p-3 border rounded">
+                                        <h4 class="text-info mb-1">
+                                            {{ (subatividades|sum(attribute='duracao_estimada_horas') or 0)|int }}h
+                                        </h4>
+                                        <small class="text-muted">Duração Total Estimada</small>
+                                    </div>
+                                </div>
+                                <div class="col-md-3 mb-3">
+                                    <div class="p-3 border rounded">
+                                        <h4 class="text-warning mb-1">
+                                            {% set complexidade_media = (subatividades|sum(attribute='complexidade') / subatividades|length) if subatividades else 0 %}
+                                            {{ "%.1f"|format(complexidade_media) }}
+                                        </h4>
+                                        <small class="text-muted">Complexidade Média</small>
+                                    </div>
+                                </div>
+                                <div class="col-md-3 mb-3">
+                                    <div class="p-3 border rounded">
+                                        <h4 class="text-success mb-1">
+                                            R$ {{ "%.2f"|format(servico.custo_unitario or 0) }}
+                                        </h4>
+                                        <small class="text-muted">Custo Unitário</small>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function novaSubatividade(servicoId) {
+    alert('Funcionalidade de nova subatividade em desenvolvimento');
+}
+</script>
+{% endblock %}
