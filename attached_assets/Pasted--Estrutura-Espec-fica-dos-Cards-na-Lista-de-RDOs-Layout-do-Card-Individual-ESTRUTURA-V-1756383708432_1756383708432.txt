@@ -1,0 +1,148 @@
+# Estrutura Específica dos Cards na Lista de RDOs
+
+## Layout do Card Individual
+
+### ESTRUTURA VISUAL:
+```
+┌─────────────────────────────────────────────┐
+│  GALPÃO INDUSTRIAL ESTRUTURAS METÁLICAS     │  ← Nome da obra (NEGRITO, grande)
+│  29/08/2025                                 │  ← Data (menor, cinza)
+│                                             │
+│  ████████████████████░░░░ 67.5%             │  ← Barra de progresso + porcentagem
+│                                             │
+│  👤 Cássio Viller Silva de Azevedo          │  ← Funcionário que criou
+│                                             │
+│  [Ver Detalhes]  [Editar RDO]              │  ← Botões de ação
+└─────────────────────────────────────────────┘
+```
+
+## Especificações Detalhadas
+
+### 1. NOME DA OBRA (Topo)
+- **Posição:** Primeira linha do card
+- **Estilo:** Texto em **negrito** e **grande**
+- **Cor:** Verde escuro (#2d5a27) ou preto
+- **Tamanho:** 1.3rem ou maior
+- **Comportamento:** Se muito longo, quebra em 2 linhas
+- **Exemplo:** "Galpão Industrial Estruturas Metálicas"
+
+### 2. DATA (Segunda linha)
+- **Posição:** Logo abaixo do nome da obra
+- **Estilo:** Texto menor e discreto
+- **Cor:** Cinza médio (#6c757d)
+- **Tamanho:** 0.9rem
+- **Formato:** DD/MM/AAAA
+- **Ícone:** Opcional - pequeno ícone de calendário
+- **Exemplo:** "29/08/2025" ou "📅 29/08/2025"
+
+### 3. PROGRESSO DA OBRA (Centro)
+- **Posição:** Centro do card, com destaque
+- **Elementos:**
+  - Barra de progresso visual (colorida)
+  - Porcentagem em número grande ao lado
+- **Barra:** 
+  - Altura: 8-10px
+  - Cor: Gradiente verde (#28a745 → #20c997)
+  - Fundo: Cinza claro (#e9ecef)
+  - Bordas arredondadas
+- **Porcentagem:**
+  - Tamanho: 1.2rem
+  - Cor: Verde escuro ou preto
+  - Peso: Negrito
+- **Exemplo:** Barra 67% preenchida + "67.5%"
+
+### 4. FUNCIONÁRIO (Parte inferior)
+- **Posição:** Abaixo do progresso
+- **Estilo:** Texto normal com ícone
+- **Ícone:** 👤 ou ícone de pessoa
+- **Cor:** Cinza escuro (#495057)
+- **Tamanho:** 0.95rem
+- **Formato:** "👤 Nome Completo do Funcionário"
+- **Exemplo:** "👤 Cássio Viller Silva de Azevedo"
+
+### 5. BOTÕES DE AÇÃO (Rodapé)
+- **Posição:** Parte inferior do card
+- **Quantidade:** 2 botões lado a lado
+- **Botão 1:** "Ver Detalhes" (verde)
+- **Botão 2:** "Editar RDO" (azul)
+- **Estilo:** Botões pequenos e arredondados
+
+## Exemplo Completo de Card
+
+### CARD 1:
+```
+┌─────────────────────────────────────────────┐
+│  RESIDENCIAL VILA NOVA FASE 2               │
+│  28/08/2025                                 │
+│                                             │
+│  ██████████████░░░░░░░░░░ 45.2%             │
+│                                             │
+│  👤 João Silva Santos                       │
+│                                             │
+│  [Ver Detalhes]  [Editar RDO]              │
+└─────────────────────────────────────────────┘
+```
+
+### CARD 2:
+```
+┌─────────────────────────────────────────────┐
+│  COMERCIAL CENTRO EMPRESARIAL               │
+│  27/08/2025                                 │
+│                                             │
+│  ████████████████████████ 89.7%            │
+│                                             │
+│  👤 Maria Oliveira Costa                    │
+│                                             │
+│  [Ver Detalhes]  [Editar RDO]              │
+└─────────────────────────────────────────────┘
+```
+
+## Características Visuais do Card
+
+### CONTAINER:
+- **Fundo:** Branco
+- **Bordas:** Arredondadas (12px)
+- **Sombra:** Sutil (0 4px 6px rgba(0,0,0,0.1))
+- **Padding:** 1.5rem em todos os lados
+- **Margin:** 1rem entre cards
+
+### EFEITOS:
+- **Hover:** Card levanta ligeiramente
+- **Sombra hover:** Mais pronunciada
+- **Transição:** Suave (0.3s)
+- **Cursor:** Pointer no card todo
+
+### ESPAÇAMENTO INTERNO:
+- Nome da obra: margin-bottom 0.5rem
+- Data: margin-bottom 1rem  
+- Progresso: margin-bottom 1rem
+- Funcionário: margin-bottom 1.5rem
+- Botões: sem margin-bottom
+
+## Grid de Cards
+
+### LAYOUT:
+- **Desktop:** 3 cards por linha
+- **Tablet:** 2 cards por linha  
+- **Mobile:** 1 card por linha
+- **Gap:** 1.5rem entre cards
+
+### ORDENAÇÃO:
+- **Padrão:** Data mais recente primeiro
+- **Alternativa:** Por progresso (maior primeiro)
+
+## Informações Adicionais Opcionais
+
+Se houver espaço, podem ser adicionadas:
+- **Status:** Badge pequeno (Finalizado/Em Andamento)
+- **ID da RDO:** Pequeno código no canto
+- **Horas trabalhadas:** Ícone + número
+
+Mas o **foco principal** são os 4 elementos que você especificou:
+1. **Nome da obra** (negrito, topo)
+2. **Data** (embaixo do nome)
+3. **Porcentagem** (com barra visual)
+4. **Funcionário** (com ícone)
+
+Esta estrutura é limpa, informativa e fácil de escanear rapidamente!
+

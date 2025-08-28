@@ -2787,7 +2787,7 @@ def rdo_novo_unificado():
 @main_bp.route('/funcionario/rdo/consolidado')
 @funcionario_required
 def funcionario_rdo_consolidado():
-    """Lista RDOs consolidada - página original que estava funcionando"""
+    """Lista RDOs consolidada com cards visuais modernos"""
     try:
         # Buscar funcionário correto para admin_id
         email_busca = "funcionario@valeverde.com" if current_user.email == "123@gmail.com" else current_user.email
@@ -2798,6 +2798,63 @@ def funcionario_rdo_consolidado():
         
         admin_id_correto = funcionario_atual.admin_id if funcionario_atual else 10
         print(f"DEBUG RDO CONSOLIDADO: Funcionário {funcionario_atual.nome if funcionario_atual else 'N/A'}, admin_id={admin_id_correto}")
+        
+        # Buscar todos os RDOs do admin com informações completas
+        rdos_query = db.session.query(RDO, Obra, Funcionario).select_from(RDO).join(
+            Obra, RDO.obra_id == Obra.id
+        ).outerjoin(
+            Funcionario, RDO.criado_por_id == Funcionario.id
+        ).filter(
+            Obra.admin_id == admin_id_correto
+        ).order_by(RDO.data_relatorio.desc(), RDO.id.desc())
+        
+        rdos_data = rdos_query.all()
+        print(f"DEBUG LISTA RDOs: {len(rdos_data)} RDOs encontrados para admin_id={admin_id_correto}")
+        
+        # Processar dados dos RDOs para o template
+        rdos_processados = []
+        for rdo, obra, funcionario in rdos_data:
+            # Calcular progresso da obra baseado nas subatividades
+            subatividades = RDOServicoSubatividade.query.filter_by(rdo_id=rdo.id).all()
+            if subatividades:
+                # Usar o atributo correto do modelo (percentual_conclusao)
+                progresso_total = sum(getattr(sub, 'percentual_conclusao', 0) or 0 for sub in subatividades) / len(subatividades)
+            else:
+                progresso_total = 0.0
+            
+            # Contar funcionários no RDO
+            funcionarios_count = RDOMaoObra.query.filter_by(rdo_id=rdo.id).count()
+            
+            rdos_processados.append({
+                'rdo': rdo,
+                'obra': obra,
+                'funcionario': funcionario,
+                'progresso': round(progresso_total, 1),
+                'funcionarios_count': funcionarios_count,
+                'data_formatada': rdo.data_relatorio.strftime("%d/%m/%Y") if rdo.data_relatorio else "N/A"
+            })
+            
+            print(f"DEBUG RDO {rdo.id}: {len(subatividades)} subatividades, {funcionarios_count} funcionários, {progresso_total:.1f}% progresso")
+        
+        return render_template('rdo_lista_unificada.html', 
+                             rdos=rdos_processados,
+                             total_rdos=len(rdos_processados),
+                             funcionario_atual=funcionario_atual,
+                             obras=[],
+                             funcionarios=[],
+                             filters={
+                                 'obra_id': None,
+                                 'status': None,
+                                 'data_inicio': None,
+                                 'data_fim': None,
+                                 'funcionario_id': None,
+                                 'order_by': 'data_desc'
+                             })
+    
+    except Exception as e:
+        print(f"ERRO na rota funcionario_rdo_consolidado: {str(e)}")
+        flash('Erro ao carregar lista de RDOs', 'error')
+        return redirect(url_for('main.funcionario_dashboard'))
         
         # MESMA LÓGICA DA FUNÇÃO rdos() QUE ESTÁ FUNCIONANDO
         page = request.args.get('page', 1, type=int)
