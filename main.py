@@ -15,6 +15,14 @@ try:
     print("✅ Sistema de visualização RDO registrado")
 except ImportError as e:
     print(f"⚠️ Sistema RDO viewer não encontrado: {e}")
+
+# Registrar sistema CRUD RDO completo
+try:
+    from crud_rdo_completo import rdo_crud_bp
+    app.register_blueprint(rdo_crud_bp)
+    print("✅ Sistema CRUD RDO completo registrado")
+except ImportError as e:
+    print(f"⚠️ Sistema CRUD RDO não encontrado: {e}")
 from flask import flash, redirect, url_for, render_template_string
 import traceback
 import logging

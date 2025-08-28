@@ -1,0 +1,458 @@
+{% extends "base_completo.html" %}
+
+{% block title %}{{ acao }} RDO{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <div class="row">
+        <div class="col-12">
+            <div class="card shadow-sm">
+                <div class="card-header bg-primary text-white">
+                    <h4 class="mb-0">
+                        <i class="fas fa-clipboard-list me-2"></i>{{ acao }} RDO
+                        {% if rdo %}
+                            - {{ rdo.numero_rdo }}
+                        {% endif %}
+                    </h4>
+                </div>
+                
+                <div class="card-body">
+                    <form method="POST" action="{{ url_for('rdo_crud.salvar_rdo') }}" id="rdoForm">
+                        {% if rdo %}
+                            <input type="hidden" name="rdo_id" value="{{ rdo.id }}">
+                        {% endif %}
+                        
+                        <!-- Informações Básicas -->
+                        <div class="row mb-4">
+                            <div class="col-md-6">
+                                <label for="obra_id" class="form-label">Obra *</label>
+                                <select class="form-select" id="obra_id" name="obra_id" required>
+                                    <option value="">Selecione uma obra</option>
+                                    {% for obra in obras %}
+                                        <option value="{{ obra.id }}" 
+                                                {% if obra_selecionada and obra.id == obra_selecionada.id %}selected{% endif %}>
+                                            {{ obra.nome }}
+                                        </option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            
+                            <div class="col-md-6">
+                                <label for="data_relatorio" class="form-label">Data do Relatório *</label>
+                                <input type="date" class="form-control" id="data_relatorio" name="data_relatorio" 
+                                       value="{{ rdo.data_relatorio.strftime('%Y-%m-%d') if rdo else date.today().strftime('%Y-%m-%d') }}" 
+                                       required>
+                            </div>
+                        </div>
+                        
+                        <!-- Condições Climáticas -->
+                        <div class="card mb-4">
+                            <div class="card-header">
+                                <h5 class="mb-0">Condições Climáticas</h5>
+                            </div>
+                            <div class="card-body">
+                                <div class="row">
+                                    <div class="col-md-4">
+                                        <label for="clima_geral" class="form-label">Clima Geral</label>
+                                        <select class="form-select" id="clima_geral" name="clima_geral">
+                                            <option value="">Selecione</option>
+                                            <option value="Ensolarado" {% if rdo and rdo.clima_geral == 'Ensolarado' %}selected{% endif %}>Ensolarado</option>
+                                            <option value="Parcialmente Nublado" {% if rdo and rdo.clima_geral == 'Parcialmente Nublado' %}selected{% endif %}>Parcialmente Nublado</option>
+                                            <option value="Nublado" {% if rdo and rdo.clima_geral == 'Nublado' %}selected{% endif %}>Nublado</option>
+                                            <option value="Chuvoso" {% if rdo and rdo.clima_geral == 'Chuvoso' %}selected{% endif %}>Chuvoso</option>
+                                        </select>
+                                    </div>
+                                    
+                                    <div class="col-md-4">
+                                        <label for="temperatura_media" class="form-label">Temperatura Média</label>
+                                        <input type="text" class="form-control" id="temperatura_media" name="temperatura_media" 
+                                               value="{{ rdo.temperatura_media if rdo else '' }}" placeholder="Ex: 25°C">
+                                    </div>
+                                    
+                                    <div class="col-md-4">
+                                        <label for="umidade_relativa" class="form-label">Umidade Relativa (%)</label>
+                                        <input type="number" class="form-control" id="umidade_relativa" name="umidade_relativa" 
+                                               value="{{ rdo.umidade_relativa if rdo else '' }}" min="0" max="100">
+                                    </div>
+                                </div>
+                                
+                                <div class="row mt-3">
+                                    <div class="col-md-6">
+                                        <label for="vento_velocidade" class="form-label">Velocidade do Vento</label>
+                                        <input type="text" class="form-control" id="vento_velocidade" name="vento_velocidade" 
+                                               value="{{ rdo.vento_velocidade if rdo else '' }}" placeholder="Ex: 10 km/h">
+                                    </div>
+                                    
+                                    <div class="col-md-6">
+                                        <label for="precipitacao" class="form-label">Precipitação</label>
+                                        <input type="text" class="form-control" id="precipitacao" name="precipitacao" 
+                                               value="{{ rdo.precipitacao if rdo else '' }}" placeholder="Ex: 5mm">
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Subatividades -->
+                        <div class="card mb-4">
+                            <div class="card-header d-flex justify-content-between align-items-center">
+                                <h5 class="mb-0">Subatividades Executadas</h5>
+                                <button type="button" class="btn btn-sm btn-primary" id="adicionarSubatividade">
+                                    <i class="fas fa-plus"></i> Adicionar
+                                </button>
+                            </div>
+                            <div class="card-body">
+                                <div id="subatividades-container">
+                                    <!-- Subatividades serão carregadas aqui via JavaScript -->
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Mão de Obra -->
+                        <div class="card mb-4">
+                            <div class="card-header d-flex justify-content-between align-items-center">
+                                <h5 class="mb-0">Mão de Obra</h5>
+                                <button type="button" class="btn btn-sm btn-primary" id="adicionarFuncionario">
+                                    <i class="fas fa-plus"></i> Adicionar
+                                </button>
+                            </div>
+                            <div class="card-body">
+                                <div id="funcionarios-container">
+                                    <!-- Funcionários serão carregados aqui via JavaScript -->
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Equipamentos -->
+                        <div class="card mb-4">
+                            <div class="card-header d-flex justify-content-between align-items-center">
+                                <h5 class="mb-0">Equipamentos Utilizados</h5>
+                                <button type="button" class="btn btn-sm btn-primary" id="adicionarEquipamento">
+                                    <i class="fas fa-plus"></i> Adicionar
+                                </button>
+                            </div>
+                            <div class="card-body">
+                                <div id="equipamentos-container">
+                                    <!-- Equipamentos serão carregados aqui via JavaScript -->
+                                </div>
+                                <input type="hidden" name="equipamentos" id="equipamentos-json" value="[]">
+                            </div>
+                        </div>
+                        
+                        <!-- Ocorrências -->
+                        <div class="card mb-4">
+                            <div class="card-header d-flex justify-content-between align-items-center">
+                                <h5 class="mb-0">Ocorrências</h5>
+                                <button type="button" class="btn btn-sm btn-primary" id="adicionarOcorrencia">
+                                    <i class="fas fa-plus"></i> Adicionar
+                                </button>
+                            </div>
+                            <div class="card-body">
+                                <div id="ocorrencias-container">
+                                    <!-- Ocorrências serão carregadas aqui via JavaScript -->
+                                </div>
+                                <input type="hidden" name="ocorrencias" id="ocorrencias-json" value="[]">
+                            </div>
+                        </div>
+                        
+                        <!-- Observações Gerais -->
+                        <div class="card mb-4">
+                            <div class="card-header">
+                                <h5 class="mb-0">Observações Gerais</h5>
+                            </div>
+                            <div class="card-body">
+                                <textarea class="form-control" name="comentario_geral" rows="4" 
+                                          placeholder="Observações gerais sobre o dia de trabalho...">{{ rdo.comentario_geral if rdo else '' }}</textarea>
+                            </div>
+                        </div>
+                        
+                        <!-- Botões de Ação -->
+                        <div class="d-flex gap-2">
+                            <button type="submit" class="btn btn-primary">
+                                <i class="fas fa-save me-2"></i>Salvar RDO
+                            </button>
+                            
+                            <a href="{{ url_for('rdo_crud.listar_rdos') }}" class="btn btn-secondary">
+                                <i class="fas fa-arrow-left me-2"></i>Voltar à Lista
+                            </a>
+                            
+                            {% if rdo and rdo.status == 'Rascunho' %}
+                                <button type="button" class="btn btn-success" onclick="finalizarRDO({{ rdo.id }})">
+                                    <i class="fas fa-check me-2"></i>Finalizar
+                                </button>
+                            {% endif %}
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- JavaScript do Formulário -->
+<script>
+// Dados das subatividades disponíveis
+const subatividadesDisponiveis = {{ subatividades | tojson }};
+const funcionariosDisponiveis = {{ funcionarios | tojson }};
+
+// Contadores para IDs únicos
+let contadorSubatividades = 0;
+let contadorFuncionarios = 0;
+let contadorEquipamentos = 0;
+let contadorOcorrencias = 0;
+
+// Arrays para armazenar dados
+let equipamentosArray = [];
+let ocorrenciasArray = [];
+
+// Inicializar formulário
+document.addEventListener('DOMContentLoaded', function() {
+    // Carregar dados existentes se estiver editando
+    {% if rdo %}
+        carregarDadosExistentes();
+    {% else %}
+        // Adicionar uma subatividade e funcionário inicial
+        adicionarSubatividade();
+        adicionarFuncionario();
+    {% endif %}
+});
+
+// Função para adicionar subatividade
+function adicionarSubatividade() {
+    const container = document.getElementById('subatividades-container');
+    const id = 'subativ_' + (++contadorSubatividades);
+    
+    const html = `
+        <div class="row mb-3 subatividade-item" id="${id}">
+            <div class="col-md-5">
+                <select class="form-select" name="subatividade_${contadorSubatividades}_id" onchange="selecionarSubatividade(${contadorSubatividades})">
+                    <option value="">Selecione uma subatividade</option>
+                    ${subatividadesDisponiveis.map(s => `<option value="${s.id}">${s.nome}</option>`).join('')}
+                </select>
+            </div>
+            <div class="col-md-3">
+                <input type="number" class="form-control" name="subatividade_${contadorSubatividades}_percentual" 
+                       placeholder="% Conclusão" min="0" max="100" step="0.1">
+            </div>
+            <div class="col-md-3">
+                <input type="text" class="form-control" name="subatividade_${contadorSubatividades}_observacoes" 
+                       placeholder="Observações">
+            </div>
+            <div class="col-md-1">
+                <button type="button" class="btn btn-danger btn-sm" onclick="removerItem('${id}')">
+                    <i class="fas fa-trash"></i>
+                </button>
+            </div>
+        </div>
+    `;
+    
+    container.insertAdjacentHTML('beforeend', html);
+}
+
+// Função para adicionar funcionário
+function adicionarFuncionario() {
+    const container = document.getElementById('funcionarios-container');
+    const id = 'func_' + (++contadorFuncionarios);
+    
+    const html = `
+        <div class="row mb-3 funcionario-item" id="${id}">
+            <div class="col-md-5">
+                <select class="form-select" name="funcionario_${contadorFuncionarios}_id" onchange="selecionarFuncionario(${contadorFuncionarios})">
+                    <option value="">Selecione um funcionário</option>
+                    ${funcionariosDisponiveis.map(f => `<option value="${f.id}">${f.nome} (${f.codigo})</option>`).join('')}
+                </select>
+            </div>
+            <div class="col-md-3">
+                <input type="number" class="form-control" name="funcionario_${contadorFuncionarios}_horas" 
+                       placeholder="Horas Trabalhadas" min="0" max="24" step="0.5" value="8">
+            </div>
+            <div class="col-md-3">
+                <input type="text" class="form-control" name="funcionario_${contadorFuncionarios}_funcao" 
+                       placeholder="Função" readonly>
+            </div>
+            <div class="col-md-1">
+                <button type="button" class="btn btn-danger btn-sm" onclick="removerItem('${id}')">
+                    <i class="fas fa-trash"></i>
+                </button>
+            </div>
+        </div>
+    `;
+    
+    container.insertAdjacentHTML('beforeend', html);
+}
+
+// Função para adicionar equipamento
+function adicionarEquipamento() {
+    const nome = prompt('Nome do equipamento:');
+    if (!nome) return;
+    
+    const quantidade = parseInt(prompt('Quantidade:', '1')) || 1;
+    const horas = parseFloat(prompt('Horas de utilização:', '8')) || 8;
+    const observacoes = prompt('Observações:', '') || '';
+    
+    const equipamento = {
+        id: ++contadorEquipamentos,
+        nome: nome,
+        quantidade: quantidade,
+        horas: horas,
+        observacoes: observacoes
+    };
+    
+    equipamentosArray.push(equipamento);
+    atualizarListaEquipamentos();
+}
+
+// Função para adicionar ocorrência
+function adicionarOcorrencia() {
+    const descricao = prompt('Descrição da ocorrência:');
+    if (!descricao) return;
+    
+    const tipo = prompt('Tipo (Segurança/Qualidade/Prazo/Outros):', 'Outros') || 'Outros';
+    const severidade = prompt('Severidade (Baixa/Média/Alta):', 'Baixa') || 'Baixa';
+    const responsavel = prompt('Responsável pela ação:', '') || '';
+    const prazo = prompt('Prazo para resolução (AAAA-MM-DD):', '') || '';
+    
+    const ocorrencia = {
+        id: ++contadorOcorrencias,
+        descricao: descricao,
+        tipo: tipo,
+        severidade: severidade,
+        responsavel: responsavel,
+        prazo: prazo
+    };
+    
+    ocorrenciasArray.push(ocorrencia);
+    atualizarListaOcorrencias();
+}
+
+// Funções auxiliares
+function selecionarSubatividade(numero) {
+    const select = document.querySelector(`select[name="subatividade_${numero}_id"]`);
+    const subatividade = subatividadesDisponiveis.find(s => s.id == select.value);
+    // Aqui você pode adicionar lógica adicional se necessário
+}
+
+function selecionarFuncionario(numero) {
+    const select = document.querySelector(`select[name="funcionario_${numero}_id"]`);
+    const funcionario = funcionariosDisponiveis.find(f => f.id == select.value);
+    if (funcionario) {
+        document.querySelector(`input[name="funcionario_${numero}_funcao"]`).value = funcionario.funcao || 'Geral';
+    }
+}
+
+function removerItem(id) {
+    document.getElementById(id).remove();
+}
+
+function atualizarListaEquipamentos() {
+    const container = document.getElementById('equipamentos-container');
+    container.innerHTML = equipamentosArray.map(eq => `
+        <div class="d-flex justify-content-between align-items-center mb-2 p-2 border rounded">
+            <span><strong>${eq.nome}</strong> - Qtd: ${eq.quantidade}, Horas: ${eq.horas}h</span>
+            <button type="button" class="btn btn-sm btn-danger" onclick="removerEquipamento(${eq.id})">
+                <i class="fas fa-trash"></i>
+            </button>
+        </div>
+    `).join('');
+    
+    document.getElementById('equipamentos-json').value = JSON.stringify(equipamentosArray);
+}
+
+function atualizarListaOcorrencias() {
+    const container = document.getElementById('ocorrencias-container');
+    container.innerHTML = ocorrenciasArray.map(oc => `
+        <div class="d-flex justify-content-between align-items-center mb-2 p-2 border rounded">
+            <span><strong>${oc.tipo}:</strong> ${oc.descricao} <em>(${oc.severidade})</em></span>
+            <button type="button" class="btn btn-sm btn-danger" onclick="removerOcorrencia(${oc.id})">
+                <i class="fas fa-trash"></i>
+            </button>
+        </div>
+    `).join('');
+    
+    document.getElementById('ocorrencias-json').value = JSON.stringify(ocorrenciasArray);
+}
+
+function removerEquipamento(id) {
+    equipamentosArray = equipamentosArray.filter(eq => eq.id !== id);
+    atualizarListaEquipamentos();
+}
+
+function removerOcorrencia(id) {
+    ocorrenciasArray = ocorrenciasArray.filter(oc => oc.id !== id);
+    atualizarListaOcorrencias();
+}
+
+function finalizarRDO(rdoId) {
+    if (confirm('Tem certeza que deseja finalizar este RDO? Após finalizado não poderá mais ser editado.')) {
+        fetch(`/rdo/finalizar/${rdoId}`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            }
+        })
+        .then(response => {
+            if (response.ok) {
+                window.location.href = `/rdo/visualizar/${rdoId}`;
+            } else {
+                alert('Erro ao finalizar RDO');
+            }
+        });
+    }
+}
+
+// Event listeners
+document.getElementById('adicionarSubatividade').addEventListener('click', adicionarSubatividade);
+document.getElementById('adicionarFuncionario').addEventListener('click', adicionarFuncionario);
+document.getElementById('adicionarEquipamento').addEventListener('click', adicionarEquipamento);
+document.getElementById('adicionarOcorrencia').addEventListener('click', adicionarOcorrencia);
+
+// Carregar dados existentes (para edição)
+function carregarDadosExistentes() {
+    {% if rdo_subatividades %}
+        // Carregar subatividades existentes
+        {% for subativ in rdo_subatividades %}
+            adicionarSubatividade();
+            // Definir valores dos campos...
+        {% endfor %}
+    {% endif %}
+    
+    {% if rdo_funcionarios %}
+        // Carregar funcionários existentes
+        {% for funcionario in rdo_funcionarios %}
+            adicionarFuncionario();
+            // Definir valores dos campos...
+        {% endfor %}
+    {% endif %}
+    
+    // Se não há dados, adicionar campos iniciais
+    if (document.querySelectorAll('.subatividade-item').length === 0) {
+        adicionarSubatividade();
+    }
+    if (document.querySelectorAll('.funcionario-item').length === 0) {
+        adicionarFuncionario();
+    }
+}
+</script>
+
+<style>
+.card-header h5 {
+    color: #495057;
+    font-weight: 600;
+}
+
+.subatividade-item, .funcionario-item {
+    border-bottom: 1px solid #dee2e6;
+    padding-bottom: 10px;
+    margin-bottom: 10px;
+}
+
+.subatividade-item:last-child, .funcionario-item:last-child {
+    border-bottom: none;
+    margin-bottom: 0;
+}
+
+.btn-sm {
+    padding: 0.25rem 0.5rem;
+    font-size: 0.875rem;
+}
+</style>
+{% endblock %}

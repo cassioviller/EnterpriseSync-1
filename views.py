@@ -2821,7 +2821,17 @@ def funcionario_rdo_consolidado():
                              pagination=rdos_paginated,
                              total_rdos=rdos_paginated.total,
                              page=page,
-                             admin_id=admin_id_correto)
+                             admin_id=admin_id_correto,
+                             obras=[],
+                             funcionarios=[],
+                             filters={
+                                 'obra_id': None,
+                                 'status': None,
+                                 'data_inicio': None,
+                                 'data_fim': None,
+                                 'funcionario_id': None,
+                                 'order_by': 'data_desc'
+                             })
         
     except Exception as e:
         print(f"ERRO RDO CONSOLIDADO: {str(e)}")
@@ -2849,7 +2859,17 @@ def funcionario_rdo_consolidado():
                                  pagination=None,
                                  total_rdos=len(rdos_fallback),
                                  page=1,
-                                 admin_id=admin_id_correto)
+                                 admin_id=admin_id_correto,
+                                 obras=[],
+                                 funcionarios=[],
+                                 filters={
+                                     'obra_id': None,
+                                     'status': None,
+                                     'data_inicio': None,
+                                     'data_fim': None,
+                                     'funcionario_id': None,
+                                     'order_by': 'data_desc'
+                                 })
                                  
         except Exception as e2:
             print(f"ERRO FALLBACK: {str(e2)}")
@@ -2893,8 +2913,8 @@ def rdo_salvar_unificado():
                 flash('Apenas RDOs em rascunho podem ser editados.', 'warning')
                 return redirect(url_for('main.funcionario_visualizar_rdo', id=rdo_id))
             
-            # Limpar atividades antigas para substituir pelas novas
-            RDOAtividade.query.filter_by(rdo_id=rdo.id).delete()
+            # Limpar dados antigos para substituir pelos novos
+            RDOServicoSubatividade.query.filter_by(rdo_id=rdo.id).delete()
             RDOMaoObra.query.filter_by(rdo_id=rdo.id).delete()
             RDOEquipamento.query.filter_by(rdo_id=rdo.id).delete()
             RDOOcorrencia.query.filter_by(rdo_id=rdo.id).delete()
@@ -3021,7 +3041,7 @@ def rdo_salvar_unificado():
                     print(f"Erro ao processar subatividade {key}: {e}")
                     continue
         
-        # Processar atividades antigas (fallback para compatibilidade)
+        # Processar atividades antigas se não há subatividades (compatibilidade)
         atividades_json = request.form.get('atividades', '[]')
         if atividades_json and atividades_json != '[]' and not any(key.startswith('subatividade_') for key in request.form.keys()):
             try:
@@ -3029,13 +3049,16 @@ def rdo_salvar_unificado():
                 for i, ativ_data in enumerate(atividades_list):
                     descricao = ativ_data.get('descricao', '').strip()
                     if descricao:
-                        atividade = RDOAtividade()
-                        atividade.rdo_id = rdo.id
-                        atividade.descricao_atividade = descricao
-                        atividade.percentual_conclusao = float(ativ_data.get('percentual', 0))
-                        atividade.observacoes_tecnicas = ativ_data.get('observacoes', '').strip()
-                        db.session.add(atividade)
-                        print(f"DEBUG: Atividade manual: {descricao} - {ativ_data.get('percentual', 0)}%")
+                        # Criar como subatividade no novo sistema
+                        rdo_servico_subativ = RDOServicoSubatividade()
+                        rdo_servico_subativ.rdo_id = rdo.id
+                        rdo_servico_subativ.nome_subatividade = descricao
+                        rdo_servico_subativ.percentual_conclusao = float(ativ_data.get('percentual', 0))
+                        rdo_servico_subativ.observacoes_tecnicas = ativ_data.get('observacoes', '').strip()
+                        rdo_servico_subativ.admin_id = current_user.admin_id
+                        rdo_servico_subativ.servico_id = 1  # Serviço genérico
+                        db.session.add(rdo_servico_subativ)
+                        print(f"DEBUG: Atividade convertida: {descricao} - {ativ_data.get('percentual', 0)}%")
             except (json.JSONDecodeError, ValueError) as e:
                 print(f"Erro ao processar atividades JSON: {e}")
                 flash(f'Erro ao processar atividades: {e}', 'warning')
