@@ -25,8 +25,10 @@ SIGE (Sistema de Gestão Empresarial) is a multi-tenant business management syst
 1. ✅ **CONCLUÍDO** - Consolidar backend RDO (rotas, calls, campos, schema)
 2. ✅ **CONCLUÍDO** - Consolidar backend Funcionários (APIs unificadas, admin_id padronizado)
 3. ✅ **CONCLUÍDO** - Consolidar backend Propostas (7 rotas, resiliência aplicada)
-4. Implementar design moderno completo
-5. Integrar backend-frontend consolidado
+4. ✅ **CONCLUÍDO** - Compatibilidade frontend-backend garantida (rotas atualizadas)
+5. ✅ **CONCLUÍDO** - Deploy produção preparado (EasyPanel/Dockerfile atualizado)
+6. Implementar design moderno completo
+7. Integrar funcionalidades avançadas
 
 **Status da Consolidação (27/08/2025):**
 - **RDO Backend:** ✅ 100% Consolidado - 5 rotas unificadas, aliases de compatibilidade

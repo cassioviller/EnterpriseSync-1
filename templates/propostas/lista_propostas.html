@@ -6,7 +6,7 @@
     <div class="d-flex justify-content-between align-items-center mb-4">
         <h2><i class="fas fa-file-contract me-2"></i> Propostas Comerciais</h2>
         <div class="btn-group" role="group">
-            <a href="{{ url_for('propostas.nova_proposta') }}" class="btn btn-primary">
+            <a href="{{ url_for('propostas.nova') }}" class="btn btn-primary">
                 <i class="fas fa-plus me-1"></i> Nova Proposta
             </a>
             <a href="{{ url_for('main.dashboard') }}" class="btn btn-outline-primary">
@@ -65,13 +65,13 @@
                                 </td>
                                 <td>
                                     <div class="btn-group" role="group">
-                                        <a href="{{ url_for('main.detalhes_proposta', id=proposta.id) }}" 
+                                        <a href="{{ url_for('propostas.visualizar', id=proposta.id) }}" 
                                            class="btn btn-sm btn-outline-primary" title="Ver Detalhes">
                                             <i class="fas fa-eye"></i>
                                         </a>
                                         
                                         {% if proposta.status == 'Rascunho' %}
-                                        <form method="POST" action="{{ url_for('main.enviar_proposta', id=proposta.id) }}" 
+                                        <form method="POST" action="{{ url_for('propostas.enviar', id=proposta.id) }}" 
                                               style="display: inline;" onsubmit="return confirm('Enviar proposta para o cliente?')">
                                             <button type="submit" class="btn btn-sm btn-success" title="Enviar para Cliente">
                                                 <i class="fas fa-paper-plane"></i>

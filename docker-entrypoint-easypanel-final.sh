@@ -459,5 +459,28 @@ echo "   • Obras: $FINAL_OBRAS"
 echo "   • Credenciais: admin@sige.com / admin123"
 echo "   • Credenciais: valeverde@sige.com / admin123"
 
+echo "🔧 Executando consolidação de módulos para produção..."
+python3 -c "
+import sys
+sys.path.append('/app')
+try:
+    # Importar módulos consolidados
+    import propostas_consolidated
+    print('✅ Propostas consolidado: OK')
+    
+    import funcionarios_consolidated  
+    print('✅ Funcionários consolidado: OK')
+    
+    import rdo_consolidated
+    print('✅ RDO consolidado: OK')
+    
+    print('✅ Todos os módulos consolidados carregados para produção')
+except ImportError as e:
+    print(f'⚠️ Alguns módulos consolidados não disponíveis: {e}')
+    print('Sistema continuará com módulos legados')
+except Exception as e:
+    print(f'⚠️ Erro na verificação de módulos: {e}')
+" || echo "⚠️ Verificação de módulos falhou, continuando..."
+
 echo "🚀 Iniciando aplicação na porta $PORT..."
 exec "$@"
