@@ -442,35 +442,42 @@ function carregarServicosDaObra(obraId) {
         </div>
     `;
     
-    // Fazer requisição para API de serviços flexíveis
-    fetch(`/api/obras/${obraId}/servicos`)
+    // Fazer requisição para API específica do último RDO
+    fetch(`/api/test/rdo/ultimo-rdo-dados/${obraId}`)
         .then(response => response.json())
         .then(data => {
             if (data.success) {
-                renderizarServicosFlexiveis(data);
+                renderizarServicosComDadosUltimoRDO(data);
             } else {
-                // Fallback para template padrão
-                renderizarTemplatePadrao();
+                // Carregar serviços da obra sem dados do último RDO
+                carregarServicosLimposDaObra(obraId);
             }
         })
         .catch(error => {
-            console.error('Erro ao carregar serviços:', error);
-            renderizarTemplatePadrao();
+            console.error('Erro ao carregar último RDO:', error);
+            // Carregar serviços da obra sem dados do último RDO
+            carregarServicosLimposDaObra(obraId);
         });
 }
 
-function renderizarServicosFlexiveis(data) {
+function renderizarServicosComDadosUltimoRDO(data) {
     const container = document.getElementById('servicos-container');
+    const temUltimoRDO = data.tem_ultimo_rdo;
     
     let html = `
-        <div class="alert alert-success">
-            <i class="fas fa-check-circle"></i>
-            Serviços carregados: ${data.template_usado} (${data.total_servicos} serviços, ${data.total_subatividades} subatividades)
+        <div class="alert alert-${temUltimoRDO ? 'info' : 'success'}">
+            <i class="fas fa-${temUltimoRDO ? 'history' : 'rocket'}"></i>
+            ${temUltimoRDO 
+                ? `Dados do último RDO carregados! (${data.ultimo_rdo.data})` 
+                : 'Primeira RDO da obra - valores zerados para início'}
+        </div>
+        <div class="small text-muted mb-3">
+            ${data.total} serviços, ${data.total_subatividades} subatividades
         </div>
     `;
     
     data.servicos.forEach((servico, index) => {
-        const servicoId = servico.nome.toLowerCase().replace(/\s+/g, '_');
+        const servicoId = servico.nome.toLowerCase().replace(/\s+/g, '_').replace(/[^a-z0-9_]/g, '');
         const isAberto = index === 0; // Primeiro serviço aberto por padrão
         
         html += `
@@ -479,7 +486,7 @@ function renderizarServicosFlexiveis(data) {
                     <div class="d-flex justify-content-between align-items-center">
                         <div>
                             <h5 class="mb-0">${servico.nome}</h5>
-                            <span class="badge bg-${servico.cor_badge}">${servico.categoria}</span>
+                            <span class="badge bg-success">${servico.categoria}</span>
                         </div>
                         <div>
                             <span class="text-muted me-2">${servico.subatividades.length} subatividades</span>
@@ -492,15 +499,16 @@ function renderizarServicosFlexiveis(data) {
         `;
         
         servico.subatividades.forEach((subatividade, subIndex) => {
-            const valorPadrao = (index === 0 && subIndex < 2) ? 100 : 0; // Primeiras 2 do primeiro serviço = 100%
+            // Se tem último RDO, usar os valores dele, senão usar 0
+            const valorPadrao = temUltimoRDO ? (subatividade.percentual_executado || 0) : 0;
             
             html += `
                 <div class="col-md-6 mb-3">
-                    <label class="form-label">${subatividade}</label>
+                    <label class="form-label">${subatividade.nome}</label>
                     <div class="input-group">
                         <input type="number" 
                                class="form-control" 
-                               name="servico_${servicoId}_${subIndex}"
+                               name="subatividade_${subatividade.id}"
                                value="${valorPadrao}" 
                                step="0.1" 
                                min="0" 
@@ -519,6 +527,25 @@ function renderizarServicosFlexiveis(data) {
     });
     
     container.innerHTML = html;
+}
+
+function carregarServicosLimposDaObra(obraId) {
+    // Fazer requisição para API de serviços da obra (sem dados do último RDO)
+    fetch(`/api/test/rdo/servicos-obra/${obraId}`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                // Marcar que não tem último RDO
+                data.tem_ultimo_rdo = false;
+                renderizarServicosComDadosUltimoRDO(data);
+            } else {
+                renderizarTemplatePadrao();
+            }
+        })
+        .catch(error => {
+            console.error('Erro ao carregar serviços da obra:', error);
+            renderizarTemplatePadrao();
+        });
 }
 
 function renderizarTemplatePadrao() {

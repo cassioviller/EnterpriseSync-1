@@ -3823,6 +3823,98 @@ def api_test_rdo_servicos_obra(obra_id):
         traceback.print_exc()
         return jsonify({'error': 'Erro interno', 'success': False}), 500
 
+# Nova API para carregar dados do último RDO
+@main_bp.route('/api/test/rdo/ultimo-rdo-dados/<int:obra_id>')
+def api_test_ultimo_rdo_dados(obra_id):
+    """API TEST para carregar serviços com dados do último RDO da obra"""
+    try:
+        admin_id = 10
+        
+        # Verificar se obra existe
+        obra = Obra.query.filter_by(id=obra_id, admin_id=admin_id).first()
+        if not obra:
+            return jsonify({'error': 'Obra não encontrada', 'success': False}), 404
+        
+        # Buscar último RDO da obra
+        ultimo_rdo = RDO.query.filter_by(
+            obra_id=obra_id,
+            admin_id=admin_id
+        ).order_by(RDO.data_relatorio.desc()).first()
+        
+        # Buscar serviços da obra
+        servicos_obra = db.session.query(ServicoObra, Servico).join(
+            Servico, ServicoObra.servico_id == Servico.id
+        ).filter(
+            ServicoObra.obra_id == obra_id,
+            ServicoObra.ativo == True,
+            Servico.ativo == True
+        ).all()
+        
+        servicos_data = []
+        total_subatividades = 0
+        
+        for servico_obra, servico in servicos_obra:
+            # Buscar subatividades mestre para este serviço
+            subatividades = SubatividadeMestre.query.filter_by(
+                servico_id=servico.id,
+                admin_id=admin_id,
+                ativo=True
+            ).order_by(SubatividadeMestre.ordem_padrao).all()
+            
+            subatividades_data = []
+            for subatividade in subatividades:
+                percentual_executado = 0
+                
+                # Se há último RDO, buscar percentual executado desta subatividade
+                if ultimo_rdo:
+                    rdo_subatividade = RDOServicoSubatividade.query.filter_by(
+                        rdo_id=ultimo_rdo.id,
+                        subatividade_mestre_id=subatividade.id
+                    ).first()
+                    
+                    if rdo_subatividade:
+                        percentual_executado = float(rdo_subatividade.percentual_executado or 0)
+                
+                subatividades_data.append({
+                    'id': subatividade.id,
+                    'nome': subatividade.nome,
+                    'descricao': subatividade.descricao,
+                    'percentual_executado': percentual_executado
+                })
+            
+            total_subatividades += len(subatividades_data)
+            
+            servico_data = {
+                'id': servico.id,
+                'nome': servico.nome,
+                'categoria': servico.categoria,
+                'subatividades': subatividades_data
+            }
+            servicos_data.append(servico_data)
+        
+        response_data = {
+            'success': True,
+            'obra': {'id': obra.id, 'nome': obra.nome},
+            'servicos': servicos_data,
+            'total': len(servicos_data),
+            'total_subatividades': total_subatividades,
+            'tem_ultimo_rdo': ultimo_rdo is not None
+        }
+        
+        if ultimo_rdo:
+            response_data['ultimo_rdo'] = {
+                'id': ultimo_rdo.id,
+                'data': ultimo_rdo.data.strftime('%d/%m/%Y') if ultimo_rdo.data else 'N/A'
+            }
+        
+        return jsonify(response_data)
+        
+    except Exception as e:
+        print(f"ERRO API ÚLTIMO RDO DADOS: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': 'Erro interno', 'success': False}), 500
+
 @main_bp.route('/api/rdo/servicos-obra/<int:obra_id>')
 @funcionario_required
 def api_rdo_servicos_obra(obra_id):
