@@ -161,8 +161,18 @@ def dashboard():
                     admin_id = admin_counts[0][0]
                     print(f"🔄 DETECÇÃO AUTOMÁTICA: Usando admin_id={admin_id} (tem {admin_counts[0][1]} funcionários)")
                 else:
-                    admin_id = 1  # Fallback absoluto
-                    print(f"🆘 FALLBACK FINAL: admin_id={admin_id}")
+                    # Buscar qualquer admin_id existente na tabela usuarios
+                    try:
+                        primeiro_admin = Usuario.query.filter_by(tipo_usuario=TipoUsuario.ADMIN).first()
+                        if primeiro_admin:
+                            admin_id = primeiro_admin.id
+                            print(f"🔍 ADMIN ENCONTRADO NA TABELA USUARIOS: admin_id={admin_id}")
+                        else:
+                            admin_id = 1  # Fallback absoluto
+                            print(f"🆘 FALLBACK FINAL: admin_id={admin_id}")
+                    except Exception as e2:
+                        print(f"❌ Erro ao buscar admin na tabela usuarios: {e2}")
+                        admin_id = 1  # Fallback absoluto
             except Exception as e:
                 print(f"❌ Erro ao detectar admin_id automaticamente: {e}")
                 admin_id = 1  # Fallback absoluto
@@ -787,9 +797,23 @@ def funcionarios():
         }
     
     except Exception as e:
+        import traceback
         print(f"ERRO CRÍTICO KPIs: {str(e)}")
-        # Em caso de erro, redirecionar para rota segura
-        return redirect(url_for('production.safe_funcionarios'))
+        print(f"TRACEBACK DETALHADO: {traceback.format_exc()}")
+        # Em caso de erro, criar dados básicos para não quebrar a página
+        funcionarios_kpis = []
+        kpis_geral = {
+            'total_funcionarios': 0,
+            'funcionarios_ativos': 0,
+            'total_horas_geral': 0,
+            'total_extras_geral': 0,
+            'total_faltas_geral': 0,
+            'total_faltas_justificadas_geral': 0,
+            'total_custo_geral': 0,
+            'total_custo_faltas_geral': 0,
+            'taxa_absenteismo_geral': 0
+        }
+        flash(f'Erro no sistema de KPIs: {str(e)}. Dados básicos carregados.', 'warning')
     
     # Debug final antes do template
     print(f"DEBUG FUNCIONÁRIOS: {len(funcionarios)} funcionários, {len(funcionarios_kpis)} KPIs")
@@ -1990,7 +2014,12 @@ def rdos():
         except Exception as fallback_error:
             print(f"ERRO FALLBACK: {str(fallback_error)}")
             db.session.rollback()
-            flash('Sistema temporariamente indisponível. Tente novamente em alguns instantes.', 'warning')
+            # Mostrar erro específico para debugging
+            error_msg = f"ERRO RDO: {str(e)}"
+            print(f"ERRO DETALHADO RDO: {str(e)}")
+            import traceback
+            traceback.print_exc()
+            flash(f'Erro detalhado no RDO: {error_msg}', 'error')
             return redirect(url_for('main.dashboard'))
 
 # ===== ROTAS ESPECÍFICAS PARA FUNCIONÁRIOS - RDO =====

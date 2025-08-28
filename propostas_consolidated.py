@@ -383,6 +383,16 @@ def nova_proposta():
     """Alias para compatibilidade com sistema antigo"""
     return redirect(url_for('propostas.nova'))
 
+@propostas_bp.route('/criar-proposta', methods=['GET', 'POST'])
+@login_required
+@admin_required
+def criar_proposta():
+    """Endpoint criar_proposta para compatibilidade"""
+    if request.method == 'GET':
+        return redirect(url_for('propostas.nova'))
+    else:
+        return redirect(url_for('propostas.criar'), code=307)  # Preservar método POST
+
 # ===== ROTAS API =====
 
 @propostas_bp.route('/api/template/<int:template_id>')
