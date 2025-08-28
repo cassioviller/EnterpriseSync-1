@@ -167,7 +167,17 @@
                     <h4 class="rdo-obra-nome">{{ rdo.obra.nome }}</h4>
                     
                     <!-- Data (Segunda linha) -->
-                    <div class="rdo-data">{{ rdo.data_relatorio.strftime('%d/%m/%Y') if rdo.data_relatorio else rdo.created_at.strftime('%d/%m/%Y') }}</div>
+                    <div class="rdo-data">
+                        {% if rdo.data_relatorio %}
+                            {{ rdo.data_relatorio.strftime('%d/%m/%Y') }}
+                        {% elif rdo.data %}
+                            {{ rdo.data.strftime('%d/%m/%Y') }}
+                        {% elif rdo.created_at %}
+                            {{ rdo.created_at.strftime('%d/%m/%Y') }}
+                        {% else %}
+                            Data não informada
+                        {% endif %}
+                    </div>
                     
                     <!-- Barra de Progresso (Centro) -->
                     <div class="rdo-progresso-container">
