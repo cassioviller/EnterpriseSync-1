@@ -2899,19 +2899,24 @@ def rdo_novo_unificado():
         else:
             return redirect(url_for('main.dashboard'))
 
-# Aliases para compatibilidade com rotas antigas
+# RDO Lista Consolidada
 @main_bp.route('/funcionario/rdo/consolidado')
 def funcionario_rdo_consolidado():
     """Lista RDOs consolidada - página original que estava funcionando"""
     try:
-        # Buscar funcionário correto para admin_id
-        email_busca = "funcionario@valeverde.com" if current_user.email == "123@gmail.com" else current_user.email
-        funcionario_atual = Funcionario.query.filter_by(email=email_busca).first()
+        from bypass_auth import obter_admin_id
+        
+        # Usar sistema de bypass para obter admin_id correto
+        admin_id_correto = obter_admin_id()
+        
+        # Buscar funcionário para logs
+        funcionario_atual = None
+        if hasattr(current_user, 'email') and current_user.email:
+            email_busca = "funcionario@valeverde.com" if current_user.email == "123@gmail.com" else current_user.email
+            funcionario_atual = Funcionario.query.filter_by(email=email_busca).first()
         
         if not funcionario_atual:
-            funcionario_atual = Funcionario.query.filter_by(admin_id=10, ativo=True).first()
-        
-        admin_id_correto = funcionario_atual.admin_id if funcionario_atual else 10
+            funcionario_atual = Funcionario.query.filter_by(admin_id=admin_id_correto, ativo=True).first()
         print(f"DEBUG RDO CONSOLIDADO: Funcionário {funcionario_atual.nome if funcionario_atual else 'N/A'}, admin_id={admin_id_correto}")
         
         # MESMA LÓGICA DA FUNÇÃO rdos() QUE ESTÁ FUNCIONANDO
