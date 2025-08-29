@@ -991,9 +991,160 @@ function toggleServico(servicoId) {
 // Inicialização
 document.addEventListener('DOMContentLoaded', function() {
     console.log('RDO Moderno carregado com sucesso!');
+    inicializarAutocompleteIntegrado();
 });
 
-// JavaScript carregado via arquivo externo
+// Sistema de autocomplete integrado ao layout atual
+let funcionariosAutocompleteSelecionados = [];
+let timeoutBuscaAutocomplete = null;
+
+function inicializarAutocompleteIntegrado() {
+    const input = document.getElementById('buscarFuncionario');
+    const sugestoes = document.getElementById('sugestoesFuncionarios');
+    
+    if (!input || !sugestoes) return;
+    
+    input.addEventListener('input', function() {
+        clearTimeout(timeoutBuscaAutocomplete);
+        const termo = this.value.trim();
+        
+        if (termo.length < 2) {
+            sugestoes.style.display = 'none';
+            return;
+        }
+        
+        timeoutBuscaAutocomplete = setTimeout(() => {
+            buscarFuncionariosAutocomplete(termo);
+        }, 300);
+    });
+    
+    document.addEventListener('click', function(e) {
+        if (!input.contains(e.target) && !sugestoes.contains(e.target)) {
+            sugestoes.style.display = 'none';
+        }
+    });
+}
+
+function buscarFuncionariosAutocomplete(termo) {
+    const sugestoes = document.getElementById('sugestoesFuncionarios');
+    
+    sugestoes.innerHTML = '<div class="p-2 text-center"><i class="fas fa-spinner fa-spin"></i> Buscando...</div>';
+    sugestoes.style.display = 'block';
+    
+    fetch(`/api/funcionarios/buscar?q=${encodeURIComponent(termo)}`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.success && data.funcionarios.length > 0) {
+                mostrarSugestoesAutocomplete(data.funcionarios);
+            } else {
+                sugestoes.innerHTML = '<div class="p-2 text-muted text-center">Nenhum funcionário encontrado</div>';
+            }
+        })
+        .catch(error => {
+            console.error('Erro na busca:', error);
+            sugestoes.innerHTML = '<div class="p-2 text-danger text-center">Erro na busca</div>';
+        });
+}
+
+function mostrarSugestoesAutocomplete(funcionarios) {
+    const sugestoes = document.getElementById('sugestoesFuncionarios');
+    let html = '';
+    
+    funcionarios.forEach(func => {
+        const jaSelecionado = funcionariosAutocompleteSelecionados.find(f => f.id === func.id);
+        if (!jaSelecionado) {
+            html += `
+                <div class="suggestion-item" onclick="selecionarFuncionarioAutocomplete(${func.id}, '${func.nome.replace(/'/g, "\\'")}', '${func.cargo}', ${func.valor_hora})">
+                    <div class="d-flex justify-content-between">
+                        <div>
+                            <strong>${func.nome}</strong>
+                            <br><small class="text-muted">${func.cargo}</small>
+                        </div>
+                        <div class="text-end">
+                            <small>R$ ${func.valor_hora.toFixed(2)}/h</small>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+    });
+    
+    sugestoes.innerHTML = html || '<div class="p-2 text-muted text-center">Todos já selecionados</div>';
+}
+
+function selecionarFuncionarioAutocomplete(id, nome, cargo, valorHora) {
+    funcionariosAutocompleteSelecionados.push({
+        id: id,
+        nome: nome,
+        cargo: cargo,
+        valor_hora: valorHora,
+        horas: 8.0
+    });
+    
+    document.getElementById('buscarFuncionario').value = '';
+    document.getElementById('sugestoesFuncionarios').style.display = 'none';
+    
+    atualizarListaFuncionariosSelecionados();
+}
+
+function atualizarListaFuncionariosSelecionados() {
+    const container = document.getElementById('funcionarios-selecionados');
+    const nenhumMsg = document.getElementById('nenhumFuncionario');
+    
+    if (funcionariosAutocompleteSelecionados.length === 0) {
+        if (nenhumMsg) nenhumMsg.style.display = 'block';
+        return;
+    }
+    
+    if (nenhumMsg) nenhumMsg.style.display = 'none';
+    
+    let html = '';
+    funcionariosAutocompleteSelecionados.forEach((func, index) => {
+        html += `
+            <div class="funcionario-selected-card mb-3">
+                <div class="card">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-start mb-2">
+                            <div>
+                                <h6 class="card-title mb-1">${func.nome}</h6>
+                                <small class="text-muted">${func.cargo} - R$ ${func.valor_hora.toFixed(2)}/hora</small>
+                            </div>
+                            <button type="button" class="btn btn-outline-danger btn-sm" onclick="removerFuncionarioAutocomplete(${index})">
+                                <i class="fas fa-times"></i>
+                            </button>
+                        </div>
+                        
+                        <div class="row">
+                            <div class="col-md-12">
+                                <label class="form-label">Horas Trabalhadas</label>
+                                <input type="number" class="form-control form-control-sm" 
+                                       min="0" max="24" step="0.5" 
+                                       value="${func.horas}"
+                                       onchange="atualizarHorasFuncionarioAutocomplete(${index}, this.value)"
+                                       name="funcionario_${func.id}_horas">
+                            </div>
+                        </div>
+                        
+                        <!-- Campos hidden para envio -->
+                        <input type="hidden" name="funcionarios_selecionados" value="${func.id}">
+                        <input type="hidden" name="funcionario_${func.id}_funcao" value="${func.cargo}">
+                    </div>
+                </div>
+            </div>
+        `;
+    });
+    
+    container.innerHTML = html;
+}
+
+function removerFuncionarioAutocomplete(index) {
+    funcionariosAutocompleteSelecionados.splice(index, 1);
+    atualizarListaFuncionariosSelecionados();
+}
+
+function atualizarHorasFuncionarioAutocomplete(index, novasHoras) {
+    funcionariosAutocompleteSelecionados[index].horas = parseFloat(novasHoras) || 0;
+}
 
 function renderizarFuncionarios(funcionarios) {
     const container = document.getElementById('funcionarios-container');
