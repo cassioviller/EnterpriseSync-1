@@ -1,0 +1,315 @@
+{% extends "base_completo.html" %}
+
+{% block title %}Gestão de Serviços - SIGE{% endblock %}
+
+{% block content %}
+<!-- Header Moderno -->
+<div style="
+    background: linear-gradient(135deg, #28a745 0%, #20c997 100%) !important;
+    color: white !important;
+    padding: 3rem 2rem !important;
+    border-radius: 16px !important;
+    margin: 2rem 0 !important;
+    display: flex !important;
+    justify-content: space-between !important;
+    align-items: center !important;
+    box-shadow: 0 8px 32px rgba(40, 167, 69, 0.3) !important;
+">
+    <div style="display: flex; align-items: center; gap: 1.5rem;">
+        <div style="
+            background: rgba(255, 255, 255, 0.2);
+            padding: 1.5rem;
+            border-radius: 50%;
+            font-size: 2rem;
+        ">
+            <i class="fas fa-cogs"></i>
+        </div>
+        <div>
+            <h1 style="margin: 0; font-size: 2.5rem; font-weight: 700; color: white;">Gestão de Serviços</h1>
+            <p style="margin: 0.5rem 0 0 0; opacity: 0.9; font-size: 1.1rem; color: white;">Configure serviços e subatividades para os RDOs</p>
+        </div>
+    </div>
+    <div>
+        <button onclick="abrirModal()" class="btn" style="
+            background: rgba(255, 255, 255, 0.2);
+            color: white;
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            padding: 0.75rem 1.5rem;
+            border-radius: 10px;
+            font-weight: 600;
+        ">
+            <i class="fas fa-plus me-2"></i>Novo Serviço
+        </button>
+    </div>
+</div>
+
+<!-- Cards de Estatísticas -->
+<div class="row mb-4">
+    <div class="col-md-3">
+        <div style="
+            background: linear-gradient(135deg, #007bff 0%, #0056b3 100%);
+            color: white;
+            padding: 1.5rem;
+            border-radius: 12px;
+            text-align: center;
+            box-shadow: 0 4px 12px rgba(0, 123, 255, 0.3);
+        ">
+            <h3 style="margin: 0; font-size: 2rem; font-weight: 700;">{{ estatisticas.total }}</h3>
+            <p style="margin: 0; opacity: 0.9;">Total de Serviços</p>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div style="
+            background: linear-gradient(135deg, #28a745 0%, #1e7e34 100%);
+            color: white;
+            padding: 1.5rem;
+            border-radius: 12px;
+            text-align: center;
+            box-shadow: 0 4px 12px rgba(40, 167, 69, 0.3);
+        ">
+            <h3 style="margin: 0; font-size: 2rem; font-weight: 700;">{{ estatisticas.ativo }}</h3>
+            <p style="margin: 0; opacity: 0.9;">Ativos</p>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div style="
+            background: linear-gradient(135deg, #ffc107 0%, #e0a800 100%);
+            color: white;
+            padding: 1.5rem;
+            border-radius: 12px;
+            text-align: center;
+            box-shadow: 0 4px 12px rgba(255, 193, 7, 0.3);
+        ">
+            <h3 style="margin: 0; font-size: 2rem; font-weight: 700;">{{ estatisticas.subatividades }}</h3>
+            <p style="margin: 0; opacity: 0.9;">Subatividades</p>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div style="
+            background: linear-gradient(135deg, #6f42c1 0%, #563d7c 100%);
+            color: white;
+            padding: 1.5rem;
+            border-radius: 12px;
+            text-align: center;
+            box-shadow: 0 4px 12px rgba(111, 66, 193, 0.3);
+        ">
+            <h3 style="margin: 0; font-size: 2rem; font-weight: 700;">{{ estatisticas.categorias }}</h3>
+            <p style="margin: 0; opacity: 0.9;">Categorias</p>
+        </div>
+    </div>
+</div>
+
+<!-- Lista de Serviços -->
+<div class="container-fluid">
+    {% if servicos %}
+        <div class="row">
+            {% for servico in servicos %}
+            <div class="col-md-6 col-lg-4 mb-4">
+                <div style="
+                    background: white;
+                    border-radius: 12px;
+                    padding: 1.5rem;
+                    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+                    transition: all 0.3s ease;
+                    border-left: 4px solid {{ servico.cor_categoria or '#28a745' }};
+                " onmouseover="this.style.transform='translateY(-5px)'" onmouseout="this.style.transform='translateY(0)'">
+                    
+                    <!-- Header do Card -->
+                    <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 1rem;">
+                        <div>
+                            <h5 style="margin: 0; color: #495057; font-weight: 700;">{{ servico.nome }}</h5>
+                            <span style="
+                                background: {{ servico.cor_categoria or '#28a745' }};
+                                color: white;
+                                padding: 0.25rem 0.75rem;
+                                border-radius: 20px;
+                                font-size: 0.8rem;
+                                font-weight: 600;
+                                margin-top: 0.5rem;
+                                display: inline-block;
+                            ">{{ servico.categoria }}</span>
+                        </div>
+                        
+                        <!-- Ações -->
+                        <div class="dropdown">
+                            <button class="btn btn-sm btn-outline-secondary" data-bs-toggle="dropdown">
+                                <i class="fas fa-ellipsis-v"></i>
+                            </button>
+                            <ul class="dropdown-menu">
+                                <li><a class="dropdown-item" href="/servicos/{{ servico.id }}/editar"><i class="fas fa-edit me-2"></i>Editar</a></li>
+                                <li><a class="dropdown-item text-danger" href="/servicos/{{ servico.id }}/excluir"><i class="fas fa-trash me-2"></i>Excluir</a></li>
+                            </ul>
+                        </div>
+                    </div>
+                    
+                    <!-- Descrição -->
+                    {% if servico.descricao %}
+                    <p style="color: #6c757d; margin-bottom: 1rem;">{{ servico.descricao }}</p>
+                    {% endif %}
+                    
+                    <!-- Subatividades -->
+                    <div>
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+                            <span style="font-weight: 600; color: #495057;">Subatividades ({{ servico.subatividades|length }})</span>
+                            {% if servico.subatividades %}
+                            <button onclick="toggleSubs({{ servico.id }})" class="btn btn-sm btn-outline-primary">
+                                <i id="icon-{{ servico.id }}" class="fas fa-chevron-down"></i>
+                            </button>
+                            {% endif %}
+                        </div>
+                        
+                        {% if servico.subatividades %}
+                            <div id="subs-{{ servico.id }}" style="display: none; background: #f8f9fa; padding: 0.75rem; border-radius: 8px; margin-top: 0.5rem;">
+                                {% for sub in servico.subatividades %}
+                                <div style="padding: 0.25rem 0; display: flex; align-items: center; gap: 0.5rem;">
+                                    <i class="fas fa-check-circle" style="color: #28a745; font-size: 0.8rem;"></i>
+                                    <span style="font-size: 0.9rem;">{{ sub.nome }}</span>
+                                </div>
+                                {% endfor %}
+                            </div>
+                        {% else %}
+                            <div style="
+                                background: #fff3cd;
+                                border: 1px solid #ffeaa7;
+                                padding: 0.75rem;
+                                border-radius: 8px;
+                                text-align: center;
+                                color: #856404;
+                            ">
+                                <i class="fas fa-info-circle"></i>
+                                <span>Nenhuma subatividade configurada</span>
+                            </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    {% else %}
+        <!-- Estado Vazio -->
+        <div style="text-align: center; padding: 3rem;">
+            <i class="fas fa-cogs" style="font-size: 4rem; color: #6c757d; margin-bottom: 1rem;"></i>
+            <h3>Nenhum serviço cadastrado</h3>
+            <p style="color: #6c757d; margin-bottom: 2rem;">Comece criando seu primeiro serviço com suas subatividades para usar nos RDOs</p>
+            <button onclick="abrirModal()" class="btn btn-primary btn-lg">
+                <i class="fas fa-plus me-2"></i>Criar Primeiro Serviço
+            </button>
+        </div>
+    {% endif %}
+</div>
+
+<!-- Modal Novo Serviço -->
+<div class="modal fade" id="modalNovoServico" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title">
+                    <i class="fas fa-plus me-2"></i> Novo Serviço
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            
+            <form method="POST" action="{{ url_for('servicos_crud.criar_servico') }}">
+                <div class="modal-body">
+                    <div class="row">
+                        <div class="col-md-8">
+                            <div class="mb-3">
+                                <label for="nome" class="form-label">Nome do Serviço *</label>
+                                <input type="text" class="form-control" id="nome" name="nome" required>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="mb-3">
+                                <label for="categoria" class="form-label">Categoria</label>
+                                <select class="form-select" id="categoria" name="categoria">
+                                    <option value="Estrutural">Estrutural</option>
+                                    <option value="Soldagem">Soldagem</option>
+                                    <option value="Pintura">Pintura</option>
+                                    <option value="Instalação">Instalação</option>
+                                    <option value="Acabamento">Acabamento</option>
+                                    <option value="Manutenção">Manutenção</option>
+                                    <option value="Outros">Outros</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="descricao" class="form-label">Descrição</label>
+                        <textarea class="form-control" id="descricao" name="descricao" rows="3"></textarea>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <div style="display: flex; justify-content: space-between; align-items: center;">
+                            <label class="form-label">Subatividades</label>
+                            <button type="button" onclick="addSub()" class="btn btn-sm btn-outline-primary">
+                                <i class="fas fa-plus"></i> Adicionar
+                            </button>
+                        </div>
+                        <div id="subatividades-container">
+                            <div class="input-group mb-2">
+                                <input type="text" class="form-control" name="subatividades[]" placeholder="Nome da subatividade">
+                                <button type="button" class="btn btn-outline-danger" onclick="removeSub(this)">
+                                    <i class="fas fa-trash"></i>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-save me-1"></i> Salvar Serviço
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+// Funções JavaScript simplificadas
+function abrirModal() {
+    const modal = new bootstrap.Modal(document.getElementById('modalNovoServico'));
+    modal.show();
+    setTimeout(() => document.getElementById('nome').focus(), 300);
+}
+
+function toggleSubs(id) {
+    const subs = document.getElementById('subs-' + id);
+    const icon = document.getElementById('icon-' + id);
+    
+    if (subs.style.display === 'none') {
+        subs.style.display = 'block';
+        icon.className = 'fas fa-chevron-up';
+    } else {
+        subs.style.display = 'none';
+        icon.className = 'fas fa-chevron-down';
+    }
+}
+
+function addSub() {
+    const container = document.getElementById('subatividades-container');
+    const div = document.createElement('div');
+    div.className = 'input-group mb-2';
+    div.innerHTML = `
+        <input type="text" class="form-control" name="subatividades[]" placeholder="Nome da subatividade">
+        <button type="button" class="btn btn-outline-danger" onclick="removeSub(this)">
+            <i class="fas fa-trash"></i>
+        </button>
+    `;
+    container.appendChild(div);
+    div.querySelector('input').focus();
+}
+
+function removeSub(btn) {
+    const container = document.getElementById('subatividades-container');
+    if (container.children.length > 1) {
+        btn.closest('.input-group').remove();
+    } else {
+        btn.closest('.input-group').querySelector('input').value = '';
+    }
+}
+</script>
+{% endblock %}

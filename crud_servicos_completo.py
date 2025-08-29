@@ -60,10 +60,17 @@ def index():
         
         logger.info(f"✅ Encontrados {len(servicos)} serviços")
         
-        return render_template('servicos/index.html',
+        estatisticas = {
+            'total': len(servicos),
+            'ativo': len(servicos),
+            'subatividades': total_subatividades,
+            'categorias': categorias_count
+        }
+        
+        return render_template('servicos/index_novo.html',
                              servicos=servicos,
-                             subatividades_total=total_subatividades,
-                             categorias_count=categorias_count)
+                             estatisticas=estatisticas,
+)
         
     except Exception as e:
         logger.error(f"❌ Erro ao carregar serviços: {str(e)}")

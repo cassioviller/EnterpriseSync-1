@@ -976,6 +976,45 @@
 
 {% block extra_js %}
 <script>
+// TODAS AS FUNÇÕES DEFINIDAS GLOBALMENTE NO INÍCIO
+window.abrirModalNovoServico = function() {
+    console.log('Abrindo modal de novo serviço...');
+    const modalElement = document.getElementById('modalNovoServico');
+    if (modalElement) {
+        const modal = new bootstrap.Modal(modalElement);
+        modal.show();
+        
+        setTimeout(() => {
+            const nomeInput = document.getElementById('nome');
+            if (nomeInput) {
+                nomeInput.focus();
+            }
+        }, 500);
+    } else {
+        console.error('Modal não encontrado!');
+        alert('Erro: Modal de criação não encontrado');
+    }
+};
+
+window.editarServico = function(servicoId) {
+    console.log('Editando serviço ID:', servicoId);
+    window.location.href = `/servicos/${servicoId}/editar`;
+};
+
+window.toggleSubatividades = function(servicoId) {
+    const lista = document.getElementById(`subatividades-${servicoId}`);
+    const button = event.target.closest('button');
+    const icon = button.querySelector('i');
+    
+    if (lista.style.display === 'none' || lista.style.display === '') {
+        lista.style.display = 'block';
+        icon.className = 'fas fa-chevron-up';
+    } else {
+        lista.style.display = 'none';
+        icon.className = 'fas fa-chevron-down';
+    }
+};
+
 // Gerenciamento de Subatividades
 function adicionarSubatividade() {
     const container = document.getElementById('subatividades-container');
@@ -1004,10 +1043,6 @@ function removerSubatividade(button) {
         container.querySelector('input').value = '';
     }
 }
-
-
-
-// DEFINIR FUNÇÕES GLOBALMENTE PRIMEIRO
 function abrirModalNovoServico() {
     console.log('Abrindo modal de novo serviço...');
     const modalElement = document.getElementById('modalNovoServico');
