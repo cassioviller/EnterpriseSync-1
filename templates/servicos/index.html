@@ -714,55 +714,157 @@
         </div>
     </div>
 
-    <!-- Lista de Serviços -->
-    <div class="servicos-section">
-        <div class="section-header">
-            <h2><i class="fas fa-list"></i> Lista de Serviços</h2>
+    <!-- Lista de Serviços com Estilos Inline -->
+    <div style="margin-top: 2rem;">
+        <div style="margin-bottom: 2rem;">
+            <h2 style="color: #2d5a27; font-weight: 700; display: flex; align-items: center; gap: 1rem;">
+                <i class="fas fa-list"></i> Lista de Serviços
+            </h2>
         </div>
         
         {% if servicos %}
-            <div class="servicos-grid">
+            <div style="
+                display: grid;
+                grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+                gap: 2rem;
+            ">
                 {% for servico in servicos %}
-                <div class="servico-card">
-                    <div class="servico-header">
+                <div style="
+                    background: linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%);
+                    border: 1px solid #e2e8f0;
+                    border-radius: 16px;
+                    overflow: hidden;
+                    transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+                    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+                    position: relative;
+                    margin-bottom: 2rem;
+                " onmouseover="this.style.transform='translateY(-6px)'; this.style.boxShadow='0 16px 40px rgba(0, 139, 58, 0.15)'" onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='0 4px 12px rgba(0, 0, 0, 0.08)'">
+                    
+                    <!-- Card Header -->
+                    <div style="
+                        background: linear-gradient(135deg, #f8f9fa, #e9ecef);
+                        padding: 1.5rem;
+                        display: flex;
+                        justify-content: space-between;
+                        align-items: center;
+                    ">
                         {% set categoria_class = servico.categoria|lower if servico.categoria else 'outros' %}
-                        <div class="servico-badge {{ categoria_class }}">{{ servico.categoria or 'Outros' }}</div>
-                        <div class="servico-actions">
-                            <button class="btn-icon" onclick="editarServico({{ servico.id }})" title="Editar">
+                        {% if categoria_class == 'estrutural' %}
+                            {% set badge_color = 'linear-gradient(135deg, #28a745, #20c997)' %}
+                        {% elif categoria_class == 'acabamento' %}
+                            {% set badge_color = 'linear-gradient(135deg, #fd7e14, #ffc107)' %}
+                        {% elif categoria_class == 'soldagem' %}
+                            {% set badge_color = 'linear-gradient(135deg, #dc3545, #e74c3c)' %}
+                        {% elif categoria_class == 'pintura' %}
+                            {% set badge_color = 'linear-gradient(135deg, #6f42c1, #e83e8c)' %}
+                        {% elif categoria_class == 'instalação' %}
+                            {% set badge_color = 'linear-gradient(135deg, #007bff, #17a2b8)' %}
+                        {% elif categoria_class == 'manutenção' %}
+                            {% set badge_color = 'linear-gradient(135deg, #6c757d, #495057)' %}
+                        {% else %}
+                            {% set badge_color = 'linear-gradient(135deg, #17a2b8, #20c997)' %}
+                        {% endif %}
+                        
+                        <div style="
+                            padding: 0.5rem 1rem;
+                            border-radius: 25px;
+                            font-size: 0.85rem;
+                            font-weight: 600;
+                            color: white;
+                            background: {{ badge_color }};
+                        ">{{ servico.categoria or 'Outros' }}</div>
+                        
+                        <div style="display: flex; gap: 0.5rem;">
+                            <button onclick="editarServico({{ servico.id }})" title="Editar" style="
+                                background: rgba(45, 90, 39, 0.1);
+                                color: #2d5a27;
+                                border: none;
+                                width: 36px;
+                                height: 36px;
+                                border-radius: 8px;
+                                display: flex;
+                                align-items: center;
+                                justify-content: center;
+                                cursor: pointer;
+                                transition: all 0.2s ease;
+                            " onmouseover="this.style.background='rgba(45, 90, 39, 0.2)'" onmouseout="this.style.background='rgba(45, 90, 39, 0.1)'">
                                 <i class="fas fa-edit"></i>
                             </button>
                         </div>
                     </div>
                     
-                    <div class="servico-body">
-                        <h3 class="servico-nome">{{ servico.nome }}</h3>
+                    <!-- Card Body -->
+                    <div style="padding: 1.5rem;">
+                        <h3 style="color: #2d5a27; font-weight: 700; margin-bottom: 1rem; font-size: 1.3rem;">{{ servico.nome }}</h3>
+                        
                         {% if servico.descricao %}
-                        <p class="servico-descricao">
+                        <p style="color: #6c757d; font-size: 0.95rem; line-height: 1.5; margin-bottom: 1.5rem;">
                             {{ servico.descricao[:120] }}{% if servico.descricao|length > 120 %}...{% endif %}
                         </p>
                         {% endif %}
                         
-                        <div class="subatividades-info">
-                            <div class="subatividades-count">
+                        <!-- Subatividades Info -->
+                        <div style="
+                            display: flex;
+                            justify-content: space-between;
+                            align-items: center;
+                            margin-bottom: 1rem;
+                            padding: 1rem;
+                            background: linear-gradient(135deg, #f8f9fa, #e9ecef);
+                            border-radius: 12px;
+                        ">
+                            <div style="display: flex; align-items: center; gap: 0.5rem; color: #495057; font-weight: 600;">
                                 <i class="fas fa-tasks"></i>
                                 <span>{{ (servico.subatividades or [])|length }} Subatividades</span>
                             </div>
-                            <button class="btn-expand" onclick="toggleSubatividades('servico{{ servico.id }}')">
+                            <button onclick="toggleSubatividades('servico{{ servico.id }}')" style="
+                                background: none;
+                                border: none;
+                                color: #6c757d;
+                                font-size: 1rem;
+                                cursor: pointer;
+                                transition: all 0.2s ease;
+                            " onmouseover="this.style.color='#2d5a27'" onmouseout="this.style.color='#6c757d'">
                                 <i class="fas fa-chevron-down"></i>
                             </button>
                         </div>
                         
-                        <div class="subatividades-lista" id="subatividades-servico{{ servico.id }}" style="display: none;">
+                        <!-- Subatividades Lista -->
+                        <div id="subatividades-servico{{ servico.id }}" style="
+                            display: none;
+                            margin-top: 1rem;
+                            border-top: 2px dashed #dee2e6;
+                            padding-top: 1rem;
+                        ">
                             {% if servico.subatividades %}
                                 {% for sub in servico.subatividades %}
-                                <div class="subatividade-item">
-                                    <i class="fas fa-check-circle text-success"></i>
+                                <div style="
+                                    display: flex;
+                                    align-items: center;
+                                    gap: 0.75rem;
+                                    padding: 0.75rem;
+                                    margin-bottom: 0.5rem;
+                                    background: white;
+                                    border: 1px solid #e9ecef;
+                                    border-radius: 8px;
+                                    transition: all 0.2s ease;
+                                " onmouseover="this.style.background='#f8f9fa'; this.style.borderColor='#2d5a27'; this.style.transform='translateX(5px)'" onmouseout="this.style.background='white'; this.style.borderColor='#e9ecef'; this.style.transform='translateX(0)'">
+                                    <i class="fas fa-check-circle" style="color: #28a745; font-size: 0.9rem;"></i>
                                     <span>{{ sub.nome }}</span>
                                 </div>
                                 {% endfor %}
                             {% else %}
-                                <div class="subatividade-item">
-                                    <i class="fas fa-info-circle text-muted"></i>
+                                <div style="
+                                    display: flex;
+                                    align-items: center;
+                                    gap: 0.75rem;
+                                    padding: 0.75rem;
+                                    background: white;
+                                    border: 1px solid #e9ecef;
+                                    border-radius: 8px;
+                                    color: #6c757d;
+                                ">
+                                    <i class="fas fa-info-circle"></i>
                                     <span>Nenhuma subatividade configurada</span>
                                 </div>
                             {% endif %}
