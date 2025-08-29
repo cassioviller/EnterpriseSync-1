@@ -4,43 +4,42 @@
 
 {% block extra_css %}
 <style>
-/* Design System Moderno Profissional */
-.page-header {
-    background: linear-gradient(135deg, #008b3a 0%, #000000 50%, #333333 100%);
+/* Design System Moderno Consistente */
+.page-header-modern {
+    background: linear-gradient(135deg, #2d5a27 0%, #4a7c59 50%, #20c997 100%);
     color: white;
-    padding: 2rem;
+    padding: 3rem 2rem;
     border-radius: 16px;
     margin-bottom: 2rem;
-    box-shadow: 0 8px 32px rgba(0, 139, 58, 0.2);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    box-shadow: 0 8px 32px rgba(45, 90, 39, 0.3);
 }
 
 .header-content {
     display: flex;
     align-items: center;
-    gap: 1rem;
+    gap: 1.5rem;
 }
 
 .header-icon {
-    background: rgba(255, 255, 255, 0.15);
-    width: 60px;
-    height: 60px;
-    border-radius: 12px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 1.5rem;
+    background: rgba(255, 255, 255, 0.2);
+    padding: 1.5rem;
+    border-radius: 50%;
+    font-size: 2rem;
 }
 
 .header-text h1 {
     margin: 0;
-    font-size: 2rem;
+    font-size: 2.5rem;
     font-weight: 700;
 }
 
 .header-text p {
     margin: 0.5rem 0 0 0;
-    opacity: 0.85;
-    font-size: 1rem;
+    opacity: 0.9;
+    font-size: 1.1rem;
 }
 
 .btn-primary-custom {
@@ -69,68 +68,81 @@
 /* Estatísticas Dashboard */
 .stats-dashboard {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
     gap: 1.5rem;
-    margin-bottom: 2rem;
+    margin-bottom: 3rem;
 }
 
 .stat-card {
-    background: linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%);
-    border: 1px solid #e2e8f0;
+    background: white;
+    padding: 2rem;
     border-radius: 16px;
-    padding: 1.5rem;
-    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+    display: flex;
+    align-items: center;
+    gap: 1.5rem;
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
 }
 
 .stat-card:hover {
-    transform: translateY(-4px);
-    box-shadow: 0 12px 28px rgba(0, 139, 58, 0.15);
-    border-color: #008b3a;
+    transform: translateY(-5px);
+    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.15);
 }
 
-.stat-card-content {
+.stat-icon {
+    width: 70px;
+    height: 70px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.8rem;
+    color: white;
+}
+
+.stat-icon.green { background: linear-gradient(135deg, #28a745, #20c997); }
+.stat-icon.blue { background: linear-gradient(135deg, #007bff, #17a2b8); }
+.stat-icon.purple { background: linear-gradient(135deg, #6f42c1, #e83e8c); }
+.stat-icon.orange { background: linear-gradient(135deg, #fd7e14, #ffc107); }
+
+.stat-content {
+    flex: 1;
+}
+
+.stat-number {
+    font-size: 2.5rem;
+    font-weight: 700;
+    color: #2d5a27;
+    margin: 0;
+}
+
+.stat-label {
+    color: #6c757d;
+    font-size: 1rem;
+    margin: 0;
+}
+
+/* Seção de Serviços */
+.servicos-section {
+    margin-top: 2rem;
+}
+
+.section-header {
+    margin-bottom: 2rem;
+}
+
+.section-header h2 {
+    color: #2d5a27;
+    font-weight: 700;
     display: flex;
     align-items: center;
     gap: 1rem;
 }
 
-.stat-icon {
-    background: linear-gradient(135deg, #008b3a 0%, #00a048 100%);
-    color: white;
-    width: 50px;
-    height: 50px;
-    border-radius: 12px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 1.2rem;
-}
-
-.stat-info {
-    flex: 1;
-}
-
-.stat-number {
-    font-size: 2rem;
-    font-weight: 700;
-    color: #008b3a;
-    margin: 0;
-    line-height: 1;
-}
-
-.stat-label {
-    color: #6c757d;
-    font-size: 0.9rem;
-    font-weight: 500;
-    margin-top: 0.25rem;
-}
-
-/* Grid de Serviços */
 .servicos-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(380px, 1fr));
-    gap: 1.5rem;
+    grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+    gap: 2rem;
 }
 
 /* Cards de Serviço Modernos */
@@ -376,10 +388,133 @@
     border-left: none;
 }
 
+.servico-header {
+    background: linear-gradient(135deg, #f8f9fa, #e9ecef);
+    padding: 1.5rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.servico-badge {
+    padding: 0.5rem 1rem;
+    border-radius: 25px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: white;
+}
+
+.servico-badge.estrutural { background: linear-gradient(135deg, #28a745, #20c997); }
+.servico-badge.acabamento { background: linear-gradient(135deg, #fd7e14, #ffc107); }
+.servico-badge.soldagem { background: linear-gradient(135deg, #dc3545, #e74c3c); }
+.servico-badge.pintura { background: linear-gradient(135deg, #6f42c1, #e83e8c); }
+.servico-badge.instalação { background: linear-gradient(135deg, #007bff, #17a2b8); }
+.servico-badge.manutenção { background: linear-gradient(135deg, #6c757d, #495057); }
+.servico-badge.outros { background: linear-gradient(135deg, #17a2b8, #20c997); }
+
+.servico-actions {
+    display: flex;
+    gap: 0.5rem;
+}
+
+.btn-icon {
+    background: rgba(45, 90, 39, 0.1);
+    color: #2d5a27;
+    border: none;
+    width: 36px;
+    height: 36px;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s ease;
+}
+
+.btn-icon:hover {
+    background: rgba(45, 90, 39, 0.2);
+    color: #2d5a27;
+    transform: scale(1.05);
+}
+
+.servico-body {
+    padding: 1.5rem;
+}
+
+.servico-nome {
+    color: #2d5a27;
+    font-weight: 700;
+    margin-bottom: 1rem;
+}
+
+.servico-descricao {
+    color: #6c757d;
+    font-size: 0.95rem;
+    line-height: 1.5;
+    margin-bottom: 1.5rem;
+}
+
+.subatividades-info {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1rem;
+    padding: 1rem;
+    background: linear-gradient(135deg, #f8f9fa, #e9ecef);
+    border-radius: 12px;
+}
+
+.subatividades-count {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    color: #495057;
+    font-weight: 600;
+}
+
+.btn-expand {
+    background: none;
+    border: none;
+    color: #6c757d;
+    font-size: 1rem;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.btn-expand:hover {
+    color: #2d5a27;
+    transform: scale(1.1);
+}
+
+.subatividades-lista {
+    margin-top: 1rem;
+    border-top: 2px dashed #dee2e6;
+    padding-top: 1rem;
+}
+
+.subatividade-item {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.75rem;
+    margin-bottom: 0.5rem;
+    background: white;
+    border: 1px solid #e9ecef;
+    border-radius: 8px;
+    transition: all 0.2s ease;
+}
+
+.subatividade-item:hover {
+    background: #f8f9fa;
+    border-color: #2d5a27;
+    transform: translateX(5px);
+}
+
 /* Responsive */
 @media (max-width: 768px) {
-    .page-header {
+    .page-header-modern {
         text-align: center;
+        flex-direction: column;
+        gap: 2rem;
     }
     
     .header-content {
@@ -400,7 +535,7 @@
 
 {% block content %}
 <!-- Header Moderno -->
-<div class="page-header">
+<div class="page-header-modern">
     <div class="header-content">
         <div class="header-icon">
             <i class="fas fa-cogs"></i>
@@ -411,7 +546,7 @@
         </div>
     </div>
     <div class="header-actions">
-        <button class="btn-primary-custom" onclick="abrirModalNovoServico()">
+        <button class="btn btn-light btn-lg" onclick="abrirModalNovoServico()">
             <i class="fas fa-plus"></i> Novo Serviço
         </button>
     </div>
@@ -421,108 +556,116 @@
     <!-- Dashboard de Estatísticas -->
     <div class="stats-dashboard">
         <div class="stat-card">
-            <div class="stat-card-content">
-                <div class="stat-icon">
-                    <i class="fas fa-cogs"></i>
-                </div>
-                <div class="stat-info">
-                    <div class="stat-number">{{ servicos|length }}</div>
-                    <div class="stat-label">Serviços Ativos</div>
-                </div>
+            <div class="stat-icon green">
+                <i class="fas fa-cogs"></i>
+            </div>
+            <div class="stat-content">
+                <div class="stat-number">{{ servicos|length }}</div>
+                <div class="stat-label">Serviços Ativos</div>
             </div>
         </div>
         
         <div class="stat-card">
-            <div class="stat-card-content">
-                <div class="stat-icon">
-                    <i class="fas fa-tasks"></i>
-                </div>
-                <div class="stat-info">
-                    <div class="stat-number">{{ subatividades_total or 0 }}</div>
-                    <div class="stat-label">Subatividades</div>
-                </div>
+            <div class="stat-icon blue">
+                <i class="fas fa-tasks"></i>
+            </div>
+            <div class="stat-content">
+                <div class="stat-number">{{ subatividades_total or 0 }}</div>
+                <div class="stat-label">Subatividades</div>
             </div>
         </div>
         
         <div class="stat-card">
-            <div class="stat-card-content">
-                <div class="stat-icon">
-                    <i class="fas fa-layer-group"></i>
-                </div>
-                <div class="stat-info">
-                    <div class="stat-number">{{ categorias_count or 0 }}</div>
-                    <div class="stat-label">Categorias</div>
-                </div>
+            <div class="stat-icon purple">
+                <i class="fas fa-layer-group"></i>
+            </div>
+            <div class="stat-content">
+                <div class="stat-number">{{ categorias_count or 0 }}</div>
+                <div class="stat-label">Categorias</div>
+            </div>
+        </div>
+        
+        <div class="stat-card">
+            <div class="stat-icon orange">
+                <i class="fas fa-chart-line"></i>
+            </div>
+            <div class="stat-content">
+                <div class="stat-number">100%</div>
+                <div class="stat-label">Configuração</div>
             </div>
         </div>
     </div>
 
     <!-- Lista de Serviços -->
-    {% if servicos %}
-        <div class="servicos-grid">
-            {% for servico in servicos %}
-            <div class="servico-card">
-                <div class="servico-header">
-                    <div class="servico-info">
-                        <h3>{{ servico.nome }}</h3>
-                        <span class="servico-categoria">{{ servico.categoria or 'Outros' }}</span>
+    <div class="servicos-section">
+        <div class="section-header">
+            <h2><i class="fas fa-list"></i> Lista de Serviços</h2>
+        </div>
+        
+        {% if servicos %}
+            <div class="servicos-grid">
+                {% for servico in servicos %}
+                <div class="servico-card">
+                    <div class="servico-header">
+                        {% set categoria_class = servico.categoria|lower if servico.categoria else 'outros' %}
+                        <div class="servico-badge {{ categoria_class }}">{{ servico.categoria or 'Outros' }}</div>
+                        <div class="servico-actions">
+                            <button class="btn-icon" onclick="editarServico({{ servico.id }})" title="Editar">
+                                <i class="fas fa-edit"></i>
+                            </button>
+                        </div>
                     </div>
-                    <div class="servico-actions">
-                        <button class="btn-icon" onclick="editarServico({{ servico.id }})" title="Editar">
-                            <i class="fas fa-edit"></i>
-                        </button>
-                    </div>
-                </div>
-                
-                <div class="servico-body">
-                    {% if servico.descricao %}
-                    <p class="servico-descricao">
-                        {{ servico.descricao[:120] }}{% if servico.descricao|length > 120 %}...{% endif %}
-                    </p>
-                    {% endif %}
                     
-                    <div class="subatividades-preview">
-                        <div class="subatividades-header" onclick="toggleSubatividades({{ servico.id }})">
-                            <i class="fas fa-tasks"></i>
-                            <span>Subatividades</span>
-                            <span class="subatividades-count">{{ (servico.subatividades or [])|length }}</span>
-                            <button class="btn-toggle">
+                    <div class="servico-body">
+                        <h3 class="servico-nome">{{ servico.nome }}</h3>
+                        {% if servico.descricao %}
+                        <p class="servico-descricao">
+                            {{ servico.descricao[:120] }}{% if servico.descricao|length > 120 %}...{% endif %}
+                        </p>
+                        {% endif %}
+                        
+                        <div class="subatividades-info">
+                            <div class="subatividades-count">
+                                <i class="fas fa-tasks"></i>
+                                <span>{{ (servico.subatividades or [])|length }} Subatividades</span>
+                            </div>
+                            <button class="btn-expand" onclick="toggleSubatividades('servico{{ servico.id }}')">
                                 <i class="fas fa-chevron-down"></i>
                             </button>
                         </div>
                         
-                        <div class="subatividades-lista" id="subatividades-{{ servico.id }}" style="display: none;">
+                        <div class="subatividades-lista" id="subatividades-servico{{ servico.id }}" style="display: none;">
                             {% if servico.subatividades %}
                                 {% for sub in servico.subatividades %}
                                 <div class="subatividade-item">
-                                    <i class="fas fa-check-circle"></i>
+                                    <i class="fas fa-check-circle text-success"></i>
                                     <span>{{ sub.nome }}</span>
                                 </div>
                                 {% endfor %}
                             {% else %}
                                 <div class="subatividade-item">
-                                    <i class="fas fa-info-circle"></i>
+                                    <i class="fas fa-info-circle text-muted"></i>
                                     <span>Nenhuma subatividade configurada</span>
                                 </div>
                             {% endif %}
                         </div>
                     </div>
                 </div>
+                {% endfor %}
             </div>
-            {% endfor %}
-        </div>
-    {% else %}
-        <!-- Estado Vazio -->
-        <div class="empty-state">
-            <i class="fas fa-cogs"></i>
-            <h3>Nenhum serviço cadastrado</h3>
-            <p>Comece criando seu primeiro serviço com suas subatividades para usar nos RDOs</p>
-            <button class="btn-primary-custom" onclick="abrirModalNovoServico()">
-                <i class="fas fa-plus me-2"></i>
-                Criar Primeiro Serviço
-            </button>
-        </div>
-    {% endif %}
+        {% else %}
+            <!-- Estado Vazio -->
+            <div class="empty-state">
+                <i class="fas fa-cogs"></i>
+                <h3>Nenhum serviço cadastrado</h3>
+                <p>Comece criando seu primeiro serviço com suas subatividades para usar nos RDOs</p>
+                <button class="btn-primary-custom" onclick="abrirModalNovoServico()">
+                    <i class="fas fa-plus me-2"></i>
+                    Criar Primeiro Serviço
+                </button>
+            </div>
+        {% endif %}
+    </div>
 </div>
 
 <!-- Modal Novo Serviço -->
@@ -658,7 +801,8 @@ function editarServico(servicoId) {
 
 function toggleSubatividades(servicoId) {
     const lista = document.getElementById(`subatividades-${servicoId}`);
-    const icon = event.target.closest('.subatividades-header').querySelector('.btn-toggle i');
+    const button = event.target.closest('.btn-expand');
+    const icon = button.querySelector('i');
     
     if (lista.style.display === 'none' || !lista.style.display) {
         lista.style.display = 'block';

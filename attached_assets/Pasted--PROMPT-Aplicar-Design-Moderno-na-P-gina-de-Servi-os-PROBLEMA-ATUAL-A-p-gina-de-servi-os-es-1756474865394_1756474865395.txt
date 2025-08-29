@@ -1,0 +1,511 @@
+# PROMPT: Aplicar Design Moderno na Página de Serviços
+
+## PROBLEMA ATUAL
+A página de serviços está com layout básico e sem design moderno. Precisa aplicar o mesmo estilo visual das páginas de RDO que funcionaram bem.
+
+## SOLUÇÃO: Aplicar Estilo Moderno Consistente
+
+### 1. HEADER COM GRADIENTE (Igual às outras páginas)
+
+**Substituir o header básico por:**
+```html
+<div class="page-header-modern">
+    <div class="header-content">
+        <div class="header-icon">
+            <i class="fas fa-cogs"></i>
+        </div>
+        <div class="header-text">
+            <h1>Gestão de Serviços</h1>
+            <p>Configure os serviços e subatividades do seu sistema</p>
+        </div>
+    </div>
+    <div class="header-actions">
+        <button class="btn btn-light btn-lg" onclick="abrirModalNovoServico()">
+            <i class="fas fa-plus"></i> Novo Serviço
+        </button>
+    </div>
+</div>
+```
+
+**CSS do Header:**
+```css
+.page-header-modern {
+    background: linear-gradient(135deg, #2d5a27 0%, #4a7c59 50%, #20c997 100%);
+    color: white;
+    padding: 3rem 2rem;
+    border-radius: 16px;
+    margin-bottom: 2rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    box-shadow: 0 8px 32px rgba(45, 90, 39, 0.3);
+}
+
+.header-content {
+    display: flex;
+    align-items: center;
+    gap: 1.5rem;
+}
+
+.header-icon {
+    background: rgba(255, 255, 255, 0.2);
+    padding: 1.5rem;
+    border-radius: 50%;
+    font-size: 2rem;
+}
+
+.header-text h1 {
+    margin: 0;
+    font-size: 2.5rem;
+    font-weight: 700;
+}
+
+.header-text p {
+    margin: 0.5rem 0 0 0;
+    opacity: 0.9;
+    font-size: 1.1rem;
+}
+```
+
+### 2. CARDS DE ESTATÍSTICAS (Igual às outras páginas)
+
+**Adicionar após o header:**
+```html
+<div class="stats-dashboard">
+    <div class="stat-card">
+        <div class="stat-icon green">
+            <i class="fas fa-cogs"></i>
+        </div>
+        <div class="stat-content">
+            <div class="stat-number">3</div>
+            <div class="stat-label">Serviços Ativos</div>
+        </div>
+    </div>
+    
+    <div class="stat-card">
+        <div class="stat-icon blue">
+            <i class="fas fa-tasks"></i>
+        </div>
+        <div class="stat-content">
+            <div class="stat-number">11</div>
+            <div class="stat-label">Subatividades</div>
+        </div>
+    </div>
+    
+    <div class="stat-card">
+        <div class="stat-icon purple">
+            <i class="fas fa-layer-group"></i>
+        </div>
+        <div class="stat-content">
+            <div class="stat-number">3</div>
+            <div class="stat-label">Categorias</div>
+        </div>
+    </div>
+    
+    <div class="stat-card">
+        <div class="stat-icon orange">
+            <i class="fas fa-chart-line"></i>
+        </div>
+        <div class="stat-content">
+            <div class="stat-number">100%</div>
+            <div class="stat-label">Configuração</div>
+        </div>
+    </div>
+</div>
+```
+
+**CSS dos Cards de Estatísticas:**
+```css
+.stats-dashboard {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 1.5rem;
+    margin-bottom: 3rem;
+}
+
+.stat-card {
+    background: white;
+    padding: 2rem;
+    border-radius: 16px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+    display: flex;
+    align-items: center;
+    gap: 1.5rem;
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.stat-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.15);
+}
+
+.stat-icon {
+    width: 70px;
+    height: 70px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.8rem;
+    color: white;
+}
+
+.stat-icon.green { background: linear-gradient(135deg, #28a745, #20c997); }
+.stat-icon.blue { background: linear-gradient(135deg, #007bff, #17a2b8); }
+.stat-icon.purple { background: linear-gradient(135deg, #6f42c1, #e83e8c); }
+.stat-icon.orange { background: linear-gradient(135deg, #fd7e14, #ffc107); }
+
+.stat-number {
+    font-size: 2.5rem;
+    font-weight: 700;
+    color: #2d5a27;
+    margin: 0;
+}
+
+.stat-label {
+    color: #6c757d;
+    font-size: 1rem;
+    margin: 0;
+}
+```
+
+### 3. LISTA DE SERVIÇOS EM CARDS MODERNOS
+
+**Substituir a lista básica por:**
+```html
+<div class="servicos-section">
+    <div class="section-header">
+        <h2><i class="fas fa-list"></i> Lista de Serviços</h2>
+    </div>
+    
+    <div class="servicos-grid">
+        <!-- Card Estrutura Metálica -->
+        <div class="servico-card">
+            <div class="servico-header">
+                <div class="servico-badge estrutural">Estrutural</div>
+                <div class="servico-actions">
+                    <button class="btn-icon" title="Editar">
+                        <i class="fas fa-edit"></i>
+                    </button>
+                    <button class="btn-icon btn-danger" title="Excluir">
+                        <i class="fas fa-trash"></i>
+                    </button>
+                </div>
+            </div>
+            
+            <div class="servico-body">
+                <h3 class="servico-nome">Estrutura Metálica</h3>
+                <p class="servico-descricao">
+                    Montagem completa de estruturas metálicas incluindo pilares, vigas e contraventamentos
+                </p>
+                
+                <div class="subatividades-info">
+                    <div class="subatividades-count">
+                        <i class="fas fa-tasks"></i>
+                        <span>4 Subatividades</span>
+                    </div>
+                    <button class="btn-expand" onclick="toggleSubatividades('estrutura')">
+                        <i class="fas fa-chevron-down"></i>
+                    </button>
+                </div>
+                
+                <div class="subatividades-lista" id="subatividades-estrutura" style="display: none;">
+                    <div class="subatividade-item">
+                        <i class="fas fa-check-circle text-success"></i>
+                        <span>Montagem de Pilares</span>
+                    </div>
+                    <div class="subatividade-item">
+                        <i class="fas fa-check-circle text-success"></i>
+                        <span>Instalação de Vigas</span>
+                    </div>
+                    <div class="subatividade-item">
+                        <i class="fas fa-check-circle text-success"></i>
+                        <span>Contraventamentos</span>
+                    </div>
+                    <div class="subatividade-item">
+                        <i class="fas fa-check-circle text-success"></i>
+                        <span>Mais 1...</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Card Pintura Industrial -->
+        <div class="servico-card">
+            <div class="servico-header">
+                <div class="servico-badge acabamento">Acabamento</div>
+                <div class="servico-actions">
+                    <button class="btn-icon" title="Editar">
+                        <i class="fas fa-edit"></i>
+                    </button>
+                    <button class="btn-icon btn-danger" title="Excluir">
+                        <i class="fas fa-trash"></i>
+                    </button>
+                </div>
+            </div>
+            
+            <div class="servico-body">
+                <h3 class="servico-nome">Pintura Industrial</h3>
+                <p class="servico-descricao">
+                    Aplicação de tinta anticorrosiva e acabamento final em estruturas metálicas
+                </p>
+                
+                <div class="subatividades-info">
+                    <div class="subatividades-count">
+                        <i class="fas fa-tasks"></i>
+                        <span>4 Subatividades</span>
+                    </div>
+                    <button class="btn-expand" onclick="toggleSubatividades('pintura')">
+                        <i class="fas fa-chevron-down"></i>
+                    </button>
+                </div>
+                
+                <div class="subatividades-lista" id="subatividades-pintura" style="display: none;">
+                    <div class="subatividade-item">
+                        <i class="fas fa-check-circle text-success"></i>
+                        <span>Preparação da Superfície</span>
+                    </div>
+                    <div class="subatividade-item">
+                        <i class="fas fa-check-circle text-success"></i>
+                        <span>Primer Anticorrosivo</span>
+                    </div>
+                    <div class="subatividade-item">
+                        <i class="fas fa-check-circle text-success"></i>
+                        <span>Pintura de Acabamento</span>
+                    </div>
+                    <div class="subatividade-item">
+                        <i class="fas fa-check-circle text-success"></i>
+                        <span>Mais 1...</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Card Soldagem Especializada -->
+        <div class="servico-card">
+            <div class="servico-header">
+                <div class="servico-badge soldagem">Soldagem</div>
+                <div class="servico-actions">
+                    <button class="btn-icon" title="Editar">
+                        <i class="fas fa-edit"></i>
+                    </button>
+                    <button class="btn-icon btn-danger" title="Excluir">
+                        <i class="fas fa-trash"></i>
+                    </button>
+                </div>
+            </div>
+            
+            <div class="servico-body">
+                <h3 class="servico-nome">Soldagem Especializada</h3>
+                <p class="servico-descricao">
+                    Serviços de soldagem TIG e MIG para estruturas metálicas com certificação AWS
+                </p>
+                
+                <div class="subatividades-info">
+                    <div class="subatividades-count">
+                        <i class="fas fa-tasks"></i>
+                        <span>3 Subatividades</span>
+                    </div>
+                    <button class="btn-expand" onclick="toggleSubatividades('soldagem')">
+                        <i class="fas fa-chevron-down"></i>
+                    </button>
+                </div>
+                
+                <div class="subatividades-lista" id="subatividades-soldagem" style="display: none;">
+                    <div class="subatividade-item">
+                        <i class="fas fa-check-circle text-success"></i>
+                        <span>Soldagem de Base</span>
+                    </div>
+                    <div class="subatividade-item">
+                        <i class="fas fa-check-circle text-success"></i>
+                        <span>Soldagem Estrutural</span>
+                    </div>
+                    <div class="subatividade-item">
+                        <i class="fas fa-check-circle text-success"></i>
+                        <span>Soldagem de Acabamento</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+```
+
+**CSS dos Cards de Serviços:**
+```css
+.servicos-section {
+    margin-top: 2rem;
+}
+
+.section-header {
+    margin-bottom: 2rem;
+}
+
+.section-header h2 {
+    color: #2d5a27;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+}
+
+.servicos-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+    gap: 2rem;
+}
+
+.servico-card {
+    background: white;
+    border-radius: 16px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+    overflow: hidden;
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.servico-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.15);
+}
+
+.servico-header {
+    background: linear-gradient(135deg, #f8f9fa, #e9ecef);
+    padding: 1.5rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.servico-badge {
+    padding: 0.5rem 1rem;
+    border-radius: 25px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: white;
+}
+
+.servico-badge.estrutural { background: linear-gradient(135deg, #28a745, #20c997); }
+.servico-badge.acabamento { background: linear-gradient(135deg, #007bff, #17a2b8); }
+.servico-badge.soldagem { background: linear-gradient(135deg, #fd7e14, #ffc107); }
+
+.servico-body {
+    padding: 2rem;
+}
+
+.servico-nome {
+    color: #2d5a27;
+    font-weight: 700;
+    font-size: 1.5rem;
+    margin-bottom: 1rem;
+}
+
+.servico-descricao {
+    color: #6c757d;
+    line-height: 1.6;
+    margin-bottom: 1.5rem;
+}
+
+.subatividades-info {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1rem;
+    background: #f8f9fa;
+    border-radius: 12px;
+    margin-bottom: 1rem;
+}
+
+.subatividades-count {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    color: #2d5a27;
+    font-weight: 600;
+}
+
+.btn-expand {
+    background: none;
+    border: none;
+    color: #2d5a27;
+    font-size: 1.2rem;
+    cursor: pointer;
+    transition: transform 0.3s ease;
+}
+
+.subatividades-lista {
+    background: #f8f9fa;
+    border-radius: 12px;
+    padding: 1rem;
+}
+
+.subatividade-item {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    padding: 0.75rem 0;
+    border-bottom: 1px solid #e9ecef;
+}
+
+.subatividade-item:last-child {
+    border-bottom: none;
+}
+
+.btn-icon {
+    background: none;
+    border: none;
+    color: #6c757d;
+    font-size: 1.2rem;
+    cursor: pointer;
+    padding: 0.5rem;
+    border-radius: 8px;
+    transition: all 0.3s ease;
+}
+
+.btn-icon:hover {
+    background: rgba(45, 90, 39, 0.1);
+    color: #2d5a27;
+}
+
+.btn-icon.btn-danger:hover {
+    background: rgba(220, 53, 69, 0.1);
+    color: #dc3545;
+}
+```
+
+### 4. JAVASCRIPT PARA INTERAÇÕES
+
+```javascript
+function toggleSubatividades(servicoId) {
+    const lista = document.getElementById(`subatividades-${servicoId}`);
+    const button = event.target.closest('.btn-expand');
+    const icon = button.querySelector('i');
+    
+    if (lista.style.display === 'none' || lista.style.display === '') {
+        lista.style.display = 'block';
+        icon.className = 'fas fa-chevron-up';
+        button.style.transform = 'rotate(180deg)';
+    } else {
+        lista.style.display = 'none';
+        icon.className = 'fas fa-chevron-down';
+        button.style.transform = 'rotate(0deg)';
+    }
+}
+
+function abrirModalNovoServico() {
+    // Implementar modal de criação
+    alert('Modal de novo serviço será implementado');
+}
+```
+
+## RESULTADO FINAL
+
+✅ **Header Moderno:** Gradiente verde/azul igual às outras páginas
+✅ **Cards de Estatísticas:** 4 cards com ícones e números
+✅ **Lista Profissional:** Cards organizados com hover effects
+✅ **Badges Coloridos:** Categorias com cores diferentes
+✅ **Subatividades Expansíveis:** Clique para ver detalhes
+✅ **Ações Intuitivas:** Botões de editar/excluir em cada card
+✅ **Design Consistente:** Mesmo padrão visual das outras páginas
+
+A página ficará moderna, profissional e consistente com o resto do sistema!
+
