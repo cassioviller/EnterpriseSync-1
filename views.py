@@ -2354,10 +2354,11 @@ def visualizar_rdo(id):
             total_subatividades_obra = 0
             servicos_encontrados = []
             
-            # Para cada serviço da obra, buscar suas subatividades no cadastro mestre
+            # Para cada serviço da obra, buscar suas subatividades no cadastro mestre (apenas ativas)
             for servico_obra in servicos_da_obra:
                 subatividades_servico = SubatividadeMestre.query.filter_by(
-                    servico_id=servico_obra.servico_id
+                    servico_id=servico_obra.servico_id,
+                    ativo=True
                 ).all()
                 
                 total_subatividades_obra += len(subatividades_servico)
