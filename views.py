@@ -3318,10 +3318,41 @@ def rdo_salvar_unificado():
         
         print(f"DEBUG FUNCIONÁRIO: RDO {rdo.numero_rdo} criado por funcionário ID {current_user.id}")
         
-        # Processar subatividades (sistema aprimorado)
-        print("DEBUG: Processando subatividades do formulário...")
+        # CORREÇÃO: Processar subatividades (SISTEMA CORRIGIDO)
+        print("DEBUG CORRIGIDO: Processando subatividades do formulário...")
+        print("🔍 TODOS OS CAMPOS DO FORMULÁRIO RECEBIDOS:")
+        for key, value in request.form.items():
+            print(f"   {key} = {value}")
         
-        # Percorrer todas as subatividades enviadas no formulário
+        subatividades_processadas = 0
+        
+        # NOVO: Também processar campos de texto livre (nomes personalizados)
+        campos_personalizados = {}
+        for key, value in request.form.items():
+            if key.startswith('nome_subatividade_') and value.strip():
+                # Extrair número: nome_subatividade_1 -> 1
+                numero = key.split('_')[-1]
+                campos_personalizados[numero] = {
+                    'nome': value.strip(),
+                    'percentual': float(request.form.get(f'percentual_subatividade_{numero}', 0)),
+                    'observacoes': request.form.get(f'observacoes_subatividade_{numero}', '').strip()
+                }
+        
+        # Processar campos personalizados primeiro
+        for numero, dados in campos_personalizados.items():
+            if dados['percentual'] > 0:
+                rdo_servico_subativ = RDOServicoSubatividade()
+                rdo_servico_subativ.rdo_id = rdo.id
+                rdo_servico_subativ.nome_subatividade = dados['nome']
+                rdo_servico_subativ.percentual_conclusao = dados['percentual']
+                rdo_servico_subativ.observacoes_tecnicas = dados['observacoes']
+                rdo_servico_subativ.admin_id = current_user.admin_id
+                rdo_servico_subativ.servico_id = 1  # Serviço genérico para campos manuais
+                db.session.add(rdo_servico_subativ)
+                subatividades_processadas += 1
+                print(f"DEBUG MANUAL: {dados['nome']}: {dados['percentual']}% - {dados['observacoes'][:30]}...")
+        
+        # Percorrer subatividades do sistema padrão
         for key, value in request.form.items():
             if key.startswith('subatividade_') and key.endswith('_percentual'):
                 try:
@@ -3346,12 +3377,26 @@ def rdo_salvar_unificado():
                             rdo_servico_subativ.admin_id = current_user.admin_id
                             rdo_servico_subativ.servico_id = subatividade.servico_id  # Importante para hierarchy
                             db.session.add(rdo_servico_subativ)
-                            
-                            print(f"DEBUG: Subatividade {subatividade.nome}: {percentual}% - {observacoes}")
+                            subatividades_processadas += 1
+                            print(f"DEBUG SISTEMA: {subatividade.nome}: {percentual}% - {observacoes[:30]}...")
+                        else:
+                            # Se não encontrou subatividade, salvar como personalizada
+                            rdo_servico_subativ = RDOServicoSubatividade()
+                            rdo_servico_subativ.rdo_id = rdo.id
+                            rdo_servico_subativ.nome_subatividade = f'Subatividade {subatividade_id}'
+                            rdo_servico_subativ.percentual_conclusao = percentual
+                            rdo_servico_subativ.observacoes_tecnicas = observacoes
+                            rdo_servico_subativ.admin_id = current_user.admin_id
+                            rdo_servico_subativ.servico_id = 1  # Genérico
+                            db.session.add(rdo_servico_subativ)
+                            subatividades_processadas += 1
+                            print(f"DEBUG GENERICO: Subatividade {subatividade_id}: {percentual}%")
                         
                 except (ValueError, IndexError) as e:
                     print(f"Erro ao processar subatividade {key}: {e}")
                     continue
+        
+        print(f"✅ TOTAL SUBATIVIDADES PROCESSADAS: {subatividades_processadas}")
         
         # Processar atividades antigas se não há subatividades (compatibilidade)
         atividades_json = request.form.get('atividades', '[]')
