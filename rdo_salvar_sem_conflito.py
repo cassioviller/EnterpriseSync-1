@@ -169,6 +169,11 @@ def salvar_rdo_flexivel():
                     logger.error(f"❌ Erro ao processar campo {campo}: {e}")
                     continue
         
+        # DEBUG: Verificar dados recebidos
+        logger.info(f"🔍 Subatividades processadas: {len(subatividades_processadas)}")
+        for sub_id, percentual in subatividades_processadas.items():
+            logger.info(f"  - Subatividade {sub_id}: {percentual}%")
+        
         # Salvar subatividades no RDOServicoSubatividade
         if rdo_existente:
             # Limpar subatividades existentes
