@@ -4,17 +4,25 @@
 
 {% block extra_css %}
 <style>
-/* Design System Moderno Consistente - Força aplicação */
+/* FORÇA TOTAL DOS ESTILOS MODERNOS - OVERRIDE COMPLETO */
+* {
+    box-sizing: border-box;
+}
+
+/* Design System Moderno Consistente - Força aplicação TOTAL */
 .page-header-modern {
     background: linear-gradient(135deg, #2d5a27 0%, #4a7c59 50%, #20c997 100%) !important;
     color: white !important;
     padding: 3rem 2rem !important;
     border-radius: 16px !important;
-    margin-bottom: 2rem !important;
+    margin: 2rem 0 !important;
     display: flex !important;
     justify-content: space-between !important;
     align-items: center !important;
     box-shadow: 0 8px 32px rgba(45, 90, 39, 0.3) !important;
+    width: 100% !important;
+    position: relative !important;
+    z-index: 10 !important;
 }
 
 .header-content {
@@ -537,64 +545,171 @@
 {% endblock %}
 
 {% block content %}
-<!-- Header Moderno -->
-<div class="page-header-modern">
-    <div class="header-content">
-        <div class="header-icon">
+<!-- Header Moderno com Estilos Inline -->
+<div style="
+    background: linear-gradient(135deg, #2d5a27 0%, #4a7c59 50%, #20c997 100%);
+    color: white;
+    padding: 3rem 2rem;
+    border-radius: 16px;
+    margin: 2rem 0;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    box-shadow: 0 8px 32px rgba(45, 90, 39, 0.3);
+    width: 100%;
+    position: relative;
+    z-index: 10;
+">
+    <div style="display: flex; align-items: center; gap: 1.5rem;">
+        <div style="
+            background: rgba(255, 255, 255, 0.2);
+            padding: 1.5rem;
+            border-radius: 50%;
+            font-size: 2rem;
+        ">
             <i class="fas fa-cogs"></i>
         </div>
-        <div class="header-text">
-            <h1>Gestão de Serviços</h1>
-            <p>Configure os serviços e subatividades do seu sistema</p>
+        <div>
+            <h1 style="margin: 0; font-size: 2.5rem; font-weight: 700; color: white;">Gestão de Serviços</h1>
+            <p style="margin: 0.5rem 0 0 0; opacity: 0.9; font-size: 1.1rem; color: white;">Configure os serviços e subatividades do seu sistema</p>
         </div>
     </div>
-    <div class="header-actions">
-        <button class="btn btn-light btn-lg" onclick="abrirModalNovoServico()">
+    <div>
+        <button class="btn btn-light btn-lg" onclick="abrirModalNovoServico()" style="
+            background: linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%);
+            color: #2d5a27;
+            border: none;
+            padding: 0.75rem 1.5rem;
+            border-radius: 10px;
+            font-weight: 600;
+            box-shadow: 0 4px 12px rgba(255, 255, 255, 0.2);
+        ">
             <i class="fas fa-plus"></i> Novo Serviço
         </button>
     </div>
 </div>
 
 <div class="container-fluid">
-    <!-- Dashboard de Estatísticas -->
-    <div class="stats-dashboard">
-        <div class="stat-card">
-            <div class="stat-icon green">
+    <!-- Dashboard de Estatísticas com Estilos Inline -->
+    <div style="
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+        gap: 1.5rem;
+        margin-bottom: 3rem;
+    ">
+        <div style="
+            background: white;
+            padding: 2rem;
+            border-radius: 16px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+            display: flex;
+            align-items: center;
+            gap: 1.5rem;
+            transition: transform 0.3s ease;
+        " onmouseover="this.style.transform='translateY(-5px)'" onmouseout="this.style.transform='translateY(0)'">
+            <div style="
+                width: 70px;
+                height: 70px;
+                border-radius: 50%;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                font-size: 1.8rem;
+                color: white;
+                background: linear-gradient(135deg, #28a745, #20c997);
+            ">
                 <i class="fas fa-cogs"></i>
             </div>
-            <div class="stat-content">
-                <div class="stat-number">{{ servicos|length }}</div>
-                <div class="stat-label">Serviços Ativos</div>
+            <div>
+                <div style="font-size: 2.5rem; font-weight: 700; color: #2d5a27; margin: 0;">{{ servicos|length }}</div>
+                <div style="color: #6c757d; font-size: 1rem; margin: 0;">Serviços Ativos</div>
             </div>
         </div>
         
-        <div class="stat-card">
-            <div class="stat-icon blue">
+        <div style="
+            background: white;
+            padding: 2rem;
+            border-radius: 16px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+            display: flex;
+            align-items: center;
+            gap: 1.5rem;
+            transition: transform 0.3s ease;
+        " onmouseover="this.style.transform='translateY(-5px)'" onmouseout="this.style.transform='translateY(0)'">
+            <div style="
+                width: 70px;
+                height: 70px;
+                border-radius: 50%;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                font-size: 1.8rem;
+                color: white;
+                background: linear-gradient(135deg, #007bff, #17a2b8);
+            ">
                 <i class="fas fa-tasks"></i>
             </div>
-            <div class="stat-content">
-                <div class="stat-number">{{ subatividades_total or 0 }}</div>
-                <div class="stat-label">Subatividades</div>
+            <div>
+                <div style="font-size: 2.5rem; font-weight: 700; color: #2d5a27; margin: 0;">{{ subatividades_total or 0 }}</div>
+                <div style="color: #6c757d; font-size: 1rem; margin: 0;">Subatividades</div>
             </div>
         </div>
         
-        <div class="stat-card">
-            <div class="stat-icon purple">
+        <div style="
+            background: white;
+            padding: 2rem;
+            border-radius: 16px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+            display: flex;
+            align-items: center;
+            gap: 1.5rem;
+            transition: transform 0.3s ease;
+        " onmouseover="this.style.transform='translateY(-5px)'" onmouseout="this.style.transform='translateY(0)'">
+            <div style="
+                width: 70px;
+                height: 70px;
+                border-radius: 50%;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                font-size: 1.8rem;
+                color: white;
+                background: linear-gradient(135deg, #6f42c1, #e83e8c);
+            ">
                 <i class="fas fa-layer-group"></i>
             </div>
-            <div class="stat-content">
-                <div class="stat-number">{{ categorias_count or 0 }}</div>
-                <div class="stat-label">Categorias</div>
+            <div>
+                <div style="font-size: 2.5rem; font-weight: 700; color: #2d5a27; margin: 0;">{{ categorias_count or 0 }}</div>
+                <div style="color: #6c757d; font-size: 1rem; margin: 0;">Categorias</div>
             </div>
         </div>
         
-        <div class="stat-card">
-            <div class="stat-icon orange">
+        <div style="
+            background: white;
+            padding: 2rem;
+            border-radius: 16px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+            display: flex;
+            align-items: center;
+            gap: 1.5rem;
+            transition: transform 0.3s ease;
+        " onmouseover="this.style.transform='translateY(-5px)'" onmouseout="this.style.transform='translateY(0)'">
+            <div style="
+                width: 70px;
+                height: 70px;
+                border-radius: 50%;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                font-size: 1.8rem;
+                color: white;
+                background: linear-gradient(135deg, #fd7e14, #ffc107);
+            ">
                 <i class="fas fa-chart-line"></i>
             </div>
-            <div class="stat-content">
-                <div class="stat-number">100%</div>
-                <div class="stat-label">Configuração</div>
+            <div>
+                <div style="font-size: 2.5rem; font-weight: 700; color: #2d5a27; margin: 0;">100%</div>
+                <div style="color: #6c757d; font-size: 1rem; margin: 0;">Configuração</div>
             </div>
         </div>
     </div>
