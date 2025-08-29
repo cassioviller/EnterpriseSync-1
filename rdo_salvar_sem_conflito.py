@@ -143,12 +143,21 @@ def salvar_rdo_flexivel():
                     # Verificar se funcionário pertence ao admin
                     func = Funcionario.query.filter_by(id=func_id, admin_id=admin_id).first()
                     if func:
+                        # Buscar dados dos campos específicos do funcionário
+                        funcao_campo = f'funcao_{func_id}'
+                        horas_campo = f'horas_{func_id}'
+                        
+                        funcao_exercida = request.form.get(funcao_campo, func.cargo or 'Operacional')
+                        horas_trabalhadas = float(request.form.get(horas_campo, 8.0))
+                        
                         rdo_funcionario = RDOMaoObra(
                             rdo_id=rdo.id,
-                            funcionario_id=func_id
+                            funcionario_id=func_id,
+                            funcao_exercida=funcao_exercida,
+                            horas_trabalhadas=horas_trabalhadas
                         )
                         db.session.add(rdo_funcionario)
-                        logger.debug(f"Funcionário {func.nome} adicionado ao RDO")
+                        logger.debug(f"Funcionário {func.nome} adicionado ao RDO - {funcao_exercida} - {horas_trabalhadas}h")
                 except (ValueError, TypeError):
                     continue
         

@@ -241,6 +241,46 @@
     border: 1px solid #dee2e6;
     border-radius: 8px;
 }
+
+/* Estilos para funcionários */
+.funcionarios-grid {
+    max-height: 400px;
+    overflow-y: auto;
+}
+
+.funcionario-card {
+    background: #f8f9fa;
+    border: 2px solid #e9ecef;
+    border-radius: 12px;
+    padding: 1rem;
+    transition: all 0.3s ease;
+}
+
+.funcionario-card:has(.form-check-input:checked) {
+    border-color: #198754;
+    background: linear-gradient(135deg, #f0fff4 0%, #e8f5e8 100%);
+}
+
+.funcionario-info h6 {
+    margin: 0;
+    color: #2d3748;
+    font-weight: 600;
+}
+
+.funcionario-details {
+    margin-top: 1rem;
+    padding-top: 1rem;
+    border-top: 1px solid #dee2e6;
+}
+
+.form-check {
+    margin-bottom: 0;
+}
+
+.form-check-input:checked {
+    background-color: #198754;
+    border-color: #198754;
+}
 </style>
 {% endblock %}
 
@@ -361,17 +401,20 @@
                     <i class="fas fa-users"></i>
                     Mão de Obra
                 </h3>
-                <button type="button" class="btn-modern btn-outline" onclick="adicionarFuncionario()">
-                    <i class="fas fa-user-plus"></i>
-                    Adicionar Funcionário
+                <button type="button" class="btn-modern btn-success" onclick="carregarFuncionarios()">
+                    <i class="fas fa-sync"></i>
+                    Carregar Funcionários
                 </button>
             </div>
             <div class="rdo-card-body">
+                <div class="alert alert-info">
+                    <i class="fas fa-info-circle"></i>
+                    <strong>Seleção de Funcionários:</strong> Marque os funcionários que trabalharam neste RDO e defina suas funções e horas.
+                </div>
                 <div id="funcionarios-container">
                     <div class="text-center p-4">
-                        <i class="fas fa-user-plus fa-3x text-muted mb-3"></i>
-                        <p class="text-muted">Nenhum funcionário selecionado</p>
-                        <p class="small text-muted">Use o botão "Adicionar Funcionário" para incluir colaboradores</p>
+                        <i class="fas fa-spinner fa-spin fa-2x text-muted mb-3"></i>
+                        <p class="text-muted">Clique em "Carregar Funcionários" para selecionar a mão de obra</p>
                     </div>
                 </div>
             </div>
@@ -892,5 +935,126 @@ function toggleServico(servicoId) {
 document.addEventListener('DOMContentLoaded', function() {
     console.log('RDO Moderno carregado com sucesso!');
 });
+
+// Função para carregar funcionários para criação de RDO
+function carregarFuncionarios() {
+    const container = document.getElementById('funcionarios-container');
+    
+    container.innerHTML = `
+        <div class="text-center p-4">
+            <div class="spinner-border text-success" role="status">
+                <span class="visually-hidden">Carregando...</span>
+            </div>
+            <p class="mt-2 text-muted">Carregando funcionários...</p>
+        </div>
+    `;
+    
+    // Carregar funcionários do admin atual
+    fetch('/api/funcionarios-ativos')
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                renderizarFuncionarios(data.funcionarios);
+            } else {
+                renderizarErroFuncionarios();
+            }
+        })
+        .catch(error => {
+            console.error('Erro ao carregar funcionários:', error);
+            renderizarErroFuncionarios();
+        });
+}
+
+function renderizarFuncionarios(funcionarios) {
+    const container = document.getElementById('funcionarios-container');
+    
+    if (funcionarios.length === 0) {
+        container.innerHTML = `
+            <div class="text-center p-4">
+                <i class="fas fa-user-slash fa-2x text-muted mb-3"></i>
+                <p class="text-muted">Nenhum funcionário ativo encontrado</p>
+            </div>
+        `;
+        return;
+    }
+    
+    let html = `
+        <div class="funcionarios-grid">
+            <div class="row">
+    `;
+    
+    funcionarios.forEach(funcionario => {
+        html += `
+            <div class="col-md-6 col-lg-4 mb-3">
+                <div class="funcionario-card">
+                    <div class="form-check">
+                        <input class="form-check-input" 
+                               type="checkbox" 
+                               name="funcionarios_selecionados" 
+                               value="${funcionario.id}"
+                               id="func_${funcionario.id}"
+                               form="formNovoRDO">
+                        <label class="form-check-label" for="func_${funcionario.id}">
+                            <div class="funcionario-info">
+                                <h6>${funcionario.nome}</h6>
+                                <small class="text-muted">${funcionario.cargo}</small>
+                            </div>
+                        </label>
+                    </div>
+                    <div class="funcionario-details" id="details_${funcionario.id}" style="display: none;">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <label class="form-label">Função</label>
+                                <input type="text" 
+                                       class="form-control form-control-sm" 
+                                       name="funcao_${funcionario.id}"
+                                       value="${funcionario.cargo}"
+                                       form="formNovoRDO">
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Horas</label>
+                                <input type="number" 
+                                       class="form-control form-control-sm" 
+                                       name="horas_${funcionario.id}"
+                                       value="8"
+                                       step="0.5"
+                                       min="0"
+                                       max="12"
+                                       form="formNovoRDO">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+    });
+    
+    html += `
+            </div>
+        </div>
+    `;
+    
+    container.innerHTML = html;
+    
+    // Adicionar evento para mostrar/ocultar detalhes
+    funcionarios.forEach(funcionario => {
+        const checkbox = document.getElementById(`func_${funcionario.id}`);
+        const details = document.getElementById(`details_${funcionario.id}`);
+        
+        checkbox.addEventListener('change', function() {
+            details.style.display = this.checked ? 'block' : 'none';
+        });
+    });
+}
+
+function renderizarErroFuncionarios() {
+    const container = document.getElementById('funcionarios-container');
+    container.innerHTML = `
+        <div class="alert alert-warning">
+            <i class="fas fa-exclamation-triangle"></i>
+            <strong>Erro ao carregar funcionários:</strong> Não foi possível carregar a lista de funcionários ativos.
+        </div>
+    `;
+}
 </script>
 {% endblock %}
