@@ -1038,26 +1038,27 @@ def funcionario_perfil_pdf(id):
 # ===== OBRAS =====
 @main_bp.route('/obras')
 def obras():
-    # Sistema robusto de detecção de admin_id (usar admin_id=10 que tem mais obras)
-    admin_id = 10  # Default para admin com mais obras
+    # Sistema dinâmico de detecção de admin_id
+    admin_id = None
     
     if hasattr(current_user, 'tipo_usuario') and current_user.is_authenticated:
         if current_user.tipo_usuario == TipoUsuario.SUPER_ADMIN:
-            # Buscar admin_id com mais obras (admin_id=10 tem 9 obras)
+            # SUPER_ADMIN pode ver todas as obras - buscar admin_id com mais dados
             obra_counts = db.session.execute(text("SELECT admin_id, COUNT(*) as total FROM obra GROUP BY admin_id ORDER BY total DESC LIMIT 1")).fetchone()
-            admin_id = obra_counts[0] if obra_counts else 10
+            admin_id = obra_counts[0] if obra_counts else current_user.admin_id
         elif current_user.tipo_usuario == TipoUsuario.ADMIN:
             admin_id = current_user.id
         else:
-            admin_id = current_user.admin_id if current_user.admin_id else 10
+            # Funcionário - usar admin_id do funcionário
+            admin_id = current_user.admin_id if hasattr(current_user, 'admin_id') and current_user.admin_id else current_user.id
     else:
-        # Sistema de bypass - usar admin_id com mais obras
+        # Sistema de bypass - detectar dinamicamente
         try:
             obra_counts = db.session.execute(text("SELECT admin_id, COUNT(*) as total FROM obra GROUP BY admin_id ORDER BY total DESC LIMIT 1")).fetchone()
-            admin_id = obra_counts[0] if obra_counts else 10
+            admin_id = obra_counts[0] if obra_counts else 1
         except Exception as e:
             print(f"Erro ao detectar admin_id: {e}")
-            admin_id = 10
+            admin_id = 1
     
     # Obter filtros da query string
     filtros = {
@@ -1541,20 +1542,22 @@ def funcionario_dashboard_desktop():
             funcionario_atual = Funcionario.query.filter_by(email="funcionario@valeverde.com").first()
         
         if not funcionario_atual:
-            # Ultimo fallback: primeiro funcionário ativo
-            funcionario_atual = Funcionario.query.filter_by(admin_id=10, ativo=True).first()
+            # Detectar admin_id dinamicamente
+            admin_counts = db.session.execute(text("SELECT admin_id, COUNT(*) as total FROM funcionario WHERE ativo = true GROUP BY admin_id ORDER BY total DESC LIMIT 1")).fetchone()
+            admin_id_dinamico = admin_counts[0] if admin_counts else current_user.admin_id if hasattr(current_user, 'admin_id') else current_user.id
+            funcionario_atual = Funcionario.query.filter_by(admin_id=admin_id_dinamico, ativo=True).first()
         
         if funcionario_atual:
             print(f"DEBUG DASHBOARD: Funcionário encontrado: {funcionario_atual.nome} (admin_id={funcionario_atual.admin_id})")
         else:
-            print(f"DEBUG DASHBOARD: NENHUM funcionário encontrado com email {email_busca}")
-            # Buscar primeiro funcionário ativo do admin_id 10
-            funcionario_atual = Funcionario.query.filter_by(admin_id=10, ativo=True).first()
+            print(f"DEBUG DASHBOARD: NENHUM funcionário encontrado")
+            # Fallback: primeiro funcionário ativo de qualquer admin
+            funcionario_atual = Funcionario.query.filter_by(ativo=True).first()
             if funcionario_atual:
                 print(f"DEBUG DASHBOARD: Usando primeiro funcionário ativo: {funcionario_atual.nome}")
         
-        # Usar admin_id do funcionário encontrado ou admin_id padrão
-        admin_id_correto = funcionario_atual.admin_id if funcionario_atual else 10
+        # Usar admin_id do funcionário encontrado ou detectar dinamicamente
+        admin_id_correto = funcionario_atual.admin_id if funcionario_atual else (current_user.admin_id if hasattr(current_user, 'admin_id') else current_user.id)
         print(f"DEBUG DASHBOARD: Usando admin_id={admin_id_correto}")
         
         # Buscar obras disponíveis para esse admin
@@ -1851,9 +1854,12 @@ def rdos():
             funcionario_atual = Funcionario.query.filter_by(email=email_busca).first()
             
             if not funcionario_atual:
-                funcionario_atual = Funcionario.query.filter_by(admin_id=10, ativo=True).first()
+                # Detectar admin_id dinamicamente
+                admin_counts = db.session.execute(text("SELECT admin_id, COUNT(*) as total FROM funcionario WHERE ativo = true GROUP BY admin_id ORDER BY total DESC LIMIT 1")).fetchone()
+                admin_id_dinamico = admin_counts[0] if admin_counts else current_user.admin_id if hasattr(current_user, 'admin_id') else current_user.id
+                funcionario_atual = Funcionario.query.filter_by(admin_id=admin_id_dinamico, ativo=True).first()
             
-            admin_id = funcionario_atual.admin_id if funcionario_atual else 10
+            admin_id = funcionario_atual.admin_id if funcionario_atual else (current_user.admin_id if hasattr(current_user, 'admin_id') else current_user.id)
         
         # Filtros
         obra_filter = request.args.get('obra_id', type=int)
@@ -2912,9 +2918,12 @@ def api_percentuais_ultimo_rdo(obra_id):
         funcionario_atual = Funcionario.query.filter_by(email=email_busca).first()
         
         if not funcionario_atual:
-            funcionario_atual = Funcionario.query.filter_by(admin_id=10, ativo=True).first()
+            # Detectar admin_id dinamicamente
+            admin_counts = db.session.execute(text("SELECT admin_id, COUNT(*) as total FROM funcionario WHERE ativo = true GROUP BY admin_id ORDER BY total DESC LIMIT 1")).fetchone()
+            admin_id_dinamico = admin_counts[0] if admin_counts else current_user.admin_id if hasattr(current_user, 'admin_id') else current_user.id
+            funcionario_atual = Funcionario.query.filter_by(admin_id=admin_id_dinamico, ativo=True).first()
         
-        admin_id_correto = funcionario_atual.admin_id if funcionario_atual else 10
+        admin_id_correto = funcionario_atual.admin_id if funcionario_atual else (current_user.admin_id if hasattr(current_user, 'admin_id') else current_user.id)
         
         # Verificar se obra pertence ao admin
         obra = Obra.query.filter_by(id=obra_id, admin_id=admin_id_correto).first()
@@ -3160,12 +3169,13 @@ def funcionario_rdo_consolidado():
         except Exception as e2:
             print(f"ERRO FALLBACK: {str(e2)}")
             # Fallback extremo - template vazio
+            admin_id_fallback = current_user.admin_id if hasattr(current_user, 'admin_id') and current_user.admin_id else (current_user.id if hasattr(current_user, 'id') else 1)
             return render_template('rdo_lista_unificada.html',
                                  rdos=[],
                                  pagination=None,
                                  total_rdos=0,
                                  page=1,
-                                 admin_id=10,
+                                 admin_id=admin_id_fallback,
                                  obras=[],
                                  funcionarios=[],
                                  filters={
