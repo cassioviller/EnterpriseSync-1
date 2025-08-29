@@ -167,6 +167,7 @@ def criar_servico():
             nome=nome,
             descricao=descricao,
             categoria=categoria,
+            unidade_medida='un',  # Valor padrão
             admin_id=admin_id,
             ativo=True,
             created_at=datetime.utcnow()

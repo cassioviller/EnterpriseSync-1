@@ -186,6 +186,8 @@ class Servico(db.Model):
     complexidade = db.Column(db.Integer, default=3)  # 1-5 para análise futura
     requer_especializacao = db.Column(db.Boolean, default=False)
     ativo = db.Column(db.Boolean, default=True)
+    # Multi-tenant obrigatório
+    admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     
@@ -193,6 +195,7 @@ class Servico(db.Model):
     # Removido: subatividades obsoletas - agora usamos SubatividadeMestre
     historico_produtividade = db.relationship('HistoricoProdutividadeServico', backref='servico', lazy=True)
     servicos_obra = db.relationship('ServicoObra', backref='servico', lazy=True)
+    admin = db.relationship('Usuario', backref='servicos_criados')
 
 # Removido: SubAtividade - substituído por SubatividadeMestre
 
