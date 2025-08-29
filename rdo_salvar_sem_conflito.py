@@ -169,7 +169,12 @@ def salvar_rdo_flexivel():
                     logger.error(f"❌ Erro ao processar campo {campo}: {e}")
                     continue
         
-        # DEBUG: Verificar dados recebidos
+        # DEBUG: Verificar TODOS os dados do formulário
+        logger.info(f"📋 TOTAL DE CAMPOS RECEBIDOS: {len(request.form)}")
+        for campo, valor in request.form.items():
+            logger.info(f"   └─ {campo}: {valor}")
+        
+        # DEBUG: Verificar dados processados
         logger.info(f"🔍 Subatividades processadas: {len(subatividades_processadas)}")
         for sub_id, percentual in subatividades_processadas.items():
             logger.info(f"  - Subatividade {sub_id}: {percentual}%")

@@ -512,7 +512,8 @@ function renderizarServicosComDadosUltimoRDO(data) {
                                value="${valorPadrao}" 
                                step="0.1" 
                                min="0" 
-                               max="100">
+                               max="100"
+                               form="formNovoRDO">
                         <span class="input-group-text">%</span>
                     </div>
                 </div>
@@ -576,33 +577,29 @@ function renderizarTemplatePadrao() {
                         <div class="col-md-6 mb-3">
                             <label class="form-label">Montagem de Formas</label>
                             <div class="input-group">
-                                <input type="number" class="form-control" name="nome_subatividade_1_percentual" value="100" step="0.1" min="0" max="100">
+                                <input type="number" class="form-control" name="subatividade_1" value="100" step="0.1" min="0" max="100" form="formNovoRDO">
                                 <span class="input-group-text">%</span>
-                                <input type="hidden" name="nome_subatividade_1" value="Montagem de Formas">
                             </div>
                         </div>
                         <div class="col-md-6 mb-3">
                             <label class="form-label">Armação de Ferro</label>
                             <div class="input-group">
-                                <input type="number" class="form-control" name="nome_subatividade_2_percentual" value="100" step="0.1" min="0" max="100">
+                                <input type="number" class="form-control" name="subatividade_2" value="100" step="0.1" min="0" max="100" form="formNovoRDO">
                                 <span class="input-group-text">%</span>
-                                <input type="hidden" name="nome_subatividade_2" value="Armação de Ferro">
                             </div>
                         </div>
                         <div class="col-md-6 mb-3">
                             <label class="form-label">Concretagem</label>
                             <div class="input-group">
-                                <input type="number" class="form-control" name="nome_subatividade_3_percentual" value="70" step="0.1" min="0" max="100">
+                                <input type="number" class="form-control" name="subatividade_3" value="70" step="0.1" min="0" max="100" form="formNovoRDO">
                                 <span class="input-group-text">%</span>
-                                <input type="hidden" name="nome_subatividade_3" value="Concretagem">
                             </div>
                         </div>
                         <div class="col-md-6 mb-3">
                             <label class="form-label">Cura do Concreto</label>
                             <div class="input-group">
-                                <input type="number" class="form-control" name="nome_subatividade_4_percentual" value="10" step="0.1" min="0" max="100">
+                                <input type="number" class="form-control" name="subatividade_4" value="10" step="0.1" min="0" max="100" form="formNovoRDO">
                                 <span class="input-group-text">%</span>
-                                <input type="hidden" name="nome_subatividade_4" value="Cura do Concreto">
                             </div>
                         </div>
                     </div>
@@ -628,33 +625,29 @@ function renderizarTemplatePadrao() {
                         <div class="col-md-6 mb-3">
                             <label class="form-label">Preparação da Superfície</label>
                             <div class="input-group">
-                                <input type="number" class="form-control" name="nome_subatividade_5_percentual" value="0" step="0.1" min="0" max="100">
+                                <input type="number" class="form-control" name="subatividade_5" value="0" step="0.1" min="0" max="100" form="formNovoRDO">
                                 <span class="input-group-text">%</span>
-                                <input type="hidden" name="nome_subatividade_5" value="Preparação da Superfície">
                             </div>
                         </div>
                         <div class="col-md-6 mb-3">
                             <label class="form-label">Aplicação do Primer</label>
                             <div class="input-group">
-                                <input type="number" class="form-control" name="nome_subatividade_6_percentual" value="0" step="0.1" min="0" max="100">
+                                <input type="number" class="form-control" name="subatividade_6" value="0" step="0.1" min="0" max="100" form="formNovoRDO">
                                 <span class="input-group-text">%</span>
-                                <input type="hidden" name="nome_subatividade_6" value="Aplicação do Primer">
                             </div>
                         </div>
                         <div class="col-md-6 mb-3">
                             <label class="form-label">Instalação da Manta</label>
                             <div class="input-group">
-                                <input type="number" class="form-control" name="nome_subatividade_7_percentual" value="0" step="0.1" min="0" max="100">
+                                <input type="number" class="form-control" name="subatividade_7" value="0" step="0.1" min="0" max="100" form="formNovoRDO">
                                 <span class="input-group-text">%</span>
-                                <input type="hidden" name="nome_subatividade_7" value="Instalação da Manta">
                             </div>
                         </div>
                         <div class="col-md-6 mb-3">
                             <label class="form-label">Acabamento e Vedação</label>
                             <div class="input-group">
-                                <input type="number" class="form-control" name="nome_subatividade_8_percentual" value="0" step="0.1" min="0" max="100">
+                                <input type="number" class="form-control" name="subatividade_8" value="0" step="0.1" min="0" max="100" form="formNovoRDO">
                                 <span class="input-group-text">%</span>
-                                <input type="hidden" name="nome_subatividade_8" value="Acabamento e Vedação">
                             </div>
                         </div>
                     </div>
@@ -680,33 +673,29 @@ function renderizarTemplatePadrao() {
                         <div class="col-md-6 mb-3">
                             <label class="form-label">Medição e Marcação</label>
                             <div class="input-group">
-                                <input type="number" class="form-control" name="nome_subatividade_9_percentual" value="0" step="0.1" min="0" max="100">
+                                <input type="number" class="form-control" name="subatividade_9" value="0" step="0.1" min="0" max="100" form="formNovoRDO">
                                 <span class="input-group-text">%</span>
-                                <input type="hidden" name="nome_subatividade_9" value="Medição e Marcação">
                             </div>
                         </div>
                         <div class="col-md-6 mb-3">
                             <label class="form-label">Corte das Peças</label>
                             <div class="input-group">
-                                <input type="number" class="form-control" name="nome_subatividade_10_percentual" value="0" step="0.1" min="0" max="100">
+                                <input type="number" class="form-control" name="subatividade_10" value="0" step="0.1" min="0" max="100" form="formNovoRDO">
                                 <span class="input-group-text">%</span>
-                                <input type="hidden" name="nome_subatividade_10" value="Corte das Peças">
                             </div>
                         </div>
                         <div class="col-md-6 mb-3">
                             <label class="form-label">Fixação dos Suportes</label>
                             <div class="input-group">
-                                <input type="number" class="form-control" name="nome_subatividade_11_percentual" value="0" step="0.1" min="0" max="100">
+                                <input type="number" class="form-control" name="subatividade_11" value="0" step="0.1" min="0" max="100" form="formNovoRDO">
                                 <span class="input-group-text">%</span>
-                                <input type="hidden" name="nome_subatividade_11" value="Fixação dos Suportes">
                             </div>
                         </div>
                         <div class="col-md-6 mb-3">
                             <label class="form-label">Instalação do Beiral</label>
                             <div class="input-group">
-                                <input type="number" class="form-control" name="nome_subatividade_12_percentual" value="0" step="0.1" min="0" max="100">
+                                <input type="number" class="form-control" name="subatividade_12" value="0" step="0.1" min="0" max="100" form="formNovoRDO">
                                 <span class="input-group-text">%</span>
-                                <input type="hidden" name="nome_subatividade_12" value="Instalação do Beiral">
                             </div>
                         </div>
                     </div>
