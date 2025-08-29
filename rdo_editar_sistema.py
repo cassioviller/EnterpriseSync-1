@@ -48,6 +48,16 @@ def editar_rdo_form(rdo_id):
         for sub_rdo in subatividades_rdo:
             subatividades_data[sub_rdo.nome_subatividade] = sub_rdo.percentual_conclusao
         
+        # Buscar funcionários já vinculados ao RDO
+        from models import RDOMaoObra
+        funcionarios_rdo = RDOMaoObra.query.filter_by(rdo_id=rdo_id).all()
+        funcionarios_data = {}
+        for func_rdo in funcionarios_rdo:
+            funcionarios_data[func_rdo.funcionario_id] = {
+                'funcao': func_rdo.funcao_exercida,
+                'horas': func_rdo.horas_trabalhadas
+            }
+        
         # Buscar dados completos da obra para carregar serviços
         obra_selecionada = rdo.obra_id
         
@@ -58,7 +68,8 @@ def editar_rdo_form(rdo_id):
                              rdo=rdo,
                              obras=obras,
                              obra_selecionada=obra_selecionada,
-                             subatividades_data=subatividades_data)
+                             subatividades_data=subatividades_data,
+                             funcionarios_data=funcionarios_data)
                              
     except Exception as e:
         logger.error(f"❌ Erro ao carregar RDO para edição: {e}")
@@ -177,6 +188,49 @@ def salvar_edicao_rdo(rdo_id):
         
         logger.info(f"💾 Total de {subatividades_salvas} subatividades salvas na edição")
         
+        # Processar funcionários selecionados
+        funcionarios_selecionados = request.form.getlist('funcionarios_selecionados')
+        logger.info(f"👥 Funcionários selecionados: {len(funcionarios_selecionados)}")
+        
+        # Limpar funcionários existentes do RDO
+        from models import RDOMaoObra
+        RDOMaoObra.query.filter_by(rdo_id=rdo_id).delete()
+        
+        # Salvar novos funcionários
+        funcionarios_salvos = 0
+        for func_id in funcionarios_selecionados:
+            try:
+                func_id = int(func_id)
+                
+                # Buscar dados dos campos específicos do funcionário
+                funcao_campo = f'funcao_{func_id}'
+                horas_campo = f'horas_{func_id}'
+                
+                funcao_exercida = request.form.get(funcao_campo, 'Operacional')
+                horas_trabalhadas = float(request.form.get(horas_campo, 8.0))
+                
+                # Verificar se funcionário pertence ao admin
+                funcionario = Funcionario.query.filter_by(id=func_id, admin_id=admin_id).first()
+                if funcionario:
+                    # Criar registro na tabela RDOMaoObra
+                    rdo_funcionario = RDOMaoObra(
+                        rdo_id=rdo_id,
+                        funcionario_id=func_id,
+                        funcao_exercida=funcao_exercida,
+                        horas_trabalhadas=horas_trabalhadas
+                    )
+                    db.session.add(rdo_funcionario)
+                    funcionarios_salvos += 1
+                    logger.info(f"✅ Funcionário editado: {funcionario.nome} - {funcao_exercida} - {horas_trabalhadas}h")
+                else:
+                    logger.warning(f"⚠️ Funcionário {func_id} não encontrado ou não pertence ao admin")
+                    
+            except Exception as e:
+                logger.error(f"❌ Erro ao salvar funcionário {func_id}: {e}")
+                continue
+        
+        logger.info(f"👥 Total de {funcionarios_salvos} funcionários salvos na edição")
+        
         # Confirmar salvamento
         db.session.commit()
         
@@ -190,3 +244,51 @@ def salvar_edicao_rdo(rdo_id):
         db.session.rollback()
         flash(f'Erro ao salvar edição: {str(e)}', 'error')
         return redirect(url_for('rdo_editar.editar_rdo_form', rdo_id=rdo_id))
+
+# API para buscar funcionários ativos
+@rdo_editar_bp.route('/api/funcionarios-ativos')
+def api_funcionarios_ativos():
+    """
+    API para buscar funcionários ativos do admin atual
+    """
+    try:
+        try:
+            from utils.auth_utils import get_admin_id_from_user
+        except ImportError:
+            from bypass_auth import obter_admin_id as get_admin_id_from_user
+        from models import Funcionario
+        
+        # Obter admin_id do usuário atual
+        admin_id = get_admin_id_from_user()
+        
+        # Buscar funcionários ativos
+        funcionarios = Funcionario.query.filter_by(
+            admin_id=admin_id,
+            ativo=True
+        ).order_by(Funcionario.nome).all()
+        
+        # Formatar dados para o frontend
+        funcionarios_data = []
+        for func in funcionarios:
+            funcionarios_data.append({
+                'id': func.id,
+                'nome': func.nome,
+                'cargo': func.cargo or 'Operacional',
+                'departamento': func.departamento or 'Sem Departamento'
+            })
+        
+        logger.info(f"📋 API Funcionários: {len(funcionarios_data)} funcionários ativos encontrados")
+        
+        return jsonify({
+            'success': True,
+            'funcionarios': funcionarios_data,
+            'total': len(funcionarios_data)
+        })
+        
+    except Exception as e:
+        logger.error(f"❌ Erro na API de funcionários: {str(e)}")
+        return jsonify({
+            'success': False,
+            'error': str(e),
+            'funcionarios': []
+        }), 500
