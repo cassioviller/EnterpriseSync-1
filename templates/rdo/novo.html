@@ -994,18 +994,23 @@ document.addEventListener('DOMContentLoaded', function() {
     inicializarAutocompleteIntegrado();
 });
 
-// Sistema de autocomplete integrado ao layout atual
-let funcionariosAutocompleteSelecionados = [];
-let timeoutBuscaAutocomplete = null;
+// Sistema de autocomplete - variáveis únicas
+var funcionariosEscolhidos = [];
+var timeoutBusca = null;
 
 function inicializarAutocompleteIntegrado() {
     const input = document.getElementById('buscarFuncionario');
     const sugestoes = document.getElementById('sugestoesFuncionarios');
     
-    if (!input || !sugestoes) return;
+    if (!input || !sugestoes) {
+        console.log('Elementos não encontrados para autocomplete');
+        return;
+    }
+    
+    console.log('Inicializando autocomplete...');
     
     input.addEventListener('input', function() {
-        clearTimeout(timeoutBuscaAutocomplete);
+        clearTimeout(timeoutBusca);
         const termo = this.value.trim();
         
         if (termo.length < 2) {
@@ -1013,8 +1018,8 @@ function inicializarAutocompleteIntegrado() {
             return;
         }
         
-        timeoutBuscaAutocomplete = setTimeout(() => {
-            buscarFuncionariosAutocomplete(termo);
+        timeoutBusca = setTimeout(() => {
+            buscarFuncionarios(termo);
         }, 300);
     });
     
@@ -1025,17 +1030,22 @@ function inicializarAutocompleteIntegrado() {
     });
 }
 
-function buscarFuncionariosAutocomplete(termo) {
+function buscarFuncionarios(termo) {
+    console.log('Buscando funcionários:', termo);
     const sugestoes = document.getElementById('sugestoesFuncionarios');
     
     sugestoes.innerHTML = '<div class="p-2 text-center"><i class="fas fa-spinner fa-spin"></i> Buscando...</div>';
     sugestoes.style.display = 'block';
     
     fetch(`/api/funcionarios/buscar?q=${encodeURIComponent(termo)}`)
-        .then(response => response.json())
+        .then(response => {
+            console.log('Response status:', response.status);
+            return response.json();
+        })
         .then(data => {
+            console.log('Dados recebidos:', data);
             if (data.success && data.funcionarios.length > 0) {
-                mostrarSugestoesAutocomplete(data.funcionarios);
+                mostrarSugestoes(data.funcionarios);
             } else {
                 sugestoes.innerHTML = '<div class="p-2 text-muted text-center">Nenhum funcionário encontrado</div>';
             }
@@ -1046,15 +1056,16 @@ function buscarFuncionariosAutocomplete(termo) {
         });
 }
 
-function mostrarSugestoesAutocomplete(funcionarios) {
+function mostrarSugestoes(funcionarios) {
+    console.log('Mostrando sugestões para', funcionarios.length, 'funcionários');
     const sugestoes = document.getElementById('sugestoesFuncionarios');
     let html = '';
     
     funcionarios.forEach(func => {
-        const jaSelecionado = funcionariosAutocompleteSelecionados.find(f => f.id === func.id);
+        const jaSelecionado = funcionariosEscolhidos.find(f => f.id === func.id);
         if (!jaSelecionado) {
             html += `
-                <div class="suggestion-item" onclick="selecionarFuncionarioAutocomplete(${func.id}, '${func.nome.replace(/'/g, "\\'")}', '${func.cargo}', ${func.valor_hora})">
+                <div class="suggestion-item" onclick="selecionarFuncionario(${func.id}, '${func.nome.replace(/'/g, "\\'")}', '${func.cargo}', ${func.valor_hora})">
                     <div class="d-flex justify-content-between">
                         <div>
                             <strong>${func.nome}</strong>
@@ -1072,8 +1083,9 @@ function mostrarSugestoesAutocomplete(funcionarios) {
     sugestoes.innerHTML = html || '<div class="p-2 text-muted text-center">Todos já selecionados</div>';
 }
 
-function selecionarFuncionarioAutocomplete(id, nome, cargo, valorHora) {
-    funcionariosAutocompleteSelecionados.push({
+function selecionarFuncionario(id, nome, cargo, valorHora) {
+    console.log('Selecionando funcionário:', nome);
+    funcionariosEscolhidos.push({
         id: id,
         nome: nome,
         cargo: cargo,
@@ -1084,14 +1096,14 @@ function selecionarFuncionarioAutocomplete(id, nome, cargo, valorHora) {
     document.getElementById('buscarFuncionario').value = '';
     document.getElementById('sugestoesFuncionarios').style.display = 'none';
     
-    atualizarListaFuncionariosSelecionados();
+    atualizarListaFuncionarios();
 }
 
-function atualizarListaFuncionariosSelecionados() {
+function atualizarListaFuncionarios() {
     const container = document.getElementById('funcionarios-selecionados');
     const nenhumMsg = document.getElementById('nenhumFuncionario');
     
-    if (funcionariosAutocompleteSelecionados.length === 0) {
+    if (funcionariosEscolhidos.length === 0) {
         if (nenhumMsg) nenhumMsg.style.display = 'block';
         return;
     }
@@ -1099,7 +1111,7 @@ function atualizarListaFuncionariosSelecionados() {
     if (nenhumMsg) nenhumMsg.style.display = 'none';
     
     let html = '';
-    funcionariosAutocompleteSelecionados.forEach((func, index) => {
+    funcionariosEscolhidos.forEach((func, index) => {
         html += `
             <div class="funcionario-selected-card mb-3">
                 <div class="card">
@@ -1109,7 +1121,7 @@ function atualizarListaFuncionariosSelecionados() {
                                 <h6 class="card-title mb-1">${func.nome}</h6>
                                 <small class="text-muted">${func.cargo} - R$ ${func.valor_hora.toFixed(2)}/hora</small>
                             </div>
-                            <button type="button" class="btn btn-outline-danger btn-sm" onclick="removerFuncionarioAutocomplete(${index})">
+                            <button type="button" class="btn btn-outline-danger btn-sm" onclick="removerFuncionario(${index})">
                                 <i class="fas fa-times"></i>
                             </button>
                         </div>
@@ -1120,7 +1132,7 @@ function atualizarListaFuncionariosSelecionados() {
                                 <input type="number" class="form-control form-control-sm" 
                                        min="0" max="24" step="0.5" 
                                        value="${func.horas}"
-                                       onchange="atualizarHorasFuncionarioAutocomplete(${index}, this.value)"
+                                       onchange="atualizarHoras(${index}, this.value)"
                                        name="funcionario_${func.id}_horas">
                             </div>
                         </div>
@@ -1137,13 +1149,13 @@ function atualizarListaFuncionariosSelecionados() {
     container.innerHTML = html;
 }
 
-function removerFuncionarioAutocomplete(index) {
-    funcionariosAutocompleteSelecionados.splice(index, 1);
-    atualizarListaFuncionariosSelecionados();
+function removerFuncionario(index) {
+    funcionariosEscolhidos.splice(index, 1);
+    atualizarListaFuncionarios();
 }
 
-function atualizarHorasFuncionarioAutocomplete(index, novasHoras) {
-    funcionariosAutocompleteSelecionados[index].horas = parseFloat(novasHoras) || 0;
+function atualizarHoras(index, novasHoras) {
+    funcionariosEscolhidos[index].horas = parseFloat(novasHoras) || 0;
 }
 
 function renderizarFuncionarios(funcionarios) {
