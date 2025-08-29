@@ -118,6 +118,11 @@ try:
     from api_funcionarios import api_funcionarios_bp
     app.register_blueprint(api_funcionarios_bp)
     print("✅ API de Funcionários registrada")
+    
+    # ✅ API de Busca de Funcionários
+    from api_funcionarios_buscar import api_buscar_funcionarios_bp
+    app.register_blueprint(api_buscar_funcionarios_bp)
+    print("✅ API de Busca de Funcionários registrada")
 except Exception as e:
     print(f"❌ Erro ao registrar API Funcionários: {e}")
 

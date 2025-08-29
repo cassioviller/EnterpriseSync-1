@@ -281,6 +281,48 @@
     background-color: #198754;
     border-color: #198754;
 }
+
+/* Autocomplete Styles */
+.suggestions-dropdown {
+    position: absolute !important;
+    top: 100% !important;
+    left: 0 !important;
+    right: 0 !important;
+    background: white !important;
+    border: 1px solid #ddd !important;
+    border-radius: 8px !important;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.1) !important;
+    max-height: 300px !important;
+    overflow-y: auto !important;
+    z-index: 1000 !important;
+    display: none !important;
+}
+
+.suggestion-item {
+    padding: 12px 16px !important;
+    border-bottom: 1px solid #f0f0f0 !important;
+    cursor: pointer !important;
+    transition: background 0.2s !important;
+}
+
+.suggestion-item:hover {
+    background: #f8f9fa !important;
+}
+
+.suggestion-item:last-child {
+    border-bottom: none !important;
+}
+
+.funcionario-selected-card .card {
+    border: 1px solid #e9ecef !important;
+    border-radius: 8px !important;
+    transition: all 0.3s ease !important;
+}
+
+.funcionario-selected-card .card:hover {
+    border-color: #28a745 !important;
+    box-shadow: 0 2px 8px rgba(40,167,69,0.1) !important;
+}
 </style>
 {% endblock %}
 
@@ -401,20 +443,35 @@
                     <i class="fas fa-users"></i>
                     Mão de Obra
                 </h3>
-                <button type="button" class="btn-modern btn-success" onclick="carregarFuncionarios()">
-                    <i class="fas fa-sync"></i>
-                    Carregar Funcionários
-                </button>
             </div>
             <div class="rdo-card-body">
                 <div class="alert alert-info">
                     <i class="fas fa-info-circle"></i>
-                    <strong>Seleção de Funcionários:</strong> Marque os funcionários que trabalharam neste RDO e defina suas funções e horas.
+                    <strong>Seleção de Funcionários:</strong> Digite o nome do funcionário para buscar e adicionar à equipe.
                 </div>
-                <div id="funcionarios-container">
-                    <div class="text-center p-4">
-                        <i class="fas fa-spinner fa-spin fa-2x text-muted mb-3"></i>
-                        <p class="text-muted">Clique em "Carregar Funcionários" para selecionar a mão de obra</p>
+                
+                <!-- Campo de autocomplete -->
+                <div class="form-group mb-4">
+                    <label class="form-label">
+                        <i class="fas fa-search"></i>
+                        Buscar Funcionário
+                    </label>
+                    <div class="position-relative">
+                        <input type="text" 
+                               class="form-control" 
+                               id="buscarFuncionario" 
+                               placeholder="Digite o nome do funcionário..."
+                               autocomplete="off">
+                        <div id="sugestoesFuncionarios" class="suggestions-dropdown"></div>
+                    </div>
+                </div>
+                
+                <!-- Funcionários selecionados -->
+                <div id="funcionarios-selecionados">
+                    <div class="text-center text-muted py-4" id="nenhumFuncionario">
+                        <i class="fas fa-user-plus fa-2x mb-2"></i>
+                        <p>Nenhum funcionário selecionado</p>
+                        <small>Use o campo de busca acima para adicionar funcionários à equipe</small>
                     </div>
                 </div>
             </div>
@@ -934,35 +991,177 @@ function toggleServico(servicoId) {
 // Inicialização
 document.addEventListener('DOMContentLoaded', function() {
     console.log('RDO Moderno carregado com sucesso!');
+    inicializarAutocompleteFuncionarios();
 });
 
-// Função para carregar funcionários para criação de RDO
-function carregarFuncionarios() {
-    const container = document.getElementById('funcionarios-container');
+// Sistema de autocomplete para funcionários
+let funcionariosSelecionados = [];
+let timeoutBusca = null;
+
+function inicializarAutocompleteFuncionarios() {
+    const input = document.getElementById('buscarFuncionario');
+    const sugestoes = document.getElementById('sugestoesFuncionarios');
     
-    container.innerHTML = `
-        <div class="text-center p-4">
-            <div class="spinner-border text-success" role="status">
-                <span class="visually-hidden">Carregando...</span>
-            </div>
-            <p class="mt-2 text-muted">Carregando funcionários...</p>
-        </div>
-    `;
+    input.addEventListener('input', function() {
+        clearTimeout(timeoutBusca);
+        const termo = this.value.trim();
+        
+        if (termo.length < 2) {
+            sugestoes.style.display = 'none';
+            return;
+        }
+        
+        timeoutBusca = setTimeout(() => {
+            buscarFuncionarios(termo);
+        }, 300);
+    });
     
-    // Carregar funcionários do admin atual
-    fetch('/api/funcionarios-ativos')
+    // Fechar sugestões ao clicar fora
+    document.addEventListener('click', function(e) {
+        if (!input.contains(e.target) && !sugestoes.contains(e.target)) {
+            sugestoes.style.display = 'none';
+        }
+    });
+}
+
+function buscarFuncionarios(termo) {
+    const sugestoes = document.getElementById('sugestoesFuncionarios');
+    
+    sugestoes.innerHTML = '<div class="p-2 text-center"><i class="fas fa-spinner fa-spin"></i> Buscando...</div>';
+    sugestoes.style.display = 'block';
+    
+    fetch(`/api/funcionarios/buscar?q=${encodeURIComponent(termo)}`)
         .then(response => response.json())
         .then(data => {
-            if (data.success) {
-                renderizarFuncionarios(data.funcionarios);
+            if (data.success && data.funcionarios.length > 0) {
+                mostrarSugestoesFuncionarios(data.funcionarios);
             } else {
-                renderizarErroFuncionarios();
+                sugestoes.innerHTML = '<div class="p-2 text-muted text-center">Nenhum funcionário encontrado</div>';
             }
         })
         .catch(error => {
-            console.error('Erro ao carregar funcionários:', error);
-            renderizarErroFuncionarios();
+            console.error('Erro na busca:', error);
+            sugestoes.innerHTML = '<div class="p-2 text-danger text-center">Erro na busca</div>';
         });
+}
+
+function mostrarSugestoesFuncionarios(funcionarios) {
+    const sugestoes = document.getElementById('sugestoesFuncionarios');
+    let html = '';
+    
+    funcionarios.forEach(func => {
+        // Verificar se já foi selecionado
+        const jaSelecionado = funcionariosSelecionados.find(f => f.id === func.id);
+        if (!jaSelecionado) {
+            html += `
+                <div class="suggestion-item" onclick="selecionarFuncionario(${func.id}, '${func.nome}', ${func.valor_hora})">
+                    <div class="d-flex justify-content-between">
+                        <div>
+                            <strong>${func.nome}</strong>
+                            <br><small class="text-muted">${func.cargo}</small>
+                        </div>
+                        <div class="text-end">
+                            <small>R$ ${func.valor_hora.toFixed(2)}/h</small>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+    });
+    
+    sugestoes.innerHTML = html || '<div class="p-2 text-muted text-center">Todos os funcionários já foram selecionados</div>';
+}
+
+function selecionarFuncionario(id, nome, valorHora) {
+    // Adicionar à lista de selecionados
+    funcionariosSelecionados.push({
+        id: id,
+        nome: nome,
+        valor_hora: valorHora,
+        horas: 8.0, // Padrão 8h
+        funcao: 'Executante'
+    });
+    
+    // Limpar campo de busca
+    document.getElementById('buscarFuncionario').value = '';
+    document.getElementById('sugestoesFuncionarios').style.display = 'none';
+    
+    // Atualizar interface
+    renderizarFuncionariosSelecionados();
+}
+
+function renderizarFuncionariosSelecionados() {
+    const container = document.getElementById('funcionarios-selecionados');
+    const nenhumFuncionario = document.getElementById('nenhumFuncionario');
+    
+    if (funcionariosSelecionados.length === 0) {
+        nenhumFuncionario.style.display = 'block';
+        return;
+    }
+    
+    nenhumFuncionario.style.display = 'none';
+    
+    let html = '<div class="funcionarios-selected-list">';
+    
+    funcionariosSelecionados.forEach((func, index) => {
+        html += `
+            <div class="funcionario-selected-card mb-3">
+                <div class="card">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-start mb-2">
+                            <div>
+                                <h6 class="card-title mb-1">${func.nome}</h6>
+                                <small class="text-muted">R$ ${func.valor_hora.toFixed(2)}/hora</small>
+                            </div>
+                            <button type="button" class="btn btn-outline-danger btn-sm" onclick="removerFuncionario(${index})">
+                                <i class="fas fa-times"></i>
+                            </button>
+                        </div>
+                        
+                        <div class="row">
+                            <div class="col-md-6">
+                                <label class="form-label">Função</label>
+                                <select class="form-select form-select-sm" onchange="atualizarFuncaoFuncionario(${index}, this.value)">
+                                    <option value="Executante" ${func.funcao === 'Executante' ? 'selected' : ''}>Executante</option>
+                                    <option value="Operador" ${func.funcao === 'Operador' ? 'selected' : ''}>Operador</option>
+                                    <option value="Auxiliar" ${func.funcao === 'Auxiliar' ? 'selected' : ''}>Auxiliar</option>
+                                    <option value="Encarregado" ${func.funcao === 'Encarregado' ? 'selected' : ''}>Encarregado</option>
+                                </select>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Horas Trabalhadas</label>
+                                <input type="number" class="form-control form-control-sm" 
+                                       min="0" max="24" step="0.5" 
+                                       value="${func.horas}"
+                                       onchange="atualizarHorasFuncionario(${index}, this.value)"
+                                       name="funcionario_${func.id}_horas">
+                            </div>
+                        </div>
+                        
+                        <!-- Campo hidden para envio -->
+                        <input type="hidden" name="funcionarios_selecionados" value="${func.id}">
+                        <input type="hidden" name="funcionario_${func.id}_funcao" value="${func.funcao}">
+                    </div>
+                </div>
+            </div>
+        `;
+    });
+    
+    html += '</div>';
+    container.innerHTML = html;
+}
+
+function removerFuncionario(index) {
+    funcionariosSelecionados.splice(index, 1);
+    renderizarFuncionariosSelecionados();
+}
+
+function atualizarFuncaoFuncionario(index, novaFuncao) {
+    funcionariosSelecionados[index].funcao = novaFuncao;
+}
+
+function atualizarHorasFuncionario(index, novasHoras) {
+    funcionariosSelecionados[index].horas = parseFloat(novasHoras) || 0;
 }
 
 function renderizarFuncionarios(funcionarios) {
