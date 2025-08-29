@@ -3321,8 +3321,23 @@ def rdo_salvar_unificado():
         # CORREÇÃO: Processar subatividades (SISTEMA CORRIGIDO)
         print("DEBUG CORRIGIDO: Processando subatividades do formulário...")
         print("🔍 TODOS OS CAMPOS DO FORMULÁRIO RECEBIDOS:")
+        print(f"   Total campos: {len(request.form)}")
+        campos_subatividades = []
         for key, value in request.form.items():
             print(f"   {key} = {value}")
+            if key.startswith('nome_subatividade_'):
+                campos_subatividades.append(key)
+        print(f"🎯 Campos de subatividades encontrados: {len(campos_subatividades)} - {campos_subatividades}")
+        
+        # DEBUG ESPECÍFICO: Verificar se os dados estão sendo processados
+        if campos_subatividades:
+            print("✅ CAMPOS SUBATIVIDADE DETECTADOS - Processando...")
+            for campo in campos_subatividades:
+                valor = request.form.get(campo)
+                print(f"   {campo} = {valor}")
+        else:
+            print("❌ NENHUM CAMPO DE SUBATIVIDADE DETECTADO!")
+            print("   Verificar template RDO ou nome dos campos")
         
         subatividades_processadas = 0
         
