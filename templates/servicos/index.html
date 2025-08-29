@@ -1021,10 +1021,10 @@ function editarServico(servicoId) {
 
 function toggleSubatividades(servicoId) {
     const lista = document.getElementById(`subatividades-${servicoId}`);
-    const button = event.target.closest('.btn-expand');
+    const button = event.target.closest('button');
     const icon = button.querySelector('i');
     
-    if (lista.style.display === 'none' || !lista.style.display) {
+    if (lista.style.display === 'none' || lista.style.display === '') {
         lista.style.display = 'block';
         icon.className = 'fas fa-chevron-up';
     } else {
@@ -1035,7 +1035,7 @@ function toggleSubatividades(servicoId) {
 
 // Animações de entrada
 document.addEventListener('DOMContentLoaded', function() {
-    const cards = document.querySelectorAll('.servico-card, .stat-card');
+    const cards = document.querySelectorAll('[style*="background: linear-gradient"]');
     cards.forEach((card, index) => {
         card.style.opacity = '0';
         card.style.transform = 'translateY(20px)';

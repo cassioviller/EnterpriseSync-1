@@ -122,6 +122,43 @@ def criar_servico():
         if servico_existente:
             flash(f'Serviço "{nome}" já existe', 'error')
             return redirect(url_for('servicos_crud.index'))
+            
+        # Criar novo serviço
+        novo_servico = Servico(
+            nome=nome,
+            descricao=descricao,
+            categoria=categoria,
+            admin_id=admin_id,
+            ativo=True
+        )
+        
+        db.session.add(novo_servico)
+        db.session.flush()  # Para obter o ID do serviço
+        
+        # Processar subatividades
+        subatividades = request.form.getlist('subatividades[]')
+        subatividades_criadas = 0
+        
+        for i, nome_sub in enumerate(subatividades):
+            nome_sub = nome_sub.strip()
+            if nome_sub:  # Só criar se não estiver vazio
+                subatividade = SubatividadeMestre(
+                    nome=nome_sub,
+                    servico_id=novo_servico.id,
+                    admin_id=admin_id,
+                    ordem_padrao=i + 1,
+                    ativo=True
+                )
+                db.session.add(subatividade)
+                subatividades_criadas += 1
+        
+        # Salvar tudo
+        db.session.commit()
+        
+        logger.info(f"✅ Serviço '{nome}' criado com {subatividades_criadas} subatividades")
+        flash(f'Serviço "{nome}" criado com sucesso!', 'success')
+        
+        return redirect(url_for('servicos_crud.index'))
         
         # Criar serviço
         novo_servico = Servico(
