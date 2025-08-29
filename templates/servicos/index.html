@@ -4,42 +4,44 @@
 
 {% block extra_css %}
 <style>
-/* Design System Moderno Consistente */
+/* Design System Moderno Consistente - Força aplicação */
 .page-header-modern {
-    background: linear-gradient(135deg, #2d5a27 0%, #4a7c59 50%, #20c997 100%);
-    color: white;
-    padding: 3rem 2rem;
-    border-radius: 16px;
-    margin-bottom: 2rem;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    box-shadow: 0 8px 32px rgba(45, 90, 39, 0.3);
+    background: linear-gradient(135deg, #2d5a27 0%, #4a7c59 50%, #20c997 100%) !important;
+    color: white !important;
+    padding: 3rem 2rem !important;
+    border-radius: 16px !important;
+    margin-bottom: 2rem !important;
+    display: flex !important;
+    justify-content: space-between !important;
+    align-items: center !important;
+    box-shadow: 0 8px 32px rgba(45, 90, 39, 0.3) !important;
 }
 
 .header-content {
-    display: flex;
-    align-items: center;
-    gap: 1.5rem;
+    display: flex !important;
+    align-items: center !important;
+    gap: 1.5rem !important;
 }
 
 .header-icon {
-    background: rgba(255, 255, 255, 0.2);
-    padding: 1.5rem;
-    border-radius: 50%;
-    font-size: 2rem;
+    background: rgba(255, 255, 255, 0.2) !important;
+    padding: 1.5rem !important;
+    border-radius: 50% !important;
+    font-size: 2rem !important;
 }
 
 .header-text h1 {
-    margin: 0;
-    font-size: 2.5rem;
-    font-weight: 700;
+    margin: 0 !important;
+    font-size: 2.5rem !important;
+    font-weight: 700 !important;
+    color: white !important;
 }
 
 .header-text p {
-    margin: 0.5rem 0 0 0;
-    opacity: 0.9;
-    font-size: 1.1rem;
+    margin: 0.5rem 0 0 0 !important;
+    opacity: 0.9 !important;
+    font-size: 1.1rem !important;
+    color: white !important;
 }
 
 .btn-primary-custom {
@@ -67,26 +69,26 @@
 
 /* Estatísticas Dashboard */
 .stats-dashboard {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-    gap: 1.5rem;
-    margin-bottom: 3rem;
+    display: grid !important;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)) !important;
+    gap: 1.5rem !important;
+    margin-bottom: 3rem !important;
 }
 
 .stat-card {
-    background: white;
-    padding: 2rem;
-    border-radius: 16px;
-    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
-    display: flex;
-    align-items: center;
-    gap: 1.5rem;
-    transition: transform 0.3s ease, box-shadow 0.3s ease;
+    background: white !important;
+    padding: 2rem !important;
+    border-radius: 16px !important;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08) !important;
+    display: flex !important;
+    align-items: center !important;
+    gap: 1.5rem !important;
+    transition: transform 0.3s ease, box-shadow 0.3s ease !important;
 }
 
 .stat-card:hover {
-    transform: translateY(-5px);
-    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.15);
+    transform: translateY(-5px) !important;
+    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.15) !important;
 }
 
 .stat-icon {
@@ -147,13 +149,14 @@
 
 /* Cards de Serviço Modernos */
 .servico-card {
-    background: linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%);
-    border: 1px solid #e2e8f0;
-    border-radius: 16px;
-    overflow: hidden;
-    transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
-    position: relative;
+    background: linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%) !important;
+    border: 1px solid #e2e8f0 !important;
+    border-radius: 16px !important;
+    overflow: hidden !important;
+    transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1) !important;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08) !important;
+    position: relative !important;
+    margin-bottom: 2rem !important;
 }
 
 .servico-card::before {
@@ -389,11 +392,11 @@
 }
 
 .servico-header {
-    background: linear-gradient(135deg, #f8f9fa, #e9ecef);
-    padding: 1.5rem;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
+    background: linear-gradient(135deg, #f8f9fa, #e9ecef) !important;
+    padding: 1.5rem !important;
+    display: flex !important;
+    justify-content: space-between !important;
+    align-items: center !important;
 }
 
 .servico-badge {
