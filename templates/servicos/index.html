@@ -1006,16 +1006,27 @@ function removerSubatividade(button) {
 }
 
 function abrirModalNovoServico() {
-    const modal = new bootstrap.Modal(document.getElementById('modalNovoServico'));
-    modal.show();
-    
-    // Focar no primeiro campo
-    setTimeout(() => {
-        document.getElementById('nome').focus();
-    }, 500);
+    console.log('Abrindo modal de novo serviço...');
+    const modalElement = document.getElementById('modalNovoServico');
+    if (modalElement) {
+        const modal = new bootstrap.Modal(modalElement);
+        modal.show();
+        
+        // Focar no primeiro campo após abrir
+        setTimeout(() => {
+            const nomeInput = document.getElementById('nome');
+            if (nomeInput) {
+                nomeInput.focus();
+            }
+        }, 500);
+    } else {
+        console.error('Modal não encontrado!');
+        alert('Erro: Modal de criação não encontrado');
+    }
 }
 
 function editarServico(servicoId) {
+    console.log('Editando serviço ID:', servicoId);
     window.location.href = `/servicos/${servicoId}/editar`;
 }
 
@@ -1033,8 +1044,18 @@ function toggleSubatividades(servicoId) {
     }
 }
 
+// Testar se Bootstrap está disponível
+console.log('Bootstrap disponível:', typeof bootstrap !== 'undefined');
+console.log('jQuery disponível:', typeof $ !== 'undefined');
+
 // Animações de entrada
 document.addEventListener('DOMContentLoaded', function() {
+    console.log('DOM carregado, inicializando página de serviços...');
+    
+    // Verificar se modal existe
+    const modalElement = document.getElementById('modalNovoServico');
+    console.log('Modal encontrado:', modalElement !== null);
+    
     const cards = document.querySelectorAll('[style*="background: linear-gradient"]');
     cards.forEach((card, index) => {
         card.style.opacity = '0';
@@ -1048,20 +1069,28 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 });
 
-// Validação do formulário
-document.getElementById('formNovoServico').addEventListener('submit', function(e) {
-    const nome = document.getElementById('nome').value.trim();
-    if (!nome) {
-        e.preventDefault();
-        alert('Por favor, insira o nome do serviço.');
-        document.getElementById('nome').focus();
-        return false;
+// Inicialização após DOM carregado
+document.addEventListener('DOMContentLoaded', function() {
+    // Validação do formulário
+    const form = document.getElementById('formNovoServico');
+    if (form) {
+        form.addEventListener('submit', function(e) {
+            const nome = document.getElementById('nome').value.trim();
+            if (!nome) {
+                e.preventDefault();
+                alert('Por favor, insira o nome do serviço.');
+                document.getElementById('nome').focus();
+                return false;
+            }
+            
+            // Adicionar loading
+            const submitBtn = this.querySelector('button[type="submit"]');
+            if (submitBtn) {
+                submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i> Salvando...';
+                submitBtn.disabled = true;
+            }
+        });
     }
-    
-    // Adicionar loading
-    const submitBtn = this.querySelector('button[type="submit"]');
-    submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i> Salvando...';
-    submitBtn.disabled = true;
 });
 </script>
 {% endblock %}
