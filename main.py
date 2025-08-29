@@ -1,5 +1,15 @@
 from app import app
 
+# Registrar sistema de edição de RDO
+try:
+    from rdo_editar_sistema import rdo_editar_bp
+    app.register_blueprint(rdo_editar_bp)
+    print("✅ Sistema de edição RDO registrado")
+except ImportError as e:
+    print(f"⚠️ Erro ao importar sistema de edição RDO: {e}")
+except Exception as e:
+    print(f"❌ Erro ao registrar sistema de edição RDO: {e}")
+
 # Registrar sistema de salvamento RDO
 try:
     from rdo_salvar_sistema import rdo_salvar_bp
