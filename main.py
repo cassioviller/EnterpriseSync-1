@@ -122,5 +122,15 @@ try:
 except ImportError as e:
     print(f"⚠️ Health check não encontrado: {e}")
 
+# Registrar CRUD de Serviços
+try:
+    from crud_servicos_completo import servicos_crud_bp
+    app.register_blueprint(servicos_crud_bp)
+    print("✅ CRUD de Serviços registrado")
+except ImportError as e:
+    print(f"⚠️ CRUD de Serviços não encontrado: {e}")
+except Exception as e:
+    print(f"❌ Erro ao registrar CRUD de Serviços: {e}")
+
 if __name__ == "__main__":
     app.run(host='0.0.0.0', port=5000, debug=True)

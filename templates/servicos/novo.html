@@ -1,0 +1,389 @@
+{% extends "base_completo.html" %}
+
+{% block title %}Novo Serviço - SIGE{% endblock %}
+
+{% block extra_css %}
+<style>
+.form-card {
+    background: white;
+    border: 1px solid #e2e8f0;
+    border-radius: 12px;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.07);
+    margin-bottom: 2rem;
+}
+
+.form-card-header {
+    background: linear-gradient(135deg, #198754 0%, #20c997 100%);
+    color: white;
+    padding: 1.5rem;
+    border-radius: 12px 12px 0 0;
+    margin: -1px -1px 0 -1px;
+}
+
+.form-card-body {
+    padding: 2rem;
+}
+
+.form-control-modern {
+    border: 1px solid #d1d5db;
+    border-radius: 8px;
+    padding: 0.75rem;
+    transition: all 0.3s ease;
+}
+
+.form-control-modern:focus {
+    border-color: #198754;
+    box-shadow: 0 0 0 3px rgba(25, 135, 84, 0.1);
+}
+
+.btn-add-sub {
+    background: linear-gradient(135deg, #6f42c1 0%, #8b5cf6 100%);
+    border: none;
+    color: white;
+    padding: 0.5rem 1rem;
+    border-radius: 6px;
+    font-size: 0.85rem;
+    transition: all 0.3s ease;
+}
+
+.btn-add-sub:hover {
+    background: linear-gradient(135deg, #5a2d91 0%, #7c3aed 100%);
+    transform: translateY(-1px);
+    color: white;
+}
+
+.subatividade-item {
+    background: #f8f9fa;
+    border: 1px solid #dee2e6;
+    border-radius: 8px;
+    padding: 1rem;
+    margin-bottom: 1rem;
+    position: relative;
+    transition: all 0.3s ease;
+}
+
+.subatividade-item:hover {
+    border-color: #198754;
+    box-shadow: 0 2px 4px rgba(25, 135, 84, 0.1);
+}
+
+.btn-remove-sub {
+    position: absolute;
+    top: 0.5rem;
+    right: 0.5rem;
+    background: #dc3545;
+    color: white;
+    border: none;
+    border-radius: 50%;
+    width: 30px;
+    height: 30px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.8rem;
+    transition: all 0.3s ease;
+}
+
+.btn-remove-sub:hover {
+    background: #c82333;
+    transform: scale(1.1);
+}
+
+.btn-salvar {
+    background: linear-gradient(135deg, #198754 0%, #20c997 100%);
+    border: none;
+    color: white;
+    padding: 0.75rem 2rem;
+    border-radius: 25px;
+    font-weight: 600;
+    transition: all 0.3s ease;
+}
+
+.btn-salvar:hover {
+    background: linear-gradient(135deg, #157347 0%, #1aa085 100%);
+    transform: translateY(-2px);
+    color: white;
+    box-shadow: 0 5px 15px rgba(25, 135, 84, 0.3);
+}
+
+.btn-cancelar {
+    background: #6c757d;
+    border: none;
+    color: white;
+    padding: 0.75rem 2rem;
+    border-radius: 25px;
+    font-weight: 600;
+    text-decoration: none;
+    display: inline-block;
+    transition: all 0.3s ease;
+}
+
+.btn-cancelar:hover {
+    background: #5a6268;
+    color: white;
+    text-decoration: none;
+    transform: translateY(-1px);
+}
+
+.page-header {
+    background: linear-gradient(135deg, #198754 0%, #20c997 100%);
+    color: white;
+    padding: 2rem 0;
+    margin-bottom: 2rem;
+    border-radius: 0 0 20px 20px;
+}
+
+.required {
+    color: #dc3545;
+}
+
+.help-text {
+    font-size: 0.85rem;
+    color: #6c757d;
+    margin-top: 0.25rem;
+}
+
+.subatividades-counter {
+    background: linear-gradient(135deg, #17a2b8 0%, #20c997 100%);
+    color: white;
+    padding: 0.5rem 1rem;
+    border-radius: 15px;
+    font-size: 0.9rem;
+    font-weight: 600;
+    display: inline-block;
+    margin-bottom: 1rem;
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div class="container">
+        <h1 class="mb-0">
+            <i class="fas fa-plus-circle me-3"></i>
+            Novo Serviço
+        </h1>
+        <p class="mb-0 mt-2 opacity-75">
+            Configure um novo serviço com suas subatividades
+        </p>
+    </div>
+</div>
+
+<div class="container">
+    <form method="POST" action="{{ url_for('servicos_crud.criar_servico') }}">
+        <!-- Dados Básicos -->
+        <div class="form-card">
+            <div class="form-card-header">
+                <h4 class="mb-0">
+                    <i class="fas fa-info-circle me-2"></i>
+                    Informações Básicas
+                </h4>
+            </div>
+            <div class="form-card-body">
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="mb-3">
+                            <label for="nome" class="form-label fw-bold">
+                                Nome do Serviço <span class="required">*</span>
+                            </label>
+                            <input type="text" class="form-control form-control-modern" 
+                                   id="nome" name="nome" required
+                                   placeholder="Ex: Montagem de Estrutura Metálica">
+                            <div class="help-text">Nome claro e descritivo do serviço</div>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="mb-3">
+                            <label for="categoria" class="form-label fw-bold">Categoria</label>
+                            <select class="form-control form-control-modern" id="categoria" name="categoria">
+                                <option value="">Selecione uma categoria</option>
+                                {% for categoria in categorias %}
+                                    <option value="{{ categoria }}">{{ categoria }}</option>
+                                {% endfor %}
+                            </select>
+                            <div class="help-text">Categoria para organização dos serviços</div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="mb-3">
+                    <label for="descricao" class="form-label fw-bold">Descrição</label>
+                    <textarea class="form-control form-control-modern" id="descricao" name="descricao" 
+                              rows="3" placeholder="Descreva o serviço de forma detalhada..."></textarea>
+                    <div class="help-text">Descrição técnica do serviço (opcional)</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Subatividades -->
+        <div class="form-card">
+            <div class="form-card-header">
+                <div class="d-flex justify-content-between align-items-center">
+                    <h4 class="mb-0">
+                        <i class="fas fa-tasks me-2"></i>
+                        Subatividades
+                    </h4>
+                    <button type="button" class="btn-add-sub" onclick="adicionarSubatividade()">
+                        <i class="fas fa-plus me-1"></i>
+                        Adicionar
+                    </button>
+                </div>
+            </div>
+            <div class="form-card-body">
+                <div class="subatividades-counter">
+                    <i class="fas fa-list me-1"></i>
+                    <span id="contadorSubs">0</span> subatividades
+                </div>
+                
+                <div id="subatividadesContainer">
+                    <div class="text-center text-muted py-4">
+                        <i class="fas fa-tasks fa-3x mb-3 opacity-50"></i>
+                        <p>Nenhuma subatividade adicionada</p>
+                        <p class="small">Use o botão "Adicionar" para criar as etapas deste serviço</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Botões de Ação -->
+        <div class="d-flex justify-content-between">
+            <a href="{{ url_for('servicos_crud.index') }}" class="btn-cancelar">
+                <i class="fas fa-arrow-left me-2"></i>
+                Cancelar
+            </a>
+            <button type="submit" class="btn-salvar">
+                <i class="fas fa-save me-2"></i>
+                Salvar Serviço
+            </button>
+        </div>
+    </form>
+</div>
+
+<script>
+let contadorSubatividades = 0;
+
+function adicionarSubatividade() {
+    contadorSubatividades++;
+    
+    const container = document.getElementById('subatividadesContainer');
+    
+    // Remover mensagem vazia se existir
+    if (contadorSubatividades === 1) {
+        container.innerHTML = '';
+    }
+    
+    const subatividadeHtml = `
+        <div class="subatividade-item" id="subatividade_${contadorSubatividades}">
+            <button type="button" class="btn-remove-sub" onclick="removerSubatividade(${contadorSubatividades})">
+                <i class="fas fa-times"></i>
+            </button>
+            
+            <div class="row">
+                <div class="col-md-8">
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Nome da Subatividade</label>
+                        <input type="text" class="form-control form-control-modern" 
+                               name="subatividade_nome[]" 
+                               placeholder="Ex: Montagem de Pilares"
+                               required>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Ordem</label>
+                        <input type="number" class="form-control form-control-modern" 
+                               value="${contadorSubatividades}" 
+                               readonly>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="mb-3">
+                <label class="form-label fw-bold">Descrição</label>
+                <textarea class="form-control form-control-modern" 
+                          name="subatividade_descricao[]" 
+                          rows="2" 
+                          placeholder="Descreva esta etapa do serviço..."></textarea>
+            </div>
+        </div>
+    `;
+    
+    container.insertAdjacentHTML('beforeend', subatividadeHtml);
+    atualizarContador();
+    
+    // Focar no campo nome da nova subatividade
+    const novoInput = container.querySelector(`#subatividade_${contadorSubatividades} input[name="subatividade_nome[]"]`);
+    novoInput.focus();
+}
+
+function removerSubatividade(id) {
+    const elemento = document.getElementById(`subatividade_${id}`);
+    elemento.style.animation = 'fadeOut 0.3s ease';
+    
+    setTimeout(() => {
+        elemento.remove();
+        atualizarContador();
+        
+        // Se não houver mais subatividades, mostrar mensagem
+        const container = document.getElementById('subatividadesContainer');
+        if (container.children.length === 0) {
+            container.innerHTML = `
+                <div class="text-center text-muted py-4">
+                    <i class="fas fa-tasks fa-3x mb-3 opacity-50"></i>
+                    <p>Nenhuma subatividade adicionada</p>
+                    <p class="small">Use o botão "Adicionar" para criar as etapas deste serviço</p>
+                </div>
+            `;
+            contadorSubatividades = 0;
+        }
+    }, 300);
+}
+
+function atualizarContador() {
+    const total = document.querySelectorAll('.subatividade-item').length;
+    document.getElementById('contadorSubs').textContent = total;
+}
+
+// Validação do formulário
+document.querySelector('form').addEventListener('submit', function(e) {
+    const nome = document.getElementById('nome').value.trim();
+    const subatividades = document.querySelectorAll('input[name="subatividade_nome[]"]');
+    
+    if (!nome) {
+        e.preventDefault();
+        alert('Nome do serviço é obrigatório!');
+        document.getElementById('nome').focus();
+        return;
+    }
+    
+    let temSubatividadeValida = false;
+    subatividades.forEach(input => {
+        if (input.value.trim()) {
+            temSubatividadeValida = true;
+        }
+    });
+    
+    if (!temSubatividadeValida && subatividades.length > 0) {
+        e.preventDefault();
+        alert('Pelo menos uma subatividade deve ter nome preenchido!');
+        return;
+    }
+});
+
+// CSS para animação
+const style = document.createElement('style');
+style.textContent = `
+    @keyframes fadeOut {
+        from { opacity: 1; transform: translateX(0); }
+        to { opacity: 0; transform: translateX(-100%); }
+    }
+`;
+document.head.appendChild(style);
+
+// Adicionar primeira subatividade automaticamente
+document.addEventListener('DOMContentLoaded', function() {
+    console.log('Formulário de novo serviço carregado');
+    // Remover auto-adição para permitir serviços sem subatividades se desejado
+});
+</script>
+{% endblock %}
