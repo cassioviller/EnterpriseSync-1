@@ -450,19 +450,45 @@
                     <strong>Seleção de Funcionários:</strong> Digite o nome do funcionário para buscar e adicionar à equipe.
                 </div>
                 
-                <!-- Campo de autocomplete -->
-                <div class="form-group mb-4">
-                    <label class="form-label">
-                        <i class="fas fa-search"></i>
-                        Buscar Funcionário
-                    </label>
-                    <div class="position-relative">
-                        <input type="text" 
-                               class="form-control" 
-                               id="buscarFuncionario" 
-                               placeholder="Digite o nome do funcionário..."
-                               autocomplete="off">
-                        <div id="sugestoesFuncionarios" class="suggestions-dropdown"></div>
+                <!-- Interface Simples de Seleção -->
+                <div class="row">
+                    <div class="col-md-8">
+                        <div class="form-group mb-3">
+                            <label class="form-label">
+                                <i class="fas fa-search"></i>
+                                Buscar e Selecionar Funcionário
+                            </label>
+                            <div class="input-group">
+                                <input type="text" 
+                                       class="form-control" 
+                                       id="buscarFuncionario" 
+                                       placeholder="Digite o nome do funcionário..."
+                                       autocomplete="off">
+                                <button class="btn btn-success" type="button" onclick="buscarTodosFuncionarios()">
+                                    <i class="fas fa-users"></i> Ver Todos
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="form-group mb-3">
+                            <label class="form-label">Ação</label>
+                            <button class="btn btn-outline-danger w-100" type="button" onclick="limparTodosFuncionarios()">
+                                <i class="fas fa-trash"></i> Limpar Todos
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Lista de sugestões visível -->
+                <div id="sugestoesFuncionarios" class="mb-4" style="display:none;">
+                    <div class="card">
+                        <div class="card-header bg-light">
+                            <h6 class="mb-0">Funcionários Disponíveis - Clique para Selecionar</h6>
+                        </div>
+                        <div class="card-body" id="listaSugestoes">
+                            <!-- Sugestões aparecem aqui -->
+                        </div>
                     </div>
                 </div>
                 
@@ -471,7 +497,7 @@
                     <div class="text-center text-muted py-4" id="nenhumFuncionario">
                         <i class="fas fa-user-plus fa-2x mb-2"></i>
                         <p>Nenhum funcionário selecionado</p>
-                        <small>Use o campo de busca acima para adicionar funcionários à equipe</small>
+                        <small>Use o campo de busca acima ou clique em "Ver Todos" para selecionar funcionários</small>
                     </div>
                 </div>
             </div>
@@ -994,27 +1020,27 @@ document.addEventListener('DOMContentLoaded', function() {
     inicializarAutocompleteIntegrado();
 });
 
-// Sistema de autocomplete - variáveis únicas
+// Sistema de funcionários - interface simples e funcional
 var funcionariosEscolhidos = [];
 var timeoutBusca = null;
+var todosFuncionarios = [];
 
 function inicializarAutocompleteIntegrado() {
     const input = document.getElementById('buscarFuncionario');
-    const sugestoes = document.getElementById('sugestoesFuncionarios');
     
-    if (!input || !sugestoes) {
-        console.log('Elementos não encontrados para autocomplete');
+    if (!input) {
+        console.log('Campo de busca não encontrado');
         return;
     }
     
-    console.log('Inicializando autocomplete...');
+    console.log('Sistema de funcionários inicializado');
     
     input.addEventListener('input', function() {
         clearTimeout(timeoutBusca);
         const termo = this.value.trim();
         
         if (termo.length < 2) {
-            sugestoes.style.display = 'none';
+            ocultarSugestoes();
             return;
         }
         
@@ -1022,69 +1048,105 @@ function inicializarAutocompleteIntegrado() {
             buscarFuncionarios(termo);
         }, 300);
     });
-    
-    document.addEventListener('click', function(e) {
-        if (!input.contains(e.target) && !sugestoes.contains(e.target)) {
-            sugestoes.style.display = 'none';
-        }
-    });
 }
 
 function buscarFuncionarios(termo) {
     console.log('Buscando funcionários:', termo);
-    const sugestoes = document.getElementById('sugestoesFuncionarios');
+    const container = document.getElementById('listaSugestoes');
     
-    sugestoes.innerHTML = '<div class="p-2 text-center"><i class="fas fa-spinner fa-spin"></i> Buscando...</div>';
-    sugestoes.style.display = 'block';
+    mostrarSugestoes();
+    container.innerHTML = '<div class="text-center p-3"><i class="fas fa-spinner fa-spin"></i> Buscando funcionários...</div>';
     
     fetch(`/api/funcionarios/buscar?q=${encodeURIComponent(termo)}`)
-        .then(response => {
-            console.log('Response status:', response.status);
-            return response.json();
-        })
+        .then(response => response.json())
         .then(data => {
-            console.log('Dados recebidos:', data);
             if (data.success && data.funcionarios.length > 0) {
-                mostrarSugestoes(data.funcionarios);
+                exibirListaFuncionarios(data.funcionarios);
             } else {
-                sugestoes.innerHTML = '<div class="p-2 text-muted text-center">Nenhum funcionário encontrado</div>';
+                container.innerHTML = '<div class="text-center text-muted p-3">Nenhum funcionário encontrado</div>';
             }
         })
         .catch(error => {
             console.error('Erro na busca:', error);
-            sugestoes.innerHTML = '<div class="p-2 text-danger text-center">Erro na busca</div>';
+            container.innerHTML = '<div class="text-center text-danger p-3">Erro ao buscar funcionários</div>';
         });
 }
 
-function mostrarSugestoes(funcionarios) {
-    console.log('Mostrando sugestões para', funcionarios.length, 'funcionários');
-    const sugestoes = document.getElementById('sugestoesFuncionarios');
-    let html = '';
+function buscarTodosFuncionarios() {
+    console.log('Carregando todos os funcionários...');
+    const container = document.getElementById('listaSugestoes');
+    
+    mostrarSugestoes();
+    container.innerHTML = '<div class="text-center p-3"><i class="fas fa-spinner fa-spin"></i> Carregando todos os funcionários...</div>';
+    
+    fetch('/api/funcionarios-ativos')
+        .then(response => response.json())
+        .then(data => {
+            if (data.success && data.funcionarios.length > 0) {
+                todosFuncionarios = data.funcionarios;
+                exibirListaFuncionarios(data.funcionarios);
+            } else {
+                container.innerHTML = '<div class="text-center text-muted p-3">Nenhum funcionário disponível</div>';
+            }
+        })
+        .catch(error => {
+            console.error('Erro ao carregar funcionários:', error);
+            container.innerHTML = '<div class="text-center text-danger p-3">Erro ao carregar funcionários</div>';
+        });
+}
+
+function exibirListaFuncionarios(funcionarios) {
+    const container = document.getElementById('listaSugestoes');
+    let html = '<div class="row">';
     
     funcionarios.forEach(func => {
         const jaSelecionado = funcionariosEscolhidos.find(f => f.id === func.id);
-        if (!jaSelecionado) {
-            html += `
-                <div class="suggestion-item" onclick="selecionarFuncionario(${func.id}, '${func.nome.replace(/'/g, "\\'")}', '${func.cargo}', ${func.valor_hora})">
-                    <div class="d-flex justify-content-between">
-                        <div>
-                            <strong>${func.nome}</strong>
-                            <br><small class="text-muted">${func.cargo}</small>
-                        </div>
-                        <div class="text-end">
-                            <small>R$ ${func.valor_hora.toFixed(2)}/h</small>
-                        </div>
+        const btnClass = jaSelecionado ? 'btn-secondary disabled' : 'btn-outline-success';
+        const btnText = jaSelecionado ? 'Já Selecionado' : 'Selecionar';
+        const btnIcon = jaSelecionado ? 'fa-check' : 'fa-plus';
+        
+        html += `
+            <div class="col-md-6 col-lg-4 mb-3">
+                <div class="card h-100">
+                    <div class="card-body">
+                        <h6 class="card-title">${func.nome}</h6>
+                        <p class="card-text">
+                            <small class="text-muted">${func.cargo}</small><br>
+                            <span class="text-success fw-bold">R$ ${func.valor_hora.toFixed(2)}/hora</span>
+                        </p>
+                        <button class="btn ${btnClass} btn-sm w-100" 
+                                onclick="selecionarFuncionario(${func.id}, '${func.nome.replace(/'/g, "\\'")}', '${func.cargo}', ${func.valor_hora})"
+                                ${jaSelecionado ? 'disabled' : ''}>
+                            <i class="fas ${btnIcon}"></i> ${btnText}
+                        </button>
                     </div>
                 </div>
-            `;
-        }
+            </div>
+        `;
     });
     
-    sugestoes.innerHTML = html || '<div class="p-2 text-muted text-center">Todos já selecionados</div>';
+    html += '</div>';
+    container.innerHTML = html;
+}
+
+function mostrarSugestoes() {
+    document.getElementById('sugestoesFuncionarios').style.display = 'block';
+}
+
+function ocultarSugestoes() {
+    document.getElementById('sugestoesFuncionarios').style.display = 'none';
 }
 
 function selecionarFuncionario(id, nome, cargo, valorHora) {
     console.log('Selecionando funcionário:', nome);
+    
+    // Verificar se já foi selecionado
+    const jaSelecionado = funcionariosEscolhidos.find(f => f.id === id);
+    if (jaSelecionado) {
+        alert('Funcionário já foi selecionado!');
+        return;
+    }
+    
     funcionariosEscolhidos.push({
         id: id,
         nome: nome,
@@ -1093,10 +1155,18 @@ function selecionarFuncionario(id, nome, cargo, valorHora) {
         horas: 8.0
     });
     
+    // Limpar campo de busca
     document.getElementById('buscarFuncionario').value = '';
-    document.getElementById('sugestoesFuncionarios').style.display = 'none';
     
+    // Atualizar lista de selecionados
     atualizarListaFuncionarios();
+    
+    // Atualizar botões na lista atual se estiver visível
+    if (todosFuncionarios.length > 0) {
+        exibirListaFuncionarios(todosFuncionarios);
+    }
+    
+    console.log(`Funcionário ${nome} adicionado. Total: ${funcionariosEscolhidos.length}`);
 }
 
 function atualizarListaFuncionarios() {
@@ -1156,6 +1226,25 @@ function removerFuncionario(index) {
 
 function atualizarHoras(index, novasHoras) {
     funcionariosEscolhidos[index].horas = parseFloat(novasHoras) || 0;
+}
+
+function limparTodosFuncionarios() {
+    if (funcionariosEscolhidos.length === 0) {
+        alert('Nenhum funcionário para remover!');
+        return;
+    }
+    
+    if (confirm(`Deseja remover todos os ${funcionariosEscolhidos.length} funcionários selecionados?`)) {
+        funcionariosEscolhidos = [];
+        atualizarListaFuncionarios();
+        
+        // Atualizar botões se a lista estiver visível
+        if (todosFuncionarios.length > 0) {
+            exibirListaFuncionarios(todosFuncionarios);
+        }
+        
+        console.log('Todos os funcionários foram removidos');
+    }
 }
 
 function renderizarFuncionarios(funcionarios) {
