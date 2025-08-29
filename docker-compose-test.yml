@@ -1,0 +1,38 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:13
+    container_name: sige-postgres-test
+    environment:
+      POSTGRES_DB: sige
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password123
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  sige:
+    build: .
+    container_name: sige-app-test
+    environment:
+      DATABASE_URL: postgresql://postgres:password123@postgres:5432/sige
+      SESSION_SECRET: test-secret-key
+      FLASK_ENV: development
+    ports:
+      - "5000:5000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - .:/app
+    command: gunicorn --bind 0.0.0.0:5000 --reload main:app
+
+volumes:
+  postgres_data:

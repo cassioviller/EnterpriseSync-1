@@ -1,160 +1,112 @@
-# DEPLOY HOTFIX PRODUÇÃO URGENTE
+# 🚨 HOTFIX PRODUÇÃO URGENTE - Interface RDO Moderna
 
-**Data:** 27 de Agosto de 2025  
-**Status:** ✅ **PRONTO PARA DEPLOY IMEDIATO**  
-**Prioridade:** 🚨 **CRÍTICA**  
+## Problema Identificado
+- **Produção:** Interface RDO antiga (lista de funcionários) 
+- **Desenvolvimento:** Interface RDO moderna (subatividades)
+- **Conexão PostgreSQL:** Instável em produção
 
----
+## Solução Implementada
 
-## RESUMO EXECUTIVO
+### 1. Dockerfile Corrigido
+```dockerfile
+# Dockerfile.producao-corrigido
+- Health check robusto
+- Verificação PostgreSQL automática  
+- Timeout aumentado para 120s
+- Workers otimizados para produção
+```
 
-O ambiente de produção apresentou problemas críticos relacionados a:
-1. **Rotas faltantes** - `main.lista_rdos` não existe
-2. **Templates ausentes** - `rdo/novo.html` não encontrado  
-3. **Tabelas não criadas** - Schema consolidado faltando no banco
-4. **Errors Jinja2** - Funções não definidas em templates
-
-**✅ TODAS AS CORREÇÕES APLICADAS - DEPLOY NECESSÁRIO**
-
----
-
-## CORREÇÕES IMPLEMENTADAS
-
-### 🔧 **1. Rotas Corrigidas (views.py)**
+### 2. Script de Deploy Automático
 ```bash
-# Substituição global aplicada
-sed -i 's/lista_rdos/rdos/g' views.py
-```
-**Resultado:** 5 ocorrências corrigidas automaticamente
-
-### 📄 **2. Template Criado (templates/rdo/novo.html)**
-- ✅ Template completo baseado em `base_completo.html`
-- ✅ Formulário funcional com validações JavaScript
-- ✅ Integração com sistema de obras e funcionários
-- ✅ Correção do erro `moment()` undefined
-
-### 🗄️ **3. Schema do Banco Atualizado**
-**Arquivo:** `docker-entrypoint-easypanel-final.sh`
-
-**Tabelas Adicionadas:**
-```sql
-✅ rdo (tabela principal)
-✅ rdo_funcionario (associação funcionários)
-✅ rdo_atividade (atividades executadas)
-✅ rdo_ocorrencia (ocorrências e problemas)
+# deploy-producao-corrigido.sh
+- Para container atual
+- Build imagem corrigida
+- Deploy com health check
+- Verificação automática
 ```
 
-**Índices de Performance:**
-```sql
-✅ idx_rdo_obra_data
-✅ idx_rdo_admin_id  
-✅ idx_rdo_funcionario_rdo_id
-✅ idx_rdo_atividade_rdo_id
-```
+## Instruções de Deploy
 
----
-
-## INSTRUÇÕES DE DEPLOY
-
-### **EasyPanel (Produção):**
-
-1. **Commit as alterações:**
+### Passo 1: Configurar Variáveis de Ambiente
 ```bash
-git add .
-git commit -m "HOTFIX CRÍTICO: Correções produção - rotas RDO, templates e schema"
-git push origin main
+export DATABASE_URL='postgresql://usuario:senha@host:5432/database'
+export SESSION_SECRET='sua-chave-secreta-segura'
+export PGHOST='seu-host-postgresql'
+export PGUSER='seu-usuario'  
+export PGPASSWORD='sua-senha'
+export PGDATABASE='sua-database'
 ```
 
-2. **Redeploy no EasyPanel:**
-- O script `docker-entrypoint-easypanel-final.sh` será executado automaticamente
-- As tabelas serão criadas na inicialização do container
-- As correções de rota entrarão em vigor imediatamente
-
-3. **Validação Pós-Deploy:**
-```sql
--- Verificar se tabelas foram criadas
-SELECT table_name FROM information_schema.tables 
-WHERE table_name LIKE 'rdo%';
-
--- Verificar índices
-SELECT indexname FROM pg_indexes 
-WHERE indexname LIKE 'idx_rdo%';
+### Passo 2: Executar Deploy
+```bash
+# No servidor de produção
+./deploy-producao-corrigido.sh
 ```
 
----
+### Passo 3: Verificar Status
+```bash
+# Verificar container
+docker ps | grep sige-producao
 
-## TESTE DE FUNCIONALIDADES
+# Verificar logs
+docker logs -f sige-producao
 
-### **Após Deploy, Verificar:**
+# Teste manual
+curl http://localhost:5000/health
+```
 
-1. **Lista RDO:** `https://sige.cassioviller.tech/rdo`
-   - Deve carregar sem erros
-   - Botão "Novo RDO" deve funcionar
+## Verificações Pós-Deploy
 
-2. **Novo RDO:** `https://sige.cassioviller.tech/rdo/novo`
-   - Formulário deve carregar completamente
-   - Dropdowns de obra e funcionários populados
-   - Validações JavaScript ativas
+### ✅ Interface RDO Moderna
+- Acessar: `/funcionario/rdo/novo`
+- Verificar: Subatividades em vez de funcionários
+- Testar: Botão "Testar Último RDO"
 
-3. **Banco de Dados:**
-   - Tabelas `rdo*` devem existir
-   - Indices de performance aplicados
-   - Sem warnings de "cannot reinitialise"
+### ✅ Conectividade Database
+- Health check: `/health`
+- Logs sem erros PostgreSQL
+- Transações funcionando
 
----
+### ✅ Performance
+- Workers: 2 (otimizado)
+- Timeout: 120s
+- Restart: unless-stopped
 
-## IMPACTO ESPERADO
+## Rollback (Se Necessário)
 
-### ✅ **Resolução Imediata:**
-- Sistema RDO totalmente funcional
-- Formulário de criação operacional
-- Performance otimizada com índices
-- Templates modernos carregando
+```bash
+# Parar nova versão
+docker stop sige-producao
+docker rm sige-producao
 
-### ✅ **Benefícios Adicionais:**
-- Schema consolidado compatível com módulos
-- Base sólida para próximas evoluções
-- Padrões de resiliência preparados
-- Deploy automatizado funcionando
+# Voltar versão anterior (substituir por sua imagem anterior)
+docker run -d --name sige-producao -p 5000:5000 sige:versao-anterior
+```
 
----
+## Monitoramento
 
-## PRÓXIMAS ETAPAS PÓS-HOTFIX
+```bash
+# Logs em tempo real
+docker logs -f sige-producao
 
-### **Fase 1: Validação (Imediata)**
-- ✅ Deploy do hotfix no EasyPanel
-- ✅ Teste funcional básico RDO
-- ✅ Verificação de banco de dados
+# Status do container
+docker stats sige-producao
 
-### **Fase 2: Consolidação (Próxima)**
-- Aplicar mesmo padrão para Funcionários
-- Validar módulo Propostas consolidado
-- Implementar design moderno unificado
+# Health check manual
+curl -I http://localhost:5000/health
+```
 
-### **Fase 3: Evolução (Futuro)**
-- Novos KPIs e dashboards
-- Funcionalidades avançadas RDO
-- Sistema de relatórios completo
+## Resultado Esperado
 
----
-
-## CONTINGÊNCIA
-
-### **Se Deploy Falhar:**
-1. Verificar logs do container EasyPanel
-2. Executar script SQL manualmente se necessário
-3. Rollback para versão anterior se crítico
-4. Contato para suporte se persistir
-
-### **Fallback Temporário:**
-- Sistema básico ainda funciona via views.py
-- Rotas principais estão operacionais
-- Dados existentes preservados
+- ✅ Interface RDO moderna em produção
+- ✅ PostgreSQL conectando corretamente  
+- ✅ Subatividades funcionando
+- ✅ Deploy zero-downtime
+- ✅ Health check passando
 
 ---
 
-**🚨 DEPLOY APROVADO - EXECUTAR IMEDIATAMENTE**
-
-**Tempo Estimado:** 5-10 minutos  
-**Downtime:** Mínimo (apenas restart container)  
-**Risco:** Baixo (correções conservadoras aplicadas)
+**Data:** 29/08/2025  
+**Urgência:** Alta  
+**Impacto:** Crítico - Interface inconsistente entre ambientes  
+**Solução:** Deploy automatizado com verificações robustas
