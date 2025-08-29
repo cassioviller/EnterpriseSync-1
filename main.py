@@ -113,6 +113,14 @@ try:
 except ImportError as e:
     print(f"⚠️ Health check não encontrado: {e}")
 
+# Registrar API de Funcionários
+try:
+    from api_funcionarios import api_funcionarios_bp
+    app.register_blueprint(api_funcionarios_bp)
+    print("✅ API de Funcionários registrada")
+except Exception as e:
+    print(f"❌ Erro ao registrar API Funcionários: {e}")
+
 # Registrar CRUD de Serviços (único - sem duplicação)
 try:
     from crud_servicos_completo import servicos_crud_bp
