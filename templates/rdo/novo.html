@@ -1,329 +1,251 @@
 {% extends "base_completo.html" %}
 
-{% block title %}Novo RDO - Sistema Moderno{% endblock %}
+{% block title %}Novo RDO - Sistema RDO{% endblock %}
 
-{% block head %}
-<style>
-/* RDO Moderno - Estilos Consolidados */
-.rdo-container {
-    background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
-    min-height: 100vh;
-    padding: 2rem 0;
-}
+{% block extra_css %}
+    <style>
+        /* Estilos do RDO Moderno */
+        .rdo-container {
+            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+            min-height: 100vh;
+            padding: 2rem 0;
+        }
 
-.rdo-card {
-    background: white;
-    border-radius: 16px;
-    box-shadow: 0 10px 25px rgba(0,0,0,0.1);
-    border: none;
-    margin-bottom: 2rem;
-    overflow: hidden;
-    transition: all 0.3s ease;
-}
+        .header-section {
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 20px;
+            padding: 2rem;
+            margin-bottom: 2rem;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+            backdrop-filter: blur(10px);
+        }
 
-.rdo-card:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 15px 35px rgba(0,0,0,0.15);
-}
+        .header-info {
+            display: flex;
+            align-items: center;
+            gap: 1.5rem;
+        }
 
-.rdo-card-header {
-    background: linear-gradient(135deg, #198754 0%, #20c997 100%);
-    color: white;
-    padding: 1.5rem 2rem;
-    border: none;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-}
+        .header-icon {
+            width: 80px;
+            height: 80px;
+            background: linear-gradient(135deg, #198754, #20c997);
+            border-radius: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 2.5rem;
+            color: white;
+            box-shadow: 0 8px 25px rgba(25, 135, 84, 0.3);
+        }
 
-.rdo-card-header h3 {
-    margin: 0;
-    font-size: 1.5rem;
-    font-weight: 600;
-    display: flex;
-    align-items: center;
-    gap: 12px;
-}
+        .page-title {
+            font-size: 2.5rem;
+            font-weight: 700;
+            color: #2d3748;
+            margin: 0;
+            background: linear-gradient(135deg, #198754, #20c997);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
 
-.rdo-card-body {
-    padding: 2rem;
-}
+        .page-subtitle {
+            color: #718096;
+            font-size: 1.1rem;
+            margin: 0.5rem 0 0 0;
+        }
 
-.form-group {
-    margin-bottom: 1.5rem;
-}
+        .rdo-card {
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 20px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+            margin-bottom: 2rem;
+            overflow: hidden;
+            backdrop-filter: blur(10px);
+            transition: all 0.3s ease;
+        }
 
-.form-label {
-    font-weight: 600;
-    color: #2d3748;
-    margin-bottom: 0.5rem;
-    display: flex;
-    align-items: center;
-    gap: 8px;
-}
+        .rdo-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 20px 40px rgba(0,0,0,0.15);
+        }
 
-.form-control {
-    border: 2px solid #e2e8f0;
-    border-radius: 12px;
-    padding: 12px 16px;
-    font-size: 1rem;
-    transition: all 0.3s ease;
-    background: #f8fafc;
-}
+        .rdo-card-header {
+            background: linear-gradient(135deg, #198754, #20c997);
+            color: white;
+            padding: 1.5rem 2rem;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
 
-.form-control:focus {
-    border-color: #198754;
-    box-shadow: 0 0 0 3px rgba(25, 135, 84, 0.1);
-    background: white;
-}
+        .rdo-card-header h3 {
+            margin: 0;
+            font-size: 1.3rem;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 0.8rem;
+        }
 
-.btn-modern {
-    padding: 12px 24px;
-    border-radius: 12px;
-    font-weight: 600;
-    text-decoration: none;
-    display: inline-flex;
-    align-items: center;
-    gap: 8px;
-    transition: all 0.3s ease;
-    border: none;
-    cursor: pointer;
-}
+        .rdo-card-body {
+            padding: 2rem;
+        }
 
-.btn-success {
-    background: linear-gradient(135deg, #198754 0%, #20c997 100%);
-    color: white;
-}
+        .btn-modern {
+            border: none;
+            border-radius: 12px;
+            padding: 0.8rem 1.5rem;
+            font-weight: 600;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            transition: all 0.3s ease;
+            cursor: pointer;
+        }
 
-.btn-success:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 5px 15px rgba(25, 135, 84, 0.4);
-    color: white;
-}
+        .btn-modern.btn-success {
+            background: linear-gradient(135deg, #198754, #20c997);
+            color: white;
+            box-shadow: 0 4px 15px rgba(25, 135, 84, 0.3);
+        }
 
-.btn-secondary {
-    background: linear-gradient(135deg, #6c757d 0%, #868e96 100%);
-    color: white;
-}
+        .btn-modern.btn-success:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(25, 135, 84, 0.4);
+            color: white;
+        }
 
-.btn-secondary:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 5px 15px rgba(108, 117, 125, 0.4);
-    color: white;
-}
+        .btn-modern.btn-outline {
+            background: transparent;
+            border: 2px solid #198754;
+            color: #198754;
+        }
 
-.btn-outline {
-    background: transparent;
-    border: 2px solid #198754;
-    color: #198754;
-}
+        .btn-modern.btn-outline:hover {
+            background: #198754;
+            color: white;
+            transform: translateY(-2px);
+        }
 
-.btn-outline:hover {
-    background: #198754;
-    color: white;
-}
+        .btn-modern.btn-secondary {
+            background: linear-gradient(135deg, #6c757d, #868e96);
+            color: white;
+            box-shadow: 0 4px 15px rgba(108, 117, 125, 0.3);
+        }
 
-.header-section {
-    margin-bottom: 2rem;
-}
+        .form-label {
+            font-weight: 600;
+            color: #2d3748;
+            margin-bottom: 0.8rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
 
-.header-info {
-    display: flex;
-    align-items: center;
-    gap: 1rem;
-}
+        .form-control, .form-select {
+            border: 2px solid #e2e8f0;
+            border-radius: 12px;
+            padding: 0.8rem 1rem;
+            font-size: 1rem;
+            transition: all 0.3s ease;
+            background: rgba(255, 255, 255, 0.8);
+        }
 
-.header-icon {
-    width: 60px;
-    height: 60px;
-    background: linear-gradient(135deg, #198754 0%, #20c997 100%);
-    border-radius: 16px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 1.5rem;
-    color: white;
-}
+        .form-control:focus, .form-select:focus {
+            border-color: #198754;
+            box-shadow: 0 0 0 3px rgba(25, 135, 84, 0.1);
+            background: white;
+        }
 
-.page-title {
-    font-size: 2rem;
-    font-weight: 700;
-    color: #2d3748;
-    margin: 0;
-}
+        .filtros-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 1.5rem;
+            margin-bottom: 2rem;
+        }
 
-.page-subtitle {
-    color: #718096;
-    margin: 0;
-    font-size: 1rem;
-}
+        .alert {
+            border: none;
+            border-radius: 12px;
+            padding: 1rem 1.5rem;
+            margin-bottom: 1.5rem;
+        }
 
-.filtros-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-    gap: 1.5rem;
-    margin-bottom: 1.5rem;
-}
+        .alert-info {
+            background: linear-gradient(135deg, #cce7ff, #b3d9ff);
+            color: #0056b3;
+        }
 
-@media (max-width: 768px) {
-    .rdo-container {
-        padding: 1rem 0;
-    }
-    
-    .rdo-card-body {
-        padding: 1.5rem;
-    }
-    
-    .filtros-grid {
-        grid-template-columns: 1fr;
-        gap: 1rem;
-    }
-}
+        .slide-in {
+            animation: slideIn 0.6s ease-out forwards;
+            opacity: 0;
+            transform: translateY(30px);
+        }
 
-.slide-in {
-    animation: slideIn 0.5s ease;
-}
+        @keyframes slideIn {
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
 
-@keyframes slideIn {
-    from {
-        opacity: 0;
-        transform: translateY(20px);
-    }
-    to {
-        opacity: 1;
-        transform: translateY(0);
-    }
-}
+        /* Estilos do autocomplete */
+        .suggestions-dropdown {
+            position: absolute !important;
+            top: 100% !important;
+            left: 0 !important;
+            right: 0 !important;
+            background: white !important;
+            border: 1px solid #ddd !important;
+            border-radius: 8px !important;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1) !important;
+            max-height: 300px !important;
+            overflow-y: auto !important;
+            z-index: 1000 !important;
+            display: none !important;
+        }
 
-/* Estilos para serviços expansíveis */
-.servico-card {
-    border: 1px solid #e2e8f0;
-    border-radius: 12px;
-    overflow: hidden;
-    background: white;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-}
+        .suggestion-item {
+            padding: 12px 16px !important;
+            border-bottom: 1px solid #f0f0f0 !important;
+            cursor: pointer !important;
+            transition: background 0.2s !important;
+        }
 
-.servico-header {
-    background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
-    padding: 1rem 1.5rem;
-    cursor: pointer;
-    transition: all 0.3s ease;
-}
+        .suggestion-item:hover {
+            background: #f8f9fa !important;
+        }
 
-.servico-header:hover {
-    background: linear-gradient(135deg, #e9ecef 0%, #dee2e6 100%);
-}
+        .suggestion-item:last-child {
+            border-bottom: none !important;
+        }
 
-.servico-body {
-    padding: 1.5rem;
-    border-top: 1px solid #e2e8f0;
-    transition: all 0.3s ease;
-}
+        .funcionario-selected-card .card {
+            border: 1px solid #e9ecef !important;
+            border-radius: 8px !important;
+            transition: all 0.3s ease !important;
+        }
 
-.servico-body.collapse {
-    display: none;
-}
+        .funcionario-selected-card .card:hover {
+            border-color: #28a745 !important;
+            box-shadow: 0 2px 8px rgba(40,167,69,0.1) !important;
+        }
 
-.badge {
-    font-size: 0.75rem;
-    padding: 0.25rem 0.5rem;
-}
-
-/* Modal autocomplete */
-.list-group-item-action:hover {
-    background-color: #f8f9fa;
-}
-
-#sugestoesFuncionarios {
-    max-height: 300px;
-    overflow-y: auto;
-    border: 1px solid #dee2e6;
-    border-radius: 8px;
-}
-
-/* Estilos para funcionários */
-.funcionarios-grid {
-    max-height: 400px;
-    overflow-y: auto;
-}
-
-.funcionario-card {
-    background: #f8f9fa;
-    border: 2px solid #e9ecef;
-    border-radius: 12px;
-    padding: 1rem;
-    transition: all 0.3s ease;
-}
-
-.funcionario-card:has(.form-check-input:checked) {
-    border-color: #198754;
-    background: linear-gradient(135deg, #f0fff4 0%, #e8f5e8 100%);
-}
-
-.funcionario-info h6 {
-    margin: 0;
-    color: #2d3748;
-    font-weight: 600;
-}
-
-.funcionario-details {
-    margin-top: 1rem;
-    padding-top: 1rem;
-    border-top: 1px solid #dee2e6;
-}
-
-.form-check {
-    margin-bottom: 0;
-}
-
-.form-check-input:checked {
-    background-color: #198754;
-    border-color: #198754;
-}
-
-/* Autocomplete Styles */
-.suggestions-dropdown {
-    position: absolute !important;
-    top: 100% !important;
-    left: 0 !important;
-    right: 0 !important;
-    background: white !important;
-    border: 1px solid #ddd !important;
-    border-radius: 8px !important;
-    box-shadow: 0 4px 12px rgba(0,0,0,0.1) !important;
-    max-height: 300px !important;
-    overflow-y: auto !important;
-    z-index: 1000 !important;
-    display: none !important;
-}
-
-.suggestion-item {
-    padding: 12px 16px !important;
-    border-bottom: 1px solid #f0f0f0 !important;
-    cursor: pointer !important;
-    transition: background 0.2s !important;
-}
-
-.suggestion-item:hover {
-    background: #f8f9fa !important;
-}
-
-.suggestion-item:last-child {
-    border-bottom: none !important;
-}
-
-.funcionario-selected-card .card {
-    border: 1px solid #e9ecef !important;
-    border-radius: 8px !important;
-    transition: all 0.3s ease !important;
-}
-
-.funcionario-selected-card .card:hover {
-    border-color: #28a745 !important;
-    box-shadow: 0 2px 8px rgba(40,167,69,0.1) !important;
-}
-</style>
+        @media (max-width: 768px) {
+            .filtros-grid {
+                grid-template-columns: 1fr;
+                gap: 1rem;
+            }
+            
+            .header-section .d-flex {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 1rem;
+            }
+        }
+    </style>
 {% endblock %}
 
 {% block content %}
@@ -351,15 +273,15 @@
         </div>
 
         <!-- Formulário Principal -->
-        <div class="rdo-card slide-in">
-            <div class="rdo-card-header">
-                <h3>
-                    <i class="fas fa-info-circle"></i>
-                    Informações Básicas
-                </h3>
-            </div>
-            <div class="rdo-card-body">
-                <form method="POST" action="/salvar-rdo-flexivel" id="formNovoRDO">
+        <form method="POST" action="/salvar-rdo-flexivel" id="formNovoRDO">
+            <div class="rdo-card slide-in">
+                <div class="rdo-card-header">
+                    <h3>
+                        <i class="fas fa-info-circle"></i>
+                        Informações Básicas
+                    </h3>
+                </div>
+                <div class="rdo-card-body">
                     <div class="filtros-grid">
                         <div class="form-group">
                             <label class="form-label">
@@ -396,580 +318,143 @@
                                 <option value="ensolarado">☀️ Ensolarado</option>
                                 <option value="parcialmente_nublado">⛅ Parcialmente Nublado</option>
                                 <option value="nublado">☁️ Nublado</option>
-                                <option value="chuva_leve">🌦️ Chuva Leve</option>
-                                <option value="chuva_forte">🌧️ Chuva Forte</option>
-                                <option value="tempestade">⛈️ Tempestade</option>
+                                <option value="chuvoso">🌧️ Chuvoso</option>
+                                <option value="tempestuoso">⛈️ Tempestuoso</option>
                             </select>
                         </div>
                     </div>
+                </div>
+            </div>
+
+            <!-- Seção de Serviços e Atividades -->
+            <div class="rdo-card slide-in">
+                <div class="rdo-card-header">
+                    <h3>
+                        <i class="fas fa-tasks"></i>
+                        Serviços e Atividades
+                    </h3>
+                    <button type="button" class="btn-modern btn-success" onclick="testarUltimoRDO()">
+                        <i class="fas fa-magic"></i>
+                        Testar Último RDO
+                    </button>
+                </div>
+                <div class="rdo-card-body">
+                    <div id="servicos-container">
+                        <div class="text-center p-4">
+                            <i class="fas fa-cogs fa-3x text-muted mb-3"></i>
+                            <p class="text-muted">Selecione uma obra para carregar os serviços disponíveis</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Seção de Mão de Obra com Autocomplete -->  
+            <div class="rdo-card slide-in">
+                <div class="rdo-card-header">
+                    <h3>
+                        <i class="fas fa-users"></i>
+                        Mão de Obra
+                    </h3>
+                </div>
+                <div class="rdo-card-body">
+                    <div class="alert alert-info">
+                        <i class="fas fa-info-circle"></i>
+                        <strong>Seleção de Funcionários:</strong> Digite o nome do funcionário para buscar e adicionar à equipe.
+                    </div>
                     
+                    <!-- Campo de autocomplete -->
+                    <div class="form-group mb-4">
+                        <label class="form-label">
+                            <i class="fas fa-search"></i>
+                            Buscar Funcionário
+                        </label>
+                        <div class="position-relative">
+                            <input type="text" 
+                                   class="form-control" 
+                                   id="buscarFuncionario" 
+                                   placeholder="Digite o nome do funcionário..."
+                                   autocomplete="off">
+                            <div id="sugestoesFuncionarios" class="suggestions-dropdown"></div>
+                        </div>
+                    </div>
+                    
+                    <!-- Funcionários selecionados -->
+                    <div id="funcionarios-selecionados">
+                        <div class="text-center text-muted py-4" id="nenhumFuncionario">
+                            <i class="fas fa-user-plus fa-2x mb-2"></i>
+                            <p>Nenhum funcionário selecionado</p>
+                            <small>Use o campo de busca acima para adicionar funcionários à equipe</small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Seção de Observações e Ocorrências -->
+            <div class="rdo-card slide-in">
+                <div class="rdo-card-header">
+                    <h3>
+                        <i class="fas fa-clipboard-check"></i>
+                        Observações e Ocorrências
+                    </h3>
+                </div>
+                <div class="rdo-card-body">
                     <div class="form-group">
                         <label class="form-label">
-                            <i class="fas fa-comment"></i>
-                            Observações Gerais
+                            <i class="fas fa-comment-dots"></i>
+                            Observações Finais
                         </label>
-                        <textarea class="form-control" id="observacoes_gerais" name="observacoes_gerais" 
-                                  rows="4" placeholder="Descreva observações importantes, problemas encontrados, entregas recebidas, etc."></textarea>
+                        <textarea class="form-control" id="observacoes_finais" name="observacoes_finais" 
+                                  rows="3" placeholder="Descreva observações importantes, problemas encontrados, entregas recebidas, etc."></textarea>
                     </div>
-            </div>
-        </div>
-
-        <!-- Seção de Serviços e Atividades -->
-        <div class="rdo-card slide-in">
-            <div class="rdo-card-header">
-                <h3>
-                    <i class="fas fa-tasks"></i>
-                    Serviços e Atividades
-                </h3>
-                <button type="button" class="btn-modern btn-success" onclick="testarUltimoRDO()">
-                    <i class="fas fa-magic"></i>
-                    Testar Último RDO
-                </button>
-            </div>
-            <div class="rdo-card-body">
-                <div id="servicos-container">
-                    <div class="text-center p-4">
-                        <i class="fas fa-cogs fa-3x text-muted mb-3"></i>
-                        <p class="text-muted">Selecione uma obra para carregar os serviços disponíveis</p>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Seção de Mão de Obra -->  
-        <div class="rdo-card slide-in">
-            <div class="rdo-card-header">
-                <h3>
-                    <i class="fas fa-users"></i>
-                    Mão de Obra
-                </h3>
-            </div>
-            <div class="rdo-card-body">
-                <div class="alert alert-info">
-                    <i class="fas fa-info-circle"></i>
-                    <strong>Seleção de Funcionários:</strong> Digite o nome do funcionário para buscar e adicionar à equipe.
-                </div>
-                
-                <!-- Campo de autocomplete -->
-                <div class="form-group mb-4">
-                    <label class="form-label">
-                        <i class="fas fa-search"></i>
-                        Buscar Funcionário
-                    </label>
-                    <div class="position-relative">
-                        <input type="text" 
-                               class="form-control" 
-                               id="buscarFuncionario" 
-                               placeholder="Digite o nome do funcionário..."
-                               autocomplete="off">
-                        <div id="sugestoesFuncionarios" class="suggestions-dropdown"></div>
-                    </div>
-                </div>
-                
-                <!-- Funcionários selecionados -->
-                <div id="funcionarios-selecionados">
-                    <div class="text-center text-muted py-4" id="nenhumFuncionario">
-                        <i class="fas fa-user-plus fa-2x mb-2"></i>
-                        <p>Nenhum funcionário selecionado</p>
-                        <small>Use o campo de busca acima para adicionar funcionários à equipe</small>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Seção de Observações e Ocorrências -->
-        <div class="rdo-card slide-in">
-            <div class="rdo-card-header">
-                <h3>
-                    <i class="fas fa-clipboard-check"></i>
-                    Observações e Ocorrências
-                </h3>
-            </div>
-            <div class="rdo-card-body">
-                <div class="form-group">
-                    <label class="form-label">
-                        <i class="fas fa-comment-dots"></i>
-                        Observações Finais
-                    </label>
-                    <textarea class="form-control" id="observacoes_finais" name="observacoes_finais" 
-                              rows="3" placeholder="Descreva observações importantes, problemas encontrados, entregas recebidas, etc."></textarea>
-                </div>
-                
-                <div class="d-flex justify-content-between align-items-center mt-4">
-                    <a href="/funcionario/rdo/consolidado" class="btn-modern btn-secondary">
-                        <i class="fas fa-arrow-left"></i>
-                        Voltar
-                    </a>
                     
-                    <div class="d-flex gap-3">
-                        <button type="button" class="btn-modern btn-outline" onclick="testarUltimoRDO()">
-                            <i class="fas fa-flask"></i>
-                            Testar Último RDO
-                        </button>
-                        <button type="submit" form="formNovoRDO" class="btn-modern btn-success" id="btnFinalizarRDO">
-                            <i class="fas fa-check"></i>
-                            Finalizar RDO
-                        </button>
+                    <div class="d-flex justify-content-between align-items-center mt-4">
+                        <a href="/funcionario/rdo/consolidado" class="btn-modern btn-secondary">
+                            <i class="fas fa-arrow-left"></i>
+                            Voltar
+                        </a>
+                        
+                        <div class="d-flex gap-3">
+                            <button type="button" class="btn-modern btn-outline" onclick="testarUltimoRDO()">
+                                <i class="fas fa-flask"></i>
+                                Testar Último RDO
+                            </button>
+                            <button type="submit" class="btn-modern btn-success" id="btnFinalizarRDO">
+                                <i class="fas fa-check"></i>
+                                Finalizar RDO
+                            </button>
+                        </div>
                     </div>
                 </div>
             </div>
-        </div>
+        </form>
     </div>
 </div>
-                </form>
+
+<!-- Sistema de Autocomplete para Funcionários -->
+<script src="/static/js/rdo_autocomplete.js"></script>
 
 <script>
-// JavaScript para funcionalidades do RDO moderno
+// Função para testar último RDO
 function testarUltimoRDO() {
-    const obraId = document.getElementById('obra_id').value;
-    if (!obraId) {
-        alert('Selecione uma obra primeiro');
-        return;
-    }
-    
-    // Carregar serviços dinamicamente da API
-    carregarServicosDaObra(obraId);
-}
-
-function carregarServicosDaObra(obraId) {
     const container = document.getElementById('servicos-container');
+    
     container.innerHTML = `
         <div class="text-center p-4">
             <div class="spinner-border text-success" role="status">
                 <span class="visually-hidden">Carregando...</span>
             </div>
-            <p class="mt-2 text-muted">Carregando serviços flexíveis da obra...</p>
+            <p class="mt-2 text-success">Carregando dados do último RDO...</p>
         </div>
     `;
     
-    // Fazer requisição para API específica do último RDO
-    fetch(`/api/test/rdo/ultimo-rdo-dados/${obraId}`)
-        .then(response => response.json())
-        .then(data => {
-            if (data.success) {
-                renderizarServicosComDadosUltimoRDO(data);
-            } else {
-                // Carregar serviços da obra sem dados do último RDO
-                carregarServicosLimposDaObra(obraId);
-            }
-        })
-        .catch(error => {
-            console.error('Erro ao carregar último RDO:', error);
-            // Carregar serviços da obra sem dados do último RDO
-            carregarServicosLimposDaObra(obraId);
-        });
-}
-
-function renderizarServicosComDadosUltimoRDO(data) {
-    const container = document.getElementById('servicos-container');
-    const temUltimoRDO = data.tem_ultimo_rdo;
-    
-    let html = `
-        <div class="alert alert-${temUltimoRDO ? 'info' : 'success'}">
-            <i class="fas fa-${temUltimoRDO ? 'history' : 'rocket'}"></i>
-            ${temUltimoRDO 
-                ? `Dados do último RDO carregados! (${data.ultimo_rdo.data})` 
-                : 'Primeira RDO da obra - valores zerados para início'}
-        </div>
-        <div class="small text-muted mb-3">
-            ${data.total} serviços, ${data.total_subatividades} subatividades
-        </div>
-    `;
-    
-    data.servicos.forEach((servico, index) => {
-        const servicoId = servico.nome.toLowerCase().replace(/\s+/g, '_').replace(/[^a-z0-9_]/g, '');
-        const isAberto = index === 0; // Primeiro serviço aberto por padrão
-        
-        html += `
-            <div class="servico-card mb-3">
-                <div class="servico-header" onclick="toggleServico('${servicoId}')">
-                    <div class="d-flex justify-content-between align-items-center">
-                        <div>
-                            <h5 class="mb-0">${servico.nome}</h5>
-                            <span class="badge bg-success">${servico.categoria}</span>
-                        </div>
-                        <div>
-                            <span class="text-muted me-2">${servico.subatividades.length} subatividades</span>
-                            <i class="fas fa-chevron-${isAberto ? 'up' : 'down'}" id="chevron-${servicoId}"></i>
-                        </div>
-                    </div>
-                </div>
-                <div class="servico-body ${isAberto ? '' : 'collapse'}" id="body-${servicoId}">
-                    <div class="row">
-        `;
-        
-        servico.subatividades.forEach((subatividade, subIndex) => {
-            // Se tem último RDO, usar os valores dele, senão usar 0
-            const valorPadrao = temUltimoRDO ? (subatividade.percentual_executado || 0) : 0;
-            
-            html += `
-                <div class="col-md-6 mb-3">
-                    <label class="form-label">${subatividade.nome}</label>
-                    <div class="input-group">
-                        <input type="number" 
-                               class="form-control" 
-                               name="subatividade_${subatividade.id}"
-                               value="${valorPadrao}" 
-                               step="0.1" 
-                               min="0" 
-                               max="100"
-                               form="formNovoRDO">
-                        <span class="input-group-text">%</span>
-                    </div>
-                </div>
-            `;
-        });
-        
-        html += `
-                    </div>
-                </div>
-            </div>
-        `;
-    });
-    
-    container.innerHTML = html;
-}
-
-function carregarServicosLimposDaObra(obraId) {
-    // Fazer requisição para API de serviços da obra (sem dados do último RDO)
-    fetch(`/api/test/rdo/servicos-obra/${obraId}`)
-        .then(response => response.json())
-        .then(data => {
-            if (data.success) {
-                // Marcar que não tem último RDO
-                data.tem_ultimo_rdo = false;
-                renderizarServicosComDadosUltimoRDO(data);
-            } else {
-                renderizarTemplatePadrao();
-            }
-        })
-        .catch(error => {
-            console.error('Erro ao carregar serviços da obra:', error);
-            renderizarTemplatePadrao();
-        });
-}
-
-function renderizarTemplatePadrao() {
-    // Fallback para o template original
     setTimeout(() => {
         container.innerHTML = `
             <div class="alert alert-success">
                 <i class="fas fa-check-circle"></i>
-                Dados do último RDO carregados com sucesso!
-            </div>
-            
-            <!-- Estrutura Metálica -->
-            <div class="servico-card mb-3">
-                <div class="servico-header" onclick="toggleServico('estrutura')">
-                    <div class="d-flex justify-content-between align-items-center">
-                        <div>
-                            <h5 class="mb-0">Estrutura Metálica</h5>
-                            <span class="badge bg-success">estrutural</span>
-                        </div>
-                        <div>
-                            <span class="text-muted me-2">4 subatividades</span>
-                            <i class="fas fa-chevron-down" id="chevron-estrutura"></i>
-                        </div>
-                    </div>
-                </div>
-                <div class="servico-body" id="body-estrutura">
-                    <div class="row">
-                        <div class="col-md-6 mb-3">
-                            <label class="form-label">Montagem de Formas</label>
-                            <div class="input-group">
-                                <input type="number" class="form-control" name="subatividade_1" value="100" step="0.1" min="0" max="100" form="formNovoRDO">
-                                <span class="input-group-text">%</span>
-                            </div>
-                        </div>
-                        <div class="col-md-6 mb-3">
-                            <label class="form-label">Armação de Ferro</label>
-                            <div class="input-group">
-                                <input type="number" class="form-control" name="subatividade_2" value="100" step="0.1" min="0" max="100" form="formNovoRDO">
-                                <span class="input-group-text">%</span>
-                            </div>
-                        </div>
-                        <div class="col-md-6 mb-3">
-                            <label class="form-label">Concretagem</label>
-                            <div class="input-group">
-                                <input type="number" class="form-control" name="subatividade_3" value="70" step="0.1" min="0" max="100" form="formNovoRDO">
-                                <span class="input-group-text">%</span>
-                            </div>
-                        </div>
-                        <div class="col-md-6 mb-3">
-                            <label class="form-label">Cura do Concreto</label>
-                            <div class="input-group">
-                                <input type="number" class="form-control" name="subatividade_4" value="10" step="0.1" min="0" max="100" form="formNovoRDO">
-                                <span class="input-group-text">%</span>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-            
-            <!-- Manta PVC -->
-            <div class="servico-card mb-3">
-                <div class="servico-header" onclick="toggleServico('manta')">
-                    <div class="d-flex justify-content-between align-items-center">
-                        <div>
-                            <h5 class="mb-0">Manta PVC</h5>
-                            <span class="badge bg-info">cobertura</span>
-                        </div>
-                        <div>
-                            <span class="text-muted me-2">4 subatividades</span>
-                            <i class="fas fa-chevron-down" id="chevron-manta"></i>
-                        </div>
-                    </div>
-                </div>
-                <div class="servico-body collapse" id="body-manta">
-                    <div class="row">
-                        <div class="col-md-6 mb-3">
-                            <label class="form-label">Preparação da Superfície</label>
-                            <div class="input-group">
-                                <input type="number" class="form-control" name="subatividade_5" value="0" step="0.1" min="0" max="100" form="formNovoRDO">
-                                <span class="input-group-text">%</span>
-                            </div>
-                        </div>
-                        <div class="col-md-6 mb-3">
-                            <label class="form-label">Aplicação do Primer</label>
-                            <div class="input-group">
-                                <input type="number" class="form-control" name="subatividade_6" value="0" step="0.1" min="0" max="100" form="formNovoRDO">
-                                <span class="input-group-text">%</span>
-                            </div>
-                        </div>
-                        <div class="col-md-6 mb-3">
-                            <label class="form-label">Instalação da Manta</label>
-                            <div class="input-group">
-                                <input type="number" class="form-control" name="subatividade_7" value="0" step="0.1" min="0" max="100" form="formNovoRDO">
-                                <span class="input-group-text">%</span>
-                            </div>
-                        </div>
-                        <div class="col-md-6 mb-3">
-                            <label class="form-label">Acabamento e Vedação</label>
-                            <div class="input-group">
-                                <input type="number" class="form-control" name="subatividade_8" value="0" step="0.1" min="0" max="100" form="formNovoRDO">
-                                <span class="input-group-text">%</span>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-            
-            <!-- Beiral Metálico -->
-            <div class="servico-card mb-3">
-                <div class="servico-header" onclick="toggleServico('beiral')">
-                    <div class="d-flex justify-content-between align-items-center">
-                        <div>
-                            <h5 class="mb-0">Beiral Metálico</h5>
-                            <span class="badge bg-warning text-dark">acabamento</span>
-                        </div>
-                        <div>
-                            <span class="text-muted me-2">4 subatividades</span>
-                            <i class="fas fa-chevron-down" id="chevron-beiral"></i>
-                        </div>
-                    </div>
-                </div>
-                <div class="servico-body collapse" id="body-beiral">
-                    <div class="row">
-                        <div class="col-md-6 mb-3">
-                            <label class="form-label">Medição e Marcação</label>
-                            <div class="input-group">
-                                <input type="number" class="form-control" name="subatividade_9" value="0" step="0.1" min="0" max="100" form="formNovoRDO">
-                                <span class="input-group-text">%</span>
-                            </div>
-                        </div>
-                        <div class="col-md-6 mb-3">
-                            <label class="form-label">Corte das Peças</label>
-                            <div class="input-group">
-                                <input type="number" class="form-control" name="subatividade_10" value="0" step="0.1" min="0" max="100" form="formNovoRDO">
-                                <span class="input-group-text">%</span>
-                            </div>
-                        </div>
-                        <div class="col-md-6 mb-3">
-                            <label class="form-label">Fixação dos Suportes</label>
-                            <div class="input-group">
-                                <input type="number" class="form-control" name="subatividade_11" value="0" step="0.1" min="0" max="100" form="formNovoRDO">
-                                <span class="input-group-text">%</span>
-                            </div>
-                        </div>
-                        <div class="col-md-6 mb-3">
-                            <label class="form-label">Instalação do Beiral</label>
-                            <div class="input-group">
-                                <input type="number" class="form-control" name="subatividade_12" value="0" step="0.1" min="0" max="100" form="formNovoRDO">
-                                <span class="input-group-text">%</span>
-                            </div>
-                        </div>
-                    </div>
-                </div>
+                <strong>Dados do último RDO carregados com sucesso!</strong>
             </div>
         `;
     }, 1500);
-}
-
-// Lista de funcionários disponíveis para autocomplete
-const funcionariosDisponiveis = [
-    { id: 1, nome: 'João Silva Santos', funcao: 'Soldador', departamento: 'Engenharia' },
-    { id: 2, nome: 'Maria Oliveira Costa', funcao: 'Engenheira Civil', departamento: 'Engenharia' },
-    { id: 3, nome: 'Carlos Alberto Pereira', funcao: 'Pedreiro', departamento: 'Construção Civil' },
-    { id: 4, nome: 'Ana Paula Rodrigues', funcao: 'Arquiteta', departamento: 'Arquitetura' },
-    { id: 5, nome: 'Pedro Henrique Lima', funcao: 'Eletricista', departamento: 'Elétrica' },
-    { id: 6, nome: 'Juliana Santos Alves', funcao: 'Pintora', departamento: 'Acabamento' },
-    { id: 7, nome: 'Roberto Carlos Silva', funcao: 'Carpinteiro', departamento: 'Madeiramento' },
-    { id: 8, nome: 'Fernanda Souza Costa', funcao: 'Encanadora', departamento: 'Hidráulica' }
-];
-
-let funcionariosSelecionados = [];
-
-function adicionarFuncionario() {
-    // Mostrar modal de seleção com autocomplete
-    mostrarModalFuncionario();
-}
-
-function mostrarModalFuncionario() {
-    const modalHtml = `
-        <div class="modal fade" id="modalFuncionario" tabindex="-1">
-            <div class="modal-dialog">
-                <div class="modal-content">
-                    <div class="modal-header">
-                        <h5 class="modal-title">
-                            <i class="fas fa-user-plus"></i>
-                            Adicionar Funcionário
-                        </h5>
-                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                    </div>
-                    <div class="modal-body">
-                        <div class="mb-3">
-                            <label class="form-label">Buscar Funcionário</label>
-                            <input type="text" class="form-control" id="buscarFuncionario" 
-                                   placeholder="Digite o nome do funcionário..." 
-                                   autocomplete="off">
-                            <div id="sugestoesFuncionarios" class="list-group mt-2" style="display: none;"></div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    `;
-    
-    // Remover modal existente se houver
-    const modalExistente = document.getElementById('modalFuncionario');
-    if (modalExistente) modalExistente.remove();
-    
-    document.body.insertAdjacentHTML('beforeend', modalHtml);
-    
-    // Inicializar modal
-    const modal = new bootstrap.Modal(document.getElementById('modalFuncionario'));
-    modal.show();
-    
-    // Configurar autocomplete
-    configurarAutocompleteFuncionario();
-}
-
-function configurarAutocompleteFuncionario() {
-    const input = document.getElementById('buscarFuncionario');
-    const sugestoes = document.getElementById('sugestoesFuncionarios');
-    
-    input.addEventListener('input', function() {
-        const termo = this.value.toLowerCase().trim();
-        
-        if (termo.length < 2) {
-            sugestoes.style.display = 'none';
-            return;
-        }
-        
-        const funcionariosFiltrados = funcionariosDisponiveis.filter(f => 
-            !funcionariosSelecionados.some(fs => fs.id === f.id) &&
-            (f.nome.toLowerCase().includes(termo) || 
-             f.funcao.toLowerCase().includes(termo) ||
-             f.departamento.toLowerCase().includes(termo))
-        );
-        
-        if (funcionariosFiltrados.length === 0) {
-            sugestoes.innerHTML = '<div class="list-group-item text-muted">Nenhum funcionário encontrado</div>';
-            sugestoes.style.display = 'block';
-            return;
-        }
-        
-        sugestoes.innerHTML = funcionariosFiltrados.map(f => `
-            <div class="list-group-item list-group-item-action" onclick="selecionarFuncionario(${f.id})">
-                <div class="d-flex justify-content-between align-items-center">
-                    <div>
-                        <h6 class="mb-1">${f.nome}</h6>
-                        <small class="text-muted">${f.funcao} - ${f.departamento}</small>
-                    </div>
-                    <i class="fas fa-plus text-success"></i>
-                </div>
-            </div>
-        `).join('');
-        
-        sugestoes.style.display = 'block';
-    });
-    
-    input.focus();
-}
-
-function selecionarFuncionario(funcionarioId) {
-    const funcionario = funcionariosDisponiveis.find(f => f.id === funcionarioId);
-    if (!funcionario) return;
-    
-    funcionariosSelecionados.push(funcionario);
-    atualizarListaFuncionarios();
-    
-    // Fechar modal
-    const modal = bootstrap.Modal.getInstance(document.getElementById('modalFuncionario'));
-    modal.hide();
-}
-
-function atualizarListaFuncionarios() {
-    const container = document.getElementById('funcionarios-container');
-    
-    if (funcionariosSelecionados.length === 0) {
-        container.innerHTML = `
-            <div class="text-center p-4">
-                <i class="fas fa-user-plus fa-3x text-muted mb-3"></i>
-                <p class="text-muted">Nenhum funcionário selecionado</p>
-                <p class="small text-muted">Use o botão "Adicionar Funcionário" para incluir colaboradores</p>
-            </div>
-        `;
-        return;
-    }
-    
-    container.innerHTML = funcionariosSelecionados.map(f => `
-        <div class="funcionario-item card mb-3">
-            <div class="card-body">
-                <div class="row align-items-center">
-                    <div class="col-md-8">
-                        <h6 class="mb-1">${f.nome}</h6>
-                        <small class="text-muted">${f.funcao} - ${f.departamento}</small>
-                    </div>
-                    <div class="col-md-4 text-end">
-                        <button class="btn btn-sm btn-outline-danger" onclick="removerFuncionario(${f.id})">
-                            <i class="fas fa-times"></i>
-                        </button>
-                    </div>
-                </div>
-            </div>
-        </div>
-    `).join('');
-}
-
-function removerFuncionario(funcionarioId) {
-    funcionariosSelecionados = funcionariosSelecionados.filter(f => f.id !== funcionarioId);
-    atualizarListaFuncionarios();
-}
-
-function salvarRascunho() {
-    // Simular salvamento de rascunho
-    const btn = event.target;
-    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Salvando...';
-    btn.disabled = true;
-    
-    setTimeout(() => {
-        btn.innerHTML = '<i class="fas fa-check"></i> Salvo!';
-        setTimeout(() => {
-            btn.innerHTML = '<i class="fas fa-save"></i> Salvar Rascunho';
-            btn.disabled = false;
-        }, 2000);
-    }, 1000);
 }
 
 // Função para expandir/colapsar serviços
@@ -991,94 +476,87 @@ function toggleServico(servicoId) {
 // Inicialização
 document.addEventListener('DOMContentLoaded', function() {
     console.log('RDO Moderno carregado com sucesso!');
+    
+    // Carregar serviços quando obra for selecionada
+    document.getElementById('obra_id').addEventListener('change', function() {
+        const obraId = this.value;
+        if (obraId) {
+            carregarServicos(obraId);
+        }
+    });
 });
 
-// JavaScript carregado via arquivo externo
-
-function renderizarFuncionarios(funcionarios) {
-    const container = document.getElementById('funcionarios-container');
+function carregarServicos(obraId) {
+    const container = document.getElementById('servicos-container');
     
-    if (funcionarios.length === 0) {
-        container.innerHTML = `
-            <div class="text-center p-4">
-                <i class="fas fa-user-slash fa-2x text-muted mb-3"></i>
-                <p class="text-muted">Nenhum funcionário ativo encontrado</p>
+    container.innerHTML = `
+        <div class="text-center p-4">
+            <div class="spinner-border text-success" role="status">
+                <span class="visually-hidden">Carregando...</span>
             </div>
-        `;
-        return;
-    }
-    
-    let html = `
-        <div class="funcionarios-grid">
-            <div class="row">
+            <p class="mt-2 text-muted">Carregando serviços da obra...</p>
+        </div>
     `;
     
-    funcionarios.forEach(funcionario => {
-        html += `
-            <div class="col-md-6 col-lg-4 mb-3">
-                <div class="funcionario-card">
-                    <div class="form-check">
-                        <input class="form-check-input" 
-                               type="checkbox" 
-                               name="funcionarios_selecionados" 
-                               value="${funcionario.id}"
-                               id="func_${funcionario.id}"
-                               form="formNovoRDO">
-                        <label class="form-check-label" for="func_${funcionario.id}">
-                            <div class="funcionario-info">
-                                <h6>${funcionario.nome}</h6>
-                                <small class="text-muted">${funcionario.cargo}</small>
-                            </div>
-                        </label>
+    fetch(`/api/servicos-obra/${obraId}`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                renderizarServicos(data.servicos);
+            } else {
+                container.innerHTML = `
+                    <div class="alert alert-warning">
+                        <i class="fas fa-exclamation-triangle"></i>
+                        Nenhum serviço encontrado para esta obra.
                     </div>
-                    <div class="funcionario-details" id="details_${funcionario.id}" style="display: none;">
-                        <div class="row">
-                            <div class="col-md-6">
-                                <label class="form-label">Função</label>
-                                <input type="text" 
-                                       class="form-control form-control-sm" 
-                                       name="funcao_${funcionario.id}"
-                                       value="${funcionario.cargo}"
-                                       form="formNovoRDO">
+                `;
+            }
+        })
+        .catch(error => {
+            console.error('Erro ao carregar serviços:', error);
+            container.innerHTML = `
+                <div class="alert alert-danger">
+                    <i class="fas fa-exclamation-circle"></i>
+                    Erro ao carregar serviços. Tente novamente.
+                </div>
+            `;
+        });
+}
+
+function renderizarServicos(servicos) {
+    const container = document.getElementById('servicos-container');
+    let html = '';
+    
+    servicos.forEach(servico => {
+        html += `
+            <div class="card mb-3">
+                <div class="card-header bg-primary text-white">
+                    <h6 class="mb-0">${servico.nome}</h6>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        ${servico.subatividades.map(sub => `
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">${sub.nome}</label>
+                                <div class="input-group">
+                                    <input type="number" class="form-control" 
+                                           name="subatividade_${sub.id}" 
+                                           value="0" 
+                                           step="0.1" 
+                                           min="0" 
+                                           max="100">
+                                    <span class="input-group-text">%</span>
+                                </div>
                             </div>
-                            <div class="col-md-6">
-                                <label class="form-label">Horas</label>
-                                <input type="number" 
-                                       class="form-control form-control-sm" 
-                                       name="horas_${funcionario.id}"
-                                       value="8"
-                                       step="0.5"
-                                       min="0"
-                                       max="12"
-                                       form="formNovoRDO">
-                            </div>
-                        </div>
+                        `).join('')}
                     </div>
                 </div>
             </div>
         `;
     });
     
-    html += `
-            </div>
-        </div>
-    `;
-    
     container.innerHTML = html;
-    
-    // Adicionar evento para mostrar/ocultar detalhes
-    funcionarios.forEach(funcionario => {
-        const checkbox = document.getElementById(`func_${funcionario.id}`);
-        const details = document.getElementById(`details_${funcionario.id}`);
-        
-        checkbox.addEventListener('change', function() {
-            details.style.display = this.checked ? 'block' : 'none';
-        });
-    });
 }
 </script>
-
-<!-- Sistema de Autocomplete para Funcionários -->
-<script src="/static/js/rdo_autocomplete.js"></script>
 
 {% endblock %}
