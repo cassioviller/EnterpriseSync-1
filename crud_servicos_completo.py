@@ -44,7 +44,6 @@ def index():
         ).order_by(Servico.nome).all()
         
         # Para cada serviço, buscar suas subatividades
-        servicos_data = []
         for servico in servicos:
             subatividades = SubatividadeMestre.query.filter_by(
                 servico_id=servico.id,
@@ -52,17 +51,19 @@ def index():
                 ativo=True
             ).order_by(SubatividadeMestre.ordem_padrao).all()
             
-            servicos_data.append({
-                'servico': servico,
-                'subatividades': subatividades,
-                'total_subatividades': len(subatividades)
-            })
+            # Adicionar subatividades ao objeto serviço
+            servico.subatividades = subatividades
         
-        logger.info(f"✅ Encontrados {len(servicos_data)} serviços")
+        # Calcular estatísticas
+        total_subatividades = sum(len(s.subatividades) for s in servicos)
+        categorias_count = len(set(s.categoria for s in servicos if s.categoria))
+        
+        logger.info(f"✅ Encontrados {len(servicos)} serviços")
         
         return render_template('servicos/index.html',
-                             servicos_data=servicos_data,
-                             total_servicos=len(servicos_data))
+                             servicos=servicos,
+                             subatividades_total=total_subatividades,
+                             categorias_count=categorias_count)
         
     except Exception as e:
         logger.error(f"❌ Erro ao carregar serviços: {str(e)}")

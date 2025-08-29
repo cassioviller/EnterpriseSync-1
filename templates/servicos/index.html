@@ -4,169 +4,8 @@
 
 {% block extra_css %}
 <style>
-/* Cards modernos para serviços */
-.servico-card {
-    background: linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%);
-    border: 1px solid #e2e8f0;
-    border-radius: 12px;
-    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.07);
-    transition: all 0.3s ease;
-    margin-bottom: 1.5rem;
-}
-
-.servico-card:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 8px 15px rgba(0, 0, 0, 0.1);
-    border-color: #198754;
-}
-
-.servico-header {
-    background: linear-gradient(135deg, #198754 0%, #20c997 100%);
-    color: white;
-    padding: 1.2rem 1.5rem;
-    border-radius: 12px 12px 0 0;
-    margin: -1px -1px 0 -1px;
-}
-
-.servico-body {
-    padding: 1.5rem;
-}
-
-.subatividade-badge {
-    background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
-    border: 1px solid #dee2e6;
-    border-radius: 20px;
-    padding: 0.4rem 0.8rem;
-    margin: 0.3rem;
-    display: inline-block;
-    font-size: 0.85rem;
-    color: #495057;
-    transition: all 0.2s ease;
-}
-
-.subatividade-badge:hover {
-    background: linear-gradient(135deg, #198754 0%, #20c997 100%);
-    color: white;
-    border-color: #198754;
-}
-
-.categoria-badge {
-    background: linear-gradient(135deg, #6f42c1 0%, #8b5cf6 100%);
-    color: white;
-    padding: 0.3rem 0.7rem;
-    border-radius: 15px;
-    font-size: 0.75rem;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-}
-
-.btn-action {
-    border: none;
-    border-radius: 8px;
-    padding: 0.5rem 1rem;
-    margin: 0.2rem;
-    font-weight: 600;
-    text-decoration: none;
-    display: inline-block;
-    transition: all 0.3s ease;
-    font-size: 0.85rem;
-}
-
-.btn-primary-custom {
-    background: linear-gradient(135deg, #198754 0%, #20c997 100%);
-    color: white;
-}
-
-.btn-primary-custom:hover {
-    background: linear-gradient(135deg, #157347 0%, #1aa085 100%);
-    transform: translateY(-1px);
-    color: white;
-    text-decoration: none;
-}
-
-.btn-secondary-custom {
-    background: linear-gradient(135deg, #6c757d 0%, #78868f 100%);
-    color: white;
-}
-
-.btn-secondary-custom:hover {
-    background: linear-gradient(135deg, #5a6268 0%, #6c7a83 100%);
-    transform: translateY(-1px);
-    color: white;
-    text-decoration: none;
-}
-
-.btn-danger-custom {
-    background: linear-gradient(135deg, #dc3545 0%, #e74c3c 100%);
-    color: white;
-}
-
-.btn-danger-custom:hover {
-    background: linear-gradient(135deg, #c82333 0%, #d62c1a 100%);
-    transform: translateY(-1px);
-    color: white;
-    text-decoration: none;
-}
-
-.stats-card {
-    background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
-    border: 1px solid #dee2e6;
-    border-radius: 12px;
-    padding: 1.5rem;
-    text-align: center;
-    margin-bottom: 2rem;
-}
-
-.stats-number {
-    font-size: 2.5rem;
-    font-weight: 700;
-    color: #198754;
-    margin: 0;
-}
-
-.stats-label {
-    color: #6c757d;
-    font-weight: 600;
-    text-transform: uppercase;
-    font-size: 0.85rem;
-    letter-spacing: 0.5px;
-}
-
-.empty-state {
-    text-align: center;
-    padding: 3rem 1rem;
-    color: #6c757d;
-}
-
-.empty-state i {
-    font-size: 4rem;
-    margin-bottom: 1rem;
-    opacity: 0.5;
-}
-
-.search-card {
-    background: white;
-    border: 1px solid #e2e8f0;
-    border-radius: 12px;
-    padding: 1.5rem;
-    margin-bottom: 2rem;
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
-}
-
-.form-control-modern {
-    border: 1px solid #d1d5db;
-    border-radius: 8px;
-    padding: 0.75rem;
-    transition: all 0.3s ease;
-}
-
-.form-control-modern:focus {
-    border-color: #198754;
-    box-shadow: 0 0 0 3px rgba(25, 135, 84, 0.1);
-}
-
-.page-header {
+/* Cards modernos para serviços inspirados no RDO */
+.page-header-services {
     background: linear-gradient(135deg, #198754 0%, #20c997 100%);
     color: white;
     padding: 2rem 0;
@@ -174,259 +13,389 @@
     border-radius: 0 0 20px 20px;
 }
 
-.btn-novo {
-    background: linear-gradient(135deg, #198754 0%, #20c997 100%);
-    border: none;
-    color: white;
-    padding: 0.75rem 2rem;
-    border-radius: 25px;
-    font-weight: 600;
-    text-decoration: none;
-    display: inline-block;
-    transition: all 0.3s ease;
+.service-card {
+    background: linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%);
+    border: 1px solid #e2e8f0;
+    border-radius: 16px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+    transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+    margin-bottom: 1.5rem;
+    overflow: hidden;
+    position: relative;
 }
 
-.btn-novo:hover {
+.service-card:hover {
+    transform: translateY(-8px);
+    box-shadow: 0 12px 25px rgba(25, 135, 84, 0.15);
+    border-color: #198754;
+}
+
+.service-card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 4px;
+    background: linear-gradient(90deg, #198754 0%, #20c997 50%, #6f42c1 100%);
+}
+
+.service-card-header {
+    padding: 1.5rem;
+    border-bottom: 1px solid #f1f3f4;
+}
+
+.service-title {
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: #1a1a1a;
+    margin: 0 0 0.5rem 0;
+    line-height: 1.3;
+}
+
+.service-category {
+    background: linear-gradient(135deg, #6f42c1 0%, #8b5cf6 100%);
+    color: white;
+    padding: 0.4rem 0.8rem;
+    border-radius: 20px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    display: inline-block;
+}
+
+.service-description {
+    color: #6c757d;
+    font-size: 0.9rem;
+    margin-top: 0.5rem;
+    line-height: 1.4;
+}
+
+.service-card-body {
+    padding: 1.5rem;
+}
+
+.subatividades-section {
+    margin-bottom: 1.5rem;
+}
+
+.subatividades-header {
+    display: flex;
+    align-items: center;
+    margin-bottom: 1rem;
+}
+
+.subatividades-title {
+    font-size: 1rem;
+    font-weight: 600;
+    color: #495057;
+    margin: 0;
+    margin-right: 0.5rem;
+}
+
+.subatividades-count {
+    background: linear-gradient(135deg, #17a2b8 0%, #20c997 100%);
+    color: white;
+    padding: 0.25rem 0.6rem;
+    border-radius: 12px;
+    font-size: 0.75rem;
+    font-weight: 600;
+}
+
+.subatividades-grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+}
+
+.subatividade-tag {
+    background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+    border: 1px solid #dee2e6;
+    border-radius: 25px;
+    padding: 0.4rem 0.8rem;
+    font-size: 0.8rem;
+    color: #495057;
+    transition: all 0.3s ease;
+    position: relative;
+    overflow: hidden;
+}
+
+.subatividade-tag:hover {
+    background: linear-gradient(135deg, #198754 0%, #20c997 100%);
+    color: white;
+    border-color: #198754;
+    transform: translateY(-1px);
+}
+
+.service-actions {
+    display: flex;
+    gap: 0.5rem;
+    justify-content: flex-end;
+    padding-top: 1rem;
+    border-top: 1px solid #f1f3f4;
+}
+
+.btn-service-action {
+    border: none;
+    border-radius: 10px;
+    padding: 0.6rem 1.2rem;
+    font-weight: 600;
+    text-decoration: none;
+    font-size: 0.85rem;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.btn-edit {
+    background: linear-gradient(135deg, #198754 0%, #20c997 100%);
+    color: white;
+}
+
+.btn-edit:hover {
     background: linear-gradient(135deg, #157347 0%, #1aa085 100%);
     transform: translateY(-2px);
     color: white;
     text-decoration: none;
     box-shadow: 0 5px 15px rgba(25, 135, 84, 0.3);
 }
+
+.btn-delete {
+    background: linear-gradient(135deg, #dc3545 0%, #e74c3c 100%);
+    color: white;
+}
+
+.btn-delete:hover {
+    background: linear-gradient(135deg, #c82333 0%, #d62c1a 100%);
+    transform: translateY(-2px);
+    color: white;
+    text-decoration: none;
+    box-shadow: 0 5px 15px rgba(220, 53, 69, 0.3);
+}
+
+.btn-new-service {
+    background: linear-gradient(135deg, #198754 0%, #20c997 100%);
+    color: white;
+    border: none;
+    border-radius: 12px;
+    padding: 0.75rem 1.5rem;
+    font-weight: 600;
+    text-decoration: none;
+    font-size: 0.9rem;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.btn-new-service:hover {
+    background: linear-gradient(135deg, #157347 0%, #1aa085 100%);
+    transform: translateY(-2px);
+    color: white;
+    text-decoration: none;
+    box-shadow: 0 8px 20px rgba(25, 135, 84, 0.3);
+}
+
+.stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 1.5rem;
+    margin-bottom: 2rem;
+}
+
+.stat-card {
+    background: linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%);
+    border: 1px solid #e2e8f0;
+    border-radius: 16px;
+    padding: 1.5rem;
+    text-align: center;
+    transition: all 0.3s ease;
+}
+
+.stat-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.1);
+}
+
+.stat-number {
+    font-size: 2.5rem;
+    font-weight: 700;
+    color: #198754;
+    margin: 0;
+}
+
+.stat-label {
+    color: #6c757d;
+    font-size: 0.9rem;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-top: 0.5rem;
+}
+
+.empty-state {
+    text-align: center;
+    padding: 3rem;
+    color: #6c757d;
+}
+
+.empty-state i {
+    font-size: 4rem;
+    color: #dee2e6;
+    margin-bottom: 1rem;
+}
+
+/* Responsivo */
+@media (max-width: 768px) {
+    .service-actions {
+        flex-direction: column;
+    }
+    
+    .btn-service-action {
+        width: 100%;
+        justify-content: center;
+    }
+    
+    .stats-grid {
+        grid-template-columns: 1fr;
+    }
+}
 </style>
 {% endblock %}
 
 {% block content %}
-<div class="page-header">
+<div class="page-header-services">
     <div class="container">
         <div class="d-flex justify-content-between align-items-center">
             <div>
                 <h1 class="mb-0">
-                    <i class="fas fa-tools me-3"></i>
+                    <i class="fas fa-cogs me-3"></i>
                     Gestão de Serviços
                 </h1>
                 <p class="mb-0 mt-2 opacity-75">
                     Configure os serviços e subatividades do seu sistema
                 </p>
             </div>
-            <div>
-                <a href="{{ url_for('servicos_crud.novo_servico') }}" class="btn-novo">
-                    <i class="fas fa-plus me-2"></i>
-                    Novo Serviço
-                </a>
-            </div>
+            <a href="{{ url_for('servicos_crud.novo_servico') }}" class="btn-new-service">
+                <i class="fas fa-plus"></i>
+                Novo Serviço
+            </a>
         </div>
     </div>
 </div>
 
 <div class="container">
     <!-- Estatísticas -->
-    <div class="row">
-        <div class="col-md-4">
-            <div class="stats-card">
-                <div class="stats-number">{{ total_servicos or 0 }}</div>
-                <div class="stats-label">Serviços Ativos</div>
-            </div>
+    <div class="stats-grid">
+        <div class="stat-card">
+            <div class="stat-number">{{ servicos|length }}</div>
+            <div class="stat-label">Serviços Ativos</div>
         </div>
-        <div class="col-md-4">
-            <div class="stats-card">
-                <div class="stats-number">
-                    {% set total_subs = servicos_data | sum(attribute='total_subatividades') %}
-                    {{ total_subs or 0 }}
-                </div>
-                <div class="stats-label">Subatividades</div>
-            </div>
+        <div class="stat-card">
+            <div class="stat-number">{{ subatividades_total }}</div>
+            <div class="stat-label">Subatividades</div>
         </div>
-        <div class="col-md-4">
-            <div class="stats-card">
-                <div class="stats-number">
-                    {% set categorias = servicos_data | map(attribute='servico.categoria') | unique | list %}
-                    {{ categorias | length or 0 }}
-                </div>
-                <div class="stats-label">Categorias</div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Filtros e Busca -->
-    <div class="search-card">
-        <div class="row">
-            <div class="col-md-6">
-                <label class="form-label fw-bold">Buscar Serviços</label>
-                <input type="text" id="buscaServicos" class="form-control form-control-modern" 
-                       placeholder="Digite o nome do serviço...">
-            </div>
-            <div class="col-md-3">
-                <label class="form-label fw-bold">Categoria</label>
-                <select id="filtroCategoria" class="form-control form-control-modern">
-                    <option value="">Todas as categorias</option>
-                    {% for servico_data in servicos_data %}
-                        {% set categoria = servico_data.servico.categoria %}
-                        {% if categoria %}
-                            <option value="{{ categoria }}">{{ categoria }}</option>
-                        {% endif %}
-                    {% endfor %}
-                </select>
-            </div>
-            <div class="col-md-3 d-flex align-items-end">
-                <button type="button" class="btn btn-outline-secondary" onclick="limparFiltros()">
-                    <i class="fas fa-times me-1"></i>
-                    Limpar
-                </button>
-            </div>
+        <div class="stat-card">
+            <div class="stat-number">{{ categorias_count }}</div>
+            <div class="stat-label">Categorias</div>
         </div>
     </div>
 
     <!-- Lista de Serviços -->
-    {% if servicos_data %}
-        <div id="servicosContainer">
-            {% for servico_data in servicos_data %}
-                <div class="servico-card" data-nome="{{ servico_data.servico.nome|lower }}" 
-                     data-categoria="{{ servico_data.servico.categoria or '' }}">
-                    <div class="servico-header">
+    {% if servicos %}
+        <div class="row">
+            {% for servico in servicos %}
+            <div class="col-lg-6 col-xl-4">
+                <div class="service-card">
+                    <div class="service-card-header">
                         <div class="d-flex justify-content-between align-items-start">
                             <div>
-                                <h4 class="mb-1">{{ servico_data.servico.nome }}</h4>
-                                {% if servico_data.servico.categoria %}
-                                    <span class="categoria-badge">{{ servico_data.servico.categoria }}</span>
-                                {% endif %}
-                            </div>
-                            <div class="text-end">
-                                <div class="text-white-50 small">
-                                    {{ servico_data.total_subatividades }} subatividades
-                                </div>
+                                <h3 class="service-title">{{ servico.nome }}</h3>
+                                <span class="service-category">{{ servico.categoria }}</span>
                             </div>
                         </div>
+                        {% if servico.descricao %}
+                        <div class="service-description">
+                            {{ servico.descricao[:100] }}{% if servico.descricao|length > 100 %}...{% endif %}
+                        </div>
+                        {% endif %}
                     </div>
                     
-                    <div class="servico-body">
-                        {% if servico_data.servico.descricao %}
-                            <p class="text-muted mb-3">{{ servico_data.servico.descricao }}</p>
-                        {% endif %}
-                        
-                        <div class="mb-3">
-                            <h6 class="fw-bold mb-2">Subatividades:</h6>
-                            {% if servico_data.subatividades %}
-                                {% for subatividade in servico_data.subatividades %}
-                                    <span class="subatividade-badge" 
-                                          title="{{ subatividade.descricao or 'Sem descrição' }}">
-                                        {{ subatividade.nome }}
-                                    </span>
+                    <div class="service-card-body">
+                        <div class="subatividades-section">
+                            <div class="subatividades-header">
+                                <h4 class="subatividades-title">
+                                    <i class="fas fa-tasks me-1"></i>
+                                    Subatividades
+                                </h4>
+                                <span class="subatividades-count">
+                                    {{ servico.subatividades|length }}
+                                </span>
+                            </div>
+                            
+                            {% if servico.subatividades %}
+                            <div class="subatividades-grid">
+                                {% for sub in servico.subatividades[:4] %}
+                                <span class="subatividade-tag">
+                                    {{ sub.nome }}
+                                </span>
                                 {% endfor %}
+                                {% if servico.subatividades|length > 4 %}
+                                <span class="subatividade-tag">
+                                    +{{ servico.subatividades|length - 4 }} mais
+                                </span>
+                                {% endif %}
+                            </div>
                             {% else %}
-                                <span class="text-muted small">Nenhuma subatividade cadastrada</span>
+                            <div class="text-muted text-center py-2">
+                                <i class="fas fa-info-circle me-1"></i>
+                                Nenhuma subatividade configurada
+                            </div>
                             {% endif %}
                         </div>
                         
-                        <div class="d-flex justify-content-end">
-                            <a href="{{ url_for('servicos_crud.editar_servico', servico_id=servico_data.servico.id) }}" 
-                               class="btn-action btn-primary-custom">
-                                <i class="fas fa-edit me-1"></i>
+                        <div class="service-actions">
+                            <a href="{{ url_for('servicos_crud.editar_servico', servico_id=servico.id) }}" 
+                               class="btn-service-action btn-edit">
+                                <i class="fas fa-edit"></i>
                                 Editar
                             </a>
-                            <button type="button" class="btn-action btn-danger-custom" 
-                                    onclick="confirmarExclusao({{ servico_data.servico.id }}, '{{ servico_data.servico.nome }}')">
-                                <i class="fas fa-trash me-1"></i>
-                                Excluir
-                            </button>
                         </div>
                     </div>
                 </div>
+            </div>
             {% endfor %}
         </div>
     {% else %}
         <div class="empty-state">
-            <i class="fas fa-tools"></i>
-            <h4>Nenhum serviço cadastrado</h4>
-            <p>Comece criando seu primeiro serviço com as respectivas subatividades.</p>
-            <a href="{{ url_for('servicos_crud.novo_servico') }}" class="btn-novo mt-3">
+            <i class="fas fa-cogs"></i>
+            <h3>Nenhum serviço cadastrado</h3>
+            <p>Comece criando seu primeiro serviço com suas subatividades</p>
+            <a href="{{ url_for('servicos_crud.novo_servico') }}" class="btn-new-service">
                 <i class="fas fa-plus me-2"></i>
                 Criar Primeiro Serviço
             </a>
         </div>
     {% endif %}
 </div>
+{% endblock %}
 
-<!-- Modal de Confirmação de Exclusão -->
-<div class="modal fade" id="modalExcluir" tabindex="-1">
-    <div class="modal-dialog">
-        <div class="modal-content">
-            <div class="modal-header bg-danger text-white">
-                <h5 class="modal-title">
-                    <i class="fas fa-exclamation-triangle me-2"></i>
-                    Confirmar Exclusão
-                </h5>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
-            </div>
-            <div class="modal-body">
-                <p>Tem certeza que deseja excluir o serviço <strong id="nomeServicoExcluir"></strong>?</p>
-                <p class="text-muted small">
-                    Esta ação desativará o serviço e todas as suas subatividades. 
-                    Os dados não serão perdidos permanentemente.
-                </p>
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
-                <form id="formExcluir" method="POST" class="d-inline">
-                    <button type="submit" class="btn btn-danger">
-                        <i class="fas fa-trash me-1"></i>
-                        Sim, Excluir
-                    </button>
-                </form>
-            </div>
-        </div>
-    </div>
-</div>
-
+{% block extra_js %}
 <script>
-// Filtros e busca
-document.getElementById('buscaServicos').addEventListener('input', filtrarServicos);
-document.getElementById('filtroCategoria').addEventListener('change', filtrarServicos);
-
-function filtrarServicos() {
-    const busca = document.getElementById('buscaServicos').value.toLowerCase();
-    const categoria = document.getElementById('filtroCategoria').value;
-    const cards = document.querySelectorAll('.servico-card');
-    
-    cards.forEach(card => {
-        const nome = card.dataset.nome;
-        const cardCategoria = card.dataset.categoria;
-        
-        const matchBusca = nome.includes(busca);
-        const matchCategoria = !categoria || cardCategoria === categoria;
-        
-        if (matchBusca && matchCategoria) {
-            card.style.display = 'block';
-        } else {
-            card.style.display = 'none';
-        }
-    });
-}
-
-function limparFiltros() {
-    document.getElementById('buscaServicos').value = '';
-    document.getElementById('filtroCategoria').value = '';
-    filtrarServicos();
-}
-
-// Modal de exclusão
-function confirmarExclusao(servicoId, nomeServico) {
-    document.getElementById('nomeServicoExcluir').textContent = nomeServico;
-    document.getElementById('formExcluir').action = `/servicos/${servicoId}/excluir`;
-    
-    const modal = new bootstrap.Modal(document.getElementById('modalExcluir'));
-    modal.show();
-}
-
-// Inicialização
+// Animações suaves ao carregar
 document.addEventListener('DOMContentLoaded', function() {
-    console.log('Sistema de Gestão de Serviços carregado');
-    
-    // Animações suaves dos cards
-    const cards = document.querySelectorAll('.servico-card');
+    const cards = document.querySelectorAll('.service-card');
     cards.forEach((card, index) => {
-        card.style.animationDelay = `${index * 0.1}s`;
-        card.classList.add('animate__animated', 'animate__fadeInUp');
+        card.style.opacity = '0';
+        card.style.transform = 'translateY(20px)';
+        
+        setTimeout(() => {
+            card.style.transition = 'all 0.5s cubic-bezier(0.4, 0, 0.2, 1)';
+            card.style.opacity = '1';
+            card.style.transform = 'translateY(0)';
+        }, index * 100);
     });
 });
 </script>
