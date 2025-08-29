@@ -526,11 +526,7 @@ console.log('Initializing RDO with light theme...');
     color: white;
     box-shadow: 0 4px 12px rgba(255, 193, 7, 0.3);
 }
-.status-rascunho { 
-    background: linear-gradient(135deg, var(--red-danger), #c21807);
-    color: white;
-    box-shadow: 0 4px 12px rgba(220, 53, 69, 0.3);
-}
+
 
 .rdo-card-body {
     padding: 2rem;
@@ -1001,9 +997,6 @@ console.log('Initializing RDO with light theme...');
                     <h3 class="rdo-obra-nome">{{ rdo.obra.nome }}</h3>
                 </div>
                 <div class="rdo-header-actions">
-                    <div class="rdo-status">
-                        <span class="status-badge status-{{ rdo.status|lower|replace(' ', '-') }}">{{ rdo.status }}</span>
-                    </div>
                     <button class="btn-delete-rdo" onclick="confirmarExclusao({{ rdo.id }})" title="Excluir RDO">
                         <i class="fas fa-trash"></i>
                     </button>
