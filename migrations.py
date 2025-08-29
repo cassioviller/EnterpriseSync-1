@@ -50,6 +50,9 @@ def executar_migracoes():
         
         # Migração 11: CRÍTICA - Criar tabelas do sistema RDO aprimorado
         migrar_sistema_rdo_aprimorado()
+        
+        # Migração 12: URGENTE - Adicionar admin_id na tabela servico
+        adicionar_admin_id_servico()
 
         logger.info("✅ Migrações automáticas concluídas com sucesso!")
         
@@ -748,6 +751,47 @@ def migrar_sistema_rdo_aprimorado():
         cursor.close()
         connection.close()
         logger.info("🎯 Migração do sistema RDO aprimorado concluída!")
+
+def adicionar_admin_id_servico():
+    """Adiciona admin_id na tabela servico para multi-tenant"""
+    try:
+        # Verificar se a coluna admin_id já existe na tabela servico
+        result = db.session.execute(text("""
+            SELECT column_name 
+            FROM information_schema.columns 
+            WHERE table_name='servico' AND column_name='admin_id'
+        """)).fetchone()
+        
+        if not result:
+            logger.info("🔧 Adicionando coluna admin_id na tabela servico...")
+            
+            # Adicionar coluna admin_id
+            db.session.execute(text("""
+                ALTER TABLE servico 
+                ADD COLUMN admin_id INTEGER REFERENCES usuario(id)
+            """))
+            
+            # Atualizar registros existentes com admin_id padrão (10)
+            db.session.execute(text("""
+                UPDATE servico 
+                SET admin_id = 10 
+                WHERE admin_id IS NULL
+            """))
+            
+            # Tornar a coluna NOT NULL após popular os dados
+            db.session.execute(text("""
+                ALTER TABLE servico 
+                ALTER COLUMN admin_id SET NOT NULL
+            """))
+            
+            db.session.commit()
+            logger.info("✅ Coluna admin_id adicionada na tabela servico")
+        else:
+            logger.info("✅ Coluna admin_id já existe na tabela servico")
+            
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"❌ Erro ao adicionar admin_id na tabela servico: {str(e)}")
         
     except Exception as e:
         logger.error(f"❌ ERRO ao migrar sistema RDO aprimorado: {str(e)}")
