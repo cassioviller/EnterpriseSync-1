@@ -160,16 +160,18 @@ html[data-bs-theme="dark"] .header-btn i {
             </h5>
         </div>
         <div class="card-body">
-            <form method="GET" class="row g-3">
+            <form id="filtroFormDashboard" method="GET" class="row g-3">
                 <div class="col-md-3">
                     <label class="form-label">Data Inicial</label>
-                    <input type="date" name="data_inicio" class="form-control" 
-                           value="{{ data_inicio.strftime('%Y-%m-%d') if data_inicio else '2025-07-01' }}">
+                    <input type="date" name="data_inicio" class="form-control" id="data_inicio_dash"
+                           value="{{ data_inicio.strftime('%Y-%m-%d') if data_inicio else '2025-07-01' }}" 
+                           onchange="aplicarFiltrosDashboard()">
                 </div>
                 <div class="col-md-3">
                     <label class="form-label">Data Final</label>
-                    <input type="date" name="data_fim" class="form-control" 
-                           value="{{ data_fim.strftime('%Y-%m-%d') if data_fim else '2025-07-31' }}">
+                    <input type="date" name="data_fim" class="form-control" id="data_fim_dash"
+                           value="{{ data_fim.strftime('%Y-%m-%d') if data_fim else '2025-07-31' }}"
+                           onchange="aplicarFiltrosDashboard()">
                 </div>
                 <div class="col-md-3 d-flex align-items-end">
                     <button type="submit" class="btn btn-primary me-2">
@@ -182,13 +184,13 @@ html[data-bs-theme="dark"] .header-btn i {
                 <div class="col-md-3 d-flex align-items-end">
                     <div class="btn-group" role="group">
                         <button type="button" class="btn btn-outline-primary btn-sm" 
-                                onclick="setDateRange('mes_atual')">Mês Atual</button>
+                                onclick="setDateRangeDashboard('mes_atual')">Mês Atual</button>
                         <button type="button" class="btn btn-outline-primary btn-sm" 
-                                onclick="setDateRange('ultimo_mes')">Último Mês</button>
+                                onclick="setDateRangeDashboard('ultimo_mes')">Último Mês</button>
                         <button type="button" class="btn btn-outline-primary btn-sm" 
-                                onclick="setDateRange('ultimos_3_meses')">3 Meses</button>
+                                onclick="setDateRangeDashboard('ultimos_3_meses')">3 Meses</button>
                         <button type="button" class="btn btn-outline-primary btn-sm" 
-                                onclick="setDateRange('ano_atual')">Ano Atual</button>
+                                onclick="setDateRangeDashboard('ano_atual')">Ano Atual</button>
                     </div>
                 </div>
             </form>
@@ -769,21 +771,30 @@ html[data-bs-theme="dark"] .header-btn i {
 </div>
 
 <script>
-function setDateRange(period) {
+// Função específica para filtros do dashboard
+function setDateRangeDashboard(period) {
     const today = new Date();
     let startDate, endDate = today;
     
     switch(period) {
+        case 'mes_atual':
+            startDate = new Date(today.getFullYear(), today.getMonth(), 1);
+            endDate = today;
+            break;
         case 'ultimo_mes':
             startDate = new Date(today.getFullYear(), today.getMonth() - 1, 1);
             endDate = new Date(today.getFullYear(), today.getMonth(), 0);
             break;
         case 'ultimos_3_meses':
             startDate = new Date(today.getFullYear(), today.getMonth() - 3, 1);
+            endDate = today;
             break;
         case 'ano_atual':
             startDate = new Date(today.getFullYear(), 0, 1);
+            endDate = today;
             break;
+        default:
+            return;
     }
     
     // Formatar datas para yyyy-mm-dd
@@ -793,8 +804,40 @@ function setDateRange(period) {
                String(date.getDate()).padStart(2, '0');
     };
     
-    document.querySelector('input[name="data_inicio"]').value = formatDate(startDate);
-    document.querySelector('input[name="data_fim"]').value = formatDate(endDate);
+    // Atualizar campos específicos do dashboard
+    const dataInicioInput = document.getElementById('data_inicio_dash');
+    const dataFimInput = document.getElementById('data_fim_dash');
+    
+    if (dataInicioInput) {
+        dataInicioInput.value = formatDate(startDate);
+        console.log('Data inicial definida:', formatDate(startDate));
+    }
+    if (dataFimInput) {
+        dataFimInput.value = formatDate(endDate);
+        console.log('Data final definida:', formatDate(endDate));
+    }
+    
+    // Auto-aplicar filtros após definir as datas
+    setTimeout(() => {
+        aplicarFiltrosDashboard();
+    }, 100);
+}
+
+// Função para aplicar filtros do dashboard
+function aplicarFiltrosDashboard() {
+    const form = document.getElementById('filtroFormDashboard');
+    if (form) {
+        console.log('🔄 Aplicando filtros do dashboard...');
+        
+        const dataInicio = form.querySelector('input[name="data_inicio"]').value;
+        const dataFim = form.querySelector('input[name="data_fim"]').value;
+        
+        console.log('Período selecionado:', dataInicio, 'até', dataFim);
+        
+        form.submit();
+    } else {
+        console.error('❌ Formulário de filtros não encontrado');
+    }
 }
 
 // Gráficos

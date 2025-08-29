@@ -789,16 +789,31 @@ function resetForm() {
 
 // Função para filtrar funcionários
 function filtrarFuncionarios() {
-    const searchTerm = document.getElementById('searchInput').value.toLowerCase();
-    const statusFilter = document.getElementById('statusFilter').value;
+    console.log('🔍 Iniciando filtro de funcionários...');
+    
+    const searchInput = document.getElementById('searchInput');
+    const statusFilter = document.getElementById('statusFilter');
+    
+    if (!searchInput) {
+        console.error('❌ Campo searchInput não encontrado');
+        return;
+    }
+    
+    const searchTerm = searchInput.value.toLowerCase().trim();
+    const statusFilterValue = statusFilter ? statusFilter.value : 'todos';
     const funcionarioCards = document.querySelectorAll('.funcionario-card');
     let visibleCount = 0;
     
-    console.log('Filtro aplicado:', {
+    console.log('🔍 Filtro aplicado:', {
         busca: searchTerm,
-        status: statusFilter,
+        status: statusFilterValue,
         totalCards: funcionarioCards.length
     });
+    
+    if (funcionarioCards.length === 0) {
+        console.warn('⚠️ Nenhum card .funcionario-card encontrado');
+        return;
+    }
     
     funcionarioCards.forEach(card => {
         const nome = card.dataset.nome || '';
