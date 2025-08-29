@@ -1005,6 +1005,9 @@ function removerSubatividade(button) {
     }
 }
 
+
+
+// DEFINIR FUNÇÕES GLOBALMENTE PRIMEIRO
 function abrirModalNovoServico() {
     console.log('Abrindo modal de novo serviço...');
     const modalElement = document.getElementById('modalNovoServico');
@@ -1012,7 +1015,6 @@ function abrirModalNovoServico() {
         const modal = new bootstrap.Modal(modalElement);
         modal.show();
         
-        // Focar no primeiro campo após abrir
         setTimeout(() => {
             const nomeInput = document.getElementById('nome');
             if (nomeInput) {
@@ -1043,10 +1045,6 @@ function toggleSubatividades(servicoId) {
         icon.className = 'fas fa-chevron-down';
     }
 }
-
-// Testar se Bootstrap está disponível
-console.log('Bootstrap disponível:', typeof bootstrap !== 'undefined');
-console.log('jQuery disponível:', typeof $ !== 'undefined');
 
 // Animações de entrada
 document.addEventListener('DOMContentLoaded', function() {

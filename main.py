@@ -113,13 +113,11 @@ try:
 except ImportError as e:
     print(f"⚠️ Health check não encontrado: {e}")
 
-# Registrar CRUD de Serviços
+# Registrar CRUD de Serviços (único - sem duplicação)
 try:
     from crud_servicos_completo import servicos_crud_bp
     app.register_blueprint(servicos_crud_bp)
-    print("✅ CRUD de Serviços registrado")
-except ImportError as e:
-    print(f"⚠️ CRUD de Serviços não encontrado: {e}")
+    print("✅ CRUD de Serviços registrado com sucesso")
 except Exception as e:
     print(f"❌ Erro ao registrar CRUD de Serviços: {e}")
 
