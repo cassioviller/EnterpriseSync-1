@@ -5395,7 +5395,8 @@ def servicos():
                 servico_id=servico.id, ativo=True
             ).order_by(SubatividadeMestre.ordem_padrao).all()
         
-        return render_template('configuracoes/servicos.html', servicos=servicos)
+        # Redirecionar para novo sistema moderno
+        return redirect('/servicos/')
         
     except Exception as e:
         print(f"ERRO GESTÃO SERVIÇOS: {str(e)}")
@@ -5405,51 +5406,12 @@ def servicos():
         else:
             return redirect(url_for('main.dashboard'))
 
+# ROTA DESABILITADA - Redirecionada para novo sistema moderno
 @main_bp.route('/servicos/novo', methods=['GET', 'POST'])
 @admin_required
 def novo_servico():
-    """Criar novo serviço"""
-    if request.method == 'POST':
-        try:
-            nome = request.form.get('nome')
-            categoria = request.form.get('categoria')
-            unidade_medida = request.form.get('unidade_medida')
-            descricao = request.form.get('descricao', '')
-            custo_unitario = float(request.form.get('custo_unitario', 0))
-            
-            # Validações básicas
-            if not nome or not categoria or not unidade_medida:
-                flash('Nome, categoria e unidade de medida são obrigatórios.', 'error')
-                return render_template('configuracoes/novo_servico.html')
-            
-            # Verificar se serviço já existe
-            servico_existente = Servico.query.filter_by(nome=nome).first()
-            if servico_existente:
-                flash(f'Serviço "{nome}" já existe.', 'error')
-                return render_template('configuracoes/novo_servico.html')
-            
-            # Criar novo serviço
-            novo_servico = Servico(
-                nome=nome,
-                categoria=categoria,
-                unidade_medida=unidade_medida,
-                descricao=descricao,
-                custo_unitario=custo_unitario,
-                ativo=True
-            )
-            
-            db.session.add(novo_servico)
-            db.session.commit()
-            
-            flash(f'Serviço "{nome}" criado com sucesso!', 'success')
-            return redirect(url_for('main.servicos'))
-            
-        except Exception as e:
-            db.session.rollback()
-            print(f"ERRO CRIAR SERVIÇO: {str(e)}")
-            flash('Erro ao criar serviço.', 'error')
-    
-    return render_template('configuracoes/novo_servico.html')
+    """Redirecionar para novo sistema moderno de serviços"""
+    return redirect('/servicos/novo')  # Redireciona para o CRUD moderno
 
 @main_bp.route('/servicos/<int:servico_id>')
 @admin_required
@@ -5463,8 +5425,8 @@ def ver_servico(servico_id):
             servico_id=servico_id, ativo=True
         ).order_by(SubatividadeMestre.ordem_padrao).all()
         
-        return render_template('configuracoes/ver_servico.html', 
-                             servico=servico, subatividades=subatividades)
+        # Redirecionar para novo sistema moderno
+        return redirect(f'/servicos/editar/{servico_id}')
         
     except Exception as e:
         print(f"ERRO VER SERVIÇO: {str(e)}")
@@ -5488,13 +5450,13 @@ def editar_servico(servico_id):
             # Validações básicas
             if not servico.nome or not servico.categoria or not servico.unidade_medida:
                 flash('Nome, categoria e unidade de medida são obrigatórios.', 'error')
-                return render_template('configuracoes/editar_servico.html', servico=servico)
+                return redirect(f'/servicos/editar/{servico_id}')
             
             db.session.commit()
             flash(f'Serviço "{servico.nome}" atualizado com sucesso!', 'success')
             return redirect(url_for('main.servicos'))
             
-        return render_template('configuracoes/editar_servico.html', servico=servico)
+        return redirect(f'/servicos/editar/{servico_id}')
         
     except Exception as e:
         db.session.rollback()
