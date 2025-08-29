@@ -5395,8 +5395,8 @@ def servicos():
                 servico_id=servico.id, ativo=True
             ).order_by(SubatividadeMestre.ordem_padrao).all()
         
-        # Redirecionar para novo sistema moderno
-        return redirect('/servicos/')
+        # Redirecionar para novo sistema moderno sem loop
+        return redirect(url_for('servicos_crud.index'))
         
     except Exception as e:
         print(f"ERRO GESTÃO SERVIÇOS: {str(e)}")
@@ -5406,12 +5406,12 @@ def servicos():
         else:
             return redirect(url_for('main.dashboard'))
 
-# ROTA DESABILITADA - Redirecionada para novo sistema moderno
+# ROTA DESABILITADA - Evita loop infinito de redirect
 @main_bp.route('/servicos/novo', methods=['GET', 'POST'])
 @admin_required
 def novo_servico():
-    """Redirecionar para novo sistema moderno de serviços"""
-    return redirect('/servicos/novo')  # Redireciona para o CRUD moderno
+    """Redireciona para novo sistema sem loop infinito"""
+    return redirect(url_for('servicos_crud.novo_servico'))  # Usando url_for correto
 
 @main_bp.route('/servicos/<int:servico_id>')
 @admin_required

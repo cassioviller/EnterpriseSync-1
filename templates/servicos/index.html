@@ -4,213 +4,452 @@
 
 {% block extra_css %}
 <style>
-/* Header da página */
+/* Design System Moderno Profissional */
 .page-header {
     background: linear-gradient(135deg, #008b3a 0%, #000000 50%, #333333 100%);
     color: white;
-    padding: 2rem 0;
+    padding: 2rem;
+    border-radius: 16px;
     margin-bottom: 2rem;
-    border-radius: 0 0 20px 20px;
+    box-shadow: 0 8px 32px rgba(0, 139, 58, 0.2);
 }
 
-/* Cards dos serviços */
-.service-card {
-    background: white;
-    border: 1px solid #e0e0e0;
+.header-content {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+}
+
+.header-icon {
+    background: rgba(255, 255, 255, 0.15);
+    width: 60px;
+    height: 60px;
     border-radius: 12px;
-    margin-bottom: 1.5rem;
-    transition: all 0.3s ease;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.5rem;
 }
 
-.service-card:hover {
+.header-text h1 {
+    margin: 0;
+    font-size: 2rem;
+    font-weight: 700;
+}
+
+.header-text p {
+    margin: 0.5rem 0 0 0;
+    opacity: 0.85;
+    font-size: 1rem;
+}
+
+.btn-primary-custom {
+    background: linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%);
+    color: #008b3a;
+    border: none;
+    padding: 0.75rem 1.5rem;
+    border-radius: 10px;
+    font-weight: 600;
+    text-decoration: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    box-shadow: 0 4px 12px rgba(255, 255, 255, 0.2);
+}
+
+.btn-primary-custom:hover {
+    background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+    color: #007532;
+    text-decoration: none;
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(255, 255, 255, 0.3);
+}
+
+/* Estatísticas Dashboard */
+.stats-dashboard {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 1.5rem;
+    margin-bottom: 2rem;
+}
+
+.stat-card {
+    background: linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%);
+    border: 1px solid #e2e8f0;
+    border-radius: 16px;
+    padding: 1.5rem;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+}
+
+.stat-card:hover {
     transform: translateY(-4px);
-    box-shadow: 0 8px 25px rgba(0,0,0,0.15);
+    box-shadow: 0 12px 28px rgba(0, 139, 58, 0.15);
     border-color: #008b3a;
 }
 
-.service-card-header {
+.stat-card-content {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+}
+
+.stat-icon {
     background: linear-gradient(135deg, #008b3a 0%, #00a048 100%);
     color: white;
-    padding: 1.2rem;
-    border-radius: 12px 12px 0 0;
+    width: 50px;
+    height: 50px;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.2rem;
 }
 
-.service-card-body {
+.stat-info {
+    flex: 1;
+}
+
+.stat-number {
+    font-size: 2rem;
+    font-weight: 700;
+    color: #008b3a;
+    margin: 0;
+    line-height: 1;
+}
+
+.stat-label {
+    color: #6c757d;
+    font-size: 0.9rem;
+    font-weight: 500;
+    margin-top: 0.25rem;
+}
+
+/* Grid de Serviços */
+.servicos-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(380px, 1fr));
+    gap: 1.5rem;
+}
+
+/* Cards de Serviço Modernos */
+.servico-card {
+    background: linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%);
+    border: 1px solid #e2e8f0;
+    border-radius: 16px;
+    overflow: hidden;
+    transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+    position: relative;
+}
+
+.servico-card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 4px;
+    background: linear-gradient(90deg, #008b3a 0%, #00a048 50%, #4a7c59 100%);
+}
+
+.servico-card:hover {
+    transform: translateY(-6px);
+    box-shadow: 0 16px 40px rgba(0, 139, 58, 0.15);
+    border-color: #008b3a;
+}
+
+.servico-header {
+    background: linear-gradient(135deg, #008b3a 0%, #00a048 100%);
+    color: white;
     padding: 1.5rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
 }
 
-.service-title {
+.servico-info h3 {
+    margin: 0 0 0.5rem 0;
     font-size: 1.3rem;
     font-weight: 700;
-    margin: 0 0 0.5rem 0;
+    line-height: 1.2;
 }
 
-.service-category {
-    background: rgba(255,255,255,0.2);
+.servico-categoria {
+    background: rgba(255, 255, 255, 0.2);
     color: white;
     padding: 0.3rem 0.8rem;
     border-radius: 15px;
     font-size: 0.8rem;
     font-weight: 600;
-    display: inline-block;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    backdrop-filter: blur(10px);
 }
 
-.subatividades-container {
-    margin-top: 1rem;
+.servico-actions {
+    display: flex;
+    gap: 0.5rem;
 }
 
-.subatividade-tag {
-    background: #f0f8f0;
+.btn-icon {
+    background: rgba(255, 255, 255, 0.15);
+    color: white;
+    border: none;
+    width: 36px;
+    height: 36px;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s ease;
+    backdrop-filter: blur(10px);
+}
+
+.btn-icon:hover {
+    background: rgba(255, 255, 255, 0.25);
+    color: white;
+    transform: scale(1.05);
+}
+
+.servico-body {
+    padding: 1.5rem;
+}
+
+.servico-descricao {
+    color: #6c757d;
+    font-size: 0.9rem;
+    line-height: 1.5;
+    margin-bottom: 1.5rem;
+}
+
+/* Subatividades Preview */
+.subatividades-preview {
+    border-top: 1px solid #f1f3f4;
+    padding-top: 1rem;
+}
+
+.subatividades-header {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 1rem;
+    cursor: pointer;
+    color: #495057;
+    font-weight: 600;
+    font-size: 0.95rem;
+}
+
+.subatividades-header:hover {
     color: #008b3a;
-    border: 1px solid #c3e6c3;
-    padding: 0.3rem 0.7rem;
-    border-radius: 20px;
-    margin: 0.2rem;
-    font-size: 0.85rem;
-    display: inline-block;
+}
+
+.subatividades-count {
+    background: linear-gradient(135deg, #17a2b8 0%, #20c997 100%);
+    color: white;
+    padding: 0.2rem 0.6rem;
+    border-radius: 10px;
+    font-size: 0.75rem;
+    font-weight: 600;
+}
+
+.btn-toggle {
+    background: none;
+    border: none;
+    color: #6c757d;
+    margin-left: auto;
     transition: all 0.2s ease;
 }
 
-.subatividade-tag:hover {
-    background: #008b3a;
+.btn-toggle:hover {
+    color: #008b3a;
+    transform: scale(1.1);
+}
+
+.subatividades-lista {
+    display: grid;
+    gap: 0.5rem;
+    margin-top: 1rem;
+}
+
+.subatividade-item {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.75rem;
+    background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+    border: 1px solid #e2e8f0;
+    border-radius: 10px;
+    font-size: 0.9rem;
+    transition: all 0.2s ease;
+}
+
+.subatividade-item:hover {
+    background: linear-gradient(135deg, #008b3a 0%, #00a048 100%);
+    color: white;
+    border-color: #008b3a;
+}
+
+.subatividade-item i {
+    color: #008b3a;
+    font-size: 0.9rem;
+}
+
+.subatividade-item:hover i {
     color: white;
 }
 
-/* Botões */
-.btn-new-service {
+.add-subatividade {
+    color: #008b3a;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.subatividade-item:hover .add-subatividade {
+    color: white;
+}
+
+/* Estado Vazio */
+.empty-state {
+    text-align: center;
+    padding: 3rem;
+    color: #6c757d;
+    background: linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%);
+    border: 2px dashed #dee2e6;
+    border-radius: 16px;
+}
+
+.empty-state i {
+    font-size: 4rem;
+    color: #dee2e6;
+    margin-bottom: 1rem;
+}
+
+.empty-state h3 {
+    color: #495057;
+    margin-bottom: 1rem;
+}
+
+/* Modal Moderno */
+.modal-content {
+    border: none;
+    border-radius: 16px;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.15);
+}
+
+.modal-header {
     background: linear-gradient(135deg, #008b3a 0%, #00a048 100%);
     color: white;
+    border-radius: 16px 16px 0 0;
     border: none;
-    padding: 0.7rem 1.5rem;
-    border-radius: 10px;
-    text-decoration: none;
+    padding: 1.5rem;
+}
+
+.section-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin: 1.5rem 0 1rem 0;
+    padding-bottom: 0.5rem;
+    border-bottom: 2px solid #f1f3f4;
+}
+
+.section-header h6 {
+    color: #495057;
     font-weight: 600;
-    transition: all 0.3s ease;
-    display: inline-flex;
+    margin: 0;
+    display: flex;
     align-items: center;
     gap: 0.5rem;
 }
 
-.btn-new-service:hover {
-    background: linear-gradient(135deg, #007532 0%, #009040 100%);
-    color: white;
-    text-decoration: none;
-    transform: translateY(-2px);
-    box-shadow: 0 5px 15px rgba(0,139,58,0.3);
+.subatividade-input {
+    margin-bottom: 0.75rem;
 }
 
-.btn-edit {
-    background: #008b3a;
-    color: white;
-    border: none;
-    padding: 0.5rem 1rem;
-    border-radius: 8px;
-    text-decoration: none;
-    font-size: 0.9rem;
-    transition: all 0.2s ease;
+.input-group .form-control {
+    border-right: none;
 }
 
-.btn-edit:hover {
-    background: #007532;
-    color: white;
-    text-decoration: none;
-    transform: translateY(-1px);
+.input-group .btn {
+    border-left: none;
 }
 
-/* Estatísticas */
-.stats-row {
-    margin-bottom: 2rem;
-}
-
-.stat-card {
-    background: white;
-    border: 1px solid #e0e0e0;
-    border-radius: 12px;
-    padding: 1.5rem;
-    text-align: center;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-    transition: all 0.3s ease;
-}
-
-.stat-card:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 5px 15px rgba(0,0,0,0.15);
-}
-
-.stat-number {
-    font-size: 2.5rem;
-    font-weight: 700;
-    color: #008b3a;
-    margin: 0;
-}
-
-.stat-label {
-    color: #666;
-    font-size: 0.9rem;
-    font-weight: 500;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-    margin-top: 0.5rem;
-}
-
-/* Estado vazio */
-.empty-state {
-    text-align: center;
-    padding: 3rem;
-    color: #666;
-}
-
-.empty-state i {
-    font-size: 3rem;
-    color: #ccc;
-    margin-bottom: 1rem;
+/* Responsive */
+@media (max-width: 768px) {
+    .page-header {
+        text-align: center;
+    }
+    
+    .header-content {
+        flex-direction: column;
+        text-align: center;
+    }
+    
+    .servicos-grid {
+        grid-template-columns: 1fr;
+    }
+    
+    .stats-dashboard {
+        grid-template-columns: 1fr;
+    }
 }
 </style>
 {% endblock %}
 
 {% block content %}
-<!-- Header da página -->
+<!-- Header Moderno -->
 <div class="page-header">
-    <div class="container">
-        <div class="row align-items-center">
-            <div class="col-md-8">
-                <h1 class="mb-1">
-                    <i class="fas fa-cogs me-3"></i>
-                    Gestão de Serviços
-                </h1>
-                <p class="mb-0 opacity-75">
-                    Configure os serviços e subatividades do seu sistema
-                </p>
-            </div>
-            <div class="col-md-4 text-end">
-                <a href="{{ url_for('servicos_crud.novo_servico') }}" class="btn-new-service">
-                    <i class="fas fa-plus"></i>
-                    Novo Serviço
-                </a>
-            </div>
+    <div class="header-content">
+        <div class="header-icon">
+            <i class="fas fa-cogs"></i>
         </div>
+        <div class="header-text">
+            <h1>Gestão de Serviços</h1>
+            <p>Configure os serviços e subatividades do seu sistema</p>
+        </div>
+    </div>
+    <div class="header-actions">
+        <button class="btn-primary-custom" onclick="abrirModalNovoServico()">
+            <i class="fas fa-plus"></i> Novo Serviço
+        </button>
     </div>
 </div>
 
-<div class="container">
-    <!-- Estatísticas -->
-    <div class="stats-row">
-        <div class="row">
-            <div class="col-md-4">
-                <div class="stat-card">
+<div class="container-fluid">
+    <!-- Dashboard de Estatísticas -->
+    <div class="stats-dashboard">
+        <div class="stat-card">
+            <div class="stat-card-content">
+                <div class="stat-icon">
+                    <i class="fas fa-cogs"></i>
+                </div>
+                <div class="stat-info">
                     <div class="stat-number">{{ servicos|length }}</div>
                     <div class="stat-label">Serviços Ativos</div>
                 </div>
             </div>
-            <div class="col-md-4">
-                <div class="stat-card">
+        </div>
+        
+        <div class="stat-card">
+            <div class="stat-card-content">
+                <div class="stat-icon">
+                    <i class="fas fa-tasks"></i>
+                </div>
+                <div class="stat-info">
                     <div class="stat-number">{{ subatividades_total or 0 }}</div>
                     <div class="stat-label">Subatividades</div>
                 </div>
             </div>
-            <div class="col-md-4">
-                <div class="stat-card">
+        </div>
+        
+        <div class="stat-card">
+            <div class="stat-card-content">
+                <div class="stat-icon">
+                    <i class="fas fa-layer-group"></i>
+                </div>
+                <div class="stat-info">
                     <div class="stat-number">{{ categorias_count or 0 }}</div>
                     <div class="stat-label">Categorias</div>
                 </div>
@@ -220,54 +459,52 @@
 
     <!-- Lista de Serviços -->
     {% if servicos %}
-        <div class="row">
+        <div class="servicos-grid">
             {% for servico in servicos %}
-            <div class="col-md-6 col-lg-4">
-                <div class="service-card">
-                    <!-- Header do card -->
-                    <div class="service-card-header">
-                        <h3 class="service-title">{{ servico.nome }}</h3>
-                        <span class="service-category">{{ servico.categoria or 'Sem categoria' }}</span>
+            <div class="servico-card">
+                <div class="servico-header">
+                    <div class="servico-info">
+                        <h3>{{ servico.nome }}</h3>
+                        <span class="servico-categoria">{{ servico.categoria or 'Outros' }}</span>
                     </div>
+                    <div class="servico-actions">
+                        <button class="btn-icon" onclick="editarServico({{ servico.id }})" title="Editar">
+                            <i class="fas fa-edit"></i>
+                        </button>
+                    </div>
+                </div>
+                
+                <div class="servico-body">
+                    {% if servico.descricao %}
+                    <p class="servico-descricao">
+                        {{ servico.descricao[:120] }}{% if servico.descricao|length > 120 %}...{% endif %}
+                    </p>
+                    {% endif %}
                     
-                    <!-- Corpo do card -->
-                    <div class="service-card-body">
-                        <!-- Descrição -->
-                        {% if servico.descricao %}
-                        <p class="text-muted mb-3">
-                            {{ servico.descricao[:80] }}{% if servico.descricao|length > 80 %}...{% endif %}
-                        </p>
-                        {% endif %}
-                        
-                        <!-- Subatividades -->
-                        <div class="subatividades-container">
-                            <h6 class="mb-2">
-                                <i class="fas fa-tasks me-1"></i>
-                                Subatividades ({{ (servico.subatividades or [])|length }})
-                            </h6>
-                            
-                            {% if servico.subatividades %}
-                                {% for sub in servico.subatividades[:3] %}
-                                <span class="subatividade-tag">{{ sub.nome }}</span>
-                                {% endfor %}
-                                {% if servico.subatividades|length > 3 %}
-                                <span class="subatividade-tag">+{{ servico.subatividades|length - 3 }} mais</span>
-                                {% endif %}
-                            {% else %}
-                            <div class="text-muted small">
-                                <i class="fas fa-info-circle me-1"></i>
-                                Nenhuma subatividade configurada
-                            </div>
-                            {% endif %}
+                    <div class="subatividades-preview">
+                        <div class="subatividades-header" onclick="toggleSubatividades({{ servico.id }})">
+                            <i class="fas fa-tasks"></i>
+                            <span>Subatividades</span>
+                            <span class="subatividades-count">{{ (servico.subatividades or [])|length }}</span>
+                            <button class="btn-toggle">
+                                <i class="fas fa-chevron-down"></i>
+                            </button>
                         </div>
                         
-                        <!-- Ações -->
-                        <div class="mt-3 text-end">
-                            <a href="{{ url_for('servicos_crud.editar_servico', servico_id=servico.id) }}" 
-                               class="btn-edit">
-                                <i class="fas fa-edit me-1"></i>
-                                Editar
-                            </a>
+                        <div class="subatividades-lista" id="subatividades-{{ servico.id }}" style="display: none;">
+                            {% if servico.subatividades %}
+                                {% for sub in servico.subatividades %}
+                                <div class="subatividade-item">
+                                    <i class="fas fa-check-circle"></i>
+                                    <span>{{ sub.nome }}</span>
+                                </div>
+                                {% endfor %}
+                            {% else %}
+                                <div class="subatividade-item">
+                                    <i class="fas fa-info-circle"></i>
+                                    <span>Nenhuma subatividade configurada</span>
+                                </div>
+                            {% endif %}
                         </div>
                     </div>
                 </div>
@@ -275,16 +512,192 @@
             {% endfor %}
         </div>
     {% else %}
-        <!-- Estado vazio -->
+        <!-- Estado Vazio -->
         <div class="empty-state">
             <i class="fas fa-cogs"></i>
             <h3>Nenhum serviço cadastrado</h3>
-            <p>Comece criando seu primeiro serviço com suas subatividades</p>
-            <a href="{{ url_for('servicos_crud.novo_servico') }}" class="btn-new-service">
+            <p>Comece criando seu primeiro serviço com suas subatividades para usar nos RDOs</p>
+            <button class="btn-primary-custom" onclick="abrirModalNovoServico()">
                 <i class="fas fa-plus me-2"></i>
                 Criar Primeiro Serviço
-            </a>
+            </button>
         </div>
     {% endif %}
 </div>
+
+<!-- Modal Novo Serviço -->
+<div class="modal fade" id="modalNovoServico" tabindex="-1" data-bs-backdrop="static">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="fas fa-plus me-2"></i> Novo Serviço
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            
+            <form id="formNovoServico" method="POST" action="{{ url_for('servicos_crud.criar_servico') }}">
+                <div class="modal-body">
+                    <!-- Informações do Serviço -->
+                    <div class="section-header">
+                        <h6><i class="fas fa-info-circle"></i> Informações do Serviço</h6>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-8">
+                            <div class="mb-3">
+                                <label for="nome" class="form-label">Nome do Serviço *</label>
+                                <input type="text" class="form-control" id="nome" name="nome" required>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="mb-3">
+                                <label for="categoria" class="form-label">Categoria</label>
+                                <select class="form-select" id="categoria" name="categoria">
+                                    <option value="Estrutural">Estrutural</option>
+                                    <option value="Soldagem">Soldagem</option>
+                                    <option value="Pintura">Pintura</option>
+                                    <option value="Instalação">Instalação</option>
+                                    <option value="Acabamento">Acabamento</option>
+                                    <option value="Manutenção">Manutenção</option>
+                                    <option value="Outros">Outros</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="descricao" class="form-label">Descrição</label>
+                        <textarea class="form-control" id="descricao" name="descricao" rows="3" placeholder="Descreva brevemente este serviço..."></textarea>
+                    </div>
+                    
+                    <!-- Subatividades -->
+                    <div class="section-header">
+                        <h6><i class="fas fa-tasks"></i> Subatividades</h6>
+                        <button type="button" class="btn btn-sm btn-outline-primary" onclick="adicionarSubatividade()">
+                            <i class="fas fa-plus"></i> Adicionar
+                        </button>
+                    </div>
+                    
+                    <div id="subatividades-container">
+                        <div class="subatividade-input">
+                            <div class="input-group">
+                                <input type="text" class="form-control" name="subatividades[]" placeholder="Nome da subatividade">
+                                <button type="button" class="btn btn-outline-danger" onclick="removerSubatividade(this)">
+                                    <i class="fas fa-trash"></i>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="alert alert-info">
+                        <i class="fas fa-info-circle"></i>
+                        <strong>Dica:</strong> Adicione todas as subatividades que fazem parte deste serviço. 
+                        Elas aparecerão nos RDOs quando este serviço for selecionado para uma obra.
+                    </div>
+                </div>
+                
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                        Cancelar
+                    </button>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-save me-1"></i> Salvar Serviço
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Gerenciamento de Subatividades
+function adicionarSubatividade() {
+    const container = document.getElementById('subatividades-container');
+    const novaSubatividade = document.createElement('div');
+    novaSubatividade.className = 'subatividade-input';
+    novaSubatividade.innerHTML = `
+        <div class="input-group">
+            <input type="text" class="form-control" name="subatividades[]" placeholder="Nome da subatividade">
+            <button type="button" class="btn btn-outline-danger" onclick="removerSubatividade(this)">
+                <i class="fas fa-trash"></i>
+            </button>
+        </div>
+    `;
+    container.appendChild(novaSubatividade);
+    
+    // Focar no novo input
+    novaSubatividade.querySelector('input').focus();
+}
+
+function removerSubatividade(button) {
+    const container = document.getElementById('subatividades-container');
+    if (container.children.length > 1) {
+        button.closest('.subatividade-input').remove();
+    } else {
+        // Limpar o primeiro input se for o último
+        container.querySelector('input').value = '';
+    }
+}
+
+function abrirModalNovoServico() {
+    const modal = new bootstrap.Modal(document.getElementById('modalNovoServico'));
+    modal.show();
+    
+    // Focar no primeiro campo
+    setTimeout(() => {
+        document.getElementById('nome').focus();
+    }, 500);
+}
+
+function editarServico(servicoId) {
+    window.location.href = `/servicos/${servicoId}/editar`;
+}
+
+function toggleSubatividades(servicoId) {
+    const lista = document.getElementById(`subatividades-${servicoId}`);
+    const icon = event.target.closest('.subatividades-header').querySelector('.btn-toggle i');
+    
+    if (lista.style.display === 'none' || !lista.style.display) {
+        lista.style.display = 'block';
+        icon.className = 'fas fa-chevron-up';
+    } else {
+        lista.style.display = 'none';
+        icon.className = 'fas fa-chevron-down';
+    }
+}
+
+// Animações de entrada
+document.addEventListener('DOMContentLoaded', function() {
+    const cards = document.querySelectorAll('.servico-card, .stat-card');
+    cards.forEach((card, index) => {
+        card.style.opacity = '0';
+        card.style.transform = 'translateY(20px)';
+        
+        setTimeout(() => {
+            card.style.transition = 'all 0.6s cubic-bezier(0.4, 0, 0.2, 1)';
+            card.style.opacity = '1';
+            card.style.transform = 'translateY(0)';
+        }, index * 100);
+    });
+});
+
+// Validação do formulário
+document.getElementById('formNovoServico').addEventListener('submit', function(e) {
+    const nome = document.getElementById('nome').value.trim();
+    if (!nome) {
+        e.preventDefault();
+        alert('Por favor, insira o nome do serviço.');
+        document.getElementById('nome').focus();
+        return false;
+    }
+    
+    // Adicionar loading
+    const submitBtn = this.querySelector('button[type="submit"]');
+    submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i> Salvando...';
+    submitBtn.disabled = true;
+});
+</script>
 {% endblock %}
