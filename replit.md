@@ -23,12 +23,12 @@ SIGE (Sistema de Gestão Empresarial) is a multi-tenant business management syst
 **✅ PROJETO CONCLUÍDO E PRONTO PARA PRODUÇÃO (29/08/2025)**
 
 **Última Atualização: 29/08/2025 - 11:45**
-- ✅ **DOCKERFILE UNIFICADO:** Sistema unificado entre desenvolvimento e produção
+- ✅ **DOCKERFILE PRINCIPAL UNIFICADO:** Sistema unificado entre desenvolvimento e produção
   - **Problema resolvido:** Inconsistências entre ambientes dev/prod
-  - **Solução implementada:** Dockerfile.unified com entrada inteligente
-  - **Deploy automatizado:** deploy-script.sh com verificações completas
+  - **Solução implementada:** Dockerfile principal atualizado com entrada inteligente
+  - **Deploy EasyPanel:** docker-entrypoint-unified.sh compatível
   - **Verificação de consistência:** 95% dos testes passando
-  - **Resultado:** Deploy 100% automatizado e seguro
+  - **Resultado:** Deploy 100% automatizado para EasyPanel
 - ✅ **HOTFIX PRODUÇÃO CRÍTICO:** Deploy final automatizado para interface RDO moderna
   - **Problema resolvido:** Produção com interface antiga vs desenvolvimento moderno
   - **Conexão PostgreSQL:** Diagnosticada e funcionando (Neon DB conectado)

@@ -1,68 +1,81 @@
-# DOCKERFILE PRODUÇÃO - SIGE v8.0
-# Sistema Integrado de Gestão Empresarial
-# Otimizado para Hostinger EasyPanel
+# DOCKERFILE UNIFICADO - SIGE v8.0
+# Idêntico entre desenvolvimento e produção
+# Sistema Integrado de Gestão Empresarial - EasyPanel Ready
 
 FROM python:3.11-slim-bullseye
 
 # Metadados
 LABEL maintainer="SIGE v8.0" \
       version="8.0" \
-      description="Sistema Integrado de Gestão Empresarial"
+      description="Sistema Integrado de Gestão Empresarial - Unified Build"
 
 # Variáveis de build
 ARG DEBIAN_FRONTEND=noninteractive
+ARG BUILD_ENV=production
 
-# Instalar dependências do sistema (seguindo o guia)
+# Instalar dependências do sistema necessárias
 RUN apt-get update && apt-get install -y --no-install-recommends \
     postgresql-client \
     curl \
     wget \
     gcc \
+    g++ \
     python3-dev \
     libpq-dev \
+    libffi-dev \
+    libssl-dev \
+    make \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
-# Criar usuário não-root para segurança
+# Criar usuário para segurança (mesmo nome em dev/prod)
 RUN groupadd -r sige && useradd -r -g sige sige
 
 # Definir diretório de trabalho
 WORKDIR /app
 
-# Copiar arquivos de dependências primeiro (otimização de cache)
+# Copiar pyproject.toml primeiro para cache de dependências
 COPY pyproject.toml ./
 
-# Gerar requirements.txt e instalar dependências
+# Instalar dependências Python
 RUN pip install --no-cache-dir --upgrade pip setuptools wheel && \
     pip install --no-cache-dir .
 
 # Copiar código da aplicação
 COPY . .
 
-# Criar diretórios necessários
-RUN mkdir -p /app/static/fotos /app/logs && \
-    chown -R sige:sige /app
+# Criar todos os diretórios necessários
+RUN mkdir -p \
+    /app/static/fotos_funcionarios \
+    /app/static/fotos \
+    /app/static/images \
+    /app/uploads \
+    /app/logs \
+    /app/temp \
+    && chown -R sige:sige /app
 
-# Copiar script de entrada para EasyPanel (versão corrigida para produção)
-COPY docker-entrypoint-producao-corrigido.sh /app/docker-entrypoint.sh
+# Copiar e configurar script de entrada unificado (para EasyPanel)
+COPY docker-entrypoint-unified.sh /app/docker-entrypoint.sh
 RUN chmod +x /app/docker-entrypoint.sh
 
 # Mudar para usuário não-root
 USER sige
 
-# Variáveis de ambiente (não-sensíveis)
-ENV FLASK_ENV=production \
+# Variáveis de ambiente padrão
+ENV FLASK_APP=main.py \
+    FLASK_ENV=production \
     PORT=5000 \
     PYTHONPATH=/app \
-    PYTHONUNBUFFERED=1
+    PYTHONUNBUFFERED=1 \
+    PYTHONIOENCODING=utf-8
 
 # Expor porta
 EXPOSE 5000
 
-# Healthcheck para EasyPanel
-HEALTHCHECK --interval=30s --timeout=5s --start-period=30s --retries=3 \
+# Health check robusto para EasyPanel
+HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
   CMD curl -f http://localhost:${PORT:-5000}/health || exit 1
 
-# Comando de entrada (padrão do guia)
+# Comando de entrada otimizado para EasyPanel
 ENTRYPOINT ["/app/docker-entrypoint.sh"]
-CMD ["gunicorn", "--bind", "0.0.0.0:5000", "--workers", "1", "--timeout", "120", "--access-logfile", "-", "main:app"]
+CMD ["gunicorn", "--bind", "0.0.0.0:5000", "--workers", "2", "--timeout", "120", "--access-logfile", "-", "--error-logfile", "-", "--log-level", "info", "main:app"]
