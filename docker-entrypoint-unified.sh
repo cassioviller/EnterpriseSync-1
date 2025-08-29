@@ -15,24 +15,39 @@ else
     ENABLE_DEBUG=false
 fi
 
-# Verificar variáveis essenciais
+# Verificar e configurar DATABASE_URL
 if [[ -z "${DATABASE_URL}" ]]; then
-    echo "⚠️  DATABASE_URL não definida, usando padrão PostgreSQL local"
-    export DATABASE_URL="postgresql://postgres:postgres@localhost:5432/sige"
+    echo "⚠️  DATABASE_URL não definida, usando padrão EasyPanel"
+    export DATABASE_URL="postgresql://sige:sige@viajey_sige:5432/sige"
+fi
+
+# Adicionar sslmode=disable se não estiver presente (para EasyPanel)
+if [[ "${DATABASE_URL}" != *"sslmode="* ]]; then
+    if [[ "${DATABASE_URL}" == *"?"* ]]; then
+        export DATABASE_URL="${DATABASE_URL}&sslmode=disable"
+    else
+        export DATABASE_URL="${DATABASE_URL}?sslmode=disable"
+    fi
+    echo "🔒 SSL desabilitado para compatibilidade EasyPanel"
 fi
 
 # Aguardar conexão com PostgreSQL
 echo "⏳ Verificando conexão com PostgreSQL..."
 
-# Extrair host e porta da DATABASE_URL para pg_isready
-DB_HOST=$(echo $DATABASE_URL | sed -n 's/.*@\([^:]*\):.*/\1/p')
-DB_PORT=$(echo $DATABASE_URL | sed -n 's/.*:\([0-9]*\)\/.*/\1/p')
-DB_USER=$(echo $DATABASE_URL | sed -n 's/.*\/\/\([^:]*\):.*/\1/p')
-
-# Valores padrão se extração falhar
-DB_HOST=${DB_HOST:-localhost}
-DB_PORT=${DB_PORT:-5432}
-DB_USER=${DB_USER:-postgres}
+# Extrair componentes da DATABASE_URL de forma mais robusta
+if [[ $DATABASE_URL =~ postgres(ql)?://([^:]+):([^@]+)@([^:]+):([0-9]+)/([^?]+) ]]; then
+    DB_USER="${BASH_REMATCH[2]}"
+    DB_PASS="${BASH_REMATCH[3]}" 
+    DB_HOST="${BASH_REMATCH[4]}"
+    DB_PORT="${BASH_REMATCH[5]}"
+    DB_NAME="${BASH_REMATCH[6]}"
+else
+    # Valores padrão para EasyPanel
+    DB_HOST="viajey_sige"
+    DB_PORT="5432"
+    DB_USER="sige"
+    DB_NAME="sige"
+fi
 
 echo "🔍 Conectando em: ${DB_HOST}:${DB_PORT} (usuário: ${DB_USER})"
 

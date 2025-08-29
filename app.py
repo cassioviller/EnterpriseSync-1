@@ -18,11 +18,16 @@ app.wsgi_app = ProxyFix(app.wsgi_app, x_proto=1, x_host=1)
 database_url = os.environ.get("DATABASE_URL")
 if not database_url:
     # EasyPanel default PostgreSQL URL pattern
-    database_url = "postgresql://sige:sige@viajey_sige:5432/sige"
+    database_url = "postgresql://sige:sige@viajey_sige:5432/sige?sslmode=disable"
 
 # Convert postgres:// to postgresql:// for SQLAlchemy compatibility
 if database_url and database_url.startswith("postgres://"):
     database_url = database_url.replace("postgres://", "postgresql://", 1)
+
+# Garantir que sslmode=disable está presente para EasyPanel
+if database_url and "sslmode=" not in database_url:
+    separator = "&" if "?" in database_url else "?"
+    database_url = f"{database_url}{separator}sslmode=disable"
 
 app.config["SQLALCHEMY_DATABASE_URI"] = database_url
 app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {
