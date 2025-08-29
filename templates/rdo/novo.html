@@ -991,178 +991,9 @@ function toggleServico(servicoId) {
 // Inicialização
 document.addEventListener('DOMContentLoaded', function() {
     console.log('RDO Moderno carregado com sucesso!');
-    inicializarAutocompleteFuncionarios();
 });
 
-// Sistema de autocomplete para funcionários
-let funcionariosSelecionados = [];
-let timeoutBusca = null;
-
-function inicializarAutocompleteFuncionarios() {
-    const input = document.getElementById('buscarFuncionario');
-    const sugestoes = document.getElementById('sugestoesFuncionarios');
-    
-    input.addEventListener('input', function() {
-        clearTimeout(timeoutBusca);
-        const termo = this.value.trim();
-        
-        if (termo.length < 2) {
-            sugestoes.style.display = 'none';
-            return;
-        }
-        
-        timeoutBusca = setTimeout(() => {
-            buscarFuncionarios(termo);
-        }, 300);
-    });
-    
-    // Fechar sugestões ao clicar fora
-    document.addEventListener('click', function(e) {
-        if (!input.contains(e.target) && !sugestoes.contains(e.target)) {
-            sugestoes.style.display = 'none';
-        }
-    });
-}
-
-function buscarFuncionarios(termo) {
-    const sugestoes = document.getElementById('sugestoesFuncionarios');
-    
-    sugestoes.innerHTML = '<div class="p-2 text-center"><i class="fas fa-spinner fa-spin"></i> Buscando...</div>';
-    sugestoes.style.display = 'block';
-    
-    fetch(`/api/funcionarios/buscar?q=${encodeURIComponent(termo)}`)
-        .then(response => response.json())
-        .then(data => {
-            if (data.success && data.funcionarios.length > 0) {
-                mostrarSugestoesFuncionarios(data.funcionarios);
-            } else {
-                sugestoes.innerHTML = '<div class="p-2 text-muted text-center">Nenhum funcionário encontrado</div>';
-            }
-        })
-        .catch(error => {
-            console.error('Erro na busca:', error);
-            sugestoes.innerHTML = '<div class="p-2 text-danger text-center">Erro na busca</div>';
-        });
-}
-
-function mostrarSugestoesFuncionarios(funcionarios) {
-    const sugestoes = document.getElementById('sugestoesFuncionarios');
-    let html = '';
-    
-    funcionarios.forEach(func => {
-        // Verificar se já foi selecionado
-        const jaSelecionado = funcionariosSelecionados.find(f => f.id === func.id);
-        if (!jaSelecionado) {
-            html += `
-                <div class="suggestion-item" onclick="selecionarFuncionario(${func.id}, '${func.nome}', ${func.valor_hora})">
-                    <div class="d-flex justify-content-between">
-                        <div>
-                            <strong>${func.nome}</strong>
-                            <br><small class="text-muted">${func.cargo}</small>
-                        </div>
-                        <div class="text-end">
-                            <small>R$ ${func.valor_hora.toFixed(2)}/h</small>
-                        </div>
-                    </div>
-                </div>
-            `;
-        }
-    });
-    
-    sugestoes.innerHTML = html || '<div class="p-2 text-muted text-center">Todos os funcionários já foram selecionados</div>';
-}
-
-function selecionarFuncionario(id, nome, valorHora) {
-    // Adicionar à lista de selecionados
-    funcionariosSelecionados.push({
-        id: id,
-        nome: nome,
-        valor_hora: valorHora,
-        horas: 8.0, // Padrão 8h
-        funcao: 'Executante'
-    });
-    
-    // Limpar campo de busca
-    document.getElementById('buscarFuncionario').value = '';
-    document.getElementById('sugestoesFuncionarios').style.display = 'none';
-    
-    // Atualizar interface
-    renderizarFuncionariosSelecionados();
-}
-
-function renderizarFuncionariosSelecionados() {
-    const container = document.getElementById('funcionarios-selecionados');
-    const nenhumFuncionario = document.getElementById('nenhumFuncionario');
-    
-    if (funcionariosSelecionados.length === 0) {
-        nenhumFuncionario.style.display = 'block';
-        return;
-    }
-    
-    nenhumFuncionario.style.display = 'none';
-    
-    let html = '<div class="funcionarios-selected-list">';
-    
-    funcionariosSelecionados.forEach((func, index) => {
-        html += `
-            <div class="funcionario-selected-card mb-3">
-                <div class="card">
-                    <div class="card-body">
-                        <div class="d-flex justify-content-between align-items-start mb-2">
-                            <div>
-                                <h6 class="card-title mb-1">${func.nome}</h6>
-                                <small class="text-muted">R$ ${func.valor_hora.toFixed(2)}/hora</small>
-                            </div>
-                            <button type="button" class="btn btn-outline-danger btn-sm" onclick="removerFuncionario(${index})">
-                                <i class="fas fa-times"></i>
-                            </button>
-                        </div>
-                        
-                        <div class="row">
-                            <div class="col-md-6">
-                                <label class="form-label">Função</label>
-                                <select class="form-select form-select-sm" onchange="atualizarFuncaoFuncionario(${index}, this.value)">
-                                    <option value="Executante" ${func.funcao === 'Executante' ? 'selected' : ''}>Executante</option>
-                                    <option value="Operador" ${func.funcao === 'Operador' ? 'selected' : ''}>Operador</option>
-                                    <option value="Auxiliar" ${func.funcao === 'Auxiliar' ? 'selected' : ''}>Auxiliar</option>
-                                    <option value="Encarregado" ${func.funcao === 'Encarregado' ? 'selected' : ''}>Encarregado</option>
-                                </select>
-                            </div>
-                            <div class="col-md-6">
-                                <label class="form-label">Horas Trabalhadas</label>
-                                <input type="number" class="form-control form-control-sm" 
-                                       min="0" max="24" step="0.5" 
-                                       value="${func.horas}"
-                                       onchange="atualizarHorasFuncionario(${index}, this.value)"
-                                       name="funcionario_${func.id}_horas">
-                            </div>
-                        </div>
-                        
-                        <!-- Campo hidden para envio -->
-                        <input type="hidden" name="funcionarios_selecionados" value="${func.id}">
-                        <input type="hidden" name="funcionario_${func.id}_funcao" value="${func.funcao}">
-                    </div>
-                </div>
-            </div>
-        `;
-    });
-    
-    html += '</div>';
-    container.innerHTML = html;
-}
-
-function removerFuncionario(index) {
-    funcionariosSelecionados.splice(index, 1);
-    renderizarFuncionariosSelecionados();
-}
-
-function atualizarFuncaoFuncionario(index, novaFuncao) {
-    funcionariosSelecionados[index].funcao = novaFuncao;
-}
-
-function atualizarHorasFuncionario(index, novasHoras) {
-    funcionariosSelecionados[index].horas = parseFloat(novasHoras) || 0;
-}
+// JavaScript carregado via arquivo externo
 
 function renderizarFuncionarios(funcionarios) {
     const container = document.getElementById('funcionarios-container');
@@ -1245,15 +1076,9 @@ function renderizarFuncionarios(funcionarios) {
         });
     });
 }
-
-function renderizarErroFuncionarios() {
-    const container = document.getElementById('funcionarios-container');
-    container.innerHTML = `
-        <div class="alert alert-warning">
-            <i class="fas fa-exclamation-triangle"></i>
-            <strong>Erro ao carregar funcionários:</strong> Não foi possível carregar a lista de funcionários ativos.
-        </div>
-    `;
-}
 </script>
+
+<!-- Sistema de Autocomplete para Funcionários -->
+<script src="/static/js/rdo_autocomplete.js"></script>
+
 {% endblock %}
