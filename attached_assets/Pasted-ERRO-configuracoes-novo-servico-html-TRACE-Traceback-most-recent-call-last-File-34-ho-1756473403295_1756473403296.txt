@@ -1,0 +1,37 @@
+ERRO: configuracoes/novo_servico.html
+
+TRACE:
+Traceback (most recent call last):
+  File &#34;/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/flask/app.py&#34;, line 917, in full_dispatch_request
+    rv = self.dispatch_request()
+         ^^^^^^^^^^^^^^^^^^^^^^^
+  File &#34;/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/flask/app.py&#34;, line 902, in dispatch_request
+    return self.ensure_sync(self.view_functions[rule.endpoint])(**view_args)  # type: ignore[no-any-return]
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File &#34;/home/runner/workspace/auth.py&#34;, line 33, in decorated_function
+    return f(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^
+  File &#34;/home/runner/workspace/views.py&#34;, line 5452, in novo_servico
+    return render_template(&#39;configuracoes/novo_servico.html&#39;)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File &#34;/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/flask/templating.py&#34;, line 149, in render_template
+    template = app.jinja_env.get_or_select_template(template_name_or_list)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File &#34;/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/jinja2/environment.py&#34;, line 1087, in get_or_select_template
+    return self.get_template(template_name_or_list, parent, globals)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File &#34;/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/jinja2/environment.py&#34;, line 1016, in get_template
+    return self._load_template(name, globals)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File &#34;/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/jinja2/environment.py&#34;, line 975, in _load_template
+    template = self.loader.load(self, name, self.make_globals(globals))
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File &#34;/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/jinja2/loaders.py&#34;, line 126, in load
+    source, filename, uptodate = self.get_source(environment, name)
+                                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File &#34;/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/flask/templating.py&#34;, line 65, in get_source
+    return self._get_source_fast(environment, template)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File &#34;/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/flask/templating.py&#34;, line 99, in _get_source_fast
+    raise TemplateNotFound(template)
+jinja2.exceptions.TemplateNotFound: configuracoes/novo_servico.html
