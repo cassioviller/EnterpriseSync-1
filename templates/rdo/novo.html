@@ -1111,8 +1111,7 @@ function exibirListaFuncionarios(funcionarios) {
                     <div class="card-body">
                         <h6 class="card-title">${func.nome}</h6>
                         <p class="card-text">
-                            <small class="text-muted">${func.cargo}</small><br>
-                            <span class="text-success fw-bold">R$ ${func.valor_hora.toFixed(2)}/hora</span>
+                            <small class="text-muted">${func.cargo}</small>
                         </p>
                         <button class="btn ${btnClass} btn-sm w-100" 
                                 onclick="selecionarFuncionario(${func.id}, '${func.nome.replace(/'/g, "\\'")}', '${func.cargo}', ${func.valor_hora})"
@@ -1189,7 +1188,7 @@ function atualizarListaFuncionarios() {
                         <div class="d-flex justify-content-between align-items-start mb-2">
                             <div>
                                 <h6 class="card-title mb-1">${func.nome}</h6>
-                                <small class="text-muted">${func.cargo} - R$ ${func.valor_hora.toFixed(2)}/hora</small>
+                                <small class="text-muted">${func.cargo}</small>
                             </div>
                             <button type="button" class="btn btn-outline-danger btn-sm" onclick="removerFuncionario(${index})">
                                 <i class="fas fa-times"></i>
