@@ -888,12 +888,12 @@ console.log('Initializing RDO with light theme...');
             <div class="stat-content">
                 <div class="stat-number">
                     {% if rdos and rdos is iterable and rdos is not string %}
-                        {{ rdos|selectattr('rdo.status', 'equalto', 'Rascunho')|list|length }}
+                        {{ rdos|selectattr('rdo.status', 'equalto', 'Finalizado')|list|length }}
                     {% else %}
                         0
                     {% endif %}
                 </div>
-                <div class="stat-label">Em Andamento</div>
+                <div class="stat-label">Finalizados</div>
             </div>
         </div>
         
@@ -943,7 +943,7 @@ console.log('Initializing RDO with light theme...');
                         <option value="">Todos os status</option>
                         <option value="Finalizado" {% if filters.status == "Finalizado" %}selected{% endif %}>Finalizado</option>
                         <option value="Em Andamento" {% if filters.status == "Em Andamento" %}selected{% endif %}>Em Andamento</option>
-                        <option value="Rascunho" {% if filters.status == "Rascunho" %}selected{% endif %}>Rascunho</option>
+                        <option value="Finalizado" {% if filters.status == "Finalizado" %}selected{% endif %}>Finalizado</option>
                     </select>
                 </div>
                 

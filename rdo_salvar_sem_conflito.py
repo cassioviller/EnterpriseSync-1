@@ -108,7 +108,7 @@ def salvar_rdo_flexivel():
             rdo.data_relatorio = data_relatorio
             rdo.criado_por_id = funcionario.id
             rdo.admin_id = admin_id
-            rdo.status = 'Rascunho'
+            rdo.status = 'Finalizado'
             db.session.add(rdo)
             logger.info(f"Criando novo RDO: {rdo.numero_rdo}")
         
