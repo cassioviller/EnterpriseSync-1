@@ -3328,15 +3328,27 @@ def rdo_salvar_unificado():
         
         # NOVO: Também processar campos de texto livre (nomes personalizados)
         campos_personalizados = {}
+        
+        # Formato: nome_subatividade_1_percentual = valor, nome_subatividade_1 = nome
         for key, value in request.form.items():
-            if key.startswith('nome_subatividade_') and value.strip():
-                # Extrair número: nome_subatividade_1 -> 1
-                numero = key.split('_')[-1]
-                campos_personalizados[numero] = {
-                    'nome': value.strip(),
-                    'percentual': float(request.form.get(f'percentual_subatividade_{numero}', 0)),
-                    'observacoes': request.form.get(f'observacoes_subatividade_{numero}', '').strip()
-                }
+            if key.startswith('nome_subatividade_') and key.endswith('_percentual'):
+                # Extrair número: nome_subatividade_1_percentual -> 1
+                numero = key.split('_')[2]  # ['nome', 'subatividade', '1', 'percentual']
+                percentual = float(value) if value else 0
+                
+                if percentual > 0:
+                    nome_key = f'nome_subatividade_{numero}'
+                    obs_key = f'observacoes_subatividade_{numero}'
+                    
+                    nome = request.form.get(nome_key, '').strip()
+                    observacoes = request.form.get(obs_key, '').strip()
+                    
+                    if nome:  # Só processar se tem nome
+                        campos_personalizados[numero] = {
+                            'nome': nome,
+                            'percentual': percentual,
+                            'observacoes': observacoes
+                        }
         
         # Processar campos personalizados primeiro
         for numero, dados in campos_personalizados.items():
