@@ -113,5 +113,7 @@ def rdo_lista_unificada():
         
     except Exception as e:
         print(f"ERRO LISTA RDO: {str(e)}")
+        import traceback
+        print(f"ERRO COMPLETO: {traceback.format_exc()}")
         flash('Erro ao carregar lista de RDOs.', 'error')
         return redirect(url_for('main.dashboard'))
