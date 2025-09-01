@@ -20,10 +20,11 @@ SIGE (Sistema de Gestão Empresarial) is a multi-tenant business management syst
 - Ambiente de produção com 80 tabelas deve ser preservado durante migrações
 
 ## Implementation Priority (September 2025)
+**🚨 HOTFIX CRÍTICO PRODUÇÃO PENDENTE (01/09/2025 - 13:45)**
 **✅ PROJETO CONCLUÍDO E PRONTO PARA PRODUÇÃO (01/09/2025)**
 **✅ RDO SISTEMA OTIMIZADO COM VALORES PADRÃO (01/09/2025)**
 
-**Última Atualização: 29/08/2025 - 12:05 - SISTEMA COMPLETO**
+**Última Atualização: 01/09/2025 - 13:45 - HOTFIX PRODUÇÃO OBRIGATÓRIO**
 - ✅ **DOCKERFILE PRINCIPAL UNIFICADO:** Sistema unificado entre desenvolvimento e produção
   - **Problema resolvido:** Inconsistências entre ambientes dev/prod
   - **Solução implementada:** Dockerfile principal atualizado com entrada inteligente
@@ -38,20 +39,27 @@ SIGE (Sistema de Gestão Empresarial) is a multi-tenant business management syst
   - **Compatibilidade:** Funciona em dev, produção, bypass e EasyPanel
   - **Resultado:** Sistema verdadeiramente multi-tenant pronto para escala
 
+**🚨 SITUAÇÃO CRÍTICA PRODUÇÃO (01/09/2025):**
+1. ⚠️ **LOOPS INFINITOS** - Sistema em produção com logs infinitos
+2. ⚠️ **TRANSAÇÕES SQL ABORTADAS** - Serviços não carregam por erro de transação
+3. ⚠️ **HEADER DESATUALIZADO** - Menu cortando em desktop
+4. ⚠️ **DEPLOY OBRIGATÓRIO** - Dockerfile unificado não sincronizado
+
 **Status Final da Implementação:**
 1. ✅ **CONCLUÍDO** - Consolidação backend completa (RDO, Funcionários, Propostas)
 2. ✅ **CONCLUÍDO** - Design moderno unificado (template base_completo.html)
 3. ✅ **CONCLUÍDO** - Sistema de filtros dashboard funcionando
-4. ✅ **CONCLUÍDO** - Deploy automático EasyPanel (Dockerfile unificado)
+4. 🚨 **HOTFIX PENDENTE** - Deploy automático EasyPanel (docker-entrypoint-production-fix.sh)
 5. ✅ **CONCLUÍDO** - Admin_id dinâmico (sistema multi-tenant real)
 6. ✅ **CONCLUÍDO** - Conexão PostgreSQL EasyPanel otimizada
 7. ✅ **CONCLUÍDO** - Health check e verificação automática implementados
-8. ✅ **CONCLUÍDO** - Tratamento de erros robusto para produção
+8. 🚨 **HOTFIX PENDENTE** - Tratamento de erros SQL transacionais
 9. ✅ **CONCLUÍDO** - RDO valores padrão otimizados (01/09/2025)
    - Data sempre atual automaticamente
    - Horas trabalhadas padrão 8,8h
    - Campo Local (Campo/Oficina) implementado
    - Seleção visual de funcionários com função automática
+10. 🚨 **HOTFIX PENDENTE** - Header responsivo (menu em 2 linhas desktop)
 
 **Módulos Consolidados e Testados:**
 - **RDO:** ✅ Sistema CRUD completo, interface moderna, rotas unificadas
