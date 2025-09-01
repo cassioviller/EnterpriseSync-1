@@ -5396,8 +5396,14 @@ def servicos():
     try:
         admin_id = current_user.id if current_user.tipo_usuario == TipoUsuario.ADMIN else current_user.admin_id
         
-        # Forçar erro para testar sistema de erro detalhado
-        raise Exception(f"Teste de erro detalhado - Admin ID: {admin_id} - Timestamp: {datetime.now()}")
+        # Buscar todos os serviços com suas subatividades
+        servicos = Servico.query.order_by(Servico.categoria, Servico.nome).all()
+        
+        # Para cada serviço, carregar subatividades
+        for servico in servicos:
+            servico.subatividades = SubatividadeMestre.query.filter_by(
+                servico_id=servico.id, ativo=True
+            ).order_by(SubatividadeMestre.ordem_padrao).all()
         
         # Redirecionar para novo sistema moderno sem loop
         return redirect(url_for('servicos_crud.index'))
