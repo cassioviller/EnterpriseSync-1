@@ -37,83 +37,69 @@ echo "✅ PostgreSQL conectado!"
 # HOTFIX CRÍTICO: Corrigir admin_id na tabela servico ANTES da aplicação iniciar
 echo "🔧 HOTFIX: Aplicando correção admin_id na tabela servico..."
 
-python3 -c "
-import os
-import psycopg2
-import logging
-
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
-
-def fix_servico_admin_id():
-    try:
-        database_url = os.environ.get('DATABASE_URL')
-        if not database_url:
-            logger.error('DATABASE_URL não encontrado')
-            return False
-            
-        logger.info('🔧 Verificando admin_id na tabela servico...')
-        
-        conn = psycopg2.connect(database_url)
-        cursor = conn.cursor()
-        
-        # Verificar se coluna admin_id existe
-        cursor.execute('''
+# Executar SQL direto sem Python para máxima confiabilidade
+if [ -n "$DATABASE_URL" ]; then
+    echo "📍 DATABASE_URL encontrado, executando HOTFIX..."
+    
+    # Extrair componentes da URL para psql
+    DB_USER=$(echo $DATABASE_URL | sed 's/.*:\/\/\([^:]*\):.*/\1/')
+    DB_PASS=$(echo $DATABASE_URL | sed 's/.*:\/\/[^:]*:\([^@]*\)@.*/\1/')
+    DB_HOST=$(echo $DATABASE_URL | sed 's/.*@\([^:]*\):.*/\1/')
+    DB_PORT=$(echo $DATABASE_URL | sed 's/.*:\([0-9]*\)\/.*/\1/')
+    DB_NAME=$(echo $DATABASE_URL | sed 's/.*\/\([^?]*\).*/\1/')
+    
+    export PGPASSWORD="$DB_PASS"
+    
+    echo "🔧 Conectando em $DB_HOST:$DB_PORT/$DB_NAME como $DB_USER..."
+    
+    # Executar comandos SQL via psql
+    psql -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d "$DB_NAME" -c "
+    DO \$\$
+    BEGIN
+        -- Verificar se coluna admin_id existe
+        IF NOT EXISTS (
             SELECT column_name 
             FROM information_schema.columns 
-            WHERE table_name=\'servico\' AND column_name=\'admin_id\'
-        ''')
-        
-        if not cursor.fetchone():
-            logger.info('✅ Adicionando coluna admin_id na tabela servico...')
+            WHERE table_name='servico' AND column_name='admin_id'
+        ) THEN
+            RAISE NOTICE '✅ Adicionando coluna admin_id na tabela servico...';
             
-            # Adicionar coluna admin_id
-            cursor.execute('''
-                ALTER TABLE servico 
-                ADD COLUMN admin_id INTEGER
-            ''')
+            -- Adicionar coluna admin_id
+            ALTER TABLE servico ADD COLUMN admin_id INTEGER;
             
-            # Popular com admin_id padrão
-            cursor.execute('''
-                UPDATE servico 
-                SET admin_id = 10 
-                WHERE admin_id IS NULL
-            ''')
+            -- Popular com admin_id padrão para todos os registros
+            UPDATE servico SET admin_id = 10 WHERE admin_id IS NULL;
             
-            # Adicionar foreign key constraint
-            cursor.execute('''
-                ALTER TABLE servico 
-                ADD CONSTRAINT fk_servico_admin 
-                FOREIGN KEY (admin_id) REFERENCES usuario(id)
-            ''')
+            -- Verificar se usuário admin_id=10 existe, se não criar
+            IF NOT EXISTS (SELECT id FROM usuario WHERE id = 10) THEN
+                INSERT INTO usuario (id, username, email, nome, password_hash, tipo_usuario, ativo, admin_id)
+                VALUES (10, 'admin_producao', 'admin@producao.com', 'Admin Produção', 
+                        'scrypt:32768:8:1\$password_hash', 'admin', TRUE, NULL)
+                ON CONFLICT (id) DO NOTHING;
+            END IF;
             
-            # Tornar NOT NULL  
-            cursor.execute('''
-                ALTER TABLE servico 
-                ALTER COLUMN admin_id SET NOT NULL
-            ''')
+            -- Adicionar foreign key constraint
+            ALTER TABLE servico ADD CONSTRAINT fk_servico_admin 
+            FOREIGN KEY (admin_id) REFERENCES usuario(id);
             
-            conn.commit()
-            logger.info('✅ HOTFIX aplicado: admin_id adicionado na tabela servico')
+            -- Tornar NOT NULL
+            ALTER TABLE servico ALTER COLUMN admin_id SET NOT NULL;
             
-        else:
-            logger.info('✅ Coluna admin_id já existe na tabela servico')
-            
-        cursor.close()
-        conn.close()
-        return True
-        
-    except Exception as e:
-        logger.error(f'❌ Erro no HOTFIX admin_id: {e}')
-        return False
-
-fix_servico_admin_id()
-" 2>/dev/null
-
-if [ $? -eq 0 ]; then
-    echo "✅ HOTFIX admin_id aplicado com sucesso"
+            RAISE NOTICE '✅ HOTFIX aplicado: admin_id adicionado na tabela servico';
+        ELSE
+            RAISE NOTICE '✅ Coluna admin_id já existe na tabela servico';
+        END IF;
+    END
+    \$\$;
+    " 2>&1
+    
+    if [ $? -eq 0 ]; then
+        echo "✅ HOTFIX admin_id aplicado com sucesso via psql"
+    else
+        echo "⚠️ HOTFIX admin_id falhou via psql - continuando inicialização"
+    fi
 else
-    echo "⚠️ HOTFIX admin_id falhou - continuando inicialização"
+    echo "❌ DATABASE_URL não encontrado - pulando HOTFIX"
 fi
 
 # Inicialização mínima da aplicação (sem loops)
