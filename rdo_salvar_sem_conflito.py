@@ -147,7 +147,14 @@ def salvar_rdo_flexivel():
                         funcao_campo = f'funcao_{func_id}'
                         horas_campo = f'horas_{func_id}'
                         
-                        funcao_exercida = request.form.get(funcao_campo, func.cargo or 'Operacional')
+                        # Obter cargo via relacionamento com Funcao
+                        cargo_funcionario = 'Operacional'
+                        if func.funcao_ref:
+                            cargo_funcionario = func.funcao_ref.nome
+                        elif hasattr(func, 'cargo'):
+                            cargo_funcionario = func.cargo
+                        
+                        funcao_exercida = request.form.get(funcao_campo, cargo_funcionario)
                         horas_trabalhadas = float(request.form.get(horas_campo, 8.0))
                         
                         rdo_funcionario = RDOMaoObra(

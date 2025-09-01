@@ -273,7 +273,7 @@ def api_funcionarios_ativos():
             funcionarios_data.append({
                 'id': func.id,
                 'nome': func.nome,
-                'cargo': func.cargo or 'Operacional',
+                'cargo': func.funcao_ref.nome if func.funcao_ref else 'Operacional',
                 'departamento': func.departamento or 'Sem Departamento'
             })
         
