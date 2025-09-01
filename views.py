@@ -2146,11 +2146,16 @@ def novo_rdo():
                 for ativ in atividades_anteriores:
                     print(f"DEBUG SERVIÇO: {ativ['descricao']} - {len(ativ['subatividades'])} subatividades")
         
+        # Adicionar data atual para o template
+        from datetime import date as date_module
+        data_hoje = date_module.today().strftime('%Y-%m-%d')
+        
         return render_template('rdo/novo.html', 
                              obras=obras,
                              funcionarios=funcionarios,
                              obra_selecionada=obra_id,
-                             atividades_anteriores=atividades_anteriores)
+                             atividades_anteriores=atividades_anteriores,
+                             data_hoje=data_hoje)
         
     except Exception as e:
         print(f"ERRO NOVO RDO: {str(e)}")
