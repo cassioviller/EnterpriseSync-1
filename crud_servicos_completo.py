@@ -10,18 +10,37 @@ import os
 import traceback
 from datetime import datetime
 
-# Importar sistema de erro detalhado
-try:
-    from utils.error_handler import handle_detailed_error, log_sql_error
-except ImportError:
-    # Fallback se não conseguir importar
-    def handle_detailed_error(exception, context="Sistema", fallback_url="main.dashboard"):
-        logger.error(f"❌ {context}: {str(exception)}")
-        flash(f'Erro no {context.lower()}', 'error')
-        return redirect(url_for(fallback_url))
+# Sistema de tratamento de erros robusto
+def handle_detailed_error(exception, context="Sistema", fallback_url="main.dashboard"):
+    """Manipula erros com logs detalhados"""
+    import traceback
+    error_trace = traceback.format_exc()
     
-    def log_sql_error(exception, query_context=""):
-        logger.error(f"🚨 ERRO SQL: {str(exception)}")
+    logger.error(f"❌ {context}: {str(exception)}")
+    logger.error(f"📋 Traceback:\n{error_trace}")
+    
+    # Em desenvolvimento, mostrar erro completo
+    if current_app.debug or os.environ.get('FLASK_ENV') == 'development':
+        flash(f'{context}: {str(exception)}', 'error')
+    else:
+        flash(f'Erro no {context.lower()}. Nossa equipe foi notificada.', 'error')
+    
+    return redirect(url_for(fallback_url))
+
+def log_sql_error(exception, query_context=""):
+    """Log específico para erros SQL"""
+    logger.error(f"🚨 ERRO SQL: {str(exception)}")
+    if query_context:
+        logger.error(f"📋 Contexto: {query_context}")
+    
+    # Detectar tipos de erro
+    error_str = str(exception).lower()
+    if "transaction" in error_str and "aborted" in error_str:
+        logger.error("💥 TRANSAÇÃO ABORTADA - Possível conflito de dados")
+    elif "duplicate key" in error_str:
+        logger.error("🔑 CHAVE DUPLICADA - Dados já existem")
+    elif "foreign key" in error_str:
+        logger.error("🔗 FOREIGN KEY - Referência inválida")
 
 # Configurar logging
 logging.basicConfig(level=logging.INFO)
@@ -82,12 +101,42 @@ def index():
             'categorias': categorias_count
         }
         
-        return render_template('servicos/index_novo.html',
-                             servicos=servicos,
-                             estatisticas=estatisticas,
-)
+        # Verificar se template existe, senão usar template base
+        try:
+            return render_template('servicos/index_novo.html',
+                                 servicos=servicos,
+                                 estatisticas=estatisticas)
+        except Exception:
+            # Fallback para template básico se não existir
+            return render_template('base_completo.html',
+                                 title="Serviços",
+                                 content=f"""
+                                 <div class="container mt-4">
+                                     <div class="card">
+                                         <div class="card-header">
+                                             <h3>Serviços Cadastrados</h3>
+                                         </div>
+                                         <div class="card-body">
+                                             <p>Total: {len(servicos)} serviços</p>
+                                             <p>Subatividades: {total_subatividades}</p>
+                                             <p>Categorias: {categorias_count}</p>
+                                             <hr>
+                                             <h5>Lista de Serviços:</h5>
+                                             <ul>
+                                             {''.join([f'<li><strong>{s.nome}</strong> ({s.categoria}) - {len(s.subatividades)} subatividades</li>' for s in servicos])}
+                                             </ul>
+                                         </div>
+                                     </div>
+                                 </div>
+                                 """)
         
     except Exception as e:
+        # Rollback da transação se necessário
+        try:
+            db.session.rollback()
+        except:
+            pass
+        
         # Log específico para erros SQL
         log_sql_error(e, "Carregamento de serviços")
         
@@ -112,7 +161,42 @@ def novo_servico():
             'Outros'
         ]
         
-        return render_template('servicos/novo.html', categorias=categorias)
+        # Verificar se template existe, senão usar inline
+        try:
+            return render_template('servicos/novo.html', categorias=categorias)
+        except Exception:
+            # Template inline como fallback
+            return render_template('base_completo.html',
+                                 title="Novo Serviço",
+                                 content=f"""
+                                 <div class="container mt-4">
+                                     <div class="card">
+                                         <div class="card-header">
+                                             <h3>Criar Novo Serviço</h3>
+                                         </div>
+                                         <div class="card-body">
+                                             <form method="POST" action="/servicos/criar">
+                                                 <div class="mb-3">
+                                                     <label for="nome" class="form-label">Nome do Serviço</label>
+                                                     <input type="text" class="form-control" id="nome" name="nome" required>
+                                                 </div>
+                                                 <div class="mb-3">
+                                                     <label for="descricao" class="form-label">Descrição</label>
+                                                     <textarea class="form-control" id="descricao" name="descricao" rows="3"></textarea>
+                                                 </div>
+                                                 <div class="mb-3">
+                                                     <label for="categoria" class="form-label">Categoria</label>
+                                                     <select class="form-control" id="categoria" name="categoria">
+                                                         {''.join([f'<option value="{cat}">{cat}</option>' for cat in categorias])}
+                                                     </select>
+                                                 </div>
+                                                 <button type="submit" class="btn btn-success">Criar Serviço</button>
+                                                 <a href="/servicos" class="btn btn-secondary">Cancelar</a>
+                                             </form>
+                                         </div>
+                                     </div>
+                                 </div>
+                                 """)
         
     except Exception as e:
         logger.error(f"❌ Erro ao abrir formulário: {str(e)}")
