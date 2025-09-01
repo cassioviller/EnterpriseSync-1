@@ -3,10 +3,25 @@ CRUD COMPLETO DE SERVIÇOS E SUBATIVIDADES - SIGE v8.0
 Sistema integrado para gestão de serviços e suas subatividades
 """
 
-from flask import Blueprint, render_template, request, jsonify, flash, redirect, url_for
+from flask import Blueprint, render_template, request, jsonify, flash, redirect, url_for, current_app, render_template_string
 from models import db, Servico, SubatividadeMestre
 import logging
+import os
+import traceback
 from datetime import datetime
+
+# Importar sistema de erro detalhado
+try:
+    from utils.error_handler import handle_detailed_error, log_sql_error
+except ImportError:
+    # Fallback se não conseguir importar
+    def handle_detailed_error(exception, context="Sistema", fallback_url="main.dashboard"):
+        logger.error(f"❌ {context}: {str(exception)}")
+        flash(f'Erro no {context.lower()}', 'error')
+        return redirect(url_for(fallback_url))
+    
+    def log_sql_error(exception, query_context=""):
+        logger.error(f"🚨 ERRO SQL: {str(exception)}")
 
 # Configurar logging
 logging.basicConfig(level=logging.INFO)
@@ -73,9 +88,11 @@ def index():
 )
         
     except Exception as e:
-        logger.error(f"❌ Erro ao carregar serviços: {str(e)}")
-        flash(f'Erro ao carregar serviços: {str(e)}', 'error')
-        return redirect(url_for('main.dashboard'))
+        # Log específico para erros SQL
+        log_sql_error(e, "Carregamento de serviços")
+        
+        # Usar sistema de erro detalhado
+        return handle_detailed_error(e, "Sistema de Serviços", "main.dashboard")
 
 @servicos_crud_bp.route('/novo', methods=['GET'])
 def novo_servico():
@@ -169,9 +186,36 @@ def criar_servico():
         
     except Exception as e:
         db.session.rollback()
-        logger.error(f"❌ Erro ao criar serviço: {str(e)}")
-        flash(f'Erro ao criar serviço: {str(e)}', 'error')
-        return redirect(url_for('servicos_crud.index'))
+        error_trace = traceback.format_exc()
+        error_msg = f"Erro ao criar serviço: {str(e)}"
+        
+        logger.error(f"❌ {error_msg}")
+        logger.error(f"📋 Traceback completo:\n{error_trace}")
+        
+        # Em desenvolvimento, mostrar erro detalhado
+        if current_app.config.get('DEBUG', False) or os.environ.get('FLASK_ENV') == 'development':
+            error_template = f"""
+            <div style="background: #f8d7da; border: 1px solid #f5c6cb; padding: 20px; margin: 20px; border-radius: 5px; font-family: Arial, sans-serif;">
+                <h3>🚨 Erro ao Criar Serviço</h3>
+                <p><strong>Erro:</strong> {str(e)}</p>
+                <details>
+                    <summary style="cursor: pointer; margin: 10px 0;">📋 Ver Traceback Completo</summary>
+                    <pre style="background: #f8f9fa; padding: 15px; border: 1px solid #dee2e6; overflow-x: auto; font-family: monospace;">{error_trace}</pre>
+                </details>
+                <hr>
+                <p><strong>Dados do Formulário:</strong></p>
+                <ul>
+                    <li>Nome: {request.form.get('nome', 'N/A')}</li>
+                    <li>Descrição: {request.form.get('descricao', 'N/A')}</li>
+                    <li>Categoria: {request.form.get('categoria', 'N/A')}</li>
+                </ul>
+                <a href="/servicos" style="background: #007bff; color: white; padding: 10px 20px; text-decoration: none; border-radius: 3px;">← Voltar aos Serviços</a>
+            </div>
+            """
+            return render_template_string(error_template), 500
+        else:
+            flash(f'Erro ao criar serviço. Detalhes registrados nos logs.', 'error')
+            return redirect(url_for('servicos_crud.index'))
 
 @servicos_crud_bp.route('/<int:servico_id>/editar')
 def editar_servico(servico_id):
