@@ -54,9 +54,10 @@ RUN mkdir -p \
     /app/temp \
     && chown -R sige:sige /app
 
-# Copiar script de entrada otimizado para produção
+# Copiar scripts de entrada (produção corrigida e backup)
 COPY docker-entrypoint-production-fix.sh /app/docker-entrypoint.sh
-RUN chmod +x /app/docker-entrypoint.sh
+COPY docker-entrypoint-unified.sh /app/docker-entrypoint-backup.sh
+RUN chmod +x /app/docker-entrypoint.sh /app/docker-entrypoint-backup.sh
 
 # Mudar para usuário não-root
 USER sige

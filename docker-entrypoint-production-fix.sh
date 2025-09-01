@@ -4,7 +4,7 @@
 
 set -e
 
-echo "🚀 SIGE v8.0 - Iniciando (Production Fix)"
+echo "🚀 SIGE v8.0 - Iniciando (Production Fix v2.0 - 01/09/2025)"
 echo "📍 Modo: ${FLASK_ENV:-production}"
 
 # Configuração silenciosa do ambiente
