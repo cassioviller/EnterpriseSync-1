@@ -54,8 +54,8 @@ RUN mkdir -p \
     /app/temp \
     && chown -R sige:sige /app
 
-# Copiar e configurar script de entrada unificado (para EasyPanel)
-COPY docker-entrypoint-unified.sh /app/docker-entrypoint.sh
+# Copiar script de entrada otimizado para produção
+COPY docker-entrypoint-production-fix.sh /app/docker-entrypoint.sh
 RUN chmod +x /app/docker-entrypoint.sh
 
 # Mudar para usuário não-root

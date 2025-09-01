@@ -786,16 +786,10 @@ def adicionar_admin_id_servico():
             
             db.session.commit()
             logger.info("✅ Coluna admin_id adicionada na tabela servico")
+            
         else:
             logger.info("✅ Coluna admin_id já existe na tabela servico")
             
     except Exception as e:
         db.session.rollback()
-        logger.error(f"❌ Erro ao adicionar admin_id na tabela servico: {str(e)}")
-        
-    except Exception as e:
-        logger.error(f"❌ ERRO ao migrar sistema RDO aprimorado: {str(e)}")
-        if 'connection' in locals():
-            connection.rollback()
-            cursor.close()
-            connection.close()
+        logger.error(f"❌ Erro ao adicionar admin_id na tabela servico: {e}")
