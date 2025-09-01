@@ -1,0 +1,73 @@
+ERRO PRODUÇÃO - Dashboard - Carregamento de Serviços
+Timestamp: 2025-09-01 14:43:34
+Tipo: ProgrammingError
+Mensagem: (psycopg2.errors.UndefinedColumn) column servico.admin_id does not exist
+LINE 1: ...r_especializacao, servico.ativo AS servico_ativo, servico.ad...
+                                                             ^
+
+[SQL: SELECT servico.id AS servico_id, servico.nome AS servico_nome, servico.descricao AS servico_descricao, servico.categoria AS servico_categoria, servico.unidade_medida AS servico_unidade_medida, servico.unidade_simbolo AS servico_unidade_simbolo, servico.custo_unitario AS servico_custo_unitario, servico.complexidade AS servico_complexidade, servico.requer_especializacao AS servico_requer_especializacao, servico.ativo AS servico_ativo, servico.admin_id AS servico_admin_id, servico.created_at AS servico_created_at, servico.updated_at AS servico_updated_at 
+FROM servico ORDER BY servico.categoria, servico.nome]
+(Background on this error at: https://sqlalche.me/e/20/f405)
+URL: https://www.sige.cassioviller.tech/servicos
+SQL Error: COLUMN_NOT_EXISTS
+Correção: Executar migração para criar coluna ausente
+
+STACK TRACE:
+Traceback (most recent call last):
+  File "/usr/local/lib/python3.11/site-packages/sqlalchemy/engine/base.py", line 1967, in _exec_single_context
+    self.dialect.do_execute(
+  File "/usr/local/lib/python3.11/site-packages/sqlalchemy/engine/default.py", line 951, in do_execute
+    cursor.execute(statement, parameters)
+psycopg2.errors.UndefinedColumn: column servico.admin_id does not exist
+LINE 1: ...r_especializacao, servico.ativo AS servico_ativo, servico.ad...
+                                                             ^
+
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/app/views.py", line 5400, in servicos
+    servicos = Servico.query.order_by(Servico.categoria, Servico.nome).all()
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.11/site-packages/sqlalchemy/orm/query.py", line 2704, in all
+    return self._iter().all()  # type: ignore
+           ^^^^^^^^^^^^
+  File "/usr/local/lib/python3.11/site-packages/sqlalchemy/orm/query.py", line 2857, in _iter
+    result: Union[ScalarResult[_T], Result[_T]] = self.session.execute(
+                                                  ^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.11/site-packages/sqlalchemy/orm/session.py", line 2365, in execute
+    return self._execute_internal(
+           ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.11/site-packages/sqlalchemy/orm/session.py", line 2251, in _execute_internal
+    result: Result[Any] = compile_state_cls.orm_execute_statement(
+                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.11/site-packages/sqlalchemy/orm/context.py", line 306, in orm_execute_statement
+    result = conn.execute(
+             ^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.11/site-packages/sqlalchemy/engine/base.py", line 1419, in execute
+    return meth(
+           ^^^^^
+  File "/usr/local/lib/python3.11/site-packages/sqlalchemy/sql/elements.py", line 526, in _execute_on_connection
+    return connection._execute_clauseelement(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.11/site-packages/sqlalchemy/engine/base.py", line 1641, in _execute_clauseelement
+    ret = self._execute_context(
+          ^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.11/site-packages/sqlalchemy/engine/base.py", line 1846, in _execute_context
+    return self._exec_single_context(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.11/site-packages/sqlalchemy/engine/base.py", line 1986, in _exec_single_context
+    self._handle_dbapi_exception(
+  File "/usr/local/lib/python3.11/site-packages/sqlalchemy/engine/base.py", line 2355, in _handle_dbapi_exception
+    raise sqlalchemy_exception.with_traceback(exc_info[2]) from e
+  File "/usr/local/lib/python3.11/site-packages/sqlalchemy/engine/base.py", line 1967, in _exec_single_context
+    self.dialect.do_execute(
+  File "/usr/local/lib/python3.11/site-packages/sqlalchemy/engine/default.py", line 951, in do_execute
+    cursor.execute(statement, parameters)
+sqlalchemy.exc.ProgrammingError: (psycopg2.errors.UndefinedColumn) column servico.admin_id does not exist
+LINE 1: ...r_especializacao, servico.ativo AS servico_ativo, servico.ad...
+                                                             ^
+
+[SQL: SELECT servico.id AS servico_id, servico.nome AS servico_nome, servico.descricao AS servico_descricao, servico.categoria AS servico_categoria, servico.unidade_medida AS servico_unidade_medida, servico.unidade_simbolo AS servico_unidade_simbolo, servico.custo_unitario AS servico_custo_unitario, servico.complexidade AS servico_complexidade, servico.requer_especializacao AS servico_requer_especializacao, servico.ativo AS servico_ativo, servico.admin_id AS servico_admin_id, servico.created_at AS servico_created_at, servico.updated_at AS servico_updated_at 
+FROM servico ORDER BY servico.categoria, servico.nome]
+(Background on this error at: https://sqlalche.me/e/20/f405)

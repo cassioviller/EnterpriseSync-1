@@ -53,6 +53,9 @@ def executar_migracoes():
         
         # Migração 12: URGENTE - Adicionar admin_id na tabela servico
         adicionar_admin_id_servico()
+        
+        # Migração 13: CRÍTICA - Corrigir admin_id em serviços existentes
+        corrigir_admin_id_servicos_existentes()
 
         logger.info("✅ Migrações automáticas concluídas com sucesso!")
         
@@ -751,6 +754,15 @@ def migrar_sistema_rdo_aprimorado():
         cursor.close()
         connection.close()
         logger.info("🎯 Migração do sistema RDO aprimorado concluída!")
+        
+    except Exception as e:
+        logger.error(f"❌ Erro na migração do sistema RDO: {e}")
+        try:
+            connection.rollback()
+            cursor.close()  
+            connection.close()
+        except:
+            pass
 
 def adicionar_admin_id_servico():
     """Adiciona admin_id na tabela servico para multi-tenant"""
@@ -793,3 +805,60 @@ def adicionar_admin_id_servico():
     except Exception as e:
         db.session.rollback()
         logger.error(f"❌ Erro ao adicionar admin_id na tabela servico: {e}")
+
+def corrigir_admin_id_servicos_existentes():
+    """Corrige admin_id em serviços existentes que podem estar sem valor"""
+    try:
+        # Usar conexão direta para máxima compatibilidade
+        connection = db.engine.raw_connection()
+        cursor = connection.cursor()
+        
+        # Verificar quantos serviços estão sem admin_id
+        cursor.execute("SELECT COUNT(*) FROM servico WHERE admin_id IS NULL")
+        servicos_sem_admin = cursor.fetchone()[0]
+        
+        if servicos_sem_admin > 0:
+            logger.info(f"🔧 Corrigindo {servicos_sem_admin} serviços sem admin_id...")
+            
+            # Atualizar serviços sem admin_id para usar admin_id=10
+            cursor.execute("""
+                UPDATE servico 
+                SET admin_id = 10 
+                WHERE admin_id IS NULL
+            """)
+            
+            logger.info(f"✅ {servicos_sem_admin} serviços corrigidos com admin_id=10")
+        else:
+            logger.info("✅ Todos os serviços já possuem admin_id correto")
+        
+        # Verificar se existem usuários admin válidos para os serviços
+        cursor.execute("""
+            SELECT DISTINCT admin_id 
+            FROM servico 
+            WHERE admin_id NOT IN (SELECT id FROM usuario WHERE tipo_usuario = 'admin')
+        """)
+        admin_ids_invalidos = cursor.fetchall()
+        
+        for (admin_id_invalido,) in admin_ids_invalidos:
+            logger.warning(f"⚠️ Serviços com admin_id inválido: {admin_id_invalido}")
+            
+            # Corrigir para admin_id=10 se não existir usuário válido
+            cursor.execute("""
+                UPDATE servico 
+                SET admin_id = 10 
+                WHERE admin_id = %s
+            """, (admin_id_invalido,))
+        
+        connection.commit()
+        cursor.close()
+        connection.close()
+        logger.info("✅ Correção de admin_id em serviços concluída!")
+        
+    except Exception as e:
+        logger.error(f"❌ Erro ao corrigir admin_id em serviços: {e}")
+        try:
+            connection.rollback()
+            cursor.close()
+            connection.close()
+        except:
+            pass
