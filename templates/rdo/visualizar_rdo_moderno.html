@@ -226,8 +226,12 @@ console.log('Initializing RDO view with light theme...');
     align-items: center;
     justify-content: center;
     font-size: 1.8rem;
-    color: white;
+    color: white !important;
     box-shadow: var(--shadow-md);
+}
+
+.stat-icon i {
+    color: white !important;
 }
 
 .stat-content {
@@ -773,7 +777,11 @@ console.log('Initializing RDO view with light theme...');
                 {% for funcionario in funcionarios %}
                 <div class="funcionario-card">
                     <div class="funcionario-avatar">
-                        <i class="fas fa-user"></i>
+                        {% if funcionario.funcionario.foto %}
+                            <img src="{{ funcionario.funcionario.foto }}" alt="{{ funcionario.funcionario.nome }}" style="width: 60px; height: 60px; border-radius: 50%; object-fit: cover;">
+                        {% else %}
+                            <i class="fas fa-user"></i>
+                        {% endif %}
                     </div>
                     <div class="funcionario-nome">{{ funcionario.funcionario.nome if funcionario.funcionario else 'Funcionário' }}</div>
                     <div class="funcionario-funcao">{{ funcionario.funcionario.funcao_ref.nome if funcionario.funcionario and funcionario.funcionario.funcao_ref else 'Funcionário' }}</div>
