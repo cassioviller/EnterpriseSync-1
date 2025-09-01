@@ -514,6 +514,43 @@
             background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 30 30'%3e%3cpath stroke='rgba%28255, 255, 255, 0.9%29' stroke-linecap='round' stroke-miterlimit='10' stroke-width='2' d='M4 7h22M4 15h22M4 23h22'/%3e%3c/svg%3e") !important;
         }
         
+        /* Desktop - Menu quebrado em duas linhas para evitar corte */
+        @media (min-width: 992px) {
+            .navbar-nav {
+                flex-wrap: wrap !important;
+                max-height: 60px !important; /* Permite duas linhas */
+                gap: 0.25rem !important;
+                align-content: flex-start !important;
+            }
+            
+            .navbar-nav .nav-item {
+                flex: 0 0 auto !important;
+            }
+            
+            .navbar-nav .nav-link {
+                font-size: 0.85rem !important;
+                padding: 0.35rem 0.6rem !important;
+                margin: 0.15rem 0.1rem !important;
+                border-radius: 5px !important;
+                white-space: nowrap !important;
+            }
+            
+            .navbar {
+                min-height: 70px !important; /* Espaço para duas linhas */
+                padding-top: 0.5rem !important;
+                padding-bottom: 0.5rem !important;
+            }
+            
+            .container-fluid {
+                align-items: flex-start !important;
+                padding-top: 0.25rem !important;
+            }
+            
+            .navbar-brand {
+                margin-bottom: 0.25rem !important;
+            }
+        }
+        
         @media (max-width: 991px) {
             .navbar-brand {
                 font-size: 1.1rem !important;
