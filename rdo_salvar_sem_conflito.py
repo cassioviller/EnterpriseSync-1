@@ -112,20 +112,15 @@ def salvar_rdo_flexivel():
             db.session.add(rdo)
             logger.info(f"Criando novo RDO: {rdo.numero_rdo}")
         
-        # Dados climáticos
-        rdo.clima_geral = request.form.get('clima_geral', '').strip()
+        # Dados climáticos - corrigido para usar os nomes corretos dos campos
+        rdo.clima_geral = request.form.get('clima', '').strip()  # Campo do form é 'clima'
         rdo.temperatura_media = request.form.get('temperatura_media', '').strip()
         rdo.umidade_relativa = request.form.get('umidade_relativa', type=int)
         rdo.vento_velocidade = request.form.get('vento_velocidade', '').strip()
         rdo.precipitacao = request.form.get('precipitacao', '').strip()
         rdo.condicoes_trabalho = request.form.get('condicoes_trabalho', '').strip()
         rdo.observacoes_climaticas = request.form.get('observacoes_climaticas', '').strip()
-        rdo.comentario_geral = request.form.get('comentario_geral', '').strip()
-        
-        # Compatibilidade com campos legados
-        rdo.tempo_manha = request.form.get('clima', '').strip()
-        rdo.temperatura = request.form.get('temperatura', '').strip()
-        rdo.condicoes_climaticas = request.form.get('condicoes_climaticas', '').strip()
+        rdo.comentario_geral = request.form.get('observacoes_gerais', '').strip()  # Campo do form é 'observacoes_gerais'
         
         db.session.flush()  # Para obter ID do RDO
         
