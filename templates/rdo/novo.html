@@ -620,7 +620,7 @@ function renderizarServicosComDadosUltimoRDO(data) {
     
     data.servicos.forEach((servico, index) => {
         const servicoId = servico.nome.toLowerCase().replace(/\s+/g, '_').replace(/[^a-z0-9_]/g, '');
-        const isAberto = index === 0; // Primeiro serviço aberto por padrão
+        const isAberto = false; // Todos os serviços fechados por padrão
         
         html += `
             <div class="servico-card mb-3">
@@ -714,7 +714,7 @@ function renderizarTemplatePadrao() {
                         </div>
                     </div>
                 </div>
-                <div class="servico-body" id="body-estrutura">
+                <div class="servico-body collapse" id="body-estrutura">
                     <div class="row">
                         <div class="col-md-6 mb-3">
                             <label class="form-label">Montagem de Formas</label>
