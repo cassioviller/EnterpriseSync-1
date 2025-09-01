@@ -5396,14 +5396,8 @@ def servicos():
     try:
         admin_id = current_user.id if current_user.tipo_usuario == TipoUsuario.ADMIN else current_user.admin_id
         
-        # Buscar todos os serviços com suas subatividades
-        servicos = Servico.query.order_by(Servico.categoria, Servico.nome).all()
-        
-        # Para cada serviço, carregar subatividades
-        for servico in servicos:
-            servico.subatividades = SubatividadeMestre.query.filter_by(
-                servico_id=servico.id, ativo=True
-            ).order_by(SubatividadeMestre.ordem_padrao).all()
+        # Forçar erro para testar sistema de erro detalhado
+        raise Exception(f"Teste de erro detalhado - Admin ID: {admin_id} - Timestamp: {datetime.now()}")
         
         # Redirecionar para novo sistema moderno sem loop
         return redirect(url_for('servicos_crud.index'))
@@ -5412,20 +5406,49 @@ def servicos():
         print(f"ERRO GESTÃO SERVIÇOS: {str(e)}")
         # Usar sistema de erro detalhado para produção
         try:
-            from utils.production_error_handler import capture_production_error
+            from utils.production_error_handler import capture_production_error, format_error_for_user
+            
+            # Capturar erro completo
             error_info = capture_production_error(e, "Dashboard - Carregamento de Serviços", {
                 'admin_id': admin_id if 'admin_id' in locals() else 'N/A',
                 'attempted_operation': 'Buscar serviços para dashboard',
-                'database_tables': ['servico', 'subatividade_mestre']
+                'database_tables': ['servico', 'subatividade_mestre'],
+                'flask_route': '/servicos',
+                'user_type': str(current_user.tipo_usuario) if current_user else 'N/A'
             })
             
-            # Flash com informações detalhadas para produção
-            if os.environ.get('FLASK_ENV') == 'development' or os.environ.get('SHOW_DETAILED_ERRORS') == 'true':
-                flash(f'Erro ao carregar serviços - Tipo: {error_info.get("sql_error_type", "SQL_ERROR")} - Ver logs para detalhes', 'error')
-            else:
-                flash(f'Erro no sistema de serviços. Equipe técnica notificada. Timestamp: {error_info["timestamp"]}', 'error')
-        except ImportError:
-            flash('Erro ao carregar serviços.', 'error')
+            # Gerar página de erro completa em vez de flash
+            error_html = format_error_for_user(error_info)
+            
+            from flask import render_template_string
+            return render_template_string(f"""
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <title>Erro - Sistema de Serviços</title>
+                <meta charset="utf-8">
+                <meta name="viewport" content="width=device-width, initial-scale=1">
+                <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+                <style>
+                    body {{ background: #f8f9fa; font-family: 'Segoe UI', sans-serif; }}
+                    .header {{ background: #28a745; color: white; padding: 20px 0; margin-bottom: 30px; }}
+                </style>
+            </head>
+            <body>
+                <div class="header text-center">
+                    <h2>SIGE - Sistema de Gestão Empresarial</h2>
+                    <p>Erro no Sistema de Serviços</p>
+                </div>
+                <div class="container">
+                    {error_html}
+                </div>
+            </body>
+            </html>
+            """), 500
+            
+        except ImportError as import_error:
+            # Fallback se não conseguir importar
+            flash(f'Erro ao carregar serviços - Detalhes: {str(e)[:100]}...', 'error')
         if current_user.tipo_usuario == TipoUsuario.FUNCIONARIO:
             return redirect(url_for('main.funcionario_dashboard'))
         else:

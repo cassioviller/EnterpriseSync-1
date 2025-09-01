@@ -159,11 +159,8 @@ TRACEBACK:
 def format_error_for_user(error_info):
     """Formata erro para exibição ao usuário em produção"""
     
-    # Determinar se é ambiente de desenvolvimento
-    is_dev = (error_info.get('flask_env') == 'development' or 
-              os.environ.get('SHOW_DETAILED_ERRORS') == 'true')
-    
-    if is_dev:
+    # SEMPRE mostrar erro detalhado para debugging (forçar teste)
+    if True:  # Forçar exibição detalhada
         return f"""
         <div style="background: #f8d7da; border: 1px solid #f5c6cb; padding: 20px; margin: 20px; border-radius: 8px; font-family: 'Segoe UI', sans-serif;">
             <h3 style="color: #721c24; margin: 0 0 15px 0;">🚨 Erro Detalhado - {error_info['context']}</h3>
