@@ -7,7 +7,7 @@ console.log('Initializing RDO view with light theme...');
 </script>
 {% endblock %}
 
-{% block title %}{{ rdo.numero_rdo }} - Detalhes - SIGE{% endblock %}
+{% block title %}{{ rdo.obra.nome }} | {{ rdo.data_relatorio.strftime('%d/%m/%Y') }} - SIGE{% endblock %}
 
 {% block styles %}
 <style>
@@ -598,8 +598,8 @@ console.log('Initializing RDO view with light theme...');
                     <i class="fas fa-clipboard-list"></i>
                 </div>
                 <div class="header-text">
-                    <h1>RDO {{ rdo.numero_rdo }}</h1>
-                    <p>{{ rdo.obra.nome }} | {{ rdo.data_relatorio.strftime('%d/%m/%Y') }} | {{ rdo.status }}</p>
+                    <h1>{{ rdo.obra.nome }} | {{ rdo.data_relatorio.strftime('%d/%m/%Y') }}</h1>
+                    <p>RDO {{ rdo.numero_rdo }} | {{ rdo.status }}</p>
                 </div>
             </div>
             <div class="header-right">
@@ -698,10 +698,10 @@ console.log('Initializing RDO view with light theme...');
                 <h3>Condições Climáticas</h3>
             </div>
             <div class="info-body">
-                {% if rdo.clima %}
+                {% if rdo.clima_geral %}
                     <div class="info-row">
                         <span class="info-label">Clima:</span>
-                        <span class="info-value">{{ rdo.clima }}</span>
+                        <span class="info-value">{{ rdo.clima_geral }}</span>
                     </div>
                 {% else %}
                     <div class="empty-state">
