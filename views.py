@@ -3013,10 +3013,15 @@ def rdo_novo_unificado():
         else:
             template = 'rdo/novo.html'
         
+        # Adicionar data atual para o template
+        from datetime import date as date_module
+        data_hoje = date_module.today().strftime('%Y-%m-%d')
+        
         return render_template(template, 
                              obras=obras, 
                              funcionarios=funcionarios_dict,
                              obra_selecionada=obra_selecionada,
+                             data_hoje=data_hoje,
                              date=date)
         
     except Exception as e:

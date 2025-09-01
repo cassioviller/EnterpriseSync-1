@@ -383,7 +383,7 @@
                                 Data do Relatório
                             </label>
                             <input type="date" class="form-control" id="data_relatorio" name="data_relatorio" 
-                                   value="{{ moment().strftime('%Y-%m-%d') if moment else '2025-08-28' }}" required>
+                                   value="{{ data_hoje }}" required>
                         </div>
                         
                         <div class="row">
@@ -1167,7 +1167,7 @@ function selecionarFuncionario(id, nome, cargo, valorHora) {
         nome: nome,
         cargo: cargo,
         valor_hora: valorHora,
-        horas: 8.0
+        horas: 8.8
     });
     
     // Limpar campo de busca
@@ -1347,7 +1347,7 @@ function renderizarFuncionarios(funcionarios) {
                                 <input type="number" 
                                        class="form-control form-control-sm" 
                                        name="horas_${funcionario.id}"
-                                       value="8"
+                                       value="8.8"
                                        step="0.5"
                                        min="0"
                                        max="12"
