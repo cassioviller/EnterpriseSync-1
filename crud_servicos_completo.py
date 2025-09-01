@@ -71,22 +71,44 @@ def index():
         admin_id = get_admin_id()
         logger.info(f"📋 Carregando lista de serviços para admin_id={admin_id}")
         
-        # Buscar serviços ativos
-        servicos = Servico.query.filter_by(
-            admin_id=admin_id,
-            ativo=True
-        ).order_by(Servico.nome).all()
+        # Buscar serviços ativos com tratamento de erro específico
+        try:
+            servicos = Servico.query.filter(
+                Servico.admin_id == admin_id,
+                Servico.ativo == True
+            ).order_by(Servico.nome).all()
+            logger.info(f"✅ Query executada com sucesso - encontrados {len(servicos)} serviços")
+        except Exception as query_error:
+            logger.error(f"❌ Erro na query de serviços: {str(query_error)}")
+            # Tentar query mais simples
+            try:
+                servicos = db.session.execute(
+                    db.text("SELECT * FROM servico WHERE admin_id = :admin_id AND ativo = true ORDER BY nome"),
+                    {"admin_id": admin_id}
+                ).fetchall()
+                logger.info(f"✅ Query SQL direta executada - encontrados {len(servicos)} serviços")
+                # Converter para objetos Servico
+                servicos = [Servico.query.get(s.id) for s in servicos]
+            except Exception as raw_query_error:
+                logger.error(f"❌ Erro na query SQL direta: {str(raw_query_error)}")
+                raise query_error
         
-        # Para cada serviço, buscar suas subatividades
+        # Para cada serviço, buscar suas subatividades com tratamento de erro
         for servico in servicos:
-            subatividades = SubatividadeMestre.query.filter_by(
-                servico_id=servico.id,
-                admin_id=admin_id,
-                ativo=True
-            ).order_by(SubatividadeMestre.ordem_padrao).all()
-            
-            # Adicionar subatividades ao objeto serviço
-            servico.subatividades = subatividades
+            try:
+                subatividades = SubatividadeMestre.query.filter(
+                    SubatividadeMestre.servico_id == servico.id,
+                    SubatividadeMestre.admin_id == admin_id,
+                    SubatividadeMestre.ativo == True
+                ).order_by(SubatividadeMestre.ordem_padrao).all()
+                
+                # Adicionar subatividades ao objeto serviço
+                servico.subatividades = subatividades
+                logger.debug(f"  - {servico.nome}: {len(subatividades)} subatividades")
+            except Exception as sub_error:
+                logger.error(f"❌ Erro ao buscar subatividades para serviço {servico.id}: {str(sub_error)}")
+                # Em caso de erro, definir lista vazia
+                servico.subatividades = []
         
         # Calcular estatísticas
         total_subatividades = sum(len(s.subatividades) for s in servicos)
