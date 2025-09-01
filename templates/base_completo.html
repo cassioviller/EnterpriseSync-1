@@ -716,32 +716,40 @@
                             {{ current_user.username if current_user.is_authenticated else 'Usuário' }}
                         </a>
                         <ul class="dropdown-menu dropdown-menu-end">
-                            <li><a class="dropdown-item" href="{{ url_for('main.dashboard') }}">
-                                <i class="fas fa-tachometer-alt me-1"></i> Dashboard
-                            </a></li>
-                            <li><hr class="dropdown-divider"></li>
-                            <li><a class="dropdown-item" href="/configuracoes">
-                                <i class="fas fa-cog me-1"></i> Configurações
-                            </a></li>
-                            <li><a class="dropdown-item" href="/configuracoes/empresa">
-                                <i class="fas fa-building me-1"></i> Empresa
-                            </a></li>
-                            <li><a class="dropdown-item" href="/configuracoes/departamentos">
-                                <i class="fas fa-sitemap me-1"></i> Departamentos
-                            </a></li>
-                            <li><a class="dropdown-item" href="/configuracoes/funcoes">
-                                <i class="fas fa-user-tag me-1"></i> Funções
-                            </a></li>
-                            <li><a class="dropdown-item" href="/configuracoes/horarios">
-                                <i class="fas fa-clock me-1"></i> Horários
-                            </a></li>
-                            <li><a class="dropdown-item" href="/servicos">
-                                <i class="fas fa-tools me-1"></i> Serviços
-                            </a></li>
-                            <li><hr class="dropdown-divider"></li>
-                            <li><a class="dropdown-item" href="{{ url_for('main.logout') }}">
-                                <i class="fas fa-sign-out-alt me-1"></i> Sair
-                            </a></li>
+                            {% if current_user.is_authenticated and current_user.tipo_usuario.name == 'FUNCIONARIO' %}
+                                <!-- Menu simplificado para funcionários: apenas Sair -->
+                                <li><a class="dropdown-item text-danger" href="{{ url_for('main.logout') }}">
+                                    <i class="fas fa-sign-out-alt me-1"></i> Sair
+                                </a></li>
+                            {% else %}
+                                <!-- Menu completo para administradores -->
+                                <li><a class="dropdown-item" href="{{ url_for('main.dashboard') }}">
+                                    <i class="fas fa-tachometer-alt me-1"></i> Dashboard
+                                </a></li>
+                                <li><hr class="dropdown-divider"></li>
+                                <li><a class="dropdown-item" href="/configuracoes">
+                                    <i class="fas fa-cog me-1"></i> Configurações
+                                </a></li>
+                                <li><a class="dropdown-item" href="/configuracoes/empresa">
+                                    <i class="fas fa-building me-1"></i> Empresa
+                                </a></li>
+                                <li><a class="dropdown-item" href="/configuracoes/departamentos">
+                                    <i class="fas fa-sitemap me-1"></i> Departamentos
+                                </a></li>
+                                <li><a class="dropdown-item" href="/configuracoes/funcoes">
+                                    <i class="fas fa-user-tag me-1"></i> Funções
+                                </a></li>
+                                <li><a class="dropdown-item" href="/configuracoes/horarios">
+                                    <i class="fas fa-clock me-1"></i> Horários
+                                </a></li>
+                                <li><a class="dropdown-item" href="/servicos">
+                                    <i class="fas fa-tools me-1"></i> Serviços
+                                </a></li>
+                                <li><hr class="dropdown-divider"></li>
+                                <li><a class="dropdown-item text-danger" href="{{ url_for('main.logout') }}">
+                                    <i class="fas fa-sign-out-alt me-1"></i> Sair
+                                </a></li>
+                            {% endif %}
                         </ul>
                     </li>
                 </ul>
