@@ -5410,7 +5410,22 @@ def servicos():
         
     except Exception as e:
         print(f"ERRO GESTÃO SERVIÇOS: {str(e)}")
-        flash('Erro ao carregar serviços.', 'error')
+        # Usar sistema de erro detalhado para produção
+        try:
+            from utils.production_error_handler import capture_production_error
+            error_info = capture_production_error(e, "Dashboard - Carregamento de Serviços", {
+                'admin_id': admin_id if 'admin_id' in locals() else 'N/A',
+                'attempted_operation': 'Buscar serviços para dashboard',
+                'database_tables': ['servico', 'subatividade_mestre']
+            })
+            
+            # Flash com informações detalhadas para produção
+            if os.environ.get('FLASK_ENV') == 'development' or os.environ.get('SHOW_DETAILED_ERRORS') == 'true':
+                flash(f'Erro ao carregar serviços - Tipo: {error_info.get("sql_error_type", "SQL_ERROR")} - Ver logs para detalhes', 'error')
+            else:
+                flash(f'Erro no sistema de serviços. Equipe técnica notificada. Timestamp: {error_info["timestamp"]}', 'error')
+        except ImportError:
+            flash('Erro ao carregar serviços.', 'error')
         if current_user.tipo_usuario == TipoUsuario.FUNCIONARIO:
             return redirect(url_for('main.funcionario_dashboard'))
         else:

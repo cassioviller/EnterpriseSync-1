@@ -10,22 +10,49 @@ import os
 import traceback
 from datetime import datetime
 
-# Sistema de tratamento de erros robusto
-def handle_detailed_error(exception, context="Sistema", fallback_url="main.dashboard"):
-    """Manipula erros com logs detalhados"""
-    import traceback
-    error_trace = traceback.format_exc()
+# Sistema de tratamento de erros robusto para produção
+def handle_detailed_error(exception, context="Sistema", fallback_url="main.dashboard", additional_info=None):
+    """Manipula erros com logs detalhados e interface completa para produção"""
     
-    logger.error(f"❌ {context}: {str(exception)}")
-    logger.error(f"📋 Traceback:\n{error_trace}")
-    
-    # Em desenvolvimento, mostrar erro completo
-    if current_app.debug or os.environ.get('FLASK_ENV') == 'development':
-        flash(f'{context}: {str(exception)}', 'error')
-    else:
-        flash(f'Erro no {context.lower()}. Nossa equipe foi notificada.', 'error')
-    
-    return redirect(url_for(fallback_url))
+    # Importar sistema de erro de produção
+    try:
+        from utils.production_error_handler import capture_production_error, format_error_for_user
+        
+        # Capturar erro completo
+        error_info = capture_production_error(exception, context, additional_info)
+        
+        # Gerar interface de erro
+        error_html = format_error_for_user(error_info)
+        
+        # Retornar página de erro completa
+        from flask import render_template_string
+        return render_template_string(f"""
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <title>Erro - {context}</title>
+            <meta charset="utf-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1">
+            <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+        </head>
+        <body style="background-color: #f8f9fa;">
+            <div class="container-fluid">
+                {error_html}
+            </div>
+        </body>
+        </html>
+        """), 500
+        
+    except ImportError:
+        # Fallback se não conseguir importar
+        import traceback
+        error_trace = traceback.format_exc()
+        
+        logger.error(f"❌ {context}: {str(exception)}")
+        logger.error(f"📋 Traceback:\n{error_trace}")
+        
+        flash(f'Erro no {context.lower()}: {str(exception)}', 'error')
+        return redirect(url_for(fallback_url))
 
 def log_sql_error(exception, query_context=""):
     """Log específico para erros SQL"""

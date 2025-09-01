@@ -44,6 +44,9 @@ RUN pip install --no-cache-dir --upgrade pip setuptools wheel && \
 # Copiar código da aplicação
 COPY . .
 
+# Copiar sistema de erro detalhado para produção
+COPY utils/production_error_handler.py /app/utils/
+
 # Criar todos os diretórios necessários
 RUN mkdir -p \
     /app/static/fotos_funcionarios \
