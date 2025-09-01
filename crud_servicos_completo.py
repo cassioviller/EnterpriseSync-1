@@ -167,42 +167,6 @@ def criar_servico():
         
         return redirect(url_for('servicos_crud.index'))
         
-        # Criar serviço
-        novo_servico = Servico(
-            nome=nome,
-            descricao=descricao,
-            categoria=categoria,
-            admin_id=admin_id,
-            ativo=True
-        )
-        
-        db.session.add(novo_servico)
-        db.session.flush()  # Para obter o ID
-        
-        # Processar subatividades
-        subatividades = request.form.getlist('subatividades[]')
-        ordem = 1
-        
-        for sub_nome in subatividades:
-            sub_nome = sub_nome.strip()
-            if sub_nome:  # Não vazio
-                subatividade = SubatividadeMestre(
-                    nome=sub_nome,
-                    servico_id=novo_servico.id,
-                    admin_id=admin_id,
-                    ordem_padrao=ordem,
-                    ativo=True
-                )
-                db.session.add(subatividade)
-                ordem += 1
-        
-        db.session.commit()
-        
-        logger.info(f"✅ Serviço '{nome}' criado com {ordem-1} subatividades")
-        flash(f'Serviço "{nome}" criado com sucesso!', 'success')
-        
-        return redirect(url_for('servicos_crud.index'))
-        
     except Exception as e:
         db.session.rollback()
         logger.error(f"❌ Erro ao criar serviço: {str(e)}")
@@ -259,76 +223,6 @@ def editar_servico(servico_id):
 # ================================
 # ROTAS DE AÇÃO (POST)
 # ================================
-
-@servicos_crud_bp.route('/criar', methods=['POST'])
-def criar_servico():
-    """Cria novo serviço com suas subatividades"""
-    try:
-        admin_id = get_admin_id()
-        
-        # Dados básicos do serviço
-        nome = request.form.get('nome', '').strip()
-        descricao = request.form.get('descricao', '').strip()
-        categoria = request.form.get('categoria', '').strip()
-        
-        if not nome:
-            flash('Nome do serviço é obrigatório', 'error')
-            return redirect(url_for('servicos_crud.novo_servico'))
-        
-        logger.info(f"🔨 Criando serviço: {nome}")
-        
-        # Criar serviço
-        servico = Servico(
-            nome=nome,
-            descricao=descricao,
-            categoria=categoria,
-            unidade_medida='un',  # Valor padrão
-            admin_id=admin_id,
-            ativo=True,
-            created_at=datetime.utcnow()
-        )
-        
-        db.session.add(servico)
-        db.session.flush()  # Para obter o ID
-        
-        # Processar subatividades
-        subatividades_nomes = request.form.getlist('subatividade_nome[]')
-        subatividades_descricoes = request.form.getlist('subatividade_descricao[]')
-        
-        subatividades_salvas = 0
-        for i, nome_sub in enumerate(subatividades_nomes):
-            if nome_sub.strip():
-                descricao_sub = ''
-                if i < len(subatividades_descricoes):
-                    descricao_sub = subatividades_descricoes[i].strip()
-                
-                subatividade = SubatividadeMestre(
-                    servico_id=servico.id,
-                    nome=nome_sub.strip(),
-                    descricao=descricao_sub,
-                    ordem_padrao=i + 1,
-                    obrigatoria=True,
-                    admin_id=admin_id,
-                    ativo=True,
-                    created_at=datetime.utcnow()
-                )
-                
-                db.session.add(subatividade)
-                subatividades_salvas += 1
-                logger.info(f"  ➕ Subatividade {i+1}: {nome_sub.strip()}")
-        
-        db.session.commit()
-        
-        logger.info(f"✅ Serviço criado: {nome} com {subatividades_salvas} subatividades")
-        flash(f'Serviço "{nome}" criado com sucesso! ({subatividades_salvas} subatividades)', 'success')
-        
-        return redirect(url_for('servicos_crud.index'))
-        
-    except Exception as e:
-        db.session.rollback()
-        logger.error(f"❌ Erro ao criar serviço: {str(e)}")
-        flash(f'Erro ao criar serviço: {str(e)}', 'error')
-        return redirect(url_for('servicos_crud.novo_servico'))
 
 @servicos_crud_bp.route('/<int:servico_id>/atualizar', methods=['POST'])
 def atualizar_servico(servico_id):
