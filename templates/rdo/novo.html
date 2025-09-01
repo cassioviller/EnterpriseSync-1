@@ -386,20 +386,36 @@
                                    value="{{ moment().strftime('%Y-%m-%d') if moment else '2025-08-28' }}" required>
                         </div>
                         
-                        <div class="form-group">
-                            <label class="form-label">
-                                <i class="fas fa-cloud"></i>
-                                Condições Climáticas
-                            </label>
-                            <select class="form-control" id="clima" name="clima">
-                                <option value="">Selecione</option>
-                                <option value="ensolarado">☀️ Ensolarado</option>
-                                <option value="parcialmente_nublado">⛅ Parcialmente Nublado</option>
-                                <option value="nublado">☁️ Nublado</option>
-                                <option value="chuva_leve">🌦️ Chuva Leve</option>
-                                <option value="chuva_forte">🌧️ Chuva Forte</option>
-                                <option value="tempestade">⛈️ Tempestade</option>
-                            </select>
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="form-group">
+                                    <label class="form-label">
+                                        <i class="fas fa-cloud"></i>
+                                        Condições Climáticas
+                                    </label>
+                                    <select class="form-control" id="clima" name="clima">
+                                        <option value="">Selecione</option>
+                                        <option value="ensolarado">☀️ Ensolarado</option>
+                                        <option value="parcialmente_nublado">⛅ Parcialmente Nublado</option>
+                                        <option value="nublado">☁️ Nublado</option>
+                                        <option value="chuva_leve">🌦️ Chuva Leve</option>
+                                        <option value="chuva_forte">🌧️ Chuva Forte</option>
+                                        <option value="tempestade">⛈️ Tempestade</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="form-group">
+                                    <label class="form-label">
+                                        <i class="fas fa-map-marker-alt"></i>
+                                        Local
+                                    </label>
+                                    <select class="form-control" id="local" name="local" required>
+                                        <option value="Campo" selected>🏗️ Campo</option>
+                                        <option value="Oficina">🔧 Oficina</option>
+                                    </select>
+                                </div>
+                            </div>
                         </div>
                     </div>
                     

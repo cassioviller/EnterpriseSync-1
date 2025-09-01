@@ -114,6 +114,7 @@ def salvar_rdo_flexivel():
         
         # Dados climáticos - corrigido para usar os nomes corretos dos campos
         rdo.clima_geral = request.form.get('clima', '').strip()  # Campo do form é 'clima'
+        rdo.local = request.form.get('local', 'Campo').strip()  # Novo campo Local
         rdo.temperatura_media = request.form.get('temperatura_media', '').strip()
         rdo.umidade_relativa = request.form.get('umidade_relativa', type=int)
         rdo.vento_velocidade = request.form.get('vento_velocidade', '').strip()

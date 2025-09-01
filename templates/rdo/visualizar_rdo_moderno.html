@@ -692,6 +692,10 @@ console.log('Initializing RDO view with light theme...');
                     <span class="info-label">Condições Climáticas:</span>
                     <span class="info-value">{{ rdo.clima_geral if rdo.clima_geral else 'Não informado' }}</span>
                 </div>
+                <div class="info-row">
+                    <span class="info-label">Local:</span>
+                    <span class="info-value">{{ '🏗️ Campo' if rdo.local == 'Campo' else '🔧 Oficina' if rdo.local == 'Oficina' else (rdo.local if rdo.local else 'Campo') }}</span>
+                </div>
             </div>
         </div>
     </div>

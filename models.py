@@ -436,6 +436,9 @@ class RDO(db.Model):
     condicoes_trabalho = db.Column(db.String(50))  # "Ideais", "Adequadas", "Limitadas", "Inadequadas"
     observacoes_climaticas = db.Column(db.Text)
     
+    # Local de trabalho
+    local = db.Column(db.String(20), default='Campo')  # "Campo" ou "Oficina"
+    
     # Comentários gerais
     comentario_geral = db.Column(db.Text)
     
