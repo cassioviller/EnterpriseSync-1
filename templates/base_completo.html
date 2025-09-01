@@ -34,6 +34,7 @@
             background-color: #f8f9fa !important;
             color: #212529 !important;
             font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif !important;
+            padding-top: 90px !important; /* Compensar altura maior do navbar fixo */
         }
         
         .navbar {
@@ -518,9 +519,10 @@
         @media (min-width: 992px) {
             .navbar-nav {
                 flex-wrap: wrap !important;
-                max-height: 60px !important; /* Permite duas linhas */
-                gap: 0.25rem !important;
+                max-height: 75px !important; /* Permite duas linhas com mais espaço */
+                gap: 0.3rem !important;
                 align-content: flex-start !important;
+                justify-content: flex-start !important;
             }
             
             .navbar-nav .nav-item {
@@ -528,17 +530,18 @@
             }
             
             .navbar-nav .nav-link {
-                font-size: 0.85rem !important;
-                padding: 0.35rem 0.6rem !important;
-                margin: 0.15rem 0.1rem !important;
-                border-radius: 5px !important;
+                font-size: 0.87rem !important;
+                padding: 0.4rem 0.7rem !important;
+                margin: 0.2rem 0.15rem !important;
+                border-radius: 6px !important;
                 white-space: nowrap !important;
+                line-height: 1.2 !important;
             }
             
             .navbar {
-                min-height: 70px !important; /* Espaço para duas linhas */
-                padding-top: 0.5rem !important;
-                padding-bottom: 0.5rem !important;
+                min-height: 85px !important; /* Espaço para duas linhas com mais conforto */
+                padding-top: 0.7rem !important;
+                padding-bottom: 0.7rem !important;
             }
             
             .container-fluid {
