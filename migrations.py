@@ -831,23 +831,31 @@ def corrigir_admin_id_servicos_existentes():
         else:
             logger.info("✅ Todos os serviços já possuem admin_id correto")
         
-        # Verificar se existem usuários admin válidos para os serviços
+        # CORREÇÃO CRÍTICA: Verificar apenas se usuários existem na tabela usuario (não só admins)
         cursor.execute("""
             SELECT DISTINCT admin_id 
             FROM servico 
-            WHERE admin_id NOT IN (SELECT id FROM usuario WHERE tipo_usuario = 'admin')
+            WHERE admin_id NOT IN (SELECT id FROM usuario)
         """)
         admin_ids_invalidos = cursor.fetchall()
         
         for (admin_id_invalido,) in admin_ids_invalidos:
-            logger.warning(f"⚠️ Serviços com admin_id inválido: {admin_id_invalido}")
+            logger.warning(f"⚠️ Serviços com admin_id inválido (usuário não existe): {admin_id_invalido}")
             
-            # Corrigir para admin_id=10 se não existir usuário válido
-            cursor.execute("""
-                UPDATE servico 
-                SET admin_id = 10 
-                WHERE admin_id = %s
-            """, (admin_id_invalido,))
+            # IMPORTANTE: Só corrigir se o usuário realmente não existir
+            # Não alterar serviços de usuários válidos como admin_id=50
+            cursor.execute("SELECT COUNT(*) FROM usuario WHERE id = %s", (admin_id_invalido,))
+            usuario_existe = cursor.fetchone()[0]
+            
+            if usuario_existe == 0:
+                logger.info(f"🔧 Corrigindo serviços para admin_id=10 (usuário {admin_id_invalido} não existe)")
+                cursor.execute("""
+                    UPDATE servico 
+                    SET admin_id = 10 
+                    WHERE admin_id = %s
+                """, (admin_id_invalido,))
+            else:
+                logger.info(f"✅ Mantendo serviços do admin_id={admin_id_invalido} (usuário válido)")
         
         connection.commit()
         cursor.close()
