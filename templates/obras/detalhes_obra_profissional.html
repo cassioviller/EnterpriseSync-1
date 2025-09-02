@@ -502,18 +502,16 @@
                         </div>
                     </div>
                     
-                    <!-- Progress da Obra -->
-                    {% if obra.progresso_conclusao or obra.progresso_conclusao == 0 %}
+                    <!-- Progress da Obra baseado no último RDO -->
                     <div class="progress-container">
                         <div class="progress-header">
-                            <h6 class="mb-0" style="color: #1f2937;">Progresso da Obra</h6>
-                            <span style="color: #1f2937; font-weight: 600;">{{ obra.progresso_conclusao or 0 }}%</span>
+                            <h6 class="mb-0" style="color: #1f2937;">Progresso da Obra (Último RDO)</h6>
+                            <span style="color: #1f2937; font-weight: 600;">{{ '{:.1f}'.format(kpis.progresso_geral if kpis and kpis.progresso_geral else 0) }}%</span>
                         </div>
                         <div class="progress-bar">
-                            <div class="progress-fill" style="width: {{ obra.progresso_conclusao or 0 }}%"></div>
+                            <div class="progress-fill" style="width: {{ '{:.1f}'.format(kpis.progresso_geral if kpis and kpis.progresso_geral else 0) }}%"></div>
                         </div>
                     </div>
-                    {% endif %}
                 </div>
             </div>
         </div>
@@ -780,19 +778,18 @@
                                 </div>
                                 <div class="servico-progresso" style="text-align: center; margin-left: 1rem;">
                                     {% set progresso = (loop.index0 * 25) % 100 %}
-                                    <div class="progress-badge" style="background: {% if progresso >= 100 %}#22c55e{% elif progresso >= 70 %}#3b82f6{% elif progresso >= 40 %}#f59e0b{% else %}#ef4444{% endif %}; color: white; padding: 0.5rem 0.8rem; border-radius: 20px; font-weight: 600; font-size: 0.9rem; margin-bottom: 0.5rem;">
-                                        {{ progresso }}%
+                                    <div class="progress-badge" style="background: {% if servico.progresso >= 100 %}#22c55e{% elif servico.progresso >= 70 %}#3b82f6{% elif servico.progresso >= 40 %}#f59e0b{% else %}#ef4444{% endif %}; color: white; padding: 0.5rem 0.8rem; border-radius: 20px; font-weight: 600; font-size: 0.9rem; margin-bottom: 0.5rem;">
+                                        {{ '{:.1f}'.format(servico.progresso) }}%
                                     </div>
                                 </div>
                             </div>
                             <div class="progress-bar-container" style="margin-top: 1rem;">
                                 <div class="progress-bar" style="width: 100%; height: 8px; background: #e2e8f0; border-radius: 4px; overflow: hidden;">
-                                    {% set progresso = (loop.index0 * 25) % 100 %}
-                                    <div class="progress-fill" style="width: {{ progresso }}%; height: 100%; background: {% if progresso >= 100 %}#22c55e{% elif progresso >= 70 %}#3b82f6{% elif progresso >= 40 %}#f59e0b{% else %}#ef4444{% endif %}; border-radius: 4px; transition: width 0.5s ease;"></div>
+                                    <div class="progress-fill" style="width: {{ '{:.1f}'.format(servico.progresso) }}%; height: 100%; background: {% if servico.progresso >= 100 %}#22c55e{% elif servico.progresso >= 70 %}#3b82f6{% elif servico.progresso >= 40 %}#f59e0b{% else %}#ef4444{% endif %}; border-radius: 4px; transition: width 0.5s ease;"></div>
                                 </div>
                                 <div class="progress-text" style="display: flex; justify-content: space-between; margin-top: 0.5rem; font-size: 0.8rem; color: #6b7280;">
-                                    <span>{% if progresso == 0 %}Não iniciado{% elif progresso < 40 %}Em início{% elif progresso < 70 %}Em progresso{% elif progresso < 100 %}Quase pronto{% else %}Concluído{% endif %}</span>
-                                    <span style="font-weight: 600;">{{ progresso }}%</span>
+                                    <span>{% if servico.progresso == 0 %}Não iniciado{% elif servico.progresso < 40 %}Em início{% elif servico.progresso < 70 %}Em progresso{% elif servico.progresso < 100 %}Quase pronto{% else %}Concluído{% endif %}</span>
+                                    <span style="font-weight: 600;">{{ '{:.1f}'.format(servico.progresso) }}%</span>
                                 </div>
                             </div>
                         </div>
@@ -1021,12 +1018,31 @@
                 
                 <!-- Serviços Disponíveis -->
                 <div class="mb-4">
-                    <h6 class="text-muted mb-3" style="font-size: 0.95rem;">
-                        <i class="fas fa-check-circle me-2"></i>
-                        Selecionar Serviços Existentes
-                    </h6>
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <h6 class="text-muted mb-0" style="font-size: 0.95rem;">
+                            <i class="fas fa-check-circle me-2"></i>
+                            Selecionar Serviços Existentes
+                        </h6>
+                        <div>
+                            <button type="button" class="btn btn-outline-success btn-sm me-2" onclick="selecionarTodosServicos()">
+                                <i class="fas fa-check-double me-1"></i>
+                                Selecionar Todos
+                            </button>
+                            <button type="button" class="btn btn-outline-warning btn-sm" onclick="limparSelecaoServicos()">
+                                <i class="fas fa-times me-1"></i>
+                                Limpar Seleção
+                            </button>
+                        </div>
+                    </div>
                     <div id="servicosDisponiveis" class="row">
                         <!-- Carregado via JavaScript -->
+                    </div>
+                    <div id="servicosSelecionados" class="mt-3 p-3 bg-light rounded d-none">
+                        <h6 class="text-primary mb-2">
+                            <i class="fas fa-shopping-cart me-2"></i>
+                            Serviços Selecionados (<span id="contadorSelecionados">0</span>)
+                        </h6>
+                        <div id="listaSelecionados"></div>
                     </div>
                 </div>
                 
@@ -1077,6 +1093,10 @@
                     <i class="fas fa-plus me-2"></i>
                     Cadastrar Novo Serviço
                 </a>
+                <button type="button" id="btnSalvarServicos" class="btn btn-success" onclick="salvarServicosSelecionados()" disabled>
+                    <i class="fas fa-save me-2"></i>
+                    Salvar Serviços (<span id="contadorBotao">0</span>)
+                </button>
             </div>
         </div>
     </div>
@@ -1175,16 +1195,24 @@ function carregarServicosDisponiveis() {
                     servicosDisponiveis.forEach(servico => {
                         const servicoCard = `
                             <div class="col-md-6 mb-3" id="servico-disponivel-${servico.id}">
-                                <div class="card border-primary">
+                                <div class="card border-primary servico-card-selecao" data-servico-id="${servico.id}">
                                     <div class="card-body">
                                         <div class="d-flex justify-content-between align-items-start">
-                                            <div>
+                                            <div class="flex-grow-1">
                                                 <h6 class="card-title mb-1">${servico.nome}</h6>
                                                 ${servico.descricao ? `<small class="text-muted">${servico.descricao.length > 80 ? servico.descricao.substring(0, 80) + '...' : servico.descricao}</small>` : ''}
+                                                ${servico.categoria ? `<br><span class="badge bg-info mt-2">${servico.categoria}</span>` : ''}
                                             </div>
-                                            <button type="button" class="btn btn-sm btn-outline-primary" onclick="adicionarServicoObra(${servico.id}, '${servico.nome.replace(/'/g, "\\'")}')">
-                                                <i class="fas fa-plus"></i>
-                                            </button>
+                                            <div class="form-check">
+                                                <input type="checkbox" class="form-check-input servico-checkbox" 
+                                                       id="checkbox-${servico.id}"
+                                                       data-servico-id="${servico.id}" 
+                                                       data-servico-nome="${servico.nome.replace(/'/g, "\\'")}"
+                                                       onchange="toggleServicoSelecao(this)">
+                                                <label class="form-check-label" for="checkbox-${servico.id}" style="cursor: pointer;">
+                                                    Selecionar
+                                                </label>
+                                            </div>
                                         </div>
                                     </div>
                                 </div>
@@ -1230,7 +1258,160 @@ function carregarServicosDisponiveis() {
         });
 }
 
-// Adicionar serviço à obra
+// Array para armazenar serviços selecionados
+let servicosSelecionados = [];
+
+// Função para alternar seleção de serviço
+function toggleServicoSelecao(checkbox) {
+    const servicoId = parseInt(checkbox.dataset.servicoId);
+    const servicoNome = checkbox.dataset.servicoNome;
+    
+    if (checkbox.checked) {
+        // Adicionar à seleção
+        if (!servicosSelecionados.find(s => s.id === servicoId)) {
+            servicosSelecionados.push({
+                id: servicoId,
+                nome: servicoNome
+            });
+            
+            // Destacar o card
+            const card = checkbox.closest('.servico-card-selecao');
+            if (card) {
+                card.classList.add('border-success');
+                card.classList.remove('border-primary');
+            }
+        }
+    } else {
+        // Remover da seleção
+        servicosSelecionados = servicosSelecionados.filter(s => s.id !== servicoId);
+        
+        // Remover destaque do card
+        const card = checkbox.closest('.servico-card-selecao');
+        if (card) {
+            card.classList.add('border-primary');
+            card.classList.remove('border-success');
+        }
+    }
+    
+    atualizarInterfaceSelecao();
+}
+
+// Função para atualizar interface de seleção
+function atualizarInterfaceSelecao() {
+    const contador = servicosSelecionados.length;
+    const contadorSelecionados = document.getElementById('contadorSelecionados');
+    const contadorBotao = document.getElementById('contadorBotao');
+    const btnSalvar = document.getElementById('btnSalvarServicos');
+    const areaSelecionados = document.getElementById('servicosSelecionados');
+    const listaSelecionados = document.getElementById('listaSelecionados');
+    
+    // Atualizar contadores
+    contadorSelecionados.textContent = contador;
+    contadorBotao.textContent = contador;
+    
+    // Habilitar/desabilitar botão salvar
+    btnSalvar.disabled = contador === 0;
+    
+    if (contador > 0) {
+        // Mostrar área de selecionados
+        areaSelecionados.classList.remove('d-none');
+        
+        // Atualizar lista de selecionados
+        listaSelecionados.innerHTML = servicosSelecionados.map(servico => 
+            `<span class="badge bg-primary me-2 mb-2">${servico.nome}</span>`
+        ).join('');
+    } else {
+        // Ocultar área de selecionados
+        areaSelecionados.classList.add('d-none');
+    }
+}
+
+// Função para selecionar todos os serviços
+function selecionarTodosServicos() {
+    const checkboxes = document.querySelectorAll('.servico-checkbox');
+    checkboxes.forEach(checkbox => {
+        if (!checkbox.checked) {
+            checkbox.checked = true;
+            toggleServicoSelecao(checkbox);
+        }
+    });
+}
+
+// Função para limpar seleção
+function limparSelecaoServicos() {
+    const checkboxes = document.querySelectorAll('.servico-checkbox');
+    checkboxes.forEach(checkbox => {
+        if (checkbox.checked) {
+            checkbox.checked = false;
+            toggleServicoSelecao(checkbox);
+        }
+    });
+}
+
+// Função para salvar serviços selecionados
+function salvarServicosSelecionados() {
+    if (servicosSelecionados.length === 0) {
+        mostrarMensagem('Nenhum serviço selecionado!', 'error');
+        return;
+    }
+    
+    const obraId = {{ obra.id }};
+    const btnSalvar = document.getElementById('btnSalvarServicos');
+    
+    // Desabilitar botão durante o salvamento
+    btnSalvar.disabled = true;
+    btnSalvar.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Salvando...';
+    
+    console.log('🚀 Salvando serviços selecionados:', servicosSelecionados.length);
+    
+    // Salvar todos os serviços em paralelo
+    const promises = servicosSelecionados.map(servico => 
+        fetch('/api/obras/servicos', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                obra_id: obraId,
+                servico_id: servico.id
+            })
+        }).then(response => response.json())
+    );
+    
+    Promise.all(promises)
+        .then(results => {
+            const sucessos = results.filter(r => r.success).length;
+            const erros = results.filter(r => !r.success).length;
+            
+            if (sucessos > 0) {
+                mostrarMensagem(`${sucessos} serviço(s) adicionado(s) com sucesso!`, 'success');
+                
+                // Recarregar página após sucesso
+                setTimeout(() => {
+                    window.location.reload();
+                }, 1500);
+            }
+            
+            if (erros > 0) {
+                mostrarMensagem(`${erros} serviço(s) falharam ao salvar`, 'error');
+            }
+            
+            // Limpar seleção
+            servicosSelecionados = [];
+            atualizarInterfaceSelecao();
+        })
+        .catch(error => {
+            console.error('❌ Erro ao salvar serviços:', error);
+            mostrarMensagem('Erro ao salvar serviços', 'error');
+        })
+        .finally(() => {
+            // Reabilitar botão
+            btnSalvar.disabled = false;
+            btnSalvar.innerHTML = '<i class="fas fa-save me-2"></i>Salvar Serviços (<span id="contadorBotao">0</span>)';
+        });
+}
+
+// Adicionar serviço à obra (função antiga mantida para compatibilidade)
 function adicionarServicoObra(servicoId, servicoNome) {
     const obraId = {{ obra.id }};
     
@@ -1445,6 +1626,51 @@ function toggleAllFuncionarios() {
 
 .fade-in {
     animation: fade-in 0.6s ease forwards;
+}
+
+/* Estilos para sistema de seleção múltipla */
+.servico-card-selecao {
+    transition: all 0.3s ease;
+    cursor: pointer;
+}
+
+.servico-card-selecao:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+}
+
+.servico-card-selecao.border-success {
+    border-color: #22c55e !important;
+    background-color: rgba(34, 197, 94, 0.05);
+}
+
+.servico-card-selecao.border-success .card-body {
+    background: linear-gradient(135deg, rgba(34, 197, 94, 0.05) 0%, rgba(34, 197, 94, 0.02) 100%);
+}
+
+.servico-checkbox {
+    transform: scale(1.2);
+    margin-right: 8px;
+}
+
+.servico-checkbox:checked {
+    background-color: #22c55e;
+    border-color: #22c55e;
+}
+
+#servicosSelecionados {
+    border: 2px dashed #3b82f6;
+    background: linear-gradient(135deg, rgba(59, 130, 246, 0.05) 0%, rgba(59, 130, 246, 0.02) 100%);
+}
+
+#servicosSelecionados .badge {
+    font-size: 0.85rem;
+    padding: 0.5rem 0.75rem;
+}
+
+#btnSalvarServicos:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
 }
 </style>
 {% endblock %}
