@@ -1600,7 +1600,7 @@ def detalhes_obra(id):
         print(f"DEBUG KPIs FINAIS: Total={kpis_obra['custo_total']:.2f}, Mão Obra={kpis_obra['custo_mao_obra']:.2f}, Horas={kpis_obra['total_horas']:.1f}")
         print(f"DEBUG FUNCIONÁRIOS: {kpis_obra['funcionarios_periodo']} no período, {kpis_obra['dias_trabalhados']} dias trabalhados")
         
-        return render_template('obras/detalhes_obra.html', 
+        return render_template('obras/detalhes_obra_simples.html', 
                              obra=obra, 
                              kpis=kpis_obra,
                              data_inicio=data_inicio,

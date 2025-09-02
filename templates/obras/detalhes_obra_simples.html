@@ -1,0 +1,304 @@
+{% extends "base_completo.html" %}
+
+{% block title %}{{ obra.nome }} - Detalhes da Obra{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- Header da Página -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h1 class="h3 mb-0 text-gray-800">
+                <i class="fas fa-building"></i> {{ obra.nome }}
+            </h1>
+            <p class="text-muted mb-0">
+                <span class="badge bg-primary">{{ obra.status }}</span> | 
+                <i class="fas fa-map-marker-alt"></i> {{ obra.endereco or 'Endereço não informado' }}
+            </p>
+        </div>
+        <div>
+            <a href="/obras/editar/{{ obra.id }}" class="btn btn-warning">
+                <i class="fas fa-edit"></i> Editar Obra
+            </a>
+            <a href="/obras" class="btn btn-outline-secondary">
+                <i class="fas fa-arrow-left"></i> Voltar
+            </a>
+        </div>
+    </div>
+
+    <!-- KPIs da Obra -->
+    <div class="row mb-4">
+        <div class="col-lg-3 col-md-6 mb-3">
+            <div class="card bg-primary text-white h-100">
+                <div class="card-body text-center">
+                    <div class="row align-items-center">
+                        <div class="col">
+                            <i class="fas fa-dollar-sign fa-2x mb-2"></i>
+                            <h3>R$ {{ '{:,.2f}'.format(kpis.custo_total if kpis and kpis.custo_total else 0).replace(',', ' ').replace('.', ',').replace(' ', '.') }}</h3>
+                            <div class="text-white-75 small">Custo Total</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-lg-3 col-md-6 mb-3">
+            <div class="card bg-success text-white h-100">
+                <div class="card-body text-center">
+                    <div class="row align-items-center">
+                        <div class="col">
+                            <i class="fas fa-calendar-check fa-2x mb-2"></i>
+                            <h3>{{ kpis.dias_trabalhados if kpis else 0 }}</h3>
+                            <div class="text-white-75 small">Dias Trabalhados</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-lg-3 col-md-6 mb-3">
+            <div class="card bg-info text-white h-100">
+                <div class="card-body text-center">
+                    <div class="row align-items-center">
+                        <div class="col">
+                            <i class="fas fa-clock fa-2x mb-2"></i>
+                            <h3>{{ '{:.1f}'.format(kpis.total_horas if kpis and kpis.total_horas else 0) }}h</h3>
+                            <div class="text-white-75 small">Total de Horas</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-lg-3 col-md-6 mb-3">
+            <div class="card bg-warning text-white h-100">
+                <div class="card-body text-center">
+                    <div class="row align-items-center">
+                        <div class="col">
+                            <i class="fas fa-users fa-2x mb-2"></i>
+                            <h3>{{ kpis.funcionarios_periodo if kpis else 0 }}</h3>
+                            <div class="text-white-75 small">Funcionários</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Informações da Obra -->
+    <div class="row mb-4">
+        <div class="col-lg-8">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">
+                        <i class="fas fa-info-circle"></i> Informações Gerais
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <strong>Nome da Obra:</strong><br>
+                            {{ obra.nome }}
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <strong>Status:</strong><br>
+                            <span class="badge bg-primary">{{ obra.status }}</span>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <strong>Data de Início:</strong><br>
+                            {{ obra.data_inicio.strftime('%d/%m/%Y') if obra.data_inicio else '-' }}
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <strong>Previsão de Fim:</strong><br>
+                            {{ obra.data_previsao_fim.strftime('%d/%m/%Y') if obra.data_previsao_fim else '-' }}
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <strong>Orçamento:</strong><br>
+                            R$ {{ '{:,.2f}'.format(obra.orcamento if obra.orcamento else 0).replace(',', ' ').replace('.', ',').replace(' ', '.') }}
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <strong>Cliente:</strong><br>
+                            {{ obra.cliente if obra.cliente else '-' }}
+                        </div>
+                        <div class="col-12 mb-3">
+                            <strong>Endereço:</strong><br>
+                            {{ obra.endereco if obra.endereco else '-' }}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Ações RDO -->
+        <div class="col-lg-4">
+            <div class="card border-primary">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0">
+                        <i class="fas fa-clipboard-list"></i> Relatórios Diários (RDO)
+                    </h5>
+                </div>
+                <div class="card-body text-center">
+                    <div class="mb-3">
+                        <p class="text-muted">Gerencie os relatórios diários desta obra</p>
+                    </div>
+                    <div class="d-grid gap-2">
+                        <a href="/funcionario/rdo/consolidado?obra_id={{ obra.id }}" 
+                           class="btn btn-primary btn-lg">
+                            <i class="fas fa-plus-circle me-2"></i>
+                            Novo RDO
+                        </a>
+                        <a href="/funcionario/rdo/consolidado?obra_id={{ obra.id }}" 
+                           class="btn btn-outline-primary">
+                            <i class="fas fa-list me-2"></i>
+                            Ver Todos os RDOs
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Custos Detalhados -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">
+                        <i class="fas fa-chart-line"></i> Breakdown de Custos
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-3 text-center">
+                            <i class="fas fa-hammer fa-2x text-info mb-2"></i>
+                            <h5 class="text-info">R$ {{ '{:,.2f}'.format(kpis.custo_mao_obra if kpis and kpis.custo_mao_obra else 0).replace(',', ' ').replace('.', ',').replace(' ', '.') }}</h5>
+                            <small class="text-muted">Mão de Obra</small>
+                        </div>
+                        <div class="col-md-3 text-center">
+                            <i class="fas fa-utensils fa-2x text-warning mb-2"></i>
+                            <h5 class="text-warning">R$ {{ '{:,.2f}'.format(kpis.custo_alimentacao if kpis and kpis.custo_alimentacao else 0).replace(',', ' ').replace('.', ',').replace(' ', '.') }}</h5>
+                            <small class="text-muted">Alimentação</small>
+                        </div>
+                        <div class="col-md-3 text-center">
+                            <i class="fas fa-bus fa-2x text-danger mb-2"></i>
+                            <h5 class="text-danger">R$ {{ '{:,.2f}'.format(kpis.custo_transporte if kpis and kpis.custo_transporte else 0).replace(',', ' ').replace('.', ',').replace(' ', '.') }}</h5>
+                            <small class="text-muted">Transporte</small>
+                        </div>
+                        <div class="col-md-3 text-center">
+                            <i class="fas fa-tools fa-2x text-secondary mb-2"></i>
+                            <h5 class="text-secondary">R$ {{ '{:,.2f}'.format(kpis.custo_outros if kpis and kpis.custo_outros else 0).replace(',', ' ').replace('.', ',').replace(' ', '.') }}</h5>
+                            <small class="text-muted">Outros</small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Funcionários que Trabalharam -->
+    {% if funcionarios_obra %}
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">
+                        <i class="fas fa-users"></i> Funcionários que Trabalharam na Obra
+                        <span class="badge bg-info ms-2">{{ funcionarios_obra|length }}</span>
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        {% for funcionario in funcionarios_obra %}
+                        <div class="col-lg-3 col-md-4 col-sm-6 mb-3">
+                            <div class="card border-secondary h-100">
+                                <div class="card-body text-center p-3">
+                                    <i class="fas fa-user-hard-hat fa-2x text-primary mb-2"></i>
+                                    <h6 class="card-title mb-1">{{ funcionario.nome }}</h6>
+                                    <small class="text-muted">{{ funcionario.funcao.nome if funcionario.funcao else 'Sem função' }}</small>
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- RDOs da Obra -->
+    {% if rdos %}
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">
+                        <i class="fas fa-clipboard-list"></i> RDOs Recentes
+                        <span class="badge bg-primary ms-2">{{ rdos|length }}</span>
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead>
+                                <tr>
+                                    <th>Número RDO</th>
+                                    <th>Data</th>
+                                    <th>Status</th>
+                                    <th>Ações</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for rdo in rdos %}
+                                <tr>
+                                    <td>{{ rdo.numero_rdo or 'RDO-' + rdo.id|string }}</td>
+                                    <td>{{ rdo.data_relatorio.strftime('%d/%m/%Y') if rdo.data_relatorio else '-' }}</td>
+                                    <td>
+                                        {% if rdo.status == 'Finalizado' %}
+                                            <span class="badge bg-success">
+                                                <i class="fas fa-check-circle me-1"></i>{{ rdo.status }}
+                                            </span>
+                                        {% else %}
+                                            <span class="badge bg-warning">
+                                                <i class="fas fa-edit me-1"></i>{{ rdo.status }}
+                                            </span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        <div class="btn-group btn-group-sm">
+                                            <a href="/funcionario/rdo/consolidado?rdo_id={{ rdo.id }}" 
+                                               class="btn btn-outline-info">
+                                                <i class="fas fa-eye"></i>
+                                            </a>
+                                            <a href="/funcionario/rdo/consolidado?rdo_id={{ rdo.id }}&edit=true" 
+                                               class="btn btn-outline-warning">
+                                                <i class="fas fa-edit"></i>
+                                            </a>
+                                        </div>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% else %}
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-body text-center py-5">
+                    <i class="fas fa-clipboard-list fa-3x text-muted mb-3"></i>
+                    <h5 class="text-muted">Nenhum RDO encontrado</h5>
+                    <p class="text-muted">Esta obra ainda não possui relatórios diários registrados.</p>
+                    <a href="/funcionario/rdo/consolidado?obra_id={{ obra.id }}" class="btn btn-primary">
+                        <i class="fas fa-plus"></i> Criar Primeiro RDO
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}
