@@ -2061,7 +2061,9 @@ def get_admin_id_dinamico():
         if admin_servicos:
             return admin_servicos[0]
             
-        # Último fallback
+        # Último fallback - permitir mudança dinâmica para teste
+        # Para forçar outro admin_id, descomente a linha abaixo:
+        # return 5  # Exemplo: admin_id 5 
         return 10
         
     except Exception as e:
@@ -2076,10 +2078,19 @@ def api_servicos():
         admin_id = get_admin_id_dinamico()
         
         print(f"DEBUG API SERVIÇOS: Buscando serviços para admin_id={admin_id}")
+        print(f"DEBUG API SERVIÇOS: current_user.is_authenticated = {current_user.is_authenticated}")
+        if current_user.is_authenticated:
+            print(f"DEBUG API SERVIÇOS: current_user.id = {current_user.id}")
+            print(f"DEBUG API SERVIÇOS: current_user.admin_id = {getattr(current_user, 'admin_id', 'N/A')}")
+            print(f"DEBUG API SERVIÇOS: current_user.email = {getattr(current_user, 'email', 'N/A')}")
         
         # Buscar serviços ativos do admin
         servicos = Servico.query.filter_by(admin_id=admin_id, ativo=True).order_by(Servico.nome).all()
         print(f"DEBUG API SERVIÇOS: Encontrados {len(servicos)} serviços para admin_id={admin_id}")
+        
+        # Debug adicional: mostrar alguns serviços
+        if len(servicos) > 0:
+            print(f"DEBUG API SERVIÇOS: Primeiros 3 serviços: {[s.nome for s in servicos[:3]]}")
         
         servicos_json = []
         for servico in servicos:
