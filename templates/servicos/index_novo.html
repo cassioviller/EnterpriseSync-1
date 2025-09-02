@@ -282,8 +282,10 @@
 <script>
 // Funções JavaScript simplificadas
 function abrirModalCategorias() {
-    console.log('Abrindo página de categorias...');
-    window.location.href = '/categorias-servicos';
+    console.log('Abrindo modal de categorias...');
+    const modal = new bootstrap.Modal(document.getElementById('modalCategorias'));
+    modal.show();
+    carregarCategorias();
 }
 
 function abrirModal() {
@@ -327,5 +329,144 @@ function removeSub(btn) {
         btn.closest('.input-group').querySelector('input').value = '';
     }
 }
+
+// Sistema de gestão de categorias
+async function carregarCategorias() {
+    try {
+        const response = await fetch('/categorias-servicos/api/listar');
+        const data = await response.json();
+        
+        if (data.success) {
+            renderizarCategorias(data.categorias);
+            document.getElementById('totalCategorias').textContent = data.categorias.length;
+        } else {
+            document.getElementById('listaCategorias').innerHTML = '<div class="alert alert-danger">Erro ao carregar categorias</div>';
+        }
+    } catch (error) {
+        console.error('Erro:', error);
+        document.getElementById('listaCategorias').innerHTML = '<div class="alert alert-danger">Erro de conexão</div>';
+    }
+}
+
+function renderizarCategorias(categorias) {
+    const lista = document.getElementById('listaCategorias');
+    
+    if (categorias.length === 0) {
+        lista.innerHTML = '<div class="text-center py-3 text-muted">Nenhuma categoria encontrada</div>';
+        return;
+    }
+    
+    let html = '';
+    categorias.forEach(categoria => {
+        html += `
+            <div class="d-flex justify-content-between align-items-center p-2 border-bottom">
+                <div>
+                    <span class="badge me-2" style="background-color: ${categoria.cor || '#198754'}">
+                        ${categoria.nome}
+                    </span>
+                    <small class="text-muted">${categoria.descricao || ''}</small>
+                </div>
+                <div>
+                    <button class="btn btn-sm btn-outline-danger" onclick="excluirCategoria(${categoria.id}, '${categoria.nome}')">
+                        <i class="fas fa-trash"></i>
+                    </button>
+                </div>
+            </div>
+        `;
+    });
+    
+    lista.innerHTML = html;
+}
+
+async function adicionarCategoria() {
+    const nome = document.getElementById('novaCategoria').value.trim();
+    if (!nome) {
+        alert('Digite o nome da categoria');
+        return;
+    }
+    
+    try {
+        const response = await fetch('/categorias-servicos/api/criar', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({nome: nome})
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+            document.getElementById('novaCategoria').value = '';
+            carregarCategorias();
+            alert('Categoria adicionada com sucesso!');
+        } else {
+            alert('Erro: ' + result.error);
+        }
+    } catch (error) {
+        console.error('Erro:', error);
+        alert('Erro de conexão');
+    }
+}
+
+async function excluirCategoria(id, nome) {
+    if (confirm(`Excluir categoria "${nome}"?`)) {
+        try {
+            const response = await fetch(`/categorias-servicos/api/${id}/excluir`, {
+                method: 'DELETE'
+            });
+            
+            const result = await response.json();
+            
+            if (result.success) {
+                carregarCategorias();
+                alert('Categoria excluída com sucesso!');
+            } else {
+                alert('Erro: ' + result.error);
+            }
+        } catch (error) {
+            console.error('Erro:', error);
+            alert('Erro de conexão');
+        }
+    }
+}
 </script>
+
+<!-- Modal de Categorias -->
+<div class="modal fade" id="modalCategorias" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header bg-success text-white">
+                <h5 class="modal-title">
+                    <i class="fas fa-tags me-2"></i>
+                    Gestão de Categorias
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="row mb-3">
+                    <div class="col-md-8">
+                        <input type="text" class="form-control" id="novaCategoria" placeholder="Nome da nova categoria">
+                    </div>
+                    <div class="col-md-4">
+                        <button class="btn btn-success w-100" onclick="adicionarCategoria()">
+                            <i class="fas fa-plus"></i> Adicionar
+                        </button>
+                    </div>
+                </div>
+                
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <h6 class="mb-0">Categorias Existentes</h6>
+                    <span class="badge bg-primary" id="totalCategorias">0</span>
+                </div>
+                
+                <div id="listaCategorias" style="max-height: 300px; overflow-y: auto;">
+                    <div class="text-center py-3">Carregando...</div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fechar</button>
+            </div>
+        </div>
+    </div>
+</div>
+
 {% endblock %}
