@@ -587,8 +587,13 @@ function carregarDadosUltimoRDO() {
         .then(response => response.json())
         .then(data => {
             if (data.success && data.ultimo_rdo) {
-                console.log(`✅ Último RDO encontrado: ${data.ultimo_rdo.numero_rdo}`);
-                exibirDadosUltimoRDO(data.ultimo_rdo);
+                if (data.primeira_rdo) {
+                    console.log(`✅ Primeira RDO - carregando serviços com percentual 0%`);
+                    exibirDadosPrimeiraRDO(data.ultimo_rdo);
+                } else {
+                    console.log(`✅ Último RDO encontrado: ${data.ultimo_rdo.numero_rdo}`);
+                    exibirDadosUltimoRDO(data.ultimo_rdo);
+                }
             } else {
                 exibirMensagemSemRDOAnterior();
             }
@@ -1457,15 +1462,15 @@ function exibirDadosUltimoRDO(ultimoRDO) {
 function exibirMensagemSemRDOAnterior() {
     const servicosContainer = document.getElementById('servicos-container');
     servicosContainer.innerHTML = `
-        <div class="alert alert-warning">
-            <i class="fas fa-info-circle"></i>
-            <strong>Nenhum RDO anterior encontrado</strong>
-            <br>Esta será a primeira RDO da obra. Preencha os dados manualmente.
+        <div class="alert alert-info">
+            <i class="fas fa-rocket"></i>
+            <strong>Primeira RDO da obra!</strong>
+            <br>Serviços carregados com percentual 0% para você preencher.
         </div>
         <div class="text-center p-4">
-            <i class="fas fa-rocket fa-3x text-muted mb-3"></i>
+            <i class="fas fa-rocket fa-3x text-success mb-3"></i>
             <p class="text-muted">Primeira RDO da obra</p>
-            <small>Selecione funcionários e preencha os serviços manualmente</small>
+            <small>Serviços carregados automaticamente - ajuste os percentuais conforme necessário</small>
         </div>
     `;
 }
@@ -1479,6 +1484,95 @@ function exibirErroCarregamento() {
             <br>Não foi possível carregar dados do último RDO. Tente novamente.
         </div>
     `;
+}
+
+function exibirDadosPrimeiraRDO(primeiraRDO) {
+    const servicosContainer = document.getElementById('servicos-container');
+    
+    let html = `
+        <div class="alert alert-success">
+            <i class="fas fa-rocket"></i>
+            <strong>Primeira RDO da Obra!</strong> Serviços carregados com percentual 0%
+            <br><small>Total: ${primeiraRDO.total_servicos} serviços | ${primeiraRDO.total_subatividades} subatividades</small>
+        </div>
+    `;
+    
+    // Mostrar serviços com percentual 0%
+    if (primeiraRDO.servicos && primeiraRDO.servicos.length > 0) {
+        html += '<h5><i class="fas fa-tools"></i> Serviços da Obra (Primeira RDO)</h5>';
+        primeiraRDO.servicos.forEach((servico, index) => {
+            html += `
+                <div class="card mb-3">
+                    <div class="card-header bg-light d-flex justify-content-between align-items-center">
+                        <h6 class="mb-0">
+                            <i class="fas fa-wrench text-primary"></i> ${servico.nome}
+                        </h6>
+                        <span class="badge bg-secondary">${servico.categoria}</span>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <label class="form-label">Progresso Geral (%)</label>
+                                <div class="input-group">
+                                    <input type="number" 
+                                           class="form-control" 
+                                           name="servico_${servico.id}_percentual"
+                                           value="0" 
+                                           min="0" 
+                                           max="100" 
+                                           step="0.1"
+                                           form="formNovoRDO">
+                                    <span class="input-group-text">%</span>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Observações</label>
+                                <input type="text" 
+                                       class="form-control" 
+                                       name="servico_${servico.id}_obs"
+                                       placeholder="Observações sobre o serviço"
+                                       form="formNovoRDO">
+                            </div>
+                        </div>
+                        
+                        ${servico.subatividades && servico.subatividades.length > 0 
+                            ? `<div class="mt-3">
+                                <h6 class="text-muted"><i class="fas fa-list"></i> Subatividades</h6>
+                                <div class="row">
+                                ${servico.subatividades.map(sub => `
+                                    <div class="col-md-6 mb-2">
+                                        <label class="form-label small">${sub.nome}</label>
+                                        <div class="input-group input-group-sm">
+                                            <input type="number" 
+                                                   class="form-control" 
+                                                   name="subatividade_${sub.id}_percentual"
+                                                   value="0" 
+                                                   min="0" 
+                                                   max="100" 
+                                                   step="0.1"
+                                                   form="formNovoRDO">
+                                            <span class="input-group-text">%</span>
+                                        </div>
+                                    </div>
+                                `).join('')}
+                                </div>
+                               </div>`
+                            : ''
+                        }
+                    </div>
+                </div>
+            `;
+        });
+    } else {
+        html += `
+            <div class="alert alert-warning">
+                <i class="fas fa-exclamation-triangle"></i>
+                Nenhum serviço encontrado para esta obra. Cadastre serviços primeiro.
+            </div>
+        `;
+    }
+    
+    servicosContainer.innerHTML = html;
 }
 
 console.log('RDO Moderno carregado com sucesso!');

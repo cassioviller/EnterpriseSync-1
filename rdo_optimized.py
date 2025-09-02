@@ -120,11 +120,67 @@ def api_ultimo_rdo_dados(obra_id):
         ultimo_rdo = obter_ultimo_rdo_obra(obra_id, date.today(), admin_id)
         
         if not ultimo_rdo:
-            return jsonify({
-                'success': False,
-                'message': 'Nenhum RDO anterior encontrado para esta obra',
-                'ultimo_rdo': None
-            })
+            # Se não há RDO anterior, carregar serviços da obra com percentual 0%
+            print(f"🔍 Primeira RDO da obra {obra_id} - carregando serviços com percentual 0%")
+            
+            # Buscar serviços cadastrados na obra
+            from models import ServicoObra
+            servicos_obra = db.session.query(Servico).join(ServicoObra).filter(
+                ServicoObra.obra_id == obra_id,
+                Servico.admin_id == admin_id,
+                Servico.ativo == True
+            ).all()
+            
+            if not servicos_obra:
+                # Se não há serviços cadastrados na obra, buscar todos os serviços da empresa
+                servicos_obra = Servico.query.filter_by(admin_id=admin_id, ativo=True).all()
+                print(f"✅ Nenhum serviço específico na obra - carregando {len(servicos_obra)} serviços da empresa")
+            else:
+                print(f"✅ Encontrados {len(servicos_obra)} serviços cadastrados na obra")
+            
+            servicos_dados = []
+            for servico in servicos_obra:
+                # Buscar subatividades do serviço (se existir)
+                from models import SubatividadeMestre
+                subatividades = SubatividadeMestre.query.filter_by(
+                    servico_id=servico.id,
+                    admin_id=admin_id,
+                    ativo=True
+                ).all()
+                
+                servico_data = {
+                    'id': servico.id,
+                    'nome': servico.nome,
+                    'percentual': 0,  # Primeira RDO = 0%
+                    'categoria': servico.categoria or 'Não categorizado',
+                    'subatividades': [
+                        {
+                            'id': sub.id,
+                            'nome': sub.nome,
+                            'percentual': 0,  # Primeira RDO = 0%
+                            'descricao': sub.descricao
+                        } for sub in subatividades
+                    ]
+                }
+                servicos_dados.append(servico_data)
+            
+            resultado = {
+                'success': True,
+                'primeira_rdo': True,
+                'ultimo_rdo': {
+                    'id': None,
+                    'numero_rdo': 'PRIMEIRA_RDO',
+                    'data_relatorio': date.today().strftime('%Y-%m-%d'),
+                    'servicos': servicos_dados,
+                    'funcionarios': [],  # Primeira RDO sem funcionários pré-selecionados
+                    'total_servicos': len(servicos_dados),
+                    'total_funcionarios': 0,
+                    'total_subatividades': sum(len(s['subatividades']) for s in servicos_dados)
+                }
+            }
+            
+            print(f"✅ PRIMEIRA RDO: {len(servicos_dados)} serviços carregados com percentual 0%")
+            return jsonify(resultado)
         
         # Buscar serviços do último RDO
         servicos_rdo = RDOServicoSubatividade.query.filter_by(rdo_id=ultimo_rdo.id).all()

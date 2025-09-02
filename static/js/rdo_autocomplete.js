@@ -86,6 +86,58 @@ document.addEventListener('DOMContentLoaded', function() {
     console.log('✅ RDO Autocomplete System Initialized');
 });
 
+// Função para testar último RDO - chamada pelo botão
+function testarUltimoRDO() {
+    console.log('🔄 Testando último RDO via função global...');
+    
+    // Buscar obra selecionada
+    const obraSelect = document.querySelector('select[name="obra_id"]');
+    if (!obraSelect || !obraSelect.value) {
+        alert('⚠️ Selecione uma obra primeiro!');
+        return;
+    }
+    
+    const obraId = obraSelect.value;
+    console.log(`🔄 Carregando dados do último RDO para obra ${obraId}`);
+    
+    // Chamar a função que já existe no template
+    fetch(`/api/ultimo-rdo-dados/${obraId}`)
+        .then(response => response.json())
+        .then(data => {
+            console.log('📊 Dados recebidos:', data);
+            if (data.success && data.ultimo_rdo) {
+                if (data.primeira_rdo) {
+                    console.log('✅ Primeira RDO - carregando serviços com percentual 0%');
+                    // Chamar função do template se existe
+                    if (typeof exibirDadosPrimeiraRDO === 'function') {
+                        exibirDadosPrimeiraRDO(data.ultimo_rdo);
+                    } else {
+                        console.log('📋 Função exibirDadosPrimeiraRDO não encontrada');
+                    }
+                } else {
+                    console.log('✅ Último RDO encontrado:', data.ultimo_rdo.numero_rdo);
+                    if (typeof exibirDadosUltimoRDO === 'function') {
+                        exibirDadosUltimoRDO(data.ultimo_rdo);
+                    } else {
+                        console.log('📋 Função exibirDadosUltimoRDO não encontrada');
+                    }
+                }
+            } else {
+                console.log('ℹ️ Nenhum RDO anterior encontrado para esta obra');
+                if (typeof exibirMensagemSemRDOAnterior === 'function') {
+                    exibirMensagemSemRDOAnterior();
+                } else {
+                    console.log('📋 Função exibirMensagemSemRDOAnterior não encontrada');
+                }
+            }
+        })
+        .catch(error => {
+            console.error('❌ Erro ao carregar último RDO:', error);
+            alert('❌ Erro ao carregar dados do último RDO');
+        });
+}
+
 // Exportar funções globalmente
 window.carregarDadosUltimoRDO = carregarDadosUltimoRDO;
 window.preencherDadosRDO = preencherDadosRDO;
+window.testarUltimoRDO = testarUltimoRDO;
