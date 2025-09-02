@@ -750,53 +750,67 @@
                 </div>
             </div>
 
-            <!-- Serviços da Obra -->
-            <div class="obra-card">
-                <div class="obra-card-header">
-                    <h3><i class="fas fa-cogs"></i> Serviços da Obra</h3>
+
+        </div>
+
+        <!-- Seção de Serviços da Obra - Layout Horizontal -->
+        <div class="obra-card" style="margin-bottom: 2rem;">
+            <div class="obra-card-header">
+                <h3><i class="fas fa-cogs"></i> Serviços da Obra</h3>
+                <div class="header-actions">
+                    <span class="badge bg-light text-dark ms-2">{{ servicos_obra|length if servicos_obra else 0 }} serviços</span>
                 </div>
-                <div class="obra-card-body" style="padding: 2rem;">
-                    {% if servicos_obra and servicos_obra|length > 0 %}
+            </div>
+            <div class="obra-card-body" style="padding: 2rem;">
+                {% if servicos_obra and servicos_obra|length > 0 %}
+                    <div class="servicos-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 1.5rem;">
                         {% for servico in servicos_obra %}
-                        <div class="servico-item" style="display: flex; justify-content: space-between; align-items: center; padding: 1rem; background: #f8fafc; border-radius: 8px; margin-bottom: 1rem; border-left: 4px solid #3b82f6;">
-                            <div class="servico-info">
-                                <div class="servico-nome" style="font-weight: 600; color: #1f2937; margin-bottom: 0.25rem;">
-                                    <i class="fas fa-tools"></i>
-                                    {{ servico.nome }}
+                        <div class="servico-card" style="background: #f8fafc; border-radius: 12px; padding: 1.5rem; border: 1px solid #e2e8f0; transition: all 0.3s ease; border-left: 4px solid #3b82f6;">
+                            <div class="servico-header" style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 1rem;">
+                                <div class="servico-info" style="flex: 1;">
+                                    <h6 class="servico-nome" style="font-weight: 600; color: #1f2937; margin: 0 0 0.5rem 0; font-size: 1.1rem;">
+                                        <i class="fas fa-tools" style="color: #3b82f6; margin-right: 0.5rem;"></i>
+                                        {{ servico.nome }}
+                                    </h6>
+                                    {% if servico.descricao %}
+                                    <p class="servico-descricao" style="font-size: 0.9rem; color: #6b7280; margin: 0; line-height: 1.4;">
+                                        {{ servico.descricao[:80] + '...' if servico.descricao|length > 80 else servico.descricao }}
+                                    </p>
+                                    {% endif %}
                                 </div>
-                                {% if servico.descricao %}
-                                <div class="servico-descricao" style="font-size: 0.9rem; color: #6b7280;">
-                                    {{ servico.descricao[:50] + '...' if servico.descricao|length > 50 else servico.descricao }}
+                                <div class="servico-progresso" style="text-align: center; margin-left: 1rem;">
+                                    {% set progresso = (loop.index0 * 25) % 100 %}
+                                    <div class="progress-badge" style="background: {% if progresso >= 100 %}#22c55e{% elif progresso >= 70 %}#3b82f6{% elif progresso >= 40 %}#f59e0b{% else %}#ef4444{% endif %}; color: white; padding: 0.5rem 0.8rem; border-radius: 20px; font-weight: 600; font-size: 0.9rem; margin-bottom: 0.5rem;">
+                                        {{ progresso }}%
+                                    </div>
                                 </div>
-                                {% endif %}
                             </div>
-                            <div class="servico-progresso" style="text-align: right;">
-                                {% set progresso = (loop.index0 * 25) % 100 %}
-                                <div class="progress-badge" style="background: {% if progresso >= 100 %}#22c55e{% elif progresso >= 70 %}#3b82f6{% elif progresso >= 40 %}#f59e0b{% else %}#ef4444{% endif %}; color: white; padding: 0.4rem 0.8rem; border-radius: 20px; font-weight: 600; font-size: 0.85rem;">
-                                    {{ progresso }}%
+                            <div class="progress-bar-container" style="margin-top: 1rem;">
+                                <div class="progress-bar" style="width: 100%; height: 8px; background: #e2e8f0; border-radius: 4px; overflow: hidden;">
+                                    {% set progresso = (loop.index0 * 25) % 100 %}
+                                    <div class="progress-fill" style="width: {{ progresso }}%; height: 100%; background: {% if progresso >= 100 %}#22c55e{% elif progresso >= 70 %}#3b82f6{% elif progresso >= 40 %}#f59e0b{% else %}#ef4444{% endif %}; border-radius: 4px; transition: width 0.5s ease;"></div>
                                 </div>
-                                <div class="progress-bar-mini" style="width: 80px; height: 4px; background: #e2e8f0; border-radius: 2px; margin-top: 0.5rem;">
-                                    <div style="width: {{ progresso }}%; height: 100%; background: {% if progresso >= 100 %}#22c55e{% elif progresso >= 70 %}#3b82f6{% elif progresso >= 40 %}#f59e0b{% else %}#ef4444{% endif %}; border-radius: 2px; transition: width 0.3s ease;"></div>
+                                <div class="progress-text" style="display: flex; justify-content: space-between; margin-top: 0.5rem; font-size: 0.8rem; color: #6b7280;">
+                                    <span>{% if progresso == 0 %}Não iniciado{% elif progresso < 40 %}Em início{% elif progresso < 70 %}Em progresso{% elif progresso < 100 %}Quase pronto{% else %}Concluído{% endif %}</span>
+                                    <span style="font-weight: 600;">{{ progresso }}%</span>
                                 </div>
                             </div>
                         </div>
                         {% endfor %}
-                    {% else %}
-                        <div class="empty-servicos" style="text-align: center; padding: 2rem; color: #6b7280;">
-                            <i class="fas fa-tools" style="font-size: 2.5rem; margin-bottom: 1rem; opacity: 0.5;"></i>
-                            <h6 style="margin-bottom: 0.5rem;">Nenhum serviço cadastrado</h6>
-                            <p style="margin: 0; font-size: 0.9rem;">Os serviços desta obra serão listados aqui conforme forem adicionados.</p>
-                            <a href="/servicos" class="btn-modern btn-primary-modern" style="margin-top: 1rem; font-size: 0.9rem; display: inline-flex; align-items: center; gap: 0.5rem;">
-                                <i class="fas fa-plus"></i>
-                                Gerenciar Serviços
-                            </a>
-                        </div>
-                    {% endif %}
-                </div>
+                    </div>
+                {% else %}
+                    <div class="empty-servicos" style="text-align: center; padding: 3rem; color: #6b7280;">
+                        <i class="fas fa-tools" style="font-size: 3rem; margin-bottom: 1.5rem; opacity: 0.5; color: #3b82f6;"></i>
+                        <h5 style="margin-bottom: 1rem; color: #374151;">Nenhum serviço cadastrado</h5>
+                        <p style="margin: 0 0 2rem 0; font-size: 1rem; max-width: 400px; margin-left: auto; margin-right: auto;">Os serviços desta obra serão listados aqui conforme forem adicionados ao sistema.</p>
+                        <a href="/servicos" class="btn-modern btn-primary-modern" style="display: inline-flex; align-items: center; gap: 0.5rem; text-decoration: none;">
+                            <i class="fas fa-plus"></i>
+                            Gerenciar Serviços
+                        </a>
+                    </div>
+                {% endif %}
             </div>
         </div>
-
-
 
         <!-- Funcionários que Trabalharam -->
         {% if funcionarios_obra %}
