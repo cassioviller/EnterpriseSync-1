@@ -1364,6 +1364,7 @@ def detalhes_obra(id):
         else:
             # Sistema de bypass - usar admin_id com mais obras OU null para ver todas
             try:
+                from sqlalchemy import text
                 obra_counts = db.session.execute(text("SELECT admin_id, COUNT(*) as total FROM obra GROUP BY admin_id ORDER BY total DESC LIMIT 1")).fetchone()
                 # Em produção, pode não ter filtro de admin_id - usar o que tem mais dados
                 admin_id = obra_counts[0] if obra_counts else None
@@ -1590,28 +1591,36 @@ def detalhes_obra(id):
             'progresso_geral': 0.0
         }
         
+        # Buscar RDOs da obra para o período
+        try:
+            from models import RDO
+            rdos_obra = RDO.query.filter_by(obra_id=obra_id).order_by(RDO.data_relatorio.desc()).limit(10).all()
+        except:
+            rdos_obra = []
+        
         # Variáveis extras para o template
         servicos_obra = []
-        total_rdos = 0
-        rdos_finalizados = 0
-        rdos_periodo = []
-        rdos_recentes = []
+        total_rdos = len(rdos_obra)
+        rdos_finalizados = len([r for r in rdos_obra if r.status == 'Finalizado'])
+        rdos_periodo = rdos_obra
+        rdos_recentes = rdos_obra
         
         print(f"DEBUG KPIs FINAIS: Total={kpis_obra['custo_total']:.2f}, Mão Obra={kpis_obra['custo_mao_obra']:.2f}, Horas={kpis_obra['total_horas']:.1f}")
         print(f"DEBUG FUNCIONÁRIOS: {kpis_obra['funcionarios_periodo']} no período, {kpis_obra['dias_trabalhados']} dias trabalhados")
         
         # Importar date para template
-        from datetime import date
+        from datetime import date as date_class
         
         return render_template('obras/detalhes_obra_profissional.html', 
                              obra=obra, 
                              kpis=kpis_obra,
                              data_inicio=data_inicio,
                              data_fim=data_fim,
-                             date=date,
+                             date=date_class,
                              servicos_obra=servicos_obra,
                              total_rdos=total_rdos,
                              rdos_finalizados=rdos_finalizados,
+                             rdos=rdos_obra,
                              rdos_periodo=rdos_periodo,
                              rdos_recentes=rdos_recentes,
                              custos_mao_obra=custos_mao_obra,
