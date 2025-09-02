@@ -1,0 +1,393 @@
+<!-- MODAL GESTÃO DE CATEGORIAS DE SERVIÇOS -->
+<div class="modal fade" id="modalCategorias" tabindex="-1" aria-labelledby="modalCategoriasLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header bg-success text-white">
+                <h5 class="modal-title" id="modalCategoriasLabel">
+                    <i class="fas fa-tags"></i> Gerenciar Categorias de Serviços
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            
+            <div class="modal-body">
+                <!-- FORMULÁRIO NOVA CATEGORIA -->
+                <div class="card mb-4">
+                    <div class="card-header">
+                        <h6 class="mb-0">
+                            <i class="fas fa-plus-circle"></i> Nova Categoria
+                        </h6>
+                    </div>
+                    <div class="card-body">
+                        <form id="formNovaCategoria">
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <label for="nomeCategoria" class="form-label">Nome *</label>
+                                    <input type="text" class="form-control" id="nomeCategoria" required 
+                                           placeholder="Ex: Estrutural, Soldagem...">
+                                </div>
+                                <div class="col-md-3">
+                                    <label for="corCategoria" class="form-label">Cor</label>
+                                    <input type="color" class="form-control form-control-color" 
+                                           id="corCategoria" value="#198754">
+                                </div>
+                                <div class="col-md-3">
+                                    <label for="iconeCategoria" class="form-label">Ícone</label>
+                                    <select class="form-control" id="iconeCategoria">
+                                        <option value="tools">🔧 Ferramentas</option>
+                                        <option value="building">🏗️ Construção</option>
+                                        <option value="fire">🔥 Soldagem</option>
+                                        <option value="palette">🎨 Pintura</option>
+                                        <option value="brush">🖌️ Acabamento</option>
+                                        <option value="gear">⚙️ Manutenção</option>
+                                        <option value="bolt">⚡ Elétrica</option>
+                                        <option value="water">💧 Hidráulica</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="row mt-3">
+                                <div class="col-12">
+                                    <label for="descricaoCategoria" class="form-label">Descrição</label>
+                                    <textarea class="form-control" id="descricaoCategoria" rows="2" 
+                                              placeholder="Descrição opcional da categoria"></textarea>
+                                </div>
+                            </div>
+                            <div class="mt-3">
+                                <button type="submit" class="btn btn-success">
+                                    <i class="fas fa-plus"></i> Adicionar Categoria
+                                </button>
+                                <button type="button" class="btn btn-secondary ms-2" onclick="limparFormCategoria()">
+                                    <i class="fas fa-eraser"></i> Limpar
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+
+                <!-- LISTA DE CATEGORIAS EXISTENTES -->
+                <div class="card">
+                    <div class="card-header">
+                        <h6 class="mb-0">
+                            <i class="fas fa-list"></i> Categorias Existentes
+                        </h6>
+                    </div>
+                    <div class="card-body">
+                        <div id="listaCategorias">
+                            <div class="text-center py-3">
+                                <div class="spinner-border text-success" role="status">
+                                    <span class="visually-hidden">Carregando...</span>
+                                </div>
+                                <p class="mt-2 text-muted">Carregando categorias...</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                    <i class="fas fa-times"></i> Fechar
+                </button>
+                <button type="button" class="btn btn-success" onclick="atualizarSelectCategoria()">
+                    <i class="fas fa-sync"></i> Atualizar Lista
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- MODAL EDIÇÃO DE CATEGORIA -->
+<div class="modal fade" id="modalEditarCategoria" tabindex="-1" aria-labelledby="modalEditarCategoriaLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-warning text-dark">
+                <h5 class="modal-title" id="modalEditarCategoriaLabel">
+                    <i class="fas fa-edit"></i> Editar Categoria
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            
+            <div class="modal-body">
+                <form id="formEditarCategoria">
+                    <input type="hidden" id="editCategoriaId">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <label for="editNomeCategoria" class="form-label">Nome *</label>
+                            <input type="text" class="form-control" id="editNomeCategoria" required>
+                        </div>
+                        <div class="col-md-6">
+                            <label for="editCorCategoria" class="form-label">Cor</label>
+                            <input type="color" class="form-control form-control-color" id="editCorCategoria">
+                        </div>
+                    </div>
+                    <div class="row mt-3">
+                        <div class="col-12">
+                            <label for="editDescricaoCategoria" class="form-label">Descrição</label>
+                            <textarea class="form-control" id="editDescricaoCategoria" rows="2"></textarea>
+                        </div>
+                    </div>
+                </form>
+            </div>
+            
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-warning" onclick="salvarEdicaoCategoria()">
+                    <i class="fas fa-save"></i> Salvar Alterações
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- JAVASCRIPT PARA GESTÃO DE CATEGORIAS -->
+<script>
+let categorias = [];
+
+// Abrir modal principal
+function abrirModalCategorias() {
+    $('#modalCategorias').modal('show');
+    carregarCategorias();
+}
+
+// Carregar lista de categorias
+async function carregarCategorias() {
+    try {
+        const response = await fetch('/categorias-servicos/api/listar');
+        const data = await response.json();
+        
+        if (data.success) {
+            categorias = data.categorias;
+            renderizarListaCategorias();
+        } else {
+            mostrarErro('Erro ao carregar categorias: ' + data.error);
+        }
+    } catch (error) {
+        console.error('Erro ao carregar categorias:', error);
+        mostrarErro('Erro de conexão ao carregar categorias');
+    }
+}
+
+// Renderizar lista de categorias
+function renderizarListaCategorias() {
+    const lista = document.getElementById('listaCategorias');
+    
+    if (categorias.length === 0) {
+        lista.innerHTML = `
+            <div class="text-center py-4 text-muted">
+                <i class="fas fa-inbox fa-3x mb-3"></i>
+                <p>Nenhuma categoria encontrada</p>
+            </div>
+        `;
+        return;
+    }
+    
+    let html = '';
+    categorias.forEach(categoria => {
+        html += `
+            <div class="d-flex justify-content-between align-items-center p-3 border-bottom" 
+                 data-categoria-id="${categoria.id}">
+                <div class="d-flex align-items-center">
+                    <div class="me-3">
+                        <span class="badge rounded-pill" 
+                              style="background-color: ${categoria.cor}; font-size: 0.9em;">
+                            <i class="fas fa-${categoria.icone}"></i> ${categoria.nome}
+                        </span>
+                    </div>
+                    <div>
+                        <small class="text-muted">${categoria.descricao || 'Sem descrição'}</small>
+                    </div>
+                </div>
+                <div class="btn-group btn-group-sm">
+                    <button class="btn btn-outline-warning btn-sm" 
+                            onclick="editarCategoria(${categoria.id})" title="Editar">
+                        <i class="fas fa-edit"></i>
+                    </button>
+                    <button class="btn btn-outline-danger btn-sm" 
+                            onclick="confirmarExclusaoCategoria(${categoria.id}, '${categoria.nome}')" 
+                            title="Excluir">
+                        <i class="fas fa-trash"></i>
+                    </button>
+                </div>
+            </div>
+        `;
+    });
+    
+    lista.innerHTML = html;
+}
+
+// Criar nova categoria
+document.getElementById('formNovaCategoria').addEventListener('submit', async function(e) {
+    e.preventDefault();
+    
+    const dados = {
+        nome: document.getElementById('nomeCategoria').value.trim(),
+        descricao: document.getElementById('descricaoCategoria').value.trim(),
+        cor: document.getElementById('corCategoria').value,
+        icone: document.getElementById('iconeCategoria').value
+    };
+    
+    if (!dados.nome) {
+        mostrarErro('Nome da categoria é obrigatório');
+        return;
+    }
+    
+    try {
+        const response = await fetch('/categorias-servicos/api/criar', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(dados)
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+            mostrarSucesso(result.message);
+            limparFormCategoria();
+            carregarCategorias();
+        } else {
+            mostrarErro(result.error);
+        }
+    } catch (error) {
+        console.error('Erro ao criar categoria:', error);
+        mostrarErro('Erro de conexão ao criar categoria');
+    }
+});
+
+// Limpar formulário
+function limparFormCategoria() {
+    document.getElementById('formNovaCategoria').reset();
+    document.getElementById('corCategoria').value = '#198754';
+}
+
+// Editar categoria
+function editarCategoria(id) {
+    const categoria = categorias.find(c => c.id === id);
+    if (!categoria) return;
+    
+    document.getElementById('editCategoriaId').value = categoria.id;
+    document.getElementById('editNomeCategoria').value = categoria.nome;
+    document.getElementById('editCorCategoria').value = categoria.cor;
+    document.getElementById('editDescricaoCategoria').value = categoria.descricao || '';
+    
+    $('#modalEditarCategoria').modal('show');
+}
+
+// Salvar edição
+async function salvarEdicaoCategoria() {
+    const id = document.getElementById('editCategoriaId').value;
+    const dados = {
+        nome: document.getElementById('editNomeCategoria').value.trim(),
+        descricao: document.getElementById('editDescricaoCategoria').value.trim(),
+        cor: document.getElementById('editCorCategoria').value
+    };
+    
+    if (!dados.nome) {
+        mostrarErro('Nome da categoria é obrigatório');
+        return;
+    }
+    
+    try {
+        const response = await fetch(`/categorias-servicos/api/${id}/atualizar`, {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(dados)
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+            mostrarSucesso(result.message);
+            $('#modalEditarCategoria').modal('hide');
+            carregarCategorias();
+        } else {
+            mostrarErro(result.error);
+        }
+    } catch (error) {
+        console.error('Erro ao atualizar categoria:', error);
+        mostrarErro('Erro de conexão ao atualizar categoria');
+    }
+}
+
+// Confirmar exclusão
+function confirmarExclusaoCategoria(id, nome) {
+    if (confirm(`Tem certeza que deseja excluir a categoria "${nome}"?\n\nEsta ação não pode ser desfeita.`)) {
+        excluirCategoria(id);
+    }
+}
+
+// Excluir categoria
+async function excluirCategoria(id) {
+    try {
+        const response = await fetch(`/categorias-servicos/api/${id}/excluir`, {
+            method: 'DELETE'
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+            mostrarSucesso(result.message);
+            carregarCategorias();
+        } else {
+            mostrarErro(result.error);
+        }
+    } catch (error) {
+        console.error('Erro ao excluir categoria:', error);
+        mostrarErro('Erro de conexão ao excluir categoria');
+    }
+}
+
+// Atualizar select de categoria no formulário principal
+async function atualizarSelectCategoria() {
+    try {
+        const response = await fetch('/categorias-servicos/api/listar');
+        const data = await response.json();
+        
+        if (data.success) {
+            const selectCategoria = document.getElementById('categoria');
+            if (selectCategoria) {
+                const valorAtual = selectCategoria.value;
+                selectCategoria.innerHTML = '';
+                
+                data.categorias.forEach(categoria => {
+                    const option = document.createElement('option');
+                    option.value = categoria.nome;
+                    option.textContent = categoria.nome;
+                    if (categoria.nome === valorAtual) {
+                        option.selected = true;
+                    }
+                    selectCategoria.appendChild(option);
+                });
+                
+                mostrarSucesso('Lista de categorias atualizada!');
+                $('#modalCategorias').modal('hide');
+            }
+        } else {
+            mostrarErro('Erro ao atualizar categorias: ' + data.error);
+        }
+    } catch (error) {
+        console.error('Erro ao atualizar categorias:', error);
+        mostrarErro('Erro de conexão ao atualizar categorias');
+    }
+}
+
+// Funções de utilidade
+function mostrarSucesso(mensagem) {
+    console.log('✅ Sucesso:', mensagem);
+    // Implementar toast ou alert de sucesso
+    alert('✅ ' + mensagem);
+}
+
+function mostrarErro(mensagem) {
+    console.error('❌ Erro:', mensagem);
+    // Implementar toast ou alert de erro
+    alert('❌ ' + mensagem);
+}
+
+// Inicializar quando o DOM estiver pronto
+document.addEventListener('DOMContentLoaded', function() {
+    console.log('✅ Sistema de gestão de categorias carregado');
+});
+</script>

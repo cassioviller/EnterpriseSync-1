@@ -223,6 +223,16 @@ with app.app_context():
         logging.info("✅ Blueprint API organizer registrado")
     except ImportError as e:
         logging.warning(f"⚠️ Blueprint API organizer não encontrado: {e}")
+    
+    # Registrar blueprint de categorias de serviços
+    try:
+        from categoria_servicos import categorias_bp
+        app.register_blueprint(categorias_bp)
+        logging.info("✅ Blueprint categorias de serviços registrado")
+    except ImportError as e:
+        logging.warning(f"⚠️ Blueprint categorias de serviços não encontrado: {e}")
+    except Exception as e:
+        logging.error(f"❌ Erro ao registrar blueprint categorias de serviços: {e}")
     except Exception as e:
         logging.error(f"❌ Erro ao registrar blueprint API organizer: {e}")
     

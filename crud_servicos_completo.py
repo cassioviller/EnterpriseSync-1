@@ -199,16 +199,21 @@ def novo_servico():
         admin_id = get_admin_id()
         logger.info(f"📝 Abrindo formulário de novo serviço para admin_id={admin_id}")
         
-        # Categorias disponíveis (fixas)
-        categorias = [
-            'Estrutural',
-            'Soldagem',
-            'Pintura',
-            'Instalação',
-            'Acabamento',
-            'Manutenção',
-            'Outros'
-        ]
+        # Importar sistema de categorias
+        try:
+            from categoria_servicos import obter_categorias_disponiveis
+            categorias = obter_categorias_disponiveis(admin_id)
+        except ImportError:
+            # Fallback se módulo não estiver disponível
+            categorias = [
+                'Estrutural',
+                'Soldagem',
+                'Pintura',
+                'Instalação',
+                'Acabamento',
+                'Manutenção',
+                'Outros'
+            ]
         
         # Verificar se template existe, senão usar inline
         try:
@@ -235,9 +240,14 @@ def novo_servico():
                                                  </div>
                                                  <div class="mb-3">
                                                      <label for="categoria" class="form-label">Categoria</label>
-                                                     <select class="form-control" id="categoria" name="categoria">
-                                                         {''.join([f'<option value="{cat}">{cat}</option>' for cat in categorias])}
-                                                     </select>
+                                                     <div class="input-group">
+                                                         <select class="form-control" id="categoria" name="categoria">
+                                                             {''.join([f'<option value="{cat}">{cat}</option>' for cat in categorias])}
+                                                         </select>
+                                                         <button type="button" class="btn btn-outline-success" onclick="abrirModalCategorias()" title="Gerenciar Categorias">
+                                                             <i class="fas fa-plus"></i>
+                                                         </button>
+                                                     </div>
                                                  </div>
                                                  <button type="submit" class="btn btn-success">Criar Serviço</button>
                                                  <a href="/servicos" class="btn btn-secondary">Cancelar</a>
@@ -245,6 +255,13 @@ def novo_servico():
                                          </div>
                                      </div>
                                  </div>
+                                 
+                                 <!-- Incluir modal de categorias -->
+                                 {% include 'servicos/modal_categorias.html' %}
+                                 
+                                 <!-- Scripts necessários -->
+                                 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+                                 <script src="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/js/all.min.js"></script>
                                  """)
         
     except Exception as e:
@@ -374,16 +391,21 @@ def editar_servico(servico_id):
             ativo=True
         ).order_by(SubatividadeMestre.ordem_padrao).all()
         
-        # Categorias disponíveis
-        categorias = [
-            'Estrutural',
-            'Soldagem', 
-            'Pintura',
-            'Instalação',
-            'Acabamento',
-            'Manutenção',
-            'Outros'
-        ]
+        # Importar sistema de categorias
+        try:
+            from categoria_servicos import obter_categorias_disponiveis
+            categorias = obter_categorias_disponiveis(admin_id)
+        except ImportError:
+            # Fallback se módulo não estiver disponível
+            categorias = [
+                'Estrutural',
+                'Soldagem', 
+                'Pintura',
+                'Instalação',
+                'Acabamento',
+                'Manutenção',
+                'Outros'
+            ]
         
         logger.info(f"✅ Serviço carregado: {servico.nome} com {len(subatividades)} subatividades")
         
