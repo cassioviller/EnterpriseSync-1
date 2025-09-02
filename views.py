@@ -2036,50 +2036,34 @@ def api_funcionarios_consolidada():
 def api_servicos():
     """API para buscar serviços para dropdowns"""
     try:
-        # Servicos ainda não implementados - retornar lista vazia por enquanto
-        servicos_json = [
-            {
-                'id': 1,
-                'nome': 'Concretagem',
-                'categoria': 'Estrutural',
-                'unidade_medida': 'Metro Cúbico',
-                'unidade_simbolo': 'm³'
-            },
-            {
-                'id': 2,
-                'nome': 'Alvenaria',
-                'categoria': 'Vedação',
-                'unidade_medida': 'Metro Quadrado',
-                'unidade_simbolo': 'm²'
-            },
-            {
-                'id': 3,
-                'nome': 'Pintura',
-                'categoria': 'Acabamento',
-                'unidade_medida': 'Metro Quadrado',
-                'unidade_simbolo': 'm²'
-            },
-            {
-                'id': 4,
-                'nome': 'Instalação Elétrica',
-                'categoria': 'Instalações',
-                'unidade_medida': 'Ponto',
-                'unidade_simbolo': 'pt'
-            },
-            {
-                'id': 5,
-                'nome': 'Instalação Hidráulica',
-                'categoria': 'Instalações',
-                'unidade_medida': 'Ponto',
-                'unidade_simbolo': 'pt'
-            }
-        ]
+        # Buscar admin_id corretamente
+        if current_user.is_authenticated:
+            admin_id = current_user.id if current_user.tipo_usuario == TipoUsuario.ADMIN else current_user.admin_id
+        else:
+            # Sistema de bypass para desenvolvimento
+            admin_id = 2
         
-        return jsonify(servicos_json)
+        # Buscar serviços ativos do admin
+        servicos = Servico.query.filter_by(admin_id=admin_id, ativo=True).order_by(Servico.nome).all()
+        
+        servicos_json = []
+        for servico in servicos:
+            servicos_json.append({
+                'id': servico.id,
+                'nome': servico.nome,
+                'descricao': servico.descricao,
+                'categoria': servico.categoria or 'Geral',
+                'unidade_medida': servico.unidade_medida or 'un',
+                'unidade_simbolo': servico.unidade_simbolo or 'un',
+                'valor_unitario': float(servico.valor_unitario) if servico.valor_unitario else 0.0,
+                'admin_id': servico.admin_id
+            })
+        
+        return jsonify({'success': True, 'servicos': servicos_json})
         
     except Exception as e:
         print(f"ERRO API SERVIÇOS: {str(e)}")
-        return jsonify([]), 500
+        return jsonify({'success': False, 'servicos': [], 'error': str(e)}), 500
 
 # ===== SISTEMA UNIFICADO DE RDO =====
 
@@ -5019,6 +5003,132 @@ def api_servicos_obra(obra_id):
     except Exception as e:
         print(f"ERRO API SERVIÇOS OBRA: {str(e)}")
         return jsonify({'success': False, 'error': str(e)}), 500
+
+# ===== API PARA GERENCIAR SERVIÇOS DA OBRA =====
+
+@main_bp.route('/api/obras/servicos', methods=['POST'])
+@login_required
+def adicionar_servico_obra():
+    """API para adicionar serviço à obra"""
+    try:
+        data = request.get_json()
+        obra_id = data.get('obra_id')
+        servico_id = data.get('servico_id')
+        
+        if not obra_id or not servico_id:
+            return jsonify({'success': False, 'message': 'Dados incompletos'}), 400
+        
+        # Buscar admin_id
+        admin_id = current_user.id if current_user.tipo_usuario == TipoUsuario.ADMIN else current_user.admin_id
+        
+        # Verificar se obra pertence ao admin
+        obra = Obra.query.filter_by(id=obra_id, admin_id=admin_id).first()
+        if not obra:
+            return jsonify({'success': False, 'message': 'Obra não encontrada'}), 404
+        
+        # Verificar se serviço pertence ao admin
+        servico = Servico.query.filter_by(id=servico_id, admin_id=admin_id).first()
+        if not servico:
+            return jsonify({'success': False, 'message': 'Serviço não encontrado'}), 404
+        
+        # Verificar se já existe associação
+        servico_obra_existente = ServicoObra.query.filter_by(
+            obra_id=obra_id, 
+            servico_id=servico_id
+        ).first()
+        
+        if servico_obra_existente:
+            if servico_obra_existente.ativo:
+                return jsonify({'success': False, 'message': 'Serviço já está associado à obra'}), 400
+            else:
+                # Reativar se estava desativado
+                servico_obra_existente.ativo = True
+                servico_obra_existente.data_criacao = datetime.now()
+        else:
+            # Criar nova associação
+            servico_obra = ServicoObra()
+            servico_obra.obra_id = obra_id
+            servico_obra.servico_id = servico_id
+            servico_obra.quantidade_planejada = 1.0
+            servico_obra.quantidade_executada = 0.0
+            servico_obra.valor_unitario = servico.valor_unitario or 0.0
+            servico_obra.ativo = True
+            servico_obra.data_criacao = datetime.now()
+            
+            db.session.add(servico_obra)
+        
+        db.session.commit()
+        
+        return jsonify({
+            'success': True, 
+            'message': 'Serviço adicionado à obra com sucesso',
+            'servico': {
+                'id': servico.id,
+                'nome': servico.nome,
+                'descricao': servico.descricao
+            }
+        })
+        
+    except Exception as e:
+        db.session.rollback()
+        print(f"ERRO ADICIONAR SERVIÇO OBRA: {str(e)}")
+        return jsonify({'success': False, 'message': 'Erro interno do servidor'}), 500
+
+@main_bp.route('/api/obras/servicos', methods=['DELETE'])
+@login_required
+def remover_servico_obra():
+    """API para remover serviço da obra"""
+    try:
+        data = request.get_json()
+        obra_id = data.get('obra_id')
+        servico_id = data.get('servico_id')
+        
+        if not obra_id or not servico_id:
+            return jsonify({'success': False, 'message': 'Dados incompletos'}), 400
+        
+        # Buscar admin_id
+        admin_id = current_user.id if current_user.tipo_usuario == TipoUsuario.ADMIN else current_user.admin_id
+        
+        # Verificar se obra pertence ao admin
+        obra = Obra.query.filter_by(id=obra_id, admin_id=admin_id).first()
+        if not obra:
+            return jsonify({'success': False, 'message': 'Obra não encontrada'}), 404
+        
+        # Buscar associação
+        servico_obra = ServicoObra.query.filter_by(
+            obra_id=obra_id, 
+            servico_id=servico_id
+        ).first()
+        
+        if not servico_obra:
+            return jsonify({'success': False, 'message': 'Associação não encontrada'}), 404
+        
+        # Verificar se há RDOs usando este serviço
+        rdos_com_servico = RDOServicoSubatividade.query.join(RDO).filter(
+            RDO.obra_id == obra_id,
+            RDOServicoSubatividade.servico_id == servico_id
+        ).first()
+        
+        if rdos_com_servico:
+            # Se há RDOs, apenas desativar
+            servico_obra.ativo = False
+            message = 'Serviço desassociado da obra (mantido no histórico devido a RDOs existentes)'
+        else:
+            # Se não há RDOs, pode remover completamente
+            db.session.delete(servico_obra)
+            message = 'Serviço removido da obra com sucesso'
+        
+        db.session.commit()
+        
+        return jsonify({
+            'success': True, 
+            'message': message
+        })
+        
+    except Exception as e:
+        db.session.rollback()
+        print(f"ERRO REMOVER SERVIÇO OBRA: {str(e)}")
+        return jsonify({'success': False, 'message': 'Erro interno do servidor'}), 500
 
 @main_bp.route('/funcionario/rdo/progresso/<int:obra_id>')
 @funcionario_required

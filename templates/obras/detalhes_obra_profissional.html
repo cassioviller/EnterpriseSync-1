@@ -803,10 +803,10 @@
                         <i class="fas fa-tools" style="font-size: 3rem; margin-bottom: 1.5rem; opacity: 0.5; color: #3b82f6;"></i>
                         <h5 style="margin-bottom: 1rem; color: #374151;">Nenhum serviço cadastrado</h5>
                         <p style="margin: 0 0 2rem 0; font-size: 1rem; max-width: 400px; margin-left: auto; margin-right: auto;">Os serviços desta obra serão listados aqui conforme forem adicionados ao sistema.</p>
-                        <a href="/servicos" class="btn-modern btn-primary-modern" style="display: inline-flex; align-items: center; gap: 0.5rem; text-decoration: none;">
+                        <button type="button" class="btn-modern btn-primary-modern" data-bs-toggle="modal" data-bs-target="#modalGerenciarServicos" style="display: inline-flex; align-items: center; gap: 0.5rem; border: none;">
                             <i class="fas fa-plus"></i>
                             Gerenciar Serviços
-                        </a>
+                        </button>
                     </div>
                 {% endif %}
             </div>
@@ -980,10 +980,10 @@
                         <i class="fas fa-edit"></i>
                         Editar Obra
                     </a>
-                    <a href="/servicos" class="btn-modern btn-outline-modern">
+                    <button type="button" class="btn-modern btn-outline-modern" data-bs-toggle="modal" data-bs-target="#modalGerenciarServicos" style="border: none;">
                         <i class="fas fa-cogs"></i>
                         Gerenciar Serviços
-                    </a>
+                    </button>
                     <a href="/funcionarios" class="btn-modern btn-outline-modern">
                         <i class="fas fa-users"></i>
                         Funcionários
@@ -991,6 +991,81 @@
                 </div>
             </div>
         </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal para Gerenciar Serviços da Obra -->
+<div class="modal fade" id="modalGerenciarServicos" tabindex="-1" aria-labelledby="modalGerenciarServicosLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title" id="modalGerenciarServicosLabel">
+                    <i class="fas fa-cogs me-2"></i>
+                    Gerenciar Serviços da Obra: {{ obra.nome }}
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <!-- Serviços Disponíveis -->
+                <div class="mb-4">
+                    <h6 class="text-primary mb-3">
+                        <i class="fas fa-list me-2"></i>
+                        Adicionar Serviços à Obra
+                    </h6>
+                    <div id="servicosDisponiveis" class="row">
+                        <!-- Carregado via JavaScript -->
+                    </div>
+                </div>
+                
+                <!-- Serviços Atuais da Obra -->
+                <div class="mb-4">
+                    <h6 class="text-success mb-3">
+                        <i class="fas fa-check-circle me-2"></i>
+                        Serviços Atuais da Obra
+                    </h6>
+                    <div id="servicosObra" class="row">
+                        {% if servicos_obra %}
+                            {% for servico in servicos_obra %}
+                            <div class="col-md-6 mb-3" id="servico-obra-{{ servico.id }}">
+                                <div class="card border-success">
+                                    <div class="card-body">
+                                        <div class="d-flex justify-content-between align-items-start">
+                                            <div>
+                                                <h6 class="card-title mb-1">{{ servico.nome }}</h6>
+                                                {% if servico.descricao %}
+                                                <small class="text-muted">{{ servico.descricao[:80] + '...' if servico.descricao|length > 80 else servico.descricao }}</small>
+                                                {% endif %}
+                                            </div>
+                                            <button type="button" class="btn btn-sm btn-outline-danger" onclick="removerServicoObra({{ servico.id }})">
+                                                <i class="fas fa-times"></i>
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            {% endfor %}
+                        {% else %}
+                            <div class="col-12" id="noServicosObra">
+                                <div class="text-center text-muted py-4">
+                                    <i class="fas fa-tools fa-2x mb-3 opacity-50"></i>
+                                    <p>Nenhum serviço associado a esta obra ainda.</p>
+                                </div>
+                            </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                    <i class="fas fa-times me-2"></i>
+                    Fechar
+                </button>
+                <a href="/servicos" class="btn btn-outline-primary">
+                    <i class="fas fa-plus me-2"></i>
+                    Cadastrar Novo Serviço
+                </a>
+            </div>
         </div>
     </div>
 </div>
@@ -1010,7 +1085,253 @@ document.addEventListener('DOMContentLoaded', function() {
     const tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
         return new bootstrap.Tooltip(tooltipTriggerEl);
     });
+    
+    // Carregar serviços disponíveis quando abrir o modal
+    const modalGerenciarServicos = document.getElementById('modalGerenciarServicos');
+    if (modalGerenciarServicos) {
+        modalGerenciarServicos.addEventListener('show.bs.modal', function() {
+            carregarServicosDisponiveis();
+        });
+    }
 });
+
+// Carregar serviços disponíveis para adicionar à obra
+function carregarServicosDisponiveis() {
+    const container = document.getElementById('servicosDisponiveis');
+    container.innerHTML = '<div class="col-12 text-center"><i class="fas fa-spinner fa-spin"></i> Carregando serviços...</div>';
+    
+    fetch('/api/servicos')
+        .then(response => response.json())
+        .then(data => {
+            container.innerHTML = '';
+            
+            if (data.servicos && data.servicos.length > 0) {
+                // Filtrar serviços que já estão na obra
+                const servicosObraIds = Array.from(document.querySelectorAll('[id^="servico-obra-"]'))
+                    .map(el => parseInt(el.id.replace('servico-obra-', '')));
+                
+                const servicosDisponiveis = data.servicos.filter(servico => 
+                    !servicosObraIds.includes(servico.id)
+                );
+                
+                if (servicosDisponiveis.length > 0) {
+                    servicosDisponiveis.forEach(servico => {
+                        const servicoCard = `
+                            <div class="col-md-6 mb-3" id="servico-disponivel-${servico.id}">
+                                <div class="card border-primary">
+                                    <div class="card-body">
+                                        <div class="d-flex justify-content-between align-items-start">
+                                            <div>
+                                                <h6 class="card-title mb-1">${servico.nome}</h6>
+                                                ${servico.descricao ? `<small class="text-muted">${servico.descricao.length > 80 ? servico.descricao.substring(0, 80) + '...' : servico.descricao}</small>` : ''}
+                                            </div>
+                                            <button type="button" class="btn btn-sm btn-outline-primary" onclick="adicionarServicoObra(${servico.id}, '${servico.nome.replace(/'/g, "\\'")}')">
+                                                <i class="fas fa-plus"></i>
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        `;
+                        container.innerHTML += servicoCard;
+                    });
+                } else {
+                    container.innerHTML = `
+                        <div class="col-12">
+                            <div class="text-center text-muted py-4">
+                                <i class="fas fa-check-circle fa-2x mb-3 text-success opacity-50"></i>
+                                <p>Todos os serviços disponíveis já estão associados a esta obra.</p>
+                            </div>
+                        </div>
+                    `;
+                }
+            } else {
+                container.innerHTML = `
+                    <div class="col-12">
+                        <div class="text-center text-muted py-4">
+                            <i class="fas fa-tools fa-2x mb-3 opacity-50"></i>
+                            <p>Nenhum serviço cadastrado no sistema.</p>
+                            <a href="/servicos" class="btn btn-outline-primary btn-sm mt-2">
+                                <i class="fas fa-plus me-1"></i> Cadastrar Primeiro Serviço
+                            </a>
+                        </div>
+                    </div>
+                `;
+            }
+        })
+        .catch(error => {
+            console.error('Erro ao carregar serviços:', error);
+            container.innerHTML = `
+                <div class="col-12">
+                    <div class="alert alert-warning">
+                        <i class="fas fa-exclamation-triangle me-2"></i>
+                        Erro ao carregar serviços. Tente novamente.
+                    </div>
+                </div>
+            `;
+        });
+}
+
+// Adicionar serviço à obra
+function adicionarServicoObra(servicoId, servicoNome) {
+    const obraId = {{ obra.id }};
+    
+    fetch('/api/obras/servicos', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+            obra_id: obraId,
+            servico_id: servicoId
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            // Remover da lista de disponíveis
+            const servicoDisponivel = document.getElementById(`servico-disponivel-${servicoId}`);
+            if (servicoDisponivel) {
+                servicoDisponivel.remove();
+            }
+            
+            // Adicionar à lista de serviços da obra
+            adicionarServicoNaLista(servicoId, servicoNome, data.servico);
+            
+            // Remover mensagem de "nenhum serviço" se existir
+            const noServicosObra = document.getElementById('noServicosObra');
+            if (noServicosObra) {
+                noServicosObra.remove();
+            }
+            
+            // Mostrar mensagem de sucesso
+            mostrarMensagem('Serviço adicionado com sucesso!', 'success');
+            
+            // Recarregar a página após 1 segundo para atualizar a visualização
+            setTimeout(() => {
+                window.location.reload();
+            }, 1000);
+            
+        } else {
+            mostrarMensagem(data.message || 'Erro ao adicionar serviço', 'error');
+        }
+    })
+    .catch(error => {
+        console.error('Erro:', error);
+        mostrarMensagem('Erro ao adicionar serviço', 'error');
+    });
+}
+
+// Remover serviço da obra
+function removerServicoObra(servicoId) {
+    const obraId = {{ obra.id }};
+    
+    if (!confirm('Tem certeza que deseja remover este serviço da obra?')) {
+        return;
+    }
+    
+    fetch('/api/obras/servicos', {
+        method: 'DELETE',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+            obra_id: obraId,
+            servico_id: servicoId
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            // Remover da lista de serviços da obra
+            const servicoObra = document.getElementById(`servico-obra-${servicoId}`);
+            if (servicoObra) {
+                servicoObra.remove();
+            }
+            
+            // Verificar se não há mais serviços na obra
+            const servicosObra = document.querySelectorAll('[id^="servico-obra-"]');
+            if (servicosObra.length === 0) {
+                const containerServicosObra = document.getElementById('servicosObra');
+                containerServicosObra.innerHTML = `
+                    <div class="col-12" id="noServicosObra">
+                        <div class="text-center text-muted py-4">
+                            <i class="fas fa-tools fa-2x mb-3 opacity-50"></i>
+                            <p>Nenhum serviço associado a esta obra ainda.</p>
+                        </div>
+                    </div>
+                `;
+            }
+            
+            // Recarregar serviços disponíveis
+            carregarServicosDisponiveis();
+            
+            // Mostrar mensagem de sucesso
+            mostrarMensagem('Serviço removido com sucesso!', 'success');
+            
+            // Recarregar a página após 1 segundo para atualizar a visualização
+            setTimeout(() => {
+                window.location.reload();
+            }, 1000);
+            
+        } else {
+            mostrarMensagem(data.message || 'Erro ao remover serviço', 'error');
+        }
+    })
+    .catch(error => {
+        console.error('Erro:', error);
+        mostrarMensagem('Erro ao remover serviço', 'error');
+    });
+}
+
+// Adicionar serviço na lista visual
+function adicionarServicoNaLista(servicoId, servicoNome, servicoData) {
+    const container = document.getElementById('servicosObra');
+    
+    const servicoCard = `
+        <div class="col-md-6 mb-3" id="servico-obra-${servicoId}">
+            <div class="card border-success">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-start">
+                        <div>
+                            <h6 class="card-title mb-1">${servicoNome}</h6>
+                            ${servicoData && servicoData.descricao ? `<small class="text-muted">${servicoData.descricao.length > 80 ? servicoData.descricao.substring(0, 80) + '...' : servicoData.descricao}</small>` : ''}
+                        </div>
+                        <button type="button" class="btn btn-sm btn-outline-danger" onclick="removerServicoObra(${servicoId})">
+                            <i class="fas fa-times"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    container.innerHTML += servicoCard;
+}
+
+// Mostrar mensagem de feedback
+function mostrarMensagem(mensagem, tipo) {
+    const alertClass = tipo === 'success' ? 'alert-success' : 'alert-danger';
+    const iconClass = tipo === 'success' ? 'fa-check-circle' : 'fa-exclamation-triangle';
+    
+    const alert = document.createElement('div');
+    alert.className = `alert ${alertClass} alert-dismissible fade show position-fixed`;
+    alert.style.cssText = 'top: 20px; right: 20px; z-index: 9999; min-width: 300px;';
+    alert.innerHTML = `
+        <i class="fas ${iconClass} me-2"></i>
+        ${mensagem}
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    `;
+    
+    document.body.appendChild(alert);
+    
+    // Auto remover após 3 segundos
+    setTimeout(() => {
+        if (alert.parentNode) {
+            alert.remove();
+        }
+    }, 3000);
+}
 
 // Função para alternar visualização de funcionários
 function toggleAllFuncionarios() {
