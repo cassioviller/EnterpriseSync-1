@@ -35,71 +35,90 @@ done
 echo "✅ PostgreSQL conectado!"
 
 # HOTFIX CRÍTICO: Corrigir admin_id na tabela servico ANTES da aplicação iniciar
-echo "🔧 HOTFIX: Aplicando correção admin_id na tabela servico..."
+echo "🚨 HOTFIX PRODUÇÃO: Aplicando correção admin_id na tabela servico..."
 
-# HOTFIX CRÍTICO usando DATABASE_URL diretamente
+# Primeira tentativa: DATABASE_URL direto
 if [ -n "$DATABASE_URL" ]; then
-    echo "📍 DATABASE_URL: $DATABASE_URL"
-    echo "🔧 HOTFIX: Executando correção admin_id diretamente..."
+    echo "📍 DATABASE_URL detectado: $(echo $DATABASE_URL | sed 's/:[^:]*@/:****@/')"
+    echo "🔧 EXECUTANDO HOTFIX DIRETO NO POSTGRESQL..."
     
-    # Usar DATABASE_URL diretamente sem parsing
-    export PGPASSWORD=""
+    # Executar SQL crítico via psql
+    psql "$DATABASE_URL" << 'EOSQL'
+-- HOTFIX CRÍTICO: Adicionar admin_id na tabela servico
+-- Este script executa automaticamente no deploy
+
+\echo '🔍 Verificando estrutura da tabela servico...'
+
+-- Verificar se coluna admin_id já existe
+DO $$
+DECLARE
+    column_exists boolean := false;
+    user_exists boolean := false;
+BEGIN
+    -- Verificar se coluna existe
+    SELECT EXISTS (
+        SELECT column_name 
+        FROM information_schema.columns 
+        WHERE table_name = 'servico' AND column_name = 'admin_id'
+    ) INTO column_exists;
     
-    # Executar comandos SQL via psql com DATABASE_URL completo
-    psql "$DATABASE_URL" -c "
-    DO \$\$
-    BEGIN
-        -- Verificar se coluna admin_id existe
-        IF NOT EXISTS (
-            SELECT column_name 
-            FROM information_schema.columns 
-            WHERE table_name='servico' AND column_name='admin_id'
-        ) THEN
-            RAISE NOTICE '✅ Adicionando coluna admin_id na tabela servico...';
-            
-            -- Adicionar coluna admin_id
-            ALTER TABLE servico ADD COLUMN admin_id INTEGER;
-            
-            -- Popular com admin_id padrão para todos os registros
-            UPDATE servico SET admin_id = 10 WHERE admin_id IS NULL;
-            
-            -- Verificar se usuário admin_id=10 existe, se não criar
-            IF NOT EXISTS (SELECT id FROM usuario WHERE id = 10) THEN
-                INSERT INTO usuario (id, username, email, nome, password_hash, tipo_usuario, ativo, admin_id)
-                VALUES (10, 'admin_producao', 'admin@producao.com', 'Admin Produção', 
-                        'scrypt:32768:8:1\$password_hash', 'admin', TRUE, NULL)
-                ON CONFLICT (id) DO NOTHING;
-            END IF;
-            
-            -- Adicionar foreign key constraint
-            ALTER TABLE servico ADD CONSTRAINT fk_servico_admin 
-            FOREIGN KEY (admin_id) REFERENCES usuario(id);
-            
-            -- Tornar NOT NULL
-            ALTER TABLE servico ALTER COLUMN admin_id SET NOT NULL;
-            
-            RAISE NOTICE '✅ HOTFIX aplicado: admin_id adicionado na tabela servico';
-        ELSE
-            RAISE NOTICE '✅ Coluna admin_id já existe na tabela servico';
-        END IF;
-    END
-    \$\$;
-    " 2>&1
-    
-    
-    if [ $? -eq 0 ]; then
-        echo "✅ HOTFIX admin_id aplicado com sucesso!"
-    else
-        echo "⚠️ HOTFIX admin_id falhou - tentando abordagem alternativa..."
+    IF NOT column_exists THEN
+        RAISE NOTICE '🚨 COLUNA admin_id NAO EXISTE - APLICANDO HOTFIX...';
         
-        # Fallback: tentar com parâmetros individuais se DATABASE_URL falhar
-        if [ -n "$DATABASE_HOST" ] && [ -n "$DATABASE_USER" ] && [ -n "$DATABASE_NAME" ]; then
-            echo "🔧 Tentando com parâmetros individuais..."
-            PGPASSWORD="$DATABASE_PASSWORD" psql -h "$DATABASE_HOST" -p "${DATABASE_PORT:-5432}" -U "$DATABASE_USER" -d "$DATABASE_NAME" -c "
-            ALTER TABLE servico ADD COLUMN IF NOT EXISTS admin_id INTEGER DEFAULT 10;
-            UPDATE servico SET admin_id = 10 WHERE admin_id IS NULL;
-            " 2>/dev/null && echo "✅ HOTFIX aplicado via fallback!" || echo "❌ Todas as tentativas falharam"
-        fi
+        -- 1. Adicionar coluna admin_id
+        RAISE NOTICE '1️⃣ Adicionando coluna admin_id...';
+        ALTER TABLE servico ADD COLUMN admin_id INTEGER;
+        
+        -- 2. Verificar/criar usuário admin padrão
+        SELECT EXISTS (SELECT id FROM usuario WHERE id = 10) INTO user_exists;
+        IF NOT user_exists THEN
+            RAISE NOTICE '2️⃣ Criando usuário admin padrão...';
+            INSERT INTO usuario (id, username, email, nome, password_hash, tipo_usuario, ativo) 
+            VALUES (10, 'admin_producao', 'admin@producao.com', 'Admin Produção', 
+                    'scrypt:32768:8:1$password_hash', 'admin', TRUE);
+        ELSE
+            RAISE NOTICE '2️⃣ Usuário admin_id=10 já existe';
+        END IF;
+        
+        -- 3. Popular todos os serviços existentes
+        RAISE NOTICE '3️⃣ Populando serviços existentes...';
+        UPDATE servico SET admin_id = 10 WHERE admin_id IS NULL;
+        
+        -- 4. Adicionar constraint foreign key
+        RAISE NOTICE '4️⃣ Adicionando foreign key constraint...';
+        ALTER TABLE servico ADD CONSTRAINT fk_servico_admin 
+        FOREIGN KEY (admin_id) REFERENCES usuario(id);
+        
+        -- 5. Tornar coluna NOT NULL
+        RAISE NOTICE '5️⃣ Definindo coluna como NOT NULL...';
+        ALTER TABLE servico ALTER COLUMN admin_id SET NOT NULL;
+        
+        RAISE NOTICE '✅ HOTFIX COMPLETADO COM SUCESSO!';
+        RAISE NOTICE '📊 Estrutura da tabela servico atualizada';
+        
+    ELSE
+        RAISE NOTICE '✅ Coluna admin_id já existe - nenhuma ação necessária';
+    END IF;
+END
+$$;
+
+\echo '🎯 HOTFIX concluído!'
+EOSQL
+    
+    
+    HOTFIX_RESULT=$?
+    
+    if [ $HOTFIX_RESULT -eq 0 ]; then
+        echo "✅ HOTFIX EXECUTADO COM SUCESSO!"
+        echo "📊 Tabela servico atualizada com admin_id"
+    else
+        echo "⚠️ HOTFIX falhou - tentando método alternativo..."
+        
+        # FALLBACK: Método alternativo sem heredoc
+        echo "🔧 Executando correção simplificada..."
+        psql "$DATABASE_URL" -c "ALTER TABLE servico ADD COLUMN IF NOT EXISTS admin_id INTEGER;" && \
+        psql "$DATABASE_URL" -c "UPDATE servico SET admin_id = 10 WHERE admin_id IS NULL;" && \
+        echo "✅ HOTFIX SIMPLIFICADO APLICADO!" || echo "❌ TODAS AS TENTATIVAS FALHARAM"
     fi
 else
     echo "❌ DATABASE_URL não encontrado - pulando HOTFIX"

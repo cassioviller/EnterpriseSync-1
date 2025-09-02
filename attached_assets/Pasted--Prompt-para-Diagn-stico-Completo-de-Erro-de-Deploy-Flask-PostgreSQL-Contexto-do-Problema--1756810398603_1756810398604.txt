@@ -1,0 +1,209 @@
+# Prompt para Diagnóstico Completo de Erro de Deploy Flask/PostgreSQL
+
+## Contexto do Problema
+
+Você é um especialista em desenvolvimento Flask, SQLAlchemy, PostgreSQL e DevOps. Preciso que faça uma análise completa e sistemática de um erro de deploy que está ocorrendo em produção.
+
+**Erro específico**: `psycopg2.errors.UndefinedColumn: column servico.admin_id does not exist`
+
+**Ambiente**:
+- Aplicação Flask com SQLAlchemy
+- Banco PostgreSQL
+- Deploy via Dockerfile no EasyPanel
+- Desenvolvimento no Replit
+- URL afetada: /servicos
+
+## Instruções para Análise Sistemática
+
+### 1. ANÁLISE DO MODELO DE DADOS
+
+Examine o arquivo do modelo `Servico` e identifique:
+
+```
+- Localização do arquivo (models.py, models/servico.py, etc.)
+- Definição completa da classe Servico
+- Todos os campos definidos, especialmente admin_id
+- Relacionamentos (ForeignKey, backref, etc.)
+- Timestamps (created_at, updated_at)
+- Validações e constraints
+- Herança de classes base
+```
+
+**Perguntas específicas**:
+- O campo `admin_id` está definido no modelo?
+- Qual o tipo de dados e constraints do campo?
+- Existe relacionamento com tabela de administradores/usuários?
+- Quando foi adicionado este campo ao modelo?
+
+### 2. SISTEMA DE MIGRAÇÕES
+
+Investigue o sistema de migrações (Flask-Migrate/Alembic):
+
+```
+- Diretório migrations/ existe?
+- Arquivo alembic.ini configurado corretamente?
+- Versões de migração disponíveis (migrations/versions/)
+- Última migração executada vs disponível
+- Histórico de migrações no banco (alembic_version table)
+- Comandos de migração no código ou scripts
+```
+
+**Comandos para verificar**:
+```bash
+flask db current
+flask db history
+flask db show
+```
+
+**Perguntas específicas**:
+- Existe migração criada para adicionar admin_id?
+- A migração foi executada em produção?
+- Há diferenças entre migrações locais e produção?
+
+### 3. CONFIGURAÇÃO DE BANCO DE DADOS
+
+Analise as configurações de conexão:
+
+```
+- Variáveis de ambiente (DATABASE_URL, DB_HOST, etc.)
+- Arquivo de configuração (config.py, settings.py)
+- Diferentes ambientes (development, production, testing)
+- String de conexão PostgreSQL
+- Credenciais e permissões
+- Pool de conexões
+```
+
+**Verificações necessárias**:
+- Conexão com banco correto em produção?
+- Usuário tem permissões para ALTER TABLE?
+- Schema/database corretos?
+
+### 4. ESTRUTURA ATUAL DO BANCO
+
+Execute queries para verificar estado atual:
+
+```sql
+-- Verificar se tabela existe
+SELECT table_name FROM information_schema.tables 
+WHERE table_schema = 'public' AND table_name = 'servico';
+
+-- Verificar colunas existentes
+SELECT column_name, data_type, is_nullable 
+FROM information_schema.columns 
+WHERE table_name = 'servico';
+
+-- Verificar constraints
+SELECT constraint_name, constraint_type 
+FROM information_schema.table_constraints 
+WHERE table_name = 'servico';
+
+-- Verificar índices
+SELECT indexname, indexdef 
+FROM pg_indexes 
+WHERE tablename = 'servico';
+```
+
+### 5. PROCESSO DE DEPLOY
+
+Examine o pipeline de deploy:
+
+```
+- Dockerfile: comandos de inicialização
+- docker-compose.yml se existir
+- Scripts de entrypoint
+- Comandos de migração automática
+- Ordem de execução (app vs migrations)
+- Logs de deploy no EasyPanel
+```
+
+**Pontos críticos**:
+- Migrações executam antes do app iniciar?
+- Há rollback automático em caso de erro?
+- Variáveis de ambiente corretas no container?
+
+### 6. COMPARAÇÃO DESENVOLVIMENTO vs PRODUÇÃO
+
+Compare os ambientes:
+
+```
+- Versão do PostgreSQL (dev vs prod)
+- Versão do Python/Flask/SQLAlchemy
+- Estado do banco local vs produção
+- Migrações aplicadas em cada ambiente
+- Dados de teste vs produção
+```
+
+### 7. ANÁLISE DE LOGS
+
+Examine logs detalhados:
+
+```
+- Logs de inicialização da aplicação
+- Logs de conexão com banco
+- Logs de execução de migrações
+- Logs de erro completos (stack trace)
+- Logs do EasyPanel/Docker
+```
+
+## Diagnóstico Esperado
+
+Com base na análise, forneça:
+
+### Causa Raiz
+- Identificação precisa do problema
+- Por que ocorreu
+- Quando foi introduzido
+
+### Soluções Propostas
+1. **Solução Imediata** (para resolver agora)
+2. **Solução Definitiva** (para prevenir recorrência)
+3. **Melhorias de Processo** (para evitar problemas similares)
+
+### Comandos de Correção
+Forneça comandos específicos para:
+```bash
+# Criar migração se necessário
+flask db migrate -m "Add admin_id to servico table"
+
+# Aplicar migração
+flask db upgrade
+
+# Verificar resultado
+flask db current
+```
+
+### Script SQL Manual (se necessário)
+```sql
+-- Adicionar coluna manualmente se migração falhar
+ALTER TABLE servico ADD COLUMN admin_id INTEGER;
+ALTER TABLE servico ADD CONSTRAINT fk_servico_admin 
+    FOREIGN KEY (admin_id) REFERENCES admin(id);
+```
+
+### Prevenção Futura
+- Checklist de deploy
+- Testes de migração
+- Validação de schema
+- Monitoramento
+
+## Entregáveis Solicitados
+
+1. **Relatório de diagnóstico** com causa raiz identificada
+2. **Plano de correção** passo a passo
+3. **Scripts/comandos** prontos para execução
+4. **Recomendações** para melhorar o processo
+5. **Checklist** para validar a correção
+
+## Informações Adicionais Necessárias
+
+Se precisar de mais informações, solicite especificamente:
+- Arquivos de configuração
+- Logs específicos
+- Output de comandos
+- Screenshots de interfaces
+- Variáveis de ambiente (sem credenciais sensíveis)
+
+---
+
+**Importante**: Seja meticuloso na análise e forneça soluções testáveis e seguras. O objetivo é não apenas corrigir o erro atual, mas estabelecer um processo robusto para evitar problemas similares no futuro.
+
