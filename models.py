@@ -111,6 +111,7 @@ class Obra(db.Model):
     cliente_nome = db.Column(db.String(100))
     cliente_email = db.Column(db.String(120))
     cliente_telefone = db.Column(db.String(20))
+    cliente = db.Column(db.String(200), nullable=True)  # Campo cliente para filtros
     proposta_origem_id = db.Column(db.Integer, db.ForeignKey('propostas_comerciais.id'))
     
     # Configurações do Portal

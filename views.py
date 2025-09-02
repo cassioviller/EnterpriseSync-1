@@ -1242,6 +1242,7 @@ def detalhes_obra(id):
         else:
             # Sistema de bypass - usar admin_id com mais obras OU null para ver todas
             try:
+                from sqlalchemy import text
                 obra_counts = db.session.execute(text("SELECT admin_id, COUNT(*) as total FROM obra GROUP BY admin_id ORDER BY total DESC LIMIT 1")).fetchone()
                 # Em produção, pode não ter filtro de admin_id - usar o que tem mais dados
                 admin_id = obra_counts[0] if obra_counts else None
@@ -1284,17 +1285,19 @@ def detalhes_obra(id):
         total_horas_periodo = 0.0
         
         # Buscar registros de ponto da obra no período
-        from models import RegistroPonto
-        registros_periodo = RegistroPonto.query.filter(
-            RegistroPonto.data >= data_inicio,
-            RegistroPonto.data <= data_fim,
-            RegistroPonto.obra_id == obra_id
-        ).all()
+        try:
+            from models import RegistroPonto
+            registros_periodo = RegistroPonto.query.filter(
+                RegistroPonto.data >= data_inicio,
+                RegistroPonto.data <= data_fim,
+                RegistroPonto.obra_id == obra_id
+            ).all()
+        except ImportError:
+            registros_periodo = []
         
         print(f"DEBUG: {len(registros_periodo)} registros de ponto no período para obra {obra_id}")
         
         # Calcular custo por funcionário usando JOIN direto - PRODUÇÃO
-        from sqlalchemy import text
         
         if admin_id is not None:
             query_custo = text("""
