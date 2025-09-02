@@ -946,7 +946,9 @@ def importar_excel():
             novo_servico = Servico(
                 nome=nome_servico,
                 descricao=f'Importado via Excel - {len(subatividades)} subatividades',
+                categoria='Importado',
                 admin_id=admin_id,
+                ativo=True,
                 criado_em=datetime.utcnow(),
                 updated_at=datetime.utcnow()
             )
@@ -963,7 +965,7 @@ def importar_excel():
                         ordem_padrao=ordem,
                         admin_id=admin_id,
                         ativo=True,
-                        criado_em=datetime.utcnow(),
+                        created_at=datetime.utcnow(),
                         updated_at=datetime.utcnow()
                     )
                     db.session.add(subatividade)
