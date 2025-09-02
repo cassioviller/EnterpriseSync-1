@@ -2094,10 +2094,23 @@ def get_admin_id_dinamico():
 def api_servicos():
     """API para buscar serviços para dropdowns"""
     try:
-        # Usar função helper para detectar admin_id
-        admin_id = get_admin_id_dinamico()
+        # Priorizar usuário autenticado sobre sistema dinâmico
+        admin_id = None
         
-        print(f"🔍 API SERVIÇOS: admin_id={admin_id} (multi-tenant ativo)")
+        if current_user.is_authenticated:
+            if current_user.tipo_usuario == TipoUsuario.ADMIN:
+                admin_id = current_user.id
+                print(f"🔍 API SERVIÇOS: Usuário ADMIN logado - admin_id={admin_id}")
+            else:
+                admin_id = current_user.admin_id
+                print(f"🔍 API SERVIÇOS: Usuário comum logado - admin_id={admin_id}")
+        
+        # Só usar sistema dinâmico se não houver usuário autenticado
+        if admin_id is None:
+            admin_id = get_admin_id_dinamico()
+            print(f"🔍 API SERVIÇOS: Sistema dinâmico - admin_id={admin_id}")
+        
+        print(f"🔍 API SERVIÇOS FINAL: admin_id={admin_id} (multi-tenant ativo)")
         
         # Buscar serviços ativos do admin com isolamento completo
         servicos = Servico.query.filter_by(admin_id=admin_id, ativo=True).order_by(Servico.nome).all()
