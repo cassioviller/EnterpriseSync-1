@@ -1,0 +1,36 @@
+ERRO: &#39;None&#39; has no attribute &#39;lower&#39;
+
+TRACE:
+Traceback (most recent call last):
+  File &#34;/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/flask/app.py&#34;, line 917, in full_dispatch_request
+    rv = self.dispatch_request()
+         ^^^^^^^^^^^^^^^^^^^^^^^
+  File &#34;/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/flask/app.py&#34;, line 902, in dispatch_request
+    return self.ensure_sync(self.view_functions[rule.endpoint])(**view_args)  # type: ignore[no-any-return]
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File &#34;/home/runner/workspace/views.py&#34;, line 1206, in obras
+    return render_template(&#39;obras_moderno.html&#39;, obras=obras, filtros=filtros)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File &#34;/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/flask/templating.py&#34;, line 150, in render_template
+    return _render(app, template, context)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File &#34;/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/flask/templating.py&#34;, line 131, in _render
+    rv = template.render(context)
+         ^^^^^^^^^^^^^^^^^^^^^^^^
+  File &#34;/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/jinja2/environment.py&#34;, line 1295, in render
+    self.environment.handle_exception()
+  File &#34;/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/jinja2/environment.py&#34;, line 942, in handle_exception
+    raise rewrite_traceback_stack(source=source)
+  File &#34;/home/runner/workspace/templates/obras_moderno.html&#34;, line 1, in top-level template code
+    {% extends &#34;base_completo.html&#34; %}
+    ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File &#34;/home/runner/workspace/templates/base_completo.html&#34;, line 852, in top-level template code
+    {% block content %}{% endblock %}
+    ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File &#34;/home/runner/workspace/templates/obras_moderno.html&#34;, line 664, in block &#39;content&#39;
+    &lt;span class=&#34;status-badge status-{{ obra.status.lower().replace(&#39; &#39;, &#39;-&#39;) }}&#34;&gt;
+    ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File &#34;/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/jinja2/utils.py&#34;, line 92, in from_obj
+    if hasattr(obj, &#34;jinja_pass_arg&#34;):
+       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+jinja2.exceptions.UndefinedError: &#39;None&#39; has no attribute &#39;lower&#39;

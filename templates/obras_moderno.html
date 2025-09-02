@@ -661,9 +661,9 @@
                         {% if obra.codigo %}
                         <span><i class="fas fa-hashtag"></i> {{ obra.codigo }}</span>
                         {% endif %}
-                        <span class="status-badge status-{{ obra.status.lower().replace(' ', '-') }}">
+                        <span class="status-badge status-{{ (obra.status or 'pendente').lower().replace(' ', '-') }}">
                             <i class="fas fa-circle"></i>
-                            {{ obra.status }}
+                            {{ obra.status or 'Pendente' }}
                         </span>
                     </div>
                 </div>
