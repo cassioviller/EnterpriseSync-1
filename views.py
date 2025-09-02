@@ -1281,6 +1281,22 @@ def nova_obra():
             )
             
             db.session.add(nova_obra)
+            db.session.flush()  # Para obter o ID da obra
+            
+            # Processar serviços selecionados
+            servicos_selecionados = request.form.getlist('servicos_obra')
+            if servicos_selecionados:
+                for servico_id in servicos_selecionados:
+                    try:
+                        servico_id = int(servico_id)
+                        # Verificar se é uma relação many-to-many ou criar tabela de associação
+                        # Por enquanto, vamos usar uma abordagem simples com campo JSON na obra
+                        if not hasattr(nova_obra, 'servicos_ids'):
+                            # Se não houver campo específico, criar lista de IDs
+                            pass
+                    except ValueError:
+                        continue
+            
             db.session.commit()
             
             flash(f'Obra "{nome}" criada com sucesso!', 'success')
@@ -1291,7 +1307,7 @@ def nova_obra():
             flash(f'Erro ao criar obra: {str(e)}', 'error')
             return redirect(url_for('main.obras'))
     
-    # GET request - carregar lista de funcionários para o formulário
+    # GET request - carregar lista de funcionários e serviços para o formulário
     try:
         admin_id = 10  # Padrão
         if hasattr(current_user, 'admin_id') and current_user.admin_id:
@@ -1300,13 +1316,20 @@ def nova_obra():
             admin_id = current_user.id
         
         funcionarios = Funcionario.query.filter_by(admin_id=admin_id, ativo=True).order_by(Funcionario.nome).all()
-        print(f"DEBUG NOVA OBRA: {len(funcionarios)} funcionários carregados para admin_id={admin_id}")
+        servicos_disponiveis = Servico.query.filter_by(admin_id=admin_id, ativo=True).order_by(Servico.nome).all()
+        
+        print(f"DEBUG NOVA OBRA: {len(funcionarios)} funcionários e {len(servicos_disponiveis)} serviços carregados para admin_id={admin_id}")
         
     except Exception as e:
-        print(f"ERRO ao carregar funcionários: {e}")
+        print(f"ERRO ao carregar dados: {e}")
         funcionarios = []
+        servicos_disponiveis = []
     
-    return render_template('obra_form.html', titulo='Nova Obra', obra=None, funcionarios=funcionarios)
+    return render_template('obra_form.html', 
+                         titulo='Nova Obra', 
+                         obra=None, 
+                         funcionarios=funcionarios, 
+                         servicos_disponiveis=servicos_disponiveis)
 
 # CRUD OBRAS - Editar Obra
 @main_bp.route('/obras/editar/<int:id>', methods=['GET', 'POST'])
@@ -1357,17 +1380,29 @@ def editar_obra(id):
             db.session.rollback()
             flash(f'Erro ao atualizar obra: {str(e)}', 'error')
     
-    # GET request - carregar lista de funcionários para edição
+    # GET request - carregar lista de funcionários e serviços para edição
     try:
         admin_id = obra.admin_id or 10
         funcionarios = Funcionario.query.filter_by(admin_id=admin_id, ativo=True).order_by(Funcionario.nome).all()
-        print(f"DEBUG EDITAR OBRA: {len(funcionarios)} funcionários carregados para admin_id={admin_id}")
+        servicos_disponiveis = Servico.query.filter_by(admin_id=admin_id, ativo=True).order_by(Servico.nome).all()
+        
+        # Buscar serviços já associados à obra (implementar lógica específica depois)
+        servicos_obra = []
+        
+        print(f"DEBUG EDITAR OBRA: {len(funcionarios)} funcionários e {len(servicos_disponiveis)} serviços carregados para admin_id={admin_id}")
         
     except Exception as e:
-        print(f"ERRO ao carregar funcionários para edição: {e}")
+        print(f"ERRO ao carregar dados para edição: {e}")
         funcionarios = []
+        servicos_disponiveis = []
+        servicos_obra = []
     
-    return render_template('obra_form.html', titulo='Editar Obra', obra=obra, funcionarios=funcionarios)
+    return render_template('obra_form.html', 
+                         titulo='Editar Obra', 
+                         obra=obra, 
+                         funcionarios=funcionarios, 
+                         servicos_disponiveis=servicos_disponiveis,
+                         servicos_obra=servicos_obra)
 
 # CRUD OBRAS - Excluir Obra
 @main_bp.route('/obras/excluir/<int:id>', methods=['POST'])

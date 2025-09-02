@@ -227,6 +227,53 @@
                     </div>
                 </div>
 
+                <!-- Serviços da Obra -->
+                <div class="row">
+                    <div class="col-12 mb-4">
+                        <div class="card">
+                            <div class="card-header">
+                                <h6 class="mb-0">
+                                    <i class="fas fa-cogs text-primary"></i> Serviços da Obra
+                                </h6>
+                                <small class="text-muted">Selecione os serviços que fazem parte desta obra</small>
+                            </div>
+                            <div class="card-body">
+                                {% if servicos_disponiveis %}
+                                <div class="row">
+                                    {% for servico in servicos_disponiveis %}
+                                    <div class="col-md-4 col-sm-6 mb-3">
+                                        <div class="form-check">
+                                            <input class="form-check-input" 
+                                                   type="checkbox" 
+                                                   name="servicos_obra" 
+                                                   value="{{ servico.id }}" 
+                                                   id="servico_{{ servico.id }}"
+                                                   {% if obra and servico in servicos_obra %}checked{% endif %}>
+                                            <label class="form-check-label" for="servico_{{ servico.id }}">
+                                                <strong>{{ servico.nome }}</strong>
+                                                {% if servico.descricao %}
+                                                <br><small class="text-muted">{{ servico.descricao[:50] + '...' if servico.descricao|length > 50 else servico.descricao }}</small>
+                                                {% endif %}
+                                            </label>
+                                        </div>
+                                    </div>
+                                    {% endfor %}
+                                </div>
+                                {% else %}
+                                <div class="text-center py-4">
+                                    <i class="fas fa-cogs text-muted" style="font-size: 2rem; opacity: 0.5;"></i>
+                                    <h6 class="mt-2 text-muted">Nenhum serviço cadastrado</h6>
+                                    <p class="text-muted mb-3">Cadastre serviços primeiro para associá-los à obra</p>
+                                    <a href="/servicos" class="btn btn-outline-primary btn-sm">
+                                        <i class="fas fa-plus"></i> Gerenciar Serviços
+                                    </a>
+                                </div>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
                 <!-- Informações adicionais se editando -->
                 {% if obra %}
                 <div class="row">
