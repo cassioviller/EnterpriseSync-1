@@ -25,7 +25,7 @@ SIGE (Sistema de Gestão Empresarial) is a multi-tenant business management syst
 **✅ PROJETO CONCLUÍDO E PRONTO PARA PRODUÇÃO (01/09/2025)**
 **✅ RDO SISTEMA OTIMIZADO COM VALORES PADRÃO (01/09/2025)**
 
-**Última Atualização: 02/09/2025 - 14:35 - HOTFIX PRODUÇÃO FINALIZADO**
+**Última Atualização: 02/09/2025 - 17:28 - MODAL GERENCIAR SERVIÇOS CORRIGIDO**
 - ✅ **DOCKERFILE PRINCIPAL UNIFICADO:** Sistema unificado entre desenvolvimento e produção
   - **Problema resolvido:** Inconsistências entre ambientes dev/prod
   - **Solução implementada:** Dockerfile principal atualizado com entrada inteligente
@@ -78,6 +78,13 @@ SIGE (Sistema de Gestão Empresarial) is a multi-tenant business management syst
     - **Deploy:** Docker entrypoint atualizado com correção
     - **Validação:** Testado e funcionando em desenvolvimento
     - **Status:** Pronto para aplicação em produção
+13. ✅ **CONCLUÍDO** - Modal Gerenciar Serviços da Obra (02/09/2025)
+    - **Problema:** Modal redirecionando para página `/servicos` 
+    - **Causa:** Conflitos de rotas e IDs específicos inexistentes
+    - **Solução:** JavaScript otimizado para capturar todos botões modal
+    - **Multi-tenant:** Sistema funcionando corretamente (dev: 16 serviços, prod: 9 serviços)
+    - **API:** Endpoint `/api/servicos` com isolamento perfeito por admin_id
+    - **Status:** Modal abrindo e carregando serviços corretamente
 
 **Módulos Consolidados e Testados:**
 - **RDO:** ✅ Sistema CRUD completo, interface moderna, rotas unificadas

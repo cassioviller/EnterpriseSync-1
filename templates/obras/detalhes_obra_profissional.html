@@ -1100,10 +1100,10 @@ document.addEventListener('DOMContentLoaded', function() {
         // Configurar eventos para TODOS os botões que devem abrir o modal
         const todosOsBotoesModal = document.querySelectorAll('[data-bs-target="#modalGerenciarServicos"]');
         
-        console.log('🔍 Total de botões encontrados:', todosOsBotoesModal.length);
+        console.log('🔗 Botões modal encontrados:', todosOsBotoesModal.length);
         
         function abrirModalServicos(e) {
-            console.log('🖱️ Botão clicado - abrindo modal!');
+            console.log('🚀 Abrindo modal gerenciar serviços...');
             e.preventDefault();
             e.stopPropagation();
             
@@ -1113,7 +1113,6 @@ document.addEventListener('DOMContentLoaded', function() {
             
             // Carregar serviços após um pequeno delay
             setTimeout(() => {
-                console.log('🚀 Modal aberto manualmente - carregando serviços...');
                 carregarServicosDisponiveis();
             }, 300);
         }
@@ -1149,14 +1148,13 @@ function carregarServicosDisponiveis() {
                 const servicosObraIds = Array.from(document.querySelectorAll('[id^="servico-obra-"]'))
                     .map(el => parseInt(el.id.replace('servico-obra-', '')));
                 
-                console.log('🔍 Serviços já na obra (IDs):', servicosObraIds);
-                console.log('🔍 Total de serviços da API:', data.servicos.length);
+                console.log('📊 Serviços empresa:', data.servicos.length, '| Já na obra:', servicosObraIds.length);
                 
                 const servicosDisponiveis = data.servicos.filter(servico => 
                     !servicosObraIds.includes(servico.id)
                 );
                 
-                console.log('🔍 Serviços disponíveis após filtro:', servicosDisponiveis.length);
+                console.log('✅ Disponíveis para adicionar:', servicosDisponiveis.length);
                 
                 if (servicosDisponiveis.length > 0) {
                     servicosDisponiveis.forEach(servico => {

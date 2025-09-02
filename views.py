@@ -2077,20 +2077,11 @@ def api_servicos():
         # Usar função helper para detectar admin_id
         admin_id = get_admin_id_dinamico()
         
-        print(f"DEBUG API SERVIÇOS: Buscando serviços para admin_id={admin_id}")
-        print(f"DEBUG API SERVIÇOS: current_user.is_authenticated = {current_user.is_authenticated}")
-        if current_user.is_authenticated:
-            print(f"DEBUG API SERVIÇOS: current_user.id = {current_user.id}")
-            print(f"DEBUG API SERVIÇOS: current_user.admin_id = {getattr(current_user, 'admin_id', 'N/A')}")
-            print(f"DEBUG API SERVIÇOS: current_user.email = {getattr(current_user, 'email', 'N/A')}")
+        print(f"🔍 API SERVIÇOS: admin_id={admin_id} (multi-tenant ativo)")
         
-        # Buscar serviços ativos do admin
+        # Buscar serviços ativos do admin com isolamento completo
         servicos = Servico.query.filter_by(admin_id=admin_id, ativo=True).order_by(Servico.nome).all()
-        print(f"DEBUG API SERVIÇOS: Encontrados {len(servicos)} serviços para admin_id={admin_id}")
-        
-        # Debug adicional: mostrar alguns serviços
-        if len(servicos) > 0:
-            print(f"DEBUG API SERVIÇOS: Primeiros 3 serviços: {[s.nome for s in servicos[:3]]}")
+        print(f"✅ API SERVIÇOS: {len(servicos)} serviços encontrados para empresa admin_id={admin_id}")
         
         servicos_json = []
         for servico in servicos:
