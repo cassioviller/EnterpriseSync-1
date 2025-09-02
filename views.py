@@ -1203,7 +1203,7 @@ def obras():
                 'custo_transporte': 0
             }
     
-    return render_template('obras.html', obras=obras, filtros=filtros)
+    return render_template('obras_moderno.html', obras=obras, filtros=filtros)
 
 # CRUD OBRAS - Nova Obra
 @main_bp.route('/obras/nova', methods=['GET', 'POST'])

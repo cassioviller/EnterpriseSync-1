@@ -1,0 +1,922 @@
+{% extends "base_completo.html" %}
+
+{% block title %}Gestão de Obras - SIGE{% endblock %}
+
+{% block head %}
+<style>
+/* Obras - Estilo Moderno Consistente com RDO e Serviços */
+.obras-container {
+    background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+    min-height: 100vh;
+    padding: 2rem 0;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+}
+
+.obras-header {
+    background: linear-gradient(135deg, #1e3a8a 0%, #1e40af 100%);
+    color: white;
+    padding: 2rem;
+    border-radius: 16px;
+    margin-bottom: 2rem;
+    position: relative;
+    overflow: hidden;
+    box-shadow: 0 10px 25px rgba(30, 58, 138, 0.3);
+}
+
+.obras-header::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    right: 0;
+    width: 100%;
+    height: 100%;
+    background: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><circle cx="80" cy="20" r="20" fill="rgba(255,255,255,0.1)"/><circle cx="90" cy="70" r="15" fill="rgba(255,255,255,0.05)"/></svg>');
+    z-index: 1;
+}
+
+.obras-header-content {
+    position: relative;
+    z-index: 2;
+    display: flex;
+    justify-content: between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 1rem;
+}
+
+.obras-title {
+    font-size: 2.2rem;
+    font-weight: 700;
+    margin: 0;
+    text-shadow: 0 2px 4px rgba(0,0,0,0.3);
+}
+
+.obras-subtitle {
+    font-size: 1.1rem;
+    opacity: 0.9;
+    margin: 0.5rem 0 0 0;
+}
+
+.header-actions {
+    display: flex;
+    gap: 1rem;
+    flex-wrap: wrap;
+}
+
+.btn-modern {
+    padding: 0.75rem 1.5rem;
+    border-radius: 12px;
+    font-weight: 600;
+    text-decoration: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    transition: all 0.3s ease;
+    border: none;
+    cursor: pointer;
+    font-size: 0.95rem;
+}
+
+.btn-primary-modern {
+    background: linear-gradient(135deg, #22c55e, #16a34a);
+    color: white;
+    box-shadow: 0 4px 15px rgba(34, 197, 94, 0.3);
+}
+
+.btn-primary-modern:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(34, 197, 94, 0.4);
+    color: white;
+}
+
+.btn-outline-modern {
+    background: rgba(255,255,255,0.2);
+    color: white;
+    border: 2px solid rgba(255,255,255,0.3);
+}
+
+.btn-outline-modern:hover {
+    background: rgba(255,255,255,0.3);
+    border-color: rgba(255,255,255,0.5);
+    transform: translateY(-1px);
+    color: white;
+}
+
+.filters-card {
+    background: white;
+    border-radius: 16px;
+    box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+    border: none;
+    margin-bottom: 2rem;
+    overflow: hidden;
+    transition: all 0.3s ease;
+}
+
+.filters-header {
+    background: linear-gradient(135deg, #64748b, #475569);
+    color: white;
+    padding: 1.5rem 2rem;
+    border: none;
+}
+
+.filters-body {
+    padding: 2rem;
+}
+
+.form-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 1.5rem;
+    margin-bottom: 1.5rem;
+}
+
+.form-group {
+    margin-bottom: 0;
+}
+
+.form-label {
+    font-weight: 600;
+    color: #374151;
+    margin-bottom: 0.5rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.9rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.form-control {
+    border: 2px solid #e2e8f0;
+    border-radius: 12px;
+    padding: 12px 16px;
+    font-size: 1rem;
+    transition: all 0.3s ease;
+    background: #f8fafc;
+}
+
+.form-control:focus {
+    border-color: #1e40af;
+    box-shadow: 0 0 0 3px rgba(30, 64, 175, 0.1);
+    background: white;
+}
+
+.obras-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(380px, 1fr));
+    gap: 2rem;
+    margin-bottom: 2rem;
+}
+
+.obra-card {
+    background: white;
+    border-radius: 16px;
+    box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+    border: none;
+    overflow: hidden;
+    transition: all 0.3s ease;
+    position: relative;
+}
+
+.obra-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 15px 35px rgba(0,0,0,0.15);
+}
+
+.obra-card-header {
+    background: linear-gradient(135deg, #1e3a8a, #1e40af);
+    color: white;
+    padding: 1.5rem;
+    position: relative;
+    overflow: hidden;
+}
+
+.obra-card-header::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    right: 0;
+    width: 100%;
+    height: 100%;
+    background: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><circle cx="85" cy="15" r="10" fill="rgba(255,255,255,0.1)"/></svg>');
+    z-index: 1;
+}
+
+.obra-card-title {
+    font-size: 1.3rem;
+    font-weight: 700;
+    margin: 0 0 0.5rem 0;
+    position: relative;
+    z-index: 2;
+    text-shadow: 0 1px 2px rgba(0,0,0,0.2);
+}
+
+.obra-card-subtitle {
+    font-size: 0.9rem;
+    opacity: 0.9;
+    margin: 0;
+    position: relative;
+    z-index: 2;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.obra-card-body {
+    padding: 1.5rem;
+}
+
+.obra-info-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+}
+
+.obra-info-item {
+    text-align: center;
+    padding: 1rem;
+    background: #f8fafc;
+    border-radius: 12px;
+    border: 1px solid #e2e8f0;
+}
+
+.obra-info-value {
+    font-size: 1.2rem;
+    font-weight: 700;
+    color: #1e40af;
+    margin-bottom: 0.25rem;
+}
+
+.obra-info-label {
+    font-size: 0.8rem;
+    color: #64748b;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    font-weight: 600;
+}
+
+.obra-details {
+    margin-bottom: 1.5rem;
+}
+
+.obra-detail-item {
+    display: flex;
+    justify-content: between;
+    align-items: center;
+    padding: 0.75rem 0;
+    border-bottom: 1px solid #f1f5f9;
+}
+
+.obra-detail-item:last-child {
+    border-bottom: none;
+}
+
+.obra-detail-label {
+    font-weight: 600;
+    color: #374151;
+    font-size: 0.9rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.obra-detail-value {
+    color: #1f2937;
+    font-weight: 500;
+    text-align: right;
+    flex: 1;
+    margin-left: 1rem;
+}
+
+.status-badge {
+    padding: 0.4rem 0.8rem;
+    border-radius: 20px;
+    font-weight: 600;
+    font-size: 0.8rem;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.status-em-andamento { 
+    background: rgba(34, 197, 94, 0.15); 
+    color: #16a34a; 
+    border: 1px solid rgba(34, 197, 94, 0.3);
+}
+
+.status-concluida { 
+    background: rgba(59, 130, 246, 0.15); 
+    color: #2563eb; 
+    border: 1px solid rgba(59, 130, 246, 0.3);
+}
+
+.status-pausada { 
+    background: rgba(251, 191, 36, 0.15); 
+    color: #d97706; 
+    border: 1px solid rgba(251, 191, 36, 0.3);
+}
+
+.status-planejamento { 
+    background: rgba(156, 163, 175, 0.15); 
+    color: #6b7280; 
+    border: 1px solid rgba(156, 163, 175, 0.3);
+}
+
+.obra-actions {
+    display: flex;
+    gap: 0.5rem;
+    justify-content: between;
+    padding-top: 1rem;
+    border-top: 1px solid #f1f5f9;
+}
+
+.btn-action {
+    flex: 1;
+    padding: 0.6rem 1rem;
+    border-radius: 8px;
+    font-weight: 600;
+    text-decoration: none;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.4rem;
+    transition: all 0.3s ease;
+    border: none;
+    cursor: pointer;
+    font-size: 0.85rem;
+}
+
+.btn-info {
+    background: linear-gradient(135deg, #3b82f6, #1d4ed8);
+    color: white;
+    box-shadow: 0 2px 8px rgba(59, 130, 246, 0.3);
+}
+
+.btn-info:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(59, 130, 246, 0.4);
+    color: white;
+}
+
+.btn-warning {
+    background: linear-gradient(135deg, #f59e0b, #d97706);
+    color: white;
+    box-shadow: 0 2px 8px rgba(245, 158, 11, 0.3);
+}
+
+.btn-warning:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(245, 158, 11, 0.4);
+    color: white;
+}
+
+.btn-danger {
+    background: linear-gradient(135deg, #ef4444, #dc2626);
+    color: white;
+    box-shadow: 0 2px 8px rgba(239, 68, 68, 0.3);
+}
+
+.btn-danger:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(239, 68, 68, 0.4);
+    color: white;
+}
+
+.progress-container {
+    margin: 1rem 0;
+    padding: 1rem;
+    background: #f8fafc;
+    border-radius: 8px;
+    border: 1px solid #e2e8f0;
+}
+
+.progress-header {
+    display: flex;
+    justify-content: between;
+    align-items: center;
+    margin-bottom: 0.5rem;
+}
+
+.progress-bar {
+    height: 8px;
+    background: #e2e8f0;
+    border-radius: 4px;
+    overflow: hidden;
+    position: relative;
+}
+
+.progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #22c55e, #16a34a);
+    border-radius: 4px;
+    transition: width 0.5s ease;
+    position: relative;
+}
+
+.progress-fill::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.3), transparent);
+    animation: shimmer 2s infinite;
+}
+
+@keyframes shimmer {
+    0% { transform: translateX(-100%); }
+    100% { transform: translateX(100%); }
+}
+
+.empty-state {
+    text-align: center;
+    padding: 4rem 2rem;
+    color: #6b7280;
+}
+
+.empty-state i {
+    font-size: 4rem;
+    margin-bottom: 1rem;
+    opacity: 0.5;
+}
+
+.stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 1rem;
+    margin-bottom: 2rem;
+}
+
+.stat-card {
+    background: white;
+    padding: 1.5rem;
+    border-radius: 12px;
+    text-align: center;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.05);
+    border: 1px solid #e2e8f0;
+}
+
+.stat-value {
+    font-size: 2rem;
+    font-weight: 700;
+    color: #1e40af;
+    margin-bottom: 0.5rem;
+}
+
+.stat-label {
+    font-size: 0.9rem;
+    color: #64748b;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    font-weight: 600;
+}
+
+@media (max-width: 768px) {
+    .obras-container {
+        padding: 1rem 0;
+    }
+    
+    .obras-title {
+        font-size: 1.8rem;
+    }
+    
+    .obras-grid {
+        grid-template-columns: 1fr;
+        gap: 1rem;
+    }
+    
+    .form-grid {
+        grid-template-columns: 1fr;
+        gap: 1rem;
+    }
+    
+    .header-actions {
+        width: 100%;
+        justify-content: center;
+    }
+    
+    .obra-info-grid {
+        grid-template-columns: 1fr;
+    }
+    
+    .obra-actions {
+        flex-direction: column;
+        gap: 0.5rem;
+    }
+    
+    .stats-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
+
+@keyframes fade-in {
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.fade-in {
+    animation: fade-in 0.6s ease forwards;
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="obras-container">
+    <div class="container-fluid">
+        <!-- Header Principal -->
+        <div class="obras-header">
+            <div class="obras-header-content">
+                <div>
+                    <h1 class="obras-title">
+                        <i class="fas fa-building"></i>
+                        Gestão de Obras
+                    </h1>
+                    <p class="obras-subtitle">
+                        Controle completo dos projetos da empresa
+                    </p>
+                </div>
+                
+                <div class="header-actions">
+                    <button class="btn-modern btn-primary-modern" data-bs-toggle="modal" data-bs-target="#obraModal">
+                        <i class="fas fa-plus"></i>
+                        Nova Obra
+                    </button>
+                    <button class="btn-modern btn-outline-modern" onclick="toggleView()">
+                        <i class="fas fa-th" id="viewIcon"></i>
+                        <span id="viewText">Visualização</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Estatísticas -->
+        <div class="stats-grid">
+            <div class="stat-card">
+                <div class="stat-value">{{ obras|length }}</div>
+                <div class="stat-label">Total de Obras</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value">{{ obras|selectattr('status', 'equalto', 'Em andamento')|list|length }}</div>
+                <div class="stat-label">Em Andamento</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value">{{ obras|selectattr('status', 'equalto', 'Concluída')|list|length }}</div>
+                <div class="stat-label">Concluídas</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value">
+                    {% set total_orcamento = obras|selectattr('orcamento')|sum(attribute='orcamento')|default(0, true) %}
+                    R$ {{ '{:,.0f}'.format(total_orcamento).replace(',', '.') }}
+                </div>
+                <div class="stat-label">Valor Total</div>
+            </div>
+        </div>
+
+        <!-- Filtros -->
+        <div class="filters-card">
+            <div class="filters-header">
+                <h5 class="mb-0">
+                    <i class="fas fa-filter"></i>
+                    Filtros de Busca
+                </h5>
+            </div>
+            <div class="filters-body">
+                <form method="GET" action="{{ url_for('main.obras') }}">
+                    <div class="form-grid">
+                        <div class="form-group">
+                            <label class="form-label">
+                                <i class="fas fa-search"></i>
+                                Nome da Obra
+                            </label>
+                            <input type="text" class="form-control" name="nome" 
+                                   placeholder="Digite o nome..." 
+                                   value="{{ request.args.get('nome', '') }}">
+                        </div>
+                        
+                        <div class="form-group">
+                            <label class="form-label">
+                                <i class="fas fa-flag"></i>
+                                Status
+                            </label>
+                            <select class="form-control" name="status">
+                                <option value="">Todos os Status</option>
+                                <option value="Em andamento" {{ 'selected' if request.args.get('status') == 'Em andamento' }}>Em Andamento</option>
+                                <option value="Concluída" {{ 'selected' if request.args.get('status') == 'Concluída' }}>Concluída</option>
+                                <option value="Pausada" {{ 'selected' if request.args.get('status') == 'Pausada' }}>Pausada</option>
+                                <option value="Planejamento" {{ 'selected' if request.args.get('status') == 'Planejamento' }}>Planejamento</option>
+                            </select>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label class="form-label">
+                                <i class="fas fa-user-tie"></i>
+                                Cliente
+                            </label>
+                            <input type="text" class="form-control" name="cliente" 
+                                   placeholder="Nome do cliente..." 
+                                   value="{{ request.args.get('cliente', '') }}">
+                        </div>
+                        
+                        <div class="form-group">
+                            <label class="form-label">
+                                <i class="fas fa-calendar"></i>
+                                Data Início
+                            </label>
+                            <input type="date" class="form-control" name="data_inicio" 
+                                   value="{{ request.args.get('data_inicio', '') }}">
+                        </div>
+                    </div>
+                    
+                    <div class="d-flex gap-2">
+                        <button type="submit" class="btn-modern btn-primary-modern">
+                            <i class="fas fa-search"></i>
+                            Buscar
+                        </button>
+                        <a href="{{ url_for('main.obras') }}" class="btn-modern btn-outline-modern" style="color: #64748b;">
+                            <i class="fas fa-times"></i>
+                            Limpar
+                        </a>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- Grid de Obras -->
+        <div class="obras-grid" id="cardView">
+            {% for obra in obras %}
+            <div class="obra-card fade-in">
+                <div class="obra-card-header">
+                    <h3 class="obra-card-title">{{ obra.nome }}</h3>
+                    <div class="obra-card-subtitle">
+                        {% if obra.codigo %}
+                        <span><i class="fas fa-hashtag"></i> {{ obra.codigo }}</span>
+                        {% endif %}
+                        <span class="status-badge status-{{ obra.status.lower().replace(' ', '-') }}">
+                            <i class="fas fa-circle"></i>
+                            {{ obra.status }}
+                        </span>
+                    </div>
+                </div>
+                
+                <div class="obra-card-body">
+                    <!-- KPIs da Obra -->
+                    <div class="obra-info-grid">
+                        <div class="obra-info-item">
+                            <div class="obra-info-value">
+                                {% if obra.orcamento and obra.orcamento > 0 %}
+                                R$ {{ '{:,.0f}'.format(obra.orcamento).replace(',', '.') }}
+                                {% else %}
+                                -
+                                {% endif %}
+                            </div>
+                            <div class="obra-info-label">Orçamento</div>
+                        </div>
+                        
+                        <div class="obra-info-item">
+                            <div class="obra-info-value">
+                                {% if obra.data_inicio and obra.data_previsao_fim %}
+                                {{ (obra.data_previsao_fim - obra.data_inicio).days }}
+                                {% else %}
+                                -
+                                {% endif %}
+                            </div>
+                            <div class="obra-info-label">Dias Previstos</div>
+                        </div>
+                    </div>
+                    
+                    <!-- Progresso da Obra -->
+                    {% if obra.progresso_conclusao or obra.progresso_conclusao == 0 %}
+                    <div class="progress-container">
+                        <div class="progress-header">
+                            <small><strong>Progresso da Obra</strong></small>
+                            <small><strong>{{ obra.progresso_conclusao or 0 }}%</strong></small>
+                        </div>
+                        <div class="progress-bar">
+                            <div class="progress-fill" style="width: {{ obra.progresso_conclusao or 0 }}%"></div>
+                        </div>
+                    </div>
+                    {% endif %}
+                    
+                    <!-- Detalhes da Obra -->
+                    <div class="obra-details">
+                        {% if obra.endereco %}
+                        <div class="obra-detail-item">
+                            <div class="obra-detail-label">
+                                <i class="fas fa-map-marker-alt"></i>
+                                Endereço
+                            </div>
+                            <div class="obra-detail-value">{{ obra.endereco[:30] + '...' if obra.endereco|length > 30 else obra.endereco }}</div>
+                        </div>
+                        {% endif %}
+                        
+                        <div class="obra-detail-item">
+                            <div class="obra-detail-label">
+                                <i class="fas fa-calendar-alt"></i>
+                                Data Início
+                            </div>
+                            <div class="obra-detail-value">{{ obra.data_inicio.strftime('%d/%m/%Y') if obra.data_inicio else '-' }}</div>
+                        </div>
+                        
+                        {% if obra.data_previsao_fim %}
+                        <div class="obra-detail-item">
+                            <div class="obra-detail-label">
+                                <i class="fas fa-flag-checkered"></i>
+                                Previsão Fim
+                            </div>
+                            <div class="obra-detail-value">{{ obra.data_previsao_fim.strftime('%d/%m/%Y') }}</div>
+                        </div>
+                        {% endif %}
+                        
+                        {% if obra.cliente or obra.cliente_nome %}
+                        <div class="obra-detail-item">
+                            <div class="obra-detail-label">
+                                <i class="fas fa-user-tie"></i>
+                                Cliente
+                            </div>
+                            <div class="obra-detail-value">{{ obra.cliente_nome or obra.cliente or '-' }}</div>
+                        </div>
+                        {% endif %}
+                        
+                        {% if obra.responsavel %}
+                        <div class="obra-detail-item">
+                            <div class="obra-detail-label">
+                                <i class="fas fa-user-hard-hat"></i>
+                                Responsável
+                            </div>
+                            <div class="obra-detail-value">{{ obra.responsavel.nome }}</div>
+                        </div>
+                        {% endif %}
+                    </div>
+                    
+                    <!-- Ações -->
+                    <div class="obra-actions">
+                        <a href="/obras/detalhes/{{ obra.id }}" class="btn-action btn-info">
+                            <i class="fas fa-eye"></i>
+                            Detalhes
+                        </a>
+                        <a href="/obras/editar/{{ obra.id }}" class="btn-action btn-warning">
+                            <i class="fas fa-edit"></i>
+                            Editar
+                        </a>
+                        <button class="btn-action btn-danger" onclick="excluirObra({{ obra.id }})">
+                            <i class="fas fa-trash"></i>
+                            Excluir
+                        </button>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+
+        <!-- Estado Vazio -->
+        {% if not obras %}
+        <div class="empty-state">
+            <i class="fas fa-hard-hat"></i>
+            <h5>Nenhuma obra encontrada</h5>
+            <p>Não há obras cadastradas que correspondam aos filtros aplicados.</p>
+            <button class="btn-modern btn-primary-modern" data-bs-toggle="modal" data-bs-target="#obraModal">
+                <i class="fas fa-plus"></i>
+                Criar Primeira Obra
+            </button>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Modal Nova Obra -->
+<div class="modal fade" id="obraModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content" style="border-radius: 16px; border: none;">
+            <div class="modal-header" style="background: linear-gradient(135deg, #1e3a8a, #1e40af); color: white; border: none;">
+                <h5 class="modal-title">
+                    <i class="fas fa-plus-circle"></i>
+                    Nova Obra
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="POST" action="{{ url_for('main.nova_obra') }}">
+                <div class="modal-body" style="padding: 2rem;">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="form-group mb-3">
+                                <label class="form-label">
+                                    <i class="fas fa-building"></i>
+                                    Nome da Obra *
+                                </label>
+                                <input type="text" class="form-control" name="nome" required>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="form-group mb-3">
+                                <label class="form-label">
+                                    <i class="fas fa-hashtag"></i>
+                                    Código
+                                </label>
+                                <input type="text" class="form-control" name="codigo">
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="form-group mb-3">
+                        <label class="form-label">
+                            <i class="fas fa-map-marker-alt"></i>
+                            Endereço
+                        </label>
+                        <textarea class="form-control" name="endereco" rows="2"></textarea>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="form-group mb-3">
+                                <label class="form-label">
+                                    <i class="fas fa-calendar-alt"></i>
+                                    Data de Início *
+                                </label>
+                                <input type="date" class="form-control" name="data_inicio" required>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="form-group mb-3">
+                                <label class="form-label">
+                                    <i class="fas fa-flag-checkered"></i>
+                                    Previsão de Conclusão
+                                </label>
+                                <input type="date" class="form-control" name="data_previsao_fim">
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="form-group mb-3">
+                                <label class="form-label">
+                                    <i class="fas fa-dollar-sign"></i>
+                                    Orçamento (R$)
+                                </label>
+                                <input type="number" class="form-control" name="orcamento" step="0.01">
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="form-group mb-3">
+                                <label class="form-label">
+                                    <i class="fas fa-user-tie"></i>
+                                    Cliente
+                                </label>
+                                <input type="text" class="form-control" name="cliente">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer" style="border: none; padding: 1rem 2rem 2rem;">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn-modern btn-primary-modern">
+                        <i class="fas fa-save"></i>
+                        Criar Obra
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+// Animações e funcionalidades
+document.addEventListener('DOMContentLoaded', function() {
+    // Animação de entrada dos cards
+    const cards = document.querySelectorAll('.obra-card');
+    cards.forEach((card, index) => {
+        card.style.animationDelay = `${index * 0.1}s`;
+    });
+    
+    // Auto-completar data de início com hoje
+    const dataInicioInput = document.querySelector('input[name="data_inicio"]');
+    if (dataInicioInput && !dataInicioInput.value) {
+        const hoje = new Date().toISOString().split('T')[0];
+        dataInicioInput.value = hoje;
+    }
+});
+
+// Função para excluir obra
+function excluirObra(id) {
+    if (confirm('Tem certeza que deseja excluir esta obra? Esta ação não pode ser desfeita.')) {
+        window.location.href = `/obras/excluir/${id}`;
+    }
+}
+
+// Função para alternar visualização (futura implementação)
+function toggleView() {
+    // Implementar alternância entre cards e tabela
+    console.log('Toggle view - implementar se necessário');
+}
+</script>
+{% endblock %}
