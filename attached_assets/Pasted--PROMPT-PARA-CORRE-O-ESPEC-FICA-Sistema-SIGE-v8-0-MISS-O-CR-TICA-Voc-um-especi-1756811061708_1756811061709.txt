@@ -1,0 +1,567 @@
+# 🔧 PROMPT PARA CORREÇÃO ESPECÍFICA - Sistema SIGE v8.0
+
+## 🎯 MISSÃO CRÍTICA
+
+Você é um especialista DevOps/Flask responsável por corrigir URGENTEMENTE um sistema em produção que está falhando devido a problemas de migração de banco de dados. O sistema SIGE v8.0 está deployado via Docker no EasyPanel e apresenta erro crítico que impede o funcionamento.
+
+## 📋 CONTEXTO ESPECÍFICO DO PROBLEMA
+
+### **Sistema Afetado:**
+- **Nome**: SIGE v8.0 (Sistema Integrado de Gestão Empresarial)
+- **Stack**: Flask + SQLAlchemy + PostgreSQL
+- **Deploy**: Docker no EasyPanel
+- **URL Produção**: https://www.sige.cassioviller.tech/servicos
+- **Status**: 🔴 CRÍTICO - Sistema inacessível
+
+### **Erro Principal:**
+```
+psycopg2.errors.UndefinedColumn: column servico.admin_id does not exist
+LINE 1: ...servico.ativo AS servico_ativo, servico.admin_id AS servico_admin_id...
+```
+
+### **Problemas Identificados:**
+1. **Migração Falhada**: Coluna `admin_id` não existe na tabela `servico` em produção
+2. **Foreign Key Error**: Tentativa de criar FK para usuário inexistente (admin_id=10)
+3. **Conexão PostgreSQL**: Problemas de socket durante migrações
+4. **Deploy Process**: Migrações não executam corretamente no container
+
+## 🔍 ANÁLISE TÉCNICA OBRIGATÓRIA
+
+### **1. VERIFICAÇÃO DO ESTADO ATUAL**
+
+Execute estas queries para diagnosticar o estado exato:
+
+```sql
+-- 1. Verificar se tabela servico existe
+SELECT table_name FROM information_schema.tables 
+WHERE table_schema = 'public' AND table_name = 'servico';
+
+-- 2. Verificar colunas existentes na tabela servico
+SELECT column_name, data_type, is_nullable, column_default
+FROM information_schema.columns 
+WHERE table_name = 'servico' 
+ORDER BY ordinal_position;
+
+-- 3. Verificar se usuário admin padrão existe
+SELECT id, nome, email FROM usuario WHERE id = 10;
+
+-- 4. Contar registros na tabela servico
+SELECT COUNT(*) as total_servicos FROM servico;
+
+-- 5. Verificar constraints existentes
+SELECT constraint_name, constraint_type 
+FROM information_schema.table_constraints 
+WHERE table_name = 'servico';
+```
+
+### **2. ANÁLISE DO DOCKERFILE**
+
+O Dockerfile está configurado corretamente com:
+- Script de entrypoint: `docker-entrypoint-production-fix.sh`
+- PostgreSQL client instalado
+- Variáveis de ambiente corretas
+- Health check configurado
+
+**PROBLEMA**: O script de migração pode estar falhando silenciosamente.
+
+### **3. ANÁLISE DO MAIN.PY**
+
+O arquivo main.py mostra:
+- Sistema de migração automática implementado
+- Configuração de banco correta para EasyPanel
+- Tentativa de executar `executar_migracoes()` no contexto da aplicação
+
+**PROBLEMA**: Migrações executam após `db.create_all()` mas podem falhar devido a dependências.
+
+## 🚨 CORREÇÃO URGENTE NECESSÁRIA
+
+### **ETAPA 1: HOTFIX IMEDIATO**
+
+Crie um script SQL robusto para execução manual:
+
+```sql
+-- HOTFIX SIGE v8.0 - Correção admin_id
+-- Execute este script diretamente no PostgreSQL
+
+BEGIN;
+
+-- 1. Verificar e criar usuário admin padrão se não existir
+DO $$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM usuario WHERE id = 10) THEN
+        INSERT INTO usuario (id, nome, email, senha_hash, ativo, admin_id, created_at, updated_at)
+        VALUES (10, 'Admin Sistema', 'admin@sistema.local', 'hash_temporario', true, 10, NOW(), NOW());
+        RAISE NOTICE '✅ Usuário admin padrão criado (ID: 10)';
+    ELSE
+        RAISE NOTICE '✅ Usuário admin já existe (ID: 10)';
+    END IF;
+END
+$$;
+
+-- 2. Verificar e adicionar coluna admin_id se não existir
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM information_schema.columns 
+        WHERE table_name = 'servico' AND column_name = 'admin_id'
+    ) THEN
+        -- Adicionar coluna
+        ALTER TABLE servico ADD COLUMN admin_id INTEGER;
+        RAISE NOTICE '✅ Coluna admin_id adicionada';
+        
+        -- Popular com valor padrão
+        UPDATE servico SET admin_id = 10 WHERE admin_id IS NULL;
+        RAISE NOTICE '✅ Dados populados com admin_id = 10';
+        
+        -- Adicionar constraint NOT NULL
+        ALTER TABLE servico ALTER COLUMN admin_id SET NOT NULL;
+        RAISE NOTICE '✅ Constraint NOT NULL adicionada';
+        
+        -- Adicionar foreign key
+        ALTER TABLE servico ADD CONSTRAINT fk_servico_admin 
+        FOREIGN KEY (admin_id) REFERENCES usuario(id);
+        RAISE NOTICE '✅ Foreign key constraint adicionada';
+        
+    ELSE
+        RAISE NOTICE '✅ Coluna admin_id já existe';
+    END IF;
+END
+$$;
+
+-- 3. Verificar resultado final
+SELECT 
+    COUNT(*) as total_servicos,
+    COUNT(admin_id) as servicos_com_admin,
+    MIN(admin_id) as min_admin_id,
+    MAX(admin_id) as max_admin_id
+FROM servico;
+
+COMMIT;
+
+-- Mensagem final
+SELECT '🎯 HOTFIX SIGE v8.0 CONCLUÍDO COM SUCESSO!' as status;
+```
+
+### **ETAPA 2: CORREÇÃO DO SCRIPT DE ENTRYPOINT**
+
+Modifique o `docker-entrypoint-production-fix.sh`:
+
+```bash
+#!/bin/bash
+set -e
+
+echo "🚨 SIGE v8.0 - Iniciando correção de produção..."
+
+# Verificar DATABASE_URL
+if [ -z "$DATABASE_URL" ]; then
+    echo "❌ DATABASE_URL não definida"
+    exit 1
+fi
+
+echo "📍 DATABASE_URL detectado: ${DATABASE_URL%:*}:****"
+
+# Aguardar PostgreSQL estar disponível
+echo "⏳ Aguardando PostgreSQL..."
+until pg_isready -d "$DATABASE_URL" -q; do
+    echo "⏳ PostgreSQL não disponível, aguardando..."
+    sleep 2
+done
+echo "✅ PostgreSQL disponível"
+
+# Executar HOTFIX crítico
+echo "🔧 EXECUTANDO HOTFIX CRÍTICO..."
+psql "$DATABASE_URL" -v ON_ERROR_STOP=1 << 'EOSQL'
+-- HOTFIX SIGE v8.0
+BEGIN;
+
+-- Criar usuário admin se não existir
+DO $$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM usuario WHERE id = 10) THEN
+        INSERT INTO usuario (id, nome, email, senha_hash, ativo, admin_id, created_at, updated_at)
+        VALUES (10, 'Admin Sistema', 'admin@sistema.local', 'hash_temporario', true, 10, NOW(), NOW());
+        RAISE NOTICE '✅ Usuário admin criado';
+    END IF;
+END
+$$;
+
+-- Adicionar coluna admin_id se não existir
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM information_schema.columns 
+        WHERE table_name = 'servico' AND column_name = 'admin_id'
+    ) THEN
+        ALTER TABLE servico ADD COLUMN admin_id INTEGER;
+        UPDATE servico SET admin_id = 10 WHERE admin_id IS NULL;
+        ALTER TABLE servico ALTER COLUMN admin_id SET NOT NULL;
+        ALTER TABLE servico ADD CONSTRAINT fk_servico_admin 
+        FOREIGN KEY (admin_id) REFERENCES usuario(id);
+        RAISE NOTICE '✅ HOTFIX admin_id aplicado';
+    ELSE
+        RAISE NOTICE '✅ admin_id já existe';
+    END IF;
+END
+$$;
+
+COMMIT;
+EOSQL
+
+if [ $? -eq 0 ]; then
+    echo "✅ HOTFIX EXECUTADO COM SUCESSO"
+else
+    echo "❌ HOTFIX FALHOU - Tentando método alternativo..."
+    # Método alternativo mais simples
+    psql "$DATABASE_URL" -c "ALTER TABLE servico ADD COLUMN IF NOT EXISTS admin_id INTEGER DEFAULT 10;" || true
+    psql "$DATABASE_URL" -c "UPDATE servico SET admin_id = 10 WHERE admin_id IS NULL;" || true
+    echo "⚠️ Método alternativo executado"
+fi
+
+# Executar aplicação
+echo "🚀 Iniciando aplicação SIGE v8.0..."
+exec "$@"
+```
+
+### **ETAPA 3: VALIDAÇÃO PÓS-CORREÇÃO**
+
+Após aplicar a correção, execute estas verificações:
+
+```sql
+-- 1. Verificar estrutura da tabela
+\d servico
+
+-- 2. Verificar dados
+SELECT id, nome, admin_id FROM servico LIMIT 5;
+
+-- 3. Verificar constraints
+SELECT constraint_name, constraint_type 
+FROM information_schema.table_constraints 
+WHERE table_name = 'servico' AND constraint_type = 'FOREIGN KEY';
+
+-- 4. Testar query que estava falhando
+SELECT servico.id, servico.nome, servico.admin_id 
+FROM servico 
+ORDER BY servico.categoria, servico.nome 
+LIMIT 3;
+```
+
+## 🎯 PLANO DE EXECUÇÃO IMEDIATO
+
+### **PASSO 1: Acesso ao Banco**
+```bash
+# Conectar diretamente ao PostgreSQL do container
+docker exec -it <container_name> psql $DATABASE_URL
+```
+
+### **PASSO 2: Executar Hotfix**
+- Copie e execute o script SQL da ETAPA 1
+- Verifique cada mensagem de NOTICE
+- Confirme que não há erros
+
+### **PASSO 3: Redeploy**
+- Atualize o script de entrypoint
+- Faça redeploy no EasyPanel
+- Monitore logs de inicialização
+
+### **PASSO 4: Teste Funcional**
+- Acesse: https://www.sige.cassioviller.tech/servicos
+- Verifique se página carrega sem erro
+- Teste criação/edição de serviços
+
+## 🔍 MONITORAMENTO PÓS-CORREÇÃO
+
+### **Logs a Monitorar:**
+```bash
+# Logs do container
+docker logs <container_name> -f
+
+# Logs específicos do PostgreSQL
+docker exec <container_name> tail -f /var/log/postgresql/postgresql.log
+```
+
+### **Queries de Monitoramento:**
+```sql
+-- Verificar integridade dos dados
+SELECT 
+    COUNT(*) as total_servicos,
+    COUNT(DISTINCT admin_id) as admins_distintos,
+    MIN(created_at) as primeiro_servico,
+    MAX(updated_at) as ultima_atualizacao
+FROM servico;
+
+-- Verificar foreign keys
+SELECT 
+    s.id, s.nome, s.admin_id, u.nome as admin_nome
+FROM servico s
+LEFT JOIN usuario u ON s.admin_id = u.id
+WHERE u.id IS NULL; -- Deve retornar 0 registros
+```
+
+## 🚨 CRITÉRIOS DE SUCESSO
+
+### **Correção Bem-Sucedida Quando:**
+1. ✅ URL `/servicos` carrega sem erro 500
+2. ✅ Query `SELECT * FROM servico` executa sem erro
+3. ✅ Coluna `admin_id` existe e tem dados válidos
+4. ✅ Foreign key constraint funciona corretamente
+5. ✅ Sistema permite criar/editar serviços
+
+### **Rollback Necessário Se:**
+1. ❌ Aplicação não inicia após correção
+2. ❌ Dados corrompidos ou perdidos
+3. ❌ Performance degradada significativamente
+4. ❌ Outros módulos param de funcionar
+
+## 📞 ENTREGÁVEIS ESPERADOS
+
+1. **Relatório de Execução** com cada passo documentado
+2. **Screenshots** da URL funcionando
+3. **Logs de Sucesso** do hotfix
+4. **Backup** do estado anterior (se possível)
+5. **Plano de Prevenção** para evitar recorrência
+
+---
+
+**⚠️ ATENÇÃO CRÍTICA**: Este é um sistema em produção. Execute cada passo com cuidado, documente tudo e tenha plano de rollback pronto. O objetivo é restaurar o funcionamento com mínimo downtime e máxima segurança dos dados.
+
+
+
+## 📋 ATUALIZAÇÃO CRÍTICA - Análise do Script Atual
+
+### **SCRIPT ENTRYPOINT ATUAL ANALISADO**
+
+O arquivo `docker-entrypoint-production-fix.sh` já possui implementação de hotfix, mas apresenta problemas:
+
+#### **✅ PONTOS POSITIVOS:**
+- Timeout configurado para PostgreSQL (20s)
+- Verificação condicional de coluna existente
+- Método fallback implementado
+- Logs informativos com emojis
+- Estrutura DO $$ correta
+
+#### **❌ PROBLEMAS IDENTIFICADOS:**
+
+1. **Erro na Criação de Usuário:**
+```sql
+INSERT INTO usuario (id, username, email, nome, password_hash, tipo_usuario, ativo) 
+VALUES (10, 'admin_producao', 'admin@producao.com', 'Admin Produção', 
+        'scrypt:32768:8:1$password_hash', 'tipo_usuario', TRUE);
+```
+**PROBLEMA**: Campo `username` pode não existir na tabela `usuario`
+**PROBLEMA**: Campo `tipo_usuario` pode não existir
+**PROBLEMA**: Hash de senha inválido
+
+2. **Inconsistência de Campos:**
+- Script usa `username` mas modelo pode usar `email` como login
+- Campo `tipo_usuario` pode não existir no modelo atual
+- Estrutura da tabela `usuario` não verificada
+
+3. **Falta de Verificação de Schema:**
+- Não verifica estrutura real da tabela `usuario`
+- Assume campos que podem não existir
+
+### **CORREÇÃO URGENTE DO SCRIPT**
+
+Substitua o bloco de criação de usuário por:
+
+```sql
+-- 2. Verificar/criar usuário admin padrão (CORRIGIDO)
+SELECT EXISTS (SELECT id FROM usuario WHERE id = 10) INTO user_exists;
+IF NOT user_exists THEN
+    RAISE NOTICE '2️⃣ Criando usuário admin padrão...';
+    
+    -- Verificar estrutura real da tabela usuario
+    IF EXISTS (SELECT column_name FROM information_schema.columns 
+               WHERE table_name = 'usuario' AND column_name = 'username') THEN
+        -- Tabela tem campo username
+        INSERT INTO usuario (id, username, email, nome, senha_hash, ativo, admin_id, created_at, updated_at) 
+        VALUES (10, 'admin_sistema', 'admin@sistema.local', 'Admin Sistema', 
+                'pbkdf2:sha256:260000$salt$hash', TRUE, 10, NOW(), NOW());
+    ELSE
+        -- Tabela usa apenas email (mais comum em Flask)
+        INSERT INTO usuario (id, email, nome, senha_hash, ativo, admin_id, created_at, updated_at) 
+        VALUES (10, 'admin@sistema.local', 'Admin Sistema', 
+                'pbkdf2:sha256:260000$salt$hash', TRUE, 10, NOW(), NOW());
+    END IF;
+ELSE
+    RAISE NOTICE '2️⃣ Usuário admin_id=10 já existe';
+END IF;
+```
+
+### **SCRIPT CORRIGIDO COMPLETO**
+
+```bash
+#!/bin/bash
+# DOCKER ENTRYPOINT PRODUCTION FIX - SIGE v8.0 CORRIGIDO
+set -e
+
+echo "🚀 SIGE v8.0 - Iniciando (Production Fix v2.1 - CORRIGIDO)"
+
+# Aguardar PostgreSQL
+echo "⏳ Verificando PostgreSQL..."
+DB_HOST="${DATABASE_HOST:-viajey_sige}"
+DB_PORT="${DATABASE_PORT:-5432}"
+DB_USER="${DATABASE_USER:-sige}"
+
+TIMEOUT=30
+COUNTER=0
+
+until pg_isready -h "${DB_HOST}" -p "${DB_PORT}" -U "${DB_USER}" >/dev/null 2>&1; do
+    if [[ ${COUNTER} -eq ${TIMEOUT} ]]; then
+        echo "❌ Timeout PostgreSQL (${TIMEOUT}s)"
+        exit 1
+    fi
+    sleep 1
+    COUNTER=$((COUNTER + 1))
+done
+
+echo "✅ PostgreSQL conectado!"
+
+# HOTFIX CRÍTICO CORRIGIDO
+if [ -n "$DATABASE_URL" ]; then
+    echo "🚨 EXECUTANDO HOTFIX CORRIGIDO..."
+    
+    psql "$DATABASE_URL" -v ON_ERROR_STOP=1 << 'EOSQL'
+DO $$
+DECLARE
+    column_exists boolean := false;
+    user_exists boolean := false;
+    has_username boolean := false;
+    has_tipo_usuario boolean := false;
+BEGIN
+    -- Verificar se coluna admin_id existe
+    SELECT EXISTS (
+        SELECT column_name FROM information_schema.columns 
+        WHERE table_name = 'servico' AND column_name = 'admin_id'
+    ) INTO column_exists;
+    
+    -- Verificar estrutura da tabela usuario
+    SELECT EXISTS (
+        SELECT column_name FROM information_schema.columns 
+        WHERE table_name = 'usuario' AND column_name = 'username'
+    ) INTO has_username;
+    
+    SELECT EXISTS (
+        SELECT column_name FROM information_schema.columns 
+        WHERE table_name = 'usuario' AND column_name = 'tipo_usuario'
+    ) INTO has_tipo_usuario;
+    
+    IF NOT column_exists THEN
+        RAISE NOTICE '🚨 APLICANDO HOTFIX CORRIGIDO...';
+        
+        -- 1. Verificar/criar usuário admin PRIMEIRO
+        SELECT EXISTS (SELECT id FROM usuario WHERE id = 10) INTO user_exists;
+        IF NOT user_exists THEN
+            RAISE NOTICE '1️⃣ Criando usuário admin (estrutura verificada)...';
+            
+            IF has_username AND has_tipo_usuario THEN
+                INSERT INTO usuario (id, username, email, nome, senha_hash, tipo_usuario, ativo, admin_id, created_at, updated_at) 
+                VALUES (10, 'admin_sistema', 'admin@sistema.local', 'Admin Sistema', 
+                        'pbkdf2:sha256:260000$salt$hash', 'admin', TRUE, 10, NOW(), NOW());
+            ELSIF has_username THEN
+                INSERT INTO usuario (id, username, email, nome, senha_hash, ativo, admin_id, created_at, updated_at) 
+                VALUES (10, 'admin_sistema', 'admin@sistema.local', 'Admin Sistema', 
+                        'pbkdf2:sha256:260000$salt$hash', TRUE, 10, NOW(), NOW());
+            ELSE
+                INSERT INTO usuario (id, email, nome, senha_hash, ativo, admin_id, created_at, updated_at) 
+                VALUES (10, 'admin@sistema.local', 'Admin Sistema', 
+                        'pbkdf2:sha256:260000$salt$hash', TRUE, 10, NOW(), NOW());
+            END IF;
+        END IF;
+        
+        -- 2. Adicionar coluna admin_id
+        RAISE NOTICE '2️⃣ Adicionando coluna admin_id...';
+        ALTER TABLE servico ADD COLUMN admin_id INTEGER;
+        
+        -- 3. Popular dados
+        RAISE NOTICE '3️⃣ Populando dados...';
+        UPDATE servico SET admin_id = 10;
+        
+        -- 4. Adicionar constraints
+        RAISE NOTICE '4️⃣ Adicionando constraints...';
+        ALTER TABLE servico ALTER COLUMN admin_id SET NOT NULL;
+        ALTER TABLE servico ADD CONSTRAINT fk_servico_admin 
+        FOREIGN KEY (admin_id) REFERENCES usuario(id);
+        
+        RAISE NOTICE '✅ HOTFIX CORRIGIDO APLICADO COM SUCESSO!';
+    ELSE
+        RAISE NOTICE '✅ admin_id já existe - sistema OK';
+    END IF;
+END
+$$;
+EOSQL
+
+    if [ $? -eq 0 ]; then
+        echo "✅ HOTFIX CORRIGIDO EXECUTADO!"
+    else
+        echo "❌ HOTFIX FALHOU - Verificar logs acima"
+        exit 1
+    fi
+fi
+
+echo "🎯 Iniciando aplicação..."
+exec "$@"
+```
+
+### **VERIFICAÇÃO OBRIGATÓRIA ANTES DO DEPLOY**
+
+Execute estas queries para verificar a estrutura real:
+
+```sql
+-- 1. Verificar estrutura da tabela usuario
+SELECT column_name, data_type, is_nullable 
+FROM information_schema.columns 
+WHERE table_name = 'usuario' 
+ORDER BY ordinal_position;
+
+-- 2. Verificar se usuário admin existe
+SELECT id, email, nome FROM usuario WHERE id = 10;
+
+-- 3. Verificar estrutura da tabela servico
+SELECT column_name, data_type, is_nullable 
+FROM information_schema.columns 
+WHERE table_name = 'servico' 
+ORDER BY ordinal_position;
+```
+
+### **PLANO DE DEPLOY CORRIGIDO**
+
+1. **Backup do Script Atual:**
+```bash
+cp docker-entrypoint-production-fix.sh docker-entrypoint-backup.sh
+```
+
+2. **Aplicar Script Corrigido:**
+- Substitua o script atual pelo corrigido
+- Verifique permissões de execução
+
+3. **Deploy no EasyPanel:**
+- Faça redeploy completo
+- Monitore logs em tempo real
+
+4. **Validação Imediata:**
+- Teste URL: `/servicos`
+- Verifique logs de sucesso
+- Confirme funcionamento
+
+### **LOGS ESPERADOS DE SUCESSO:**
+
+```
+🚀 SIGE v8.0 - Iniciando (Production Fix v2.1 - CORRIGIDO)
+⏳ Verificando PostgreSQL...
+✅ PostgreSQL conectado!
+🚨 EXECUTANDO HOTFIX CORRIGIDO...
+NOTICE: 🚨 APLICANDO HOTFIX CORRIGIDO...
+NOTICE: 1️⃣ Criando usuário admin (estrutura verificada)...
+NOTICE: 2️⃣ Adicionando coluna admin_id...
+NOTICE: 3️⃣ Populando dados...
+NOTICE: 4️⃣ Adicionando constraints...
+NOTICE: ✅ HOTFIX CORRIGIDO APLICADO COM SUCESSO!
+✅ HOTFIX CORRIGIDO EXECUTADO!
+🎯 Iniciando aplicação...
+```
+
+---
+
+**🚨 AÇÃO IMEDIATA NECESSÁRIA**: O script atual tem bugs que impedem o funcionamento. Use a versão corrigida acima para resolver definitivamente o problema.
+

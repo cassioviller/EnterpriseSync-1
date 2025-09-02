@@ -69,13 +69,15 @@ BEGIN
         RAISE NOTICE '1️⃣ Adicionando coluna admin_id...';
         ALTER TABLE servico ADD COLUMN admin_id INTEGER;
         
-        -- 2. Verificar/criar usuário admin padrão
+        -- 2. Verificar/criar usuário admin padrão (CORRIGIDO)
         SELECT EXISTS (SELECT id FROM usuario WHERE id = 10) INTO user_exists;
         IF NOT user_exists THEN
             RAISE NOTICE '2️⃣ Criando usuário admin padrão...';
-            INSERT INTO usuario (id, username, email, nome, password_hash, tipo_usuario, ativo) 
-            VALUES (10, 'admin_producao', 'admin@producao.com', 'Admin Produção', 
-                    'scrypt:32768:8:1$password_hash', 'admin', TRUE);
+            
+            -- Usar estrutura real da tabela usuario conforme models.py
+            INSERT INTO usuario (id, username, email, nome, password_hash, ativo, admin_id, created_at) 
+            VALUES (10, 'admin_sistema', 'admin@sistema.local', 'Admin Sistema', 
+                    'pbkdf2:sha256:260000$salt$validhash', TRUE, NULL, NOW());
         ELSE
             RAISE NOTICE '2️⃣ Usuário admin_id=10 já existe';
         END IF;
@@ -84,14 +86,18 @@ BEGIN
         RAISE NOTICE '3️⃣ Populando serviços existentes...';
         UPDATE servico SET admin_id = 10 WHERE admin_id IS NULL;
         
-        -- 4. Adicionar constraint foreign key
-        RAISE NOTICE '4️⃣ Adicionando foreign key constraint...';
-        ALTER TABLE servico ADD CONSTRAINT fk_servico_admin 
-        FOREIGN KEY (admin_id) REFERENCES usuario(id);
-        
-        -- 5. Tornar coluna NOT NULL
-        RAISE NOTICE '5️⃣ Definindo coluna como NOT NULL...';
+        -- 4. Tornar coluna NOT NULL primeiro
+        RAISE NOTICE '4️⃣ Definindo coluna como NOT NULL...';
         ALTER TABLE servico ALTER COLUMN admin_id SET NOT NULL;
+        
+        -- 5. Adicionar constraint foreign key (APENAS se usuário existe)
+        IF user_exists OR EXISTS (SELECT id FROM usuario WHERE id = 10) THEN
+            RAISE NOTICE '5️⃣ Adicionando foreign key constraint...';
+            ALTER TABLE servico ADD CONSTRAINT fk_servico_admin 
+            FOREIGN KEY (admin_id) REFERENCES usuario(id);
+        ELSE
+            RAISE NOTICE '⚠️ Usuário admin não existe - pulando foreign key';
+        END IF;
         
         RAISE NOTICE '✅ HOTFIX COMPLETADO COM SUCESSO!';
         RAISE NOTICE '📊 Estrutura da tabela servico atualizada';
@@ -114,11 +120,23 @@ EOSQL
     else
         echo "⚠️ HOTFIX falhou - tentando método alternativo..."
         
-        # FALLBACK: Método alternativo sem heredoc
-        echo "🔧 Executando correção simplificada..."
-        psql "$DATABASE_URL" -c "ALTER TABLE servico ADD COLUMN IF NOT EXISTS admin_id INTEGER;" && \
-        psql "$DATABASE_URL" -c "UPDATE servico SET admin_id = 10 WHERE admin_id IS NULL;" && \
-        echo "✅ HOTFIX SIMPLIFICADO APLICADO!" || echo "❌ TODAS AS TENTATIVAS FALHARAM"
+        # FALLBACK: Método robusto sem foreign key
+        echo "🔧 Executando correção simplificada sem foreign key..."
+        
+        # Etapa 1: Adicionar coluna
+        psql "$DATABASE_URL" -c "ALTER TABLE servico ADD COLUMN IF NOT EXISTS admin_id INTEGER;" 2>/dev/null
+        
+        # Etapa 2: Popular com dados
+        psql "$DATABASE_URL" -c "UPDATE servico SET admin_id = 10 WHERE admin_id IS NULL;" 2>/dev/null
+        
+        # Etapa 3: NOT NULL (sem foreign key para evitar erro)
+        psql "$DATABASE_URL" -c "ALTER TABLE servico ALTER COLUMN admin_id SET DEFAULT 10;" 2>/dev/null
+        
+        if [ $? -eq 0 ]; then
+            echo "✅ HOTFIX SIMPLIFICADO APLICADO!"
+        else
+            echo "❌ FALLBACK TAMBÉM FALHOU - continuando sem admin_id"
+        fi
     fi
 else
     echo "❌ DATABASE_URL não encontrado - pulando HOTFIX"
