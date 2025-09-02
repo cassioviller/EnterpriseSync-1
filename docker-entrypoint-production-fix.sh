@@ -86,7 +86,7 @@ BEGIN
             'pbkdf2:sha256:260000$salt$hash_placeholder',
             'Admin Sistema',
             TRUE,
-            'ADMIN',
+            'admin',
             10,
             NOW()
         );
