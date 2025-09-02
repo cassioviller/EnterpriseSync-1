@@ -78,13 +78,36 @@ servicos_crud_bp = Blueprint('servicos_crud', __name__, url_prefix='/servicos')
 
 # Funções auxiliares
 def get_admin_id():
-    """Obter admin_id do usuário atual"""
+    """Obter admin_id do usuário atual com prioridade para usuário autenticado"""
     try:
-        from utils.auth_utils import get_admin_id_from_user
-        return get_admin_id_from_user()
-    except ImportError:
-        from bypass_auth import obter_admin_id
-        return obter_admin_id()
+        # Importar current_user para verificar autenticação
+        from flask_login import current_user
+        from models import TipoUsuario
+        
+        # Priorizar usuário autenticado
+        if current_user.is_authenticated:
+            if current_user.tipo_usuario == TipoUsuario.ADMIN:
+                admin_id = current_user.id
+                logger.info(f"🔍 CRUD SERVIÇOS: Usuário ADMIN autenticado - admin_id={admin_id}")
+                return admin_id
+            else:
+                admin_id = current_user.admin_id
+                logger.info(f"🔍 CRUD SERVIÇOS: Usuário comum autenticado - admin_id={admin_id}")
+                return admin_id
+        
+        # Fallback para sistema de bypass (desenvolvimento)
+        try:
+            from bypass_auth import obter_admin_id
+            admin_id = obter_admin_id()
+            logger.info(f"🔍 CRUD SERVIÇOS: Sistema bypass - admin_id={admin_id}")
+            return admin_id
+        except ImportError:
+            logger.warning("⚠️ Sistema de bypass não disponível")
+            return 1
+            
+    except Exception as e:
+        logger.error(f"❌ Erro ao obter admin_id: {str(e)}")
+        return 1
 
 # ================================
 # ROTAS DE VISUALIZAÇÃO
