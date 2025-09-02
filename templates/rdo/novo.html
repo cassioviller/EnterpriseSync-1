@@ -1510,30 +1510,6 @@ function exibirDadosPrimeiraRDO(primeiraRDO) {
                         <span class="badge bg-secondary">${servico.categoria}</span>
                     </div>
                     <div class="card-body">
-                        <div class="row">
-                            <div class="col-md-6">
-                                <label class="form-label">Progresso Geral (%)</label>
-                                <div class="input-group">
-                                    <input type="number" 
-                                           class="form-control" 
-                                           name="servico_${servico.id}_percentual"
-                                           value="0" 
-                                           min="0" 
-                                           max="100" 
-                                           step="0.1"
-                                           form="formNovoRDO">
-                                    <span class="input-group-text">%</span>
-                                </div>
-                            </div>
-                            <div class="col-md-6">
-                                <label class="form-label">Observações</label>
-                                <input type="text" 
-                                       class="form-control" 
-                                       name="servico_${servico.id}_obs"
-                                       placeholder="Observações sobre o serviço"
-                                       form="formNovoRDO">
-                            </div>
-                        </div>
                         
                         ${servico.subatividades && servico.subatividades.length > 0 
                             ? `<div class="mt-3">

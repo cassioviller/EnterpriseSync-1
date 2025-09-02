@@ -165,17 +165,20 @@ def salvar_rdo_flexivel():
                     continue
         
         # Processar subatividades recebidas do formulário
-        # Processar subatividades (campos do tipo 'subatividade_{id}')
+        # Processar subatividades (campos do tipo 'subatividade_{id}_percentual')
         subatividades_processadas = {}
         for campo, valor in request.form.items():
-            if campo.startswith('subatividade_'):
+            if campo.startswith('subatividade_') and campo.endswith('_percentual'):
                 try:
-                    # Parse do campo: subatividade_{subatividade_mestre_id}
-                    subatividade_id = int(campo.replace('subatividade_', ''))
+                    # Parse do campo: subatividade_{subatividade_mestre_id}_percentual
+                    # Remover prefixo 'subatividade_' e sufixo '_percentual'
+                    subatividade_id_str = campo.replace('subatividade_', '').replace('_percentual', '')
+                    subatividade_id = int(subatividade_id_str)
                     percentual = float(valor) if valor else 0.0
                     
                     # Salvar TODOS os valores, incluindo 0 para rastreamento completo
                     subatividades_processadas[subatividade_id] = percentual
+                    logger.debug(f"✅ Subatividade {subatividade_id}: {percentual}%")
                         
                 except (ValueError, TypeError) as e:
                     logger.error(f"❌ Erro ao processar campo {campo}: {e}")
