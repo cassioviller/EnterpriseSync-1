@@ -2038,13 +2038,23 @@ def api_servicos():
     try:
         # Buscar admin_id corretamente
         if current_user.is_authenticated:
-            admin_id = current_user.id if current_user.tipo_usuario == TipoUsuario.ADMIN else current_user.admin_id
+            if current_user.tipo_usuario == TipoUsuario.ADMIN:
+                admin_id = current_user.id
+            else:
+                admin_id = current_user.admin_id
         else:
-            # Sistema de bypass para desenvolvimento
-            admin_id = 2
+            # Sistema de bypass para desenvolvimento - detectar admin_id dinamicamente
+            from sqlalchemy import text
+            admin_counts = db.session.execute(
+                text("SELECT admin_id, COUNT(*) as total FROM servico WHERE ativo = true GROUP BY admin_id ORDER BY total DESC LIMIT 1")
+            ).fetchone()
+            admin_id = admin_counts[0] if admin_counts else 10
+        
+        print(f"DEBUG API SERVIÇOS: Buscando serviços para admin_id={admin_id}")
         
         # Buscar serviços ativos do admin
         servicos = Servico.query.filter_by(admin_id=admin_id, ativo=True).order_by(Servico.nome).all()
+        print(f"DEBUG API SERVIÇOS: Encontrados {len(servicos)} serviços para admin_id={admin_id}")
         
         servicos_json = []
         for servico in servicos:
@@ -2055,7 +2065,7 @@ def api_servicos():
                 'categoria': servico.categoria or 'Geral',
                 'unidade_medida': servico.unidade_medida or 'un',
                 'unidade_simbolo': servico.unidade_simbolo or 'un',
-                'valor_unitario': float(servico.valor_unitario) if servico.valor_unitario else 0.0,
+                'valor_unitario': float(servico.custo_unitario) if servico.custo_unitario else 0.0,
                 'admin_id': servico.admin_id
             })
         
@@ -5018,8 +5028,19 @@ def adicionar_servico_obra():
         if not obra_id or not servico_id:
             return jsonify({'success': False, 'message': 'Dados incompletos'}), 400
         
-        # Buscar admin_id
-        admin_id = current_user.id if current_user.tipo_usuario == TipoUsuario.ADMIN else current_user.admin_id
+        # Buscar admin_id corretamente
+        if current_user.is_authenticated:
+            if current_user.tipo_usuario == TipoUsuario.ADMIN:
+                admin_id = current_user.id
+            else:
+                admin_id = current_user.admin_id
+        else:
+            # Sistema de bypass para desenvolvimento - detectar admin_id dinamicamente
+            from sqlalchemy import text
+            admin_counts = db.session.execute(
+                text("SELECT admin_id, COUNT(*) as total FROM servico WHERE ativo = true GROUP BY admin_id ORDER BY total DESC LIMIT 1")
+            ).fetchone()
+            admin_id = admin_counts[0] if admin_counts else 10
         
         # Verificar se obra pertence ao admin
         obra = Obra.query.filter_by(id=obra_id, admin_id=admin_id).first()
@@ -5051,7 +5072,7 @@ def adicionar_servico_obra():
             servico_obra.servico_id = servico_id
             servico_obra.quantidade_planejada = 1.0
             servico_obra.quantidade_executada = 0.0
-            servico_obra.valor_unitario = servico.valor_unitario or 0.0
+            servico_obra.valor_unitario = servico.custo_unitario or 0.0
             servico_obra.ativo = True
             servico_obra.data_criacao = datetime.now()
             
@@ -5086,8 +5107,19 @@ def remover_servico_obra():
         if not obra_id or not servico_id:
             return jsonify({'success': False, 'message': 'Dados incompletos'}), 400
         
-        # Buscar admin_id
-        admin_id = current_user.id if current_user.tipo_usuario == TipoUsuario.ADMIN else current_user.admin_id
+        # Buscar admin_id corretamente
+        if current_user.is_authenticated:
+            if current_user.tipo_usuario == TipoUsuario.ADMIN:
+                admin_id = current_user.id
+            else:
+                admin_id = current_user.admin_id
+        else:
+            # Sistema de bypass para desenvolvimento - detectar admin_id dinamicamente
+            from sqlalchemy import text
+            admin_counts = db.session.execute(
+                text("SELECT admin_id, COUNT(*) as total FROM servico WHERE ativo = true GROUP BY admin_id ORDER BY total DESC LIMIT 1")
+            ).fetchone()
+            admin_id = admin_counts[0] if admin_counts else 10
         
         # Verificar se obra pertence ao admin
         obra = Obra.query.filter_by(id=obra_id, admin_id=admin_id).first()
