@@ -153,6 +153,23 @@
     display: inline-block;
     margin-bottom: 1rem;
 }
+
+.btn-categoria-plus {
+    border: 1px solid #198754;
+    background: #198754;
+    color: white;
+    border-radius: 0 8px 8px 0;
+    margin-left: -1px;
+    padding: 0.75rem 1rem;
+    transition: all 0.3s ease;
+}
+
+.btn-categoria-plus:hover {
+    background: #157347;
+    border-color: #157347;
+    color: white;
+    transform: scale(1.05);
+}
 </style>
 {% endblock %}
 
@@ -195,12 +212,18 @@
                     <div class="col-md-6">
                         <div class="mb-3">
                             <label for="categoria" class="form-label fw-bold">Categoria</label>
-                            <select class="form-control form-control-modern" id="categoria" name="categoria">
-                                <option value="">Selecione uma categoria</option>
-                                {% for categoria in categorias %}
-                                    <option value="{{ categoria }}">{{ categoria }}</option>
-                                {% endfor %}
-                            </select>
+                            <div class="input-group">
+                                <select class="form-control form-control-modern" id="categoria" name="categoria">
+                                    <option value="">Selecione uma categoria</option>
+                                    {% for categoria in categorias %}
+                                        <option value="{{ categoria }}">{{ categoria }}</option>
+                                    {% endfor %}
+                                </select>
+                                <button type="button" class="btn btn-outline-success btn-categoria-plus" 
+                                        onclick="abrirModalCategorias()" title="Gerenciar Categorias">
+                                    <i class="fas fa-plus"></i>
+                                </button>
+                            </div>
                             <div class="help-text">Categoria para organização dos serviços</div>
                         </div>
                     </div>
@@ -258,6 +281,9 @@
         </div>
     </form>
 </div>
+
+<!-- Incluir Modal de Categorias -->
+{% include 'servicos/modal_categorias.html' %}
 
 <script>
 let contadorSubatividades = 0;
@@ -385,5 +411,22 @@ document.addEventListener('DOMContentLoaded', function() {
     console.log('Formulário de novo serviço carregado');
     // Remover auto-adição para permitir serviços sem subatividades se desejado
 });
+
+// Função para abrir modal de categorias
+function abrirModalCategorias() {
+    console.log('Abrindo modal de categorias...');
+    const modalElement = document.getElementById('modalCategorias');
+    if (modalElement) {
+        const modal = new bootstrap.Modal(modalElement);
+        modal.show();
+        
+        // Carregar categorias quando modal abrir
+        if (typeof carregarCategorias === 'function') {
+            carregarCategorias();
+        }
+    } else {
+        console.error('Modal de categorias não encontrado');
+    }
+}
 </script>
 {% endblock %}
