@@ -49,8 +49,8 @@
 .obra-header-main {
     background: linear-gradient(135deg, #1e3a8a 0%, #1e40af 100%);
     color: white;
-    padding: 2rem;
-    margin: -2rem -2rem 2rem -2rem;
+    padding: 3rem 2rem 2.5rem 2rem;
+    margin: -15px -15px 2rem -15px;
     position: relative;
     overflow: hidden;
 }
@@ -463,10 +463,10 @@
 {% endblock %}
 
 {% block content %}
-<div class="obra-container">
-    <div class="container-fluid">
+<div class="obra-container" style="padding: 0;">
+    <div class="container-fluid" style="padding: 0;">
         <!-- Header Principal da Obra -->
-        <div class="obra-card">
+        <div class="obra-card" style="margin: 0; border-radius: 0;">
             <div class="obra-header-main">
                 <div class="obra-header-content">
                     <div class="d-flex justify-content-between align-items-start flex-wrap">
@@ -519,6 +519,7 @@
         </div>
 
         <!-- KPIs da Obra -->
+        <div class="container-fluid" style="padding: 0 15px;">
         <div class="kpi-grid">
             <div class="kpi-card" style="--kpi-color: #3b82f6; --kpi-color-light: #60a5fa;">
                 <i class="fas fa-dollar-sign kpi-icon"></i>
@@ -975,6 +976,7 @@
                     </a>
                 </div>
             </div>
+        </div>
         </div>
     </div>
 </div>
