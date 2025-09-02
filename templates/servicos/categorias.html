@@ -1,0 +1,296 @@
+{% extends "base_completo.html" %}
+
+{% block title %}Gestão de Categorias - SIGE{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="card shadow-sm">
+        <div class="card-header bg-success text-white">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <h3 class="mb-0">
+                        <i class="fas fa-tags me-2"></i>
+                        Gestão de Categorias de Serviços
+                    </h3>
+                    <p class="mb-0 mt-1 opacity-75">Organize seus serviços por categorias</p>
+                </div>
+                <a href="/servicos" class="btn btn-light btn-sm">
+                    <i class="fas fa-arrow-left me-1"></i>
+                    Voltar
+                </a>
+            </div>
+        </div>
+        
+        <div class="card-body">
+            <!-- Formulário para nova categoria -->
+            <div class="row mb-4">
+                <div class="col-md-8">
+                    <div class="input-group">
+                        <span class="input-group-text">
+                            <i class="fas fa-tag"></i>
+                        </span>
+                        <input type="text" 
+                               class="form-control" 
+                               id="novaCategoria" 
+                               placeholder="Digite o nome da nova categoria"
+                               maxlength="50">
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <button class="btn btn-success w-100" onclick="adicionarCategoria()">
+                        <i class="fas fa-plus me-1"></i>
+                        Adicionar Categoria
+                    </button>
+                </div>
+            </div>
+            
+            <!-- Lista de categorias -->
+            <div class="row">
+                <div class="col-12">
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <h5 class="mb-0">
+                            <i class="fas fa-list me-2"></i>
+                            Categorias Existentes
+                        </h5>
+                        <span class="badge bg-primary" id="totalCategorias">{{ categorias|length }}</span>
+                    </div>
+                    
+                    <div id="listaCategorias">
+                        {% if categorias %}
+                            {% for categoria in categorias %}
+                            <div class="categoria-item border rounded p-3 mb-2" data-id="{{ categoria.id }}">
+                                <div class="row align-items-center">
+                                    <div class="col-md-6">
+                                        <div class="d-flex align-items-center">
+                                            <span class="badge me-2" style="background-color: {{ categoria.cor or '#198754' }}">
+                                                <i class="{{ categoria.icone or 'fas fa-tag' }}"></i>
+                                            </span>
+                                            <div>
+                                                <strong class="categoria-nome">{{ categoria.nome }}</strong>
+                                                {% if categoria.descricao %}
+                                                <br><small class="text-muted">{{ categoria.descricao }}</small>
+                                                {% endif %}
+                                            </div>
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="col-md-3 text-center">
+                                        <small class="text-muted">
+                                            Ordem: {{ categoria.ordem or 0 }}
+                                        </small>
+                                    </div>
+                                    
+                                    <div class="col-md-3 text-end">
+                                        <div class="btn-group" role="group">
+                                            <button class="btn btn-sm btn-outline-warning" 
+                                                    onclick="editarCategoria({{ categoria.id }}, '{{ categoria.nome }}')"
+                                                    title="Editar categoria">
+                                                <i class="fas fa-edit"></i>
+                                            </button>
+                                            <button class="btn btn-sm btn-outline-danger" 
+                                                    onclick="excluirCategoria({{ categoria.id }}, '{{ categoria.nome }}')"
+                                                    title="Excluir categoria">
+                                                <i class="fas fa-trash"></i>
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            {% endfor %}
+                        {% else %}
+                            <div class="text-center py-5">
+                                <i class="fas fa-tags fa-3x text-muted mb-3"></i>
+                                <h5 class="text-muted">Nenhuma categoria encontrada</h5>
+                                <p class="text-muted">Adicione uma categoria para começar a organizar seus serviços</p>
+                            </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal para edição -->
+<div class="modal fade" id="modalEditarCategoria" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-warning text-dark">
+                <h5 class="modal-title">
+                    <i class="fas fa-edit me-2"></i>
+                    Editar Categoria
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <label for="editarNome" class="form-label">Nome da Categoria</label>
+                    <input type="text" class="form-control" id="editarNome" maxlength="50">
+                </div>
+                <div class="mb-3">
+                    <label for="editarDescricao" class="form-label">Descrição (opcional)</label>
+                    <textarea class="form-control" id="editarDescricao" rows="2" maxlength="200"></textarea>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-warning" onclick="salvarEdicao()">
+                    <i class="fas fa-save me-1"></i>
+                    Salvar Alterações
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+let categoriaEditandoId = null;
+
+// Adicionar nova categoria
+async function adicionarCategoria() {
+    const nome = document.getElementById('novaCategoria').value.trim();
+    
+    if (!nome) {
+        alert('Por favor, digite o nome da categoria');
+        document.getElementById('novaCategoria').focus();
+        return;
+    }
+    
+    try {
+        const response = await fetch('/categorias-servicos/api/criar', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ nome: nome })
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+            document.getElementById('novaCategoria').value = '';
+            mostrarMensagem('Categoria adicionada com sucesso!', 'success');
+            setTimeout(() => location.reload(), 1000);
+        } else {
+            mostrarMensagem('Erro: ' + result.error, 'error');
+        }
+    } catch (error) {
+        console.error('Erro:', error);
+        mostrarMensagem('Erro de conexão', 'error');
+    }
+}
+
+// Editar categoria
+function editarCategoria(id, nome) {
+    categoriaEditandoId = id;
+    document.getElementById('editarNome').value = nome;
+    document.getElementById('editarDescricao').value = '';
+    
+    const modal = new bootstrap.Modal(document.getElementById('modalEditarCategoria'));
+    modal.show();
+}
+
+// Salvar edição
+async function salvarEdicao() {
+    const nome = document.getElementById('editarNome').value.trim();
+    const descricao = document.getElementById('editarDescricao').value.trim();
+    
+    if (!nome) {
+        alert('Nome da categoria é obrigatório');
+        return;
+    }
+    
+    try {
+        const response = await fetch(`/categorias-servicos/api/${categoriaEditandoId}/editar`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ 
+                nome: nome,
+                descricao: descricao
+            })
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+            const modal = bootstrap.Modal.getInstance(document.getElementById('modalEditarCategoria'));
+            modal.hide();
+            mostrarMensagem('Categoria atualizada com sucesso!', 'success');
+            setTimeout(() => location.reload(), 1000);
+        } else {
+            mostrarMensagem('Erro: ' + result.error, 'error');
+        }
+    } catch (error) {
+        console.error('Erro:', error);
+        mostrarMensagem('Erro de conexão', 'error');
+    }
+}
+
+// Excluir categoria
+async function excluirCategoria(id, nome) {
+    if (!confirm(`Tem certeza que deseja excluir a categoria "${nome}"?\n\nEsta ação não pode ser desfeita.`)) {
+        return;
+    }
+    
+    try {
+        const response = await fetch(`/categorias-servicos/api/${id}/excluir`, {
+            method: 'DELETE'
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+            mostrarMensagem('Categoria excluída com sucesso!', 'success');
+            setTimeout(() => location.reload(), 1000);
+        } else {
+            mostrarMensagem('Erro: ' + result.error, 'error');
+        }
+    } catch (error) {
+        console.error('Erro:', error);
+        mostrarMensagem('Erro de conexão', 'error');
+    }
+}
+
+// Mostrar mensagens
+function mostrarMensagem(texto, tipo) {
+    const alertClass = tipo === 'success' ? 'alert-success' : 'alert-danger';
+    const icone = tipo === 'success' ? 'fas fa-check-circle' : 'fas fa-exclamation-triangle';
+    
+    const mensagem = document.createElement('div');
+    mensagem.className = `alert ${alertClass} alert-dismissible fade show position-fixed`;
+    mensagem.style.cssText = 'top: 20px; right: 20px; z-index: 1060; min-width: 300px;';
+    mensagem.innerHTML = `
+        <i class="${icone} me-2"></i>
+        ${texto}
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    `;
+    
+    document.body.appendChild(mensagem);
+    
+    setTimeout(() => {
+        if (mensagem.parentNode) {
+            mensagem.remove();
+        }
+    }, 5000);
+}
+
+// Enter no campo de nova categoria
+document.addEventListener('DOMContentLoaded', function() {
+    const input = document.getElementById('novaCategoria');
+    if (input) {
+        input.addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                adicionarCategoria();
+            }
+        });
+        
+        // Focar no campo ao carregar
+        input.focus();
+    }
+});
+</script>
+{% endblock %}

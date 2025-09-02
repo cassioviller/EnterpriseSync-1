@@ -25,9 +25,8 @@ def index():
             ativo=True
         ).order_by(CategoriaServico.nome).all()
         
-        return render_template('base_completo.html',
-                             title="Gestão de Categorias",
-                             content=f"""
+        return render_template('servicos/categorias.html',
+                             categorias=categorias)
                              <div class="container mt-4">
                                  <div class="card">
                                      <div class="card-header bg-success text-white">
@@ -140,8 +139,7 @@ def index():
                                      }});
                                  }}
                              }});
-                             </script>
-                             """)
+
         
     except Exception as e:
         logger.error(f"❌ Erro ao carregar página de categorias: {str(e)}")
@@ -195,6 +193,65 @@ def api_listar_categorias():
         
     except Exception as e:
         logger.error(f"❌ Erro ao listar categorias: {str(e)}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+@categorias_bp.route('/api/<int:categoria_id>/editar', methods=['POST'])
+def api_editar_categoria(categoria_id):
+    """API para editar categoria existente"""
+    try:
+        admin_id = get_admin_id()
+        dados = request.get_json()
+        
+        categoria = CategoriaServico.query.filter_by(
+            id=categoria_id,
+            admin_id=admin_id
+        ).first()
+        
+        if not categoria:
+            return jsonify({
+                'success': False,
+                'error': 'Categoria não encontrada'
+            }), 404
+        
+        nome = dados.get('nome', '').strip()
+        if not nome:
+            return jsonify({
+                'success': False,
+                'error': 'Nome da categoria é obrigatório'
+            }), 400
+        
+        # Verificar se nome já existe (exceto para a categoria atual)
+        existente = CategoriaServico.query.filter(
+            CategoriaServico.nome == nome,
+            CategoriaServico.admin_id == admin_id,
+            CategoriaServico.id != categoria_id,
+            CategoriaServico.ativo == True
+        ).first()
+        
+        if existente:
+            return jsonify({
+                'success': False,
+                'error': f'Já existe uma categoria com o nome "{nome}"'
+            }), 400
+        
+        # Atualizar categoria
+        categoria.nome = nome
+        categoria.descricao = dados.get('descricao', '').strip()
+        categoria.updated_at = datetime.now()
+        
+        db.session.commit()
+        
+        return jsonify({
+            'success': True,
+            'message': 'Categoria atualizada com sucesso'
+        })
+        
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"❌ Erro ao editar categoria: {str(e)}")
         return jsonify({
             'success': False,
             'error': str(e)
