@@ -109,6 +109,79 @@ def editar_rdo(rdo_id):
                          modo_edicao=True,
                          dados_salvos=dados_salvos)
 
+@rdo_bp.route('/api/ultimo-rdo-dados/<int:obra_id>')
+def api_ultimo_rdo_dados(obra_id):
+    """API para obter dados do último RDO de uma obra"""
+    try:
+        admin_id = obter_admin_id()
+        print(f"✅ API ÚLTIMO RDO: obra_id={obra_id}, admin_id={admin_id}")
+        
+        # Buscar último RDO da obra
+        ultimo_rdo = obter_ultimo_rdo_obra(obra_id, date.today(), admin_id)
+        
+        if not ultimo_rdo:
+            return jsonify({
+                'success': False,
+                'message': 'Nenhum RDO anterior encontrado para esta obra',
+                'ultimo_rdo': None
+            })
+        
+        # Buscar serviços do último RDO
+        servicos_rdo = RDOServicoSubatividade.query.filter_by(rdo_id=ultimo_rdo.id).all()
+        servicos_dados = []
+        
+        for servico_rdo in servicos_rdo:
+            if servico_rdo.servico:
+                servicos_dados.append({
+                    'id': servico_rdo.servico.id,
+                    'nome': servico_rdo.servico.nome,
+                    'percentual': servico_rdo.percentual_executado or 0,
+                    'subatividades': [
+                        {
+                            'id': sa.id,
+                            'nome': sa.nome,
+                            'percentual': servico_rdo.percentual_executado or 0
+                        } for sa in servico_rdo.servico.subatividades if hasattr(servico_rdo.servico, 'subatividades')
+                    ]
+                })
+        
+        # Buscar funcionários do último RDO
+        funcionarios_rdo = RDOMaoObra.query.filter_by(rdo_id=ultimo_rdo.id).all()
+        funcionarios_dados = []
+        
+        for func_rdo in funcionarios_rdo:
+            if func_rdo.funcionario:
+                funcionarios_dados.append({
+                    'id': func_rdo.funcionario.id,
+                    'nome': func_rdo.funcionario.nome,
+                    'funcao': func_rdo.funcionario.funcao.nome if func_rdo.funcionario.funcao else 'Não informado',
+                    'horas_trabalhadas': float(func_rdo.horas_trabalhadas) if func_rdo.horas_trabalhadas else 8.0
+                })
+        
+        resultado = {
+            'success': True,
+            'ultimo_rdo': {
+                'id': ultimo_rdo.id,
+                'numero_rdo': ultimo_rdo.numero_rdo,
+                'data_relatorio': ultimo_rdo.data_relatorio.strftime('%Y-%m-%d'),
+                'servicos': servicos_dados,
+                'funcionarios': funcionarios_dados,
+                'total_servicos': len(servicos_dados),
+                'total_funcionarios': len(funcionarios_dados)
+            }
+        }
+        
+        print(f"✅ ÚLTIMO RDO ENCONTRADO: {ultimo_rdo.numero_rdo} com {len(servicos_dados)} serviços e {len(funcionarios_dados)} funcionários")
+        return jsonify(resultado)
+        
+    except Exception as e:
+        print(f"❌ ERRO API ÚLTIMO RDO: {str(e)}")
+        return jsonify({
+            'success': False,
+            'error': str(e),
+            'ultimo_rdo': None
+        }), 500
+
 def carregar_dados_rdo(rdo):
     """Carrega dados do RDO para edição"""
     dados = {

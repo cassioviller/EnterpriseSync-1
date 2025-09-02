@@ -544,9 +544,9 @@
                     </a>
                     
                     <div class="d-flex gap-3">
-                        <button type="button" class="btn-modern btn-outline" onclick="testarUltimoRDO()">
-                            <i class="fas fa-flask"></i>
-                            Testar Último RDO
+                        <button type="button" class="btn-modern btn-outline" onclick="carregarDadosUltimoRDO()">
+                            <i class="fas fa-history"></i>
+                            Carregar Dados do Último RDO
                         </button>
                         <button type="submit" form="formNovoRDO" class="btn-modern btn-success" id="btnFinalizarRDO">
                             <i class="fas fa-check"></i>
@@ -562,15 +562,41 @@
 
 <script>
 // JavaScript para funcionalidades do RDO moderno
-function testarUltimoRDO() {
+function carregarDadosUltimoRDO() {
     const obraId = document.getElementById('obra_id').value;
     if (!obraId) {
-        alert('Selecione uma obra primeiro');
+        alert('⚠️ Selecione uma obra primeiro para carregar dados do último RDO');
         return;
     }
     
-    // Carregar serviços dinamicamente da API
-    carregarServicosDaObra(obraId);
+    console.log(`🔄 Carregando dados do último RDO para obra ${obraId}`);
+    
+    // Exibir loading
+    const servicosContainer = document.getElementById('servicos-container');
+    servicosContainer.innerHTML = `
+        <div class="text-center p-4">
+            <div class="spinner-border text-success" role="status">
+                <span class="visually-hidden">Carregando...</span>
+            </div>
+            <p class="mt-2 text-muted">Buscando dados do último RDO...</p>
+        </div>
+    `;
+    
+    // Fazer requisição para API do último RDO
+    fetch(`/api/ultimo-rdo-dados/${obraId}`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.success && data.ultimo_rdo) {
+                console.log(`✅ Último RDO encontrado: ${data.ultimo_rdo.numero_rdo}`);
+                exibirDadosUltimoRDO(data.ultimo_rdo);
+            } else {
+                exibirMensagemSemRDOAnterior();
+            }
+        })
+        .catch(error => {
+            console.error('❌ Erro ao carregar último RDO:', error);
+            exibirErroCarregamento();
+        });
 }
 
 function carregarServicosDaObra(obraId) {
@@ -693,6 +719,7 @@ function carregarServicosLimposDaObra(obraId) {
 
 function renderizarTemplatePadrao() {
     // Fallback para o template original
+    const container = document.getElementById('servicos-container');
     setTimeout(() => {
         container.innerHTML = `
             <div class="alert alert-success">
@@ -1377,6 +1404,85 @@ function renderizarFuncionarios(funcionarios) {
         });
     });
 }
+
+function exibirDadosUltimoRDO(ultimoRDO) {
+    const servicosContainer = document.getElementById('servicos-container');
+    
+    let html = `
+        <div class="alert alert-info">
+            <i class="fas fa-history"></i>
+            <strong>Dados do Último RDO:</strong> ${ultimoRDO.numero_rdo} (${ultimoRDO.data_relatorio})
+            <br><small>Serviços: ${ultimoRDO.total_servicos} | Funcionários: ${ultimoRDO.total_funcionarios}</small>
+        </div>
+    `;
+    
+    // Mostrar serviços
+    if (ultimoRDO.servicos && ultimoRDO.servicos.length > 0) {
+        html += '<h5><i class="fas fa-tools"></i> Serviços do Último RDO</h5>';
+        ultimoRDO.servicos.forEach(servico => {
+            html += `
+                <div class="card mb-2">
+                    <div class="card-body">
+                        <h6>${servico.nome}</h6>
+                        <p class="text-success mb-1">Progresso: ${servico.percentual || 0}%</p>
+                        ${servico.subatividades && servico.subatividades.length > 0 
+                            ? `<small class="text-muted">${servico.subatividades.length} subatividades</small>`
+                            : ''
+                        }
+                    </div>
+                </div>
+            `;
+        });
+    }
+    
+    // Mostrar funcionários
+    if (ultimoRDO.funcionarios && ultimoRDO.funcionarios.length > 0) {
+        html += '<h5 class="mt-4"><i class="fas fa-users"></i> Funcionários do Último RDO</h5>';
+        ultimoRDO.funcionarios.forEach(funcionario => {
+            html += `
+                <div class="card mb-2">
+                    <div class="card-body">
+                        <h6>${funcionario.nome}</h6>
+                        <p class="text-info mb-1">${funcionario.funcao}</p>
+                        <small class="text-muted">Horas trabalhadas: ${funcionario.horas_trabalhadas}h</small>
+                    </div>
+                </div>
+            `;
+        });
+    }
+    
+    servicosContainer.innerHTML = html;
+}
+
+function exibirMensagemSemRDOAnterior() {
+    const servicosContainer = document.getElementById('servicos-container');
+    servicosContainer.innerHTML = `
+        <div class="alert alert-warning">
+            <i class="fas fa-info-circle"></i>
+            <strong>Nenhum RDO anterior encontrado</strong>
+            <br>Esta será a primeira RDO da obra. Preencha os dados manualmente.
+        </div>
+        <div class="text-center p-4">
+            <i class="fas fa-rocket fa-3x text-muted mb-3"></i>
+            <p class="text-muted">Primeira RDO da obra</p>
+            <small>Selecione funcionários e preencha os serviços manualmente</small>
+        </div>
+    `;
+}
+
+function exibirErroCarregamento() {
+    const servicosContainer = document.getElementById('servicos-container');
+    servicosContainer.innerHTML = `
+        <div class="alert alert-danger">
+            <i class="fas fa-exclamation-triangle"></i>
+            <strong>Erro ao carregar dados</strong>
+            <br>Não foi possível carregar dados do último RDO. Tente novamente.
+        </div>
+    `;
+}
+
+console.log('RDO Moderno carregado com sucesso!');
+console.log('Sistema de funcionários inicializado');
 </script>
 
 <!-- Sistema de Autocomplete para Funcionários -->
