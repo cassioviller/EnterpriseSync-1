@@ -2042,33 +2042,53 @@ def get_admin_id_dinamico():
             else:
                 return current_user.admin_id
         
-        # 2. Sistema de bypass - detectar admin_id baseado nos dados
+        # 2. Sistema de bypass - detectar admin_id baseado nos dados disponíveis
         from sqlalchemy import text
         
-        # Priorizar admin com mais funcionários ativos
+        # Primeiro: verificar se existe admin_id com funcionários
         admin_funcionarios = db.session.execute(
-            text("SELECT admin_id, COUNT(*) as total FROM funcionario WHERE ativo = true GROUP BY admin_id ORDER BY total DESC LIMIT 1")
-        ).fetchone()
+            text("SELECT admin_id, COUNT(*) as total FROM funcionario WHERE ativo = true GROUP BY admin_id ORDER BY total DESC LIMIT 3")
+        ).fetchall()
         
-        if admin_funcionarios and admin_funcionarios[1] > 5:  # Pelo menos 5 funcionários
-            return admin_funcionarios[0]
+        print(f"🔍 ADMINS DISPONÍVEIS: {admin_funcionarios}")
         
-        # Fallback: admin com mais serviços
+        # Priorizar admin com mais funcionários (mas pelo menos 1)
+        for admin_info in admin_funcionarios:
+            admin_id, total = admin_info
+            if total >= 1:  # Qualquer admin com pelo menos 1 funcionário
+                print(f"✅ SELECIONADO: admin_id={admin_id} ({total} funcionários)")
+                return admin_id
+        
+        # Fallback: qualquer admin com serviços
         admin_servicos = db.session.execute(
             text("SELECT admin_id, COUNT(*) as total FROM servico WHERE ativo = true GROUP BY admin_id ORDER BY total DESC LIMIT 1")
         ).fetchone()
         
         if admin_servicos:
+            print(f"✅ FALLBACK SERVIÇOS: admin_id={admin_servicos[0]} ({admin_servicos[1]} serviços)")
             return admin_servicos[0]
             
-        # Último fallback - permitir mudança dinâmica para teste
-        # Para forçar outro admin_id, descomente a linha abaixo:
-        # return 5  # Exemplo: admin_id 5 
-        return 10
+        # Último fallback: primeiro admin_id encontrado na tabela funcionario
+        primeiro_admin = db.session.execute(
+            text("SELECT DISTINCT admin_id FROM funcionario ORDER BY admin_id LIMIT 1")
+        ).fetchone()
+        
+        if primeiro_admin:
+            print(f"✅ ÚLTIMO FALLBACK: admin_id={primeiro_admin[0]}")
+            return primeiro_admin[0]
+            
+        # Se nada funcionar, retornar 1
+        print("⚠️ USANDO DEFAULT: admin_id=1")
+        return 1
         
     except Exception as e:
-        print(f"ERRO GET_ADMIN_ID_DINAMICO: {str(e)}")
-        return 10
+        print(f"❌ ERRO GET_ADMIN_ID_DINAMICO: {str(e)}")
+        # Em caso de erro, tentar um fallback mais simples
+        try:
+            primeiro_admin = db.session.execute(text("SELECT MIN(admin_id) FROM funcionario")).fetchone()
+            return primeiro_admin[0] if primeiro_admin and primeiro_admin[0] else 1
+        except:
+            return 1
 
 @main_bp.route('/api/servicos')
 def api_servicos():
