@@ -29,7 +29,18 @@
             <p style="margin: 0.5rem 0 0 0; opacity: 0.9; font-size: 1.1rem; color: white;">Configure serviços e subatividades para os RDOs</p>
         </div>
     </div>
-    <div>
+    <div style="display: flex; gap: 1rem; align-items: center;">
+        <button onclick="abrirModalCategorias()" class="btn" style="
+            background: rgba(255, 255, 255, 0.15);
+            color: white;
+            border: 2px solid rgba(255, 255, 255, 0.25);
+            padding: 0.75rem 1.5rem;
+            border-radius: 10px;
+            font-weight: 600;
+            transition: all 0.3s ease;
+        ">
+            <i class="fas fa-tags me-2"></i>Categorias
+        </button>
         <button onclick="abrirModal()" class="btn" style="
             background: rgba(255, 255, 255, 0.2);
             color: white;
@@ -270,6 +281,11 @@
 
 <script>
 // Funções JavaScript simplificadas
+function abrirModalCategorias() {
+    console.log('Abrindo página de categorias...');
+    window.location.href = '/categorias-servicos';
+}
+
 function abrirModal() {
     const modal = new bootstrap.Modal(document.getElementById('modalNovoServico'));
     modal.show();
