@@ -1097,12 +1097,18 @@ document.addEventListener('DOMContentLoaded', function() {
 
 // Carregar serviços disponíveis para adicionar à obra
 function carregarServicosDisponiveis() {
+    console.log('🔄 Iniciando carregamento de serviços...');
     const container = document.getElementById('servicosDisponiveis');
     container.innerHTML = '<div class="col-12 text-center"><i class="fas fa-spinner fa-spin"></i> Carregando serviços...</div>';
     
     fetch('/api/servicos')
-        .then(response => response.json())
+        .then(response => {
+            console.log('📡 Resposta da API:', response.status);
+            return response.json();
+        })
         .then(data => {
+            console.log('📊 Dados recebidos:', data);
+            console.log('📊 Quantidade de serviços:', data.servicos ? data.servicos.length : 0);
             container.innerHTML = '';
             
             if (data.servicos && data.servicos.length > 0) {
@@ -1160,12 +1166,13 @@ function carregarServicosDisponiveis() {
             }
         })
         .catch(error => {
-            console.error('Erro ao carregar serviços:', error);
+            console.error('❌ Erro ao carregar serviços:', error);
             container.innerHTML = `
                 <div class="col-12">
                     <div class="alert alert-warning">
                         <i class="fas fa-exclamation-triangle me-2"></i>
                         Erro ao carregar serviços. Tente novamente.
+                        <br><small>Erro: ${error.message}</small>
                     </div>
                 </div>
             `;
