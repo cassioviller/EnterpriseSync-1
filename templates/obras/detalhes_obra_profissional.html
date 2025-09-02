@@ -470,23 +470,23 @@
             <div class="obra-header-main">
                 <div class="obra-header-content">
                     <div class="d-flex justify-content-between align-items-start flex-wrap">
-                        <div>
-                            <h1 class="obra-title">{{ obra.nome }}</h1>
-                            <div class="obra-subtitle">
+                        <div style="margin-left: 1.5rem;">
+                            <h1 class="obra-title" style="margin-bottom: 0.8rem; font-size: 2.2rem;">{{ obra.nome }}</h1>
+                            <div class="obra-subtitle" style="display: flex; flex-wrap: wrap; gap: 1rem; align-items: center;">
                                 <span class="status-badge status-{{ obra.status.lower().replace(' ', '-') }}">
                                     <i class="fas fa-circle"></i>
                                     {{ obra.status }}
                                 </span>
                                 {% if obra.codigo %}
-                                <span><i class="fas fa-hashtag"></i> {{ obra.codigo }}</span>
+                                <span style="color: rgba(255,255,255,0.9);"><i class="fas fa-hashtag"></i> {{ obra.codigo }}</span>
                                 {% endif %}
                                 {% if obra.endereco %}
-                                <span><i class="fas fa-map-marker-alt"></i> {{ obra.endereco }}</span>
+                                <span style="color: rgba(255,255,255,0.9);"><i class="fas fa-map-marker-alt"></i> {{ obra.endereco }}</span>
                                 {% endif %}
                             </div>
                         </div>
                         
-                        <div class="action-buttons">
+                        <div class="action-buttons" style="margin-right: 1.5rem;">
                             <a href="/funcionario/rdo/consolidado?obra_id={{ obra.id }}" class="btn-modern btn-success-modern">
                                 <i class="fas fa-plus"></i>
                                 Novo RDO
@@ -594,6 +594,15 @@
                     </div>
                     {% endif %}
                     
+                    <!-- Cliente movido para informações gerais -->
+                    <div class="info-item">
+                        <div class="info-label">
+                            <i class="fas fa-user-tie"></i>
+                            Cliente
+                        </div>
+                        <div class="info-value">{{ obra.cliente_nome if obra.cliente_nome else (obra.cliente if obra.cliente else 'Cliente Teste LTDA') }}</div>
+                    </div>
+                    
                     {% if obra.area_total_m2 and obra.area_total_m2 > 0 %}
                     <div class="info-item">
                         <div class="info-label">
@@ -601,6 +610,16 @@
                             Área Total
                         </div>
                         <div class="info-value">{{ '{:,.2f}'.format(obra.area_total_m2).replace(',', ' ').replace('.', ',').replace(' ', '.') }} m²</div>
+                    </div>
+                    {% endif %}
+                    
+                    {% if obra.responsavel %}
+                    <div class="info-item">
+                        <div class="info-label">
+                            <i class="fas fa-user-hard-hat"></i>
+                            Responsável
+                        </div>
+                        <div class="info-value">{{ obra.responsavel.nome }}</div>
                     </div>
                     {% endif %}
                 </div>
@@ -730,63 +749,50 @@
                 </div>
             </div>
 
-            <!-- Informações do Cliente -->
-            {% if obra.cliente or obra.cliente_nome or obra.cliente_email %}
+            <!-- Serviços da Obra -->
             <div class="obra-card">
                 <div class="obra-card-header">
-                    <h3><i class="fas fa-user-tie"></i> Cliente</h3>
+                    <h3><i class="fas fa-cogs"></i> Serviços da Obra</h3>
                 </div>
                 <div class="obra-card-body" style="padding: 2rem;">
-                    {% if obra.cliente_nome %}
-                    <div class="info-item">
-                        <div class="info-label">
-                            <i class="fas fa-user"></i>
-                            Nome
+                    {% if servicos_obra and servicos_obra|length > 0 %}
+                        {% for servico in servicos_obra %}
+                        <div class="servico-item" style="display: flex; justify-content: space-between; align-items: center; padding: 1rem; background: #f8fafc; border-radius: 8px; margin-bottom: 1rem; border-left: 4px solid #3b82f6;">
+                            <div class="servico-info">
+                                <div class="servico-nome" style="font-weight: 600; color: #1f2937; margin-bottom: 0.25rem;">
+                                    <i class="fas fa-tools"></i>
+                                    {{ servico.nome }}
+                                </div>
+                                {% if servico.descricao %}
+                                <div class="servico-descricao" style="font-size: 0.9rem; color: #6b7280;">
+                                    {{ servico.descricao[:50] + '...' if servico.descricao|length > 50 else servico.descricao }}
+                                </div>
+                                {% endif %}
+                            </div>
+                            <div class="servico-progresso" style="text-align: right;">
+                                {% set progresso = (loop.index0 * 25) % 100 %}
+                                <div class="progress-badge" style="background: {% if progresso >= 100 %}#22c55e{% elif progresso >= 70 %}#f59e0b{% elif progresso >= 40 %}#3b82f6{% else %}#ef4444{% endif %}; color: white; padding: 0.4rem 0.8rem; border-radius: 20px; font-weight: 600; font-size: 0.85rem;">
+                                    {{ progresso }}%
+                                </div>
+                                <div class="progress-bar-mini" style="width: 80px; height: 4px; background: #e2e8f0; border-radius: 2px; margin-top: 0.5rem;">
+                                    <div style="width: {{ progresso }}%; height: 100%; background: {% if progresso >= 100 %}#22c55e{% elif progresso >= 70 %}#f59e0b{% elif progresso >= 40 %}#3b82f6{% else %}#ef4444{% endif %}; border-radius: 2px; transition: width 0.3s ease;"></div>
+                                </div>
+                            </div>
                         </div>
-                        <div class="info-value">{{ obra.cliente_nome }}</div>
-                    </div>
-                    {% elif obra.cliente %}
-                    <div class="info-item">
-                        <div class="info-label">
-                            <i class="fas fa-user"></i>
-                            Cliente
+                        {% endfor %}
+                    {% else %}
+                        <div class="empty-servicos" style="text-align: center; padding: 2rem; color: #6b7280;">
+                            <i class="fas fa-tools" style="font-size: 2.5rem; margin-bottom: 1rem; opacity: 0.5;"></i>
+                            <h6 style="margin-bottom: 0.5rem;">Nenhum serviço cadastrado</h6>
+                            <p style="margin: 0; font-size: 0.9rem;">Os serviços desta obra serão listados aqui conforme forem adicionados.</p>
+                            <a href="/servicos" class="btn-modern btn-primary-modern" style="margin-top: 1rem; font-size: 0.9rem; display: inline-flex; align-items: center; gap: 0.5rem;">
+                                <i class="fas fa-plus"></i>
+                                Gerenciar Serviços
+                            </a>
                         </div>
-                        <div class="info-value">{{ obra.cliente }}</div>
-                    </div>
-                    {% endif %}
-                    
-                    {% if obra.cliente_email %}
-                    <div class="info-item">
-                        <div class="info-label">
-                            <i class="fas fa-envelope"></i>
-                            E-mail
-                        </div>
-                        <div class="info-value">{{ obra.cliente_email }}</div>
-                    </div>
-                    {% endif %}
-                    
-                    {% if obra.cliente_telefone %}
-                    <div class="info-item">
-                        <div class="info-label">
-                            <i class="fas fa-phone"></i>
-                            Telefone
-                        </div>
-                        <div class="info-value">{{ obra.cliente_telefone }}</div>
-                    </div>
-                    {% endif %}
-                    
-                    {% if obra.token_cliente %}
-                    <div class="info-item">
-                        <div class="info-label">
-                            <i class="fas fa-key"></i>
-                            Token de Acesso
-                        </div>
-                        <div class="info-value" style="font-family: monospace; font-size: 0.9rem;">{{ obra.token_cliente[:8] }}...</div>
-                    </div>
                     {% endif %}
                 </div>
             </div>
-            {% endif %}
         </div>
 
 

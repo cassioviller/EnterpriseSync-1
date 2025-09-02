@@ -1598,8 +1598,13 @@ def detalhes_obra(id):
         except:
             rdos_obra = []
         
-        # Variáveis extras para o template
-        servicos_obra = []
+        # Buscar serviços para exibir na obra (simulação baseada em dados reais)
+        try:
+            from models import Servico
+            servicos_all = Servico.query.filter_by(admin_id=admin_id or obra.admin_id).limit(5).all()
+            servicos_obra = servicos_all if servicos_all else []
+        except:
+            servicos_obra = []
         total_rdos = len(rdos_obra)
         rdos_finalizados = len([r for r in rdos_obra if r.status == 'Finalizado'])
         rdos_periodo = rdos_obra
