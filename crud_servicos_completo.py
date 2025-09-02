@@ -497,12 +497,64 @@ def atualizar_servico(servico_id):
         flash(f'Erro ao atualizar serviço: {str(e)}', 'error')
         return redirect(url_for('servicos_crud.editar_servico', servico_id=servico_id))
 
-@servicos_crud_bp.route('/<int:servico_id>/excluir', methods=['POST'])
+@servicos_crud_bp.route('/<int:servico_id>/excluir', methods=['POST', 'DELETE', 'GET'])
 def excluir_servico(servico_id):
-    """Exclui serviço (soft delete)"""
+    """Exclui serviço (soft delete) - aceita GET, POST e DELETE"""
     try:
         admin_id = get_admin_id()
         
+        # Para GET, mostrar confirmação
+        if request.method == 'GET':
+            # Buscar serviço para confirmação
+            servico = Servico.query.filter_by(
+                id=servico_id,
+                admin_id=admin_id
+            ).first()
+            
+            if not servico:
+                flash('Serviço não encontrado', 'error')
+                return redirect(url_for('servicos_crud.index'))
+            
+            # Retornar página de confirmação
+            return render_template_string("""
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <title>Confirmar Exclusão</title>
+                <meta charset="utf-8">
+                <meta name="viewport" content="width=device-width, initial-scale=1">
+                <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+            </head>
+            <body>
+                <div class="container mt-5">
+                    <div class="card">
+                        <div class="card-header bg-danger text-white">
+                            <h3>⚠️ Confirmar Exclusão</h3>
+                        </div>
+                        <div class="card-body">
+                            <p>Tem certeza que deseja excluir o serviço:</p>
+                            <h4>"{{ servico.nome }}"</h4>
+                            <p><strong>Categoria:</strong> {{ servico.categoria }}</p>
+                            <p><strong>Descrição:</strong> {{ servico.descricao }}</p>
+                            
+                            <div class="d-flex gap-2 mt-4">
+                                <form method="POST" action="{{ url_for('servicos_crud.excluir_servico', servico_id=servico.id) }}">
+                                    <button type="submit" class="btn btn-danger">
+                                        🗑️ Sim, Excluir
+                                    </button>
+                                </form>
+                                <a href="{{ url_for('servicos_crud.index') }}" class="btn btn-secondary">
+                                    ↩️ Cancelar
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </body>
+            </html>
+            """, servico=servico)
+        
+        # Para POST e DELETE, executar exclusão
         # Buscar serviço
         servico = Servico.query.filter_by(
             id=servico_id,
@@ -530,13 +582,27 @@ def excluir_servico(servico_id):
         logger.info(f"✅ Serviço excluído: {servico.nome}")
         flash(f'Serviço "{servico.nome}" excluído com sucesso!', 'success')
         
-        return redirect(url_for('servicos_crud.index'))
+        # Resposta diferente para diferentes métodos
+        if request.method == 'DELETE':
+            return jsonify({
+                'success': True,
+                'message': f'Serviço "{servico.nome}" excluído com sucesso!'
+            })
+        else:
+            return redirect(url_for('servicos_crud.index'))
         
     except Exception as e:
         db.session.rollback()
         logger.error(f"❌ Erro ao excluir serviço: {str(e)}")
         flash(f'Erro ao excluir serviço: {str(e)}', 'error')
-        return redirect(url_for('servicos_crud.index'))
+        
+        if request.method == 'DELETE':
+            return jsonify({
+                'success': False,
+                'error': str(e)
+            }), 500
+        else:
+            return redirect(url_for('servicos_crud.index'))
 
 # ================================
 # API ENDPOINTS
