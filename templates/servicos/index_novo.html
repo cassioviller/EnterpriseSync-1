@@ -158,7 +158,7 @@
                                 <i class="fas fa-ellipsis-v"></i>
                             </button>
                             <ul class="dropdown-menu">
-                                <li><a class="dropdown-item" href="/servicos/{{ servico.id }}/editar"><i class="fas fa-edit me-2"></i>Editar</a></li>
+                                <li><a class="dropdown-item" href="javascript:void(0)" onclick="abrirEdicaoServico({{ servico.id }}, '{{ servico.nome|replace("'", "\\'") }}', '{{ (servico.descricao or '')|replace("'", "\\'") }}', '{{ (servico.categoria or '')|replace("'", "\\'") }}')"><i class="fas fa-edit me-2"></i>Editar</a></li>
                                 <li><a class="dropdown-item text-danger" href="/servicos/{{ servico.id }}/excluir"><i class="fas fa-trash me-2"></i>Excluir</a></li>
                             </ul>
                         </div>
@@ -590,6 +590,109 @@ async function importarServicos() {
         btnImportar.innerHTML = '<i class="fas fa-download me-2"></i>Importar Serviços';
     }
 }
+
+// Sistema de edição de serviços
+let servicoEditando = null;
+
+function abrirEdicaoServico(id, nome, descricao, categoria) {
+    servicoEditando = id;
+    
+    document.getElementById('editarServicoNome').value = nome;
+    document.getElementById('editarServicoDescricao').value = descricao;
+    document.getElementById('editarServicoCategoria').value = categoria;
+    
+    // Carregar categorias disponíveis
+    carregarCategoriasParaEdicao();
+    
+    const modal = new bootstrap.Modal(document.getElementById('modalEditarServico'));
+    modal.show();
+}
+
+async function carregarCategoriasParaEdicao() {
+    try {
+        const response = await fetch('/categorias-servicos/api/listar');
+        const result = await response.json();
+        
+        const select = document.getElementById('editarServicoCategoria');
+        
+        // Limpar opções existentes (manter a primeira)
+        while (select.children.length > 1) {
+            select.removeChild(select.lastChild);
+        }
+        
+        // Adicionar categorias do banco
+        if (result.success && result.categorias) {
+            result.categorias.forEach(categoria => {
+                const option = document.createElement('option');
+                option.value = categoria.nome;
+                option.textContent = categoria.nome;
+                select.appendChild(option);
+            });
+        }
+        
+        // Adicionar algumas opções padrão se não houver categorias
+        if (!result.categorias || result.categorias.length === 0) {
+            ['Importado', 'Estrutural', 'Soldagem', 'Pintura', 'Instalação'].forEach(cat => {
+                const option = document.createElement('option');
+                option.value = cat;
+                option.textContent = cat;
+                select.appendChild(option);
+            });
+        }
+        
+    } catch (error) {
+        console.error('Erro ao carregar categorias:', error);
+    }
+}
+
+async function salvarEdicaoServico() {
+    if (!servicoEditando) return;
+    
+    const nome = document.getElementById('editarServicoNome').value.trim();
+    const descricao = document.getElementById('editarServicoDescricao').value.trim();
+    const categoria = document.getElementById('editarServicoCategoria').value;
+    
+    if (!nome) {
+        alert('Nome do serviço é obrigatório');
+        return;
+    }
+    
+    const btnSalvar = document.getElementById('btnSalvarEdicao');
+    btnSalvar.disabled = true;
+    btnSalvar.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Salvando...';
+    
+    try {
+        const response = await fetch(`/servicos/api/editar/${servicoEditando}`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                nome: nome,
+                descricao: descricao,
+                categoria: categoria
+            })
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+            // Fechar modal e recarregar página
+            const modal = bootstrap.Modal.getInstance(document.getElementById('modalEditarServico'));
+            modal.hide();
+            setTimeout(() => location.reload(), 500);
+        } else {
+            alert('Erro ao salvar: ' + result.error);
+        }
+        
+    } catch (error) {
+        console.error('Erro:', error);
+        alert('Erro de conexão ao salvar');
+    } finally {
+        btnSalvar.disabled = false;
+        btnSalvar.innerHTML = '<i class="fas fa-save me-2"></i>Salvar';
+    }
+}
 </script>
 
 <!-- Biblioteca SheetJS para processar Excel -->
@@ -698,6 +801,45 @@ async function importarServicos() {
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fechar</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal de Edição de Serviço -->
+<div class="modal fade" id="modalEditarServico" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-warning text-dark">
+                <h5 class="modal-title">
+                    <i class="fas fa-edit me-2"></i>
+                    Editar Serviço
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <label for="editarServicoNome" class="form-label">Nome do Serviço</label>
+                    <input type="text" class="form-control" id="editarServicoNome" required>
+                </div>
+                
+                <div class="mb-3">
+                    <label for="editarServicoDescricao" class="form-label">Descrição</label>
+                    <textarea class="form-control" id="editarServicoDescricao" rows="3"></textarea>
+                </div>
+                
+                <div class="mb-3">
+                    <label for="editarServicoCategoria" class="form-label">Categoria</label>
+                    <select class="form-control" id="editarServicoCategoria">
+                        <option value="">Selecione uma categoria</option>
+                    </select>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-warning" id="btnSalvarEdicao" onclick="salvarEdicaoServico()">
+                    <i class="fas fa-save me-2"></i>Salvar
+                </button>
             </div>
         </div>
     </div>

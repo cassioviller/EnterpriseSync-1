@@ -572,21 +572,23 @@ def editar_servico(servico_id):
             ativo=True
         ).order_by(SubatividadeMestre.ordem_padrao).all()
         
-        # Importar sistema de categorias
+        # Carregar categorias do banco de dados do usuário
         try:
-            from categoria_servicos import obter_categorias_disponiveis
-            categorias = obter_categorias_disponiveis(admin_id)
-        except ImportError:
-            # Fallback se módulo não estiver disponível
-            categorias = [
-                'Estrutural',
-                'Soldagem', 
-                'Pintura',
-                'Instalação',
-                'Acabamento',
-                'Manutenção',
-                'Outros'
-            ]
+            from models import CategoriaServico
+            categorias_obj = CategoriaServico.query.filter_by(
+                admin_id=admin_id,
+                ativo=True
+            ).order_by(CategoriaServico.ordem, CategoriaServico.nome).all()
+            
+            categorias = [cat.nome for cat in categorias_obj]
+            
+            # Se não houver categorias cadastradas, usar algumas padrão
+            if not categorias:
+                categorias = ['Importado', 'Estrutural', 'Soldagem', 'Pintura', 'Instalação']
+                
+        except Exception as e:
+            logger.error(f"❌ Erro ao carregar categorias: {str(e)}")
+            categorias = ['Importado', 'Estrutural', 'Soldagem', 'Pintura', 'Instalação']
         
         logger.info(f"✅ Serviço carregado: {servico.nome} com {len(subatividades)} subatividades")
         
@@ -995,4 +997,64 @@ def importar_excel():
         return jsonify({
             'success': False,
             'error': f'Erro na importação: {str(e)}'
+        }), 500
+
+@servicos_crud_bp.route('/api/editar/<int:servico_id>', methods=['POST'])
+def api_editar_servico(servico_id):
+    """API para editar serviço via AJAX"""
+    try:
+        admin_id = get_admin_id()
+        dados = request.get_json()
+        
+        # Buscar serviço
+        servico = Servico.query.filter_by(
+            id=servico_id,
+            admin_id=admin_id
+        ).first()
+        
+        if not servico:
+            return jsonify({
+                'success': False,
+                'error': 'Serviço não encontrado'
+            }), 404
+        
+        # Atualizar campos
+        nome = dados.get('nome', '').strip()
+        descricao = dados.get('descricao', '').strip()
+        categoria = dados.get('categoria', '').strip()
+        
+        if not nome:
+            return jsonify({
+                'success': False,
+                'error': 'Nome do serviço é obrigatório'
+            }), 400
+        
+        logger.info(f"🔄 Editando serviço {servico_id}: {nome} -> categoria: {categoria}")
+        
+        servico.nome = nome
+        servico.descricao = descricao
+        servico.categoria = categoria
+        servico.updated_at = datetime.utcnow()
+        
+        db.session.commit()
+        
+        logger.info(f"✅ Serviço {servico_id} editado com sucesso")
+        
+        return jsonify({
+            'success': True,
+            'message': 'Serviço editado com sucesso',
+            'servico': {
+                'id': servico.id,
+                'nome': servico.nome,
+                'descricao': servico.descricao,
+                'categoria': servico.categoria
+            }
+        })
+        
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"❌ Erro ao editar serviço {servico_id}: {str(e)}")
+        return jsonify({
+            'success': False,
+            'error': f'Erro ao editar serviço: {str(e)}'
         }), 500
