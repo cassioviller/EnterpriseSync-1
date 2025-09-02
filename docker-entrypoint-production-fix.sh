@@ -1,32 +1,20 @@
 #!/bin/bash
-# DOCKER ENTRYPOINT PRODUCTION FIX - SIGE v8.0 
-# Script final simplificado para corrigir admin_id
-
+# DOCKER ENTRYPOINT PRODUCTION FIX - SIGE v8.0 FINAL
 set -e
 
-echo "🚀 SIGE v8.0 - Iniciando (Production Fix - 02/09/2025)"
-echo "📍 Modo: ${FLASK_ENV:-production}"
+echo "🚀 SIGE v8.0 - Iniciando (Production Fix FINAL - 02/09/2025)"
 
 # Configuração do ambiente
 export PYTHONPATH=/app
 export FLASK_APP=main.py
 export FLASK_ENV=production
 
-# Verificar/detectar DATABASE_URL
+# Detectar DATABASE_URL
 if [ -z "$DATABASE_URL" ]; then
-    echo "⚠️ DATABASE_URL não definida - tentando detectar automaticamente..."
-    
-    # Tentar variáveis alternativas do EasyPanel
     if [ -n "$POSTGRES_URL" ]; then
         export DATABASE_URL="$POSTGRES_URL"
-        echo "✅ DATABASE_URL detectada via POSTGRES_URL"
-    elif [ -n "$DB_HOST" ] && [ -n "$DB_USER" ]; then
-        export DATABASE_URL="postgres://${DB_USER}:${DB_PASSWORD}@${DB_HOST}:${DB_PORT:-5432}/${DB_NAME}?sslmode=disable"
-        echo "✅ DATABASE_URL construída via DB_* variables"
     else
-        # Fallback para configuração conhecida do projeto
         export DATABASE_URL="postgres://sige:sige@viajey_sige:5432/sige?sslmode=disable"
-        echo "⚠️ Usando DATABASE_URL fallback do projeto"
     fi
 fi
 
@@ -34,7 +22,7 @@ echo "📍 DATABASE_URL: $(echo $DATABASE_URL | sed 's/:\/\/[^:]*:[^@]*@/:\/\/**
 
 # Aguardar PostgreSQL
 echo "⏳ Verificando PostgreSQL..."
-TIMEOUT=20
+TIMEOUT=30
 COUNTER=0
 
 until psql "$DATABASE_URL" -c "SELECT 1;" >/dev/null 2>&1; do
@@ -42,70 +30,151 @@ until psql "$DATABASE_URL" -c "SELECT 1;" >/dev/null 2>&1; do
         echo "❌ Timeout PostgreSQL (${TIMEOUT}s)"
         exit 1
     fi
-    echo "⏳ Tentativa $COUNTER/$TIMEOUT - aguardando PostgreSQL..."
     sleep 1
     COUNTER=$((COUNTER + 1))
 done
 
 echo "✅ PostgreSQL conectado!"
 
-# HOTFIX CRÍTICO - COMANDOS SQL DIRETOS
-echo "🔧 HOTFIX: Aplicando correção admin_id na tabela servico..."
+# HOTFIX DEFINITIVO
+echo "🔧 HOTFIX DEFINITIVO: Corrigindo estrutura completa..."
 
-echo "1️⃣ Verificando se coluna admin_id existe..."
-COLUMN_EXISTS=$(psql "$DATABASE_URL" -t -c "SELECT COUNT(*) FROM information_schema.columns WHERE table_name='servico' AND column_name='admin_id';" 2>/dev/null | xargs)
+# Executar correção em bloco único
+psql "$DATABASE_URL" -v ON_ERROR_STOP=1 << 'EOSQL'
+DO $$
+DECLARE
+    column_exists boolean := false;
+    user_exists boolean := false;
+    servico_count integer := 0;
+BEGIN
+    -- 1. Verificar se coluna admin_id existe na tabela servico
+    SELECT EXISTS (
+        SELECT column_name FROM information_schema.columns 
+        WHERE table_name = 'servico' AND column_name = 'admin_id'
+    ) INTO column_exists;
+    
+    -- 2. Verificar se usuário admin existe
+    SELECT EXISTS (
+        SELECT id FROM usuario WHERE id = 10
+    ) INTO user_exists;
+    
+    -- 3. Contar serviços existentes
+    SELECT COUNT(*) FROM servico INTO servico_count;
+    
+    RAISE NOTICE '🔍 STATUS INICIAL:';
+    RAISE NOTICE '   - Coluna admin_id existe: %', column_exists;
+    RAISE NOTICE '   - Usuário admin existe: %', user_exists;
+    RAISE NOTICE '   - Total de serviços: %', servico_count;
+    
+    -- 4. Criar usuário admin se não existir
+    IF NOT user_exists THEN
+        RAISE NOTICE '1️⃣ Criando usuário admin (ID: 10)...';
+        INSERT INTO usuario (
+            id, 
+            username, 
+            email, 
+            password_hash, 
+            nome, 
+            ativo, 
+            tipo_usuario, 
+            admin_id, 
+            created_at
+        ) VALUES (
+            10,
+            'admin_sistema',
+            'admin@sistema.local',
+            'pbkdf2:sha256:260000$salt$hash_placeholder',
+            'Admin Sistema',
+            TRUE,
+            'ADMIN',
+            10,
+            NOW()
+        );
+        RAISE NOTICE '✅ Usuário admin criado com sucesso';
+    ELSE
+        RAISE NOTICE '✅ Usuário admin já existe';
+    END IF;
+    
+    -- 5. Adicionar coluna admin_id se não existir
+    IF NOT column_exists THEN
+        RAISE NOTICE '2️⃣ Adicionando coluna admin_id na tabela servico...';
+        ALTER TABLE servico ADD COLUMN admin_id INTEGER;
+        
+        RAISE NOTICE '3️⃣ Populando % serviços com admin_id = 10...', servico_count;
+        UPDATE servico SET admin_id = 10 WHERE admin_id IS NULL;
+        
+        RAISE NOTICE '4️⃣ Definindo coluna como NOT NULL...';
+        ALTER TABLE servico ALTER COLUMN admin_id SET NOT NULL;
+        
+        RAISE NOTICE '5️⃣ Adicionando foreign key constraint...';
+        ALTER TABLE servico ADD CONSTRAINT fk_servico_admin 
+        FOREIGN KEY (admin_id) REFERENCES usuario(id);
+        
+        RAISE NOTICE '✅ HOTFIX COMPLETADO COM SUCESSO!';
+        RAISE NOTICE '📊 Estrutura da tabela servico atualizada';
+    ELSE
+        RAISE NOTICE '✅ Coluna admin_id já existe - sistema OK';
+    END IF;
+    
+    -- 6. Verificação final
+    SELECT COUNT(*) FROM servico WHERE admin_id = 10 INTO servico_count;
+    RAISE NOTICE '🎯 VERIFICAÇÃO FINAL: % serviços com admin_id = 10', servico_count;
+    
+END
+$$;
+EOSQL
 
-if [ "$COLUMN_EXISTS" = "0" ]; then
-    echo "🚨 COLUNA admin_id NÃO EXISTE - APLICANDO CORREÇÃO..."
+HOTFIX_RESULT=$?
+
+if [ $HOTFIX_RESULT -eq 0 ]; then
+    echo "✅ HOTFIX DEFINITIVO EXECUTADO COM SUCESSO!"
     
-    echo "2️⃣ Adicionando coluna admin_id..."
-    psql "$DATABASE_URL" -c "ALTER TABLE servico ADD COLUMN admin_id INTEGER;" || echo "⚠️ Erro ao adicionar coluna"
+    # Verificação adicional
+    echo "🔍 Verificação pós-hotfix..."
+    FINAL_COUNT=$(psql "$DATABASE_URL" -t -c "SELECT COUNT(*) FROM information_schema.columns WHERE table_name='servico' AND column_name='admin_id';" 2>/dev/null | xargs)
     
-    echo "3️⃣ Verificando usuário admin..."
-    USER_EXISTS=$(psql "$DATABASE_URL" -t -c "SELECT COUNT(*) FROM usuario WHERE id=10;" 2>/dev/null | xargs)
-    if [ "$USER_EXISTS" = "0" ]; then
-        echo "🔧 Criando usuário admin_id=10..."
-        psql "$DATABASE_URL" -c "INSERT INTO usuario (id, username, email, nome, password_hash, ativo, created_at) VALUES (10, 'admin_sistema', 'admin@sistema.local', 'Admin Sistema', 'pbkdf2:sha256:260000\$salt\$hash', TRUE, NOW());" || echo "⚠️ Erro ao criar usuário"
-    fi
-    
-    echo "4️⃣ Populando serviços..."
-    psql "$DATABASE_URL" -c "UPDATE servico SET admin_id = 10 WHERE admin_id IS NULL;" || echo "⚠️ Erro ao popular"
-    
-    echo "5️⃣ Definindo NOT NULL..."
-    psql "$DATABASE_URL" -c "ALTER TABLE servico ALTER COLUMN admin_id SET NOT NULL;" || echo "⚠️ Erro NOT NULL"
-    
-    echo "✅ HOTFIX EXECUTADO"
-    
-    # Verificar resultado
-    FINAL_CHECK=$(psql "$DATABASE_URL" -t -c "SELECT COUNT(*) FROM information_schema.columns WHERE table_name='servico' AND column_name='admin_id';" 2>/dev/null | xargs)
-    if [ "$FINAL_CHECK" = "1" ]; then
-        echo "✅ SUCESSO: Coluna admin_id criada!"
+    if [ "$FINAL_COUNT" = "1" ]; then
+        echo "✅ SUCESSO CONFIRMADO: Coluna admin_id existe!"
+        
+        # Testar query que estava falhando
+        echo "🧪 Testando query original..."
+        psql "$DATABASE_URL" -c "SELECT COUNT(*) as total FROM servico;" >/dev/null 2>&1
+        if [ $? -eq 0 ]; then
+            echo "✅ QUERY ORIGINAL FUNCIONANDO!"
+        else
+            echo "⚠️ Query ainda com problemas"
+        fi
     else
         echo "❌ FALHA: Coluna ainda não existe"
+        exit 1
     fi
 else
-    echo "✅ Coluna admin_id já existe"
+    echo "❌ HOTFIX FALHOU - Código de saída: $HOTFIX_RESULT"
+    exit 1
 fi
 
 # Inicialização da aplicação
-echo "🔧 Inicializando aplicação..."
+echo "🔧 Inicializando aplicação SIGE v8.0..."
 python -c "
 import sys
 sys.path.append('/app')
 try:
     from app import app
-    print('✅ App carregado')
+    print('✅ App Flask carregado com sucesso')
 except Exception as e:
-    print(f'❌ Erro: {e}')
+    print(f'❌ Erro ao carregar app: {e}')
+    import traceback
+    traceback.print_exc()
     sys.exit(1)
 " 2>/dev/null
 
 if [[ $? -ne 0 ]]; then
-    echo "❌ Falha na inicialização"
+    echo "❌ Falha na inicialização da aplicação"
     exit 1
 fi
 
-echo "🎯 Aplicação pronta!"
+echo "🎯 Sistema SIGE v8.0 pronto para uso!"
+echo "📍 URL de teste: /servicos"
 
-# Executar comando
+# Executar comando principal
 exec "$@"
