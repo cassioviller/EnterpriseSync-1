@@ -1148,6 +1148,9 @@ function carregarServicosDisponiveis() {
                 const servicosObraIds = Array.from(document.querySelectorAll('[id^="servico-obra-"]'))
                     .map(el => parseInt(el.id.replace('servico-obra-', '')));
                 
+                console.log('🔍 DEBUG: Elementos servico-obra encontrados:', document.querySelectorAll('[id^="servico-obra-"]').length);
+                console.log('🔍 DEBUG: IDs dos serviços na obra:', servicosObraIds);
+                
                 console.log('📊 Serviços empresa:', data.servicos.length, '| Já na obra:', servicosObraIds.length);
                 
                 const servicosDisponiveis = data.servicos.filter(servico => 
