@@ -123,7 +123,7 @@ def api_criar_categoria():
             cor='#198754',
             icone='fas fa-tag',
             ativo=True,
-            criado_em=datetime.now(),
+            created_at=datetime.now(),
             updated_at=datetime.now()
         )
         
