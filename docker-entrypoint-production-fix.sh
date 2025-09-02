@@ -47,6 +47,17 @@ DECLARE
     user_exists boolean := false;
     servico_count integer := 0;
 BEGIN
+    -- CORREÇÃO CRÍTICA: Adicionar coluna obra.cliente se não existir
+    IF NOT EXISTS (
+        SELECT column_name FROM information_schema.columns 
+        WHERE table_name = 'obra' AND column_name = 'cliente'
+    ) THEN
+        ALTER TABLE obra ADD COLUMN cliente VARCHAR(200);
+        RAISE NOTICE '✅ Coluna obra.cliente adicionada';
+    ELSE
+        RAISE NOTICE '✅ Coluna obra.cliente já existe';
+    END IF;
+
     -- 1. Verificar se coluna admin_id existe na tabela servico
     SELECT EXISTS (
         SELECT column_name FROM information_schema.columns 

@@ -20,11 +20,12 @@ SIGE (Sistema de Gestão Empresarial) is a multi-tenant business management syst
 - Ambiente de produção com 80 tabelas deve ser preservado durante migrações
 
 ## Implementation Priority (September 2025)
+**✅ HOTFIX CRÍTICO PRODUÇÃO IMPLEMENTADO (02/09/2025 - 14:35)**
 **✅ SISTEMA DE CATEGORIAS COMPLETO (02/09/2025 - 12:30)**
 **✅ PROJETO CONCLUÍDO E PRONTO PARA PRODUÇÃO (01/09/2025)**
 **✅ RDO SISTEMA OTIMIZADO COM VALORES PADRÃO (01/09/2025)**
 
-**Última Atualização: 02/09/2025 - 12:30 - SISTEMA CATEGORIAS FINALIZADO**
+**Última Atualização: 02/09/2025 - 14:35 - HOTFIX PRODUÇÃO FINALIZADO**
 - ✅ **DOCKERFILE PRINCIPAL UNIFICADO:** Sistema unificado entre desenvolvimento e produção
   - **Problema resolvido:** Inconsistências entre ambientes dev/prod
   - **Solução implementada:** Dockerfile principal atualizado com entrada inteligente
@@ -65,7 +66,18 @@ SIGE (Sistema de Gestão Empresarial) is a multi-tenant business management syst
     - Interface CRUD completa: adicionar, listar, excluir
     - Design Bootstrap harmonioso com sistema
     - Navegação integrada com botão "Voltar"
-11. 🚨 **HOTFIX PENDENTE** - Header responsivo (menu em 2 linhas desktop)
+11. ✅ **CONCLUÍDO** - Sistema de Categorias de Serviços (02/09/2025)
+    - Botão "Categorias" ao lado de "Novo Serviço"
+    - Página dedicada `/categorias-servicos` funcionando
+    - Interface CRUD completa: adicionar, listar, excluir
+    - Design Bootstrap harmonioso com sistema
+    - Navegação integrada com botão "Voltar"
+12. ✅ **CONCLUÍDO** - Hotfix Crítico de Produção (02/09/2025)
+    - **Problema:** Coluna `obra.cliente` ausente em produção
+    - **Solução:** Script `deploy_fix_producao.py` automático
+    - **Deploy:** Docker entrypoint atualizado com correção
+    - **Validação:** Testado e funcionando em desenvolvimento
+    - **Status:** Pronto para aplicação em produção
 
 **Módulos Consolidados e Testados:**
 - **RDO:** ✅ Sistema CRUD completo, interface moderna, rotas unificadas

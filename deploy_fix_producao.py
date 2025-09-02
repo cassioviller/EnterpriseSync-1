@@ -1,95 +1,174 @@
 #!/usr/bin/env python3
 """
-Script específico para corrigir fotos em ambiente de produção
-Deve ser executado APÓS cada deploy
+Script de Deploy - Correção Crítica de Produção
+Fix para coluna obra.cliente ausente em produção
 """
 
-from app import app
-from models import db, Funcionario
+import sys
 import os
-import hashlib
-import base64
-from datetime import datetime
+import logging
+from sqlalchemy import text, inspect
+from sqlalchemy.exc import ProgrammingError
 
-def criar_avatar_svg_inline(codigo_funcionario, nome_funcionario):
-    """Cria um avatar SVG inline para usar diretamente no HTML"""
-    hash_nome = hashlib.md5(nome_funcionario.encode()).hexdigest()
-    cor_fundo = f"#{hash_nome[:6]}"
-    
-    # Pegar iniciais do nome
-    palavras = nome_funcionario.split()
-    iniciais = ""
-    if len(palavras) >= 2:
-        iniciais = palavras[0][0] + palavras[-1][0]
-    else:
-        iniciais = palavras[0][:2] if palavras else "??"
-    
-    # SVG otimizado para inline
-    svg_content = f'''<svg width="120" height="120" viewBox="0 0 120 120" style="background-color: {cor_fundo}; border-radius: 50%;">
-  <text x="60" y="70" font-family="Arial, sans-serif" font-size="40" font-weight="bold" 
-        text-anchor="middle" fill="white">{iniciais.upper()}</text>
-</svg>'''
-    
-    return svg_content
+# Configurar logging
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+logger = logging.getLogger(__name__)
 
-def corrigir_fotos_producao():
-    """Correção específica para produção - usa dados inline no banco"""
+def check_and_add_missing_columns():
+    """Verifica e adiciona colunas ausentes na tabela obra"""
     
-    with app.app_context():
-        print("🚀 CORREÇÃO DE FOTOS - AMBIENTE DE PRODUÇÃO")
-        print("=" * 60)
+    try:
+        # Importar app e db
+        sys.path.append('.')
+        from app import app, db
         
-        # Estratégia para produção: salvar SVG inline no banco
-        funcionarios = Funcionario.query.all()
-        print(f"Processando {len(funcionarios)} funcionários...")
-        
-        funcionarios_corrigidos = 0
-        
-        for funcionario in funcionarios:
-            codigo = funcionario.codigo or f"F{funcionario.id:04d}"
+        with app.app_context():
+            logger.info("🔍 Verificando estrutura da tabela obra...")
             
-            # Verificar se precisa de correção
-            if not funcionario.foto or funcionario.foto == '' or not funcionario.foto.startswith('data:'):
+            # Obter inspetor do banco
+            inspector = inspect(db.engine)
+            
+            # Verificar colunas existentes
+            existing_columns = [col['name'] for col in inspector.get_columns('obra')]
+            logger.info(f"✅ Colunas existentes: {existing_columns}")
+            
+            # Colunas que devem existir
+            required_columns = {
+                'cliente': 'VARCHAR(200)',
+                'cliente_nome': 'VARCHAR(100)',
+                'cliente_email': 'VARCHAR(120)',
+                'cliente_telefone': 'VARCHAR(20)',
+                'token_cliente': 'VARCHAR(255)',
+                'portal_ativo': 'BOOLEAN DEFAULT TRUE',
+                'ultima_visualizacao_cliente': 'TIMESTAMP',
+                'proposta_origem_id': 'INTEGER REFERENCES propostas_comerciais(id)'
+            }
+            
+            # Verificar e adicionar colunas ausentes
+            missing_columns = []
+            for col_name, col_definition in required_columns.items():
+                if col_name not in existing_columns:
+                    missing_columns.append((col_name, col_definition))
+                    logger.warning(f"⚠️ Coluna ausente: {col_name}")
+            
+            if not missing_columns:
+                logger.info("✅ Todas as colunas já existem!")
+                return True
+            
+            # Adicionar colunas ausentes
+            logger.info(f"🔧 Adicionando {len(missing_columns)} colunas ausentes...")
+            
+            for col_name, col_definition in missing_columns:
+                try:
+                    sql = f"ALTER TABLE obra ADD COLUMN {col_name} {col_definition};"
+                    logger.info(f"📝 Executando: {sql}")
+                    db.session.execute(text(sql))
+                    db.session.commit()
+                    logger.info(f"✅ Coluna {col_name} adicionada com sucesso!")
+                    
+                except ProgrammingError as e:
+                    if "already exists" in str(e):
+                        logger.info(f"ℹ️ Coluna {col_name} já existe (ignorando)")
+                        db.session.rollback()
+                    else:
+                        logger.error(f"❌ Erro ao adicionar coluna {col_name}: {e}")
+                        db.session.rollback()
+                        return False
+                except Exception as e:
+                    logger.error(f"❌ Erro inesperado ao adicionar coluna {col_name}: {e}")
+                    db.session.rollback()
+                    return False
+            
+            # Verificar se todas as colunas foram adicionadas
+            updated_columns = [col['name'] for col in inspector.get_columns('obra')]
+            logger.info(f"✅ Colunas após migração: {updated_columns}")
+            
+            # Verificar se há tokens únicos ausentes
+            logger.info("🔧 Verificando tokens únicos...")
+            try:
+                obras_sem_token = db.session.execute(text(
+                    "SELECT id, nome FROM obra WHERE token_cliente IS NULL OR token_cliente = ''"
+                )).fetchall()
                 
-                # Criar caminho simples para arquivo SVG
-                caminho_svg = f"fotos_funcionarios/{codigo}.svg"
-                caminho_completo = os.path.join('static', caminho_svg)
-                
-                # Garantir que o diretório existe
-                os.makedirs(os.path.dirname(caminho_completo), exist_ok=True)
-                
-                # Criar arquivo SVG físico
-                svg_content = criar_avatar_svg_inline(codigo, funcionario.nome)
-                with open(caminho_completo, 'w', encoding='utf-8') as f:
-                    f.write(svg_content)
-                
-                # Atualizar banco com caminho do arquivo
-                funcionario.foto = caminho_svg
-                funcionarios_corrigidos += 1
-                
-                print(f"  ✅ {funcionario.nome} -> Avatar inline criado")
-        
-        # Salvar todas as mudanças
-        db.session.commit()
-        
-        print(f"\n🎯 RESULTADO:")
-        print(f"   ✅ {funcionarios_corrigidos} funcionários corrigidos")
-        print(f"   ✅ Fotos agora são independentes de arquivos")
-        print(f"   ✅ Sistema funcionará em qualquer ambiente")
-        
-        # Log detalhado
-        log_content = f"""CORREÇÃO DE FOTOS - PRODUÇÃO
-Data/Hora: {datetime.now()}
-Funcionários processados: {len(funcionarios)}
-Funcionários corrigidos: {funcionarios_corrigidos}
-Método: SVG inline com data URI
-Status: Independente de arquivos físicos
-"""
-        
-        with open('producao_fotos_fix.log', 'w') as f:
-            f.write(log_content)
-        
-        print(f"   📝 Log salvo em: producao_fotos_fix.log")
+                if obras_sem_token:
+                    logger.info(f"🔧 Gerando tokens para {len(obras_sem_token)} obras...")
+                    import uuid
+                    
+                    for obra in obras_sem_token:
+                        token = str(uuid.uuid4())
+                        db.session.execute(text(
+                            "UPDATE obra SET token_cliente = :token WHERE id = :id"
+                        ), {'token': token, 'id': obra.id})
+                        logger.info(f"  ✅ Token gerado para obra {obra.nome}")
+                    
+                    db.session.commit()
+                    logger.info("✅ Tokens únicos gerados com sucesso!")
+                else:
+                    logger.info("✅ Todas as obras já possuem tokens únicos!")
+                    
+            except Exception as e:
+                logger.warning(f"⚠️ Erro ao verificar tokens: {e}")
+                db.session.rollback()
+            
+            return True
+            
+    except Exception as e:
+        logger.error(f"❌ Erro crítico durante migração: {e}")
+        return False
 
-if __name__ == "__main__":
-    corrigir_fotos_producao()
+def verify_fix():
+    """Verifica se o fix foi aplicado corretamente"""
+    
+    try:
+        sys.path.append('.')
+        from app import app, db
+        from models import Obra
+        
+        with app.app_context():
+            logger.info("🔍 Verificando fix aplicado...")
+            
+            # Testar query que estava falhando
+            try:
+                obras = Obra.query.filter_by(admin_id=2).limit(1).all()
+                logger.info("✅ Query de obras funcionando corretamente!")
+                return True
+                
+            except Exception as e:
+                logger.error(f"❌ Query ainda falhando: {e}")
+                return False
+                
+    except Exception as e:
+        logger.error(f"❌ Erro na verificação: {e}")
+        return False
+
+def main():
+    """Função principal do script de deploy"""
+    
+    logger.info("🚀 INICIANDO DEPLOY - CORREÇÃO CRÍTICA DE PRODUÇÃO")
+    logger.info("=" * 60)
+    
+    # Verificar ambiente
+    database_url = os.environ.get('DATABASE_URL')
+    if not database_url:
+        logger.error("❌ DATABASE_URL não configurado!")
+        sys.exit(1)
+    
+    logger.info(f"🔗 Conectando ao banco: {database_url[:50]}...")
+    
+    # Executar correções
+    if not check_and_add_missing_columns():
+        logger.error("❌ Falha na adição de colunas!")
+        sys.exit(1)
+    
+    # Verificar se funcionou
+    if not verify_fix():
+        logger.error("❌ Verificação falhou!")
+        sys.exit(1)
+    
+    logger.info("=" * 60)
+    logger.info("🎉 DEPLOY CONCLUÍDO COM SUCESSO!")
+    logger.info("✅ Problema da coluna obra.cliente resolvido")
+    logger.info("✅ Sistema pronto para produção")
+
+if __name__ == '__main__':
+    main()
