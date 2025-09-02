@@ -1212,26 +1212,40 @@ def nova_obra():
     """Criar nova obra"""
     if request.method == 'POST':
         try:
-            # Obter dados do formulário
+            # Obter dados do formulário - Campos novos incluídos
             nome = request.form.get('nome')
             endereco = request.form.get('endereco', '')
-            cliente = request.form.get('cliente', '')
+            status = request.form.get('status', 'Em andamento')
+            codigo = request.form.get('codigo', '')
+            area_total_m2 = request.form.get('area_total_m2')
+            responsavel_id = request.form.get('responsavel_id')
+            
+            # Dados do cliente
+            cliente_nome = request.form.get('cliente_nome', '')
+            cliente_email = request.form.get('cliente_email', '')
+            cliente_telefone = request.form.get('cliente_telefone', '')
+            portal_ativo = request.form.get('portal_ativo') == '1'
+            
+            # Datas
             data_inicio = datetime.strptime(request.form.get('data_inicio'), '%Y-%m-%d').date()
             data_previsao_fim = None
             if request.form.get('data_previsao_fim'):
                 data_previsao_fim = datetime.strptime(request.form.get('data_previsao_fim'), '%Y-%m-%d').date()
             
-            orcamento = float(request.form.get('orcamento', 0))
-            valor_contrato = float(request.form.get('valor_contrato', 0))
-            status = request.form.get('status', 'Em andamento')
+            # Valores
+            orcamento = float(request.form.get('orcamento', 0)) if request.form.get('orcamento') else None
+            valor_contrato = float(request.form.get('valor_contrato', 0)) if request.form.get('valor_contrato') else None
+            area_total_m2 = float(area_total_m2) if area_total_m2 else None
+            responsavel_id = int(responsavel_id) if responsavel_id else None
             
-            # Gerar código único
-            ultimo_codigo = db.session.execute(text("SELECT MAX(CAST(SUBSTRING(codigo FROM 2) AS INTEGER)) FROM obra WHERE codigo LIKE 'O%'")).fetchone()
-            if ultimo_codigo and ultimo_codigo[0]:
-                novo_numero = ultimo_codigo[0] + 1
-            else:
-                novo_numero = 1
-            codigo = f"O{novo_numero:04d}"
+            # Gerar código único se não fornecido
+            if not codigo:
+                ultimo_codigo = db.session.execute(text("SELECT MAX(CAST(SUBSTRING(codigo FROM 2) AS INTEGER)) FROM obra WHERE codigo LIKE 'O%'")).fetchone()
+                if ultimo_codigo and ultimo_codigo[0]:
+                    novo_numero = ultimo_codigo[0] + 1
+                else:
+                    novo_numero = 1
+                codigo = f"O{novo_numero:04d}"
             
             # Detectar admin_id
             admin_id = 10  # Padrão
@@ -1240,17 +1254,29 @@ def nova_obra():
             elif hasattr(current_user, 'id'):
                 admin_id = current_user.id
             
+            # Gerar token para portal do cliente se ativo
+            token_cliente = None
+            if portal_ativo and cliente_email:
+                import secrets
+                token_cliente = secrets.token_urlsafe(32)
+            
             # Criar nova obra
             nova_obra = Obra(
                 nome=nome,
                 codigo=codigo,
                 endereco=endereco,
-                cliente=cliente,
                 data_inicio=data_inicio,
                 data_previsao_fim=data_previsao_fim,
                 orcamento=orcamento,
                 valor_contrato=valor_contrato,
+                area_total_m2=area_total_m2,
                 status=status,
+                responsavel_id=responsavel_id,
+                cliente_nome=cliente_nome,
+                cliente_email=cliente_email,
+                cliente_telefone=cliente_telefone,
+                portal_ativo=portal_ativo,
+                token_cliente=token_cliente,
                 admin_id=admin_id
             )
             
@@ -1265,7 +1291,22 @@ def nova_obra():
             flash(f'Erro ao criar obra: {str(e)}', 'error')
             return redirect(url_for('main.obras'))
     
-    return render_template('obra_form.html', titulo='Nova Obra', obra=None)
+    # GET request - carregar lista de funcionários para o formulário
+    try:
+        admin_id = 10  # Padrão
+        if hasattr(current_user, 'admin_id') and current_user.admin_id:
+            admin_id = current_user.admin_id
+        elif hasattr(current_user, 'id'):
+            admin_id = current_user.id
+        
+        funcionarios = Funcionario.query.filter_by(admin_id=admin_id, ativo=True).order_by(Funcionario.nome).all()
+        print(f"DEBUG NOVA OBRA: {len(funcionarios)} funcionários carregados para admin_id={admin_id}")
+        
+    except Exception as e:
+        print(f"ERRO ao carregar funcionários: {e}")
+        funcionarios = []
+    
+    return render_template('obra_form.html', titulo='Nova Obra', obra=None, funcionarios=funcionarios)
 
 # CRUD OBRAS - Editar Obra
 @main_bp.route('/obras/editar/<int:id>', methods=['GET', 'POST'])
@@ -1276,18 +1317,36 @@ def editar_obra(id):
     
     if request.method == 'POST':
         try:
-            # Atualizar dados
+            # Atualizar dados básicos
             obra.nome = request.form.get('nome')
             obra.endereco = request.form.get('endereco', '')
-            obra.cliente = request.form.get('cliente', '')
+            obra.status = request.form.get('status', 'Em andamento')
             obra.data_inicio = datetime.strptime(request.form.get('data_inicio'), '%Y-%m-%d').date()
             
             if request.form.get('data_previsao_fim'):
                 obra.data_previsao_fim = datetime.strptime(request.form.get('data_previsao_fim'), '%Y-%m-%d').date()
+            else:
+                obra.data_previsao_fim = None
             
-            obra.orcamento = float(request.form.get('orcamento', 0))
-            obra.valor_contrato = float(request.form.get('valor_contrato', 0))
-            obra.status = request.form.get('status', 'Em andamento')
+            # Valores financeiros
+            obra.orcamento = float(request.form.get('orcamento', 0)) if request.form.get('orcamento') else None
+            obra.valor_contrato = float(request.form.get('valor_contrato', 0)) if request.form.get('valor_contrato') else None
+            
+            # Novos campos
+            obra.area_total_m2 = float(request.form.get('area_total_m2', 0)) if request.form.get('area_total_m2') else None
+            obra.responsavel_id = int(request.form.get('responsavel_id')) if request.form.get('responsavel_id') else None
+            obra.codigo = request.form.get('codigo', obra.codigo)
+            
+            # Dados do cliente
+            obra.cliente_nome = request.form.get('cliente_nome', '')
+            obra.cliente_email = request.form.get('cliente_email', '')
+            obra.cliente_telefone = request.form.get('cliente_telefone', '')
+            obra.portal_ativo = request.form.get('portal_ativo') == '1'
+            
+            # Gerar token se portal ativado e não existir
+            if obra.portal_ativo and obra.cliente_email and not obra.token_cliente:
+                import secrets
+                obra.token_cliente = secrets.token_urlsafe(32)
             
             db.session.commit()
             
@@ -1298,7 +1357,17 @@ def editar_obra(id):
             db.session.rollback()
             flash(f'Erro ao atualizar obra: {str(e)}', 'error')
     
-    return render_template('obra_form.html', titulo='Editar Obra', obra=obra)
+    # GET request - carregar lista de funcionários para edição
+    try:
+        admin_id = obra.admin_id or 10
+        funcionarios = Funcionario.query.filter_by(admin_id=admin_id, ativo=True).order_by(Funcionario.nome).all()
+        print(f"DEBUG EDITAR OBRA: {len(funcionarios)} funcionários carregados para admin_id={admin_id}")
+        
+    except Exception as e:
+        print(f"ERRO ao carregar funcionários para edição: {e}")
+        funcionarios = []
+    
+    return render_template('obra_form.html', titulo='Editar Obra', obra=obra, funcionarios=funcionarios)
 
 # CRUD OBRAS - Excluir Obra
 @main_bp.route('/obras/excluir/<int:id>', methods=['POST'])
