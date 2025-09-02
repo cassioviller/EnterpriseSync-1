@@ -1088,10 +1088,37 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Carregar serviços disponíveis quando abrir o modal
     const modalGerenciarServicos = document.getElementById('modalGerenciarServicos');
+    console.log('🔍 Modal element found:', modalGerenciarServicos);
+    console.log('🔍 Bootstrap version:', typeof bootstrap !== 'undefined' ? 'Loaded' : 'Not loaded');
+    
     if (modalGerenciarServicos) {
         modalGerenciarServicos.addEventListener('show.bs.modal', function() {
+            console.log('🚀 Modal sendo aberto - carregando serviços...');
             carregarServicosDisponiveis();
         });
+        
+        // Teste adicional - verificar se o botão está funcionando
+        const botaoGerenciar = document.querySelector('[data-bs-target="#modalGerenciarServicos"]');
+        console.log('🔍 Botão encontrado:', botaoGerenciar);
+        
+        if (botaoGerenciar) {
+            botaoGerenciar.addEventListener('click', function(e) {
+                console.log('🖱️ Botão clicado!');
+                e.preventDefault();
+                
+                // Abrir modal manualmente
+                const modal = new bootstrap.Modal(modalGerenciarServicos);
+                modal.show();
+                
+                // Carregar serviços após um pequeno delay
+                setTimeout(() => {
+                    console.log('🚀 Modal aberto manualmente - carregando serviços...');
+                    carregarServicosDisponiveis();
+                }, 300);
+            });
+        }
+    } else {
+        console.error('❌ Modal não encontrado no DOM!');
     }
 });
 
