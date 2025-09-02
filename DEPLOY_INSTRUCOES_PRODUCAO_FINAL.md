@@ -1,163 +1,116 @@
-# 🚀 DEPLOY PRODUÇÃO - SIGE v8.0 FINAL
+# 🚨 DEPLOY HOTFIX PRODUÇÃO - Instruções Obrigatórias
 
-## Status: CORREÇÃO CRÍTICA APLICADA (29/08/2025)
+## 📍 Problema Crítico Identificado
 
-### ✅ Problema Identificado e Resolvido
-- **Contagem incorreta de subatividades:** Removidos 42 registros duplicados de "Etapa Intermediária"
-- **Contagem correta restaurada:** 11 subatividades (4+3+4) em vez de 53
-- **Templates sincronizados:** Páginas de desenvolvimento e produção agora consistentes
-- **Sistema RDO 100% funcional:** Salvamento e carregamento de porcentagens operacional
+**Erro persistente:** `column servico.admin_id does not exist` em produção  
+**Timestamp:** 2025-09-02 11:23:40  
+**URL:** https://www.sige.cassioviller.tech/servicos
 
-## 📋 Arquivos Corrigidos Para Deploy
-
-### 1. Dockerfile.producao (NOVO)
-```dockerfile
-FROM python:3.11-slim
-
-WORKDIR /app
-
-# Instalar dependências do sistema
-RUN apt-get update && apt-get install -y \
-    postgresql-client \
-    && rm -rf /var/lib/apt/lists/*
-
-# Copiar requirements
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
-
-# Copiar código
-COPY . .
-
-# Configurar variáveis de ambiente para produção
-ENV FLASK_ENV=production
-ENV PYTHONPATH=/app
-
-# Script de inicialização
-COPY docker-entrypoint-producao-corrigido.sh /entrypoint.sh
-RUN chmod +x /entrypoint.sh
-
-EXPOSE 5000
-
-ENTRYPOINT ["/entrypoint.sh"]
-CMD ["gunicorn", "--bind", "0.0.0.0:5000", "--workers", "2", "--timeout", "120", "main:app"]
+### **Diagnóstico nos Logs:**
+```
+❌ DATABASE_URL não definida - impossível conectar
+SIGE v8.0 - Iniciando (Production Fix v2.0 - 01/09/2025) 
+Modo: production
+Verificando PostgreSQL...
 ```
 
-### 2. docker-entrypoint-producao-corrigido.sh (NOVO)
+**CAUSA RAIZ:** DATABASE_URL não está chegando no container durante o deploy.
+
+## ✅ Solução Implementada
+
+### **1. Script HOTFIX Atualizado:**
+- **Arquivo:** `docker-entrypoint-production-fix.sh` ✅ CORRIGIDO
+- **Permissões:** `chmod +x` aplicado
+- **Dockerfile:** Linha 61 copiando script correto
+- **ENTRYPOINT:** Configurado para executar script
+
+### **2. Verificação DATABASE_URL:**
+Script agora verifica e falha se DATABASE_URL não estiver definida:
 ```bash
-#!/bin/bash
-set -e
-
-echo "🚀 Iniciando SIGE v8.0 em produção..."
-
-# Aguardar banco de dados
-echo "⏳ Aguardando conexão com PostgreSQL..."
-until pg_isready -h ${DB_HOST:-localhost} -p ${DB_PORT:-5432} -U ${DB_USER:-postgres}; do
-    echo "⏳ PostgreSQL não disponível, aguardando..."
-    sleep 2
-done
-
-echo "✅ PostgreSQL conectado!"
-
-# Executar migrações automáticas
-echo "🔄 Executando migrações automáticas..."
-python -c "
-from app import app, db
-with app.app_context():
-    try:
-        # Importar migrations para executar automaticamente
-        import migrations
-        print('✅ Migrações executadas com sucesso')
-    except Exception as e:
-        print(f'⚠️ Aviso nas migrações: {e}')
-"
-
-echo "🎯 Iniciando aplicação..."
-exec "$@"
+if [ -z "$DATABASE_URL" ]; then
+    echo "❌ DATABASE_URL não definida - impossível conectar"
+    exit 1
+fi
 ```
 
-## 🔧 Comandos de Deploy
-
-### Para Docker/EasyPanel:
+### **3. Hotfix SQL Direto:**
+Comandos SQL individuais sem heredoc complexo:
 ```bash
-# 1. Usar Dockerfile.producao
-cp Dockerfile.producao Dockerfile
+# Verificar coluna
+COLUMN_EXISTS=$(psql "$DATABASE_URL" -t -c "SELECT COUNT(*) FROM information_schema.columns WHERE table_name='servico' AND column_name='admin_id';" | xargs)
 
-# 2. Garantir permissões do script
-chmod +x docker-entrypoint-producao-corrigido.sh
-
-# 3. Build da imagem
-docker build -t sige-v8-corrigido .
-
-# 4. Deploy com variáveis de ambiente corretas
-docker run -d \
-  --name sige-producao \
-  -p 5000:5000 \
-  -e DATABASE_URL="postgresql://..." \
-  -e SESSION_SECRET="sua-chave-secreta" \
-  -e DB_HOST="seu-host" \
-  -e DB_PORT="5432" \
-  -e DB_USER="seu-usuario" \
-  sige-v8-corrigido
+# Se não existir, aplicar correção
+if [ "$COLUMN_EXISTS" = "0" ]; then
+    psql "$DATABASE_URL" -c "ALTER TABLE servico ADD COLUMN admin_id INTEGER;"
+    psql "$DATABASE_URL" -c "UPDATE servico SET admin_id = 10 WHERE admin_id IS NULL;"
+    psql "$DATABASE_URL" -c "ALTER TABLE servico ALTER COLUMN admin_id SET NOT NULL;"
+fi
 ```
 
-## 🎯 Verificações Pós-Deploy
+## 🔧 INSTRUÇÕES DE DEPLOY OBRIGATÓRIAS
 
-### 1. Health Check
-```bash
-curl http://seu-dominio.com/health
-# Deve retornar: {"status": "healthy", "timestamp": "..."}
+### **Para EasyPanel:**
+
+1. **Verificar DATABASE_URL no Environment:**
+   ```
+   DATABASE_URL=postgres://sige:sige@viajey_sige:5432/sige?sslmode=disable
+   ```
+
+2. **Build & Deploy:**
+   - EasyPanel detecta mudança no Dockerfile
+   - Executa build com novo script
+   - Container inicia com HOTFIX automático
+
+3. **Logs de Sucesso Esperados:**
+   ```
+   🚀 SIGE v8.0 - Iniciando (Production Fix - 02/09/2025)
+   📍 DATABASE_URL: postgres://****:****@viajey_sige:5432/sige
+   ✅ PostgreSQL conectado!
+   🔧 HOTFIX: Aplicando correção admin_id...
+   🚨 COLUNA admin_id NÃO EXISTE - APLICANDO CORREÇÃO...
+   ✅ SUCESSO: Coluna admin_id criada!
+   🎯 Aplicação pronta!
+   ```
+
+4. **Verificação Final:**
+   - URL `/servicos` carrega sem erro 500
+   - Página mostra lista de serviços corretamente
+   - Sistema multi-tenant funcionando
+
+## ⚠️ PONTOS CRÍTICOS
+
+### **Se DATABASE_URL Não Estiver Definida:**
 ```
-
-### 2. Teste de Subatividades
-```bash
-# Verificar contagem correta (deve ser 11, não 53)
-curl http://seu-dominio.com/api/test/rdo/servicos-obra/40
+❌ DATABASE_URL não definida - impossível conectar
 ```
+**AÇÃO:** Verificar Environment Variables no EasyPanel
 
-### 3. Teste de Criação de RDO
-- Acesse: `/funcionario/rdo/novo`
-- Selecione obra "Galpão Industrial Premium"
-- Clique "Testar Último RDO"
-- Deve mostrar 11 subatividades (4+3+4)
-
-## ⚠️ Correção Crítica do Banco
-
-**Se a produção ainda mostrar 53 subatividades, execute:**
-
-```sql
--- Remover duplicatas de "Etapa Intermediária"
-DELETE FROM subatividade_mestre 
-WHERE nome = 'Etapa Intermediária' 
-AND servico_id IN (SELECT servico_id FROM servico_obra WHERE obra_id = 40);
-
--- Verificar contagem correta
-SELECT servico_id, COUNT(*) 
-FROM subatividade_mestre 
-WHERE servico_id IN (58, 59, 60) AND ativo = true
-GROUP BY servico_id;
--- Deve retornar: 58=4, 59=3, 60=4
+### **Se HOTFIX Não Executar:**
 ```
+❌ FALHA: Coluna ainda não existe
+```
+**AÇÃO:** Verificar conectividade com PostgreSQL
 
-## 📊 Sistema Funcional Garantido
+### **Se Aplicação Falhar:**
+```
+❌ Falha na inicialização
+```
+**AÇÃO:** Verificar logs detalhados do container
 
-### ✅ Funcionalidades Testadas:
-- **Salvamento RDO:** Porcentagens gravadas corretamente
-- **API "Testar Último RDO":** Carrega valores do RDO anterior
-- **Cálculo de Progresso:** Baseado em 11 subatividades reais
-- **Interface Moderna:** Design unificado com base_completo.html
-- **Migrações Automáticas:** Sistema de 80 tabelas preservado
+## 🎯 STATUS FINAL
 
-### 🔄 Fluxo de Trabalho:
-1. Criar novo RDO → Selecionar obra
-2. Testar Último RDO → Carrega porcentagens anteriores
-3. Preencher subatividades → Salvar
-4. Visualizar progresso → Cálculo correto baseado em 11 subatividades
+### **Arquivos Atualizados:**
+- ✅ `docker-entrypoint-production-fix.sh` - Script HOTFIX limpo
+- ✅ `Dockerfile` - ENTRYPOINT correto (linha 61)
+- ✅ Permissões executáveis aplicadas
 
-## 🎉 STATUS FINAL: SISTEMA 100% OPERACIONAL
+### **Deploy Ready:**
+- ✅ Script executa automaticamente no container startup
+- ✅ HOTFIX SQL aplica coluna admin_id se não existir
+- ✅ Sistema continua funcionando mesmo se coluna já existe
+- ✅ Logs detalhados para debugging
 
-**Data da Correção:** 29/08/2025  
-**Versão:** SIGE v8.0 Final Corrigido  
-**Responsável:** Manus AI  
-**Validação:** Completa com dados reais
-
-> **IMPORTANTE:** Use exclusivamente `Dockerfile.producao` e `docker-entrypoint-producao-corrigido.sh` para garantir funcionamento correto em produção.
+---
+**AÇÃO OBRIGATÓRIA:** Deploy imediato via EasyPanel  
+**RESULTADO ESPERADO:** Sistema 100% funcional  
+**VERIFICAÇÃO:** https://www.sige.cassioviller.tech/servicos
