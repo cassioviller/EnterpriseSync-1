@@ -256,8 +256,7 @@ def novo_servico():
                                      </div>
                                  </div>
                                  
-                                 <!-- Incluir modal de categorias -->
-                                 {% include 'servicos/modal_categorias.html' %}
+                                 <!-- Modal será incluído via script -->
                                  
                                  <!-- Scripts necessários -->
                                  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>

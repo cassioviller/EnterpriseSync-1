@@ -28,31 +28,9 @@ def get_admin_id():
     except:
         return 10
 
-# Modelo CategoriaServico
-class CategoriaServico(db.Model):
-    __tablename__ = 'categoria_servico'
-    
-    id = db.Column(db.Integer, primary_key=True)
-    nome = db.Column(db.String(100), nullable=False)
-    descricao = db.Column(db.Text)
-    cor = db.Column(db.String(7), default='#198754')  # Verde padrão
-    icone = db.Column(db.String(50), default='tools')  # Ícone padrão
-    ordem = db.Column(db.Integer, default=0)
-    ativo = db.Column(db.Boolean, default=True)
-    admin_id = db.Column(db.Integer, nullable=False)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
-    
-    def to_dict(self):
-        return {
-            'id': self.id,
-            'nome': self.nome,
-            'descricao': self.descricao,
-            'cor': self.cor,
-            'icone': self.icone,
-            'ordem': self.ordem,
-            'ativo': self.ativo
-        }
+# Usar modelo existente do models.py para evitar conflito
+from models import CategoriaServico
+
 
 # ================================
 # ROTAS API PARA CATEGORIAS
@@ -71,7 +49,15 @@ def api_listar_categorias():
         
         return jsonify({
             'success': True,
-            'categorias': [cat.to_dict() for cat in categorias]
+            'categorias': [{
+                'id': cat.id,
+                'nome': cat.nome,
+                'descricao': cat.descricao,
+                'cor': cat.cor,
+                'icone': cat.icone,
+                'ordem': cat.ordem,
+                'ativo': cat.ativo
+            } for cat in categorias]
         })
         
     except Exception as e:
@@ -124,7 +110,15 @@ def api_criar_categoria():
         
         return jsonify({
             'success': True,
-            'categoria': nova_categoria.to_dict(),
+            'categoria': {
+                'id': nova_categoria.id,
+                'nome': nova_categoria.nome,
+                'descricao': nova_categoria.descricao,
+                'cor': nova_categoria.cor,
+                'icone': nova_categoria.icone,
+                'ordem': nova_categoria.ordem,
+                'ativo': nova_categoria.ativo
+            },
             'message': f'Categoria "{nome}" criada com sucesso!'
         })
         
@@ -188,7 +182,15 @@ def api_atualizar_categoria(categoria_id):
         
         return jsonify({
             'success': True,
-            'categoria': categoria.to_dict(),
+            'categoria': {
+                'id': categoria.id,
+                'nome': categoria.nome,
+                'descricao': categoria.descricao,
+                'cor': categoria.cor,
+                'icone': categoria.icone,
+                'ordem': categoria.ordem,
+                'ativo': categoria.ativo
+            },
             'message': f'Categoria "{nome}" atualizada com sucesso!'
         })
         

@@ -5406,7 +5406,11 @@ def servicos():
             ).order_by(SubatividadeMestre.ordem_padrao).all()
         
         # Redirecionar para novo sistema moderno sem loop
-        return redirect(url_for('servicos_crud.index'))
+        try:
+            return redirect(url_for('servicos_crud.index'))
+        except Exception as endpoint_error:
+            # Se blueprint não registrado, usar rota direta
+            return redirect('/servicos')
         
     except Exception as e:
         print(f"ERRO GESTÃO SERVIÇOS: {str(e)}")
