@@ -1706,12 +1706,44 @@ def detalhes_obra(id):
         except:
             rdos_obra = []
         
-        # Buscar serviços para exibir na obra (simulação baseada em dados reais)
+        # Buscar APENAS serviços cadastrados na obra (não todos os serviços)
         try:
             from models import Servico
-            servicos_all = Servico.query.filter_by(admin_id=admin_id or obra.admin_id).limit(5).all()
-            servicos_obra = servicos_all if servicos_all else []
-        except:
+            from sqlalchemy import text
+            
+            # Buscar serviços que foram especificamente cadastrados nesta obra
+            servicos_obra_query = db.session.execute(text("""
+                SELECT s.id, s.nome, s.descricao, s.categoria, s.unidade_medida, s.custo_unitario,
+                       so.quantidade_planejada, so.quantidade_executada
+                FROM servico s 
+                JOIN servico_obra so ON s.id = so.servico_id 
+                WHERE so.obra_id = :obra_id AND so.ativo = true AND s.admin_id = :admin_id
+                ORDER BY s.nome
+            """), {'obra_id': obra_id, 'admin_id': admin_id or obra.admin_id}).fetchall()
+            
+            # Converter para lista de dicionários para o template
+            servicos_obra = []
+            for row in servicos_obra_query:
+                progresso = 0.0
+                if row.quantidade_planejada and row.quantidade_planejada > 0:
+                    progresso = (row.quantidade_executada or 0) / row.quantidade_planejada * 100
+                
+                servicos_obra.append({
+                    'id': row.id,
+                    'nome': row.nome,
+                    'descricao': row.descricao or '',
+                    'categoria': row.categoria,
+                    'unidade_medida': row.unidade_medida,
+                    'custo_unitario': row.custo_unitario,
+                    'quantidade_planejada': row.quantidade_planejada,
+                    'quantidade_executada': row.quantidade_executada or 0,
+                    'progresso': progresso
+                })
+            
+            print(f"DEBUG SERVIÇOS OBRA: {len(servicos_obra)} serviços encontrados cadastrados na obra")
+            
+        except Exception as e:
+            print(f"ERRO ao buscar serviços da obra: {e}")
             servicos_obra = []
         total_rdos = len(rdos_obra)
         rdos_finalizados = len([r for r in rdos_obra if r.status == 'Finalizado'])

@@ -134,5 +134,13 @@ try:
 except Exception as e:
     print(f"❌ Erro ao registrar CRUD de Serviços: {e}")
 
+# Registrar sistema de cadastro de serviços na obra
+try:
+    from cadastrar_servico_obra import cadastrar_servico_bp
+    app.register_blueprint(cadastrar_servico_bp)
+    print("✅ Sistema de cadastro serviço-obra registrado")
+except Exception as e:
+    print(f"❌ Erro ao registrar cadastro serviço-obra: {e}")
+
 if __name__ == "__main__":
     app.run(host='0.0.0.0', port=5000, debug=True)
