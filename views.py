@@ -2052,10 +2052,6 @@ def get_admin_id_dinamico():
         
         print(f"🔍 ADMINS DISPONÍVEIS: {admin_funcionarios}")
         
-        # TESTE: Forçar admin_id=5 temporariamente
-        print(f"🧪 TESTE: Forçando admin_id=5 para teste do modal")
-        return 5
-        
         # Priorizar admin com mais funcionários (mas pelo menos 1)
         for admin_info in admin_funcionarios:
             admin_id, total = admin_info
