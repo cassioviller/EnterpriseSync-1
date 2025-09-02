@@ -771,11 +771,11 @@
                             </div>
                             <div class="servico-progresso" style="text-align: right;">
                                 {% set progresso = (loop.index0 * 25) % 100 %}
-                                <div class="progress-badge" style="background: {% if progresso >= 100 %}#22c55e{% elif progresso >= 70 %}#f59e0b{% elif progresso >= 40 %}#3b82f6{% else %}#ef4444{% endif %}; color: white; padding: 0.4rem 0.8rem; border-radius: 20px; font-weight: 600; font-size: 0.85rem;">
+                                <div class="progress-badge" style="background: {% if progresso >= 100 %}#22c55e{% elif progresso >= 70 %}#3b82f6{% elif progresso >= 40 %}#f59e0b{% else %}#ef4444{% endif %}; color: white; padding: 0.4rem 0.8rem; border-radius: 20px; font-weight: 600; font-size: 0.85rem;">
                                     {{ progresso }}%
                                 </div>
                                 <div class="progress-bar-mini" style="width: 80px; height: 4px; background: #e2e8f0; border-radius: 2px; margin-top: 0.5rem;">
-                                    <div style="width: {{ progresso }}%; height: 100%; background: {% if progresso >= 100 %}#22c55e{% elif progresso >= 70 %}#f59e0b{% elif progresso >= 40 %}#3b82f6{% else %}#ef4444{% endif %}; border-radius: 2px; transition: width 0.3s ease;"></div>
+                                    <div style="width: {{ progresso }}%; height: 100%; background: {% if progresso >= 100 %}#22c55e{% elif progresso >= 70 %}#3b82f6{% elif progresso >= 40 %}#f59e0b{% else %}#ef4444{% endif %}; border-radius: 2px; transition: width 0.3s ease;"></div>
                                 </div>
                             </div>
                         </div>
