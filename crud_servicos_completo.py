@@ -942,16 +942,19 @@ def importar_excel():
                 logger.warning(f"⚠️ Serviço '{nome_servico}' já existe, ignorando")
                 continue
             
-            # Criar novo serviço
-            novo_servico = Servico(
-                nome=nome_servico,
-                descricao=f'Importado via Excel - {len(subatividades)} subatividades',
-                categoria='Importado',
-                admin_id=admin_id,
-                ativo=True,
-                criado_em=datetime.utcnow(),
-                updated_at=datetime.utcnow()
-            )
+            # Debug: Log dos campos que serão usados
+            campos_servico = {
+                'nome': nome_servico,
+                'descricao': f'Importado via Excel - {len(subatividades)} subatividades',
+                'categoria': 'Importado',
+                'unidade_medida': 'un',
+                'admin_id': admin_id,
+                'ativo': True
+            }
+            logger.info(f"🔍 DEBUG: Criando serviço com campos: {campos_servico}")
+            
+            # Criar novo serviço (usando apenas campos válidos do modelo)
+            novo_servico = Servico(**campos_servico)
             
             db.session.add(novo_servico)
             db.session.flush()  # Para obter o ID
@@ -985,7 +988,10 @@ def importar_excel():
         
     except Exception as e:
         db.session.rollback()
+        import traceback
         logger.error(f"❌ Erro na importação Excel: {str(e)}")
+        logger.error(f"📋 Traceback completo: {traceback.format_exc()}")
+        logger.error(f"🔍 Dados que causaram erro: {dados}")
         return jsonify({
             'success': False,
             'error': f'Erro na importação: {str(e)}'
