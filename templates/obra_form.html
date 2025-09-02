@@ -39,21 +39,38 @@
         transform: translate(50px, -50px);
     }
     
+    .field-container {
+        background: white;
+        border: 2px solid #e9ecef;
+        border-radius: 15px;
+        padding: 1.25rem;
+        margin-bottom: 1rem;
+        transition: all 0.3s ease;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+    }
+    
+    .field-container:hover {
+        border-color: #28a745;
+        box-shadow: 0 4px 12px rgba(40, 167, 69, 0.1);
+        transform: translateY(-1px);
+    }
+    
     .modern-form-control {
         border: 2px solid #e9ecef;
-        border-radius: 12px;
-        padding: 1rem;
+        border-radius: 10px;
+        padding: 0.875rem 1rem;
         font-size: 0.95rem;
         transition: all 0.3s ease;
-        background-color: #fafbfc;
+        background-color: #ffffff;
         font-weight: 500;
+        width: 100%;
     }
     
     .modern-form-control:focus {
         border-color: #28a745;
-        box-shadow: 0 0 0 0.25rem rgba(40, 167, 69, 0.15);
+        box-shadow: 0 0 0 0.2rem rgba(40, 167, 69, 0.15);
         background-color: #ffffff;
-        transform: translateY(-1px);
+        outline: none;
     }
     
     .modern-form-label {
@@ -252,57 +269,65 @@
                         <i class="fas fa-info-circle me-2"></i>Informações Básicas
                     </h6>
                     
-                    <div class="row form-group-row">
+                    <div class="row">
                         <div class="col-md-8">
-                            <label for="nome" class="modern-form-label required-field">
-                                <i class="fas fa-building"></i>Nome da Obra
-                            </label>
-                            <input type="text" 
-                                   class="form-control modern-form-control" 
-                                   id="nome" 
-                                   name="nome" 
-                                   value="{{ obra.nome if obra else '' }}" 
-                                   required
-                                   placeholder="Ex: Edifício Residencial São Paulo">
+                            <div class="field-container">
+                                <label for="nome" class="modern-form-label required-field">
+                                    <i class="fas fa-building"></i>Nome da Obra
+                                </label>
+                                <input type="text" 
+                                       class="form-control modern-form-control" 
+                                       id="nome" 
+                                       name="nome" 
+                                       value="{{ obra.nome if obra else '' }}" 
+                                       required
+                                       placeholder="Ex: Edifício Residencial São Paulo">
+                            </div>
                         </div>
                         
                         <div class="col-md-4">
-                            <label for="status" class="modern-form-label">
-                                <i class="fas fa-flag"></i>Status
-                            </label>
-                            <select class="form-select modern-form-control" id="status" name="status">
-                                <option value="Em andamento" {{ 'selected' if obra and obra.status == 'Em andamento' else '' }}>Em andamento</option>
-                                <option value="PLANEJAMENTO" {{ 'selected' if obra and obra.status == 'PLANEJAMENTO' else '' }}>Planejamento</option>
-                                <option value="Pausada" {{ 'selected' if obra and obra.status == 'Pausada' else '' }}>Pausada</option>
-                                <option value="Concluída" {{ 'selected' if obra and obra.status == 'Concluída' else '' }}>Concluída</option>
-                            </select>
+                            <div class="field-container">
+                                <label for="status" class="modern-form-label">
+                                    <i class="fas fa-flag"></i>Status
+                                </label>
+                                <select class="form-select modern-form-control" id="status" name="status">
+                                    <option value="Em andamento" {{ 'selected' if obra and obra.status == 'Em andamento' else '' }}>Em andamento</option>
+                                    <option value="PLANEJAMENTO" {{ 'selected' if obra and obra.status == 'PLANEJAMENTO' else '' }}>Planejamento</option>
+                                    <option value="Pausada" {{ 'selected' if obra and obra.status == 'Pausada' else '' }}>Pausada</option>
+                                    <option value="Concluída" {{ 'selected' if obra and obra.status == 'Concluída' else '' }}>Concluída</option>
+                                </select>
+                            </div>
                         </div>
                     </div>
 
-                    <div class="row form-group-row">
+                    <div class="row">
                         <div class="col-md-8">
-                            <label for="endereco" class="modern-form-label">
-                                <i class="fas fa-map-marker-alt"></i>Endereço
-                            </label>
-                            <input type="text" 
-                                   class="form-control modern-form-control" 
-                                   id="endereco" 
-                                   name="endereco" 
-                                   value="{{ obra.endereco if obra else '' }}"
-                                   placeholder="Endereço completo da obra">
+                            <div class="field-container">
+                                <label for="endereco" class="modern-form-label">
+                                    <i class="fas fa-map-marker-alt"></i>Endereço
+                                </label>
+                                <input type="text" 
+                                       class="form-control modern-form-control" 
+                                       id="endereco" 
+                                       name="endereco" 
+                                       value="{{ obra.endereco if obra else '' }}"
+                                       placeholder="Endereço completo da obra">
+                            </div>
                         </div>
                         
                         <div class="col-md-4">
-                            <label for="area_total_m2" class="modern-form-label">
-                                <i class="fas fa-ruler-combined"></i>Área Total (m²)
-                            </label>
-                            <input type="number" 
-                                   class="form-control modern-form-control" 
-                                   id="area_total_m2" 
-                                   name="area_total_m2" 
-                                   value="{{ obra.area_total_m2 if obra and obra.area_total_m2 else '' }}"
-                                   step="0.01"
-                                   placeholder="0.00">
+                            <div class="field-container">
+                                <label for="area_total_m2" class="modern-form-label">
+                                    <i class="fas fa-ruler-combined"></i>Área Total (m²)
+                                </label>
+                                <input type="number" 
+                                       class="form-control modern-form-control" 
+                                       id="area_total_m2" 
+                                       name="area_total_m2" 
+                                       value="{{ obra.area_total_m2 if obra and obra.area_total_m2 else '' }}"
+                                       step="0.01"
+                                       placeholder="0.00">
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -313,41 +338,47 @@
                         <i class="fas fa-user-tie me-2"></i>Informações do Cliente
                     </h6>
                     
-                    <div class="row form-group-row">
+                    <div class="row">
                         <div class="col-md-4">
-                            <label for="cliente_nome" class="modern-form-label">
-                                <i class="fas fa-user"></i>Nome do Cliente
-                            </label>
-                            <input type="text" 
-                                   class="form-control modern-form-control" 
-                                   id="cliente_nome" 
-                                   name="cliente_nome" 
-                                   value="{{ obra.cliente_nome if obra else '' }}"
-                                   placeholder="Nome completo do cliente">
+                            <div class="field-container">
+                                <label for="cliente_nome" class="modern-form-label">
+                                    <i class="fas fa-user"></i>Nome do Cliente
+                                </label>
+                                <input type="text" 
+                                       class="form-control modern-form-control" 
+                                       id="cliente_nome" 
+                                       name="cliente_nome" 
+                                       value="{{ obra.cliente_nome if obra else '' }}"
+                                       placeholder="Nome completo do cliente">
+                            </div>
                         </div>
                         
                         <div class="col-md-4">
-                            <label for="cliente_email" class="modern-form-label">
-                                <i class="fas fa-envelope"></i>Email do Cliente
-                            </label>
-                            <input type="email" 
-                                   class="form-control modern-form-control" 
-                                   id="cliente_email" 
-                                   name="cliente_email" 
-                                   value="{{ obra.cliente_email if obra else '' }}"
-                                   placeholder="cliente@empresa.com">
+                            <div class="field-container">
+                                <label for="cliente_email" class="modern-form-label">
+                                    <i class="fas fa-envelope"></i>Email do Cliente
+                                </label>
+                                <input type="email" 
+                                       class="form-control modern-form-control" 
+                                       id="cliente_email" 
+                                       name="cliente_email" 
+                                       value="{{ obra.cliente_email if obra else '' }}"
+                                       placeholder="cliente@empresa.com">
+                            </div>
                         </div>
                         
                         <div class="col-md-4">
-                            <label for="cliente_telefone" class="modern-form-label">
-                                <i class="fas fa-phone"></i>Telefone do Cliente
-                            </label>
-                            <input type="tel" 
-                                   class="form-control modern-form-control" 
-                                   id="cliente_telefone" 
-                                   name="cliente_telefone" 
-                                   value="{{ obra.cliente_telefone if obra else '' }}"
-                                   placeholder="(11) 99999-9999">
+                            <div class="field-container">
+                                <label for="cliente_telefone" class="modern-form-label">
+                                    <i class="fas fa-phone"></i>Telefone do Cliente
+                                </label>
+                                <input type="tel" 
+                                       class="form-control modern-form-control" 
+                                       id="cliente_telefone" 
+                                       name="cliente_telefone" 
+                                       value="{{ obra.cliente_telefone if obra else '' }}"
+                                       placeholder="(11) 99999-9999">
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -358,46 +389,52 @@
                         <i class="fas fa-calendar me-2"></i>Cronograma e Responsabilidade
                     </h6>
                     
-                    <div class="row form-group-row">
+                    <div class="row">
                         <div class="col-md-4">
-                            <label for="data_inicio" class="modern-form-label required-field">
-                                <i class="fas fa-play"></i>Data de Início
-                            </label>
-                            <input type="date" 
-                                   class="form-control modern-form-control" 
-                                   id="data_inicio" 
-                                   name="data_inicio" 
-                                   value="{{ obra.data_inicio.strftime('%Y-%m-%d') if obra and obra.data_inicio else '' }}"
-                                   required>
+                            <div class="field-container">
+                                <label for="data_inicio" class="modern-form-label required-field">
+                                    <i class="fas fa-play"></i>Data de Início
+                                </label>
+                                <input type="date" 
+                                       class="form-control modern-form-control" 
+                                       id="data_inicio" 
+                                       name="data_inicio" 
+                                       value="{{ obra.data_inicio.strftime('%Y-%m-%d') if obra and obra.data_inicio else '' }}"
+                                       required>
+                            </div>
                         </div>
                         
                         <div class="col-md-4">
-                            <label for="data_previsao_fim" class="modern-form-label">
-                                <i class="fas fa-stop"></i>Previsão de Fim
-                            </label>
-                            <input type="date" 
-                                   class="form-control modern-form-control" 
-                                   id="data_previsao_fim" 
-                                   name="data_previsao_fim" 
-                                   value="{{ obra.data_previsao_fim.strftime('%Y-%m-%d') if obra and obra.data_previsao_fim else '' }}">
+                            <div class="field-container">
+                                <label for="data_previsao_fim" class="modern-form-label">
+                                    <i class="fas fa-stop"></i>Previsão de Fim
+                                </label>
+                                <input type="date" 
+                                       class="form-control modern-form-control" 
+                                       id="data_previsao_fim" 
+                                       name="data_previsao_fim" 
+                                       value="{{ obra.data_previsao_fim.strftime('%Y-%m-%d') if obra and obra.data_previsao_fim else '' }}">
+                            </div>
                         </div>
                         
                         <div class="col-md-4">
-                            <label for="responsavel_id" class="modern-form-label">
-                                <i class="fas fa-user-hard-hat"></i>Responsável pela Obra
-                            </label>
-                            <select class="form-select modern-form-control" id="responsavel_id" name="responsavel_id">
-                                <option value="">Selecione um responsável</option>
-                                {% for funcionario in funcionarios %}
-                                <option value="{{ funcionario.id }}" 
-                                        {{ 'selected' if obra and obra.responsavel_id == funcionario.id else '' }}>
-                                    {{ funcionario.nome }}
-                                    {% if funcionario.funcao_ref %}
-                                    - {{ funcionario.funcao_ref.nome }}
-                                    {% endif %}
-                                </option>
-                                {% endfor %}
-                            </select>
+                            <div class="field-container">
+                                <label for="responsavel_id" class="modern-form-label">
+                                    <i class="fas fa-user-hard-hat"></i>Responsável pela Obra
+                                </label>
+                                <select class="form-select modern-form-control" id="responsavel_id" name="responsavel_id">
+                                    <option value="">Selecione um responsável</option>
+                                    {% for funcionario in funcionarios %}
+                                    <option value="{{ funcionario.id }}" 
+                                            {{ 'selected' if obra and obra.responsavel_id == funcionario.id else '' }}>
+                                        {{ funcionario.nome }}
+                                        {% if funcionario.funcao_ref %}
+                                        - {{ funcionario.funcao_ref.nome }}
+                                        {% endif %}
+                                    </option>
+                                    {% endfor %}
+                                </select>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -408,55 +445,63 @@
                         <i class="fas fa-dollar-sign me-2"></i>Informações Financeiras e Técnicas
                     </h6>
                     
-                    <div class="row form-group-row">
+                    <div class="row">
                         <div class="col-md-3">
-                            <label for="orcamento" class="modern-form-label">
-                                <i class="fas fa-calculator"></i>Orçamento (R$)
-                            </label>
-                            <input type="number" 
-                                   class="form-control modern-form-control" 
-                                   id="orcamento" 
-                                   name="orcamento" 
-                                   value="{{ obra.orcamento if obra and obra.orcamento else '' }}"
-                                   step="0.01"
-                                   placeholder="0,00">
+                            <div class="field-container">
+                                <label for="orcamento" class="modern-form-label">
+                                    <i class="fas fa-calculator"></i>Orçamento (R$)
+                                </label>
+                                <input type="number" 
+                                       class="form-control modern-form-control" 
+                                       id="orcamento" 
+                                       name="orcamento" 
+                                       value="{{ obra.orcamento if obra and obra.orcamento else '' }}"
+                                       step="0.01"
+                                       placeholder="0,00">
+                            </div>
                         </div>
                         
                         <div class="col-md-3">
-                            <label for="valor_contrato" class="modern-form-label">
-                                <i class="fas fa-file-contract"></i>Valor do Contrato (R$)
-                            </label>
-                            <input type="number" 
-                                   class="form-control modern-form-control" 
-                                   id="valor_contrato" 
-                                   name="valor_contrato" 
-                                   value="{{ obra.valor_contrato if obra and obra.valor_contrato else '' }}"
-                                   step="0.01"
-                                   placeholder="0,00">
+                            <div class="field-container">
+                                <label for="valor_contrato" class="modern-form-label">
+                                    <i class="fas fa-file-contract"></i>Valor do Contrato (R$)
+                                </label>
+                                <input type="number" 
+                                       class="form-control modern-form-control" 
+                                       id="valor_contrato" 
+                                       name="valor_contrato" 
+                                       value="{{ obra.valor_contrato if obra and obra.valor_contrato else '' }}"
+                                       step="0.01"
+                                       placeholder="0,00">
+                            </div>
                         </div>
                         
                         <div class="col-md-3">
-                            <label for="codigo" class="modern-form-label">
-                                <i class="fas fa-hashtag"></i>Código da Obra
-                            </label>
-                            <input type="text" 
-                                   class="form-control modern-form-control" 
-                                   id="codigo" 
-                                   name="codigo" 
-                                   value="{{ obra.codigo if obra else '' }}"
-                                   placeholder="Deixe em branco para gerar automaticamente">
-                            <small class="text-muted">Geração automática se deixado em branco</small>
+                            <div class="field-container">
+                                <label for="codigo" class="modern-form-label">
+                                    <i class="fas fa-hashtag"></i>Código da Obra
+                                </label>
+                                <input type="text" 
+                                       class="form-control modern-form-control" 
+                                       id="codigo" 
+                                       name="codigo" 
+                                       value="{{ obra.codigo if obra else '' }}"
+                                       placeholder="Deixe em branco para gerar automaticamente">
+                                <small class="text-muted">Geração automática se deixado em branco</small>
+                            </div>
                         </div>
                         
                         <div class="col-md-3">
-                            <label for="portal_ativo" class="modern-form-label">
-                                <i class="fas fa-globe"></i>Portal do Cliente
-                            </label>
-                            <select class="form-select modern-form-control" id="portal_ativo" name="portal_ativo">
-                                <option value="1" {{ 'selected' if obra and obra.portal_ativo else '' }}>Ativo</option>
-                                <option value="0" {{ 'selected' if obra and not obra.portal_ativo else '' }}>Inativo</option>
-                            </select>
-                            <small class="text-muted">Permite ao cliente acompanhar a obra online</small>
+                            <div class="field-container">
+                                <label for="portal_ativo" class="modern-form-label">
+                                    <i class="fas fa-globe"></i>Portal do Cliente
+                                </label>
+                                <select class="form-select modern-form-control" id="portal_ativo" name="portal_ativo">
+                                    <option value="1" {{ 'selected' if obra and obra.portal_ativo else '' }}>Ativo</option>
+                                    <option value="0" {{ 'selected' if obra and not obra.portal_ativo else '' }}>Inativo</option>
+                                </select>
+                                <small class="text-muted">Permite ao cliente acompanhar a obra online</small>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -560,14 +605,19 @@ document.addEventListener('DOMContentLoaded', function() {
     });
     
     // Enhanced form interactions
-    document.querySelectorAll('.modern-form-control').forEach(input => {
-        input.addEventListener('focus', function() {
-            this.parentElement.classList.add('focused');
-        });
-        
-        input.addEventListener('blur', function() {
-            this.parentElement.classList.remove('focused');
-        });
+    document.querySelectorAll('.field-container').forEach(container => {
+        const input = container.querySelector('.modern-form-control');
+        if (input) {
+            input.addEventListener('focus', function() {
+                container.style.borderColor = '#28a745';
+                container.style.boxShadow = '0 4px 15px rgba(40, 167, 69, 0.15)';
+            });
+            
+            input.addEventListener('blur', function() {
+                container.style.borderColor = '#e9ecef';
+                container.style.boxShadow = '0 2px 4px rgba(0, 0, 0, 0.05)';
+            });
+        }
     });
     
     // Service checkbox interactions
