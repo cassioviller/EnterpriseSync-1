@@ -86,6 +86,9 @@ def get_admin_id():
         
         # Priorizar usuário autenticado
         if current_user.is_authenticated:
+            # Debug do usuário atual
+            logger.info(f"🔍 CRUD DEBUG: current_user.id={current_user.id}, tipo={current_user.tipo_usuario}, admin_id={getattr(current_user, 'admin_id', 'N/A')}")
+            
             if current_user.tipo_usuario == TipoUsuario.ADMIN:
                 admin_id = current_user.id
                 logger.info(f"🔍 CRUD SERVIÇOS: Usuário ADMIN autenticado - admin_id={admin_id}")
