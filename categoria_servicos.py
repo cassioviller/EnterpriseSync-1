@@ -15,6 +15,139 @@ logger = logging.getLogger(__name__)
 
 categorias_bp = Blueprint('categorias_servicos', __name__, url_prefix='/categorias-servicos')
 
+@categorias_bp.route('/', methods=['GET'])
+def index():
+    """Página principal de gestão de categorias"""
+    try:
+        admin_id = get_admin_id()
+        categorias = CategoriaServico.query.filter_by(
+            admin_id=admin_id,
+            ativo=True
+        ).order_by(CategoriaServico.nome).all()
+        
+        return render_template('base_completo.html',
+                             title="Gestão de Categorias",
+                             content=f"""
+                             <div class="container mt-4">
+                                 <div class="card">
+                                     <div class="card-header bg-success text-white">
+                                         <h3 class="mb-0">
+                                             <i class="fas fa-tags me-2"></i>
+                                             Gestão de Categorias de Serviços
+                                         </h3>
+                                     </div>
+                                     <div class="card-body">
+                                         <div class="row mb-3">
+                                             <div class="col-md-8">
+                                                 <input type="text" class="form-control" id="novaCategoria" placeholder="Nome da nova categoria">
+                                             </div>
+                                             <div class="col-md-4">
+                                                 <button class="btn btn-success w-100" onclick="adicionarCategoria()">
+                                                     <i class="fas fa-plus"></i> Adicionar
+                                                 </button>
+                                             </div>
+                                         </div>
+                                         
+                                         <div class="row">
+                                             <div class="col-12">
+                                                 <h5>Categorias Existentes ({len(categorias)})</h5>
+                                                 <div id="listaCategorias">
+                                                     {''.join([f'''
+                                                     <div class="d-flex justify-content-between align-items-center p-3 border rounded mb-2">
+                                                         <div>
+                                                             <span class="badge bg-success me-2">{cat.nome}</span>
+                                                             <small class="text-muted">{cat.descricao or 'Sem descrição'}</small>
+                                                         </div>
+                                                         <div>
+                                                             <button class="btn btn-sm btn-outline-danger" onclick="excluirCategoria({cat.id}, '{cat.nome}')">
+                                                                 <i class="fas fa-trash"></i>
+                                                             </button>
+                                                         </div>
+                                                     </div>
+                                                     ''' for cat in categorias]) if categorias else '<p class="text-muted">Nenhuma categoria encontrada</p>'}
+                                                 </div>
+                                             </div>
+                                         </div>
+                                         
+                                         <div class="mt-4">
+                                             <a href="/servicos" class="btn btn-secondary">
+                                                 <i class="fas fa-arrow-left"></i> Voltar para Serviços
+                                             </a>
+                                         </div>
+                                     </div>
+                                 </div>
+                             </div>
+                             
+                             <script>
+                             async function adicionarCategoria() {{
+                                 const nome = document.getElementById('novaCategoria').value.trim();
+                                 if (!nome) {{
+                                     alert('Digite o nome da categoria');
+                                     return;
+                                 }}
+                                 
+                                 try {{
+                                     const response = await fetch('/categorias-servicos/api/criar', {{
+                                         method: 'POST',
+                                         headers: {{'Content-Type': 'application/json'}},
+                                         body: JSON.stringify({{nome: nome}})
+                                     }});
+                                     
+                                     const result = await response.json();
+                                     
+                                     if (result.success) {{
+                                         alert('Categoria adicionada com sucesso!');
+                                         location.reload();
+                                     }} else {{
+                                         alert('Erro: ' + result.error);
+                                     }}
+                                 }} catch (error) {{
+                                     console.error('Erro:', error);
+                                     alert('Erro de conexão');
+                                 }}
+                             }}
+                             
+                             async function excluirCategoria(id, nome) {{
+                                 if (confirm(`Excluir categoria "${{nome}}"?`)) {{
+                                     try {{
+                                         const response = await fetch(`/categorias-servicos/api/${{id}}/excluir`, {{
+                                             method: 'DELETE'
+                                         }});
+                                         
+                                         const result = await response.json();
+                                         
+                                         if (result.success) {{
+                                             alert('Categoria excluída com sucesso!');
+                                             location.reload();
+                                         }} else {{
+                                             alert('Erro: ' + result.error);
+                                         }}
+                                     }} catch (error) {{
+                                         console.error('Erro:', error);
+                                         alert('Erro de conexão');
+                                     }}
+                                 }}
+                             }}
+                             
+                             // Enter no campo de nova categoria
+                             document.addEventListener('DOMContentLoaded', function() {{
+                                 const input = document.getElementById('novaCategoria');
+                                 if (input) {{
+                                     input.addEventListener('keypress', function(e) {{
+                                         if (e.key === 'Enter') {{
+                                             adicionarCategoria();
+                                         }}
+                                     }});
+                                 }}
+                             }});
+                             </script>
+                             """)
+        
+    except Exception as e:
+        logger.error(f"❌ Erro ao carregar página de categorias: {str(e)}")
+        flash(f'Erro ao carregar categorias: {str(e)}', 'error')
+        return redirect('/servicos')
+
 # Função para obter admin_id dinâmico
 def get_admin_id():
     """Obtém admin_id dinamicamente baseado no usuário logado"""

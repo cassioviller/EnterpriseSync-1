@@ -574,7 +574,19 @@
             <p style="margin: 0.5rem 0 0 0; opacity: 0.9; font-size: 1.1rem; color: white;">Configure os serviços e subatividades do seu sistema</p>
         </div>
     </div>
-    <div>
+    <div style="display: flex; gap: 1rem; align-items: center;">
+        <button class="btn btn-light btn-lg" onclick="abrirModalCategorias()" style="
+            background: linear-gradient(135deg, #e9ecef 0%, #dee2e6 100%);
+            color: #495057;
+            border: none;
+            padding: 0.75rem 1.5rem;
+            border-radius: 10px;
+            font-weight: 600;
+            box-shadow: 0 4px 12px rgba(255, 255, 255, 0.2);
+            transition: all 0.3s ease;
+        ">
+            <i class="fas fa-tags"></i> Categorias
+        </button>
         <button class="btn btn-light btn-lg" onclick="abrirModalNovoServico()" style="
             background: linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%);
             color: #2d5a27;
@@ -1043,6 +1055,11 @@ function removerSubatividade(button) {
         container.querySelector('input').value = '';
     }
 }
+function abrirModalCategorias() {
+    console.log('Abrindo modal de categorias...');
+    window.location.href = '/categorias-servicos';
+}
+
 function abrirModalNovoServico() {
     console.log('Abrindo modal de novo serviço...');
     const modalElement = document.getElementById('modalNovoServico');
