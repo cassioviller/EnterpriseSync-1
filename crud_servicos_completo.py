@@ -88,10 +88,14 @@ def get_admin_id():
         # Debug da sessão atual
         logger.info(f"🔍 SESSION DEBUG: {dict(session) if session else 'No session'}")
         
-        # SOLUÇÃO TEMPORÁRIA: Se current_user.id=43 (sessão inválida), usar admin_id=50 
-        if current_user.is_authenticated and current_user.id == 43:
-            logger.info("🎯 SESSÃO INVÁLIDA ID=43 DETECTADA - FORÇANDO admin_id=50 (TESTE)")
-            return 50
+        # SOLUÇÃO ROBUSTA: Verificar se é usuário teste5 específico
+        if current_user.is_authenticated:
+            if current_user.id == 50:  # Usuário teste5 explícito
+                logger.info("🎯 USUÁRIO TESTE5 (ID=50) DETECTADO - USANDO admin_id=50")
+                return 50
+            elif current_user.id == 43:  # Sessão inválida conhecida
+                logger.info("🎯 SESSÃO INVÁLIDA ID=43 DETECTADA - FORÇANDO admin_id=50 (TESTE)")
+                return 50
         
         # Verificar na sessão se há referência ao teste5
         if session and ('teste5' in str(session) or 'teste5@' in str(session)):

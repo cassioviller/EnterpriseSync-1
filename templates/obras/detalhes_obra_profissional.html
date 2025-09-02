@@ -1007,11 +1007,23 @@
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <div class="modal-body">
+                <!-- Botão para Criar Novo Serviço -->
+                <div class="d-flex justify-content-between align-items-center mb-4">
+                    <h6 class="text-primary mb-0">
+                        <i class="fas fa-list me-2"></i>
+                        Gerenciar Serviços da Obra
+                    </h6>
+                    <a href="/servicos/novo" class="btn btn-success btn-sm">
+                        <i class="fas fa-plus me-1"></i>
+                        Criar Novo Serviço
+                    </a>
+                </div>
+                
                 <!-- Serviços Disponíveis -->
                 <div class="mb-4">
-                    <h6 class="text-primary mb-3">
-                        <i class="fas fa-list me-2"></i>
-                        Adicionar Serviços à Obra
+                    <h6 class="text-muted mb-3" style="font-size: 0.95rem;">
+                        <i class="fas fa-check-circle me-2"></i>
+                        Selecionar Serviços Existentes
                     </h6>
                     <div id="servicosDisponiveis" class="row">
                         <!-- Carregado via JavaScript -->
