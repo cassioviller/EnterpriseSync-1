@@ -964,9 +964,7 @@ def importar_excel():
                         servico_id=novo_servico.id,
                         ordem_padrao=ordem,
                         admin_id=admin_id,
-                        ativo=True,
-                        created_at=datetime.utcnow(),
-                        updated_at=datetime.utcnow()
+                        ativo=True
                     )
                     db.session.add(subatividade)
             
