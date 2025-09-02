@@ -1,0 +1,969 @@
+{% extends "base_completo.html" %}
+
+{% block title %}{{ obra.nome }} - Detalhes da Obra - SIGE{% endblock %}
+
+{% block head %}
+<style>
+/* Detalhes da Obra - Estilo Profissional Moderno */
+.obra-container {
+    background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+    min-height: 100vh;
+    padding: 2rem 0;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+}
+
+.obra-card {
+    background: white;
+    border-radius: 16px;
+    box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+    border: none;
+    margin-bottom: 2rem;
+    overflow: hidden;
+    transition: all 0.3s ease;
+}
+
+.obra-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 15px 35px rgba(0,0,0,0.15);
+}
+
+.obra-card-header {
+    background: linear-gradient(135deg, #0066cc 0%, #004499 100%);
+    color: white;
+    padding: 1.5rem 2rem;
+    border: none;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.obra-card-header h3 {
+    margin: 0;
+    font-size: 1.5rem;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.obra-header-main {
+    background: linear-gradient(135deg, #1e3a8a 0%, #1e40af 100%);
+    color: white;
+    padding: 2rem;
+    margin: -2rem -2rem 2rem -2rem;
+    position: relative;
+    overflow: hidden;
+}
+
+.obra-header-main::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    right: 0;
+    width: 100%;
+    height: 100%;
+    background: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><circle cx="80" cy="20" r="20" fill="rgba(255,255,255,0.1)"/><circle cx="90" cy="70" r="15" fill="rgba(255,255,255,0.05)"/></svg>');
+    z-index: 1;
+}
+
+.obra-header-content {
+    position: relative;
+    z-index: 2;
+}
+
+.obra-title {
+    font-size: 2.2rem;
+    font-weight: 700;
+    margin: 0 0 0.5rem 0;
+    text-shadow: 0 2px 4px rgba(0,0,0,0.3);
+}
+
+.obra-subtitle {
+    font-size: 1.1rem;
+    opacity: 0.9;
+    margin: 0;
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    flex-wrap: wrap;
+}
+
+.status-badge {
+    padding: 0.5rem 1rem;
+    border-radius: 25px;
+    font-weight: 600;
+    font-size: 0.9rem;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.status-em-andamento { background: rgba(34, 197, 94, 0.2); color: #22c55e; border: 2px solid #22c55e; }
+.status-concluida { background: rgba(59, 130, 246, 0.2); color: #3b82f6; border: 2px solid #3b82f6; }
+.status-pausada { background: rgba(251, 191, 36, 0.2); color: #fbbf24; border: 2px solid #fbbf24; }
+.status-planejamento { background: rgba(156, 163, 175, 0.2); color: #9ca3af; border: 2px solid #9ca3af; }
+
+.kpi-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 1.5rem;
+    margin-bottom: 2rem;
+}
+
+.kpi-card {
+    background: white;
+    border-radius: 16px;
+    padding: 1.5rem;
+    text-align: center;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.08);
+    border: 1px solid rgba(0,0,0,0.05);
+    transition: all 0.3s ease;
+    position: relative;
+    overflow: hidden;
+}
+
+.kpi-card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 4px;
+    background: linear-gradient(90deg, var(--kpi-color, #198754), var(--kpi-color-light, #20c997));
+}
+
+.kpi-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 8px 25px rgba(0,0,0,0.15);
+}
+
+.kpi-icon {
+    font-size: 2.5rem;
+    margin-bottom: 1rem;
+    color: var(--kpi-color, #198754);
+}
+
+.kpi-value {
+    font-size: 2rem;
+    font-weight: 700;
+    color: #1a202c;
+    margin: 0.5rem 0;
+}
+
+.kpi-label {
+    font-size: 0.9rem;
+    color: #64748b;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.info-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 2rem;
+    margin-bottom: 2rem;
+}
+
+.info-item {
+    padding: 1rem 0;
+    border-bottom: 1px solid #e2e8f0;
+}
+
+.info-item:last-child {
+    border-bottom: none;
+}
+
+.info-label {
+    font-weight: 600;
+    color: #374151;
+    font-size: 0.9rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 0.5rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.info-value {
+    font-size: 1.1rem;
+    color: #1a202c;
+    font-weight: 500;
+}
+
+.progress-container {
+    background: #f8fafc;
+    border-radius: 12px;
+    padding: 1.5rem;
+    margin: 1.5rem 0;
+}
+
+.progress-header {
+    display: flex;
+    justify-content: between;
+    align-items: center;
+    margin-bottom: 1rem;
+}
+
+.progress-bar {
+    height: 12px;
+    background: #e2e8f0;
+    border-radius: 6px;
+    overflow: hidden;
+    position: relative;
+}
+
+.progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #22c55e, #16a34a);
+    border-radius: 6px;
+    transition: width 0.5s ease;
+    position: relative;
+}
+
+.progress-fill::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.3), transparent);
+    animation: shimmer 2s infinite;
+}
+
+@keyframes shimmer {
+    0% { transform: translateX(-100%); }
+    100% { transform: translateX(100%); }
+}
+
+.action-buttons {
+    display: flex;
+    gap: 1rem;
+    flex-wrap: wrap;
+    margin-top: 1.5rem;
+}
+
+.btn-modern {
+    padding: 0.75rem 1.5rem;
+    border-radius: 12px;
+    font-weight: 600;
+    text-decoration: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    transition: all 0.3s ease;
+    border: none;
+    cursor: pointer;
+    font-size: 0.95rem;
+}
+
+.btn-primary-modern {
+    background: linear-gradient(135deg, #3b82f6, #1d4ed8);
+    color: white;
+    box-shadow: 0 4px 15px rgba(59, 130, 246, 0.3);
+}
+
+.btn-primary-modern:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(59, 130, 246, 0.4);
+    color: white;
+}
+
+.btn-success-modern {
+    background: linear-gradient(135deg, #22c55e, #16a34a);
+    color: white;
+    box-shadow: 0 4px 15px rgba(34, 197, 94, 0.3);
+}
+
+.btn-success-modern:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(34, 197, 94, 0.4);
+    color: white;
+}
+
+.btn-warning-modern {
+    background: linear-gradient(135deg, #f59e0b, #d97706);
+    color: white;
+    box-shadow: 0 4px 15px rgba(245, 158, 11, 0.3);
+}
+
+.btn-warning-modern:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(245, 158, 11, 0.4);
+    color: white;
+}
+
+.btn-outline-modern {
+    background: white;
+    color: #6b7280;
+    border: 2px solid #e5e7eb;
+}
+
+.btn-outline-modern:hover {
+    background: #f9fafb;
+    border-color: #d1d5db;
+    transform: translateY(-1px);
+}
+
+.timeline-container {
+    position: relative;
+    padding-left: 2rem;
+}
+
+.timeline-container::before {
+    content: '';
+    position: absolute;
+    left: 1rem;
+    top: 0;
+    bottom: 0;
+    width: 2px;
+    background: #e5e7eb;
+}
+
+.timeline-item {
+    position: relative;
+    padding: 1rem 0;
+}
+
+.timeline-item::before {
+    content: '';
+    position: absolute;
+    left: -1.5rem;
+    top: 1.5rem;
+    width: 12px;
+    height: 12px;
+    background: #22c55e;
+    border-radius: 50%;
+    border: 3px solid white;
+    box-shadow: 0 0 0 3px #22c55e;
+}
+
+.funcionarios-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 1rem;
+    margin-top: 1rem;
+}
+
+.funcionario-card {
+    background: white;
+    border-radius: 12px;
+    padding: 1rem;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+    border: 1px solid #e5e7eb;
+    text-align: center;
+    transition: all 0.3s ease;
+}
+
+.funcionario-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+}
+
+.funcionario-avatar {
+    width: 60px;
+    height: 60px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #3b82f6, #1d4ed8);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0 auto 1rem;
+    color: white;
+    font-size: 1.5rem;
+    font-weight: bold;
+}
+
+.table-modern {
+    background: white;
+    border-radius: 12px;
+    overflow: hidden;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.05);
+}
+
+.table-modern thead {
+    background: linear-gradient(135deg, #1f2937, #374151);
+    color: white;
+}
+
+.table-modern th {
+    padding: 1rem;
+    font-weight: 600;
+    border: none;
+    font-size: 0.9rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.table-modern td {
+    padding: 1rem;
+    border: none;
+    border-bottom: 1px solid #f3f4f6;
+    vertical-align: middle;
+}
+
+.table-modern tbody tr:hover {
+    background: #f9fafb;
+}
+
+.empty-state {
+    text-align: center;
+    padding: 3rem 2rem;
+    color: #6b7280;
+}
+
+.empty-state i {
+    font-size: 4rem;
+    margin-bottom: 1rem;
+    opacity: 0.5;
+}
+
+@media (max-width: 768px) {
+    .obra-container {
+        padding: 1rem 0;
+    }
+    
+    .obra-title {
+        font-size: 1.8rem;
+    }
+    
+    .kpi-grid {
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 1rem;
+    }
+    
+    .info-grid {
+        grid-template-columns: 1fr;
+        gap: 1rem;
+    }
+    
+    .action-buttons {
+        flex-direction: column;
+    }
+    
+    .funcionarios-grid {
+        grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    }
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="obra-container">
+    <div class="container-fluid">
+        <!-- Header Principal da Obra -->
+        <div class="obra-card">
+            <div class="obra-header-main">
+                <div class="obra-header-content">
+                    <div class="d-flex justify-content-between align-items-start flex-wrap">
+                        <div>
+                            <h1 class="obra-title">{{ obra.nome }}</h1>
+                            <div class="obra-subtitle">
+                                <span class="status-badge status-{{ obra.status.lower().replace(' ', '-') }}">
+                                    <i class="fas fa-circle"></i>
+                                    {{ obra.status }}
+                                </span>
+                                {% if obra.codigo %}
+                                <span><i class="fas fa-hashtag"></i> {{ obra.codigo }}</span>
+                                {% endif %}
+                                {% if obra.endereco %}
+                                <span><i class="fas fa-map-marker-alt"></i> {{ obra.endereco }}</span>
+                                {% endif %}
+                            </div>
+                        </div>
+                        
+                        <div class="action-buttons">
+                            <a href="/funcionario/rdo/consolidado?obra_id={{ obra.id }}" class="btn-modern btn-success-modern">
+                                <i class="fas fa-plus"></i>
+                                Novo RDO
+                            </a>
+                            <a href="/obras/editar/{{ obra.id }}" class="btn-modern btn-warning-modern">
+                                <i class="fas fa-edit"></i>
+                                Editar
+                            </a>
+                            <a href="/obras" class="btn-modern btn-outline-modern">
+                                <i class="fas fa-arrow-left"></i>
+                                Voltar
+                            </a>
+                        </div>
+                    </div>
+                    
+                    <!-- Progress da Obra -->
+                    {% if obra.progresso_conclusao or obra.progresso_conclusao == 0 %}
+                    <div class="progress-container">
+                        <div class="progress-header">
+                            <h6 class="mb-0" style="color: #1f2937;">Progresso da Obra</h6>
+                            <span style="color: #1f2937; font-weight: 600;">{{ obra.progresso_conclusao or 0 }}%</span>
+                        </div>
+                        <div class="progress-bar">
+                            <div class="progress-fill" style="width: {{ obra.progresso_conclusao or 0 }}%"></div>
+                        </div>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <!-- KPIs da Obra -->
+        <div class="kpi-grid">
+            <div class="kpi-card" style="--kpi-color: #3b82f6; --kpi-color-light: #60a5fa;">
+                <i class="fas fa-dollar-sign kpi-icon"></i>
+                <div class="kpi-value">R$ {{ '{:,.2f}'.format(kpis.custo_total if kpis and kpis.custo_total else 0).replace(',', ' ').replace('.', ',').replace(' ', '.') }}</div>
+                <div class="kpi-label">Custo Total</div>
+            </div>
+            
+            <div class="kpi-card" style="--kpi-color: #22c55e; --kpi-color-light: #4ade80;">
+                <i class="fas fa-calendar-check kpi-icon"></i>
+                <div class="kpi-value">{{ kpis.dias_trabalhados if kpis else 0 }}</div>
+                <div class="kpi-label">Dias Trabalhados</div>
+            </div>
+            
+            <div class="kpi-card" style="--kpi-color: #f59e0b; --kpi-color-light: #fbbf24;">
+                <i class="fas fa-clock kpi-icon"></i>
+                <div class="kpi-value">{{ '{:.1f}'.format(kpis.total_horas if kpis and kpis.total_horas else 0) }}h</div>
+                <div class="kpi-label">Total de Horas</div>
+            </div>
+            
+            <div class="kpi-card" style="--kpi-color: #8b5cf6; --kpi-color-light: #a78bfa;">
+                <i class="fas fa-users kpi-icon"></i>
+                <div class="kpi-value">{{ kpis.funcionarios_periodo if kpis else 0 }}</div>
+                <div class="kpi-label">Funcionários</div>
+            </div>
+        </div>
+
+        <!-- Informações Detalhadas -->
+        <div class="info-grid">
+            <!-- Informações Gerais -->
+            <div class="obra-card">
+                <div class="obra-card-header">
+                    <h3><i class="fas fa-info-circle"></i> Informações Gerais</h3>
+                </div>
+                <div class="obra-card-body" style="padding: 2rem;">
+                    <div class="info-item">
+                        <div class="info-label">
+                            <i class="fas fa-building"></i>
+                            Nome da Obra
+                        </div>
+                        <div class="info-value">{{ obra.nome }}</div>
+                    </div>
+                    
+                    {% if obra.codigo %}
+                    <div class="info-item">
+                        <div class="info-label">
+                            <i class="fas fa-hashtag"></i>
+                            Código
+                        </div>
+                        <div class="info-value">{{ obra.codigo }}</div>
+                    </div>
+                    {% endif %}
+                    
+                    <div class="info-item">
+                        <div class="info-label">
+                            <i class="fas fa-flag"></i>
+                            Status
+                        </div>
+                        <div class="info-value">
+                            <span class="status-badge status-{{ obra.status.lower().replace(' ', '-') }}">
+                                <i class="fas fa-circle"></i>
+                                {{ obra.status }}
+                            </span>
+                        </div>
+                    </div>
+                    
+                    {% if obra.endereco %}
+                    <div class="info-item">
+                        <div class="info-label">
+                            <i class="fas fa-map-marker-alt"></i>
+                            Endereço
+                        </div>
+                        <div class="info-value">{{ obra.endereco }}</div>
+                    </div>
+                    {% endif %}
+                    
+                    {% if obra.area_total_m2 and obra.area_total_m2 > 0 %}
+                    <div class="info-item">
+                        <div class="info-label">
+                            <i class="fas fa-ruler-combined"></i>
+                            Área Total
+                        </div>
+                        <div class="info-value">{{ '{:,.2f}'.format(obra.area_total_m2).replace(',', ' ').replace('.', ',').replace(' ', '.') }} m²</div>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Datas e Cronograma -->
+            <div class="obra-card">
+                <div class="obra-card-header">
+                    <h3><i class="fas fa-calendar-alt"></i> Cronograma</h3>
+                </div>
+                <div class="obra-card-body" style="padding: 2rem;">
+                    <div class="info-item">
+                        <div class="info-label">
+                            <i class="fas fa-play"></i>
+                            Data de Início
+                        </div>
+                        <div class="info-value">{{ obra.data_inicio.strftime('%d/%m/%Y') if obra.data_inicio else '-' }}</div>
+                    </div>
+                    
+                    {% if obra.data_previsao_fim %}
+                    <div class="info-item">
+                        <div class="info-label">
+                            <i class="fas fa-flag-checkered"></i>
+                            Previsão de Conclusão
+                        </div>
+                        <div class="info-value">{{ obra.data_previsao_fim.strftime('%d/%m/%Y') }}</div>
+                    </div>
+                    {% endif %}
+                    
+                    {% if obra.data_inicio %}
+                    <div class="info-item">
+                        <div class="info-label">
+                            <i class="fas fa-hourglass-half"></i>
+                            Dias Decorridos
+                        </div>
+                        <div class="info-value">{{ (date.today() - obra.data_inicio).days }} dias</div>
+                    </div>
+                    {% endif %}
+                    
+                    {% if obra.data_previsao_fim and obra.data_inicio %}
+                    <div class="info-item">
+                        <div class="info-label">
+                            <i class="fas fa-calendar-day"></i>
+                            Duração Prevista
+                        </div>
+                        <div class="info-value">{{ (obra.data_previsao_fim - obra.data_inicio).days }} dias</div>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Valores Financeiros -->
+            <div class="obra-card">
+                <div class="obra-card-header">
+                    <h3><i class="fas fa-chart-line"></i> Valores Financeiros</h3>
+                </div>
+                <div class="obra-card-body" style="padding: 2rem;">
+                    {% if obra.orcamento and obra.orcamento > 0 %}
+                    <div class="info-item">
+                        <div class="info-label">
+                            <i class="fas fa-calculator"></i>
+                            Orçamento
+                        </div>
+                        <div class="info-value">R$ {{ '{:,.2f}'.format(obra.orcamento).replace(',', ' ').replace('.', ',').replace(' ', '.') }}</div>
+                    </div>
+                    {% endif %}
+                    
+                    {% if obra.valor_contrato and obra.valor_contrato > 0 %}
+                    <div class="info-item">
+                        <div class="info-label">
+                            <i class="fas fa-file-contract"></i>
+                            Valor do Contrato
+                        </div>
+                        <div class="info-value">R$ {{ '{:,.2f}'.format(obra.valor_contrato).replace(',', ' ').replace('.', ',').replace(' ', '.') }}</div>
+                    </div>
+                    {% endif %}
+                    
+                    {% if kpis and kpis.custo_total > 0 %}
+                    <div class="info-item">
+                        <div class="info-label">
+                            <i class="fas fa-coins"></i>
+                            Custo Realizado
+                        </div>
+                        <div class="info-value">R$ {{ '{:,.2f}'.format(kpis.custo_total).replace(',', ' ').replace('.', ',').replace(' ', '.') }}</div>
+                    </div>
+                    {% endif %}
+                    
+                    {% if obra.valor_contrato and kpis and kpis.custo_total > 0 %}
+                    <div class="info-item">
+                        <div class="info-label">
+                            <i class="fas fa-percentage"></i>
+                            Margem Atual
+                        </div>
+                        {% set margem = ((obra.valor_contrato - kpis.custo_total) / obra.valor_contrato * 100) if obra.valor_contrato > 0 else 0 %}
+                        <div class="info-value" style="color: {% if margem >= 20 %}#22c55e{% elif margem >= 10 %}#f59e0b{% else %}#ef4444{% endif %};">
+                            {{ '{:.1f}'.format(margem) }}%
+                        </div>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Informações do Cliente -->
+            {% if obra.cliente or obra.cliente_nome or obra.cliente_email %}
+            <div class="obra-card">
+                <div class="obra-card-header">
+                    <h3><i class="fas fa-user-tie"></i> Cliente</h3>
+                </div>
+                <div class="obra-card-body" style="padding: 2rem;">
+                    {% if obra.cliente_nome %}
+                    <div class="info-item">
+                        <div class="info-label">
+                            <i class="fas fa-user"></i>
+                            Nome
+                        </div>
+                        <div class="info-value">{{ obra.cliente_nome }}</div>
+                    </div>
+                    {% elif obra.cliente %}
+                    <div class="info-item">
+                        <div class="info-label">
+                            <i class="fas fa-user"></i>
+                            Cliente
+                        </div>
+                        <div class="info-value">{{ obra.cliente }}</div>
+                    </div>
+                    {% endif %}
+                    
+                    {% if obra.cliente_email %}
+                    <div class="info-item">
+                        <div class="info-label">
+                            <i class="fas fa-envelope"></i>
+                            E-mail
+                        </div>
+                        <div class="info-value">{{ obra.cliente_email }}</div>
+                    </div>
+                    {% endif %}
+                    
+                    {% if obra.cliente_telefone %}
+                    <div class="info-item">
+                        <div class="info-label">
+                            <i class="fas fa-phone"></i>
+                            Telefone
+                        </div>
+                        <div class="info-value">{{ obra.cliente_telefone }}</div>
+                    </div>
+                    {% endif %}
+                    
+                    {% if obra.token_cliente %}
+                    <div class="info-item">
+                        <div class="info-label">
+                            <i class="fas fa-key"></i>
+                            Token de Acesso
+                        </div>
+                        <div class="info-value" style="font-family: monospace; font-size: 0.9rem;">{{ obra.token_cliente[:8] }}...</div>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+            {% endif %}
+        </div>
+
+        <!-- Breakdown de Custos -->
+        {% if kpis and kpis.custo_total > 0 %}
+        <div class="obra-card">
+            <div class="obra-card-header">
+                <h3><i class="fas fa-chart-pie"></i> Breakdown de Custos</h3>
+            </div>
+            <div class="obra-card-body" style="padding: 2rem;">
+                <div class="kpi-grid">
+                    <div class="kpi-card" style="--kpi-color: #3b82f6; --kpi-color-light: #60a5fa;">
+                        <i class="fas fa-hammer kpi-icon"></i>
+                        <div class="kpi-value">R$ {{ '{:,.2f}'.format(kpis.custo_mao_obra if kpis.custo_mao_obra else 0).replace(',', ' ').replace('.', ',').replace(' ', '.') }}</div>
+                        <div class="kpi-label">Mão de Obra</div>
+                    </div>
+                    
+                    <div class="kpi-card" style="--kpi-color: #f59e0b; --kpi-color-light: #fbbf24;">
+                        <i class="fas fa-utensils kpi-icon"></i>
+                        <div class="kpi-value">R$ {{ '{:,.2f}'.format(kpis.custo_alimentacao if kpis.custo_alimentacao else 0).replace(',', ' ').replace('.', ',').replace(' ', '.') }}</div>
+                        <div class="kpi-label">Alimentação</div>
+                    </div>
+                    
+                    <div class="kpi-card" style="--kpi-color: #ef4444; --kpi-color-light: #f87171;">
+                        <i class="fas fa-bus kpi-icon"></i>
+                        <div class="kpi-value">R$ {{ '{:,.2f}'.format(kpis.custo_transporte if kpis.custo_transporte else 0).replace(',', ' ').replace('.', ',').replace(' ', '.') }}</div>
+                        <div class="kpi-label">Transporte</div>
+                    </div>
+                    
+                    <div class="kpi-card" style="--kpi-color: #8b5cf6; --kpi-color-light: #a78bfa;">
+                        <i class="fas fa-tools kpi-icon"></i>
+                        <div class="kpi-value">R$ {{ '{:,.2f}'.format(kpis.custo_outros if kpis.custo_outros else 0).replace(',', ' ').replace('.', ',').replace(' ', '.') }}</div>
+                        <div class="kpi-label">Outros</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Funcionários que Trabalharam -->
+        {% if funcionarios_obra %}
+        <div class="obra-card">
+            <div class="obra-card-header">
+                <h3>
+                    <i class="fas fa-users"></i> 
+                    Funcionários que Trabalharam na Obra
+                    <span class="badge bg-light text-dark ms-2">{{ funcionarios_obra|length }}</span>
+                </h3>
+            </div>
+            <div class="obra-card-body" style="padding: 2rem;">
+                <div class="funcionarios-grid">
+                    {% for funcionario in funcionarios_obra %}
+                    <div class="funcionario-card">
+                        <div class="funcionario-avatar">
+                            {{ funcionario.nome[0].upper() }}
+                        </div>
+                        <h6 class="mb-1">{{ funcionario.nome }}</h6>
+                        <small class="text-muted">{{ funcionario.funcao.nome if funcionario.funcao else 'Sem função definida' }}</small>
+                        {% if funcionario.salario %}
+                        <div class="mt-2">
+                            <small class="text-success">R$ {{ '{:,.2f}'.format(funcionario.salario).replace(',', ' ').replace('.', ',').replace(' ', '.') }}/mês</small>
+                        </div>
+                        {% endif %}
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- RDOs Recentes -->
+        {% if rdos %}
+        <div class="obra-card">
+            <div class="obra-card-header">
+                <h3>
+                    <i class="fas fa-clipboard-list"></i> 
+                    RDOs Recentes
+                    <span class="badge bg-light text-dark ms-2">{{ rdos|length }}</span>
+                </h3>
+            </div>
+            <div class="obra-card-body" style="padding: 0;">
+                <div class="table-modern">
+                    <table class="table mb-0">
+                        <thead>
+                            <tr>
+                                <th>Número RDO</th>
+                                <th>Data</th>
+                                <th>Status</th>
+                                <th>Progresso</th>
+                                <th>Ações</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for rdo in rdos %}
+                            <tr>
+                                <td><strong>{{ rdo.numero_rdo or 'RDO-' + rdo.id|string }}</strong></td>
+                                <td>{{ rdo.data_relatorio.strftime('%d/%m/%Y') if rdo.data_relatorio else '-' }}</td>
+                                <td>
+                                    {% if rdo.status == 'Finalizado' %}
+                                        <span class="badge bg-success">
+                                            <i class="fas fa-check-circle me-1"></i>{{ rdo.status }}
+                                        </span>
+                                    {% else %}
+                                        <span class="badge bg-warning">
+                                            <i class="fas fa-edit me-1"></i>{{ rdo.status or 'Rascunho' }}
+                                        </span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if rdo.progresso_conclusao %}
+                                        <div class="progress" style="height: 8px;">
+                                            <div class="progress-bar bg-success" style="width: {{ rdo.progresso_conclusao }}%"></div>
+                                        </div>
+                                        <small class="text-muted">{{ rdo.progresso_conclusao }}%</small>
+                                    {% else %}
+                                        <span class="text-muted">-</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <div class="btn-group btn-group-sm">
+                                        <a href="/funcionario/rdo/consolidado?rdo_id={{ rdo.id }}" 
+                                           class="btn btn-outline-primary">
+                                            <i class="fas fa-eye"></i>
+                                        </a>
+                                        <a href="/funcionario/rdo/consolidado?rdo_id={{ rdo.id }}&edit=true" 
+                                           class="btn btn-outline-warning">
+                                            <i class="fas fa-edit"></i>
+                                        </a>
+                                    </div>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+        {% else %}
+        <div class="obra-card">
+            <div class="obra-card-body empty-state">
+                <i class="fas fa-clipboard-list"></i>
+                <h5>Nenhum RDO encontrado</h5>
+                <p>Esta obra ainda não possui relatórios diários registrados.</p>
+                <a href="/funcionario/rdo/consolidado?obra_id={{ obra.id }}" class="btn-modern btn-primary-modern">
+                    <i class="fas fa-plus"></i> Criar Primeiro RDO
+                </a>
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Ações Rápidas -->
+        <div class="obra-card">
+            <div class="obra-card-header">
+                <h3><i class="fas fa-lightning-bolt"></i> Ações Rápidas</h3>
+            </div>
+            <div class="obra-card-body" style="padding: 2rem;">
+                <div class="action-buttons">
+                    <a href="/funcionario/rdo/consolidado?obra_id={{ obra.id }}" class="btn-modern btn-success-modern">
+                        <i class="fas fa-plus-circle"></i>
+                        Novo RDO
+                    </a>
+                    <a href="/funcionario/rdo/consolidado?obra_id={{ obra.id }}" class="btn-modern btn-primary-modern">
+                        <i class="fas fa-list"></i>
+                        Ver Todos os RDOs
+                    </a>
+                    <a href="/obras/editar/{{ obra.id }}" class="btn-modern btn-warning-modern">
+                        <i class="fas fa-edit"></i>
+                        Editar Obra
+                    </a>
+                    <a href="/servicos" class="btn-modern btn-outline-modern">
+                        <i class="fas fa-cogs"></i>
+                        Gerenciar Serviços
+                    </a>
+                    <a href="/funcionarios" class="btn-modern btn-outline-modern">
+                        <i class="fas fa-users"></i>
+                        Funcionários
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// Animações e interatividade
+document.addEventListener('DOMContentLoaded', function() {
+    // Animação de entrada dos cards
+    const cards = document.querySelectorAll('.obra-card');
+    cards.forEach((card, index) => {
+        card.style.animationDelay = `${index * 0.1}s`;
+        card.classList.add('fade-in');
+    });
+    
+    // Tooltips para botões
+    const tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+    const tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
+        return new bootstrap.Tooltip(tooltipTriggerEl);
+    });
+});
+</script>
+
+<style>
+@keyframes fade-in {
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.fade-in {
+    animation: fade-in 0.6s ease forwards;
+}
+</style>
+{% endblock %}
