@@ -1,267 +1,250 @@
 {% extends "base_completo.html" %}
 
-{% block title %}
-    {% if obra %}Editar Obra{% else %}Nova Obra{% endif %} - SIGE
-{% endblock %}
+{% block title %}{{ titulo }} - SIGE{% endblock %}
 
 {% block content %}
-<div class="container-fluid mt-4">
-    <div class="row">
-        <div class="col-12">
-            <div class="d-flex justify-content-between align-items-center mb-4">
-                <h1 class="h3 mb-0">
-                    <i class="fas fa-building me-2"></i>
-                    {% if obra %}Editar Obra{% else %}Nova Obra{% endif %}
-                </h1>
-                <a href="{{ url_for('main.obras') }}" class="btn btn-outline-secondary">
-                    <i class="fas fa-arrow-left me-2"></i>Voltar
-                </a>
-            </div>
+<div class="container-fluid">
+    <!-- Header da Página -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h1 class="h3 mb-0 text-gray-800">
+                <i class="fas fa-building"></i> {{ titulo }}
+            </h1>
+            <p class="text-muted mb-0">{{ 'Editar informações da obra' if obra else 'Criar nova obra no sistema' }}</p>
+        </div>
+        <div>
+            <a href="{{ url_for('main.obras') }}" class="btn btn-outline-secondary">
+                <i class="fas fa-arrow-left"></i> Voltar para Lista
+            </a>
+        </div>
+    </div>
 
-            <div class="card">
-                <div class="card-body">
-                    <form method="POST" class="row g-3">
-                        {{ form.hidden_tag() }}
-                        
-                        <div class="col-md-6">
-                            <label for="{{ form.nome.id }}" class="form-label">Nome da Obra *</label>
-                            {{ form.nome(class="form-control") }}
-                            {% if form.nome.errors %}
-                                <div class="text-danger small">
-                                    {% for error in form.nome.errors %}
-                                        <span>{{ error }}</span>
-                                    {% endfor %}
-                                </div>
-                            {% endif %}
+    <!-- Formulário -->
+    <div class="card">
+        <div class="card-header">
+            <h5 class="mb-0">
+                <i class="fas fa-edit"></i> {{ 'Informações da Obra' if obra else 'Dados da Nova Obra' }}
+            </h5>
+        </div>
+        <div class="card-body">
+            <form method="POST" id="obraForm">
+                <div class="row">
+                    <!-- Nome da Obra -->
+                    <div class="col-md-8 mb-3">
+                        <label for="nome" class="form-label">
+                            <i class="fas fa-building text-primary"></i> Nome da Obra *
+                        </label>
+                        <input type="text" 
+                               class="form-control" 
+                               id="nome" 
+                               name="nome" 
+                               value="{{ obra.nome if obra else '' }}" 
+                               required
+                               placeholder="Ex: Edifício Residencial São Paulo">
+                    </div>
+                    
+                    <!-- Status -->
+                    <div class="col-md-4 mb-3">
+                        <label for="status" class="form-label">
+                            <i class="fas fa-flag text-success"></i> Status
+                        </label>
+                        <select class="form-select" id="status" name="status">
+                            <option value="Em andamento" {{ 'selected' if obra and obra.status == 'Em andamento' else '' }}>Em andamento</option>
+                            <option value="PLANEJAMENTO" {{ 'selected' if obra and obra.status == 'PLANEJAMENTO' else '' }}>Planejamento</option>
+                            <option value="Pausada" {{ 'selected' if obra and obra.status == 'Pausada' else '' }}>Pausada</option>
+                            <option value="Concluída" {{ 'selected' if obra and obra.status == 'Concluída' else '' }}>Concluída</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="row">
+                    <!-- Cliente -->
+                    <div class="col-md-6 mb-3">
+                        <label for="cliente" class="form-label">
+                            <i class="fas fa-user text-info"></i> Cliente
+                        </label>
+                        <input type="text" 
+                               class="form-control" 
+                               id="cliente" 
+                               name="cliente" 
+                               value="{{ obra.cliente if obra and obra.cliente else '' }}"
+                               placeholder="Nome do cliente da obra">
+                    </div>
+                    
+                    <!-- Endereço -->
+                    <div class="col-md-6 mb-3">
+                        <label for="endereco" class="form-label">
+                            <i class="fas fa-map-marker-alt text-warning"></i> Endereço
+                        </label>
+                        <input type="text" 
+                               class="form-control" 
+                               id="endereco" 
+                               name="endereco" 
+                               value="{{ obra.endereco if obra and obra.endereco else '' }}"
+                               placeholder="Endereço completo da obra">
+                    </div>
+                </div>
+
+                <div class="row">
+                    <!-- Data de Início -->
+                    <div class="col-md-3 mb-3">
+                        <label for="data_inicio" class="form-label">
+                            <i class="fas fa-calendar-alt text-success"></i> Data de Início *
+                        </label>
+                        <input type="date" 
+                               class="form-control" 
+                               id="data_inicio" 
+                               name="data_inicio" 
+                               value="{{ obra.data_inicio.strftime('%Y-%m-%d') if obra and obra.data_inicio else '' }}" 
+                               required>
+                    </div>
+                    
+                    <!-- Data de Previsão de Fim -->
+                    <div class="col-md-3 mb-3">
+                        <label for="data_previsao_fim" class="form-label">
+                            <i class="fas fa-calendar-check text-warning"></i> Previsão de Fim
+                        </label>
+                        <input type="date" 
+                               class="form-control" 
+                               id="data_previsao_fim" 
+                               name="data_previsao_fim" 
+                               value="{{ obra.data_previsao_fim.strftime('%Y-%m-%d') if obra and obra.data_previsao_fim else '' }}">
+                    </div>
+                    
+                    <!-- Orçamento -->
+                    <div class="col-md-3 mb-3">
+                        <label for="orcamento" class="form-label">
+                            <i class="fas fa-dollar-sign text-primary"></i> Orçamento (R$)
+                        </label>
+                        <input type="number" 
+                               class="form-control" 
+                               id="orcamento" 
+                               name="orcamento" 
+                               step="0.01" 
+                               value="{{ obra.orcamento if obra and obra.orcamento else '0' }}"
+                               placeholder="0.00">
+                    </div>
+                    
+                    <!-- Valor do Contrato -->
+                    <div class="col-md-3 mb-3">
+                        <label for="valor_contrato" class="form-label">
+                            <i class="fas fa-file-contract text-info"></i> Valor Contrato (R$)
+                        </label>
+                        <input type="number" 
+                               class="form-control" 
+                               id="valor_contrato" 
+                               name="valor_contrato" 
+                               step="0.01" 
+                               value="{{ obra.valor_contrato if obra and obra.valor_contrato else '0' }}"
+                               placeholder="0.00">
+                    </div>
+                </div>
+
+                <!-- Informações adicionais se editando -->
+                {% if obra %}
+                <div class="row">
+                    <div class="col-12 mb-3">
+                        <div class="alert alert-info">
+                            <i class="fas fa-info-circle"></i>
+                            <strong>Informações:</strong>
+                            <ul class="mb-0 mt-2">
+                                <li>Código da obra: <strong>{{ obra.codigo if obra.codigo else 'Não definido' }}</strong></li>
+                                <li>Criada em: <strong>{{ obra.created_at.strftime('%d/%m/%Y às %H:%M') if obra.created_at else 'Não disponível' }}</strong></li>
+                                <li>Admin ID: <strong>{{ obra.admin_id }}</strong></li>
+                            </ul>
                         </div>
+                    </div>
+                </div>
+                {% endif %}
 
-                        <div class="col-md-6">
-                            <label for="{{ form.status.id }}" class="form-label">Status</label>
-                            {{ form.status(class="form-select") }}
-                        </div>
-
-                        <div class="col-12">
-                            <label for="{{ form.endereco.id }}" class="form-label">Endereço</label>
-                            {{ form.endereco(class="form-control") }}
-                        </div>
-
-                        <div class="col-md-4">
-                            <label for="{{ form.data_inicio.id }}" class="form-label">Data de Início</label>
-                            {{ form.data_inicio(class="form-control") }}
-                        </div>
-
-                        <div class="col-md-4">
-                            <label for="{{ form.data_previsao_fim.id }}" class="form-label">Previsão de Término</label>
-                            {{ form.data_previsao_fim(class="form-control") }}
-                        </div>
-
-                        <div class="col-md-4">
-                            <label for="{{ form.orcamento.id }}" class="form-label">Orçamento (R$)</label>
-                            {{ form.orcamento(class="form-control", step="0.01") }}
-                        </div>
-
-                        <div class="col-md-6">
-                            <label for="{{ form.responsavel_id.id }}" class="form-label">Responsável</label>
-                            {{ form.responsavel_id(class="form-select") }}
-                        </div>
-
-                        <div class="col-12">
-                            <div class="d-flex gap-2">
-                                <button type="submit" class="btn btn-success">
-                                    <i class="fas fa-save me-2"></i>
-                                    {% if obra %}Atualizar{% else %}Criar{% endif %} Obra
+                <!-- Botões de Ação -->
+                <div class="row">
+                    <div class="col-12">
+                        <div class="d-flex justify-content-between">
+                            <div>
+                                <button type="submit" class="btn btn-primary">
+                                    <i class="fas fa-save"></i> {{ 'Atualizar Obra' if obra else 'Criar Obra' }}
                                 </button>
-                                <a href="{{ url_for('main.obras') }}" class="btn btn-outline-secondary">
-                                    <i class="fas fa-times me-2"></i>Cancelar
+                                <a href="{{ url_for('main.obras') }}" class="btn btn-outline-secondary ms-2">
+                                    <i class="fas fa-times"></i> Cancelar
                                 </a>
                             </div>
-                        </div>
-                    </form>
-                </div>
-            </div>
-
-            <!-- Seção de Serviços (apenas para edição) -->
-            {% if obra %}
-            <div class="card mt-4">
-                <div class="card-header">
-                    <div class="d-flex justify-content-between align-items-center">
-                        <h5 class="mb-0">
-                            <i class="fas fa-cogs me-2"></i>Serviços da Obra
-                        </h5>
-                        <button type="button" class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#modalNovoServico">
-                            <i class="fas fa-plus me-2"></i>Adicionar Serviço
-                        </button>
-                    </div>
-                </div>
-                <div class="card-body">
-                    <div class="table-responsive">
-                        <table class="table table-hover">
-                            <thead>
-                                <tr>
-                                    <th>Serviço</th>
-                                    <th>Categoria</th>
-                                    <th>Quantidade Planejada</th>
-                                    <th>Unidade</th>
-                                    <th>Ações</th>
-                                </tr>
-                            </thead>
-                            <tbody id="servicosTableBody">
-                                <!-- Serviços serão carregados via JavaScript -->
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Modal para Novo Serviço -->
-            <div class="modal fade" id="modalNovoServico" tabindex="-1">
-                <div class="modal-dialog">
-                    <div class="modal-content">
-                        <div class="modal-header">
-                            <h5 class="modal-title">Adicionar Serviço à Obra</h5>
-                            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                        </div>
-                        <div class="modal-body">
-                            <form id="formNovoServico">
-                                <div class="mb-3">
-                                    <label class="form-label">Serviço *</label>
-                                    <select class="form-select" id="servicoSelect" required>
-                                        <option value="">Selecione um serviço...</option>
-                                    </select>
-                                </div>
-                                <div class="mb-3">
-                                    <label class="form-label">Quantidade Planejada *</label>
-                                    <input type="number" class="form-control" id="quantidadePlanejada" step="0.01" min="0" required>
-                                </div>
-                                <div class="mb-3">
-                                    <label class="form-label">Observações</label>
-                                    <textarea class="form-control" id="observacoes" rows="3"></textarea>
-                                </div>
-                            </form>
-                        </div>
-                        <div class="modal-footer">
-                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
-                            <button type="button" class="btn btn-primary" onclick="adicionarServico()">Adicionar</button>
+                            
+                            {% if obra %}
+                            <div>
+                                <button type="button" 
+                                        class="btn btn-outline-danger" 
+                                        onclick="confirmarExclusao({{ obra.id }}, '{{ obra.nome }}')">
+                                    <i class="fas fa-trash"></i> Excluir Obra
+                                </button>
+                            </div>
+                            {% endif %}
                         </div>
                     </div>
                 </div>
-            </div>
-            {% endif %}
+            </form>
         </div>
     </div>
 </div>
 
+<!-- Modal de Confirmação de Exclusão -->
+{% if obra %}
+<div class="modal fade" id="modalExclusao" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="fas fa-exclamation-triangle text-warning"></i> Confirmar Exclusão
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p>Tem certeza que deseja excluir a obra <strong id="nomeObraExclusao"></strong>?</p>
+                <div class="alert alert-warning">
+                    <i class="fas fa-info-circle"></i>
+                    <strong>Atenção:</strong> Esta ação não pode ser desfeita. Todos os dados relacionados à obra serão verificados antes da exclusão.
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <form method="POST" id="formExclusao" style="display: inline;">
+                    <button type="submit" class="btn btn-danger">
+                        <i class="fas fa-trash"></i> Confirmar Exclusão
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+
 <script>
 {% if obra %}
-// Carregar serviços da obra
-document.addEventListener('DOMContentLoaded', function() {
-    carregarServicosObra();
-    carregarServicosDisponiveis();
-});
-
-function carregarServicosObra() {
-    fetch(`/api/obras/{{ obra.id }}/servicos`)
-        .then(response => response.json())
-        .then(data => {
-            const tbody = document.getElementById('servicosTableBody');
-            tbody.innerHTML = '';
-            
-            data.forEach(servico => {
-                const row = document.createElement('tr');
-                row.innerHTML = `
-                    <td>${servico.nome}</td>
-                    <td>${servico.categoria || 'N/A'}</td>
-                    <td>${servico.quantidade_planejada || 0}</td>
-                    <td>${servico.unidade_simbolo || servico.unidade_medida}</td>
-                    <td>
-                        <button class="btn btn-sm btn-outline-danger" onclick="removerServico(${servico.id})">
-                            <i class="fas fa-trash"></i>
-                        </button>
-                    </td>
-                `;
-                tbody.appendChild(row);
-            });
-        })
-        .catch(error => {
-            console.error('Erro ao carregar serviços:', error);
-        });
+function confirmarExclusao(obraId, nomeObra) {
+    document.getElementById('nomeObraExclusao').textContent = nomeObra;
+    document.getElementById('formExclusao').action = `/obras/excluir/${obraId}`;
+    new bootstrap.Modal(document.getElementById('modalExclusao')).show();
 }
+{% endif %}
 
-function carregarServicosDisponiveis() {
-    fetch('/api/servicos')
-        .then(response => response.json())
-        .then(data => {
-            const select = document.getElementById('servicoSelect');
-            select.innerHTML = '<option value="">Selecione um serviço...</option>';
-            
-            data.forEach(servico => {
-                const option = document.createElement('option');
-                option.value = servico.id;
-                option.textContent = `${servico.nome} (${servico.unidade_simbolo || servico.unidade_medida})`;
-                select.appendChild(option);
-            });
-        })
-        .catch(error => {
-            console.error('Erro ao carregar serviços disponíveis:', error);
-        });
-}
-
-function adicionarServico() {
-    const servicoId = document.getElementById('servicoSelect').value;
-    const quantidade = document.getElementById('quantidadePlanejada').value;
-    const observacoes = document.getElementById('observacoes').value;
+// Validação do formulário
+document.getElementById('obraForm').addEventListener('submit', function(e) {
+    const nome = document.getElementById('nome').value.trim();
+    const dataInicio = document.getElementById('data_inicio').value;
     
-    if (!servicoId || !quantidade) {
-        alert('Por favor, preencha todos os campos obrigatórios.');
+    if (!nome) {
+        e.preventDefault();
+        alert('Por favor, informe o nome da obra.');
+        document.getElementById('nome').focus();
         return;
     }
     
-    fetch(`/obras/{{ obra.id }}/servicos`, {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-            servico_id: servicoId,
-            quantidade_planejada: parseFloat(quantidade),
-            observacoes: observacoes
-        })
-    })
-    .then(response => response.json())
-    .then(data => {
-        if (data.success) {
-            bootstrap.Modal.getInstance(document.getElementById('modalNovoServico')).hide();
-            document.getElementById('formNovoServico').reset();
-            carregarServicosObra();
-        } else {
-            alert('Erro ao adicionar serviço: ' + data.message);
-        }
-    })
-    .catch(error => {
-        console.error('Erro:', error);
-        alert('Erro ao adicionar serviço.');
-    });
-}
-
-function removerServico(servicoId) {
-    if (confirm('Tem certeza que deseja remover este serviço da obra?')) {
-        fetch(`/obras/{{ obra.id }}/servicos/${servicoId}`, {
-            method: 'DELETE'
-        })
-        .then(response => response.json())
-        .then(data => {
-            if (data.success) {
-                carregarServicosObra();
-            } else {
-                alert('Erro ao remover serviço: ' + data.message);
-            }
-        })
-        .catch(error => {
-            console.error('Erro:', error);
-            alert('Erro ao remover serviço.');
-        });
+    if (!dataInicio) {
+        e.preventDefault();
+        alert('Por favor, informe a data de início da obra.');
+        document.getElementById('data_inicio').focus();
+        return;
     }
-}
-{% endif %}
+});
 </script>
 {% endblock %}

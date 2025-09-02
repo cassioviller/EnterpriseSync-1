@@ -269,7 +269,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 
                 <div class="card-footer bg-transparent">
                     <div class="btn-group btn-group-sm w-100">
-                        <a href="{{ url_for('main.detalhes_obra', id=obra.id) }}" 
+                        <a href="/obras/detalhes/{{ obra.id }}" 
                            class="btn btn-outline-info"
                            data-bs-toggle="tooltip" 
                            title="Ver Detalhes">
@@ -357,7 +357,7 @@ document.addEventListener('DOMContentLoaded', function() {
                             </td>
                             <td>
                                 <div class="btn-group btn-group-sm">
-                                    <a href="{{ url_for('main.detalhes_obra', id=obra.id) }}" 
+                                    <a href="/obras/detalhes/{{ obra.id }}" 
                                        class="btn btn-outline-info btn-sm">
                                         <i class="fas fa-eye"></i>
                                     </a>
