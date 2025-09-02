@@ -364,6 +364,16 @@
     box-shadow: 0 4px 15px rgba(0,0,0,0.1);
 }
 
+.header-actions {
+    display: flex;
+    gap: 0.5rem;
+}
+
+.header-actions .btn {
+    font-size: 0.85rem;
+    padding: 0.4rem 0.8rem;
+}
+
 .funcionario-avatar {
     width: 60px;
     height: 60px;
@@ -672,9 +682,36 @@
                     <div class="info-item">
                         <div class="info-label">
                             <i class="fas fa-coins"></i>
-                            Custo Realizado
+                            Custo Realizado Total
                         </div>
                         <div class="info-value">R$ {{ '{:,.2f}'.format(kpis.custo_total).replace(',', ' ').replace('.', ',').replace(' ', '.') }}</div>
+                    </div>
+                    {% endif %}
+                    
+                    <!-- Custos Detalhados -->
+                    {% if kpis %}
+                    <div class="info-item">
+                        <div class="info-label">
+                            <i class="fas fa-hammer"></i>
+                            Custo Mão de Obra
+                        </div>
+                        <div class="info-value" style="color: #3b82f6;">R$ {{ '{:,.2f}'.format(kpis.custo_mao_obra if kpis.custo_mao_obra else 0).replace(',', ' ').replace('.', ',').replace(' ', '.') }}</div>
+                    </div>
+                    
+                    <div class="info-item">
+                        <div class="info-label">
+                            <i class="fas fa-utensils"></i>
+                            Custo Alimentação
+                        </div>
+                        <div class="info-value" style="color: #f59e0b;">R$ {{ '{:,.2f}'.format(kpis.custo_alimentacao if kpis.custo_alimentacao else 0).replace(',', ' ').replace('.', ',').replace(' ', '.') }}</div>
+                    </div>
+                    
+                    <div class="info-item">
+                        <div class="info-label">
+                            <i class="fas fa-bus"></i>
+                            Custo Transporte
+                        </div>
+                        <div class="info-value" style="color: #ef4444;">R$ {{ '{:,.2f}'.format(kpis.custo_transporte if kpis.custo_transporte else 0).replace(',', ' ').replace('.', ',').replace(' ', '.') }}</div>
                     </div>
                     {% endif %}
                     
@@ -752,41 +789,7 @@
             {% endif %}
         </div>
 
-        <!-- Breakdown de Custos -->
-        {% if kpis and kpis.custo_total > 0 %}
-        <div class="obra-card">
-            <div class="obra-card-header">
-                <h3><i class="fas fa-chart-pie"></i> Breakdown de Custos</h3>
-            </div>
-            <div class="obra-card-body" style="padding: 2rem;">
-                <div class="kpi-grid">
-                    <div class="kpi-card" style="--kpi-color: #3b82f6; --kpi-color-light: #60a5fa;">
-                        <i class="fas fa-hammer kpi-icon"></i>
-                        <div class="kpi-value">R$ {{ '{:,.2f}'.format(kpis.custo_mao_obra if kpis.custo_mao_obra else 0).replace(',', ' ').replace('.', ',').replace(' ', '.') }}</div>
-                        <div class="kpi-label">Mão de Obra</div>
-                    </div>
-                    
-                    <div class="kpi-card" style="--kpi-color: #f59e0b; --kpi-color-light: #fbbf24;">
-                        <i class="fas fa-utensils kpi-icon"></i>
-                        <div class="kpi-value">R$ {{ '{:,.2f}'.format(kpis.custo_alimentacao if kpis.custo_alimentacao else 0).replace(',', ' ').replace('.', ',').replace(' ', '.') }}</div>
-                        <div class="kpi-label">Alimentação</div>
-                    </div>
-                    
-                    <div class="kpi-card" style="--kpi-color: #ef4444; --kpi-color-light: #f87171;">
-                        <i class="fas fa-bus kpi-icon"></i>
-                        <div class="kpi-value">R$ {{ '{:,.2f}'.format(kpis.custo_transporte if kpis.custo_transporte else 0).replace(',', ' ').replace('.', ',').replace(' ', '.') }}</div>
-                        <div class="kpi-label">Transporte</div>
-                    </div>
-                    
-                    <div class="kpi-card" style="--kpi-color: #8b5cf6; --kpi-color-light: #a78bfa;">
-                        <i class="fas fa-tools kpi-icon"></i>
-                        <div class="kpi-value">R$ {{ '{:,.2f}'.format(kpis.custo_outros if kpis.custo_outros else 0).replace(',', ' ').replace('.', ',').replace(' ', '.') }}</div>
-                        <div class="kpi-label">Outros</div>
-                    </div>
-                </div>
-            </div>
-        </div>
-        {% endif %}
+
 
         <!-- Funcionários que Trabalharam -->
         {% if funcionarios_obra %}
@@ -794,13 +797,42 @@
             <div class="obra-card-header">
                 <h3>
                     <i class="fas fa-users"></i> 
-                    Funcionários que Trabalharam na Obra
+                    Funcionários que Mais Trabalharam na Obra
                     <span class="badge bg-light text-dark ms-2">{{ funcionarios_obra|length }}</span>
                 </h3>
+                <div class="header-actions">
+                    <button class="btn btn-outline-light btn-sm" id="toggleFuncionarios" onclick="toggleAllFuncionarios()">
+                        <i class="fas fa-chevron-down" id="funcionariosIcon"></i>
+                        <span id="funcionariosText">Ver Todos</span>
+                    </button>
+                </div>
             </div>
             <div class="obra-card-body" style="padding: 2rem;">
-                <div class="funcionarios-grid">
-                    {% for funcionario in funcionarios_obra %}
+                <!-- Top 4 Funcionários (sempre visíveis) -->
+                <div class="funcionarios-grid" id="topFuncionarios">
+                    {% for funcionario in funcionarios_obra[:4] %}
+                    <div class="funcionario-card">
+                        <div class="funcionario-avatar">
+                            {{ funcionario.nome[0].upper() }}
+                        </div>
+                        <h6 class="mb-1">{{ funcionario.nome }}</h6>
+                        <small class="text-muted">{{ funcionario.funcao.nome if funcionario.funcao else 'Sem função definida' }}</small>
+                        {% if funcionario.salario %}
+                        <div class="mt-2">
+                            <small class="text-success">R$ {{ '{:,.2f}'.format(funcionario.salario).replace(',', ' ').replace('.', ',').replace(' ', '.') }}/mês</small>
+                        </div>
+                        {% endif %}
+                        <div class="mt-1">
+                            <small class="text-primary"><i class="fas fa-clock"></i> Top {{ loop.index }}</small>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+                
+                <!-- Funcionários Restantes (inicialmente ocultos) -->
+                {% if funcionarios_obra|length > 4 %}
+                <div class="funcionarios-grid d-none" id="allFuncionarios">
+                    {% for funcionario in funcionarios_obra[4:] %}
                     <div class="funcionario-card">
                         <div class="funcionario-avatar">
                             {{ funcionario.nome[0].upper() }}
@@ -815,6 +847,15 @@
                     </div>
                     {% endfor %}
                 </div>
+                
+                <!-- Separador visual quando expandido -->
+                <div class="d-none mt-3 pt-3 border-top" id="funcionariosSeparator">
+                    <small class="text-muted">
+                        <i class="fas fa-info-circle"></i>
+                        Mostrando {{ funcionarios_obra|length - 4 }} funcionários adicionais
+                    </small>
+                </div>
+                {% endif %}
             </div>
         </div>
         {% endif %}
@@ -948,6 +989,45 @@ document.addEventListener('DOMContentLoaded', function() {
         return new bootstrap.Tooltip(tooltipTriggerEl);
     });
 });
+
+// Função para alternar visualização de funcionários
+function toggleAllFuncionarios() {
+    const allFuncionarios = document.getElementById('allFuncionarios');
+    const separator = document.getElementById('funcionariosSeparator');
+    const icon = document.getElementById('funcionariosIcon');
+    const text = document.getElementById('funcionariosText');
+    
+    if (allFuncionarios.classList.contains('d-none')) {
+        // Mostrar todos
+        allFuncionarios.classList.remove('d-none');
+        separator.classList.remove('d-none');
+        icon.classList.remove('fa-chevron-down');
+        icon.classList.add('fa-chevron-up');
+        text.textContent = 'Mostrar Menos';
+        
+        // Animação suave
+        allFuncionarios.style.opacity = '0';
+        allFuncionarios.style.transform = 'translateY(-10px)';
+        setTimeout(() => {
+            allFuncionarios.style.transition = 'all 0.3s ease';
+            allFuncionarios.style.opacity = '1';
+            allFuncionarios.style.transform = 'translateY(0)';
+        }, 10);
+    } else {
+        // Ocultar
+        allFuncionarios.style.transition = 'all 0.3s ease';
+        allFuncionarios.style.opacity = '0';
+        allFuncionarios.style.transform = 'translateY(-10px)';
+        
+        setTimeout(() => {
+            allFuncionarios.classList.add('d-none');
+            separator.classList.add('d-none');
+            icon.classList.remove('fa-chevron-up');
+            icon.classList.add('fa-chevron-down');
+            text.textContent = 'Ver Todos';
+        }, 300);
+    }
+}
 </script>
 
 <style>
