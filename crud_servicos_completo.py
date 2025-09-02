@@ -904,3 +904,89 @@ def api_servicos_por_obra(obra_id):
             'error': str(e),
             'servicos': []
         }), 500
+
+@servicos_crud_bp.route('/importar-excel', methods=['POST'])
+def importar_excel():
+    """Importar serviços via Excel"""
+    try:
+        admin_id = get_admin_id()
+        dados = request.get_json()
+        
+        if not dados or 'servicos' not in dados:
+            return jsonify({
+                'success': False,
+                'error': 'Dados de serviços não fornecidos'
+            }), 400
+        
+        servicos_dados = dados['servicos']
+        importados = 0
+        duplicados = 0
+        
+        logger.info(f"🔄 Iniciando importação de {len(servicos_dados)} serviços para admin_id={admin_id}")
+        
+        for servico_data in servicos_dados:
+            nome_servico = servico_data.get('nome', '').strip()
+            subatividades = servico_data.get('subatividades', [])
+            
+            if not nome_servico:
+                continue
+            
+            # Verificar se serviço já existe
+            servico_existente = Servico.query.filter_by(
+                nome=nome_servico,
+                admin_id=admin_id
+            ).first()
+            
+            if servico_existente:
+                duplicados += 1
+                logger.warning(f"⚠️ Serviço '{nome_servico}' já existe, ignorando")
+                continue
+            
+            # Criar novo serviço
+            novo_servico = Servico(
+                nome=nome_servico,
+                descricao=f'Importado via Excel - {len(subatividades)} subatividades',
+                admin_id=admin_id,
+                criado_em=datetime.utcnow(),
+                updated_at=datetime.utcnow()
+            )
+            
+            db.session.add(novo_servico)
+            db.session.flush()  # Para obter o ID
+            
+            # Adicionar subatividades usando SubatividadeMestre
+            for ordem, nome_sub in enumerate(subatividades, 1):
+                if nome_sub.strip():
+                    subatividade = SubatividadeMestre(
+                        nome=nome_sub.strip(),
+                        servico_id=novo_servico.id,
+                        ordem_padrao=ordem,
+                        admin_id=admin_id,
+                        ativo=True,
+                        criado_em=datetime.utcnow(),
+                        updated_at=datetime.utcnow()
+                    )
+                    db.session.add(subatividade)
+            
+            importados += 1
+            logger.info(f"✅ Serviço '{nome_servico}' importado com {len(subatividades)} subatividades")
+        
+        db.session.commit()
+        
+        logger.info(f"🎯 Importação concluída: {importados} importados, {duplicados} duplicados")
+        
+        return jsonify({
+            'success': True,
+            'message': 'Importação concluída com sucesso',
+            'importados': importados,
+            'duplicados': duplicados,
+            'total_processados': len(servicos_dados)
+        })
+        
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"❌ Erro na importação Excel: {str(e)}")
+        return jsonify({
+            'success': False,
+            'error': f'Erro na importação: {str(e)}'
+        }), 500
