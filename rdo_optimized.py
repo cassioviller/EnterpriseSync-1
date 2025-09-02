@@ -2,7 +2,7 @@
 # Sistema consolidado sem redundâncias
 
 from flask import Blueprint, render_template, request, redirect, url_for, flash, jsonify
-from models import db, RDO, RDOMaoObra, RDOServicoSubatividade, Obra, Funcionario, Servico, SubAtividade, RDOAtividade
+from models import db, RDO, RDOMaoObra, RDOServicoSubatividade, Obra, Funcionario, Servico
 from bypass_auth import obter_admin_id
 from datetime import datetime, date
 import logging

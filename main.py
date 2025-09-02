@@ -49,6 +49,14 @@ try:
     print("✅ Sistema CRUD RDO completo registrado")
 except ImportError as e:
     print(f"⚠️ Sistema CRUD RDO não encontrado: {e}")
+
+# Registrar sistema RDO otimizado (API último RDO)
+try:
+    from rdo_optimized import rdo_bp
+    app.register_blueprint(rdo_bp)
+    print("✅ Sistema RDO otimizado registrado")
+except ImportError as e:
+    print(f"⚠️ Sistema RDO otimizado não encontrado: {e}")
 from flask import flash, redirect, url_for, render_template_string
 import traceback
 import logging
