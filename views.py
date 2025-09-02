@@ -1684,6 +1684,28 @@ def detalhes_obra(id):
         
         print(f"DEBUG CUSTOS DETALHADOS: Alimentação={custo_alimentacao} (tabela={custo_alimentacao_tabela}, outros={custo_alimentacao_outros}), Transporte VT={custo_transporte}, Veículos={custos_transporte_total}, Outros={outros_custos}")
         
+        # Calcular progresso geral da obra baseado no último RDO
+        progresso_geral = 0.0
+        try:
+            # Buscar o último RDO da obra
+            ultimo_rdo = RDO.query.filter_by(obra_id=obra_id).order_by(RDO.data_relatorio.desc()).first()
+            
+            if ultimo_rdo:
+                # Buscar subatividades do último RDO
+                subatividades_rdo = RDOServicoSubatividade.query.filter_by(rdo_id=ultimo_rdo.id).all()
+                
+                if subatividades_rdo:
+                    total_percentuais = sum(sub.percentual_conclusao or 0 for sub in subatividades_rdo)
+                    progresso_geral = total_percentuais / len(subatividades_rdo) if len(subatividades_rdo) > 0 else 0.0
+                    print(f"DEBUG PROGRESSO OBRA: {len(subatividades_rdo)} subatividades, progresso geral: {progresso_geral:.1f}%")
+                else:
+                    print("DEBUG PROGRESSO: Último RDO sem subatividades registradas")
+            else:
+                print("DEBUG PROGRESSO: Nenhum RDO encontrado para esta obra")
+        except Exception as e:
+            print(f"ERRO ao calcular progresso da obra: {e}")
+            progresso_geral = 0.0
+
         # Montar KPIs finais da obra
         kpis_obra = {
             'total_funcionarios': len(funcionarios_obra),
@@ -1696,7 +1718,7 @@ def detalhes_obra(id):
             'dias_trabalhados': len(set([r.data for r in registros_periodo])),
             'total_rdos': 0,
             'funcionarios_ativos': len(funcionarios_obra),
-            'progresso_geral': 0.0
+            'progresso_geral': progresso_geral
         }
         
         # Buscar RDOs da obra para o período
@@ -1724,9 +1746,32 @@ def detalhes_obra(id):
             # Converter para lista de dicionários para o template
             servicos_obra = []
             for row in servicos_obra_query:
+                # Calcular progresso baseado no último RDO (não em quantidade)
                 progresso = 0.0
-                if row.quantidade_planejada and row.quantidade_planejada > 0:
-                    progresso = (row.quantidade_executada or 0) / row.quantidade_planejada * 100
+                try:
+                    # Buscar último RDO da obra
+                    ultimo_rdo = RDO.query.filter_by(obra_id=obra_id).order_by(RDO.data_relatorio.desc()).first()
+                    
+                    if ultimo_rdo:
+                        # Buscar subatividades deste serviço no último RDO
+                        subatividades_servico = RDOServicoSubatividade.query.filter_by(
+                            rdo_id=ultimo_rdo.id,
+                            servico_id=row.id
+                        ).all()
+                        
+                        if subatividades_servico:
+                            # Calcular média dos percentuais das subatividades
+                            total_percentuais = sum(sub.percentual_conclusao or 0 for sub in subatividades_servico)
+                            progresso = total_percentuais / len(subatividades_servico) if len(subatividades_servico) > 0 else 0.0
+                        else:
+                            # Fallback: usar quantidade se não há dados de RDO
+                            if row.quantidade_planejada and row.quantidade_planejada > 0:
+                                progresso = (row.quantidade_executada or 0) / row.quantidade_planejada * 100
+                except Exception as e:
+                    print(f"ERRO ao calcular progresso do serviço {row.id}: {e}")
+                    # Fallback: usar quantidade
+                    if row.quantidade_planejada and row.quantidade_planejada > 0:
+                        progresso = (row.quantidade_executada or 0) / row.quantidade_planejada * 100
                 
                 servicos_obra.append({
                     'id': row.id,
