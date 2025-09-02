@@ -2085,18 +2085,25 @@ def api_servicos():
         
         servicos_json = []
         for servico in servicos:
-            servicos_json.append({
-                'id': servico.id,
-                'nome': servico.nome,
-                'descricao': servico.descricao,
-                'categoria': servico.categoria or 'Geral',
-                'unidade_medida': servico.unidade_medida or 'un',
-                'unidade_simbolo': servico.unidade_simbolo or 'un',
-                'valor_unitario': float(servico.custo_unitario) if servico.custo_unitario else 0.0,
-                'admin_id': servico.admin_id
-            })
+            try:
+                servico_data = {
+                    'id': servico.id,
+                    'nome': servico.nome or 'Serviço sem nome',
+                    'descricao': servico.descricao or '',
+                    'categoria': servico.categoria or 'Geral',
+                    'unidade_medida': servico.unidade_medida or 'un',
+                    'unidade_simbolo': servico.unidade_simbolo or 'un',
+                    'valor_unitario': float(servico.custo_unitario) if hasattr(servico, 'custo_unitario') and servico.custo_unitario else 0.0,
+                    'admin_id': servico.admin_id
+                }
+                servicos_json.append(servico_data)
+                print(f"✅ Serviço processado: {servico.nome} (ID: {servico.id})")
+            except Exception as e:
+                print(f"❌ Erro ao processar serviço {servico.id}: {str(e)}")
+                continue
         
-        return jsonify({'success': True, 'servicos': servicos_json})
+        print(f"🔥 RETORNANDO: {len(servicos_json)} serviços no JSON final")
+        return jsonify({'success': True, 'servicos': servicos_json, 'total': len(servicos_json)})
         
     except Exception as e:
         print(f"ERRO API SERVIÇOS: {str(e)}")
