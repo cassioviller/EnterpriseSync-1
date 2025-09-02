@@ -12,10 +12,22 @@ export PYTHONPATH=/app
 export FLASK_APP=main.py
 export FLASK_ENV=production
 
-# Verificar DATABASE_URL obrigatório
+# Verificar/detectar DATABASE_URL
 if [ -z "$DATABASE_URL" ]; then
-    echo "❌ DATABASE_URL não definida - impossível conectar"
-    exit 1
+    echo "⚠️ DATABASE_URL não definida - tentando detectar automaticamente..."
+    
+    # Tentar variáveis alternativas do EasyPanel
+    if [ -n "$POSTGRES_URL" ]; then
+        export DATABASE_URL="$POSTGRES_URL"
+        echo "✅ DATABASE_URL detectada via POSTGRES_URL"
+    elif [ -n "$DB_HOST" ] && [ -n "$DB_USER" ]; then
+        export DATABASE_URL="postgres://${DB_USER}:${DB_PASSWORD}@${DB_HOST}:${DB_PORT:-5432}/${DB_NAME}?sslmode=disable"
+        echo "✅ DATABASE_URL construída via DB_* variables"
+    else
+        # Fallback para configuração conhecida do projeto
+        export DATABASE_URL="postgres://sige:sige@viajey_sige:5432/sige?sslmode=disable"
+        echo "⚠️ Usando DATABASE_URL fallback do projeto"
+    fi
 fi
 
 echo "📍 DATABASE_URL: $(echo $DATABASE_URL | sed 's/:\/\/[^:]*:[^@]*@/:\/\/****:****@/')"

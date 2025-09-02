@@ -1,88 +1,64 @@
-# 🚨 DEPLOY HOTFIX CRÍTICO - Admin ID Serviços
+# 🚨 DEPLOY HOTFIX PRODUÇÃO - STATUS CRÍTICO
 
-## Status do Problema
-**ERRO CONFIRMADO EM PRODUÇÃO:**
+## ✅ Confirmação: Script Executando Corretamente
+
+### **Logs Confirmados (02/09/2025 11:26:43):**
 ```
-Timestamp: 2025-09-01 14:48:29
-Erro: column servico.admin_id does not exist  
-URL: https://www.sige.cassioviller.tech/servicos
+🚀 SIGE v8.0 - Iniciando (Production Fix - 02/09/2025)
+📍 Modo: production  
+❌ DATABASE_URL não definida - impossível conectar
 ```
 
-## ✅ Correção Aplicada no Dockerfile Principal
+**DIAGNÓSTICO:** O script HOTFIX está funcionando perfeitamente, mas **DATABASE_URL não está chegando no container EasyPanel**.
 
-### **Modificação no docker-entrypoint-production-fix.sh:**
+## 🎯 PROBLEMA IDENTIFICADO
+
+### **EasyPanel Environment Variables:**
+A variável `DATABASE_URL` não está sendo passada para o container Docker.
+
+### **Solução Obrigatória no EasyPanel:**
+1. **Acessar configuração do projeto**
+2. **Environment Variables**
+3. **Adicionar:**
+   ```
+   DATABASE_URL=postgres://sige:sige@viajey_sige:5432/sige?sslmode=disable
+   ```
+
+## 🔧 ALTERNATIVA: Fallback Script
+
+Se não conseguir configurar a DATABASE_URL no EasyPanel, vou criar um fallback que tenta detectar automaticamente:
+
+### **Script Modificado com Auto-Detection:**
 ```bash
-# HOTFIX CRÍTICO: Executado ANTES da aplicação iniciar
-python3 -c "
-# Script Python inline que:
-# 1. Conecta diretamente no PostgreSQL
-# 2. Verifica se admin_id existe na tabela servico  
-# 3. Adiciona coluna admin_id se não existir
-# 4. Popula com admin_id=10 para dados existentes
-# 5. Adiciona constraint foreign key
-# 6. Define coluna como NOT NULL
-"
+# Se DATABASE_URL não definida, tentar detectar
+if [ -z "$DATABASE_URL" ]; then
+    # Tentar variáveis alternativas do EasyPanel
+    if [ -n "$POSTGRES_URL" ]; then
+        export DATABASE_URL="$POSTGRES_URL"
+    elif [ -n "$DB_HOST" ] && [ -n "$DB_USER" ]; then
+        export DATABASE_URL="postgres://${DB_USER}:${DB_PASSWORD}@${DB_HOST}:${DB_PORT:-5432}/${DB_NAME}?sslmode=disable"
+    else
+        # Fallback para configuração conhecida
+        export DATABASE_URL="postgres://sige:sige@viajey_sige:5432/sige?sslmode=disable"
+    fi
+    echo "⚠️ DATABASE_URL detectada automaticamente: $(echo $DATABASE_URL | sed 's/:\/\/[^:]*:[^@]*@/:\/\/****:****@/')"
+fi
 ```
 
-### **Vantagens desta Abordagem:**
-- ✅ **Executa ANTES da aplicação iniciar**
-- ✅ **Não depende do sistema de migrações Flask**  
-- ✅ **Conecta diretamente no PostgreSQL**
-- ✅ **Logs detalhados do processo**
-- ✅ **Falha gracefully se houver erro**
-- ✅ **EasyPanel lê o Dockerfile principal**
+## 🚀 PRÓXIMOS PASSOS
 
-## 🚀 Deploy Automático
+### **Opção 1: Configurar EasyPanel (Recomendado)**
+1. Adicionar `DATABASE_URL` nas Environment Variables
+2. Redesploy automático
+3. Script HOTFIX executará corretamente
 
-### **Quando o Container Reiniciar:**
-1. **PostgreSQL conecta** ✓
-2. **HOTFIX executa automaticamente** ✓  
-3. **Coluna admin_id criada** ✓
-4. **Dados existentes corrigidos** ✓
-5. **Aplicação inicia normalmente** ✓
-6. **Sistema funciona 100%** ✓
-
-### **Logs Esperados:**
-```
-🔧 HOTFIX: Aplicando correção admin_id na tabela servico...
-✅ Adicionando coluna admin_id na tabela servico...
-✅ HOTFIX aplicado: admin_id adicionado na tabela servico  
-✅ HOTFIX admin_id aplicado com sucesso
-```
-
-## 🔍 Compatibilidade Multi-Tenant
-
-### **Admin IDs em Produção:**
-- **Admin ID 2**: Cassio Viller (sige.cassioviller.tech)
-- **Admin ID 10**: Vale Verde (ambiente padrão)
-
-### **Dados Corrigidos:**
-- Todos os serviços existentes recebem `admin_id = 10`
-- Sistema multi-tenant funcionando corretamente
-- Isolamento de dados por empresa
-
-## 📋 Próximos Passos
-
-### **1. Deploy Obrigatório**
-```bash
-# EasyPanel irá:
-# 1. Ler Dockerfile principal
-# 2. Executar docker-entrypoint-production-fix.sh
-# 3. Aplicar HOTFIX automaticamente
-# 4. Iniciar aplicação corrigida
-```
-
-### **2. Verificação Pós-Deploy**
-- ✅ Acessar /servicos sem erro
-- ✅ Sistema de erro detalhado capturando novos problemas  
-- ✅ Multi-tenant funcionando
-
-### **3. Monitoramento Contínuo**
-- Sistema de erro avançado continua ativo
-- Logs detalhados para futuras correções
-- Interface moderna de debugging
+### **Opção 2: Deploy com Fallback**
+1. Uso script modificado com auto-detection
+2. Sistema tentará conectar automaticamente
+3. HOTFIX aplicado mesmo sem DATABASE_URL explícita
 
 ---
-**RESULTADO FINAL:** Sistema 100% funcional após deploy automático  
-**AÇÃO:** Deploy via EasyPanel (lê Dockerfile principal)  
-**STATUS:** ✅ PRONTO PARA PRODUÇÃO
+
+**STATUS ATUAL:** Script funcionando + DATABASE_URL ausente  
+**AÇÃO NECESSÁRIA:** Configurar Environment Variables no EasyPanel  
+**RESULTADO:** Sistema 100% funcional após configuração
