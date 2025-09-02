@@ -803,9 +803,9 @@
                         <i class="fas fa-tools" style="font-size: 3rem; margin-bottom: 1.5rem; opacity: 0.5; color: #3b82f6;"></i>
                         <h5 style="margin-bottom: 1rem; color: #374151;">Nenhum serviço cadastrado</h5>
                         <p style="margin: 0 0 2rem 0; font-size: 1rem; max-width: 400px; margin-left: auto; margin-right: auto;">Os serviços desta obra serão listados aqui conforme forem adicionados ao sistema.</p>
-                        <button type="button" class="btn-modern btn-primary-modern" data-bs-toggle="modal" data-bs-target="#modalGerenciarServicos" style="display: inline-flex; align-items: center; gap: 0.5rem; border: none;">
+                        <button type="button" id="btnGerenciarServicosObraTop" class="btn-modern btn-primary-modern" data-bs-toggle="modal" data-bs-target="#modalGerenciarServicos" style="display: inline-flex; align-items: center; gap: 0.5rem; border: none;">
                             <i class="fas fa-plus"></i>
-                            Gerenciar Serviços
+                            Gerenciar Serviços da Obra
                         </button>
                     </div>
                 {% endif %}
@@ -980,9 +980,9 @@
                         <i class="fas fa-edit"></i>
                         Editar Obra
                     </a>
-                    <button type="button" class="btn-modern btn-outline-modern" data-bs-toggle="modal" data-bs-target="#modalGerenciarServicos" style="border: none;">
+                    <button type="button" id="btnGerenciarServicosObra" class="btn-modern btn-outline-modern" data-bs-toggle="modal" data-bs-target="#modalGerenciarServicos" style="border: none;">
                         <i class="fas fa-cogs"></i>
-                        Gerenciar Serviços
+                        Gerenciar Serviços da Obra
                     </button>
                     <a href="/funcionarios" class="btn-modern btn-outline-modern">
                         <i class="fas fa-users"></i>
@@ -1097,25 +1097,35 @@ document.addEventListener('DOMContentLoaded', function() {
             carregarServicosDisponiveis();
         });
         
-        // Teste adicional - verificar se o botão está funcionando
-        const botaoGerenciar = document.querySelector('[data-bs-target="#modalGerenciarServicos"]');
-        console.log('🔍 Botão encontrado:', botaoGerenciar);
+        // Configurar eventos para ambos os botões de gerenciar serviços
+        const botaoGerenciarTop = document.getElementById('btnGerenciarServicosObraTop');
+        const botaoGerenciarBottom = document.getElementById('btnGerenciarServicosObra');
         
-        if (botaoGerenciar) {
-            botaoGerenciar.addEventListener('click', function(e) {
-                console.log('🖱️ Botão clicado!');
-                e.preventDefault();
-                
-                // Abrir modal manualmente
-                const modal = new bootstrap.Modal(modalGerenciarServicos);
-                modal.show();
-                
-                // Carregar serviços após um pequeno delay
-                setTimeout(() => {
-                    console.log('🚀 Modal aberto manualmente - carregando serviços...');
-                    carregarServicosDisponiveis();
-                }, 300);
-            });
+        console.log('🔍 Botão Top encontrado:', botaoGerenciarTop);
+        console.log('🔍 Botão Bottom encontrado:', botaoGerenciarBottom);
+        
+        function abrirModalServicos(e) {
+            console.log('🖱️ Botão clicado!');
+            e.preventDefault();
+            e.stopPropagation();
+            
+            // Abrir modal manualmente
+            const modal = new bootstrap.Modal(modalGerenciarServicos);
+            modal.show();
+            
+            // Carregar serviços após um pequeno delay
+            setTimeout(() => {
+                console.log('🚀 Modal aberto manualmente - carregando serviços...');
+                carregarServicosDisponiveis();
+            }, 300);
+        }
+        
+        if (botaoGerenciarTop) {
+            botaoGerenciarTop.addEventListener('click', abrirModalServicos);
+        }
+        
+        if (botaoGerenciarBottom) {
+            botaoGerenciarBottom.addEventListener('click', abrirModalServicos);
         }
     } else {
         console.error('❌ Modal não encontrado no DOM!');
