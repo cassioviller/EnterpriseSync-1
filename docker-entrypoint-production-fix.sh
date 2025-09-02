@@ -15,19 +15,24 @@ export FLASK_ENV=production
 # Aguardar PostgreSQL com timeout reduzido
 echo "⏳ Verificando PostgreSQL..."
 
-# Configuração padrão EasyPanel
-DB_HOST="${DATABASE_HOST:-viajey_sige}"
-DB_PORT="${DATABASE_PORT:-5432}"
-DB_USER="${DATABASE_USER:-sige}"
+# Verificar DATABASE_URL obrigatório
+if [ -z "$DATABASE_URL" ]; then
+    echo "❌ DATABASE_URL não definida - impossível conectar"
+    exit 1
+fi
+
+echo "📍 DATABASE_URL: $(echo $DATABASE_URL | sed 's/:\/\/[^:]*:[^@]*@/:\/\/****:****@/')"
 
 TIMEOUT=20
 COUNTER=0
 
-until pg_isready -h "${DB_HOST}" -p "${DB_PORT}" -U "${DB_USER}" >/dev/null 2>&1; do
+# Testar conexão usando DATABASE_URL diretamente
+until psql "$DATABASE_URL" -c "SELECT 1;" >/dev/null 2>&1; do
     if [[ ${COUNTER} -eq ${TIMEOUT} ]]; then
-        echo "❌ Timeout PostgreSQL (${TIMEOUT}s)"
+        echo "❌ Timeout PostgreSQL (${TIMEOUT}s) - DATABASE_URL: ${DATABASE_URL%:*}:****"
         exit 1
     fi
+    echo "⏳ Tentativa $COUNTER/$TIMEOUT - aguardando PostgreSQL..."
     sleep 1
     COUNTER=$((COUNTER + 1))
 done
