@@ -1371,6 +1371,10 @@ def editar_obra(id):
                 import secrets
                 obra.token_cliente = secrets.token_urlsafe(32)
             
+            # Processar serviços selecionados na edição
+            servicos_selecionados = request.form.getlist('servicos_obra')
+            print(f"DEBUG EDITAR OBRA: Serviços selecionados = {servicos_selecionados}")
+            
             db.session.commit()
             
             flash(f'Obra "{obra.nome}" atualizada com sucesso!', 'success')

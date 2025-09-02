@@ -2,383 +2,595 @@
 
 {% block title %}{{ titulo }} - SIGE{% endblock %}
 
+{% block extra_css %}
+<style>
+    .modern-card {
+        border: none;
+        border-radius: 20px;
+        box-shadow: 0 8px 25px rgba(0, 0, 0, 0.1);
+        background: linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%);
+        transition: all 0.4s ease;
+        overflow: hidden;
+    }
+    
+    .modern-card:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 15px 35px rgba(0, 0, 0, 0.15);
+    }
+    
+    .page-header {
+        background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+        color: white;
+        padding: 2.5rem 2rem;
+        margin: -0.5rem -0.5rem 2rem -0.5rem;
+        position: relative;
+        overflow: hidden;
+    }
+    
+    .page-header::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        right: 0;
+        width: 200px;
+        height: 200px;
+        background: rgba(255, 255, 255, 0.1);
+        border-radius: 50%;
+        transform: translate(50px, -50px);
+    }
+    
+    .modern-form-control {
+        border: 2px solid #e9ecef;
+        border-radius: 12px;
+        padding: 1rem;
+        font-size: 0.95rem;
+        transition: all 0.3s ease;
+        background-color: #fafbfc;
+        font-weight: 500;
+    }
+    
+    .modern-form-control:focus {
+        border-color: #28a745;
+        box-shadow: 0 0 0 0.25rem rgba(40, 167, 69, 0.15);
+        background-color: #ffffff;
+        transform: translateY(-1px);
+    }
+    
+    .modern-form-label {
+        font-weight: 700;
+        color: #2d3748;
+        margin-bottom: 0.75rem;
+        font-size: 0.9rem;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+    
+    .modern-form-label i {
+        margin-right: 0.5rem;
+        width: 16px;
+        text-align: center;
+    }
+    
+    .section-card {
+        background: white;
+        border-radius: 15px;
+        padding: 1.5rem;
+        margin-bottom: 1.5rem;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.07);
+        border: 1px solid #e9ecef;
+        transition: all 0.3s ease;
+    }
+    
+    .section-card:hover {
+        box-shadow: 0 8px 15px rgba(0, 0, 0, 0.1);
+        border-color: #28a745;
+    }
+    
+    .section-title {
+        color: #28a745;
+        font-weight: 700;
+        font-size: 1.1rem;
+        margin-bottom: 1.5rem;
+        padding-bottom: 0.75rem;
+        border-bottom: 2px solid #e9ecef;
+        position: relative;
+    }
+    
+    .section-title::after {
+        content: '';
+        position: absolute;
+        bottom: -2px;
+        left: 0;
+        width: 60px;
+        height: 2px;
+        background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+        border-radius: 1px;
+    }
+    
+    .modern-btn {
+        border-radius: 25px;
+        padding: 0.875rem 2.5rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        transition: all 0.3s ease;
+        border: none;
+        font-size: 0.85rem;
+    }
+    
+    .modern-btn-success {
+        background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+        color: white;
+        box-shadow: 0 4px 15px rgba(40, 167, 69, 0.3);
+    }
+    
+    .modern-btn-success:hover {
+        background: linear-gradient(135deg, #20c997 0%, #17a2b8 100%);
+        transform: translateY(-2px);
+        box-shadow: 0 8px 25px rgba(40, 167, 69, 0.4);
+        color: white;
+    }
+    
+    .modern-btn-outline {
+        background: transparent;
+        border: 2px solid #6c757d;
+        color: #6c757d;
+    }
+    
+    .modern-btn-outline:hover {
+        background: #6c757d;
+        color: white;
+        transform: translateY(-2px);
+    }
+    
+    .service-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+        gap: 1rem;
+    }
+    
+    .service-checkbox-card {
+        border: 2px solid #e9ecef;
+        border-radius: 12px;
+        padding: 1.25rem;
+        transition: all 0.3s ease;
+        background: linear-gradient(135deg, #fafbfc 0%, #ffffff 100%);
+        cursor: pointer;
+    }
+    
+    .service-checkbox-card:hover {
+        border-color: #28a745;
+        background: linear-gradient(135deg, #f8fff9 0%, #ffffff 100%);
+        transform: translateY(-2px);
+        box-shadow: 0 4px 15px rgba(40, 167, 69, 0.1);
+    }
+    
+    .service-checkbox-card input[type="checkbox"] {
+        transform: scale(1.3);
+        margin-right: 1rem;
+    }
+    
+    .service-checkbox-card input[type="checkbox"]:checked + .service-info {
+        color: #28a745;
+    }
+    
+    .service-info h6 {
+        font-weight: 700;
+        margin-bottom: 0.5rem;
+        color: #2d3748;
+    }
+    
+    .service-info small {
+        color: #6c757d;
+        line-height: 1.4;
+    }
+    
+    .empty-state {
+        text-align: center;
+        padding: 3rem 2rem;
+        color: #6c757d;
+    }
+    
+    .empty-state i {
+        font-size: 3rem;
+        opacity: 0.3;
+        margin-bottom: 1rem;
+    }
+    
+    .form-group-row {
+        margin-bottom: 1.5rem;
+    }
+    
+    .required-field::after {
+        content: ' *';
+        color: #dc3545;
+        font-weight: bold;
+    }
+    
+    @media (max-width: 768px) {
+        .page-header {
+            padding: 1.5rem 1rem;
+        }
+        
+        .section-card {
+            padding: 1rem;
+        }
+        
+        .service-grid {
+            grid-template-columns: 1fr;
+        }
+    }
+</style>
+{% endblock %}
+
 {% block content %}
-<div class="container-fluid">
-    <!-- Header da Página -->
-    <div class="d-flex justify-content-between align-items-center mb-4">
-        <div>
-            <h1 class="h3 mb-0 text-gray-800">
-                <i class="fas fa-building"></i> {{ titulo }}
-            </h1>
-            <p class="text-muted mb-0">{{ 'Editar informações da obra' if obra else 'Criar nova obra no sistema' }}</p>
+<div class="container-fluid px-4">
+    <div class="modern-card">
+        <div class="page-header">
+            <div class="d-flex justify-content-between align-items-center">
+                <div class="position-relative">
+                    <h1 class="h2 mb-1 fw-bold">
+                        <i class="fas fa-building me-3"></i>{{ titulo }}
+                    </h1>
+                    <p class="mb-0 opacity-75 fs-5">
+                        {{ 'Editar informações da obra' if obra else 'Criar nova obra no sistema' }}
+                    </p>
+                </div>
+                <div>
+                    <a href="{{ url_for('main.obras') }}" class="btn btn-light modern-btn modern-btn-outline">
+                        <i class="fas fa-arrow-left me-2"></i>Voltar
+                    </a>
+                </div>
+            </div>
         </div>
-        <div>
-            <a href="{{ url_for('main.obras') }}" class="btn btn-outline-secondary">
-                <i class="fas fa-arrow-left"></i> Voltar para Lista
-            </a>
-        </div>
-    </div>
 
-    <!-- Formulário -->
-    <div class="card">
-        <div class="card-header">
-            <h5 class="mb-0">
-                <i class="fas fa-edit"></i> {{ 'Informações da Obra' if obra else 'Dados da Nova Obra' }}
-            </h5>
-        </div>
-        <div class="card-body">
-            <form method="POST" id="obraForm">
-                <div class="row">
-                    <!-- Nome da Obra -->
-                    <div class="col-md-8 mb-3">
-                        <label for="nome" class="form-label">
-                            <i class="fas fa-building text-primary"></i> Nome da Obra *
-                        </label>
-                        <input type="text" 
-                               class="form-control" 
-                               id="nome" 
-                               name="nome" 
-                               value="{{ obra.nome if obra else '' }}" 
-                               required
-                               placeholder="Ex: Edifício Residencial São Paulo">
-                    </div>
+        <div class="p-4">
+            <form method="POST" id="obraForm" novalidate>
+                <!-- Informações Básicas -->
+                <div class="section-card">
+                    <h6 class="section-title">
+                        <i class="fas fa-info-circle me-2"></i>Informações Básicas
+                    </h6>
                     
-                    <!-- Status -->
-                    <div class="col-md-4 mb-3">
-                        <label for="status" class="form-label">
-                            <i class="fas fa-flag text-success"></i> Status
-                        </label>
-                        <select class="form-select" id="status" name="status">
-                            <option value="Em andamento" {{ 'selected' if obra and obra.status == 'Em andamento' else '' }}>Em andamento</option>
-                            <option value="PLANEJAMENTO" {{ 'selected' if obra and obra.status == 'PLANEJAMENTO' else '' }}>Planejamento</option>
-                            <option value="Pausada" {{ 'selected' if obra and obra.status == 'Pausada' else '' }}>Pausada</option>
-                            <option value="Concluída" {{ 'selected' if obra and obra.status == 'Concluída' else '' }}>Concluída</option>
-                        </select>
+                    <div class="row form-group-row">
+                        <div class="col-md-8">
+                            <label for="nome" class="modern-form-label required-field">
+                                <i class="fas fa-building"></i>Nome da Obra
+                            </label>
+                            <input type="text" 
+                                   class="form-control modern-form-control" 
+                                   id="nome" 
+                                   name="nome" 
+                                   value="{{ obra.nome if obra else '' }}" 
+                                   required
+                                   placeholder="Ex: Edifício Residencial São Paulo">
+                        </div>
+                        
+                        <div class="col-md-4">
+                            <label for="status" class="modern-form-label">
+                                <i class="fas fa-flag"></i>Status
+                            </label>
+                            <select class="form-select modern-form-control" id="status" name="status">
+                                <option value="Em andamento" {{ 'selected' if obra and obra.status == 'Em andamento' else '' }}>Em andamento</option>
+                                <option value="PLANEJAMENTO" {{ 'selected' if obra and obra.status == 'PLANEJAMENTO' else '' }}>Planejamento</option>
+                                <option value="Pausada" {{ 'selected' if obra and obra.status == 'Pausada' else '' }}>Pausada</option>
+                                <option value="Concluída" {{ 'selected' if obra and obra.status == 'Concluída' else '' }}>Concluída</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="row form-group-row">
+                        <div class="col-md-8">
+                            <label for="endereco" class="modern-form-label">
+                                <i class="fas fa-map-marker-alt"></i>Endereço
+                            </label>
+                            <input type="text" 
+                                   class="form-control modern-form-control" 
+                                   id="endereco" 
+                                   name="endereco" 
+                                   value="{{ obra.endereco if obra else '' }}"
+                                   placeholder="Endereço completo da obra">
+                        </div>
+                        
+                        <div class="col-md-4">
+                            <label for="area_total_m2" class="modern-form-label">
+                                <i class="fas fa-ruler-combined"></i>Área Total (m²)
+                            </label>
+                            <input type="number" 
+                                   class="form-control modern-form-control" 
+                                   id="area_total_m2" 
+                                   name="area_total_m2" 
+                                   value="{{ obra.area_total_m2 if obra and obra.area_total_m2 else '' }}"
+                                   step="0.01"
+                                   placeholder="0.00">
+                        </div>
                     </div>
                 </div>
 
-                <div class="row">
-                    <!-- Cliente Nome -->
-                    <div class="col-md-4 mb-3">
-                        <label for="cliente_nome" class="form-label">
-                            <i class="fas fa-user text-info"></i> Nome do Cliente
-                        </label>
-                        <input type="text" 
-                               class="form-control" 
-                               id="cliente_nome" 
-                               name="cliente_nome" 
-                               value="{{ obra.cliente_nome if obra and obra.cliente_nome else '' }}"
-                               placeholder="Nome completo do cliente">
-                    </div>
+                <!-- Informações do Cliente -->
+                <div class="section-card">
+                    <h6 class="section-title">
+                        <i class="fas fa-user-tie me-2"></i>Informações do Cliente
+                    </h6>
                     
-                    <!-- Cliente Email -->
-                    <div class="col-md-4 mb-3">
-                        <label for="cliente_email" class="form-label">
-                            <i class="fas fa-envelope text-info"></i> Email do Cliente
-                        </label>
-                        <input type="email" 
-                               class="form-control" 
-                               id="cliente_email" 
-                               name="cliente_email" 
-                               value="{{ obra.cliente_email if obra and obra.cliente_email else '' }}"
-                               placeholder="email@cliente.com">
-                    </div>
-                    
-                    <!-- Cliente Telefone -->
-                    <div class="col-md-4 mb-3">
-                        <label for="cliente_telefone" class="form-label">
-                            <i class="fas fa-phone text-info"></i> Telefone do Cliente
-                        </label>
-                        <input type="tel" 
-                               class="form-control" 
-                               id="cliente_telefone" 
-                               name="cliente_telefone" 
-                               value="{{ obra.cliente_telefone if obra and obra.cliente_telefone else '' }}"
-                               placeholder="(11) 99999-9999">
+                    <div class="row form-group-row">
+                        <div class="col-md-4">
+                            <label for="cliente_nome" class="modern-form-label">
+                                <i class="fas fa-user"></i>Nome do Cliente
+                            </label>
+                            <input type="text" 
+                                   class="form-control modern-form-control" 
+                                   id="cliente_nome" 
+                                   name="cliente_nome" 
+                                   value="{{ obra.cliente_nome if obra else '' }}"
+                                   placeholder="Nome completo do cliente">
+                        </div>
+                        
+                        <div class="col-md-4">
+                            <label for="cliente_email" class="modern-form-label">
+                                <i class="fas fa-envelope"></i>Email do Cliente
+                            </label>
+                            <input type="email" 
+                                   class="form-control modern-form-control" 
+                                   id="cliente_email" 
+                                   name="cliente_email" 
+                                   value="{{ obra.cliente_email if obra else '' }}"
+                                   placeholder="cliente@empresa.com">
+                        </div>
+                        
+                        <div class="col-md-4">
+                            <label for="cliente_telefone" class="modern-form-label">
+                                <i class="fas fa-phone"></i>Telefone do Cliente
+                            </label>
+                            <input type="tel" 
+                                   class="form-control modern-form-control" 
+                                   id="cliente_telefone" 
+                                   name="cliente_telefone" 
+                                   value="{{ obra.cliente_telefone if obra else '' }}"
+                                   placeholder="(11) 99999-9999">
+                        </div>
                     </div>
                 </div>
 
-                <div class="row">
-                    <!-- Endereço -->
-                    <div class="col-md-8 mb-3">
-                        <label for="endereco" class="form-label">
-                            <i class="fas fa-map-marker-alt text-warning"></i> Endereço da Obra
-                        </label>
-                        <input type="text" 
-                               class="form-control" 
-                               id="endereco" 
-                               name="endereco" 
-                               value="{{ obra.endereco if obra and obra.endereco else '' }}"
-                               placeholder="Endereço completo da obra">
-                    </div>
+                <!-- Datas e Responsável -->
+                <div class="section-card">
+                    <h6 class="section-title">
+                        <i class="fas fa-calendar me-2"></i>Cronograma e Responsabilidade
+                    </h6>
                     
-                    <!-- Área Total -->
-                    <div class="col-md-4 mb-3">
-                        <label for="area_total_m2" class="form-label">
-                            <i class="fas fa-ruler-combined text-warning"></i> Área Total (m²)
-                        </label>
-                        <input type="number" 
-                               class="form-control" 
-                               id="area_total_m2" 
-                               name="area_total_m2" 
-                               step="0.01" 
-                               value="{{ obra.area_total_m2 if obra and obra.area_total_m2 else '' }}"
-                               placeholder="0.00">
-                    </div>
-                </div>
-
-                <div class="row">
-                    <!-- Data de Início -->
-                    <div class="col-md-3 mb-3">
-                        <label for="data_inicio" class="form-label">
-                            <i class="fas fa-calendar-alt text-success"></i> Data de Início *
-                        </label>
-                        <input type="date" 
-                               class="form-control" 
-                               id="data_inicio" 
-                               name="data_inicio" 
-                               value="{{ obra.data_inicio.strftime('%Y-%m-%d') if obra and obra.data_inicio else '' }}" 
-                               required>
-                    </div>
-                    
-                    <!-- Data de Previsão de Fim -->
-                    <div class="col-md-3 mb-3">
-                        <label for="data_previsao_fim" class="form-label">
-                            <i class="fas fa-calendar-check text-warning"></i> Previsão de Fim
-                        </label>
-                        <input type="date" 
-                               class="form-control" 
-                               id="data_previsao_fim" 
-                               name="data_previsao_fim" 
-                               value="{{ obra.data_previsao_fim.strftime('%Y-%m-%d') if obra and obra.data_previsao_fim else '' }}">
-                    </div>
-                    
-                    <!-- Responsável -->
-                    <div class="col-md-6 mb-3">
-                        <label for="responsavel_id" class="form-label">
-                            <i class="fas fa-user-hard-hat text-primary"></i> Responsável pela Obra
-                        </label>
-                        <select class="form-select" id="responsavel_id" name="responsavel_id">
-                            <option value="">Selecione um responsável</option>
-                            {% if funcionarios %}
+                    <div class="row form-group-row">
+                        <div class="col-md-4">
+                            <label for="data_inicio" class="modern-form-label required-field">
+                                <i class="fas fa-play"></i>Data de Início
+                            </label>
+                            <input type="date" 
+                                   class="form-control modern-form-control" 
+                                   id="data_inicio" 
+                                   name="data_inicio" 
+                                   value="{{ obra.data_inicio.strftime('%Y-%m-%d') if obra and obra.data_inicio else '' }}"
+                                   required>
+                        </div>
+                        
+                        <div class="col-md-4">
+                            <label for="data_previsao_fim" class="modern-form-label">
+                                <i class="fas fa-stop"></i>Previsão de Fim
+                            </label>
+                            <input type="date" 
+                                   class="form-control modern-form-control" 
+                                   id="data_previsao_fim" 
+                                   name="data_previsao_fim" 
+                                   value="{{ obra.data_previsao_fim.strftime('%Y-%m-%d') if obra and obra.data_previsao_fim else '' }}">
+                        </div>
+                        
+                        <div class="col-md-4">
+                            <label for="responsavel_id" class="modern-form-label">
+                                <i class="fas fa-user-hard-hat"></i>Responsável pela Obra
+                            </label>
+                            <select class="form-select modern-form-control" id="responsavel_id" name="responsavel_id">
+                                <option value="">Selecione um responsável</option>
                                 {% for funcionario in funcionarios %}
-                                <option value="{{ funcionario.id }}" {{ 'selected' if obra and obra.responsavel_id == funcionario.id else '' }}>
-                                    {{ funcionario.nome }} - {{ funcionario.funcao.nome if funcionario.funcao else 'Sem função' }}
+                                <option value="{{ funcionario.id }}" 
+                                        {{ 'selected' if obra and obra.responsavel_id == funcionario.id else '' }}>
+                                    {{ funcionario.nome }}
+                                    {% if funcionario.funcao_ref %}
+                                    - {{ funcionario.funcao_ref.nome }}
+                                    {% endif %}
                                 </option>
                                 {% endfor %}
-                            {% endif %}
-                        </select>
+                            </select>
+                        </div>
                     </div>
                 </div>
 
-                <div class="row">
-                    <!-- Orçamento Inicial -->
-                    <div class="col-md-3 mb-3">
-                        <label for="orcamento" class="form-label">
-                            <i class="fas fa-calculator text-primary"></i> Orçamento Inicial (R$)
-                        </label>
-                        <input type="number" 
-                               class="form-control" 
-                               id="orcamento" 
-                               name="orcamento" 
-                               step="0.01" 
-                               value="{{ obra.orcamento if obra and obra.orcamento else '' }}"
-                               placeholder="0.00">
-                    </div>
+                <!-- Informações Financeiras e Técnicas -->
+                <div class="section-card">
+                    <h6 class="section-title">
+                        <i class="fas fa-dollar-sign me-2"></i>Informações Financeiras e Técnicas
+                    </h6>
                     
-                    <!-- Valor do Contrato -->
-                    <div class="col-md-3 mb-3">
-                        <label for="valor_contrato" class="form-label">
-                            <i class="fas fa-file-contract text-info"></i> Valor do Contrato (R$)
-                        </label>
-                        <input type="number" 
-                               class="form-control" 
-                               id="valor_contrato" 
-                               name="valor_contrato" 
-                               step="0.01" 
-                               value="{{ obra.valor_contrato if obra and obra.valor_contrato else '' }}"
-                               placeholder="0.00">
-                    </div>
-                    
-                    <!-- Código da Obra -->
-                    <div class="col-md-3 mb-3">
-                        <label for="codigo" class="form-label">
-                            <i class="fas fa-hashtag text-secondary"></i> Código da Obra
-                        </label>
-                        <input type="text" 
-                               class="form-control" 
-                               id="codigo" 
-                               name="codigo" 
-                               value="{{ obra.codigo if obra and obra.codigo else '' }}"
-                               placeholder="Ex: OBR001">
-                        <small class="form-text text-muted">Deixe em branco para gerar automaticamente</small>
-                    </div>
-                    
-                    <!-- Portal Ativo -->
-                    <div class="col-md-3 mb-3">
-                        <label for="portal_ativo" class="form-label">
-                            <i class="fas fa-globe text-info"></i> Portal do Cliente
-                        </label>
-                        <select class="form-select" id="portal_ativo" name="portal_ativo">
-                            <option value="1" {{ 'selected' if not obra or (obra and obra.portal_ativo) else '' }}>Ativo</option>
-                            <option value="0" {{ 'selected' if obra and not obra.portal_ativo else '' }}>Inativo</option>
-                        </select>
-                        <small class="form-text text-muted">Permite ao cliente acompanhar a obra online</small>
+                    <div class="row form-group-row">
+                        <div class="col-md-3">
+                            <label for="orcamento" class="modern-form-label">
+                                <i class="fas fa-calculator"></i>Orçamento (R$)
+                            </label>
+                            <input type="number" 
+                                   class="form-control modern-form-control" 
+                                   id="orcamento" 
+                                   name="orcamento" 
+                                   value="{{ obra.orcamento if obra and obra.orcamento else '' }}"
+                                   step="0.01"
+                                   placeholder="0,00">
+                        </div>
+                        
+                        <div class="col-md-3">
+                            <label for="valor_contrato" class="modern-form-label">
+                                <i class="fas fa-file-contract"></i>Valor do Contrato (R$)
+                            </label>
+                            <input type="number" 
+                                   class="form-control modern-form-control" 
+                                   id="valor_contrato" 
+                                   name="valor_contrato" 
+                                   value="{{ obra.valor_contrato if obra and obra.valor_contrato else '' }}"
+                                   step="0.01"
+                                   placeholder="0,00">
+                        </div>
+                        
+                        <div class="col-md-3">
+                            <label for="codigo" class="modern-form-label">
+                                <i class="fas fa-hashtag"></i>Código da Obra
+                            </label>
+                            <input type="text" 
+                                   class="form-control modern-form-control" 
+                                   id="codigo" 
+                                   name="codigo" 
+                                   value="{{ obra.codigo if obra else '' }}"
+                                   placeholder="Deixe em branco para gerar automaticamente">
+                            <small class="text-muted">Geração automática se deixado em branco</small>
+                        </div>
+                        
+                        <div class="col-md-3">
+                            <label for="portal_ativo" class="modern-form-label">
+                                <i class="fas fa-globe"></i>Portal do Cliente
+                            </label>
+                            <select class="form-select modern-form-control" id="portal_ativo" name="portal_ativo">
+                                <option value="1" {{ 'selected' if obra and obra.portal_ativo else '' }}>Ativo</option>
+                                <option value="0" {{ 'selected' if obra and not obra.portal_ativo else '' }}>Inativo</option>
+                            </select>
+                            <small class="text-muted">Permite ao cliente acompanhar a obra online</small>
+                        </div>
                     </div>
                 </div>
 
                 <!-- Serviços da Obra -->
-                <div class="row">
-                    <div class="col-12 mb-4">
-                        <div class="card">
-                            <div class="card-header">
-                                <h6 class="mb-0">
-                                    <i class="fas fa-cogs text-primary"></i> Serviços da Obra
-                                </h6>
-                                <small class="text-muted">Selecione os serviços que fazem parte desta obra</small>
-                            </div>
-                            <div class="card-body">
-                                {% if servicos_disponiveis %}
-                                <div class="row">
-                                    {% for servico in servicos_disponiveis %}
-                                    <div class="col-md-4 col-sm-6 mb-3">
-                                        <div class="form-check">
-                                            <input class="form-check-input" 
-                                                   type="checkbox" 
-                                                   name="servicos_obra" 
-                                                   value="{{ servico.id }}" 
-                                                   id="servico_{{ servico.id }}"
-                                                   {% if obra and servico in servicos_obra %}checked{% endif %}>
-                                            <label class="form-check-label" for="servico_{{ servico.id }}">
-                                                <strong>{{ servico.nome }}</strong>
-                                                {% if servico.descricao %}
-                                                <br><small class="text-muted">{{ servico.descricao[:50] + '...' if servico.descricao|length > 50 else servico.descricao }}</small>
-                                                {% endif %}
-                                            </label>
-                                        </div>
-                                    </div>
-                                    {% endfor %}
+                <div class="section-card">
+                    <h6 class="section-title">
+                        <i class="fas fa-cogs me-2"></i>Serviços da Obra
+                    </h6>
+                    <p class="text-muted mb-3">Selecione os serviços que fazem parte desta obra</p>
+                    
+                    {% if servicos_disponiveis %}
+                    <div class="service-grid">
+                        {% for servico in servicos_disponiveis %}
+                        <div class="service-checkbox-card">
+                            <div class="d-flex align-items-start">
+                                <input class="form-check-input" 
+                                       type="checkbox" 
+                                       name="servicos_obra" 
+                                       value="{{ servico.id }}" 
+                                       id="servico_{{ servico.id }}"
+                                       {% if obra and servico in servicos_obra %}checked{% endif %}>
+                                <div class="service-info flex-grow-1">
+                                    <h6 class="mb-1">{{ servico.nome }}</h6>
+                                    {% if servico.descricao %}
+                                    <small class="text-muted">
+                                        {{ servico.descricao[:80] + '...' if servico.descricao|length > 80 else servico.descricao }}
+                                    </small>
+                                    {% endif %}
                                 </div>
-                                {% else %}
-                                <div class="text-center py-4">
-                                    <i class="fas fa-cogs text-muted" style="font-size: 2rem; opacity: 0.5;"></i>
-                                    <h6 class="mt-2 text-muted">Nenhum serviço cadastrado</h6>
-                                    <p class="text-muted mb-3">Cadastre serviços primeiro para associá-los à obra</p>
-                                    <a href="/servicos" class="btn btn-outline-primary btn-sm">
-                                        <i class="fas fa-plus"></i> Gerenciar Serviços
-                                    </a>
-                                </div>
-                                {% endif %}
                             </div>
                         </div>
+                        {% endfor %}
                     </div>
-                </div>
-
-                <!-- Informações adicionais se editando -->
-                {% if obra %}
-                <div class="row">
-                    <div class="col-12 mb-3">
-                        <div class="alert alert-info">
-                            <i class="fas fa-info-circle"></i>
-                            <strong>Informações:</strong>
-                            <ul class="mb-0 mt-2">
-                                <li>Código da obra: <strong>{{ obra.codigo if obra.codigo else 'Não definido' }}</strong></li>
-                                <li>Criada em: <strong>{{ obra.created_at.strftime('%d/%m/%Y às %H:%M') if obra.created_at else 'Não disponível' }}</strong></li>
-                                <li>Admin ID: <strong>{{ obra.admin_id }}</strong></li>
-                            </ul>
-                        </div>
+                    {% else %}
+                    <div class="empty-state">
+                        <i class="fas fa-cogs"></i>
+                        <h6 class="mt-2">Nenhum serviço cadastrado</h6>
+                        <p class="mb-3">Cadastre serviços primeiro para associá-los à obra</p>
+                        <a href="/servicos" class="btn btn-outline-primary modern-btn">
+                            <i class="fas fa-plus me-2"></i>Gerenciar Serviços
+                        </a>
                     </div>
+                    {% endif %}
                 </div>
-                {% endif %}
 
                 <!-- Botões de Ação -->
-                <div class="row">
-                    <div class="col-12">
-                        <div class="d-flex justify-content-between">
-                            <div>
-                                <button type="submit" class="btn btn-primary">
-                                    <i class="fas fa-save"></i> {{ 'Atualizar Obra' if obra else 'Criar Obra' }}
-                                </button>
-                                <a href="{{ url_for('main.obras') }}" class="btn btn-outline-secondary ms-2">
-                                    <i class="fas fa-times"></i> Cancelar
-                                </a>
-                            </div>
-                            
-                            {% if obra %}
-                            <div>
-                                <button type="button" 
-                                        class="btn btn-outline-danger" 
-                                        onclick="confirmarExclusao({{ obra.id }}, '{{ obra.nome }}')">
-                                    <i class="fas fa-trash"></i> Excluir Obra
-                                </button>
-                            </div>
-                            {% endif %}
-                        </div>
-                    </div>
+                <div class="d-flex justify-content-between align-items-center mt-4">
+                    <a href="{{ url_for('main.obras') }}" class="btn modern-btn modern-btn-outline">
+                        <i class="fas fa-times me-2"></i>Cancelar
+                    </a>
+                    
+                    <button type="submit" class="btn modern-btn modern-btn-success">
+                        <i class="fas fa-save me-2"></i>
+                        {{ 'Atualizar Obra' if obra else 'Criar Obra' }}
+                    </button>
                 </div>
             </form>
         </div>
     </div>
 </div>
 
-<!-- Modal de Confirmação de Exclusão -->
-{% if obra %}
-<div class="modal fade" id="modalExclusao" tabindex="-1">
-    <div class="modal-dialog">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title">
-                    <i class="fas fa-exclamation-triangle text-warning"></i> Confirmar Exclusão
-                </h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-            </div>
-            <div class="modal-body">
-                <p>Tem certeza que deseja excluir a obra <strong id="nomeObraExclusao"></strong>?</p>
-                <div class="alert alert-warning">
-                    <i class="fas fa-info-circle"></i>
-                    <strong>Atenção:</strong> Esta ação não pode ser desfeita. Todos os dados relacionados à obra serão verificados antes da exclusão.
-                </div>
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
-                <form method="POST" id="formExclusao" style="display: inline;">
-                    <button type="submit" class="btn btn-danger">
-                        <i class="fas fa-trash"></i> Confirmar Exclusão
-                    </button>
-                </form>
-            </div>
-        </div>
-    </div>
-</div>
-{% endif %}
-
 <script>
-{% if obra %}
-function confirmarExclusao(obraId, nomeObra) {
-    document.getElementById('nomeObraExclusao').textContent = nomeObra;
-    document.getElementById('formExclusao').action = `/obras/excluir/${obraId}`;
-    new bootstrap.Modal(document.getElementById('modalExclusao')).show();
-}
-{% endif %}
-
-// Validação do formulário
-document.getElementById('obraForm').addEventListener('submit', function(e) {
-    const nome = document.getElementById('nome').value.trim();
-    const dataInicio = document.getElementById('data_inicio').value;
+document.addEventListener('DOMContentLoaded', function() {
+    // Form validation
+    const form = document.getElementById('obraForm');
+    const nomeInput = document.getElementById('nome');
+    const dataInicioInput = document.getElementById('data_inicio');
     
-    if (!nome) {
-        e.preventDefault();
-        alert('Por favor, informe o nome da obra.');
-        document.getElementById('nome').focus();
-        return;
-    }
+    form.addEventListener('submit', function(e) {
+        let isValid = true;
+        
+        // Validate required fields
+        if (!nomeInput.value.trim()) {
+            nomeInput.classList.add('is-invalid');
+            isValid = false;
+        } else {
+            nomeInput.classList.remove('is-invalid');
+        }
+        
+        if (!dataInicioInput.value) {
+            dataInicioInput.classList.add('is-invalid');
+            isValid = false;
+        } else {
+            dataInicioInput.classList.remove('is-invalid');
+        }
+        
+        if (!isValid) {
+            e.preventDefault();
+            // Show error message
+            if (!document.querySelector('.alert-danger')) {
+                const alertDiv = document.createElement('div');
+                alertDiv.className = 'alert alert-danger alert-dismissible fade show';
+                alertDiv.innerHTML = `
+                    <strong>Erro:</strong> Por favor, preencha todos os campos obrigatórios.
+                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                `;
+                form.insertBefore(alertDiv, form.firstChild);
+            }
+        }
+    });
     
-    if (!dataInicio) {
-        e.preventDefault();
-        alert('Por favor, informe a data de início da obra.');
-        document.getElementById('data_inicio').focus();
-        return;
-    }
+    // Enhanced form interactions
+    document.querySelectorAll('.modern-form-control').forEach(input => {
+        input.addEventListener('focus', function() {
+            this.parentElement.classList.add('focused');
+        });
+        
+        input.addEventListener('blur', function() {
+            this.parentElement.classList.remove('focused');
+        });
+    });
+    
+    // Service checkbox interactions
+    document.querySelectorAll('.service-checkbox-card').forEach(card => {
+        const checkbox = card.querySelector('input[type="checkbox"]');
+        
+        card.addEventListener('click', function(e) {
+            if (e.target.type !== 'checkbox') {
+                checkbox.checked = !checkbox.checked;
+                checkbox.dispatchEvent(new Event('change'));
+            }
+        });
+        
+        checkbox.addEventListener('change', function() {
+            if (this.checked) {
+                card.style.borderColor = '#28a745';
+                card.style.backgroundColor = '#f8fff9';
+            } else {
+                card.style.borderColor = '#e9ecef';
+                card.style.backgroundColor = '';
+            }
+        });
+    });
 });
 </script>
 {% endblock %}
