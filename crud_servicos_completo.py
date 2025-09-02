@@ -218,7 +218,9 @@ def novo_servico():
         # Verificar se template existe, senão usar inline
         try:
             return render_template('servicos/novo.html', categorias=categorias)
-        except Exception:
+        except Exception as template_error:
+            logger.warning(f"⚠️ Template servicos/novo.html não encontrado: {template_error}")
+            logger.info("🔄 Usando template inline como fallback")
             # Template inline como fallback
             return render_template('base_completo.html',
                                  title="Novo Serviço",
@@ -256,11 +258,191 @@ def novo_servico():
                                      </div>
                                  </div>
                                  
-                                 <!-- Modal será incluído via script -->
+                                 <!-- Modal de Categorias -->
+                                 <div class="modal fade" id="modalCategorias" tabindex="-1">
+                                     <div class="modal-dialog modal-lg">
+                                         <div class="modal-content">
+                                             <div class="modal-header bg-success text-white">
+                                                 <h5 class="modal-title">Gerenciar Categorias</h5>
+                                                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                                             </div>
+                                             <div class="modal-body">
+                                                 <div class="row mb-3">
+                                                     <div class="col-md-8">
+                                                         <input type="text" class="form-control" id="novaCategoria" placeholder="Nome da nova categoria">
+                                                     </div>
+                                                     <div class="col-md-4">
+                                                         <button class="btn btn-success w-100" onclick="adicionarCategoria()">Adicionar</button>
+                                                     </div>
+                                                 </div>
+                                                 <div id="listaCategorias" style="max-height: 300px; overflow-y: auto;">
+                                                     <div class="text-center py-3">Carregando...</div>
+                                                 </div>
+                                             </div>
+                                             <div class="modal-footer">
+                                                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fechar</button>
+                                                 <button type="button" class="btn btn-success" onclick="atualizarSelectCategoria()">Atualizar Lista</button>
+                                             </div>
+                                         </div>
+                                     </div>
+                                 </div>
                                  
                                  <!-- Scripts necessários -->
                                  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
                                  <script src="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/js/all.min.js"></script>
+                                 
+                                 <script>
+                                 // Sistema de gestão de categorias
+                                 let categorias = [];
+                                 
+                                 function abrirModalCategorias() {{
+                                     console.log('Abrindo modal de categorias...');
+                                     const modal = new bootstrap.Modal(document.getElementById('modalCategorias'));
+                                     modal.show();
+                                     carregarCategorias();
+                                 }}
+                                 
+                                 async function carregarCategorias() {{
+                                     try {{
+                                         const response = await fetch('/categorias-servicos/api/listar');
+                                         const data = await response.json();
+                                         
+                                         if (data.success) {{
+                                             categorias = data.categorias;
+                                             renderizarCategorias();
+                                         }} else {{
+                                             document.getElementById('listaCategorias').innerHTML = '<div class="alert alert-danger">Erro ao carregar categorias</div>';
+                                         }}
+                                     }} catch (error) {{
+                                         console.error('Erro:', error);
+                                         document.getElementById('listaCategorias').innerHTML = '<div class="alert alert-danger">Erro de conexão</div>';
+                                     }}
+                                 }}
+                                 
+                                 function renderizarCategorias() {{
+                                     const lista = document.getElementById('listaCategorias');
+                                     
+                                     if (categorias.length === 0) {{
+                                         lista.innerHTML = '<div class="text-center py-3 text-muted">Nenhuma categoria encontrada</div>';
+                                         return;
+                                     }}
+                                     
+                                     let html = '';
+                                     categorias.forEach(categoria => {{
+                                         html += `
+                                             <div class="d-flex justify-content-between align-items-center p-2 border-bottom">
+                                                 <div>
+                                                     <span class="badge" style="background-color: ${{categoria.cor || '#198754'}}">
+                                                         ${{categoria.nome}}
+                                                     </span>
+                                                     <small class="text-muted ms-2">${{categoria.descricao || ''}}</small>
+                                                 </div>
+                                                 <div>
+                                                     <button class="btn btn-sm btn-outline-warning me-1" onclick="editarCategoria(${{categoria.id}})">
+                                                         <i class="fas fa-edit"></i>
+                                                     </button>
+                                                     <button class="btn btn-sm btn-outline-danger" onclick="excluirCategoria(${{categoria.id}}, '${{categoria.nome}}')">
+                                                         <i class="fas fa-trash"></i>
+                                                     </button>
+                                                 </div>
+                                             </div>
+                                         `;
+                                     }});
+                                     
+                                     lista.innerHTML = html;
+                                 }}
+                                 
+                                 async function adicionarCategoria() {{
+                                     const nome = document.getElementById('novaCategoria').value.trim();
+                                     if (!nome) {{
+                                         alert('Digite o nome da categoria');
+                                         return;
+                                     }}
+                                     
+                                     try {{
+                                         const response = await fetch('/categorias-servicos/api/criar', {{
+                                             method: 'POST',
+                                             headers: {{'Content-Type': 'application/json'}},
+                                             body: JSON.stringify({{nome: nome}})
+                                         }});
+                                         
+                                         const result = await response.json();
+                                         
+                                         if (result.success) {{
+                                             document.getElementById('novaCategoria').value = '';
+                                             carregarCategorias();
+                                             alert('Categoria adicionada com sucesso!');
+                                         }} else {{
+                                             alert('Erro: ' + result.error);
+                                         }}
+                                     }} catch (error) {{
+                                         console.error('Erro:', error);
+                                         alert('Erro de conexão');
+                                     }}
+                                 }}
+                                 
+                                 async function excluirCategoria(id, nome) {{
+                                     if (confirm(`Excluir categoria "${{nome}}"?`)) {{
+                                         try {{
+                                             const response = await fetch(`/categorias-servicos/api/${{id}}/excluir`, {{
+                                                 method: 'DELETE'
+                                             }});
+                                             
+                                             const result = await response.json();
+                                             
+                                             if (result.success) {{
+                                                 carregarCategorias();
+                                                 alert('Categoria excluída com sucesso!');
+                                             }} else {{
+                                                 alert('Erro: ' + result.error);
+                                             }}
+                                         }} catch (error) {{
+                                             console.error('Erro:', error);
+                                             alert('Erro de conexão');
+                                         }}
+                                     }}
+                                 }}
+                                 
+                                 async function atualizarSelectCategoria() {{
+                                     try {{
+                                         const response = await fetch('/categorias-servicos/api/listar');
+                                         const data = await response.json();
+                                         
+                                         if (data.success) {{
+                                             const select = document.getElementById('categoria');
+                                             const valorAtual = select.value;
+                                             select.innerHTML = '<option value="">Selecione uma categoria</option>';
+                                             
+                                             data.categorias.forEach(categoria => {{
+                                                 const option = document.createElement('option');
+                                                 option.value = categoria.nome;
+                                                 option.textContent = categoria.nome;
+                                                 if (categoria.nome === valorAtual) option.selected = true;
+                                                 select.appendChild(option);
+                                             }});
+                                             
+                                             const modal = bootstrap.Modal.getInstance(document.getElementById('modalCategorias'));
+                                             modal.hide();
+                                             alert('Lista atualizada!');
+                                         }}
+                                     }} catch (error) {{
+                                         console.error('Erro:', error);
+                                         alert('Erro ao atualizar');
+                                     }}
+                                 }}
+                                 
+                                 // Permitir Enter no campo de nova categoria
+                                 document.addEventListener('DOMContentLoaded', function() {{
+                                     const inputNovaCategoria = document.getElementById('novaCategoria');
+                                     if (inputNovaCategoria) {{
+                                         inputNovaCategoria.addEventListener('keypress', function(e) {{
+                                             if (e.key === 'Enter') {{
+                                                 adicionarCategoria();
+                                             }}
+                                         }});
+                                     }}
+                                 }});
+                                 </script>
                                  """)
         
     except Exception as e:
