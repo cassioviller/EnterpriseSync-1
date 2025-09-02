@@ -1061,7 +1061,7 @@
                     <i class="fas fa-times me-2"></i>
                     Fechar
                 </button>
-                <a href="/servicos" class="btn btn-outline-primary">
+                <a href="/servicos" class="btn btn-outline-primary" target="_blank">
                     <i class="fas fa-plus me-2"></i>
                     Cadastrar Novo Serviço
                 </a>
@@ -1097,15 +1097,13 @@ document.addEventListener('DOMContentLoaded', function() {
             carregarServicosDisponiveis();
         });
         
-        // Configurar eventos para ambos os botões de gerenciar serviços
-        const botaoGerenciarTop = document.getElementById('btnGerenciarServicosObraTop');
-        const botaoGerenciarBottom = document.getElementById('btnGerenciarServicosObra');
+        // Configurar eventos para TODOS os botões que devem abrir o modal
+        const todosOsBotoesModal = document.querySelectorAll('[data-bs-target="#modalGerenciarServicos"]');
         
-        console.log('🔍 Botão Top encontrado:', botaoGerenciarTop);
-        console.log('🔍 Botão Bottom encontrado:', botaoGerenciarBottom);
+        console.log('🔍 Total de botões encontrados:', todosOsBotoesModal.length);
         
         function abrirModalServicos(e) {
-            console.log('🖱️ Botão clicado!');
+            console.log('🖱️ Botão clicado - abrindo modal!');
             e.preventDefault();
             e.stopPropagation();
             
@@ -1120,13 +1118,11 @@ document.addEventListener('DOMContentLoaded', function() {
             }, 300);
         }
         
-        if (botaoGerenciarTop) {
-            botaoGerenciarTop.addEventListener('click', abrirModalServicos);
-        }
-        
-        if (botaoGerenciarBottom) {
-            botaoGerenciarBottom.addEventListener('click', abrirModalServicos);
-        }
+        // Adicionar evento a todos os botões encontrados
+        todosOsBotoesModal.forEach((botao, index) => {
+            console.log(`🔍 Configurando botão ${index + 1}:`, botao);
+            botao.addEventListener('click', abrirModalServicos);
+        });
     } else {
         console.error('❌ Modal não encontrado no DOM!');
     }
