@@ -2184,57 +2184,71 @@ def get_admin_id_dinamico():
 
 @main_bp.route('/api/servicos')
 def api_servicos():
-    """API para buscar serviços para dropdowns"""
+    """API para buscar serviços para dropdowns - Multi-tenant seguro"""
     try:
-        # Detectar admin_id baseado no usuário atual (produção e desenvolvimento)
+        # DETECÇÃO SEGURA DE ADMIN_ID
         admin_id = None
+        user_status = "não autenticado"
         
-        if current_user.is_authenticated:
-            if current_user.tipo_usuario == TipoUsuario.ADMIN:
-                # Para usuários ADMIN, usar o próprio ID como admin_id
-                admin_id = current_user.id
-                print(f"🔍 API SERVIÇOS: Usuário ADMIN logado - admin_id={admin_id}")
-            else:
-                # Para funcionários, usar o admin_id associado
-                admin_id = current_user.admin_id if hasattr(current_user, 'admin_id') and current_user.admin_id else current_user.id
-                print(f"🔍 API SERVIÇOS: Funcionário logado - admin_id={admin_id}")
+        # Verificar se usuário está autenticado de forma segura
+        try:
+            if current_user and current_user.is_authenticated and hasattr(current_user, 'tipo_usuario'):
+                if current_user.tipo_usuario == TipoUsuario.ADMIN:
+                    admin_id = current_user.id
+                    user_status = f"ADMIN (ID:{admin_id})"
+                elif hasattr(current_user, 'admin_id') and current_user.admin_id:
+                    admin_id = current_user.admin_id
+                    user_status = f"Funcionário (admin_id:{admin_id})"
+                else:
+                    admin_id = current_user.id
+                    user_status = f"Usuário genérico (ID:{admin_id})"
+        except Exception as auth_error:
+            print(f"⚠️ Erro na autenticação: {auth_error}")
+            admin_id = None
         
-        # Fallback: usar sistema dinâmico apenas se necessário
+        # Fallback para desenvolvimento (quando não há usuário autenticado)
         if admin_id is None:
             admin_id = get_admin_id_dinamico()
-            print(f"🔍 API SERVIÇOS: Sistema dinâmico - admin_id={admin_id}")
+            user_status = f"Fallback dinâmico (admin_id:{admin_id})"
         
-        print(f"🔍 API SERVIÇOS FINAL: admin_id={admin_id} (multi-tenant ativo)")
+        print(f"🎯 API SERVIÇOS: {user_status} → admin_id={admin_id}")
         
-        # Buscar serviços ativos do admin com isolamento completo
+        # Buscar serviços com isolamento por admin_id
         servicos = Servico.query.filter_by(admin_id=admin_id, ativo=True).order_by(Servico.nome).all()
-        print(f"✅ API SERVIÇOS: {len(servicos)} serviços encontrados para empresa admin_id={admin_id}")
+        print(f"✅ Encontrados {len(servicos)} serviços para empresa admin_id={admin_id}")
         
+        # Processar serviços para JSON
         servicos_json = []
         for servico in servicos:
-            try:
-                servico_data = {
-                    'id': servico.id,
-                    'nome': servico.nome or 'Serviço sem nome',
-                    'descricao': servico.descricao or '',
-                    'categoria': servico.categoria or 'Geral',
-                    'unidade_medida': servico.unidade_medida or 'un',
-                    'unidade_simbolo': servico.unidade_simbolo or 'un',
-                    'valor_unitario': float(servico.custo_unitario) if hasattr(servico, 'custo_unitario') and servico.custo_unitario else 0.0,
-                    'admin_id': servico.admin_id
-                }
-                servicos_json.append(servico_data)
-                print(f"✅ Serviço processado: {servico.nome} (ID: {servico.id})")
-            except Exception as e:
-                print(f"❌ Erro ao processar serviço {servico.id}: {str(e)}")
-                continue
+            servico_data = {
+                'id': servico.id,
+                'nome': servico.nome or 'Serviço sem nome',
+                'descricao': servico.descricao or '',
+                'categoria': servico.categoria or 'Geral',
+                'unidade_medida': servico.unidade_medida or 'un',
+                'unidade_simbolo': servico.unidade_simbolo or 'un',
+                'valor_unitario': float(servico.custo_unitario) if hasattr(servico, 'custo_unitario') and servico.custo_unitario else 0.0,
+                'admin_id': servico.admin_id
+            }
+            servicos_json.append(servico_data)
         
-        print(f"🔥 RETORNANDO: {len(servicos_json)} serviços no JSON final")
-        return jsonify({'success': True, 'servicos': servicos_json, 'total': len(servicos_json)})
+        print(f"🚀 API RETORNA: {len(servicos_json)} serviços em JSON")
+        return jsonify({
+            'success': True, 
+            'servicos': servicos_json, 
+            'total': len(servicos_json),
+            'admin_id': admin_id
+        })
         
     except Exception as e:
-        print(f"ERRO API SERVIÇOS: {str(e)}")
-        return jsonify({'success': False, 'servicos': [], 'error': str(e)}), 500
+        error_msg = str(e)
+        print(f"❌ ERRO API SERVIÇOS: {error_msg}")
+        return jsonify({
+            'success': False, 
+            'servicos': [], 
+            'error': error_msg,
+            'admin_id': None
+        }), 500
 
 # ===== SISTEMA UNIFICADO DE RDO =====
 
