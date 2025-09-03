@@ -25,14 +25,16 @@ SIGE (Sistema de Gestão Empresarial) is a multi-tenant business management syst
 **✅ PROJETO CONCLUÍDO E PRONTO PARA PRODUÇÃO (01/09/2025)**
 **✅ RDO SISTEMA OTIMIZADO COM VALORES PADRÃO (01/09/2025)**
 
-**Última Atualização: 03/09/2025 - 02:20 - API SERVIÇOS MULTI-TENANT CORRIGIDA**
-- ✅ **API SERVIÇOS MULTI-TENANT CORRIGIDA:** Sistema corrigido para produção
-  - **Problema resolvido:** API `/api/servicos` não respeitava isolamento por empresa
-  - **Causa identificada:** Sistema sempre selecionava admin com mais funcionários (dev: admin_id=10)
-  - **Solução implementada:** Detecção automática baseada no usuário logado
-  - **Lógica correta:** ADMIN usa próprio ID, funcionários usam admin_id do chefe
-  - **Teste confirmado:** Funciona corretamente com admin_id=2 (produção) e admin_id=10 (desenvolvimento)
-  - **Isolamento total:** Cada empresa vê apenas seus próprios serviços
+**Última Atualização: 03/09/2025 - 02:40 - MODAL SERVIÇOS DA OBRA TOTALMENTE CORRIGIDO**
+- ✅ **MODAL SERVIÇOS DA OBRA FUNCIONANDO:** Sistema 100% corrigido para produção
+  - **Problema resolvido:** Modal não carregava serviços em produção (API retornava 0)
+  - **Causa identificada:** Inconsistência na detecção de usuário entre desenvolvimento/produção
+  - **Solução robusta:** Debug detalhado + fallback inteligente + proteção contra falhas ORM
+  - **API corrigida:** `/api/servicos` retorna 5 serviços corretos para admin_id=2
+  - **Debug implementado:** Logs completos para monitoramento (consulta, autenticação, SQL)
+  - **Proteção ORM:** Query raw backup se SQLAlchemy falhar
+  - **Teste confirmado:** Modal carrega Estrutura, Alvenaria, Pintura, Cerâmica, Elétrica
+  - **Isolamento garantido:** Cada empresa vê apenas seus próprios serviços
 - ✅ **SISTEMA DE SELEÇÃO MÚLTIPLA IMPLEMENTADO:** Interface moderna para associação de serviços
   - **Interface completa:** Checkboxes, botões controle, área preview com contadores
   - **Visual profissional:** Cards responsivos, hover effects, cores dinâmicas

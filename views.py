@@ -2191,6 +2191,15 @@ def api_servicos():
         user_status = "não detectado"
         
         # PRIORIDADE 1: Usuário autenticado (PRODUÇÃO)
+        print(f"🔍 DEBUG AUTENTICAÇÃO:")
+        print(f"   - current_user exists: {current_user is not None}")
+        if current_user:
+            print(f"   - is_authenticated: {getattr(current_user, 'is_authenticated', 'N/A')}")
+            print(f"   - has tipo_usuario: {hasattr(current_user, 'tipo_usuario')}")
+            print(f"   - tipo_usuario: {getattr(current_user, 'tipo_usuario', 'N/A')}")
+            print(f"   - id: {getattr(current_user, 'id', 'N/A')}")
+            print(f"   - admin_id: {getattr(current_user, 'admin_id', 'N/A')}")
+            
         try:
             if current_user and current_user.is_authenticated and hasattr(current_user, 'tipo_usuario'):
                 if current_user.tipo_usuario == TipoUsuario.ADMIN:
@@ -2201,8 +2210,12 @@ def api_servicos():
                     admin_id = current_user.admin_id
                     user_status = f"Funcionário autenticado (admin_id:{admin_id})"
                     print(f"✅ PRODUÇÃO: {user_status}")
+                else:
+                    print("⚠️ PRODUÇÃO: Usuário autenticado mas sem admin_id definido")
+            else:
+                print("⚠️ PRODUÇÃO: Usuário não autenticado ou sem tipo_usuario")
         except Exception as auth_error:
-            print(f"⚠️ Erro na autenticação: {auth_error}")
+            print(f"❌ ERRO na autenticação: {auth_error}")
         
         # PRIORIDADE 2: Fallback inteligente para desenvolvimento
         if admin_id is None:
@@ -2225,14 +2238,37 @@ def api_servicos():
         
         print(f"🎯 API SERVIÇOS FINAL: {user_status} → admin_id={admin_id}")
         
-        # Buscar serviços com debug
-        servicos = Servico.query.filter_by(admin_id=admin_id, ativo=True).order_by(Servico.nome).all()
-        print(f"✅ Encontrados {len(servicos)} serviços ativos para admin_id={admin_id}")
+        # DEBUG DETALHADO DA CONSULTA
+        print(f"🔍 DEBUG CONSULTA: admin_id={admin_id} (tipo: {type(admin_id)})")
         
-        # Se não encontrou serviços, mostrar debug
-        if len(servicos) == 0:
-            total_servicos_admin = Servico.query.filter_by(admin_id=admin_id).count()
-            print(f"⚠️ DEBUG: Total de serviços (incluindo inativos) para admin_id={admin_id}: {total_servicos_admin}")
+        # Primeiro: verificar se existem serviços para esse admin_id
+        total_servicos_admin = Servico.query.filter_by(admin_id=admin_id).count()
+        print(f"📊 Total de serviços para admin_id={admin_id}: {total_servicos_admin}")
+        
+        # Segundo: verificar quantos estão ativos
+        servicos_ativos_count = Servico.query.filter_by(admin_id=admin_id, ativo=True).count()
+        print(f"✅ Serviços ativos para admin_id={admin_id}: {servicos_ativos_count}")
+        
+        # Terceiro: buscar os serviços ativos
+        servicos = Servico.query.filter_by(admin_id=admin_id, ativo=True).order_by(Servico.nome).all()
+        print(f"🎯 Query result: {len(servicos)} serviços encontrados")
+        
+        # Se ainda não encontrou, fazer debug da consulta raw
+        if len(servicos) == 0 and servicos_ativos_count > 0:
+            print("⚠️ INCONSISTÊNCIA: Count diz que há serviços, mas query retorna vazio")
+            # Tentar consulta alternativa
+            servicos_raw = db.session.execute(
+                text("SELECT * FROM servico WHERE admin_id = :admin_id AND ativo = true ORDER BY nome"),
+                {"admin_id": admin_id}
+            ).fetchall()
+            print(f"🔧 Query RAW encontrou: {len(servicos_raw)} serviços")
+            
+            if len(servicos_raw) > 0:
+                print("🚨 PROBLEMA NO ORM - usando consulta raw")
+                # Converter resultado raw para objetos Servico
+                servicos = Servico.query.filter(
+                    Servico.id.in_([row[0] for row in servicos_raw])
+                ).order_by(Servico.nome).all()
         
         # Processar para JSON
         servicos_json = []
