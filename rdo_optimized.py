@@ -186,20 +186,41 @@ def api_ultimo_rdo_dados(obra_id):
         servicos_rdo = RDOServicoSubatividade.query.filter_by(rdo_id=ultimo_rdo.id).all()
         servicos_dados = []
         
+        # Agrupar subatividades por serviço
+        servicos_agrupados = {}
+        
         for servico_rdo in servicos_rdo:
             if servico_rdo.servico:
-                servicos_dados.append({
-                    'id': servico_rdo.servico.id,
-                    'nome': servico_rdo.servico.nome,
-                    'percentual': servico_rdo.percentual_executado or 0,
-                    'subatividades': [
-                        {
-                            'id': sa.id,
-                            'nome': sa.nome,
-                            'percentual': servico_rdo.percentual_executado or 0
-                        } for sa in servico_rdo.servico.subatividades if hasattr(servico_rdo.servico, 'subatividades')
-                    ]
+                servico_id = servico_rdo.servico.id
+                if servico_id not in servicos_agrupados:
+                    servicos_agrupados[servico_id] = {
+                        'servico': servico_rdo.servico,
+                        'subatividades': []
+                    }
+                
+                # Adicionar subatividade com percentual correto
+                servicos_agrupados[servico_id]['subatividades'].append({
+                    'id': servico_rdo.id,
+                    'nome': servico_rdo.nome_subatividade,
+                    'percentual': servico_rdo.percentual_conclusao or 0,
+                    'descricao': servico_rdo.descricao_subatividade or ''
                 })
+        
+        # Converter para formato esperado
+        for servico_id, dados in servicos_agrupados.items():
+            servico = dados['servico']
+            subatividades = dados['subatividades']
+            
+            # Calcular percentual médio do serviço
+            percentual_servico = sum(sub['percentual'] for sub in subatividades) / len(subatividades) if subatividades else 0
+            
+            servicos_dados.append({
+                'id': servico.id,
+                'nome': servico.nome,
+                'percentual': percentual_servico,
+                'categoria': servico.categoria or 'Não categorizado',
+                'subatividades': subatividades
+            })
         
         # Buscar funcionários do último RDO
         funcionarios_rdo = RDOMaoObra.query.filter_by(rdo_id=ultimo_rdo.id).all()
