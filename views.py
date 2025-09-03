@@ -824,7 +824,7 @@ def funcionarios():
         flash(f'Erro no sistema de KPIs: {str(e)}. Dados básicos carregados.', 'warning')
     
     # Debug final antes do template
-    print(f"DEBUG FUNCIONÁRIOS: {len(funcionarios)} funcionários, {len(funcionarios_kpis)} KPIs")
+    # Employee KPIs loaded
     
     return render_template('funcionarios.html', 
                          funcionarios_kpis=funcionarios_kpis,
@@ -1127,7 +1127,7 @@ def obras():
     else:
         periodo_fim = date.today()
     
-    print(f"DEBUG PERÍODO CUSTOS: {periodo_inicio} até {periodo_fim}")
+    # DEBUG: Período de custos definido
     
     # Calcular custos reais para cada obra no período
     for obra in obras:
@@ -1196,7 +1196,7 @@ def obras():
                 'custo_transporte': custo_transporte_total
             }
             
-            print(f"DEBUG CUSTO OBRA {obra.nome}: Total=R${custo_total_obra:.2f} (Mão=R${custo_mao_obra:.2f} + Alim=R${custo_alimentacao:.2f} + Div=R${custo_diversos_total:.2f} + Trans=R${custo_transporte_total:.2f})")
+            # DEBUG: Custos calculados para obra
             
         except Exception as e:
             print(f"ERRO ao calcular custos obra {obra.nome}: {e}")
@@ -1474,7 +1474,7 @@ def detalhes_obra(id):
         else:
             data_fim = datetime.strptime(data_fim_param, '%Y-%m-%d').date()
         
-        print(f"DEBUG PERÍODO DETALHES: {data_inicio} até {data_fim}")
+        # DEBUG: Período de detalhes definido
         obra_id = id
         
         # Sistema robusto de detecção de admin_id - PRODUÇÃO
@@ -1599,7 +1599,7 @@ def detalhes_obra(id):
                 'data_fim': data_fim
             }).fetchall()
         
-        print(f"DEBUG SQL: {len(resultado_custos)} registros encontrados com JOIN")
+        # SQL results processed
         
         for row in resultado_custos:
             data_reg, funcionario_id, funcionario_nome, horas, salario, custo_dia = row
@@ -1614,7 +1614,7 @@ def detalhes_obra(id):
                 'total_dia': float(custo_dia)
             })
         
-        print(f"DEBUG KPIs: {total_custo_mao_obra:.2f} em custos, {total_horas_periodo}h trabalhadas")
+        # KPIs calculated successfully
             
         # Buscar custos da obra para o período
         from models import OutroCusto, CustoVeiculo, RegistroAlimentacao
@@ -1818,8 +1818,8 @@ def detalhes_obra(id):
         rdos_periodo = rdos_obra
         rdos_recentes = rdos_obra
         
-        print(f"DEBUG KPIs FINAIS: Total={kpis_obra['custo_total']:.2f}, Mão Obra={kpis_obra['custo_mao_obra']:.2f}, Horas={kpis_obra['total_horas']:.1f}")
-        print(f"DEBUG FUNCIONÁRIOS: {kpis_obra['funcionarios_periodo']} no período, {kpis_obra['dias_trabalhados']} dias trabalhados")
+        # Final KPIs calculated
+        # Employee period summary calculated
         
         # Importar date para template
         from datetime import date as date_class
