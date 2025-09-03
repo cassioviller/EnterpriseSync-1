@@ -589,28 +589,30 @@ function carregarDadosUltimoRDO() {
             console.log('📊 Dados recebidos:', data);
             
             if (data.success) {
-                // CORREÇÃO: Verificar se há último RDO pelos dados, não pela flag
-                const temUltimoRDO = data.ultimo_rdo && 
-                                   data.ultimo_rdo.numero_rdo && 
-                                   data.ultimo_rdo.numero_rdo !== 'PRIMEIRA_RDO';
+                // LÓGICA CORRETA: Verificar se é primeira RDO ou não
+                const isPrimeiraRDO = !data.ultimo_rdo || 
+                                     !data.ultimo_rdo.id || 
+                                     data.ultimo_rdo.numero_rdo === 'PRIMEIRA_RDO';
                 
-                console.log('🔍 Tem último RDO?', temUltimoRDO);
+                console.log('🔍 É primeira RDO?', isPrimeiraRDO);
                 console.log('🔍 Número RDO:', data.ultimo_rdo?.numero_rdo);
-                console.log('🔍 Flag primeira_rdo:', data.primeira_rdo);
+                console.log('🔍 ID RDO:', data.ultimo_rdo?.id);
                 
-                if (temUltimoRDO) {
-                    // HÁ ÚLTIMO RDO - Mostrar formulário editável com dados preenchidos
-                    console.log('🔧 FORÇANDO formulário editável com dados preenchidos...');
-                    exibirDadosPrimeiraRDO(data.ultimo_rdo, true); // true = com dados preenchidos
-                    console.log('✅ Formulário editável carregado com sucesso!');
+                if (isPrimeiraRDO) {
+                    // 🆕 PRIMEIRA RDO - Carregar com 0%
+                    console.log('🆕 PRIMEIRA RDO da obra - carregando com 0%');
+                    exibirFormularioRDO(data.ultimo_rdo, 'primeira');
+                    mostrarAlertaPrimeiraRDO(data.ultimo_rdo);
+                    
                 } else {
-                    // PRIMEIRA RDO - Mostrar formulário com 0%
-                    console.log('🆕 Primeira RDO - formulário com 0%');
-                    exibirDadosPrimeiraRDO(data.ultimo_rdo, false); // false = campos zerados
+                    // 🔄 PRÓXIMA RDO - Carregar com porcentagens da última RDO
+                    console.log('🔄 PRÓXIMA RDO - carregando porcentagens da última RDO:', data.ultimo_rdo.numero_rdo);
+                    exibirFormularioRDO(data.ultimo_rdo, 'continuacao');
+                    mostrarAlertaContinuacao(data.ultimo_rdo);
                 }
             } else {
                 console.error('❌ Erro na API:', data.error);
-                exibirMensagemSemRDOAnterior();
+                alert('Erro ao carregar dados do último RDO');
             }
         })
         .catch(error => {
@@ -1565,6 +1567,145 @@ function exibirDadosPrimeiraRDO(primeiraRDO, comDadosPreenchidos = false) {
     }
     
     servicosContainer.innerHTML = html;
+}
+
+// FUNÇÃO UNIFICADA - Gerar Formulário com Base no Tipo
+function exibirFormularioRDO(dadosRDO, tipoRDO) {
+    console.log(`🎯 Gerando formulário - Tipo: ${tipoRDO}`, dadosRDO);
+    
+    const container = document.getElementById('servicos-container');
+    
+    if (!dadosRDO || !dadosRDO.servicos) {
+        console.error('❌ Dados do RDO inválidos');
+        return;
+    }
+    
+    let html = '<div class="servicos-accordion">';
+    
+    // Gerar formulário para cada serviço
+    dadosRDO.servicos.forEach((servico, index) => {
+        const servicoId = `servico-${servico.id}`;
+        const isExpanded = index === 0; // Primeiro serviço expandido
+        
+        html += `
+        <div class="card mb-3">
+            <div class="card-header bg-light d-flex justify-content-between align-items-center">
+                <h6 class="mb-0">
+                    <i class="fas fa-wrench text-primary"></i> ${servico.nome}
+                </h6>
+                <span class="badge bg-secondary">${servico.categoria || 'Não categorizado'}</span>
+            </div>
+            <div class="card-body">
+                <div class="row">`;
+        
+        // Gerar campos editáveis para cada subatividade
+        if (servico.subatividades && servico.subatividades.length > 0) {
+            servico.subatividades.forEach(subatividade => {
+                // LÓGICA PRINCIPAL: Definir percentual inicial
+                let percentualInicial;
+                let helpText;
+                
+                if (tipoRDO === 'primeira') {
+                    // PRIMEIRA RDO: Sempre 0%
+                    percentualInicial = 0;
+                    helpText = "Primeira RDO - começar do 0%";
+                } else {
+                    // PRÓXIMA RDO: Usar percentual da última RDO
+                    percentualInicial = subatividade.percentual || 0;
+                    helpText = `Última RDO: ${percentualInicial}% - ajustar conforme progresso`;
+                }
+                
+                html += `
+                <div class="col-md-6 mb-3">
+                    <label class="form-label">
+                        ${subatividade.nome}
+                        ${tipoRDO === 'continuacao' && percentualInicial > 0 ? 
+                          `<span class="badge bg-info ms-2">${percentualInicial}%</span>` : ''}
+                    </label>
+                    <div class="input-group input-group-sm">
+                        <input type="number" 
+                               class="form-control" 
+                               name="subatividade_${subatividade.id}_percentual"
+                               value="${percentualInicial}"
+                               min="0" 
+                               max="100" 
+                               step="0.1"
+                               form="formNovoRDO"
+                               data-ultima-porcentagem="${percentualInicial}">
+                        <span class="input-group-text">%</span>
+                    </div>
+                    <small class="form-text text-muted">${helpText}</small>
+                </div>`;
+            });
+        } else {
+            html += `
+            <div class="col-12">
+                <div class="alert alert-warning">
+                    <i class="fas fa-exclamation-triangle"></i>
+                    Nenhuma subatividade cadastrada para este serviço.
+                </div>
+            </div>`;
+        }
+        
+        html += `
+                </div>
+            </div>
+        </div>`;
+    });
+    
+    html += '</div>';
+    
+    // Atualizar container
+    container.innerHTML = html;
+    
+    console.log(`✅ Formulário ${tipoRDO} gerado com sucesso`);
+}
+
+// ALERTAS INFORMATIVOS
+function mostrarAlertaPrimeiraRDO(dadosRDO) {
+    const alertDiv = document.createElement('div');
+    alertDiv.className = 'alert alert-success mb-4';
+    alertDiv.innerHTML = `
+        <div class="d-flex align-items-center">
+            <i class="fas fa-seedling fa-2x me-3"></i>
+            <div>
+                <h5 class="alert-heading mb-1">🆕 Primeira RDO da Obra!</h5>
+                <p class="mb-0">
+                    Serviços carregados com percentual <strong>0%</strong> para início dos trabalhos.<br>
+                    <small class="text-muted">
+                        Total: ${dadosRDO.servicos?.length || 0} serviços | 
+                        ${dadosRDO.total_subatividades || 0} subatividades
+                    </small>
+                </p>
+            </div>
+        </div>
+    `;
+    
+    const container = document.getElementById('servicos-container');
+    container.insertBefore(alertDiv, container.firstChild);
+}
+
+function mostrarAlertaContinuacao(ultimoRDO) {
+    const alertDiv = document.createElement('div');
+    alertDiv.className = 'alert alert-info mb-4';
+    alertDiv.innerHTML = `
+        <div class="d-flex align-items-center">
+            <i class="fas fa-history fa-2x me-3"></i>
+            <div>
+                <h5 class="alert-heading mb-1">🔄 Continuação dos Trabalhos</h5>
+                <p class="mb-0">
+                    Dados carregados do <strong>${ultimoRDO.numero_rdo}</strong> (${ultimoRDO.data_relatorio}).<br>
+                    <small class="text-muted">
+                        Ajuste as porcentagens conforme o progresso de hoje. 
+                        Valores atuais representam o progresso até a última RDO.
+                    </small>
+                </p>
+            </div>
+        </div>
+    `;
+    
+    const container = document.getElementById('servicos-container');
+    container.insertBefore(alertDiv, container.firstChild);
 }
 
 // Função para o botão "Testar Último RDO"
