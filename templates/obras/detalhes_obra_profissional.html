@@ -1450,6 +1450,7 @@ function adicionarServicoObra(servicoId, servicoNome) {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
+            'X-CSRFToken': '{{ csrf_token() }}',
         },
         body: JSON.stringify({
             obra_id: obraId,
@@ -1504,6 +1505,7 @@ function removerServicoObra(servicoId) {
         method: 'DELETE',
         headers: {
             'Content-Type': 'application/json',
+            'X-CSRFToken': '{{ csrf_token() }}',
         },
         body: JSON.stringify({
             obra_id: obraId,
