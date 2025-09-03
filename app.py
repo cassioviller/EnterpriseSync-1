@@ -253,13 +253,15 @@ with app.app_context():
     
     # Photo migration moved to migrations.py for cleaner app initialization
     
-    # Development authentication bypass (disabled in production)
-    if os.environ.get('FLASK_ENV') != 'production':
-        try:
-            import bypass_auth
-            logging.info("🔓 Sistema de bypass de autenticação carregado")
-        except Exception as e:
-            logging.error(f"Erro ao carregar bypass: {e}")
+    # Development authentication bypass (temporarily disabled for testing)
+    # if os.environ.get('FLASK_ENV') != 'production':
+    #     try:
+    #         import bypass_auth
+    #         logging.info("🔓 Sistema de bypass de autenticação carregado")
+    #     except Exception as e:
+    #         logging.error(f"Erro ao carregar bypass: {e}")
+    
+    logging.info("🔒 Sistema de bypass desabilitado para teste de autenticação")
 
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=5000)
