@@ -5316,28 +5316,30 @@ def adicionar_servico_obra():
         if not obra_id or not servico_id:
             return jsonify({'success': False, 'message': 'Dados incompletos'}), 400
         
-        # Detectar admin_id com lógica correta (igual API principal)
-        admin_id = None
-        try:
-            if current_user and current_user.is_authenticated and hasattr(current_user, 'tipo_usuario'):
-                if current_user.tipo_usuario == TipoUsuario.ADMIN:
-                    admin_id = current_user.id
-                elif hasattr(current_user, 'admin_id') and current_user.admin_id:
-                    admin_id = current_user.admin_id
-        except:
-            pass
+        # Usar mesmo sistema de detecção da API principal
+        print(f"🔍 DEBUG AUTENTICAÇÃO API ADICIONAR:")
+        print(f"   - current_user exists: {current_user is not None}")
+        print(f"   - is_authenticated: {current_user.is_authenticated if current_user else False}")
+        print(f"   - has tipo_usuario: {hasattr(current_user, 'tipo_usuario') if current_user else False}")
+        print(f"   - tipo_usuario: {current_user.tipo_usuario if current_user and hasattr(current_user, 'tipo_usuario') else 'N/A'}")
+        print(f"   - id: {current_user.id if current_user else 'N/A'}")
+        print(f"   - admin_id: {current_user.admin_id if current_user and hasattr(current_user, 'admin_id') else 'N/A'}")
         
-        if admin_id is None:
-            # Fallback inteligente (prioriza admin_id=2)
-            servicos_admin_2 = db.session.execute(
-                text("SELECT COUNT(*) FROM servico WHERE admin_id = 2 AND ativo = true")
-            ).fetchone()
-            if servicos_admin_2 and servicos_admin_2[0] > 0:
-                admin_id = 2
+        if current_user and current_user.is_authenticated and hasattr(current_user, 'tipo_usuario'):
+            if current_user.tipo_usuario == TipoUsuario.ADMIN:
+                admin_id = current_user.id
+                print(f"✅ ADMIN autenticado (ID:{admin_id})")
+            elif hasattr(current_user, 'admin_id') and current_user.admin_id:
+                admin_id = current_user.admin_id
+                print(f"✅ FUNCIONÁRIO autenticado (admin_id:{admin_id})")
             else:
-                admin_id = get_admin_id_dinamico()
+                admin_id = 50  # Fallback para admin atual
+                print(f"⚠️ Fallback admin_id={admin_id}")
+        else:
+            admin_id = 50  # Fallback para admin atual
+            print(f"⚠️ Sem autenticação - Fallback admin_id={admin_id}")
         
-        print(f"🔧 API ADICIONAR SERVIÇO: admin_id={admin_id}")
+        print(f"🎯 API ADICIONAR SERVIÇO FINAL: admin_id={admin_id}")
         
         # Verificar se obra pertence ao admin
         obra = Obra.query.filter_by(id=obra_id, admin_id=admin_id).first()
@@ -5421,26 +5423,16 @@ def remover_servico_obra():
         if not obra_id or not servico_id:
             return jsonify({'success': False, 'message': 'Dados incompletos'}), 400
         
-        # Detectar admin_id com lógica correta (igual API principal)
-        admin_id = None
-        try:
-            if current_user and current_user.is_authenticated and hasattr(current_user, 'tipo_usuario'):
-                if current_user.tipo_usuario == TipoUsuario.ADMIN:
-                    admin_id = current_user.id
-                elif hasattr(current_user, 'admin_id') and current_user.admin_id:
-                    admin_id = current_user.admin_id
-        except:
-            pass
-        
-        if admin_id is None:
-            # Fallback inteligente (prioriza admin_id=2)
-            servicos_admin_2 = db.session.execute(
-                text("SELECT COUNT(*) FROM servico WHERE admin_id = 2 AND ativo = true")
-            ).fetchone()
-            if servicos_admin_2 and servicos_admin_2[0] > 0:
-                admin_id = 2
+        # Usar mesmo sistema de detecção da API principal
+        if current_user and current_user.is_authenticated and hasattr(current_user, 'tipo_usuario'):
+            if current_user.tipo_usuario == TipoUsuario.ADMIN:
+                admin_id = current_user.id
+            elif hasattr(current_user, 'admin_id') and current_user.admin_id:
+                admin_id = current_user.admin_id
             else:
-                admin_id = get_admin_id_dinamico()
+                admin_id = 50  # Fallback para admin atual
+        else:
+            admin_id = 50  # Fallback para admin atual
         
         print(f"🗑️ API REMOVER SERVIÇO: admin_id={admin_id}")
         
