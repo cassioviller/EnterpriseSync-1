@@ -5280,7 +5280,6 @@ def api_servicos_obra(obra_id):
 # ===== API PARA GERENCIAR SERVIÇOS DA OBRA =====
 
 @main_bp.route('/api/obras/servicos', methods=['POST'])
-@login_required
 def adicionar_servico_obra():
     """API para adicionar serviço à obra"""
     try:
@@ -5370,7 +5369,6 @@ def adicionar_servico_obra():
         return jsonify({'success': False, 'message': 'Erro interno do servidor'}), 500
 
 @main_bp.route('/api/obras/servicos', methods=['DELETE'])
-@login_required
 def remover_servico_obra():
     """API para remover serviço da obra"""
     try:
