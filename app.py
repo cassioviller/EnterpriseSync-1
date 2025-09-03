@@ -4,6 +4,7 @@ from flask import Flask, url_for
 from flask_login import LoginManager
 from flask_migrate import Migrate
 from flask_wtf.csrf import CSRFProtect
+from flask_cors import CORS
 from werkzeug.middleware.proxy_fix import ProxyFix
 
 # Configure logging
@@ -38,6 +39,9 @@ app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {
 }
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 app.config['WTF_CSRF_ENABLED'] = False
+
+# Configure CORS for AJAX requests
+CORS(app, origins="*", methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"])
 
 # Initialize extensions
 from models import db  # Import the db instance from models
@@ -93,8 +97,9 @@ def inject_company_config():
             }
         }
 
-csrf = CSRFProtect()
-csrf.init_app(app)
+# CSRF removido - conflitava com WTF_CSRF_ENABLED = False
+# csrf = CSRFProtect()
+# csrf.init_app(app)
 
 # Import all models (now consolidated)
 from models import *

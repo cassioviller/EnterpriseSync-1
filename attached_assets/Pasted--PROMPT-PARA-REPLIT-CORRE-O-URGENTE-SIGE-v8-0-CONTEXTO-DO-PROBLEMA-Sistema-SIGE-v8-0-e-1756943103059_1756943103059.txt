@@ -1,0 +1,133 @@
+# 🚨 PROMPT PARA REPLIT - CORREÇÃO URGENTE SIGE v8.0
+
+## CONTEXTO DO PROBLEMA
+Sistema SIGE v8.0 em produção com **ERRO 405 METHOD NOT ALLOWED** em duas operações críticas:
+
+1. **Salvamento de serviços em obras** - API `/api/obras/servicos` POST
+2. **Exclusão de obras** - Rota `/obras/excluir/<id>` POST
+
+## ARQUIVOS PRINCIPAIS ANALISADOS
+
+### 1. ROTAS PROBLEMÁTICAS (views.py)
+```python
+# LINHA 5285-5371: API adicionar serviço obra
+@main_bp.route('/api/obras/servicos', methods=['POST'])
+@login_required
+def adicionar_servico_obra():
+    # Código está correto, mas retorna 405
+
+# LINHA 1434-1457: Excluir obra  
+@main_bp.route('/obras/excluir/<int:id>', methods=['POST'])
+@login_required
+def excluir_obra(id):
+    # Código está correto, mas retorna 405
+```
+
+### 2. CONFIGURAÇÃO APP (app.py)
+```python
+# PROBLEMA IDENTIFICADO: Configuração CSRF conflitante
+app.config['WTF_CSRF_ENABLED'] = False  # CSRF desabilitado
+# ...
+csrf = CSRFProtect()  # Mas CSRFProtect ainda é inicializado
+csrf.init_app(app)     # CONFLITO!
+```
+
+### 3. FRONTEND JAVASCRIPT (obras.html)
+```javascript
+// Função excluirObra está CORRETA - envia POST
+function excluirObra(id) {
+    const form = document.createElement('form');
+    form.method = 'POST';  // ✅ CORRETO
+    form.action = '/obras/excluir/' + id;
+    // ... código correto
+}
+```
+
+## DIAGNÓSTICO TÉCNICO
+
+### ❌ PROBLEMAS IDENTIFICADOS:
+
+1. **CSRF CONFLITANTE**: CSRFProtect inicializado mesmo com CSRF desabilitado
+2. **FALTA CORS**: Nenhuma configuração CORS para requisições AJAX
+3. **POSSÍVEL CONFLITO DE ROTAS**: Blueprint pode não estar registrado corretamente
+
+### ✅ ESTRUTURAS CORRETAS:
+
+- Modelo ServicoObra definido corretamente
+- Tabela servico_obra criada no banco
+- JavaScript frontend enviando POST corretamente
+- Lógica das rotas está adequada
+
+## SOLUÇÕES NECESSÁRIAS
+
+### 1. CORRIGIR CONFIGURAÇÃO CSRF
+```python
+# Em app.py - ESCOLHER UMA OPÇÃO:
+
+# OPÇÃO A: Remover CSRFProtect completamente
+app.config['WTF_CSRF_ENABLED'] = False
+# csrf = CSRFProtect()  # COMENTAR ESTAS LINHAS
+# csrf.init_app(app)    # COMENTAR ESTAS LINHAS
+
+# OPÇÃO B: Habilitar CSRF corretamente
+app.config['WTF_CSRF_ENABLED'] = True
+csrf = CSRFProtect()
+csrf.init_app(app)
+```
+
+### 2. ADICIONAR CORS
+```python
+# Instalar: pip install flask-cors
+from flask_cors import CORS
+
+# Após criar app:
+CORS(app, origins="*", methods=["GET", "POST", "PUT", "DELETE"])
+```
+
+### 3. VERIFICAR REGISTRO DE BLUEPRINT
+```python
+# Garantir que main_bp está registrado:
+from views import main_bp
+app.register_blueprint(main_bp)
+```
+
+## TESTE DE VALIDAÇÃO
+
+Após correções, testar:
+
+1. **Teste API serviços:**
+```bash
+curl -X POST http://localhost:5000/api/obras/servicos \
+  -H "Content-Type: application/json" \
+  -d '{"obra_id": 1, "servico_id": 1}'
+```
+
+2. **Teste exclusão obra:**
+```bash
+curl -X POST http://localhost:5000/obras/excluir/1
+```
+
+## ARQUIVOS PARA MODIFICAR
+
+1. **app.py** - Corrigir CSRF e adicionar CORS
+2. **views.py** - Verificar se rotas estão corretas (parecem estar)
+3. **requirements.txt** - Adicionar flask-cors se necessário
+
+## PRIORIDADE MÁXIMA
+
+⚠️ **SISTEMA EM PRODUÇÃO COM USUÁRIOS AFETADOS**
+⚠️ **FUNCIONALIDADES CRÍTICAS QUEBRADAS**
+⚠️ **CORREÇÃO URGENTE NECESSÁRIA**
+
+## RESULTADO ESPERADO
+
+Após correções:
+- ✅ API `/api/obras/servicos` POST funcionando
+- ✅ Rota `/obras/excluir/<id>` POST funcionando  
+- ✅ Usuários conseguem salvar serviços em obras
+- ✅ Usuários conseguem excluir obras
+
+---
+
+**INSTRUÇÃO FINAL:** Analise os arquivos fornecidos, implemente as correções sugeridas e teste as rotas problemáticas. Foque na configuração CSRF conflitante como causa mais provável do erro 405.
+
