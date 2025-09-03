@@ -164,8 +164,18 @@ else
     exit 1
 fi
 
+# Criar diretório de logs para produção
+echo "📁 Criando sistema de logs para produção..."
+mkdir -p /app/logs
+mkdir -p /app/templates/debug
+mkdir -p /app/templates/errors
+touch /app/logs/production_errors.log
+touch /app/logs/production_debug.log
+chmod 755 /app/logs
+chmod 644 /app/logs/*.log
+
 # Inicialização da aplicação
-echo "🔧 Inicializando aplicação SIGE v8.0..."
+echo "🔧 Inicializando aplicação SIGE v8.0.1 com sistema de logs..."
 python -c "
 import sys
 sys.path.append('/app')

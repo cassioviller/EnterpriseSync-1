@@ -87,17 +87,29 @@ def debug_rdo_status():
 def debug_rdo_last_errors():
     """Últimos erros específicos de RDO"""
     try:
-        # Ler logs de erro específicos do RDO
+        # Ler logs de erro específicos do RDO com fallback para /tmp
         error_logs = []
         
-        try:
-            with open('/app/logs/production_errors.log', 'r') as f:
-                lines = f.readlines()
-                # Filtrar apenas linhas relacionadas ao RDO
-                rdo_lines = [line for line in lines if 'RDO' in line or 'rdo' in line]
-                error_logs = rdo_lines[-20:]  # Últimas 20 linhas relacionadas ao RDO
-        except FileNotFoundError:
-            error_logs = ['Log de erros RDO não encontrado']
+        log_paths = [
+            '/app/logs/production_errors.log',
+            '/tmp/sige_logs/production_errors.log'
+        ]
+        
+        log_found = False
+        for log_path in log_paths:
+            try:
+                with open(log_path, 'r') as f:
+                    lines = f.readlines()
+                    # Filtrar apenas linhas relacionadas ao RDO
+                    rdo_lines = [line for line in lines if 'RDO' in line or 'rdo' in line]
+                    error_logs = rdo_lines[-20:]  # Últimas 20 linhas relacionadas ao RDO
+                    log_found = True
+                    break
+            except FileNotFoundError:
+                continue
+        
+        if not log_found:
+            error_logs = ['Log de erros RDO não encontrado em nenhum local']
             
         return jsonify({
             'success': True,

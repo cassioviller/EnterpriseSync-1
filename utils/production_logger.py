@@ -20,23 +20,59 @@ class ProductionLogger:
         
     def setup_logging(self):
         """Configurar sistema de logging para produção"""
-        # Criar diretório de logs se não existir
-        os.makedirs('/app/logs', exist_ok=True)
+        # Criar diretório de logs se não existir com permissões robustas
+        try:
+            os.makedirs('/app/logs', exist_ok=True)
+            # Garantir permissões corretas
+            os.chmod('/app/logs', 0o755)
+        except (OSError, PermissionError) as e:
+            print(f"⚠️ Aviso: Erro ao criar diretório de logs: {e}")
+            # Fallback: usar diretório temporário
+            try:
+                os.makedirs('/tmp/sige_logs', exist_ok=True)
+                print("📁 Usando /tmp/sige_logs como fallback para logs")
+            except Exception as fallback_error:
+                print(f"❌ Erro crítico: Não foi possível criar diretório de logs: {fallback_error}")
+                # Sistema continuará funcionando, mas sem logs em arquivo
         
         # Configurar formatter detalhado
         formatter = logging.Formatter(
             '%(asctime)s | %(levelname)s | %(name)s | %(funcName)s:%(lineno)d | %(message)s'
         )
         
-        # Handler para arquivo de erro geral
-        error_handler = logging.FileHandler('/app/logs/production_errors.log')
-        error_handler.setLevel(logging.ERROR)
-        error_handler.setFormatter(formatter)
+        # Handler para arquivo de erro geral com fallback
+        try:
+            error_handler = logging.FileHandler('/app/logs/production_errors.log')
+            error_handler.setLevel(logging.ERROR)
+            error_handler.setFormatter(formatter)
+        except (OSError, PermissionError):
+            try:
+                # Fallback para /tmp
+                error_handler = logging.FileHandler('/tmp/sige_logs/production_errors.log')
+                error_handler.setLevel(logging.ERROR)
+                error_handler.setFormatter(formatter)
+                print("⚠️ Usando /tmp para logs de erro")
+            except Exception:
+                # Se tudo falhar, usar apenas console
+                error_handler = None
+                print("⚠️ Logs de erro apenas no console")
         
-        # Handler para debug específico
-        debug_handler = logging.FileHandler('/app/logs/production_debug.log')
-        debug_handler.setLevel(logging.DEBUG)
-        debug_handler.setFormatter(formatter)
+        # Handler para debug específico com fallback
+        try:
+            debug_handler = logging.FileHandler('/app/logs/production_debug.log')
+            debug_handler.setLevel(logging.DEBUG)
+            debug_handler.setFormatter(formatter)
+        except (OSError, PermissionError):
+            try:
+                # Fallback para /tmp
+                debug_handler = logging.FileHandler('/tmp/sige_logs/production_debug.log')
+                debug_handler.setLevel(logging.DEBUG)
+                debug_handler.setFormatter(formatter)
+                print("⚠️ Usando /tmp para logs de debug")
+            except Exception:
+                # Se tudo falhar, usar apenas console
+                debug_handler = None
+                print("⚠️ Logs de debug apenas no console")
         
         # Handler para console (visível nos logs do container)
         console_handler = logging.StreamHandler()
@@ -46,8 +82,12 @@ class ProductionLogger:
         # Configurar logger raiz
         root_logger = logging.getLogger()
         root_logger.setLevel(logging.DEBUG)
-        root_logger.addHandler(error_handler)
-        root_logger.addHandler(debug_handler)
+        
+        # Adicionar handlers que funcionaram
+        if error_handler:
+            root_logger.addHandler(error_handler)
+        if debug_handler:
+            root_logger.addHandler(debug_handler)
         root_logger.addHandler(console_handler)
         
         # Logger específico para RDO
