@@ -2,7 +2,7 @@
 # Sistema consolidado sem redundâncias
 
 from flask import Blueprint, render_template, request, redirect, url_for, flash, jsonify
-from models import db, RDO, RDOMaoObra, RDOServicoSubatividade, Obra, Funcionario, Servico, SubatividadeMestre
+from models import db, RDO, RDOMaoObra, RDOServicoSubatividade, Obra, Funcionario, Servico
 from bypass_auth import obter_admin_id
 from datetime import datetime, date
 import logging
@@ -201,32 +201,13 @@ def api_ultimo_rdo_dados(obra_id):
                         'subatividades': []
                     }
                 
-                # CORREÇÃO: Buscar o ID da subatividade mestre correspondente
-                subatividade_mestre = SubatividadeMestre.query.filter_by(
-                    nome=subatividade_rdo.nome_subatividade,
-                    servico_id=servico_id
-                ).first()
-                
-                if subatividade_mestre:
-                    # Usar ID da subatividade mestre para que o salvamento funcione
-                    servicos_dict[servico_id]['subatividades'].append({
-                        'id': subatividade_mestre.id,  # ID da SubatividadeMestre
-                        'nome': subatividade_rdo.nome_subatividade,
-                        'percentual': float(subatividade_rdo.percentual_conclusao or 0),
-                        'descricao': subatividade_rdo.descricao_subatividade or ''
-                    })
-                else:
-                    # Se não encontrar, criar uma subatividade temporária para não quebrar
-                    print(f"⚠️ SubatividadeMestre não encontrada: {subatividade_rdo.nome_subatividade}")
-                    # Buscar qualquer subatividade do serviço para usar como fallback
-                    fallback_sub = SubatividadeMestre.query.filter_by(servico_id=servico_id).first()
-                    if fallback_sub:
-                        servicos_dict[servico_id]['subatividades'].append({
-                            'id': fallback_sub.id,
-                            'nome': subatividade_rdo.nome_subatividade,
-                            'percentual': float(subatividade_rdo.percentual_conclusao or 0),
-                            'descricao': subatividade_rdo.descricao_subatividade or ''
-                        })
+                # Usar campos diretos do modelo RDOServicoSubatividade
+                servicos_dict[servico_id]['subatividades'].append({
+                    'id': subatividade_rdo.id,  # Usar ID da própria subatividade do RDO
+                    'nome': subatividade_rdo.nome_subatividade,  # Campo direto
+                    'percentual': float(subatividade_rdo.percentual_conclusao or 0),
+                    'descricao': subatividade_rdo.descricao_subatividade or ''  # Campo direto
+                })
         
         servicos_dados = list(servicos_dict.values())
         
