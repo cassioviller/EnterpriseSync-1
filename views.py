@@ -1266,12 +1266,27 @@ def nova_obra():
                     timestamp = datetime.now().strftime("%m%d%H%M")
                     codigo = f"O{timestamp}"
             
-            # Detectar admin_id
-            admin_id = 10  # Padrão
-            if hasattr(current_user, 'admin_id') and current_user.admin_id:
-                admin_id = current_user.admin_id
-            elif hasattr(current_user, 'id'):
-                admin_id = current_user.id
+            # Detectar admin_id dinamicamente
+            admin_id = 10  # Padrão desenvolvimento
+            try:
+                if hasattr(current_user, 'admin_id') and current_user.admin_id:
+                    admin_id = current_user.admin_id
+                elif hasattr(current_user, 'id'):
+                    admin_id = current_user.id
+                else:
+                    # Fallback inteligente - buscar admin com funcionários ativos
+                    fallback_admin = db.session.execute(
+                        text("""SELECT admin_id, COUNT(*) as funcionarios FROM funcionarios 
+                                GROUP BY admin_id ORDER BY funcionarios DESC LIMIT 1""")
+                    ).fetchone()
+                    if fallback_admin:
+                        admin_id = fallback_admin[0]
+                        print(f"🔧 NOVA OBRA - Admin_id detectado por fallback: {admin_id}")
+                    else:
+                        print(f"⚠️ NOVA OBRA - Usando admin_id padrão: {admin_id}")
+            except Exception as e:
+                print(f"❌ NOVA OBRA - Erro na detecção admin_id: {e}")
+                admin_id = 10
             
             # Gerar token para portal do cliente se ativo
             token_cliente = None
@@ -1304,16 +1319,28 @@ def nova_obra():
             
             # Processar serviços selecionados
             servicos_selecionados = request.form.getlist('servicos_obra')
+            print(f"🔧 NOVA OBRA - Serviços selecionados: {servicos_selecionados}")
+            
             if servicos_selecionados:
                 for servico_id in servicos_selecionados:
                     try:
                         servico_id = int(servico_id)
-                        # Verificar se é uma relação many-to-many ou criar tabela de associação
-                        # Por enquanto, vamos usar uma abordagem simples com campo JSON na obra
-                        if not hasattr(nova_obra, 'servicos_ids'):
-                            # Se não houver campo específico, criar lista de IDs
-                            pass
-                    except ValueError:
+                        print(f"🔧 NOVA OBRA - Associando serviço {servico_id} à obra {nova_obra.id}")
+                        
+                        # Criar associação na tabela servico_obra
+                        associacao = ServicoObra(
+                            obra_id=nova_obra.id,
+                            servico_id=servico_id,
+                            admin_id=admin_id
+                        )
+                        db.session.add(associacao)
+                        print(f"✅ NOVA OBRA - Serviço {servico_id} associado com admin_id={admin_id}")
+                        
+                    except ValueError as e:
+                        print(f"⚠️ NOVA OBRA - Erro ao processar servico_id {servico_id}: {e}")
+                        continue
+                    except Exception as e:
+                        print(f"❌ NOVA OBRA - Erro ao criar associação: {e}")
                         continue
             
             db.session.commit()
@@ -1328,11 +1355,25 @@ def nova_obra():
     
     # GET request - carregar lista de funcionários e serviços para o formulário
     try:
-        admin_id = 10  # Padrão
-        if hasattr(current_user, 'admin_id') and current_user.admin_id:
-            admin_id = current_user.admin_id
-        elif hasattr(current_user, 'id'):
-            admin_id = current_user.id
+        # Detectar admin_id dinamicamente (mesmo código do POST)
+        admin_id = 10  # Padrão desenvolvimento
+        try:
+            if hasattr(current_user, 'admin_id') and current_user.admin_id:
+                admin_id = current_user.admin_id
+            elif hasattr(current_user, 'id'):
+                admin_id = current_user.id
+            else:
+                # Fallback inteligente - buscar admin com funcionários ativos
+                fallback_admin = db.session.execute(
+                    text("""SELECT admin_id, COUNT(*) as funcionarios FROM funcionarios 
+                            GROUP BY admin_id ORDER BY funcionarios DESC LIMIT 1""")
+                ).fetchone()
+                if fallback_admin:
+                    admin_id = fallback_admin[0]
+                    print(f"🔧 GET NOVA OBRA - Admin_id detectado por fallback: {admin_id}")
+        except Exception as e:
+            print(f"❌ GET NOVA OBRA - Erro na detecção admin_id: {e}")
+            admin_id = 10
         
         funcionarios = Funcionario.query.filter_by(admin_id=admin_id, ativo=True).order_by(Funcionario.nome).all()
         servicos_disponiveis = Servico.query.filter_by(admin_id=admin_id, ativo=True).order_by(Servico.nome).all()
