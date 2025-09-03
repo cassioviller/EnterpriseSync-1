@@ -1431,19 +1431,14 @@ def editar_obra(id):
                          servicos_obra=servicos_obra)
 
 # CRUD OBRAS - Excluir Obra
-@main_bp.route('/obras/excluir/<int:id>', methods=['POST'])
+@main_bp.route('/obras/excluir/<int:id>', methods=['POST', 'GET'])
+@login_required
 def excluir_obra(id):
-    """Excluir obra"""
-    # For development - bypass login requirement for obra operations
-    try:
-        from flask_login import current_user
-        if not current_user.is_authenticated:
-            # Create a mock user for requests
-            from bypass_auth import MockCurrentUser
-            import flask_login
-            flask_login._get_user = lambda: MockCurrentUser()
-    except:
-        pass
+    """Excluir obra - aceita GET e POST"""
+    # Se for GET, redirecionar para lista de obras
+    if request.method == 'GET':
+        flash('Operação de exclusão deve ser feita via POST', 'warning')
+        return redirect(url_for('main.obras'))
     try:
         obra = Obra.query.get_or_404(id)
         nome = obra.nome
