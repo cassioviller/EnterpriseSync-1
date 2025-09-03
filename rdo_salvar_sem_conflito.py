@@ -203,35 +203,71 @@ def salvar_rdo_flexivel():
         from models import SubatividadeMestre
         
         subatividades_salvas = 0
-        for subatividade_id, percentual in subatividades_processadas.items():
+        for subatividade_rdo_id, percentual in subatividades_processadas.items():
             try:
-                # Buscar dados da subatividade mestre
-                subatividade_mestre = SubatividadeMestre.query.filter_by(
-                    id=subatividade_id,
-                    admin_id=admin_id,
-                    ativo=True
+                # CORREÇÃO: O ID recebido é de RDOServicoSubatividade do RDO anterior, 
+                # não de SubatividadeMestre. Precisamos buscar a subatividade mestre correspondente
+                
+                # Primeiro, buscar a subatividade do RDO anterior para obter nome e serviço
+                subatividade_rdo_anterior = RDOServicoSubatividade.query.filter_by(
+                    id=subatividade_rdo_id
                 ).first()
                 
-                if subatividade_mestre:
-                    # Criar registro na tabela RDOServicoSubatividade com campos corretos
-                    rdo_subatividade = RDOServicoSubatividade(
-                        rdo_id=rdo.id,
-                        servico_id=subatividade_mestre.servico_id,
-                        nome_subatividade=subatividade_mestre.nome,
-                        descricao_subatividade=subatividade_mestre.descricao,
-                        percentual_conclusao=percentual,
-                        observacoes_tecnicas=f'Executado em {percentual}% - {data_relatorio}',
+                if subatividade_rdo_anterior:
+                    # Agora buscar a SubatividadeMestre correspondente pelo nome e serviço
+                    subatividade_mestre = SubatividadeMestre.query.filter_by(
+                        servico_id=subatividade_rdo_anterior.servico_id,
+                        nome=subatividade_rdo_anterior.nome_subatividade,
                         admin_id=admin_id,
                         ativo=True
-                    )
-                    db.session.add(rdo_subatividade)
-                    subatividades_salvas += 1
-                    logger.info(f"✅ Subatividade salva: {subatividade_mestre.nome} - {percentual}%")
+                    ).first()
+                    
+                    if subatividade_mestre:
+                        # Criar registro na tabela RDOServicoSubatividade com campos corretos
+                        rdo_subatividade = RDOServicoSubatividade(
+                            rdo_id=rdo.id,
+                            servico_id=subatividade_mestre.servico_id,
+                            nome_subatividade=subatividade_mestre.nome,
+                            descricao_subatividade=subatividade_mestre.descricao,
+                            percentual_conclusao=percentual,
+                            observacoes_tecnicas=f'Executado em {percentual}% - {data_relatorio}',
+                            admin_id=admin_id,
+                            ativo=True
+                        )
+                        db.session.add(rdo_subatividade)
+                        subatividades_salvas += 1
+                        logger.info(f"✅ Subatividade salva: {subatividade_mestre.nome} - {percentual}% (mapeada do RDO anterior)")
+                    else:
+                        logger.warning(f"⚠️ Subatividade mestre não encontrada para: {subatividade_rdo_anterior.nome_subatividade} do serviço {subatividade_rdo_anterior.servico_id}")
                 else:
-                    logger.warning(f"⚠️ Subatividade mestre {subatividade_id} não encontrada")
+                    logger.warning(f"⚠️ Subatividade RDO anterior {subatividade_rdo_id} não encontrada - tentando busca direta na SubatividadeMestre")
+                    
+                    # Fallback: tentar busca direta (caso seja primeira RDO)
+                    subatividade_mestre = SubatividadeMestre.query.filter_by(
+                        id=subatividade_rdo_id,
+                        admin_id=admin_id,
+                        ativo=True
+                    ).first()
+                    
+                    if subatividade_mestre:
+                        rdo_subatividade = RDOServicoSubatividade(
+                            rdo_id=rdo.id,
+                            servico_id=subatividade_mestre.servico_id,
+                            nome_subatividade=subatividade_mestre.nome,
+                            descricao_subatividade=subatividade_mestre.descricao,
+                            percentual_conclusao=percentual,
+                            observacoes_tecnicas=f'Executado em {percentual}% - {data_relatorio}',
+                            admin_id=admin_id,
+                            ativo=True
+                        )
+                        db.session.add(rdo_subatividade)
+                        subatividades_salvas += 1
+                        logger.info(f"✅ Subatividade salva (busca direta): {subatividade_mestre.nome} - {percentual}%")
+                    else:
+                        logger.warning(f"⚠️ Subatividade {subatividade_rdo_id} não encontrada em nenhuma tabela")
                     
             except Exception as e:
-                logger.error(f"❌ Erro ao salvar subatividade {subatividade_id}: {e}")
+                logger.error(f"❌ Erro ao salvar subatividade {subatividade_rdo_id}: {e}")
                 continue
         
         logger.info(f"💾 Total de {subatividades_salvas} subatividades salvas no RDO")
