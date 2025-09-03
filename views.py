@@ -5336,19 +5336,21 @@ def adicionar_servico_obra():
             else:
                 # Reativar se estava desativado
                 servico_obra_existente.ativo = True
-                servico_obra_existente.data_criacao = datetime.now()
+                servico_obra_existente.created_at = datetime.now()
         else:
-            # Criar nova associação
-            servico_obra = ServicoObra()
-            servico_obra.obra_id = obra_id
-            servico_obra.servico_id = servico_id
-            servico_obra.quantidade_planejada = 1.0
-            servico_obra.quantidade_executada = 0.0
-            servico_obra.valor_unitario = servico.custo_unitario or 0.0
-            servico_obra.ativo = True
-            servico_obra.data_criacao = datetime.now()
-            
-            db.session.add(servico_obra)
+            # Criar nova associação com INSERT direto para garantir admin_id
+            db.session.execute(text("""
+                INSERT INTO servico_obra (obra_id, servico_id, quantidade_planejada, quantidade_executada, ativo, created_at, admin_id)
+                VALUES (:obra_id, :servico_id, :quantidade_planejada, :quantidade_executada, :ativo, :created_at, :admin_id)
+            """), {
+                'obra_id': obra_id,
+                'servico_id': servico_id,
+                'quantidade_planejada': 1.0,
+                'quantidade_executada': 0.0,
+                'ativo': True,
+                'created_at': datetime.now(),
+                'admin_id': admin_id
+            })
         
         db.session.commit()
         
