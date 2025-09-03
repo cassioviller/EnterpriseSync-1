@@ -1251,12 +1251,24 @@ def nova_obra():
             
             # Gerar código único se não fornecido
             if not codigo:
-                ultimo_codigo = db.session.execute(text("SELECT MAX(CAST(SUBSTRING(codigo FROM 2) AS INTEGER)) FROM obra WHERE codigo LIKE 'O%'")).fetchone()
-                if ultimo_codigo and ultimo_codigo[0]:
-                    novo_numero = ultimo_codigo[0] + 1
-                else:
-                    novo_numero = 1
-                codigo = f"O{novo_numero:04d}"
+                try:
+                    # Buscar apenas códigos que seguem o padrão O + números
+                    ultimo_codigo = db.session.execute(
+                        text("SELECT MAX(CAST(SUBSTRING(codigo FROM 2) AS INTEGER)) FROM obra WHERE codigo ~ '^O[0-9]+$'")
+                    ).fetchone()
+                    
+                    if ultimo_codigo and ultimo_codigo[0]:
+                        novo_numero = ultimo_codigo[0] + 1
+                    else:
+                        novo_numero = 1
+                    codigo = f"O{novo_numero:04d}"
+                    
+                except Exception as e:
+                    print(f"⚠️ Erro na geração de código, usando fallback: {e}")
+                    # Fallback: gerar código baseado em timestamp
+                    from datetime import datetime
+                    timestamp = datetime.now().strftime("%m%d%H%M")
+                    codigo = f"O{timestamp}"
             
             # Detectar admin_id
             admin_id = 10  # Padrão
