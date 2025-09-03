@@ -1266,7 +1266,6 @@ def nova_obra():
                 except Exception as e:
                     print(f"⚠️ Erro na geração de código, usando fallback: {e}")
                     # Fallback: gerar código baseado em timestamp
-                    from datetime import datetime
                     timestamp = datetime.now().strftime("%m%d%H%M")
                     codigo = f"O{timestamp}"
             
