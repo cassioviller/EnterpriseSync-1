@@ -259,6 +259,62 @@ CREATE TABLE IF NOT EXISTS propostas_comerciais (
 );
 
 -- CRIAR TABELA PROPOSTA_ITENS SEM FOREIGN KEY
+-- TABELA SERVICO - CRITICA PARA FUNCIONAMENTO
+CREATE TABLE IF NOT EXISTS servico (
+    id SERIAL PRIMARY KEY,
+    nome VARCHAR(100) NOT NULL,
+    descricao TEXT,
+    categoria VARCHAR(50) NOT NULL,
+    unidade_medida VARCHAR(10) NOT NULL,
+    unidade_simbolo VARCHAR(10),
+    custo_unitario DECIMAL(10,2) DEFAULT 0.0,
+    valor_unitario DECIMAL(10,2) DEFAULT 0.0,
+    complexidade INTEGER DEFAULT 3,
+    requer_especializacao BOOLEAN DEFAULT FALSE,
+    ativo BOOLEAN DEFAULT TRUE,
+    admin_id INTEGER NOT NULL,
+    categoria_id INTEGER,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- TABELA SERVICO_OBRA - RELACIONAMENTO CRITICO
+CREATE TABLE IF NOT EXISTS servico_obra (
+    id SERIAL PRIMARY KEY,
+    obra_id INTEGER NOT NULL,
+    servico_id INTEGER NOT NULL,
+    quantidade_planejada DECIMAL(10,4) NOT NULL,
+    quantidade_executada DECIMAL(10,4) DEFAULT 0.0,
+    observacoes TEXT,
+    ativo BOOLEAN DEFAULT TRUE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(obra_id, servico_id)
+);
+
+-- TABELA CUSTO_VEICULO - PARA CUSTOS
+CREATE TABLE IF NOT EXISTS custo_veiculo (
+    id SERIAL PRIMARY KEY,
+    tipo_custo VARCHAR(50) NOT NULL,
+    descricao VARCHAR(200) NOT NULL,
+    valor DECIMAL(10,2) NOT NULL,
+    data_custo DATE NOT NULL,
+    admin_id INTEGER NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- TABELA REGISTRO_ALIMENTACAO - PARA CUSTOS
+CREATE TABLE IF NOT EXISTS registro_alimentacao (
+    id SERIAL PRIMARY KEY,
+    funcionario_id INTEGER NOT NULL,
+    data DATE NOT NULL,
+    valor DECIMAL(10,2) NOT NULL,
+    tipo_refeicao VARCHAR(20) DEFAULT 'almoco',
+    admin_id INTEGER NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(funcionario_id, data)
+);
+
 CREATE TABLE IF NOT EXISTS proposta_itens (
     id SERIAL PRIMARY KEY,
     proposta_id INTEGER NOT NULL,
@@ -369,6 +425,16 @@ ON CONFLICT (funcionario_id, data) DO NOTHING;
 -- CORRIGIR FUNCIONÁRIOS EXISTENTES PARA O ADMIN CORRETO
 -- Em produção, manter os admin_id existentes se já tiverem dados
 -- UPDATE funcionario SET admin_id = 10 WHERE admin_id = 4;
+
+-- SERVICOS DEMO PARA PRODUÇÃO
+INSERT INTO servico (nome, descricao, categoria, unidade_medida, unidade_simbolo, custo_unitario, valor_unitario, admin_id, ativo)
+VALUES 
+('Estrutura Metálica Industrial', 'Montagem de estrutura metálica para galpões industriais', 'Estrutura', 'tonelada', 'ton', 2500.00, 2500.00, 10, TRUE),
+('Cobertura Telha Galvanizada', 'Instalação de cobertura com telha galvanizada', 'Cobertura', 'metro', 'm²', 45.00, 45.00, 10, TRUE),
+('Soldagem Especializada', 'Soldagem certificada para estruturas metálicas', 'Soldagem', 'metro', 'm', 150.00, 150.00, 10, TRUE),
+('Instalação Elétrica Residencial', 'Instalação completa de sistema elétrico residencial', 'Elétrica', 'ponto', 'pt', 85.00, 85.00, 10, TRUE),
+('Pintura Interna Premium', 'Pintura interna com tinta premium', 'Acabamento', 'metro', 'm²', 35.00, 35.00, 10, TRUE)
+ON CONFLICT (nome) DO NOTHING;
 
 -- OBRA DEMO
 INSERT INTO obra (codigo, nome, descricao, status, data_inicio, data_fim_prevista, admin_id, token_cliente, orcamento, valor_contrato, area_total_m2, cliente_nome, cliente_email, cliente_telefone, portal_ativo)
