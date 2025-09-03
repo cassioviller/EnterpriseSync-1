@@ -113,7 +113,27 @@ def obter_admin_id():
         from flask_login import current_user
         from flask import session
         
-        # Verificar usuário autenticado
+        # CORREÇÃO: Verificar conflito entre sessão e current_user (igual API e CRUD)
+        session_user_id = session.get('_user_id')
+        
+        # Se há sessão mas current_user diferente, usar sessão
+        if session_user_id and current_user and str(current_user.id) != str(session_user_id):
+            print(f"🚨 CONFLITO DETECTADO RDO: session_user_id={session_user_id}, current_user.id={current_user.id}")
+            try:
+                from models import Usuario, TipoUsuario
+                session_user = Usuario.query.get(int(session_user_id))
+                if session_user and session_user.tipo_usuario == TipoUsuario.ADMIN:
+                    admin_id = session_user.id
+                    print(f"✅ CORREÇÃO SESSÃO RDO: ADMIN (ID:{admin_id})")
+                    return admin_id
+                elif session_user and hasattr(session_user, 'admin_id') and session_user.admin_id:
+                    admin_id = session_user.admin_id
+                    print(f"✅ CORREÇÃO SESSÃO RDO: Funcionário (admin_id:{admin_id})")
+                    return admin_id
+            except Exception as session_error:
+                print(f"❌ ERRO ao buscar usuário da sessão RDO: {session_error}")
+        
+        # Usar current_user normal se não há conflito
         if current_user and current_user.is_authenticated:
             # Para usuários ADMIN, usar o próprio ID como admin_id
             if hasattr(current_user, 'tipo_usuario') and current_user.tipo_usuario.value == 'admin':
