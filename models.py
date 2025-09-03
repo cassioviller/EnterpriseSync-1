@@ -140,8 +140,9 @@ class ServicoObra(db.Model):
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     
-    # Unique constraint para evitar duplicatas
-    __table_args__ = (db.UniqueConstraint('obra_id', 'servico_id', name='_obra_servico_uc'),)
+    # Unique constraint multi-tenant - incluir admin_id para isolamento correto
+    admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), default=10)
+    __table_args__ = (db.UniqueConstraint('obra_id', 'servico_id', 'admin_id', name='_obra_servico_admin_uc'),)
 
 class Veiculo(db.Model):
     id = db.Column(db.Integer, primary_key=True)

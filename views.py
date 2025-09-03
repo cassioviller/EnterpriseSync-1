@@ -5323,10 +5323,11 @@ def adicionar_servico_obra():
         if not servico:
             return jsonify({'success': False, 'message': 'Serviço não encontrado'}), 404
         
-        # Verificar se já existe associação
+        # CRÍTICO: Verificar se já existe associação INCLUINDO admin_id para multi-tenant
         servico_obra_existente = ServicoObra.query.filter_by(
             obra_id=obra_id, 
-            servico_id=servico_id
+            servico_id=servico_id,
+            admin_id=admin_id  # CORREÇÃO: Incluir admin_id na verificação
         ).first()
         
         if servico_obra_existente:
