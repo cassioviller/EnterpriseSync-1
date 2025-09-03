@@ -183,24 +183,32 @@ def api_ultimo_rdo_dados(obra_id):
             print(f"✅ PRIMEIRA RDO: {len(servicos_dados)} serviços carregados com percentual 0%")
             return jsonify(resultado)
         
-        # Buscar serviços do último RDO
-        servicos_rdo = RDOServicoSubatividade.query.filter_by(rdo_id=ultimo_rdo.id).all()
-        servicos_dados = []
+        # CORREÇÃO: Buscar subatividades individuais do último RDO
+        subatividades_rdo = RDOServicoSubatividade.query.filter_by(rdo_id=ultimo_rdo.id).all()
         
-        for servico_rdo in servicos_rdo:
-            if servico_rdo.servico:
-                servicos_dados.append({
-                    'id': servico_rdo.servico.id,
-                    'nome': servico_rdo.servico.nome,
-                    'percentual': servico_rdo.percentual_executado or 0,
-                    'subatividades': [
-                        {
-                            'id': sa.id,
-                            'nome': sa.nome,
-                            'percentual': servico_rdo.percentual_executado or 0
-                        } for sa in servico_rdo.servico.subatividades if hasattr(servico_rdo.servico, 'subatividades')
-                    ]
+        # Agrupar por serviço
+        servicos_dict = {}
+        for subatividade_rdo in subatividades_rdo:
+            if subatividade_rdo.subatividade and subatividade_rdo.subatividade.servico:
+                servico = subatividade_rdo.subatividade.servico
+                servico_id = servico.id
+                
+                if servico_id not in servicos_dict:
+                    servicos_dict[servico_id] = {
+                        'id': servico.id,
+                        'nome': servico.nome,
+                        'categoria': getattr(servico, 'categoria', 'Não categorizado'),
+                        'subatividades': []
+                    }
+                
+                servicos_dict[servico_id]['subatividades'].append({
+                    'id': subatividade_rdo.subatividade.id,
+                    'nome': subatividade_rdo.subatividade.nome,
+                    'percentual': float(subatividade_rdo.percentual_conclusao or 0),
+                    'descricao': getattr(subatividade_rdo.subatividade, 'descricao', '')
                 })
+        
+        servicos_dados = list(servicos_dict.values())
         
         # Buscar funcionários do último RDO
         funcionarios_rdo = RDOMaoObra.query.filter_by(rdo_id=ultimo_rdo.id).all()
