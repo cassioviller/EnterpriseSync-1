@@ -1108,7 +1108,6 @@ def obras():
     obras = query.order_by(desc(Obra.data_inicio)).all()
     
     print(f"DEBUG FILTROS OBRAS: {filtros}")
-    print(f"DEBUG TOTAL OBRAS ENCONTRADAS: {len(obras)}")
     
     # Definir período para cálculos de custo
     if filtros['data_inicio']:
@@ -1281,11 +1280,8 @@ def nova_obra():
                     ).fetchone()
                     if fallback_admin:
                         admin_id = fallback_admin[0]
-                        print(f"🔧 NOVA OBRA - Admin_id detectado por fallback: {admin_id}")
-                    else:
-                        print(f"⚠️ NOVA OBRA - Usando admin_id padrão: {admin_id}")
-            except Exception as e:
-                print(f"❌ NOVA OBRA - Erro na detecção admin_id: {e}")
+                        pass
+            except Exception:
                 admin_id = 10
             
             # Gerar token para portal do cliente se ativo
@@ -1319,13 +1315,10 @@ def nova_obra():
             
             # Processar serviços selecionados
             servicos_selecionados = request.form.getlist('servicos_obra')
-            print(f"🔧 NOVA OBRA - Serviços selecionados: {servicos_selecionados}")
-            
             if servicos_selecionados:
                 for servico_id in servicos_selecionados:
                     try:
                         servico_id = int(servico_id)
-                        print(f"🔧 NOVA OBRA - Associando serviço {servico_id} à obra {nova_obra.id}")
                         
                         # Criar associação na tabela servico_obra
                         associacao = ServicoObra(
@@ -1334,13 +1327,8 @@ def nova_obra():
                             admin_id=admin_id
                         )
                         db.session.add(associacao)
-                        print(f"✅ NOVA OBRA - Serviço {servico_id} associado com admin_id={admin_id}")
                         
-                    except ValueError as e:
-                        print(f"⚠️ NOVA OBRA - Erro ao processar servico_id {servico_id}: {e}")
-                        continue
-                    except Exception as e:
-                        print(f"❌ NOVA OBRA - Erro ao criar associação: {e}")
+                    except (ValueError, Exception):
                         continue
             
             db.session.commit()
@@ -1370,15 +1358,13 @@ def nova_obra():
                 ).fetchone()
                 if fallback_admin:
                     admin_id = fallback_admin[0]
-                    print(f"🔧 GET NOVA OBRA - Admin_id detectado por fallback: {admin_id}")
-        except Exception as e:
-            print(f"❌ GET NOVA OBRA - Erro na detecção admin_id: {e}")
+                    pass
+        except Exception:
             admin_id = 10
         
         funcionarios = Funcionario.query.filter_by(admin_id=admin_id, ativo=True).order_by(Funcionario.nome).all()
         servicos_disponiveis = Servico.query.filter_by(admin_id=admin_id, ativo=True).order_by(Servico.nome).all()
         
-        print(f"DEBUG NOVA OBRA: {len(funcionarios)} funcionários e {len(servicos_disponiveis)} serviços carregados para admin_id={admin_id}")
         
     except Exception as e:
         print(f"ERRO ao carregar dados: {e}")
@@ -1487,7 +1473,6 @@ def editar_obra(id):
         # Buscar serviços já associados à obra (implementar lógica específica depois)
         servicos_obra = []
         
-        print(f"DEBUG EDITAR OBRA: {len(funcionarios)} funcionários e {len(servicos_disponiveis)} serviços carregados para admin_id={admin_id}")
         
     except Exception as e:
         print(f"ERRO ao carregar dados para edição: {e}")

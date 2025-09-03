@@ -1,13 +1,12 @@
-# DOCKERFILE UNIFICADO - SIGE v8.3 FINAL  
-# CORREÇÃO DEFINITIVA: Erro 405 + Multi-tenant + Deploy Produção
-# Sistema Integrado de Gestão Empresarial - EasyPanel Ready
+# DOCKERFILE PRODUÇÃO - SIGE v9.0
+# Sistema de Gestão Empresarial - Limpo e Otimizado
 
 FROM python:3.11-slim-bullseye
 
-# Metadados atualizados
-LABEL maintainer="SIGE v8.3 Final" \
-      version="8.3.0" \
-      description="Sistema Integrado de Gestão Empresarial - Erro 405 + Multi-tenant Corrigido" \
+# Metadados
+LABEL maintainer="SIGE v9.0" \
+      version="9.0.0" \
+      description="Sistema de Gestão Empresarial - Produção" \
       build-date="2025-09-03"
 
 # Variáveis de build
@@ -44,53 +43,33 @@ RUN pip install --no-cache-dir --upgrade pip setuptools wheel && \
     pip install --no-cache-dir . && \
     pip list > /app/installed_packages.txt
 
-# Copiar TODO o código da aplicação (garantindo sincronia total)
+# Copiar código da aplicação
 COPY . .
 
-# CORREÇÕES CRÍTICAS PARA SALVAMENTO DE SERVIÇOS - v8.2
-# Scripts de correção específicos para produção
-COPY fix_servicos_api_production.py /app/
-COPY verify_production_fixes.py /app/
-RUN python3 /app/fix_servicos_api_production.py
-
-# Criar todos os diretórios necessários para dev e prod (incluindo debug)
+# Criar diretórios necessários
 RUN mkdir -p \
     /app/static/fotos_funcionarios \
-    /app/static/fotos \
-    /app/static/images \
     /app/static/uploads \
-    /app/uploads \
     /app/logs \
-    /app/temp \
-    /app/instance \
-    /app/migrations \
-    /app/templates/debug \
-    /app/templates/errors \
-    && chown -R sige:sige /app \
-    && chmod 755 /app/logs
+    && chown -R sige:sige /app
 
 # Garantir que arquivos Python sejam executáveis
 RUN find /app -name "*.py" -exec chmod 644 {} \;
 
-# Copiar e configurar script de entrada FINAL v8.3
+# Script de entrada otimizado
 COPY docker-entrypoint-v8.3-final.sh /app/docker-entrypoint.sh
 RUN chmod +x /app/docker-entrypoint.sh
 
 # Mudar para usuário não-root
 USER sige
 
-# Variáveis de ambiente unificadas para dev/prod
+# Variáveis de ambiente
 ENV FLASK_APP=main.py \
     FLASK_ENV=production \
     PORT=5000 \
     PYTHONPATH=/app \
     PYTHONUNBUFFERED=1 \
-    PYTHONIOENCODING=utf-8 \
-    LANG=C.UTF-8 \
-    LC_ALL=C.UTF-8 \
-    SHOW_DETAILED_ERRORS=true \
-    DEBUG=false \
-    WEB_CONCURRENCY=2
+    DEBUG=false
 
 # Expor porta
 EXPOSE 5000
