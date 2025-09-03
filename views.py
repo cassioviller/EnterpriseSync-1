@@ -1687,12 +1687,14 @@ def detalhes_obra(id):
         # Calcular progresso geral da obra baseado no último RDO
         progresso_geral = 0.0
         try:
+            from models import RDO, RDOServicoSubatividade
+            
             # Buscar o último RDO da obra
-            ultimo_rdo_obra = db.session.query(RDO).filter_by(obra_id=obra_id).order_by(RDO.data_relatorio.desc()).first()
+            ultimo_rdo_obra = RDO.query.filter_by(obra_id=obra_id).order_by(RDO.data_relatorio.desc()).first()
             
             if ultimo_rdo_obra:
                 # Buscar subatividades do último RDO
-                subatividades_rdo = db.session.query(RDOServicoSubatividade).filter_by(rdo_id=ultimo_rdo_obra.id).all()
+                subatividades_rdo = RDOServicoSubatividade.query.filter_by(rdo_id=ultimo_rdo_obra.id).all()
                 
                 if subatividades_rdo:
                     total_percentuais = sum(sub.percentual_conclusao or 0 for sub in subatividades_rdo)
@@ -1749,12 +1751,14 @@ def detalhes_obra(id):
                 # Calcular progresso baseado no último RDO (não em quantidade)
                 progresso = 0.0
                 try:
+                    from models import RDO, RDOServicoSubatividade
+                    
                     # Buscar último RDO da obra
-                    ultimo_rdo_servico = db.session.query(RDO).filter_by(obra_id=obra_id).order_by(RDO.data_relatorio.desc()).first()
+                    ultimo_rdo_servico = RDO.query.filter_by(obra_id=obra_id).order_by(RDO.data_relatorio.desc()).first()
                     
                     if ultimo_rdo_servico:
                         # Buscar subatividades deste serviço no último RDO
-                        subatividades_servico = db.session.query(RDOServicoSubatividade).filter_by(
+                        subatividades_servico = RDOServicoSubatividade.query.filter_by(
                             rdo_id=ultimo_rdo_servico.id,
                             servico_id=row.id
                         ).all()
