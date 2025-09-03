@@ -2,7 +2,7 @@
 # DOCKER ENTRYPOINT PRODUCTION FIX - SIGE v8.0 FINAL
 set -e
 
-echo "🚀 SIGE v8.0.1 - Iniciando (Full Sync Dev-Prod - 03/09/2025)"
+echo "🚀 SIGE v8.1.0 - Iniciando (Full Sync Dev-Prod + Erro 400 Corrigido - 03/09/2025)"
 
 # Configuração do ambiente
 export PYTHONPATH=/app
@@ -36,8 +36,13 @@ done
 
 echo "✅ PostgreSQL conectado!"
 
-# CORREÇÕES ATUALIZADAS - DESENVOLVIMENTO SINCRONIZADO
-echo "🔧 CORREÇÕES ATUALIZADAS: Sincronizando dev-prod e aplicando fixes RDO..."
+# CORREÇÕES ATUALIZADAS - DESENVOLVIMENTO SINCRONIZADO + ERRO 400 FIXADO
+echo "🔧 CORREÇÕES ATUALIZADAS: Sincronizando dev-prod, aplicando fixes RDO + correções JS..."
+
+# Verificação completa das correções
+echo "🔍 Executando verificação completa das correções..."
+python3 /app/verify_production_fixes.py
+echo "✅ Verificação concluída - sistema pronto!"
 
 # Executar correção em bloco único
 psql "$DATABASE_URL" -v ON_ERROR_STOP=1 << 'EOSQL'

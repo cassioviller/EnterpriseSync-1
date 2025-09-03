@@ -1,13 +1,13 @@
-# DOCKERFILE UNIFICADO - SIGE v8.0 FINAL
-# Sincronização Total Desenvolvimento ↔ Produção
+# DOCKERFILE UNIFICADO - SIGE v8.1 FINAL  
+# Sincronização Total Desenvolvimento ↔ Produção - ERRO 400 CORRIGIDO
 # Sistema Integrado de Gestão Empresarial - EasyPanel Ready
 
 FROM python:3.11-slim-bullseye
 
 # Metadados atualizados
-LABEL maintainer="SIGE v8.0 Final" \
-      version="8.0.1" \
-      description="Sistema Integrado de Gestão Empresarial - Full Sync Build" \
+LABEL maintainer="SIGE v8.1 Final" \
+      version="8.1.0" \
+      description="Sistema Integrado de Gestão Empresarial - Erro 400 Corrigido" \
       build-date="2025-09-03"
 
 # Variáveis de build
@@ -46,6 +46,11 @@ RUN pip install --no-cache-dir --upgrade pip setuptools wheel && \
 
 # Copiar TODO o código da aplicação (garantindo sincronia total)
 COPY . .
+
+# CORREÇÕES ESPECÍFICAS PARA ERRO 400 - APLICAR EM PRODUÇÃO
+# Script de verificação completa das correções
+COPY verify_production_fixes.py /app/
+RUN python3 /app/verify_production_fixes.py
 
 # Criar todos os diretórios necessários para dev e prod (incluindo debug)
 RUN mkdir -p \
