@@ -592,7 +592,8 @@ function carregarDadosUltimoRDO() {
                     exibirDadosPrimeiraRDO(data.ultimo_rdo);
                 } else {
                     console.log(`✅ Último RDO encontrado: ${data.ultimo_rdo.numero_rdo}`);
-                    exibirDadosUltimoRDO(data.ultimo_rdo);
+                    // CORREÇÃO: Carregar formulário editável com dados pré-preenchidos
+                    exibirDadosPrimeiraRDO(data.ultimo_rdo, true); // true = com dados preenchidos
                 }
             } else {
                 exibirMensagemSemRDOAnterior();
@@ -1486,20 +1487,21 @@ function exibirErroCarregamento() {
     `;
 }
 
-function exibirDadosPrimeiraRDO(primeiraRDO) {
+function exibirDadosPrimeiraRDO(primeiraRDO, comDadosPreenchidos = false) {
     const servicosContainer = document.getElementById('servicos-container');
     
     let html = `
-        <div class="alert alert-success">
-            <i class="fas fa-rocket"></i>
-            <strong>Primeira RDO da Obra!</strong> Serviços carregados com percentual 0%
-            <br><small>Total: ${primeiraRDO.total_servicos} serviços | ${primeiraRDO.total_subatividades} subatividades</small>
+        <div class="alert ${comDadosPreenchidos ? 'alert-info' : 'alert-success'}">
+            <i class="fas ${comDadosPreenchidos ? 'fa-history' : 'fa-rocket'}"></i>
+            <strong>${comDadosPreenchidos ? 'Dados do Último RDO' : 'Primeira RDO da Obra!'}</strong> 
+            ${comDadosPreenchidos ? 'Campos pré-preenchidos com dados salvos' : 'Serviços carregados com percentual 0%'}
+            <br><small>Total: ${primeiraRDO.total_servicos} serviços | ${primeiraRDO.total_subatividades || 'N/A'} subatividades</small>
         </div>
     `;
     
-    // Mostrar serviços com percentual 0%
+    // Mostrar serviços com percentual correto
     if (primeiraRDO.servicos && primeiraRDO.servicos.length > 0) {
-        html += '<h5><i class="fas fa-tools"></i> Serviços da Obra (Primeira RDO)</h5>';
+        html += `<h5><i class="fas fa-tools"></i> Serviços da Obra ${comDadosPreenchidos ? '(Com Dados Salvos)' : '(Primeira RDO)'}</h5>`;
         primeiraRDO.servicos.forEach((servico, index) => {
             html += `
                 <div class="card mb-3">
@@ -1522,7 +1524,7 @@ function exibirDadosPrimeiraRDO(primeiraRDO) {
                                             <input type="number" 
                                                    class="form-control" 
                                                    name="subatividade_${sub.id}_percentual"
-                                                   value="0" 
+                                                   value="${comDadosPreenchidos ? (sub.percentual || 0) : 0}" 
                                                    min="0" 
                                                    max="100" 
                                                    step="0.1"
