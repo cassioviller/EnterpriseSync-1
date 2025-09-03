@@ -1,13 +1,13 @@
-# DOCKERFILE UNIFICADO - SIGE v8.1 FINAL  
-# Sincronização Total Desenvolvimento ↔ Produção - ERRO 400 CORRIGIDO
+# DOCKERFILE UNIFICADO - SIGE v8.2 FINAL  
+# CORREÇÃO CRÍTICA: Salvamento de Serviços em Produção
 # Sistema Integrado de Gestão Empresarial - EasyPanel Ready
 
 FROM python:3.11-slim-bullseye
 
 # Metadados atualizados
-LABEL maintainer="SIGE v8.1 Final" \
-      version="8.1.0" \
-      description="Sistema Integrado de Gestão Empresarial - Erro 400 Corrigido" \
+LABEL maintainer="SIGE v8.2 Final" \
+      version="8.2.0" \
+      description="Sistema Integrado de Gestão Empresarial - Correção APIs Serviços" \
       build-date="2025-09-03"
 
 # Variáveis de build
@@ -47,10 +47,11 @@ RUN pip install --no-cache-dir --upgrade pip setuptools wheel && \
 # Copiar TODO o código da aplicação (garantindo sincronia total)
 COPY . .
 
-# CORREÇÕES ESPECÍFICAS PARA ERRO 400 - APLICAR EM PRODUÇÃO
-# Script de verificação completa das correções
+# CORREÇÕES CRÍTICAS PARA SALVAMENTO DE SERVIÇOS - v8.2
+# Scripts de correção específicos para produção
+COPY fix_servicos_api_production.py /app/
 COPY verify_production_fixes.py /app/
-RUN python3 /app/verify_production_fixes.py
+RUN python3 /app/fix_servicos_api_production.py
 
 # Criar todos os diretórios necessários para dev e prod (incluindo debug)
 RUN mkdir -p \
@@ -71,8 +72,8 @@ RUN mkdir -p \
 # Garantir que arquivos Python sejam executáveis
 RUN find /app -name "*.py" -exec chmod 644 {} \;
 
-# Copiar e configurar script de entrada UNIFICADO
-COPY docker-entrypoint-production-fix.sh /app/docker-entrypoint.sh
+# Copiar e configurar script de entrada ATUALIZADO v8.2
+COPY docker-entrypoint-v8.2-servicos-fix.sh /app/docker-entrypoint.sh
 RUN chmod +x /app/docker-entrypoint.sh
 
 # Mudar para usuário não-root
