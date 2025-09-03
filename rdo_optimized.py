@@ -217,10 +217,20 @@ def api_ultimo_rdo_dados(obra_id):
         
         for func_rdo in funcionarios_rdo:
             if func_rdo.funcionario:
+                # CORREÇÃO: Usar o relacionamento correto para funcao
+                funcao_nome = 'Não informado'
+                try:
+                    if hasattr(func_rdo.funcionario, 'funcao_ref') and func_rdo.funcionario.funcao_ref:
+                        funcao_nome = func_rdo.funcionario.funcao_ref.nome
+                    elif hasattr(func_rdo, 'funcao_exercida') and func_rdo.funcao_exercida:
+                        funcao_nome = func_rdo.funcao_exercida
+                except Exception:
+                    funcao_nome = 'Funcionário'  # Fallback seguro
+                
                 funcionarios_dados.append({
                     'id': func_rdo.funcionario.id,
                     'nome': func_rdo.funcionario.nome,
-                    'funcao': func_rdo.funcionario.funcao.nome if func_rdo.funcionario.funcao else 'Não informado',
+                    'funcao': funcao_nome,
                     'horas_trabalhadas': float(func_rdo.horas_trabalhadas) if func_rdo.horas_trabalhadas else 8.0
                 })
         
