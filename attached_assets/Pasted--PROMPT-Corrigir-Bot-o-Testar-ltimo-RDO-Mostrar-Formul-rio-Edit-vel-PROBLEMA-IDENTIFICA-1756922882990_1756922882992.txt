@@ -1,0 +1,291 @@
+# PROMPT: Corrigir Botão "Testar Último RDO" - Mostrar Formulário Editável
+
+## PROBLEMA IDENTIFICADO
+
+O botão "Testar Último RDO" está mostrando apenas **visualização em modo leitura** (primeira imagem) quando deveria mostrar **formulário editável** com campos de input (segunda imagem).
+
+### COMPORTAMENTO ATUAL (ERRADO):
+- Mostra dados estáticos do último RDO
+- Sem campos de input editáveis
+- Apenas visualização dos percentuais salvos
+
+### COMPORTAMENTO ESPERADO (CORRETO):
+- Formulário editável com campos de input
+- Dados pré-preenchidos do último RDO
+- Usuário pode editar as porcentagens
+- Campos com placeholder "0" e símbolo "%"
+
+## ANÁLISE DO PROBLEMA
+
+### CAUSA RAIZ:
+A função JavaScript `carregarDadosUltimoRDO()` não está executando o código correto para exibir o formulário editável.
+
+### CONDIÇÃO PROBLEMÁTICA:
+```javascript
+if (data.primeira_rdo) {
+    // Primeira RDO - formulário com 0%
+} else {
+    // DEVERIA entrar aqui e chamar:
+    // exibirDadosPrimeiraRDO(data.ultimo_rdo, true)
+    // MAS NÃO ESTÁ EXECUTANDO
+}
+```
+
+## SOLUÇÃO ESPECÍFICA
+
+### 1. CORRIGIR A CONDIÇÃO JAVASCRIPT
+
+**Problema:** A API não retorna `primeira_rdo: false` explicitamente, então `data.primeira_rdo` é `undefined`.
+
+**Solução:** Modificar a condição para detectar corretamente quando há último RDO:
+
+```javascript
+function carregarDadosUltimoRDO() {
+    const obraId = document.getElementById('obra_id').value;
+    
+    if (!obraId) {
+        alert('Selecione uma obra primeiro');
+        return;
+    }
+    
+    console.log('🔍 Carregando dados do último RDO para obra:', obraId);
+    
+    fetch(`/api/ultimo-rdo-dados/${obraId}`)
+        .then(response => response.json())
+        .then(data => {
+            console.log('📦 Dados recebidos:', data);
+            
+            if (data.success) {
+                // CORREÇÃO: Verificar se há último RDO pelos dados, não pela flag
+                const temUltimoRDO = data.ultimo_rdo && 
+                                   data.ultimo_rdo.numero_rdo && 
+                                   data.ultimo_rdo.numero_rdo !== 'PRIMEIRA_RDO';
+                
+                console.log('🔍 Tem último RDO?', temUltimoRDO);
+                console.log('🔍 Número RDO:', data.ultimo_rdo?.numero_rdo);
+                
+                if (temUltimoRDO) {
+                    // HÁ ÚLTIMO RDO - Mostrar formulário editável com dados preenchidos
+                    console.log('🔧 FORÇANDO formulário editável com dados preenchidos...');
+                    exibirDadosPrimeiraRDO(data.ultimo_rdo, true); // true = com dados preenchidos
+                    
+                    // Mostrar informação do último RDO usado
+                    mostrarInfoUltimoRDO(data.ultimo_rdo);
+                } else {
+                    // PRIMEIRA RDO - Mostrar formulário com 0%
+                    console.log('🆕 Primeira RDO - formulário com 0%');
+                    exibirDadosPrimeiraRDO(data.ultimo_rdo, false); // false = campos zerados
+                    
+                    // Mostrar informação de primeira RDO
+                    mostrarInfoPrimeiraRDO();
+                }
+            } else {
+                console.error('❌ Erro na API:', data.error);
+                alert('Erro ao carregar dados do último RDO');
+            }
+        })
+        .catch(error => {
+            console.error('❌ Erro na requisição:', error);
+            alert('Erro ao conectar com o servidor');
+        });
+}
+```
+
+### 2. GARANTIR QUE A FUNÇÃO SEJA CHAMADA CORRETAMENTE
+
+**Verificar se a função `exibirDadosPrimeiraRDO` está sendo chamada com os parâmetros corretos:**
+
+```javascript
+function exibirDadosPrimeiraRDO(dadosRDO, comDadosPreenchidos = false) {
+    console.log('🎯 exibirDadosPrimeiraRDO chamada:', {
+        dadosRDO: dadosRDO,
+        comDadosPreenchidos: comDadosPreenchidos
+    });
+    
+    const container = document.getElementById('servicos-container');
+    
+    if (!dadosRDO || !dadosRDO.servicos) {
+        console.error('❌ Dados do RDO inválidos');
+        return;
+    }
+    
+    let html = '';
+    
+    // Cabeçalho informativo
+    if (comDadosPreenchidos) {
+        html += `
+        <div class="alert alert-info mb-4">
+            <i class="fas fa-info-circle"></i>
+            <strong>📋 Dados do Último RDO:</strong> ${dadosRDO.numero_rdo} (${dadosRDO.data_relatorio})<br>
+            Serviços: ${dadosRDO.servicos.length} | Funcionários: ${dadosRDO.funcionarios?.length || 0}
+        </div>`;
+    } else {
+        html += `
+        <div class="alert alert-success mb-4">
+            <i class="fas fa-seedling"></i>
+            <strong>🆕 Primeira RDO da Obra!</strong> Serviços carregados com percentual 0%<br>
+            Total: ${dadosRDO.servicos.length} serviços | ${dadosRDO.total_subatividades || 0} subatividades
+        </div>`;
+    }
+    
+    html += '<div class="servicos-accordion">';
+    
+    // Gerar formulário para cada serviço
+    dadosRDO.servicos.forEach((servico, index) => {
+        const servicoId = `servico-${servico.id}`;
+        const isExpanded = index === 0; // Primeiro serviço expandido
+        
+        html += `
+        <div class="servico-card mb-3">
+            <div class="servico-header" onclick="toggleServico('${servicoId}')">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <h5 class="mb-0">
+                            <i class="fas fa-wrench text-primary"></i>
+                            ${servico.nome}
+                        </h5>
+                        <small class="text-muted">${servico.categoria || 'Categoria não definida'}</small>
+                    </div>
+                    <div class="d-flex align-items-center gap-3">
+                        <span class="badge bg-secondary">${servico.subatividades?.length || 0} subatividades</span>
+                        <i class="fas fa-chevron-${isExpanded ? 'up' : 'down'}" id="icon-${servicoId}"></i>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="servico-body ${isExpanded ? '' : 'collapse'}" id="${servicoId}">
+                <div class="subatividades-grid">`;
+        
+        // Gerar campos editáveis para cada subatividade
+        if (servico.subatividades && servico.subatividades.length > 0) {
+            servico.subatividades.forEach(subatividade => {
+                const percentualAtual = comDadosPreenchidos ? subatividade.percentual || 0 : 0;
+                
+                html += `
+                <div class="col-md-6 mb-3">
+                    <label class="form-label">${subatividade.nome}</label>
+                    <div class="input-group">
+                        <input type="number" 
+                               class="form-control" 
+                               name="subatividade_${subatividade.id}_percentual"
+                               value="${percentualAtual}"
+                               min="0" 
+                               max="100" 
+                               step="0.1"
+                               placeholder="0">
+                        <span class="input-group-text">%</span>
+                    </div>
+                </div>`;
+            });
+        } else {
+            html += `
+            <div class="col-12">
+                <div class="alert alert-warning">
+                    <i class="fas fa-exclamation-triangle"></i>
+                    Nenhuma subatividade cadastrada para este serviço.
+                </div>
+            </div>`;
+        }
+        
+        html += `
+                </div>
+            </div>
+        </div>`;
+    });
+    
+    html += '</div>';
+    
+    // Atualizar container
+    container.innerHTML = html;
+    
+    console.log('✅ Formulário editável gerado com sucesso');
+    
+    // Se tem dados preenchidos, preencher também os funcionários
+    if (comDadosPreenchidos && dadosRDO.funcionarios) {
+        preencherFuncionarios(dadosRDO.funcionarios);
+    }
+}
+```
+
+### 3. ADICIONAR FUNÇÕES AUXILIARES
+
+```javascript
+function mostrarInfoUltimoRDO(ultimoRDO) {
+    // Mostrar informações do último RDO usado
+    const infoDiv = document.createElement('div');
+    infoDiv.className = 'alert alert-info mb-3';
+    infoDiv.innerHTML = `
+        <i class="fas fa-history"></i>
+        <strong>Último RDO encontrado:</strong> ${ultimoRDO.numero_rdo} 
+        (${ultimoRDO.data_relatorio}) - Dados carregados para edição
+    `;
+    
+    const container = document.getElementById('servicos-container');
+    container.insertBefore(infoDiv, container.firstChild);
+}
+
+function mostrarInfoPrimeiraRDO() {
+    // Mostrar informações de primeira RDO
+    const infoDiv = document.createElement('div');
+    infoDiv.className = 'alert alert-success mb-3';
+    infoDiv.innerHTML = `
+        <i class="fas fa-seedling"></i>
+        <strong>Primeira RDO da obra!</strong> 
+        Serviços carregados com percentual 0% para início dos trabalhos
+    `;
+    
+    const container = document.getElementById('servicos-container');
+    container.insertBefore(infoDiv, container.firstChild);
+}
+
+function preencherFuncionarios(funcionarios) {
+    // Preencher funcionários do último RDO
+    funcionarios.forEach(funcionario => {
+        // Lógica para preencher funcionários selecionados
+        console.log('👤 Preenchendo funcionário:', funcionario.nome);
+    });
+}
+```
+
+### 4. VERIFICAR CHAMADA DO BOTÃO
+
+**Garantir que o botão chama a função correta:**
+
+```html
+<button type="button" class="btn-modern btn-success" onclick="testarUltimoRDO()">
+    <i class="fas fa-magic"></i>
+    Testar Último RDO
+</button>
+```
+
+```javascript
+function testarUltimoRDO() {
+    console.log('🧪 BOTÃO TESTAR ÚLTIMO RDO CLICADO');
+    carregarDadosUltimoRDO();
+}
+```
+
+## RESULTADO ESPERADO
+
+Após a correção, ao clicar em "Testar Último RDO":
+
+✅ **Formulário editável** aparece (não visualização estática)
+✅ **Campos de input** com valores pré-preenchidos do último RDO
+✅ **Símbolo "%"** nos campos de porcentagem
+✅ **Funcionários** pré-selecionados (se houver)
+✅ **Informação** sobre qual RDO foi usado como base
+
+## DEBUG ADICIONAL
+
+Para confirmar que está funcionando, adicionar logs:
+
+```javascript
+console.log('🔍 Verificando condição:');
+console.log('- data.primeira_rdo:', data.primeira_rdo);
+console.log('- data.ultimo_rdo:', data.ultimo_rdo);
+console.log('- numero_rdo:', data.ultimo_rdo?.numero_rdo);
+console.log('- temUltimoRDO:', temUltimoRDO);
+```
+
+A correção principal é **modificar a condição de verificação** para detectar corretamente quando há dados do último RDO e **forçar a chamada** da função `exibirDadosPrimeiraRDO(data.ultimo_rdo, true)` com o parâmetro `true` para mostrar o formulário editável.
+
