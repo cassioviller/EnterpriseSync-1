@@ -1,13 +1,13 @@
-# DOCKERFILE UNIFICADO - SIGE v8.2 FINAL  
-# CORREÇÃO CRÍTICA: Salvamento de Serviços em Produção
+# DOCKERFILE UNIFICADO - SIGE v8.3 FINAL  
+# CORREÇÃO DEFINITIVA: Erro 405 + Multi-tenant + Deploy Produção
 # Sistema Integrado de Gestão Empresarial - EasyPanel Ready
 
 FROM python:3.11-slim-bullseye
 
 # Metadados atualizados
-LABEL maintainer="SIGE v8.2 Final" \
-      version="8.2.0" \
-      description="Sistema Integrado de Gestão Empresarial - Correção APIs Serviços" \
+LABEL maintainer="SIGE v8.3 Final" \
+      version="8.3.0" \
+      description="Sistema Integrado de Gestão Empresarial - Erro 405 + Multi-tenant Corrigido" \
       build-date="2025-09-03"
 
 # Variáveis de build
@@ -72,8 +72,8 @@ RUN mkdir -p \
 # Garantir que arquivos Python sejam executáveis
 RUN find /app -name "*.py" -exec chmod 644 {} \;
 
-# Copiar e configurar script de entrada ATUALIZADO v8.2
-COPY docker-entrypoint-v8.2-servicos-fix.sh /app/docker-entrypoint.sh
+# Copiar e configurar script de entrada FINAL v8.3
+COPY docker-entrypoint-v8.3-final.sh /app/docker-entrypoint.sh
 RUN chmod +x /app/docker-entrypoint.sh
 
 # Mudar para usuário não-root
