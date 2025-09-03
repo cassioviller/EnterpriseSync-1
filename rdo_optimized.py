@@ -59,12 +59,11 @@ def obter_servicos_obra(obra_id, admin_id):
 
 def obter_ultimo_rdo_obra(obra_id, data_atual, admin_id):
     """Obtém o último RDO da obra para herança de percentuais"""
-    # CORREÇÃO: Incluir RDOs do mesmo dia para permitir múltiplos RDOs por dia
     return RDO.query.filter(
         RDO.obra_id == obra_id,
         RDO.admin_id == admin_id,
-        RDO.data_relatorio <= data_atual  # Mudado de < para <= 
-    ).order_by(RDO.data_relatorio.desc(), RDO.id.desc()).first()  # Ordenar por ID também
+        RDO.data_relatorio < data_atual
+    ).order_by(RDO.data_relatorio.desc()).first()
 
 # ================================
 # ROTAS PRINCIPAIS
