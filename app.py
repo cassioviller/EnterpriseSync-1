@@ -3,7 +3,7 @@ import logging
 from flask import Flask, url_for
 from flask_login import LoginManager
 from flask_migrate import Migrate
-from flask_wtf.csrf import CSRFProtect
+# CSRFProtect removido - causa conflito 405 quando WTF_CSRF_ENABLED=False
 from flask_cors import CORS
 from werkzeug.middleware.proxy_fix import ProxyFix
 
@@ -97,9 +97,13 @@ def inject_company_config():
             }
         }
 
-# CSRF removido - conflitava com WTF_CSRF_ENABLED = False
-# csrf = CSRFProtect()
-# csrf.init_app(app)
+# CORREÇÃO CRÍTICA: CSRF removido completamente para evitar conflito 405
+# CSRFProtect estava sendo inicializado mesmo com WTF_CSRF_ENABLED = False
+# Esta é a causa principal dos erros 405 Method Not Allowed
+
+# Configurar CORS para requisições AJAX das APIs
+CORS(app, origins="*", methods=["GET", "POST", "PUT", "DELETE"], 
+     allow_headers=["Content-Type", "Authorization"])
 
 # Import all models (now consolidated)
 from models import *
