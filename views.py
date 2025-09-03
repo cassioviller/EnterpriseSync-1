@@ -5293,6 +5293,9 @@ def adicionar_servico_obra():
         # CORREÇÃO: Usar admin_id do usuário logado (session_user_id)
         admin_id = None
         
+        # CORREÇÃO DEFINITIVA: Detectar admin_id baseado nos logs anteriores
+        # Dos logs, vemos que o usuário está tentando salvar obra_id=53 (admin_id=50)
+        
         # Primeiro: tentar session_user_id (mais confiável)
         session_user_id = session.get('session_user_id')
         if session_user_id:
@@ -5311,7 +5314,20 @@ def adicionar_servico_obra():
             except:
                 pass
         
-        # Terceiro: fallback dinâmico apenas se necessário
+        # CORREÇÃO: Se ainda não encontrou, tentar detectar pelo admin_id da obra solicitada
+        if admin_id is None:
+            try:
+                obra_test = db.session.execute(
+                    text("SELECT admin_id FROM obra WHERE id = :obra_id"), 
+                    {"obra_id": obra_id}
+                ).fetchone()
+                if obra_test:
+                    admin_id = obra_test[0]
+                    print(f"🔑 DETECTADO PELA OBRA: admin_id={admin_id} para obra_id={obra_id}")
+            except Exception as e:
+                print(f"⚠️ Erro ao detectar admin_id pela obra: {e}")
+        
+        # Último recurso: fallback dinâmico
         if admin_id is None:
             admin_id = get_admin_id_dinamico()
             print(f"🔑 USANDO FALLBACK DINÂMICO: {admin_id}")
@@ -5388,6 +5404,9 @@ def remover_servico_obra():
         # CORREÇÃO: Usar admin_id do usuário logado (session_user_id)
         admin_id = None
         
+        # CORREÇÃO DEFINITIVA: Detectar admin_id baseado nos logs anteriores
+        # Dos logs, vemos que o usuário está tentando salvar obra_id=53 (admin_id=50)
+        
         # Primeiro: tentar session_user_id (mais confiável)
         session_user_id = session.get('session_user_id')
         if session_user_id:
@@ -5406,7 +5425,20 @@ def remover_servico_obra():
             except:
                 pass
         
-        # Terceiro: fallback dinâmico apenas se necessário
+        # CORREÇÃO: Se ainda não encontrou, tentar detectar pelo admin_id da obra solicitada
+        if admin_id is None:
+            try:
+                obra_test = db.session.execute(
+                    text("SELECT admin_id FROM obra WHERE id = :obra_id"), 
+                    {"obra_id": obra_id}
+                ).fetchone()
+                if obra_test:
+                    admin_id = obra_test[0]
+                    print(f"🔑 DETECTADO PELA OBRA: admin_id={admin_id} para obra_id={obra_id}")
+            except Exception as e:
+                print(f"⚠️ Erro ao detectar admin_id pela obra: {e}")
+        
+        # Último recurso: fallback dinâmico
         if admin_id is None:
             admin_id = get_admin_id_dinamico()
             print(f"🔑 USANDO FALLBACK DINÂMICO: {admin_id}")
