@@ -2201,7 +2201,11 @@ def api_servicos():
         admin_id = None
         user_status = "não detectado"
         
-        # PRIORIDADE 1: Usuário autenticado (PRODUÇÃO)
+        # PRIORIDADE 1: Verificar sessão Flask primeiro (para resolver conflitos)
+        session_user_id = session.get('_user_id')
+        print(f"🔍 DEBUG SESSÃO: session_user_id={session_user_id}")
+        
+        # PRIORIDADE 2: Usuário autenticado (PRODUÇÃO)
         print(f"🔍 DEBUG AUTENTICAÇÃO:")
         print(f"   - current_user exists: {current_user is not None}")
         if current_user:
@@ -2210,23 +2214,44 @@ def api_servicos():
             print(f"   - tipo_usuario: {getattr(current_user, 'tipo_usuario', 'N/A')}")
             print(f"   - id: {getattr(current_user, 'id', 'N/A')}")
             print(f"   - admin_id: {getattr(current_user, 'admin_id', 'N/A')}")
-            
-        try:
-            if current_user and current_user.is_authenticated and hasattr(current_user, 'tipo_usuario'):
-                if current_user.tipo_usuario == TipoUsuario.ADMIN:
-                    admin_id = current_user.id
-                    user_status = f"ADMIN autenticado (ID:{admin_id})"
-                    print(f"✅ PRODUÇÃO: {user_status}")
-                elif hasattr(current_user, 'admin_id') and current_user.admin_id:
-                    admin_id = current_user.admin_id
-                    user_status = f"Funcionário autenticado (admin_id:{admin_id})"
-                    print(f"✅ PRODUÇÃO: {user_status}")
+        
+        # PRIORIDADE: Se há sessão mas current_user diferente, usar sessão
+        if session_user_id and current_user and str(current_user.id) != str(session_user_id):
+            print(f"🚨 CONFLITO DETECTADO: session_user_id={session_user_id}, current_user.id={current_user.id}")
+            # Buscar usuário correto pela sessão
+            try:
+                session_user = Usuario.query.get(int(session_user_id))
+                if session_user and session_user.tipo_usuario == TipoUsuario.ADMIN:
+                    admin_id = session_user.id
+                    user_status = f"ADMIN pela sessão (ID:{admin_id})"
+                    print(f"✅ CORREÇÃO SESSÃO: {user_status}")
+                elif session_user and hasattr(session_user, 'admin_id') and session_user.admin_id:
+                    admin_id = session_user.admin_id
+                    user_status = f"Funcionário pela sessão (admin_id:{admin_id})"
+                    print(f"✅ CORREÇÃO SESSÃO: {user_status}")
                 else:
-                    print("⚠️ PRODUÇÃO: Usuário autenticado mas sem admin_id definido")
-            else:
-                print("⚠️ PRODUÇÃO: Usuário não autenticado ou sem tipo_usuario")
-        except Exception as auth_error:
-            print(f"❌ ERRO na autenticação: {auth_error}")
+                    print("⚠️ Usuário da sessão sem admin_id válido")
+            except Exception as session_error:
+                print(f"❌ ERRO ao buscar usuário da sessão: {session_error}")
+        
+        # Se ainda não foi definido, usar current_user normal
+        if admin_id is None:
+            try:
+                if current_user and current_user.is_authenticated and hasattr(current_user, 'tipo_usuario'):
+                    if current_user.tipo_usuario == TipoUsuario.ADMIN:
+                        admin_id = current_user.id
+                        user_status = f"ADMIN autenticado (ID:{admin_id})"
+                        print(f"✅ PRODUÇÃO: {user_status}")
+                    elif hasattr(current_user, 'admin_id') and current_user.admin_id:
+                        admin_id = current_user.admin_id
+                        user_status = f"Funcionário autenticado (admin_id:{admin_id})"
+                        print(f"✅ PRODUÇÃO: {user_status}")
+                    else:
+                        print("⚠️ PRODUÇÃO: Usuário autenticado mas sem admin_id definido")
+                else:
+                    print("⚠️ PRODUÇÃO: Usuário não autenticado ou sem tipo_usuario")
+            except Exception as auth_error:
+                print(f"❌ ERRO na autenticação: {auth_error}")
         
         # PRIORIDADE 2: Fallback inteligente para desenvolvimento
         if admin_id is None:
