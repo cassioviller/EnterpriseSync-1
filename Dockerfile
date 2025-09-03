@@ -58,7 +58,7 @@ RUN mkdir -p \
     && chown -R sige:sige /app
 
 # Copiar scripts de entrada (produção corrigida e backup)
-COPY docker-entrypoint-production-fix.sh /app/docker-entrypoint.sh
+COPY docker-entrypoint-easypanel-final.sh /app/docker-entrypoint.sh
 COPY docker-entrypoint-unified.sh /app/docker-entrypoint-backup.sh
 RUN chmod +x /app/docker-entrypoint.sh /app/docker-entrypoint-backup.sh
 
