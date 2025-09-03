@@ -1,0 +1,349 @@
+# PROMPT: Lógica Correta de Herança de RDO - Sistema de Continuidade
+
+## LÓGICA DO SISTEMA RDO
+
+### REGRA FUNDAMENTAL:
+1. **PRIMEIRA RDO da obra** → Todas as subatividades começam com **0%**
+2. **PRÓXIMAS RDOs** → Carregam as porcentagens da **última RDO** para continuar de onde parou
+
+### OBJETIVO:
+O usuário só preenche o **progresso adicional** do dia, não recomeça do zero.
+
+## IMPLEMENTAÇÃO CORRETA
+
+### 1. FUNÇÃO PRINCIPAL - Detectar Primeira vs. Próxima RDO
+
+```javascript
+function carregarDadosUltimoRDO() {
+    const obraId = document.getElementById('obra_id').value;
+    
+    if (!obraId) {
+        alert('Selecione uma obra primeiro');
+        return;
+    }
+    
+    console.log('🔍 Carregando dados para obra:', obraId);
+    
+    fetch(`/api/ultimo-rdo-dados/${obraId}`)
+        .then(response => response.json())
+        .then(data => {
+            console.log('📦 Dados recebidos:', data);
+            
+            if (data.success) {
+                // LÓGICA CORRETA: Verificar se é primeira RDO ou não
+                const isPrimeiraRDO = !data.ultimo_rdo || 
+                                     !data.ultimo_rdo.id || 
+                                     data.ultimo_rdo.numero_rdo === 'PRIMEIRA_RDO';
+                
+                if (isPrimeiraRDO) {
+                    // 🆕 PRIMEIRA RDO - Carregar com 0%
+                    console.log('🆕 PRIMEIRA RDO da obra - carregando com 0%');
+                    exibirFormularioRDO(data.ultimo_rdo, 'primeira');
+                    mostrarAlertaPrimeiraRDO(data.ultimo_rdo);
+                    
+                } else {
+                    // 🔄 PRÓXIMA RDO - Carregar com porcentagens da última RDO
+                    console.log('🔄 PRÓXIMA RDO - carregando porcentagens da última RDO:', data.ultimo_rdo.numero_rdo);
+                    exibirFormularioRDO(data.ultimo_rdo, 'continuacao');
+                    mostrarAlertaContinuacao(data.ultimo_rdo);
+                }
+            } else {
+                console.error('❌ Erro na API:', data.error);
+                alert('Erro ao carregar dados do último RDO');
+            }
+        })
+        .catch(error => {
+            console.error('❌ Erro na requisição:', error);
+            alert('Erro ao conectar com o servidor');
+        });
+}
+```
+
+### 2. FUNÇÃO UNIFICADA - Gerar Formulário com Base no Tipo
+
+```javascript
+function exibirFormularioRDO(dadosRDO, tipoRDO) {
+    console.log(`🎯 Gerando formulário - Tipo: ${tipoRDO}`, dadosRDO);
+    
+    const container = document.getElementById('servicos-container');
+    
+    if (!dadosRDO || !dadosRDO.servicos) {
+        console.error('❌ Dados do RDO inválidos');
+        return;
+    }
+    
+    let html = '<div class="servicos-accordion">';
+    
+    // Gerar formulário para cada serviço
+    dadosRDO.servicos.forEach((servico, index) => {
+        const servicoId = `servico-${servico.id}`;
+        const isExpanded = index === 0; // Primeiro serviço expandido
+        
+        html += `
+        <div class="servico-card mb-3">
+            <div class="servico-header" onclick="toggleServico('${servicoId}')">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <h5 class="mb-0">
+                            <i class="fas fa-wrench text-primary"></i>
+                            ${servico.nome}
+                        </h5>
+                        <small class="text-muted">${servico.categoria || 'Não categorizado'}</small>
+                    </div>
+                    <div class="d-flex align-items-center gap-3">
+                        <span class="badge bg-secondary">${servico.subatividades?.length || 0} subatividades</span>
+                        <i class="fas fa-chevron-${isExpanded ? 'up' : 'down'}" id="icon-${servicoId}"></i>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="servico-body ${isExpanded ? '' : 'collapse'}" id="${servicoId}">
+                <div class="row subatividades-grid">`;
+        
+        // Gerar campos editáveis para cada subatividade
+        if (servico.subatividades && servico.subatividades.length > 0) {
+            servico.subatividades.forEach(subatividade => {
+                // LÓGICA PRINCIPAL: Definir percentual inicial
+                let percentualInicial;
+                let placeholderText;
+                let helpText;
+                
+                if (tipoRDO === 'primeira') {
+                    // PRIMEIRA RDO: Sempre 0%
+                    percentualInicial = 0;
+                    placeholderText = "0";
+                    helpText = "Primeira RDO - começar do 0%";
+                } else {
+                    // PRÓXIMA RDO: Usar percentual da última RDO
+                    percentualInicial = subatividade.percentual || 0;
+                    placeholderText = percentualInicial.toString();
+                    helpText = `Última RDO: ${percentualInicial}% - ajustar conforme progresso`;
+                }
+                
+                html += `
+                <div class="col-md-6 mb-3">
+                    <label class="form-label">
+                        ${subatividade.nome}
+                        ${tipoRDO === 'continuacao' && percentualInicial > 0 ? 
+                          `<span class="badge bg-info ms-2">${percentualInicial}%</span>` : ''}
+                    </label>
+                    <div class="input-group">
+                        <input type="number" 
+                               class="form-control" 
+                               name="subatividade_${subatividade.id}_percentual"
+                               value="${percentualInicial}"
+                               min="0" 
+                               max="100" 
+                               step="0.1"
+                               placeholder="${placeholderText}"
+                               data-ultima-porcentagem="${percentualInicial}">
+                        <span class="input-group-text">%</span>
+                    </div>
+                    <small class="form-text text-muted">${helpText}</small>
+                </div>`;
+            });
+        } else {
+            html += `
+            <div class="col-12">
+                <div class="alert alert-warning">
+                    <i class="fas fa-exclamation-triangle"></i>
+                    Nenhuma subatividade cadastrada para este serviço.
+                </div>
+            </div>`;
+        }
+        
+        html += `
+                </div>
+            </div>
+        </div>`;
+    });
+    
+    html += '</div>';
+    
+    // Atualizar container
+    container.innerHTML = html;
+    
+    console.log(`✅ Formulário ${tipoRDO} gerado com sucesso`);
+    
+    // Preencher funcionários se for continuação
+    if (tipoRDO === 'continuacao' && dadosRDO.funcionarios) {
+        preencherFuncionariosContinuacao(dadosRDO.funcionarios);
+    }
+}
+```
+
+### 3. ALERTAS INFORMATIVOS
+
+```javascript
+function mostrarAlertaPrimeiraRDO(dadosRDO) {
+    const alertDiv = document.createElement('div');
+    alertDiv.className = 'alert alert-success mb-4';
+    alertDiv.innerHTML = `
+        <div class="d-flex align-items-center">
+            <i class="fas fa-seedling fa-2x me-3"></i>
+            <div>
+                <h5 class="alert-heading mb-1">🆕 Primeira RDO da Obra!</h5>
+                <p class="mb-0">
+                    Serviços carregados com percentual <strong>0%</strong> para início dos trabalhos.<br>
+                    <small class="text-muted">
+                        Total: ${dadosRDO.servicos?.length || 0} serviços | 
+                        ${dadosRDO.total_subatividades || 0} subatividades
+                    </small>
+                </p>
+            </div>
+        </div>
+    `;
+    
+    const container = document.getElementById('servicos-container');
+    container.insertBefore(alertDiv, container.firstChild);
+}
+
+function mostrarAlertaContinuacao(ultimoRDO) {
+    const alertDiv = document.createElement('div');
+    alertDiv.className = 'alert alert-info mb-4';
+    alertDiv.innerHTML = `
+        <div class="d-flex align-items-center">
+            <i class="fas fa-history fa-2x me-3"></i>
+            <div>
+                <h5 class="alert-heading mb-1">🔄 Continuação dos Trabalhos</h5>
+                <p class="mb-0">
+                    Dados carregados do <strong>${ultimoRDO.numero_rdo}</strong> (${ultimoRDO.data_relatorio}).<br>
+                    <small class="text-muted">
+                        Ajuste as porcentagens conforme o progresso de hoje. 
+                        Valores atuais representam o progresso até a última RDO.
+                    </small>
+                </p>
+            </div>
+        </div>
+    `;
+    
+    const container = document.getElementById('servicos-container');
+    container.insertBefore(alertDiv, container.firstChild);
+}
+```
+
+### 4. PREENCHER FUNCIONÁRIOS DE CONTINUAÇÃO
+
+```javascript
+function preencherFuncionariosContinuacao(funcionarios) {
+    console.log('👥 Preenchendo funcionários da última RDO:', funcionarios);
+    
+    funcionarios.forEach(funcionario => {
+        // Buscar funcionário na lista e marcar como selecionado
+        const funcionarioElement = document.querySelector(`[data-funcionario-id="${funcionario.id}"]`);
+        
+        if (funcionarioElement) {
+            // Marcar checkbox
+            const checkbox = funcionarioElement.querySelector('input[type="checkbox"]');
+            if (checkbox) {
+                checkbox.checked = true;
+            }
+            
+            // Preencher horas trabalhadas
+            const horasInput = funcionarioElement.querySelector('input[name*="_horas"]');
+            if (horasInput) {
+                horasInput.value = funcionario.horas_trabalhadas || 8.0;
+            }
+            
+            console.log(`✅ Funcionário ${funcionario.nome} pré-selecionado com ${funcionario.horas_trabalhadas}h`);
+        }
+    });
+}
+```
+
+### 5. CORREÇÃO NA API BACKEND
+
+**Garantir que a API retorna os dados corretos:**
+
+```python
+@rdo_bp.route('/api/ultimo-rdo-dados/<int:obra_id>')
+def api_ultimo_rdo_dados(obra_id):
+    try:
+        admin_id = obter_admin_id()
+        
+        # Buscar último RDO da obra
+        ultimo_rdo = obter_ultimo_rdo_obra(obra_id, date.today(), admin_id)
+        
+        if not ultimo_rdo:
+            # PRIMEIRA RDO: Carregar serviços com 0%
+            servicos_obra = obter_servicos_obra(obra_id, admin_id)
+            
+            servicos_dados = []
+            for servico in servicos_obra:
+                subatividades = obter_subatividades_servico(servico.id, admin_id)
+                
+                servico_data = {
+                    'id': servico.id,
+                    'nome': servico.nome,
+                    'categoria': servico.categoria or 'Não categorizado',
+                    'subatividades': [
+                        {
+                            'id': sub.id,
+                            'nome': sub.nome,
+                            'percentual': 0,  # PRIMEIRA RDO = 0%
+                            'descricao': sub.descricao
+                        } for sub in subatividades
+                    ]
+                }
+                servicos_dados.append(servico_data)
+            
+            return jsonify({
+                'success': True,
+                'ultimo_rdo': {
+                    'id': None,
+                    'numero_rdo': 'PRIMEIRA_RDO',
+                    'data_relatorio': date.today().strftime('%Y-%m-%d'),
+                    'servicos': servicos_dados,
+                    'funcionarios': [],
+                    'total_servicos': len(servicos_dados),
+                    'total_subatividades': sum(len(s['subatividades']) for s in servicos_dados)
+                }
+            })
+        
+        else:
+            # PRÓXIMA RDO: Carregar com porcentagens da última RDO
+            servicos_dados = carregar_servicos_ultimo_rdo(ultimo_rdo)
+            funcionarios_dados = carregar_funcionarios_ultimo_rdo(ultimo_rdo)
+            
+            return jsonify({
+                'success': True,
+                'ultimo_rdo': {
+                    'id': ultimo_rdo.id,
+                    'numero_rdo': ultimo_rdo.numero_rdo,
+                    'data_relatorio': ultimo_rdo.data_relatorio.strftime('%Y-%m-%d'),
+                    'servicos': servicos_dados,
+                    'funcionarios': funcionarios_dados,
+                    'total_servicos': len(servicos_dados),
+                    'total_funcionarios': len(funcionarios_dados)
+                }
+            })
+            
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+```
+
+## FLUXO COMPLETO DO SISTEMA
+
+### CENÁRIO 1: PRIMEIRA RDO
+1. Usuário clica "Testar Último RDO"
+2. Sistema detecta que não há RDO anterior
+3. Carrega todos os serviços da obra com **0%**
+4. Mostra alert: "🆕 Primeira RDO da Obra!"
+5. Usuário preenche o progresso inicial
+
+### CENÁRIO 2: PRÓXIMA RDO
+1. Usuário clica "Testar Último RDO"
+2. Sistema encontra RDO anterior (ex: RDO-2025-001)
+3. Carrega porcentagens da última RDO (ex: Pintura 25%, Estrutura 80%)
+4. Mostra alert: "🔄 Continuação dos Trabalhos - RDO-2025-001"
+5. Usuário ajusta apenas o progresso adicional do dia
+
+## RESULTADO FINAL
+
+✅ **Primeira RDO:** Formulário com 0% em todas as subatividades
+✅ **Próximas RDOs:** Formulário com porcentagens da última RDO
+✅ **Continuidade:** Usuário só preenche o progresso adicional
+✅ **Funcionários:** Pré-selecionados da última RDO (se houver)
+✅ **Interface Clara:** Alertas explicam qual situação está sendo exibida
+
+O sistema agora funciona como um verdadeiro acompanhamento de obra, onde cada RDO continua de onde a anterior parou!
