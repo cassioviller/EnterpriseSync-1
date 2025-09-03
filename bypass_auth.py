@@ -113,19 +113,37 @@ def obter_admin_id():
         from flask_login import current_user
         from flask import session
         
-        # CORREÇÃO ESPECÍFICA TESTE5: Verificar se usuário logado é teste5
-        if current_user and current_user.is_authenticated and current_user.id == 50:
-            print(f"✅ BYPASS RDO: Usuário TESTE5 detectado (ID=50) - USANDO admin_id=50")
-            return 50
+        # Verificar usuário autenticado
+        if current_user and current_user.is_authenticated:
+            # Para usuários ADMIN, usar o próprio ID como admin_id
+            if hasattr(current_user, 'tipo_usuario') and current_user.tipo_usuario.value == 'admin':
+                admin_id = current_user.id
+                print(f"✅ BYPASS RDO: Usuário ADMIN detectado (ID={current_user.id}) - USANDO admin_id={admin_id}")
+                return admin_id
+            # Para funcionários, usar o admin_id associado
+            elif hasattr(current_user, 'admin_id') and current_user.admin_id:
+                admin_id = current_user.admin_id
+                print(f"✅ BYPASS RDO: Funcionário detectado - USANDO admin_id={admin_id}")
+                return admin_id
         
-        # Verificar sessão para usuário teste5
+        # Verificar sessão para qualquer usuário
         if session and '_user_id' in session:
             user_id = int(session['_user_id'])
-            if user_id == 50:
-                print(f"✅ BYPASS RDO: Sessão TESTE5 detectada - USANDO admin_id=50")
-                return 50
-            else:
-                print(f"✅ BYPASS RDO: Usuário sessão ID={user_id} - USANDO admin_id={user_id}")
+            # Buscar no banco para determinar admin_id correto
+            try:
+                from models import Usuario, TipoUsuario
+                usuario = Usuario.query.get(user_id)
+                if usuario:
+                    if usuario.tipo_usuario == TipoUsuario.ADMIN:
+                        admin_id = usuario.id
+                    else:
+                        admin_id = usuario.admin_id or usuario.id
+                    print(f"✅ BYPASS RDO: Usuário sessão ID={user_id} - USANDO admin_id={admin_id}")
+                    return admin_id
+            except Exception as e:
+                print(f"⚠️ Erro ao buscar usuário no banco: {e}")
+                # Fallback: usar o próprio user_id como admin_id
+                print(f"✅ BYPASS RDO: Fallback - USANDO admin_id={user_id}")
                 return user_id
         
         # Fallback padrão

@@ -251,9 +251,20 @@ def dashboard():
         else:
             data_fim = date.today()
         
-        # Garantir que admin_id está definido - usar valor detectado do hotfix
+        # Garantir que admin_id está definido - usar valor do usuário atual
         if 'admin_id' not in locals() or admin_id is None:
-            admin_id = 2  # Admin detectado com funcionários ativos
+            # Usar sistema automático de detecção
+            if current_user.is_authenticated:
+                if current_user.tipo_usuario == TipoUsuario.ADMIN:
+                    admin_id = current_user.id
+                else:
+                    admin_id = current_user.admin_id or current_user.id
+            else:
+                # Fallback: detectar automaticamente baseado em funcionários ativos
+                funcionarios_admin = db.session.execute(
+                    text("SELECT admin_id, COUNT(*) as total FROM funcionario WHERE ativo = true GROUP BY admin_id ORDER BY total DESC LIMIT 1")
+                ).fetchone()
+                admin_id = funcionarios_admin[0] if funcionarios_admin else 1
             
         print(f"✅ DEBUG DASHBOARD KPIs: Usando admin_id={admin_id} para cálculos")
         

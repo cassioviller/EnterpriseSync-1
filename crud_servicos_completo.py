@@ -88,38 +88,10 @@ def get_admin_id():
         # Debug da sessão atual
         logger.info(f"🔍 SESSION DEBUG: {dict(session) if session else 'No session'}")
         
-        # SOLUÇÃO ROBUSTA: Verificar se é usuário teste5 específico
-        if current_user.is_authenticated:
-            if current_user.id == 50:  # Usuário teste5 explícito
-                logger.info("🎯 USUÁRIO TESTE5 (ID=50) DETECTADO - USANDO admin_id=50")
-                return 50
-            elif current_user.id == 43:  # Sessão inválida conhecida
-                logger.info("🎯 SESSÃO INVÁLIDA ID=43 DETECTADA - FORÇANDO admin_id=50 (TESTE)")
-                return 50
-        
-        # Verificar na sessão se há referência ao teste5
-        if session and ('teste5' in str(session) or 'teste5@' in str(session)):
-            logger.info("🎯 SESSÃO TESTE5 DETECTADA - FORÇANDO admin_id=50")
-            return 50
-        
         # Priorizar usuário autenticado
         if current_user.is_authenticated:
             # Debug do usuário atual
             logger.info(f"🔍 CRUD DEBUG: current_user.id={current_user.id}, tipo={current_user.tipo_usuario}, admin_id={getattr(current_user, 'admin_id', 'N/A')}")
-            
-            # Verificar se é usuário teste5 por qualquer campo
-            try:
-                user_data = Usuario.query.get(current_user.id)
-                if user_data and (user_data.username == 'teste5' or user_data.email == 'teste5@empresateste.com'):
-                    logger.info("🎯 USUÁRIO TESTE5 CONFIRMADO NO BANCO - FORÇANDO admin_id=50")
-                    return 50
-            except Exception as db_error:
-                logger.error(f"Erro ao verificar usuário no banco: {db_error}")
-            
-            # CORREÇÃO ESPECÍFICA: Se current_user.id=50, usar admin_id=50
-            if current_user.id == 50:
-                logger.info("🎯 USUÁRIO ID=50 DETECTADO - FORÇANDO admin_id=50")
-                return 50
                 
             if current_user.tipo_usuario == TipoUsuario.ADMIN:
                 admin_id = current_user.id
