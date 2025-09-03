@@ -1,5 +1,6 @@
-# DOCKERIGNORE - SIGE v8.0
-# Arquivos e diretórios a serem ignorados no build
+# DOCKERIGNORE - SIGE v8.0.1
+# Otimização de build e sincronização dev-prod
+# Atualizado: 03/09/2025
 
 # Arquivos de desenvolvimento
 __pycache__/

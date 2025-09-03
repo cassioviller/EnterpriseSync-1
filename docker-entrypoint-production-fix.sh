@@ -2,7 +2,7 @@
 # DOCKER ENTRYPOINT PRODUCTION FIX - SIGE v8.0 FINAL
 set -e
 
-echo "🚀 SIGE v8.0 - Iniciando (Production Fix FINAL - 02/09/2025)"
+echo "🚀 SIGE v8.0.1 - Iniciando (Full Sync Dev-Prod - 03/09/2025)"
 
 # Configuração do ambiente
 export PYTHONPATH=/app
@@ -36,8 +36,8 @@ done
 
 echo "✅ PostgreSQL conectado!"
 
-# HOTFIX DEFINITIVO
-echo "🔧 HOTFIX DEFINITIVO: Corrigindo estrutura completa..."
+# CORREÇÕES ATUALIZADAS - DESENVOLVIMENTO SINCRONIZADO
+echo "🔧 CORREÇÕES ATUALIZADAS: Sincronizando dev-prod e aplicando fixes RDO..."
 
 # Executar correção em bloco único
 psql "$DATABASE_URL" -v ON_ERROR_STOP=1 << 'EOSQL'
@@ -184,8 +184,9 @@ if [[ $? -ne 0 ]]; then
     exit 1
 fi
 
-echo "🎯 Sistema SIGE v8.0 pronto para uso!"
-echo "📍 URL de teste: /servicos"
+echo "🎯 Sistema SIGE v8.0.1 pronto para uso - SINCRONIZADO!"
+echo "📍 URLs de teste: /servicos | /rdo | /dashboard | /funcionarios"
+echo "🔧 Correções incluídas: RDO continuação, mapping IDs, salvamento de subatividades"
 
 # Executar comando principal
 exec "$@"

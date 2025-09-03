@@ -1,13 +1,14 @@
-# DOCKERFILE UNIFICADO - SIGE v8.0
-# Idêntico entre desenvolvimento e produção
+# DOCKERFILE UNIFICADO - SIGE v8.0 FINAL
+# Sincronização Total Desenvolvimento ↔ Produção
 # Sistema Integrado de Gestão Empresarial - EasyPanel Ready
 
 FROM python:3.11-slim-bullseye
 
-# Metadados
-LABEL maintainer="SIGE v8.0" \
-      version="8.0" \
-      description="Sistema Integrado de Gestão Empresarial - Unified Build"
+# Metadados atualizados
+LABEL maintainer="SIGE v8.0 Final" \
+      version="8.0.1" \
+      description="Sistema Integrado de Gestão Empresarial - Full Sync Build" \
+      build-date="2025-09-03"
 
 # Variáveis de build
 ARG DEBIAN_FRONTEND=noninteractive
@@ -25,6 +26,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libffi-dev \
     libssl-dev \
     make \
+    git \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
@@ -34,53 +36,60 @@ RUN groupadd -r sige && useradd -r -g sige sige
 # Definir diretório de trabalho
 WORKDIR /app
 
-# Copiar pyproject.toml primeiro para cache de dependências
-COPY pyproject.toml ./
+# Copiar arquivos de configuração primeiro para cache otimizado
+COPY pyproject.toml requirements.txt* ./
 
-# Instalar dependências Python
+# Instalar dependências Python (versões fixas para estabilidade)
 RUN pip install --no-cache-dir --upgrade pip setuptools wheel && \
-    pip install --no-cache-dir .
+    pip install --no-cache-dir . && \
+    pip list > /app/installed_packages.txt
 
-# Copiar código da aplicação
+# Copiar TODO o código da aplicação (garantindo sincronia total)
 COPY . .
 
-# Copiar sistema de erro detalhado para produção
-COPY utils/production_error_handler.py /app/utils/
-
-# Criar todos os diretórios necessários
+# Criar todos os diretórios necessários para dev e prod
 RUN mkdir -p \
     /app/static/fotos_funcionarios \
     /app/static/fotos \
     /app/static/images \
+    /app/static/uploads \
     /app/uploads \
     /app/logs \
     /app/temp \
+    /app/instance \
+    /app/migrations \
     && chown -R sige:sige /app
 
-# Copiar scripts de entrada (produção corrigida e backup)
+# Garantir que arquivos Python sejam executáveis
+RUN find /app -name "*.py" -exec chmod 644 {} \;
+
+# Copiar e configurar script de entrada UNIFICADO
 COPY docker-entrypoint-production-fix.sh /app/docker-entrypoint.sh
-COPY docker-entrypoint-unified.sh /app/docker-entrypoint-backup.sh
-RUN chmod +x /app/docker-entrypoint.sh /app/docker-entrypoint-backup.sh
+RUN chmod +x /app/docker-entrypoint.sh
 
 # Mudar para usuário não-root
 USER sige
 
-# Variáveis de ambiente padrão
+# Variáveis de ambiente unificadas para dev/prod
 ENV FLASK_APP=main.py \
     FLASK_ENV=production \
     PORT=5000 \
     PYTHONPATH=/app \
     PYTHONUNBUFFERED=1 \
     PYTHONIOENCODING=utf-8 \
-    SHOW_DETAILED_ERRORS=true
+    LANG=C.UTF-8 \
+    LC_ALL=C.UTF-8 \
+    SHOW_DETAILED_ERRORS=true \
+    DEBUG=false \
+    WEB_CONCURRENCY=2
 
 # Expor porta
 EXPOSE 5000
 
-# Health check robusto para EasyPanel
-HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
+# Health check robusto para ambos ambientes
+HEALTHCHECK --interval=30s --timeout=15s --start-period=90s --retries=3 \
   CMD curl -f http://localhost:${PORT:-5000}/health || exit 1
 
-# Comando de entrada otimizado para EasyPanel
+# Comando de entrada otimizado para produção
 ENTRYPOINT ["/app/docker-entrypoint.sh"]
-CMD ["gunicorn", "--bind", "0.0.0.0:5000", "--workers", "2", "--timeout", "120", "--access-logfile", "-", "--error-logfile", "-", "--log-level", "info", "main:app"]
+CMD ["gunicorn", "--bind", "0.0.0.0:5000", "--workers", "2", "--threads", "4", "--timeout", "120", "--keepalive", "2", "--max-requests", "1000", "--max-requests-jitter", "100", "--access-logfile", "-", "--error-logfile", "-", "--log-level", "info", "--preload", "main:app"]
