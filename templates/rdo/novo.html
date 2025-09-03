@@ -1414,42 +1414,96 @@ function exibirDadosUltimoRDO(ultimoRDO) {
     const servicosContainer = document.getElementById('servicos-container');
     
     let html = `
-        <div class="alert alert-info">
-            <i class="fas fa-history"></i>
-            <strong>Dados do Último RDO:</strong> ${ultimoRDO.numero_rdo} (${ultimoRDO.data_relatorio})
-            <br><small>Serviços: ${ultimoRDO.total_servicos} | Funcionários: ${ultimoRDO.total_funcionarios}</small>
+        <div class="alert alert-info mb-4">
+            <div class="d-flex align-items-center">
+                <i class="fas fa-history fa-2x me-3"></i>
+                <div>
+                    <h5 class="alert-heading mb-1">🔄 Continuação dos Trabalhos</h5>
+                    <p class="mb-0">
+                        Dados carregados do <strong>${ultimoRDO.numero_rdo}</strong> (${ultimoRDO.data_relatorio}).<br>
+                        <small class="text-muted">
+                            Ajuste as porcentagens conforme o progresso de hoje. 
+                            Valores atuais representam o progresso até a última RDO.
+                        </small>
+                    </p>
+                </div>
+            </div>
         </div>
     `;
     
-    // Mostrar serviços
+    // CRIAR CAMPOS EDITÁVEIS para cada serviço e subatividade
     if (ultimoRDO.servicos && ultimoRDO.servicos.length > 0) {
-        html += '<h5><i class="fas fa-tools"></i> Serviços do Último RDO</h5>';
-        ultimoRDO.servicos.forEach(servico => {
+        html += '<h5><i class="fas fa-tools"></i> Serviços do Último RDO (Editáveis)</h5>';
+        
+        ultimoRDO.servicos.forEach((servico, index) => {
+            const isExpanded = index === 0; // Primeiro serviço expandido
+            const servicoId = `servico-${servico.id}`;
+            
             html += `
-                <div class="card mb-2">
-                    <div class="card-body">
-                        <h6>${servico.nome}</h6>
-                        <p class="text-success mb-1">Progresso: ${servico.percentual || 0}%</p>
-                        ${servico.subatividades && servico.subatividades.length > 0 
-                            ? `<small class="text-muted">${servico.subatividades.length} subatividades</small>`
-                            : ''
-                        }
+                <div class="card mb-3">
+                    <div class="card-header bg-light d-flex justify-content-between align-items-center" 
+                         style="cursor: pointer;" onclick="toggleServico('${servicoId}')">
+                        <div>
+                            <h6 class="mb-0">
+                                <i class="fas fa-wrench text-primary"></i>
+                                ${servico.nome}
+                            </h6>
+                            <small class="text-muted">${servico.categoria || 'Não categorizado'}</small>
+                        </div>
+                        <div class="d-flex align-items-center gap-3">
+                            <span class="badge bg-secondary">${servico.subatividades?.length || 0} subatividades</span>
+                            <i class="fas fa-chevron-${isExpanded ? 'up' : 'down'}" id="icon-${servicoId}"></i>
+                        </div>
                     </div>
-                </div>
+                    
+                    <div class="card-body ${isExpanded ? '' : 'collapse'}" id="${servicoId}">
+                        <div class="row subatividades-grid">
             `;
-        });
-    }
-    
-    // Mostrar funcionários
-    if (ultimoRDO.funcionarios && ultimoRDO.funcionarios.length > 0) {
-        html += '<h5 class="mt-4"><i class="fas fa-users"></i> Funcionários do Último RDO</h5>';
-        ultimoRDO.funcionarios.forEach(funcionario => {
+            
+            // Gerar campos editáveis para cada subatividade
+            if (servico.subatividades && servico.subatividades.length > 0) {
+                servico.subatividades.forEach(subatividade => {
+                    const percentualAtual = subatividade.percentual || 0;
+                    
+                    html += `
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">
+                                ${subatividade.nome}
+                                ${percentualAtual > 0 ? 
+                                  `<span class="badge bg-info ms-2">${percentualAtual}%</span>` : ''}
+                            </label>
+                            <div class="input-group">
+                                <input type="number" 
+                                       class="form-control" 
+                                       name="subatividade_${subatividade.id}_percentual"
+                                       value="${percentualAtual}"
+                                       min="0" 
+                                       max="100" 
+                                       step="0.1"
+                                       placeholder="${percentualAtual}"
+                                       data-ultima-porcentagem="${percentualAtual}"
+                                       form="formNovoRDO">
+                                <span class="input-group-text">%</span>
+                            </div>
+                            <small class="form-text text-muted">
+                                Última RDO: ${percentualAtual}% - ajustar conforme progresso
+                            </small>
+                        </div>
+                    `;
+                });
+            } else {
+                html += `
+                    <div class="col-12">
+                        <div class="alert alert-warning">
+                            <i class="fas fa-exclamation-triangle"></i>
+                            Nenhuma subatividade cadastrada para este serviço.
+                        </div>
+                    </div>
+                `;
+            }
+            
             html += `
-                <div class="card mb-2">
-                    <div class="card-body">
-                        <h6>${funcionario.nome}</h6>
-                        <p class="text-info mb-1">${funcionario.funcao}</p>
-                        <small class="text-muted">Horas trabalhadas: ${funcionario.horas_trabalhadas}h</small>
+                        </div>
                     </div>
                 </div>
             `;
@@ -1457,6 +1511,53 @@ function exibirDadosUltimoRDO(ultimoRDO) {
     }
     
     servicosContainer.innerHTML = html;
+    
+    // Preencher funcionários automaticamente
+    if (ultimoRDO.funcionarios && ultimoRDO.funcionarios.length > 0) {
+        preencherFuncionariosContinuacao(ultimoRDO.funcionarios);
+    }
+}
+
+// Função para alternar visibilidade do serviço
+function toggleServico(servicoId) {
+    const elemento = document.getElementById(servicoId);
+    const icone = document.getElementById(`icon-${servicoId}`);
+    
+    if (elemento.classList.contains('collapse')) {
+        elemento.classList.remove('collapse');
+        icone.classList.remove('fa-chevron-down');
+        icone.classList.add('fa-chevron-up');
+    } else {
+        elemento.classList.add('collapse');
+        icone.classList.remove('fa-chevron-up');
+        icone.classList.add('fa-chevron-down');
+    }
+}
+
+// Função para preencher funcionários de continuação
+function preencherFuncionariosContinuacao(funcionarios) {
+    console.log('👥 Preenchendo funcionários da última RDO:', funcionarios);
+    
+    funcionarios.forEach(funcionario => {
+        // Buscar funcionário na lista e marcar como selecionado
+        const funcionarioElement = document.querySelector(`[data-funcionario-id="${funcionario.id}"]`);
+        
+        if (funcionarioElement) {
+            // Marcar checkbox
+            const checkbox = funcionarioElement.querySelector('input[type="checkbox"]');
+            if (checkbox) {
+                checkbox.checked = true;
+            }
+            
+            // Preencher horas trabalhadas
+            const horasInput = funcionarioElement.querySelector('input[name*="_horas"]');
+            if (horasInput) {
+                horasInput.value = funcionario.horas_trabalhadas || 8.0;
+            }
+            
+            console.log(`✅ Funcionário ${funcionario.nome} pré-selecionado com ${funcionario.horas_trabalhadas}h`);
+        }
+    });
 }
 
 function exibirMensagemSemRDOAnterior() {

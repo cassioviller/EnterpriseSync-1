@@ -1,0 +1,301 @@
+# PROMPT: Corrigir Detecção da Segunda RDO - Problema de Herança
+
+## PROBLEMA IDENTIFICADO
+
+**SITUAÇÃO:**
+- ✅ **Primeira RDO:** Carregou corretamente com formulário (imagem 1)
+- ✅ **Usuário preencheu:** "Planejamento Elétrico" com 100%
+- ❌ **Segunda RDO:** Detectou incorretamente como "Primeira RDO da obra"
+- ❌ **Resultado:** Não carregou os campos, só mostrou mensagem
+
+**COMPORTAMENTO ESPERADO:**
+- Segunda RDO deveria carregar a **mesma tabela** da primeira imagem
+- Mas com "Planejamento Elétrico" **pré-preenchido com 100%**
+- Outros campos com 0% para continuar preenchendo
+
+## CAUSA RAIZ
+
+A lógica de detecção está falhando ao identificar se existe RDO anterior salva no banco.
+
+### POSSÍVEIS CAUSAS:
+
+1. **RDO não foi salva** no banco após o preenchimento
+2. **Consulta SQL incorreta** para buscar último RDO
+3. **Condição JavaScript errada** para detectar RDO existente
+4. **Filtros de data** excluindo a RDO anterior
+
+## SOLUÇÃO ESPECÍFICA
+
+### 1. CORRIGIR CONSULTA NO BACKEND
+
+**Verificar se a função está buscando corretamente:**
+
+```python
+def obter_ultimo_rdo_obra(obra_id, data_atual, admin_id):
+    """Obtém o último RDO da obra para herança de percentuais"""
+    
+    # CORREÇÃO: Buscar RDO mais recente SEM filtro de data restritivo
+    ultimo_rdo = RDO.query.filter(
+        RDO.obra_id == obra_id,
+        RDO.admin_id == admin_id,
+        RDO.data_relatorio < data_atual  # APENAS RDOs de dias anteriores
+    ).order_by(RDO.data_relatorio.desc(), RDO.id.desc()).first()
+    
+    print(f"🔍 BUSCA ÚLTIMO RDO:")
+    print(f"   - obra_id: {obra_id}")
+    print(f"   - admin_id: {admin_id}")
+    print(f"   - data_atual: {data_atual}")
+    print(f"   - resultado: {ultimo_rdo.numero_rdo if ultimo_rdo else 'NENHUM'}")
+    
+    return ultimo_rdo
+```
+
+### 2. MELHORAR LOGS NA API
+
+```python
+@rdo_bp.route('/api/ultimo-rdo-dados/<int:obra_id>')
+def api_ultimo_rdo_dados(obra_id):
+    try:
+        admin_id = obter_admin_id()
+        data_hoje = date.today()
+        
+        print(f"🔍 API ÚLTIMO RDO CHAMADA:")
+        print(f"   - obra_id: {obra_id}")
+        print(f"   - admin_id: {admin_id}")
+        print(f"   - data_hoje: {data_hoje}")
+        
+        # Buscar último RDO da obra
+        ultimo_rdo = obter_ultimo_rdo_obra(obra_id, data_hoje, admin_id)
+        
+        if not ultimo_rdo:
+            print("❌ NENHUM RDO ANTERIOR ENCONTRADO - Primeira RDO")
+            
+            # Verificar se realmente não existe RDO
+            total_rdos = RDO.query.filter_by(obra_id=obra_id, admin_id=admin_id).count()
+            print(f"🔍 TOTAL DE RDOs NA OBRA: {total_rdos}")
+            
+            if total_rdos > 0:
+                print("⚠️  ATENÇÃO: Existem RDOs mas nenhuma foi encontrada pela consulta!")
+                # Buscar qualquer RDO da obra para debug
+                qualquer_rdo = RDO.query.filter_by(obra_id=obra_id, admin_id=admin_id).first()
+                if qualquer_rdo:
+                    print(f"🔍 RDO ENCONTRADA PARA DEBUG: {qualquer_rdo.numero_rdo} - {qualquer_rdo.data_relatorio}")
+            
+            # Carregar primeira RDO
+            return carregar_primeira_rdo(obra_id, admin_id)
+            
+        else:
+            print(f"✅ ÚLTIMO RDO ENCONTRADO: {ultimo_rdo.numero_rdo} ({ultimo_rdo.data_relatorio})")
+            
+            # Carregar dados do último RDO
+            return carregar_continuacao_rdo(ultimo_rdo)
+            
+    except Exception as e:
+        print(f"❌ ERRO NA API: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'success': False, 'error': str(e)}), 500
+```
+
+### 3. FUNÇÃO PARA CARREGAR CONTINUAÇÃO
+
+```python
+def carregar_continuacao_rdo(ultimo_rdo):
+    """Carrega dados do último RDO para continuação"""
+    
+    print(f"🔄 CARREGANDO CONTINUAÇÃO DO RDO: {ultimo_rdo.numero_rdo}")
+    
+    # Buscar serviços e subatividades do último RDO
+    servicos_rdo = RDOServicoSubatividade.query.filter_by(rdo_id=ultimo_rdo.id).all()
+    
+    print(f"🔍 SUBATIVIDADES ENCONTRADAS NO ÚLTIMO RDO: {len(servicos_rdo)}")
+    
+    # Agrupar por serviço
+    servicos_agrupados = {}
+    
+    for servico_rdo in servicos_rdo:
+        if servico_rdo.servico:
+            servico_id = servico_rdo.servico.id
+            
+            if servico_id not in servicos_agrupados:
+                servicos_agrupados[servico_id] = {
+                    'servico': servico_rdo.servico,
+                    'subatividades': []
+                }
+            
+            # Dados da subatividade com percentual da última RDO
+            subatividade_data = {
+                'id': servico_rdo.subatividade_id,
+                'nome': servico_rdo.nome_subatividade,
+                'percentual': servico_rdo.percentual_conclusao or 0,  # HERANÇA!
+                'descricao': servico_rdo.descricao_subatividade or ''
+            }
+            
+            servicos_agrupados[servico_id]['subatividades'].append(subatividade_data)
+            print(f"   ✅ {subatividade_data['nome']}: {subatividade_data['percentual']}%")
+    
+    # Converter para formato da API
+    servicos_dados = []
+    for servico_id, dados in servicos_agrupados.items():
+        servico = dados['servico']
+        subatividades = dados['subatividades']
+        
+        servicos_dados.append({
+            'id': servico.id,
+            'nome': servico.nome,
+            'categoria': servico.categoria or 'Não categorizado',
+            'subatividades': subatividades
+        })
+    
+    # Buscar funcionários do último RDO
+    funcionarios_rdo = RDOMaoObra.query.filter_by(rdo_id=ultimo_rdo.id).all()
+    funcionarios_dados = []
+    
+    for func_rdo in funcionarios_rdo:
+        if func_rdo.funcionario:
+            funcionarios_dados.append({
+                'id': func_rdo.funcionario.id,
+                'nome': func_rdo.funcionario.nome,
+                'horas_trabalhadas': float(func_rdo.horas_trabalhadas) if func_rdo.horas_trabalhadas else 8.0
+            })
+    
+    resultado = {
+        'success': True,
+        'ultimo_rdo': {
+            'id': ultimo_rdo.id,
+            'numero_rdo': ultimo_rdo.numero_rdo,
+            'data_relatorio': ultimo_rdo.data_relatorio.strftime('%Y-%m-%d'),
+            'servicos': servicos_dados,
+            'funcionarios': funcionarios_dados,
+            'total_servicos': len(servicos_dados),
+            'total_funcionarios': len(funcionarios_dados)
+        }
+    }
+    
+    print(f"✅ CONTINUAÇÃO CARREGADA: {len(servicos_dados)} serviços, {len(funcionarios_dados)} funcionários")
+    
+    return jsonify(resultado)
+```
+
+### 4. CORRIGIR CONDIÇÃO NO JAVASCRIPT
+
+```javascript
+function carregarDadosUltimoRDO() {
+    const obraId = document.getElementById('obra_id').value;
+    
+    if (!obraId) {
+        alert('Selecione uma obra primeiro');
+        return;
+    }
+    
+    console.log('🔍 Carregando dados para obra:', obraId);
+    
+    fetch(`/api/ultimo-rdo-dados/${obraId}`)
+        .then(response => response.json())
+        .then(data => {
+            console.log('📦 Dados recebidos:', data);
+            
+            if (data.success) {
+                // CORREÇÃO: Verificar se há dados reais do último RDO
+                const temDadosUltimoRDO = data.ultimo_rdo && 
+                                         data.ultimo_rdo.id && 
+                                         data.ultimo_rdo.numero_rdo !== 'PRIMEIRA_RDO' &&
+                                         data.ultimo_rdo.servicos && 
+                                         data.ultimo_rdo.servicos.length > 0;
+                
+                console.log('🔍 Verificação de último RDO:');
+                console.log('   - tem ultimo_rdo:', !!data.ultimo_rdo);
+                console.log('   - tem id:', !!data.ultimo_rdo?.id);
+                console.log('   - numero_rdo:', data.ultimo_rdo?.numero_rdo);
+                console.log('   - tem servicos:', data.ultimo_rdo?.servicos?.length || 0);
+                console.log('   - temDadosUltimoRDO:', temDadosUltimoRDO);
+                
+                if (temDadosUltimoRDO) {
+                    // CONTINUAÇÃO: Carregar formulário com dados da última RDO
+                    console.log('🔄 CONTINUAÇÃO - Carregando dados do último RDO');
+                    exibirFormularioRDO(data.ultimo_rdo, 'continuacao');
+                    mostrarAlertaContinuacao(data.ultimo_rdo);
+                    
+                } else {
+                    // PRIMEIRA RDO: Carregar formulário zerado
+                    console.log('🆕 PRIMEIRA RDO - Carregando formulário zerado');
+                    exibirFormularioRDO(data.ultimo_rdo, 'primeira');
+                    mostrarAlertaPrimeiraRDO(data.ultimo_rdo);
+                }
+            } else {
+                console.error('❌ Erro na API:', data.error);
+                alert('Erro ao carregar dados: ' + data.error);
+            }
+        })
+        .catch(error => {
+            console.error('❌ Erro na requisição:', error);
+            alert('Erro ao conectar com o servidor');
+        });
+}
+```
+
+### 5. VERIFICAR SE RDO FOI SALVA
+
+**Adicionar logs no salvamento:**
+
+```python
+@rdo_bp.route('/rdo/salvar', methods=['POST'])
+def salvar_rdo():
+    try:
+        # ... código de salvamento ...
+        
+        db.session.commit()
+        
+        print(f"✅ RDO SALVA COM SUCESSO:")
+        print(f"   - ID: {rdo.id}")
+        print(f"   - Número: {rdo.numero_rdo}")
+        print(f"   - Obra: {rdo.obra_id}")
+        print(f"   - Data: {rdo.data_relatorio}")
+        
+        # Verificar se subatividades foram salvas
+        subatividades_salvas = RDOServicoSubatividade.query.filter_by(rdo_id=rdo.id).count()
+        print(f"   - Subatividades salvas: {subatividades_salvas}")
+        
+        return jsonify({
+            'success': True, 
+            'message': 'RDO salvo com sucesso!',
+            'rdo_id': rdo.id,
+            'numero_rdo': rdo.numero_rdo
+        })
+        
+    except Exception as e:
+        print(f"❌ ERRO AO SALVAR RDO: {str(e)}")
+        # ... resto do tratamento de erro ...
+```
+
+## TESTE ESPECÍFICO
+
+Para o caso "Casa Família Silva":
+
+1. **Verificar se primeira RDO foi salva:**
+   ```sql
+   SELECT * FROM rdos WHERE obra_id = [ID_OBRA_FAMILIA_SILVA];
+   ```
+
+2. **Verificar subatividades salvas:**
+   ```sql
+   SELECT * FROM rdo_servico_subatividade WHERE rdo_id = [ID_PRIMEIRA_RDO];
+   ```
+
+3. **Testar API diretamente:**
+   ```
+   GET /api/ultimo-rdo-dados/[ID_OBRA_FAMILIA_SILVA]
+   ```
+
+## RESULTADO ESPERADO
+
+Após a correção, na segunda RDO:
+
+✅ **Detecta corretamente** que existe RDO anterior
+✅ **Carrega mesma tabela** da primeira imagem
+✅ **"Planejamento Elétrico" pré-preenchido** com 100%
+✅ **Outros campos** com 0% para continuar
+✅ **Alert correto:** "🔄 Continuação dos Trabalhos"
+
+A chave é garantir que a consulta SQL encontre a RDO anterior e que a condição JavaScript detecte corretamente os dados carregados.
+
