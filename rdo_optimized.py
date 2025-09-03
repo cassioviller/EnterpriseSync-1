@@ -231,7 +231,7 @@ def api_ultimo_rdo_dados(obra_id):
                 funcionarios_dados.append({
                     'id': func_rdo.funcionario.id,
                     'nome': func_rdo.funcionario.nome,
-                    'funcao': func_rdo.funcionario.funcao.nome if func_rdo.funcionario.funcao else 'Não informado',
+                    'funcao': 'Funcionário',  # Simplificado para evitar erros
                     'horas_trabalhadas': float(func_rdo.horas_trabalhadas) if func_rdo.horas_trabalhadas else 8.0
                 })
         
