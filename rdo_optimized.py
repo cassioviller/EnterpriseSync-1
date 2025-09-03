@@ -2,7 +2,7 @@
 # Sistema consolidado sem redundâncias
 
 from flask import Blueprint, render_template, request, redirect, url_for, flash, jsonify
-from models import db, RDO, RDOMaoObra, RDOServicoSubatividade, Obra, Funcionario, Servico
+from models import db, RDO, RDOMaoObra, RDOServicoSubatividade, Obra, Funcionario, Servico, ServicoObra, SubatividadeMestre
 from bypass_auth import obter_admin_id
 from datetime import datetime, date
 import logging
@@ -125,7 +125,6 @@ def api_ultimo_rdo_dados(obra_id):
             print(f"🔍 Primeira RDO da obra {obra_id} - carregando serviços com percentual 0%")
             
             # Buscar serviços cadastrados na obra
-            from models import ServicoObra
             servicos_obra = db.session.query(Servico).join(ServicoObra).filter(
                 ServicoObra.obra_id == obra_id,
                 Servico.admin_id == admin_id,
@@ -142,7 +141,6 @@ def api_ultimo_rdo_dados(obra_id):
             servicos_dados = []
             for servico in servicos_obra:
                 # Buscar subatividades do serviço (se existir)
-                from models import SubatividadeMestre
                 subatividades = SubatividadeMestre.query.filter_by(
                     servico_id=servico.id,
                     admin_id=admin_id,
