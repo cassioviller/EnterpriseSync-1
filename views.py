@@ -5290,30 +5290,31 @@ def adicionar_servico_obra():
         if not obra_id or not servico_id:
             return jsonify({'success': False, 'message': 'Dados incompletos'}), 400
         
-        # Detectar admin_id com lógica correta (igual API principal)
+        # CORREÇÃO: Usar admin_id do usuário logado (session_user_id)
         admin_id = None
-        try:
-            if current_user and current_user.is_authenticated and hasattr(current_user, 'tipo_usuario'):
-                if current_user.tipo_usuario == TipoUsuario.ADMIN:
-                    admin_id = current_user.id
-                elif hasattr(current_user, 'admin_id') and current_user.admin_id:
-                    admin_id = current_user.admin_id
-        except:
-            pass
         
+        # Primeiro: tentar session_user_id (mais confiável)
+        session_user_id = session.get('session_user_id')
+        if session_user_id:
+            admin_id = session_user_id
+            print(f"🔑 USANDO SESSION USER_ID: {admin_id}")
+        
+        # Segundo: tentar current_user
         if admin_id is None:
-            # CORREÇÃO: Usar admin_id dinâmico primeiro (funciona em dev e prod)
+            try:
+                if current_user and current_user.is_authenticated and hasattr(current_user, 'tipo_usuario'):
+                    if current_user.tipo_usuario == TipoUsuario.ADMIN:
+                        admin_id = current_user.id
+                    elif hasattr(current_user, 'admin_id') and current_user.admin_id:
+                        admin_id = current_user.admin_id
+                    print(f"🔑 USANDO CURRENT_USER: {admin_id}")
+            except:
+                pass
+        
+        # Terceiro: fallback dinâmico apenas se necessário
+        if admin_id is None:
             admin_id = get_admin_id_dinamico()
-            
-            # Se ainda não encontrou, tentar fallback para produção
-            if admin_id is None:
-                servicos_admin_2 = db.session.execute(
-                    text("SELECT COUNT(*) FROM servico WHERE admin_id = 2 AND ativo = true")
-                ).fetchone()
-                if servicos_admin_2 and servicos_admin_2[0] > 0:
-                    admin_id = 2
-                else:
-                    admin_id = 10  # Fallback desenvolvimento
+            print(f"🔑 USANDO FALLBACK DINÂMICO: {admin_id}")
         
         print(f"🔧 API ADICIONAR SERVIÇO: admin_id={admin_id}")
         
@@ -5384,30 +5385,31 @@ def remover_servico_obra():
         if not obra_id or not servico_id:
             return jsonify({'success': False, 'message': 'Dados incompletos'}), 400
         
-        # Detectar admin_id com lógica correta (igual API principal)
+        # CORREÇÃO: Usar admin_id do usuário logado (session_user_id)
         admin_id = None
-        try:
-            if current_user and current_user.is_authenticated and hasattr(current_user, 'tipo_usuario'):
-                if current_user.tipo_usuario == TipoUsuario.ADMIN:
-                    admin_id = current_user.id
-                elif hasattr(current_user, 'admin_id') and current_user.admin_id:
-                    admin_id = current_user.admin_id
-        except:
-            pass
         
+        # Primeiro: tentar session_user_id (mais confiável)
+        session_user_id = session.get('session_user_id')
+        if session_user_id:
+            admin_id = session_user_id
+            print(f"🔑 USANDO SESSION USER_ID: {admin_id}")
+        
+        # Segundo: tentar current_user
         if admin_id is None:
-            # CORREÇÃO: Usar admin_id dinâmico primeiro (funciona em dev e prod)
+            try:
+                if current_user and current_user.is_authenticated and hasattr(current_user, 'tipo_usuario'):
+                    if current_user.tipo_usuario == TipoUsuario.ADMIN:
+                        admin_id = current_user.id
+                    elif hasattr(current_user, 'admin_id') and current_user.admin_id:
+                        admin_id = current_user.admin_id
+                    print(f"🔑 USANDO CURRENT_USER: {admin_id}")
+            except:
+                pass
+        
+        # Terceiro: fallback dinâmico apenas se necessário
+        if admin_id is None:
             admin_id = get_admin_id_dinamico()
-            
-            # Se ainda não encontrou, tentar fallback para produção
-            if admin_id is None:
-                servicos_admin_2 = db.session.execute(
-                    text("SELECT COUNT(*) FROM servico WHERE admin_id = 2 AND ativo = true")
-                ).fetchone()
-                if servicos_admin_2 and servicos_admin_2[0] > 0:
-                    admin_id = 2
-                else:
-                    admin_id = 10  # Fallback desenvolvimento
+            print(f"🔑 USANDO FALLBACK DINÂMICO: {admin_id}")
         
         print(f"🗑️ API REMOVER SERVIÇO: admin_id={admin_id}")
         
