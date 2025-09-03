@@ -47,7 +47,7 @@ RUN pip install --no-cache-dir --upgrade pip setuptools wheel && \
 # Copiar TODO o código da aplicação (garantindo sincronia total)
 COPY . .
 
-# Criar todos os diretórios necessários para dev e prod
+# Criar todos os diretórios necessários para dev e prod (incluindo debug)
 RUN mkdir -p \
     /app/static/fotos_funcionarios \
     /app/static/fotos \
@@ -58,7 +58,10 @@ RUN mkdir -p \
     /app/temp \
     /app/instance \
     /app/migrations \
-    && chown -R sige:sige /app
+    /app/templates/debug \
+    /app/templates/errors \
+    && chown -R sige:sige /app \
+    && chmod 755 /app/logs
 
 # Garantir que arquivos Python sejam executáveis
 RUN find /app -name "*.py" -exec chmod 644 {} \;
