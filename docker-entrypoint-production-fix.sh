@@ -2,7 +2,7 @@
 # DOCKER ENTRYPOINT PRODUCTION FIX - SIGE v8.0 FINAL
 set -e
 
-echo "🚀 SIGE v8.1.0 - Iniciando (Full Sync Dev-Prod + Erro 400 Corrigido - 03/09/2025)"
+echo "🚀 SIGE v8.0 - Iniciando (Production Fix FINAL - 02/09/2025)"
 
 # Configuração do ambiente
 export PYTHONPATH=/app
@@ -36,13 +36,8 @@ done
 
 echo "✅ PostgreSQL conectado!"
 
-# CORREÇÕES ATUALIZADAS - DESENVOLVIMENTO SINCRONIZADO + ERRO 400 FIXADO
-echo "🔧 CORREÇÕES ATUALIZADAS: Sincronizando dev-prod, aplicando fixes RDO + correções JS..."
-
-# Verificação completa das correções
-echo "🔍 Executando verificação completa das correções..."
-python3 /app/verify_production_fixes.py
-echo "✅ Verificação concluída - sistema pronto!"
+# HOTFIX DEFINITIVO
+echo "🔧 HOTFIX DEFINITIVO: Corrigindo estrutura completa..."
 
 # Executar correção em bloco único
 psql "$DATABASE_URL" -v ON_ERROR_STOP=1 << 'EOSQL'
@@ -169,18 +164,8 @@ else
     exit 1
 fi
 
-# Criar diretório de logs para produção
-echo "📁 Criando sistema de logs para produção..."
-mkdir -p /app/logs
-mkdir -p /app/templates/debug
-mkdir -p /app/templates/errors
-touch /app/logs/production_errors.log
-touch /app/logs/production_debug.log
-chmod 755 /app/logs
-chmod 644 /app/logs/*.log
-
 # Inicialização da aplicação
-echo "🔧 Inicializando aplicação SIGE v8.0.1 com sistema de logs..."
+echo "🔧 Inicializando aplicação SIGE v8.0..."
 python -c "
 import sys
 sys.path.append('/app')
@@ -199,9 +184,8 @@ if [[ $? -ne 0 ]]; then
     exit 1
 fi
 
-echo "🎯 Sistema SIGE v8.0.1 pronto para uso - SINCRONIZADO!"
-echo "📍 URLs de teste: /servicos | /rdo | /dashboard | /funcionarios"
-echo "🔧 Correções incluídas: RDO continuação, mapping IDs, salvamento de subatividades"
+echo "🎯 Sistema SIGE v8.0 pronto para uso!"
+echo "📍 URL de teste: /servicos"
 
 # Executar comando principal
 exec "$@"

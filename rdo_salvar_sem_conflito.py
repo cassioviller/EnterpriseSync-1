@@ -1,5 +1,4 @@
-# SISTEMA DE SALVAMENTO RDO SEM CONFLITO DE IDEMPOTÊNCIA - v3.1
-# Versão com logging robusto para produção
+# SISTEMA DE SALVAMENTO RDO SEM CONFLITO DE IDEMPOTÊNCIA
 from flask import Blueprint, request, jsonify, redirect, url_for, flash
 from models import db, RDO, RDOMaoObra, RDOServicoSubatividade, Obra, Funcionario
 from bypass_auth import obter_admin_id, obter_usuario_atual
@@ -7,11 +6,6 @@ from datetime import datetime, date
 import logging
 import json
 import time
-import traceback
-
-# Configurar logging específico para produção
-prod_logger = logging.getLogger('RDO_PRODUCTION')
-prod_logger.setLevel(logging.DEBUG)
 
 rdo_sem_conflito_bp = Blueprint('rdo_sem_conflito', __name__)
 logger = logging.getLogger(__name__)
@@ -282,40 +276,12 @@ def salvar_rdo_flexivel():
         db.session.commit()
         
         logger.info(f"✅ RDO salvo com sucesso: {rdo.numero_rdo}")
-        prod_logger.info(f"✅ PRODUÇÃO - RDO salvo: {rdo.numero_rdo} com {subatividades_salvas} subatividades")
         flash(f'RDO {rdo.numero_rdo} salvo com sucesso!', 'success')
         
         return redirect(url_for('main.funcionario_rdo_consolidado'))
         
     except Exception as e:
-        # LOGGING DETALHADO PARA PRODUÇÃO
-        error_context = {
-            'operation': 'RDO_SAVE',
-            'admin_id': admin_id,
-            'obra_id': obra_id,
-            'form_keys': list(request.form.keys()),
-            'subatividades_processadas': len(subatividades_processadas) if 'subatividades_processadas' in locals() else 0,
-            'error_type': type(e).__name__,
-            'error_message': str(e),
-            'traceback': traceback.format_exc(),
-            'database_url_configured': bool(db.engine.url) if hasattr(db, 'engine') else False,
-        }
-        
-        # Log crítico para produção
-        prod_logger.error(f"🚨 ERRO CRÍTICO DE PRODUÇÃO - RDO_SAVE")
-        prod_logger.error(f"   ❌ {type(e).__name__}: {e}")
-        prod_logger.error(f"   📋 Contexto: {json.dumps(error_context, indent=2, default=str)}")
-        
-        # Console log para visibilidade imediata
-        print("🔥" * 20)
-        print("ERRO CRÍTICO NO SALVAMENTO RDO - PRODUÇÃO")
-        print(f"Admin ID: {admin_id}")
-        print(f"Obra ID: {obra_id}")  
-        print(f"Erro: {type(e).__name__} - {e}")
-        print(f"Form keys: {list(request.form.keys())}")
-        print("🔥" * 20)
-        
         logger.error(f"❌ Erro ao salvar RDO: {str(e)}")
         db.session.rollback()
-        flash(f'Erro ao salvar RDO: {str(e)} (ID do erro salvo nos logs)', 'error')
+        flash(f'Erro ao salvar RDO: {str(e)}', 'error')
         return redirect(url_for('main.funcionario_rdo_novo'))

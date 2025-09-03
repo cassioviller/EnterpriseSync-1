@@ -1,7 +1,6 @@
 """
-SISTEMA DE ERRO DETALHADO PARA PRODUÇÃO - SIGE v8.0.1  
+SISTEMA DE ERRO DETALHADO PARA PRODUÇÃO - SIGE v8.0
 Captura erros completos para debugging em ambiente de produção
-Atualizado: 03/09/2025 - Sistema integrado de logging
 """
 
 import traceback

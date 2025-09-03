@@ -89,7 +89,7 @@ def logout():
 def index():
     if current_user.is_authenticated:
         if current_user.tipo_usuario == TipoUsuario.FUNCIONARIO:
-            # DEBUG REMOVIDO
+            print(f"DEBUG INDEX: Funcionário {current_user.email} redirecionado para RDO consolidado")
             return redirect(url_for('main.funcionario_rdo_consolidado'))
         elif current_user.tipo_usuario == TipoUsuario.SUPER_ADMIN:
             return redirect(url_for('main.super_admin_dashboard'))
@@ -111,7 +111,7 @@ def dashboard():
     if hasattr(current_user, 'tipo_usuario') and current_user.is_authenticated:
         # FUNCIONÁRIO - SEMPRE vai para dashboard específico (SEGURANÇA CRÍTICA)
         if current_user.tipo_usuario == TipoUsuario.FUNCIONARIO:
-            # DEBUG REMOVIDO
+            print(f"DEBUG DASHBOARD: Funcionário {current_user.email} BLOQUEADO do dashboard admin - redirecionado")
             return redirect(url_for('main.funcionario_rdo_consolidado'))
             
         # SUPER ADMIN - vai para dashboard específico
@@ -124,28 +124,31 @@ def dashboard():
         admin_id = None  # Vamos detectar dinamicamente
         
         # DIAGNÓSTICO COMPLETO PARA PRODUÇÃO
-        # DEBUG DESATIVADO - PRODUÇÃO OTIMIZADA
+        print(f"🔍 DASHBOARD DEBUG PRODUÇÃO:")
+        print(f"  - current_user.is_authenticated: {getattr(current_user, 'is_authenticated', False)}")
+        print(f"  - current_user.email: {getattr(current_user, 'email', 'N/A')}")
+        print(f"  - current_user.tipo_usuario: {getattr(current_user, 'tipo_usuario', 'N/A')}")
+        print(f"  - current_user.admin_id: {getattr(current_user, 'admin_id', 'N/A')}")
+        print(f"  - current_user.id: {getattr(current_user, 'id', 'N/A')}")
         
         if hasattr(current_user, 'tipo_usuario') and current_user.is_authenticated:
             if current_user.tipo_usuario == TipoUsuario.ADMIN:
                 admin_id = current_user.id
-                # DEBUG REMOVIDO
+                print(f"✅ DEBUG DASHBOARD PROD: Admin direto - admin_id={admin_id}")
             elif hasattr(current_user, 'admin_id') and current_user.admin_id:
                 admin_id = current_user.admin_id
-                # DEBUG REMOVIDO
+                print(f"✅ DEBUG DASHBOARD PROD: Via admin_id do usuário - admin_id={admin_id}")
             else:
                 # Buscar pelo email na tabela usuarios
                 try:
                     usuario_db = Usuario.query.filter_by(email=current_user.email).first()
                     if usuario_db and usuario_db.admin_id:
                         admin_id = usuario_db.admin_id
-                        # DEBUG REMOVIDO
+                        print(f"✅ DEBUG DASHBOARD PROD: Via busca na tabela usuarios - admin_id={admin_id}")
                     else:
-                        # DEBUG REMOVIDO
-                        pass
+                        print(f"⚠️ DASHBOARD PROD: Usuário não encontrado na tabela usuarios ou sem admin_id")
                 except Exception as e:
-                    # DEBUG REMOVIDO - erro ao buscar na tabela usuarios
-                    pass
+                    print(f"❌ DEBUG DASHBOARD PROD: Erro ao buscar na tabela usuarios: {e}")
         
         # Se ainda não encontrou admin_id, detectar automaticamente
         if admin_id is None:
@@ -163,7 +166,7 @@ def dashboard():
                         primeiro_admin = Usuario.query.filter_by(tipo_usuario=TipoUsuario.ADMIN).first()
                         if primeiro_admin:
                             admin_id = primeiro_admin.id
-                            # DEBUG REMOVIDO
+                            print(f"🔍 ADMIN ENCONTRADO NA TABELA USUARIOS: admin_id={admin_id}")
                         else:
                             admin_id = 1  # Fallback absoluto
                             print(f"🆘 FALLBACK FINAL: admin_id={admin_id}")
@@ -263,24 +266,24 @@ def dashboard():
                 ).fetchone()
                 admin_id = funcionarios_admin[0] if funcionarios_admin else 1
             
-        # DEBUG REMOVIDO
+        print(f"✅ DEBUG DASHBOARD KPIs: Usando admin_id={admin_id} para cálculos")
         
         # Verificar estrutura completa do banco para diagnóstico
         try:
             # Diagnóstico completo do banco de dados
-            # DEBUG REMOVIDO
+            print(f"🔍 DIAGNÓSTICO COMPLETO DO BANCO DE DADOS:")
             
             # Total de funcionários por admin_id
             funcionarios_por_admin = db.session.execute(
                 text("SELECT admin_id, COUNT(*) as total, COUNT(CASE WHEN ativo = true THEN 1 END) as ativos FROM funcionario GROUP BY admin_id ORDER BY admin_id")
             ).fetchall()
-            # DEBUG REMOVIDO
+            print(f"  📊 FUNCIONÁRIOS POR ADMIN: {[(row[0], row[1], row[2]) for row in funcionarios_por_admin]}")
             
             # Total de obras por admin_id
             obras_por_admin = db.session.execute(
                 text("SELECT admin_id, COUNT(*) as total FROM obra GROUP BY admin_id ORDER BY admin_id")
             ).fetchall()
-            # DEBUG REMOVIDO
+            print(f"  🏗️ OBRAS POR ADMIN: {[(row[0], row[1]) for row in obras_por_admin]}")
             
             # Verificar estrutura da tabela registro_ponto primeiro
             try:
@@ -288,14 +291,14 @@ def dashboard():
                     text("SELECT column_name FROM information_schema.columns WHERE table_name = 'registro_ponto' ORDER BY ordinal_position")
                 ).fetchall()
                 colunas_str = [col[0] for col in colunas_ponto]
-                # DEBUG REMOVIDO
+                print(f"  🔍 COLUNAS REGISTRO_PONTO: {colunas_str}")
                 
                 # Usar coluna correta baseada na estrutura real
                 coluna_data = 'data' if 'data' in colunas_str else 'data_registro'
                 registros_ponto = db.session.execute(
                     text(f"SELECT COUNT(*) FROM registro_ponto WHERE {coluna_data} >= '2025-07-01' AND {coluna_data} <= '2025-07-31'")
                 ).fetchone()
-                # DEBUG REMOVIDO
+                print(f"  ⏰ REGISTROS DE PONTO (Jul/2025): {registros_ponto[0] if registros_ponto else 0}")
             except Exception as e:
                 print(f"  ❌ ERRO registros ponto: {e}")
             
@@ -310,7 +313,7 @@ def dashboard():
                     custos_veiculo = db.session.execute(
                         text("SELECT COUNT(*), COALESCE(SUM(valor), 0) FROM custo_veiculo WHERE data_custo >= '2025-07-01' AND data_custo <= '2025-07-31'")
                     ).fetchone()
-                    # DEBUG REMOVIDO
+                    print(f"  🚗 CUSTOS VEÍCULOS (Jul/2025): {custos_veiculo[0] if custos_veiculo else 0} registros, R$ {custos_veiculo[1] if custos_veiculo else 0}")
                 else:
                     print(f"  🚗 TABELA custo_veiculo NÃO EXISTE")
             except Exception as e:
@@ -322,7 +325,7 @@ def dashboard():
                     alimentacao = db.session.execute(
                         text("SELECT COUNT(*), COALESCE(SUM(valor), 0) FROM registro_alimentacao WHERE data >= '2025-07-01' AND data <= '2025-07-31'")
                     ).fetchone()
-                    # DEBUG REMOVIDO
+                    print(f"  🍽️ ALIMENTAÇÃO (Jul/2025): {alimentacao[0] if alimentacao else 0} registros, R$ {alimentacao[1] if alimentacao else 0}")
                 else:
                     print(f"  🍽️ TABELA registro_alimentacao NÃO EXISTE")
             except Exception as e:
@@ -333,7 +336,7 @@ def dashboard():
         
         # Buscar todos os funcionários ativos para o admin_id detectado
         funcionarios_dashboard = Funcionario.query.filter_by(admin_id=admin_id, ativo=True).all()
-        # DEBUG REMOVIDO
+        print(f"✅ DEBUG DASHBOARD KPIs: Encontrados {len(funcionarios_dashboard)} funcionários para admin_id={admin_id}")
         
         # Se não encontrou funcionários, buscar o admin_id com mais dados
         if len(funcionarios_dashboard) == 0:
@@ -363,7 +366,7 @@ def dashboard():
             
             # Refazer busca de funcionários
             funcionarios_dashboard = Funcionario.query.filter_by(admin_id=admin_id, ativo=True).all()
-            # DEBUG REMOVIDO
+            print(f"✅ APÓS ROLLBACK: {len(funcionarios_dashboard)} funcionários encontrados")
             
             for func in funcionarios_dashboard:
                 try:
@@ -416,16 +419,16 @@ def dashboard():
             ).all()
             custo_alimentacao_real += sum(o.valor or 0 for o in outros_alimentacao)
             
-            # DEBUG REMOVIDO
+            print(f"DEBUG ALIMENTAÇÃO DASHBOARD: Registros={sum(a.valor or 0 for a in alimentacao_registros):.2f}, Outros={sum(o.valor or 0 for o in outros_alimentacao):.2f}, Total={custo_alimentacao_real:.2f}")
         except Exception as e:
             print(f"Erro cálculo alimentação: {e}")
             custo_alimentacao_real = 0
         
         # Debug dos valores calculados
-        # DEBUG REMOVIDO
-        # DEBUG REMOVIDO
-        # DEBUG REMOVIDO
-        # DEBUG REMOVIDO
+        print(f"DEBUG DASHBOARD: {len(funcionarios_dashboard)} funcionários")
+        print(f"DEBUG DASHBOARD: Custo total calculado: R$ {total_custo_real:.2f}")
+        print(f"DEBUG DASHBOARD: Horas totais: {total_horas_real}")
+        print(f"DEBUG DASHBOARD: Extras totais: {total_extras_real}")
         
         # Calcular KPIs específicos corretamente
         # 1. Custos de Transporte (veículos) - usar campo data_custo para filtrar
@@ -438,7 +441,7 @@ def dashboard():
                 CustoVeiculo.data_custo <= data_fim
             ).all()
             custo_transporte_real = sum(c.valor or 0 for c in custos_veiculo)
-            # DEBUG REMOVIDO
+            print(f"DEBUG Custos veículo: R$ {custo_transporte_real:.2f}")
         except Exception as e:
             print(f"Erro custos veículo: {e}")
             # Fallback: usar todos os registros se filtro falhar
@@ -469,7 +472,7 @@ def dashboard():
                     valor_dia = (funcionario.salario / 22)
                     custo_faltas_justificadas += valor_dia
             
-            # DEBUG REMOVIDO
+            print(f"DEBUG Faltas Justificadas: {quantidade_faltas_justificadas} faltas, R$ {custo_faltas_justificadas:.2f}")
         except Exception as e:
             print(f"Erro faltas justificadas: {e}")
         
@@ -515,7 +518,7 @@ def dashboard():
             if sem_dept > 0:
                 funcionarios_por_departamento['Sem Departamento'] = sem_dept
                 
-            # DEBUG REMOVIDO
+            print(f"DEBUG Funcionários por dept: {funcionarios_por_departamento}")
                 
         except Exception as e:
             print(f"Erro funcionários por departamento: {e}")
@@ -626,8 +629,8 @@ def dashboard():
     custos_recentes = [{'nome': k, 'total_custo': v} for k, v in custos_por_obra.items()]
     
     # Debug final
-    # DEBUG REMOVIDO
-    # DEBUG REMOVIDO
+    print(f"DEBUG FINAL - Funcionários por dept: {funcionarios_dept}")
+    print(f"DEBUG FINAL - Custos por obra: {custos_recentes}")
     
     # Buscar obras em andamento para a tabela com tratamento de erro
     obras_andamento = safe_db_operation(
@@ -716,7 +719,7 @@ def funcionarios():
     ).order_by(Funcionario.nome).all()
     
     # Debug para produção
-    # DEBUG REMOVIDO
+    print(f"DEBUG FUNCIONÁRIOS: {len(funcionarios)} funcionários para admin_id={admin_id}")
     print(f"DEBUG USER: {current_user.email if hasattr(current_user, 'email') else 'No user'} - {current_user.tipo_usuario if hasattr(current_user, 'tipo_usuario') else 'No type'}")
     
     # Buscar funcionários inativos também para exibir na lista
@@ -824,7 +827,7 @@ def funcionarios():
         flash(f'Erro no sistema de KPIs: {str(e)}. Dados básicos carregados.', 'warning')
     
     # Debug final antes do template
-    # Employee KPIs loaded
+    print(f"DEBUG FUNCIONÁRIOS: {len(funcionarios)} funcionários, {len(funcionarios_kpis)} KPIs")
     
     return render_template('funcionarios.html', 
                          funcionarios_kpis=funcionarios_kpis,
@@ -1108,6 +1111,7 @@ def obras():
     obras = query.order_by(desc(Obra.data_inicio)).all()
     
     print(f"DEBUG FILTROS OBRAS: {filtros}")
+    print(f"DEBUG TOTAL OBRAS ENCONTRADAS: {len(obras)}")
     
     # Definir período para cálculos de custo
     if filtros['data_inicio']:
@@ -1126,7 +1130,7 @@ def obras():
     else:
         periodo_fim = date.today()
     
-    # DEBUG: Período de custos definido
+    print(f"DEBUG PERÍODO CUSTOS: {periodo_inicio} até {periodo_fim}")
     
     # Calcular custos reais para cada obra no período
     for obra in obras:
@@ -1195,7 +1199,7 @@ def obras():
                 'custo_transporte': custo_transporte_total
             }
             
-            # DEBUG: Custos calculados para obra
+            print(f"DEBUG CUSTO OBRA {obra.nome}: Total=R${custo_total_obra:.2f} (Mão=R${custo_mao_obra:.2f} + Alim=R${custo_alimentacao:.2f} + Div=R${custo_diversos_total:.2f} + Trans=R${custo_transporte_total:.2f})")
             
         except Exception as e:
             print(f"ERRO ao calcular custos obra {obra.nome}: {e}")
@@ -1265,24 +1269,12 @@ def nova_obra():
                     timestamp = datetime.now().strftime("%m%d%H%M")
                     codigo = f"O{timestamp}"
             
-            # Detectar admin_id dinamicamente
-            admin_id = 10  # Padrão desenvolvimento
-            try:
-                if hasattr(current_user, 'admin_id') and current_user.admin_id:
-                    admin_id = current_user.admin_id
-                elif hasattr(current_user, 'id'):
-                    admin_id = current_user.id
-                else:
-                    # Fallback inteligente - buscar admin com funcionários ativos
-                    fallback_admin = db.session.execute(
-                        text("""SELECT admin_id, COUNT(*) as funcionarios FROM funcionarios 
-                                GROUP BY admin_id ORDER BY funcionarios DESC LIMIT 1""")
-                    ).fetchone()
-                    if fallback_admin:
-                        admin_id = fallback_admin[0]
-                        pass
-            except Exception:
-                admin_id = 10
+            # Detectar admin_id
+            admin_id = 10  # Padrão
+            if hasattr(current_user, 'admin_id') and current_user.admin_id:
+                admin_id = current_user.admin_id
+            elif hasattr(current_user, 'id'):
+                admin_id = current_user.id
             
             # Gerar token para portal do cliente se ativo
             token_cliente = None
@@ -1319,16 +1311,12 @@ def nova_obra():
                 for servico_id in servicos_selecionados:
                     try:
                         servico_id = int(servico_id)
-                        
-                        # Criar associação na tabela servico_obra
-                        associacao = ServicoObra(
-                            obra_id=nova_obra.id,
-                            servico_id=servico_id,
-                            admin_id=admin_id
-                        )
-                        db.session.add(associacao)
-                        
-                    except (ValueError, Exception):
+                        # Verificar se é uma relação many-to-many ou criar tabela de associação
+                        # Por enquanto, vamos usar uma abordagem simples com campo JSON na obra
+                        if not hasattr(nova_obra, 'servicos_ids'):
+                            # Se não houver campo específico, criar lista de IDs
+                            pass
+                    except ValueError:
                         continue
             
             db.session.commit()
@@ -1343,28 +1331,16 @@ def nova_obra():
     
     # GET request - carregar lista de funcionários e serviços para o formulário
     try:
-        # Detectar admin_id dinamicamente (mesmo código do POST)
-        admin_id = 10  # Padrão desenvolvimento
-        try:
-            if hasattr(current_user, 'admin_id') and current_user.admin_id:
-                admin_id = current_user.admin_id
-            elif hasattr(current_user, 'id'):
-                admin_id = current_user.id
-            else:
-                # Fallback inteligente - buscar admin com funcionários ativos
-                fallback_admin = db.session.execute(
-                    text("""SELECT admin_id, COUNT(*) as funcionarios FROM funcionarios 
-                            GROUP BY admin_id ORDER BY funcionarios DESC LIMIT 1""")
-                ).fetchone()
-                if fallback_admin:
-                    admin_id = fallback_admin[0]
-                    pass
-        except Exception:
-            admin_id = 10
+        admin_id = 10  # Padrão
+        if hasattr(current_user, 'admin_id') and current_user.admin_id:
+            admin_id = current_user.admin_id
+        elif hasattr(current_user, 'id'):
+            admin_id = current_user.id
         
         funcionarios = Funcionario.query.filter_by(admin_id=admin_id, ativo=True).order_by(Funcionario.nome).all()
         servicos_disponiveis = Servico.query.filter_by(admin_id=admin_id, ativo=True).order_by(Servico.nome).all()
         
+        print(f"DEBUG NOVA OBRA: {len(funcionarios)} funcionários e {len(servicos_disponiveis)} serviços carregados para admin_id={admin_id}")
         
     except Exception as e:
         print(f"ERRO ao carregar dados: {e}")
@@ -1421,40 +1397,6 @@ def editar_obra(id):
             servicos_selecionados = request.form.getlist('servicos_obra')
             print(f"DEBUG EDITAR OBRA: Serviços selecionados = {servicos_selecionados}")
             
-            # CORREÇÃO: Salvar associações serviço-obra após editar
-            if servicos_selecionados:
-                try:
-                    # Detectar admin_id correto (igual às APIs)
-                    admin_id = obra.admin_id  # Usar admin_id da obra sendo editada
-                    
-                    # Remover associações antigas desta obra
-                    ServicoObra.query.filter_by(obra_id=obra.id, admin_id=admin_id).delete()
-                    
-                    # Adicionar novas associações
-                    for servico_id in servicos_selecionados:
-                        if servico_id:  # Verificar se não está vazio
-                            # Verificar se serviço pertence ao mesmo admin
-                            servico = Servico.query.filter_by(id=int(servico_id), admin_id=admin_id).first()
-                            if servico:
-                                nova_associacao = ServicoObra(
-                                    obra_id=obra.id,
-                                    servico_id=int(servico_id),
-                                    admin_id=admin_id,
-                                    quantidade_planejada=1.0,
-                                    quantidade_executada=0.0,
-                                    ativo=True,
-                                    created_at=datetime.now()
-                                )
-                                db.session.add(nova_associacao)
-                                print(f"➕ Serviço {servico_id} associado à obra {obra.id}")
-                            else:
-                                print(f"⚠️ Serviço {servico_id} não encontrado para admin_id={admin_id}")
-                    
-                    print(f"✅ Processados {len(servicos_selecionados)} serviços para obra {obra.id}")
-                    
-                except Exception as e:
-                    print(f"❌ Erro ao processar serviços: {e}")
-            
             db.session.commit()
             
             flash(f'Obra "{obra.nome}" atualizada com sucesso!', 'success')
@@ -1473,6 +1415,7 @@ def editar_obra(id):
         # Buscar serviços já associados à obra (implementar lógica específica depois)
         servicos_obra = []
         
+        print(f"DEBUG EDITAR OBRA: {len(funcionarios)} funcionários e {len(servicos_disponiveis)} serviços carregados para admin_id={admin_id}")
         
     except Exception as e:
         print(f"ERRO ao carregar dados para edição: {e}")
@@ -1534,7 +1477,7 @@ def detalhes_obra(id):
         else:
             data_fim = datetime.strptime(data_fim_param, '%Y-%m-%d').date()
         
-        # DEBUG: Período de detalhes definido
+        print(f"DEBUG PERÍODO DETALHES: {data_inicio} até {data_fim}")
         obra_id = id
         
         # Sistema robusto de detecção de admin_id - PRODUÇÃO
@@ -1659,7 +1602,7 @@ def detalhes_obra(id):
                 'data_fim': data_fim
             }).fetchall()
         
-        # SQL results processed
+        print(f"DEBUG SQL: {len(resultado_custos)} registros encontrados com JOIN")
         
         for row in resultado_custos:
             data_reg, funcionario_id, funcionario_nome, horas, salario, custo_dia = row
@@ -1674,7 +1617,7 @@ def detalhes_obra(id):
                 'total_dia': float(custo_dia)
             })
         
-        # KPIs calculated successfully
+        print(f"DEBUG KPIs: {total_custo_mao_obra:.2f} em custos, {total_horas_periodo}h trabalhadas")
             
         # Buscar custos da obra para o período
         from models import OutroCusto, CustoVeiculo, RegistroAlimentacao
@@ -1743,7 +1686,7 @@ def detalhes_obra(id):
         # Total de alimentação (tabela específica + outros custos)
         custo_alimentacao = custo_alimentacao_tabela + custo_alimentacao_outros
         
-        # DEBUG REMOVIDO
+        print(f"DEBUG ALIMENTAÇÃO: Tabela específica={custo_alimentacao_tabela}, Outros custos={custo_alimentacao_outros}, Total={custo_alimentacao}")
         
         custo_transporte = sum(c.valor for c in custos_obra if any([
             c.kpi_associado == 'custo_transporte',
@@ -1878,8 +1821,8 @@ def detalhes_obra(id):
         rdos_periodo = rdos_obra
         rdos_recentes = rdos_obra
         
-        # Final KPIs calculated
-        # Employee period summary calculated
+        print(f"DEBUG KPIs FINAIS: Total={kpis_obra['custo_total']:.2f}, Mão Obra={kpis_obra['custo_mao_obra']:.2f}, Horas={kpis_obra['total_horas']:.1f}")
+        print(f"DEBUG FUNCIONÁRIOS: {kpis_obra['funcionarios_periodo']} no período, {kpis_obra['dias_trabalhados']} dias trabalhados")
         
         # Importar date para template
         from datetime import date as date_class
@@ -5339,9 +5282,10 @@ def api_servicos_obra(obra_id):
 
 # ===== API PARA GERENCIAR SERVIÇOS DA OBRA =====
 
-@main_bp.route('/api/obras/servicos', methods=['POST', 'DELETE'])
-def gerenciar_servico_obra():
-    """API unificada para gerenciar serviços da obra"""
+@main_bp.route('/api/obras/servicos', methods=['POST'])
+@login_required
+def adicionar_servico_obra():
+    """API para adicionar serviço à obra"""
     try:
         data = request.get_json()
         obra_id = data.get('obra_id')
@@ -5350,62 +5294,26 @@ def gerenciar_servico_obra():
         if not obra_id or not servico_id:
             return jsonify({'success': False, 'message': 'Dados incompletos'}), 400
         
-        # Determinar se é POST (adicionar) ou DELETE (remover)
-        if request.method == 'DELETE':
-            return _remover_servico_obra(obra_id, servico_id)
-        else:  # POST
-            return _adicionar_servico_obra(obra_id, servico_id)
-            
-    except Exception as e:
-        db.session.rollback()
-        print(f"ERRO API SERVIÇOS OBRA: {str(e)}")
-        return jsonify({'success': False, 'message': 'Erro interno do servidor'}), 500
-
-def _adicionar_servico_obra(obra_id, servico_id):
-    """Função auxiliar para adicionar serviço à obra"""
-    try:
-        
-        # CORREÇÃO: Usar admin_id do usuário logado (session_user_id)
+        # Detectar admin_id com lógica correta (igual API principal)
         admin_id = None
+        try:
+            if current_user and current_user.is_authenticated and hasattr(current_user, 'tipo_usuario'):
+                if current_user.tipo_usuario == TipoUsuario.ADMIN:
+                    admin_id = current_user.id
+                elif hasattr(current_user, 'admin_id') and current_user.admin_id:
+                    admin_id = current_user.admin_id
+        except:
+            pass
         
-        # CORREÇÃO DEFINITIVA: Detectar admin_id baseado nos logs anteriores
-        # Dos logs, vemos que o usuário está tentando salvar obra_id=53 (admin_id=50)
-        
-        # Primeiro: tentar session_user_id (mais confiável)
-        session_user_id = session.get('session_user_id')
-        if session_user_id:
-            admin_id = session_user_id
-            print(f"🔑 USANDO SESSION USER_ID: {admin_id}")
-        
-        # Segundo: tentar current_user
         if admin_id is None:
-            try:
-                if current_user and current_user.is_authenticated and hasattr(current_user, 'tipo_usuario'):
-                    if current_user.tipo_usuario == TipoUsuario.ADMIN:
-                        admin_id = current_user.id
-                    elif hasattr(current_user, 'admin_id') and current_user.admin_id:
-                        admin_id = current_user.admin_id
-                    print(f"🔑 USANDO CURRENT_USER: {admin_id}")
-            except:
-                pass
-        
-        # CORREÇÃO: Se ainda não encontrou, tentar detectar pelo admin_id da obra solicitada
-        if admin_id is None:
-            try:
-                obra_test = db.session.execute(
-                    text("SELECT admin_id FROM obra WHERE id = :obra_id"), 
-                    {"obra_id": obra_id}
-                ).fetchone()
-                if obra_test:
-                    admin_id = obra_test[0]
-                    print(f"🔑 DETECTADO PELA OBRA: admin_id={admin_id} para obra_id={obra_id}")
-            except Exception as e:
-                print(f"⚠️ Erro ao detectar admin_id pela obra: {e}")
-        
-        # Último recurso: fallback dinâmico
-        if admin_id is None:
-            admin_id = get_admin_id_dinamico()
-            print(f"🔑 USANDO FALLBACK DINÂMICO: {admin_id}")
+            # Fallback inteligente (prioriza admin_id=2)
+            servicos_admin_2 = db.session.execute(
+                text("SELECT COUNT(*) FROM servico WHERE admin_id = 2 AND ativo = true")
+            ).fetchone()
+            if servicos_admin_2 and servicos_admin_2[0] > 0:
+                admin_id = 2
+            else:
+                admin_id = get_admin_id_dinamico()
         
         print(f"🔧 API ADICIONAR SERVIÇO: admin_id={admin_id}")
         
@@ -5419,11 +5327,10 @@ def _adicionar_servico_obra(obra_id, servico_id):
         if not servico:
             return jsonify({'success': False, 'message': 'Serviço não encontrado'}), 404
         
-        # CRÍTICO: Verificar se já existe associação INCLUINDO admin_id para multi-tenant
+        # Verificar se já existe associação
         servico_obra_existente = ServicoObra.query.filter_by(
             obra_id=obra_id, 
-            servico_id=servico_id,
-            admin_id=admin_id  # CORREÇÃO: Incluir admin_id na verificação
+            servico_id=servico_id
         ).first()
         
         if servico_obra_existente:
@@ -5432,21 +5339,19 @@ def _adicionar_servico_obra(obra_id, servico_id):
             else:
                 # Reativar se estava desativado
                 servico_obra_existente.ativo = True
-                servico_obra_existente.created_at = datetime.now()
+                servico_obra_existente.data_criacao = datetime.now()
         else:
-            # Criar nova associação com INSERT direto para garantir admin_id
-            db.session.execute(text("""
-                INSERT INTO servico_obra (obra_id, servico_id, quantidade_planejada, quantidade_executada, ativo, created_at, admin_id)
-                VALUES (:obra_id, :servico_id, :quantidade_planejada, :quantidade_executada, :ativo, :created_at, :admin_id)
-            """), {
-                'obra_id': obra_id,
-                'servico_id': servico_id,
-                'quantidade_planejada': 1.0,
-                'quantidade_executada': 0.0,
-                'ativo': True,
-                'created_at': datetime.now(),
-                'admin_id': admin_id
-            })
+            # Criar nova associação
+            servico_obra = ServicoObra()
+            servico_obra.obra_id = obra_id
+            servico_obra.servico_id = servico_id
+            servico_obra.quantidade_planejada = 1.0
+            servico_obra.quantidade_executada = 0.0
+            servico_obra.valor_unitario = servico.custo_unitario or 0.0
+            servico_obra.ativo = True
+            servico_obra.data_criacao = datetime.now()
+            
+            db.session.add(servico_obra)
         
         db.session.commit()
         
@@ -5465,51 +5370,38 @@ def _adicionar_servico_obra(obra_id, servico_id):
         print(f"ERRO ADICIONAR SERVIÇO OBRA: {str(e)}")
         return jsonify({'success': False, 'message': 'Erro interno do servidor'}), 500
 
-def _remover_servico_obra(obra_id, servico_id):
-    """Função auxiliar para remover serviço da obra"""
+@main_bp.route('/api/obras/servicos', methods=['DELETE'])
+@login_required
+def remover_servico_obra():
+    """API para remover serviço da obra"""
     try:
+        data = request.get_json()
+        obra_id = data.get('obra_id')
+        servico_id = data.get('servico_id')
         
-        # CORREÇÃO: Usar admin_id do usuário logado (session_user_id)
+        if not obra_id or not servico_id:
+            return jsonify({'success': False, 'message': 'Dados incompletos'}), 400
+        
+        # Detectar admin_id com lógica correta (igual API principal)
         admin_id = None
+        try:
+            if current_user and current_user.is_authenticated and hasattr(current_user, 'tipo_usuario'):
+                if current_user.tipo_usuario == TipoUsuario.ADMIN:
+                    admin_id = current_user.id
+                elif hasattr(current_user, 'admin_id') and current_user.admin_id:
+                    admin_id = current_user.admin_id
+        except:
+            pass
         
-        # CORREÇÃO DEFINITIVA: Detectar admin_id baseado nos logs anteriores
-        # Dos logs, vemos que o usuário está tentando salvar obra_id=53 (admin_id=50)
-        
-        # Primeiro: tentar session_user_id (mais confiável)
-        session_user_id = session.get('session_user_id')
-        if session_user_id:
-            admin_id = session_user_id
-            print(f"🔑 USANDO SESSION USER_ID: {admin_id}")
-        
-        # Segundo: tentar current_user
         if admin_id is None:
-            try:
-                if current_user and current_user.is_authenticated and hasattr(current_user, 'tipo_usuario'):
-                    if current_user.tipo_usuario == TipoUsuario.ADMIN:
-                        admin_id = current_user.id
-                    elif hasattr(current_user, 'admin_id') and current_user.admin_id:
-                        admin_id = current_user.admin_id
-                    print(f"🔑 USANDO CURRENT_USER: {admin_id}")
-            except:
-                pass
-        
-        # CORREÇÃO: Se ainda não encontrou, tentar detectar pelo admin_id da obra solicitada
-        if admin_id is None:
-            try:
-                obra_test = db.session.execute(
-                    text("SELECT admin_id FROM obra WHERE id = :obra_id"), 
-                    {"obra_id": obra_id}
-                ).fetchone()
-                if obra_test:
-                    admin_id = obra_test[0]
-                    print(f"🔑 DETECTADO PELA OBRA: admin_id={admin_id} para obra_id={obra_id}")
-            except Exception as e:
-                print(f"⚠️ Erro ao detectar admin_id pela obra: {e}")
-        
-        # Último recurso: fallback dinâmico
-        if admin_id is None:
-            admin_id = get_admin_id_dinamico()
-            print(f"🔑 USANDO FALLBACK DINÂMICO: {admin_id}")
+            # Fallback inteligente (prioriza admin_id=2)
+            servicos_admin_2 = db.session.execute(
+                text("SELECT COUNT(*) FROM servico WHERE admin_id = 2 AND ativo = true")
+            ).fetchone()
+            if servicos_admin_2 and servicos_admin_2[0] > 0:
+                admin_id = 2
+            else:
+                admin_id = get_admin_id_dinamico()
         
         print(f"🗑️ API REMOVER SERVIÇO: admin_id={admin_id}")
         

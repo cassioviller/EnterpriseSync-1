@@ -815,23 +815,7 @@ document.addEventListener('DOMContentLoaded', function() {
 // Função para excluir obra
 function excluirObra(id) {
     if (confirm('Tem certeza que deseja excluir esta obra? Esta ação não pode ser desfeita.')) {
-        // Criar form POST para exclusão
-        const form = document.createElement('form');
-        form.method = 'POST';
-        form.action = `/obras/excluir/${id}`;
-        
-        // Adicionar token CSRF se disponível
-        const csrfToken = document.querySelector('meta[name=csrf-token]');
-        if (csrfToken) {
-            const csrfInput = document.createElement('input');
-            csrfInput.type = 'hidden';
-            csrfInput.name = 'csrf_token';
-            csrfInput.value = csrfToken.getAttribute('content');
-            form.appendChild(csrfInput);
-        }
-        
-        document.body.appendChild(form);
-        form.submit();
+        window.location.href = `/obras/excluir/${id}`;
     }
 }
 

@@ -1,13 +1,13 @@
-# DOCKERFILE PRODUÇÃO - SIGE v9.0
-# Sistema de Gestão Empresarial - Limpo e Otimizado
+# DOCKERFILE UNIFICADO - SIGE v8.0
+# Idêntico entre desenvolvimento e produção
+# Sistema Integrado de Gestão Empresarial - EasyPanel Ready
 
 FROM python:3.11-slim-bullseye
 
 # Metadados
-LABEL maintainer="SIGE v9.0" \
-      version="9.0.0" \
-      description="Sistema de Gestão Empresarial - Produção" \
-      build-date="2025-09-03"
+LABEL maintainer="SIGE v8.0" \
+      version="8.0" \
+      description="Sistema Integrado de Gestão Empresarial - Unified Build"
 
 # Variáveis de build
 ARG DEBIAN_FRONTEND=noninteractive
@@ -25,7 +25,6 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libffi-dev \
     libssl-dev \
     make \
-    git \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
@@ -35,49 +34,53 @@ RUN groupadd -r sige && useradd -r -g sige sige
 # Definir diretório de trabalho
 WORKDIR /app
 
-# Copiar arquivos de configuração primeiro para cache otimizado
-COPY pyproject.toml requirements.txt* ./
+# Copiar pyproject.toml primeiro para cache de dependências
+COPY pyproject.toml ./
 
-# Instalar dependências Python (versões fixas para estabilidade)
+# Instalar dependências Python
 RUN pip install --no-cache-dir --upgrade pip setuptools wheel && \
-    pip install --no-cache-dir . && \
-    pip list > /app/installed_packages.txt
+    pip install --no-cache-dir .
 
 # Copiar código da aplicação
 COPY . .
 
-# Criar diretórios necessários
+# Copiar sistema de erro detalhado para produção
+COPY utils/production_error_handler.py /app/utils/
+
+# Criar todos os diretórios necessários
 RUN mkdir -p \
     /app/static/fotos_funcionarios \
-    /app/static/uploads \
+    /app/static/fotos \
+    /app/static/images \
+    /app/uploads \
     /app/logs \
+    /app/temp \
     && chown -R sige:sige /app
 
-# Garantir que arquivos Python sejam executáveis
-RUN find /app -name "*.py" -exec chmod 644 {} \;
-
-# Script de entrada otimizado
-COPY docker-entrypoint-v8.3-final.sh /app/docker-entrypoint.sh
-RUN chmod +x /app/docker-entrypoint.sh
+# Copiar scripts de entrada (produção corrigida e backup)
+COPY docker-entrypoint-production-fix.sh /app/docker-entrypoint.sh
+COPY docker-entrypoint-unified.sh /app/docker-entrypoint-backup.sh
+RUN chmod +x /app/docker-entrypoint.sh /app/docker-entrypoint-backup.sh
 
 # Mudar para usuário não-root
 USER sige
 
-# Variáveis de ambiente
+# Variáveis de ambiente padrão
 ENV FLASK_APP=main.py \
     FLASK_ENV=production \
     PORT=5000 \
     PYTHONPATH=/app \
     PYTHONUNBUFFERED=1 \
-    DEBUG=false
+    PYTHONIOENCODING=utf-8 \
+    SHOW_DETAILED_ERRORS=true
 
 # Expor porta
 EXPOSE 5000
 
-# Health check robusto para ambos ambientes
-HEALTHCHECK --interval=30s --timeout=15s --start-period=90s --retries=3 \
+# Health check robusto para EasyPanel
+HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
   CMD curl -f http://localhost:${PORT:-5000}/health || exit 1
 
-# Comando de entrada otimizado para produção
+# Comando de entrada otimizado para EasyPanel
 ENTRYPOINT ["/app/docker-entrypoint.sh"]
-CMD ["gunicorn", "--bind", "0.0.0.0:5000", "--workers", "2", "--threads", "4", "--timeout", "120", "--keepalive", "2", "--max-requests", "1000", "--max-requests-jitter", "100", "--access-logfile", "-", "--error-logfile", "-", "--log-level", "info", "--preload", "main:app"]
+CMD ["gunicorn", "--bind", "0.0.0.0:5000", "--workers", "2", "--timeout", "120", "--access-logfile", "-", "--error-logfile", "-", "--log-level", "info", "main:app"]

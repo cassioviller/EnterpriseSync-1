@@ -1,16 +1,5 @@
 from app import app
 
-# Configurar logging para produção se necessário
-import os
-if os.environ.get('FLASK_ENV') == 'production':
-    try:
-        from utils.production_logger import production_logger
-        print("✅ Sistema de logging de produção ativado")
-        
-    except ImportError as e:
-        print(f"⚠️ Sistema de logging de produção não disponível: {e}")
-        pass
-
 # Registrar sistema de edição de RDO
 try:
     from rdo_editar_sistema import rdo_editar_bp
@@ -160,14 +149,6 @@ try:
     print("✅ Sistema de cadastro serviço-obra registrado")
 except Exception as e:
     print(f"❌ Erro ao registrar cadastro serviço-obra: {e}")
-
-# Registrar sistema de debug de produção para RDO
-try:
-    from debug_production_rdo import debug_rdo_bp
-    app.register_blueprint(debug_rdo_bp, url_prefix='/')
-    print("✅ Sistema de debug RDO registrado")
-except ImportError as e:
-    print(f"⚠️ Sistema debug RDO não encontrado: {e}")
 
 if __name__ == "__main__":
     app.run(host='0.0.0.0', port=5000, debug=True)

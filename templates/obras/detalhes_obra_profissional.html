@@ -1258,20 +1258,10 @@ function carregarServicosDisponiveis() {
         });
 }
 
-// Array para armazenar serviços selecionados (global)
+// Array para armazenar serviços selecionados
 let servicosSelecionados = [];
 
-// Aguardar carregamento completo do DOM antes de inicializar JavaScript
-document.addEventListener('DOMContentLoaded', function() {
-    console.log('✅ DOM carregado - Inicializando sistema de seleção de serviços');
-    
-    // Inicializar interface se elementos existirem
-    if (document.getElementById('contadorSelecionados')) {
-        atualizarInterfaceSelecao();
-    }
-});
-
-// Função para alternar seleção de serviço (global para HTML)
+// Função para alternar seleção de serviço
 function toggleServicoSelecao(checkbox) {
     const servicoId = parseInt(checkbox.dataset.servicoId);
     const servicoNome = checkbox.dataset.servicoNome;
@@ -1315,36 +1305,24 @@ function atualizarInterfaceSelecao() {
     const areaSelecionados = document.getElementById('servicosSelecionados');
     const listaSelecionados = document.getElementById('listaSelecionados');
     
-    // Verificação de segurança - só atualiza elementos que existem
-    if (contadorSelecionados) {
-        contadorSelecionados.textContent = contador;
-    }
-    if (contadorBotao) {
-        contadorBotao.textContent = contador;
-    }
+    // Atualizar contadores
+    contadorSelecionados.textContent = contador;
+    contadorBotao.textContent = contador;
     
     // Habilitar/desabilitar botão salvar
-    if (btnSalvar) {
-        btnSalvar.disabled = contador === 0;
-    }
+    btnSalvar.disabled = contador === 0;
     
     if (contador > 0) {
         // Mostrar área de selecionados
-        if (areaSelecionados) {
-            areaSelecionados.classList.remove('d-none');
-        }
+        areaSelecionados.classList.remove('d-none');
         
         // Atualizar lista de selecionados
-        if (listaSelecionados) {
-            listaSelecionados.innerHTML = servicosSelecionados.map(servico => 
-                `<span class="badge bg-primary me-2 mb-2">${servico.nome}</span>`
-            ).join('');
-        }
+        listaSelecionados.innerHTML = servicosSelecionados.map(servico => 
+            `<span class="badge bg-primary me-2 mb-2">${servico.nome}</span>`
+        ).join('');
     } else {
         // Ocultar área de selecionados
-        if (areaSelecionados) {
-            areaSelecionados.classList.add('d-none');
-        }
+        areaSelecionados.classList.add('d-none');
     }
 }
 
@@ -1380,12 +1358,6 @@ function salvarServicosSelecionados() {
     const obraId = {{ obra.id }};
     const btnSalvar = document.getElementById('btnSalvarServicos');
     
-    // Verificação de segurança - verificar se botão existe
-    if (!btnSalvar) {
-        console.error('❌ Botão salvar não encontrado');
-        return;
-    }
-    
     // Desabilitar botão durante o salvamento
     btnSalvar.disabled = true;
     btnSalvar.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Salvando...';
@@ -1398,7 +1370,6 @@ function salvarServicosSelecionados() {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                'X-CSRFToken': '{{ csrf_token() }}',
             },
             body: JSON.stringify({
                 obra_id: obraId,
@@ -1434,11 +1405,9 @@ function salvarServicosSelecionados() {
             mostrarMensagem('Erro ao salvar serviços', 'error');
         })
         .finally(() => {
-            // Reabilitar botão com verificação de segurança
-            if (btnSalvar) {
-                btnSalvar.disabled = false;
-                btnSalvar.innerHTML = '<i class="fas fa-save me-2"></i>Salvar Serviços (<span id="contadorBotao">0</span>)';
-            }
+            // Reabilitar botão
+            btnSalvar.disabled = false;
+            btnSalvar.innerHTML = '<i class="fas fa-save me-2"></i>Salvar Serviços (<span id="contadorBotao">0</span>)';
         });
 }
 
@@ -1450,7 +1419,6 @@ function adicionarServicoObra(servicoId, servicoNome) {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
-            'X-CSRFToken': '{{ csrf_token() }}',
         },
         body: JSON.stringify({
             obra_id: obraId,
@@ -1505,7 +1473,6 @@ function removerServicoObra(servicoId) {
         method: 'DELETE',
         headers: {
             'Content-Type': 'application/json',
-            'X-CSRFToken': '{{ csrf_token() }}',
         },
         body: JSON.stringify({
             obra_id: obraId,
