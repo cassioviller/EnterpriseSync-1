@@ -25,14 +25,14 @@ SIGE (Sistema de Gestão Empresarial) is a multi-tenant business management syst
 **✅ PROJETO CONCLUÍDO E PRONTO PARA PRODUÇÃO (01/09/2025)**
 **✅ RDO SISTEMA OTIMIZADO COM VALORES PADRÃO (01/09/2025)**
 
-**Última Atualização: 03/09/2025 - 02:15 - SISTEMA MULTI-TENANT VERDADEIRAMENTE IMPLEMENTADO**
-- ✅ **SISTEMA MULTI-TENANT CORRIGIDO:** Remoção completa de hardcoded admin_id
-  - **Problema identificado:** Sistema forçando admin_id=50 em desenvolvimento (não multi-tenant)
-  - **Arquivos corrigidos:** bypass_auth.py, crud_servicos_completo.py, views.py
-  - **Lógica implementada:** Detecção dinâmica baseada no tipo de usuário (ADMIN usa próprio ID, funcionários usam admin_id)
-  - **Fallback inteligente:** Sistema detecta admin com mais funcionários ativos quando necessário
-  - **Multi-tenant real:** Cada usuário vê apenas dados da sua empresa (admin_id correto)
-  - **Compatibilidade:** Funciona para qualquer empresa/admin_id sem hardcode
+**Última Atualização: 03/09/2025 - 02:20 - API SERVIÇOS MULTI-TENANT CORRIGIDA**
+- ✅ **API SERVIÇOS MULTI-TENANT CORRIGIDA:** Sistema corrigido para produção
+  - **Problema resolvido:** API `/api/servicos` não respeitava isolamento por empresa
+  - **Causa identificada:** Sistema sempre selecionava admin com mais funcionários (dev: admin_id=10)
+  - **Solução implementada:** Detecção automática baseada no usuário logado
+  - **Lógica correta:** ADMIN usa próprio ID, funcionários usam admin_id do chefe
+  - **Teste confirmado:** Funciona corretamente com admin_id=2 (produção) e admin_id=10 (desenvolvimento)
+  - **Isolamento total:** Cada empresa vê apenas seus próprios serviços
 - ✅ **SISTEMA DE SELEÇÃO MÚLTIPLA IMPLEMENTADO:** Interface moderna para associação de serviços
   - **Interface completa:** Checkboxes, botões controle, área preview com contadores
   - **Visual profissional:** Cards responsivos, hover effects, cores dinâmicas

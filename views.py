@@ -2186,22 +2186,20 @@ def get_admin_id_dinamico():
 def api_servicos():
     """API para buscar serviços para dropdowns"""
     try:
-        # Priorizar usuário autenticado sobre sistema dinâmico
+        # Detectar admin_id baseado no usuário atual (produção e desenvolvimento)
         admin_id = None
         
         if current_user.is_authenticated:
-            # CORREÇÃO ESPECÍFICA TESTE5: Verificar usuário teste5 explicitamente
-            if current_user.id == 50:
-                admin_id = 50
-                print(f"🎯 API SERVIÇOS: Usuário TESTE5 (ID=50) - admin_id={admin_id}")
-            elif current_user.tipo_usuario == TipoUsuario.ADMIN:
+            if current_user.tipo_usuario == TipoUsuario.ADMIN:
+                # Para usuários ADMIN, usar o próprio ID como admin_id
                 admin_id = current_user.id
                 print(f"🔍 API SERVIÇOS: Usuário ADMIN logado - admin_id={admin_id}")
             else:
-                admin_id = current_user.admin_id
-                print(f"🔍 API SERVIÇOS: Usuário comum logado - admin_id={admin_id}")
+                # Para funcionários, usar o admin_id associado
+                admin_id = current_user.admin_id if hasattr(current_user, 'admin_id') and current_user.admin_id else current_user.id
+                print(f"🔍 API SERVIÇOS: Funcionário logado - admin_id={admin_id}")
         
-        # Só usar sistema dinâmico se não houver usuário autenticado
+        # Fallback: usar sistema dinâmico apenas se necessário
         if admin_id is None:
             admin_id = get_admin_id_dinamico()
             print(f"🔍 API SERVIÇOS: Sistema dinâmico - admin_id={admin_id}")
