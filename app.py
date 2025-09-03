@@ -6,8 +6,8 @@ from flask_migrate import Migrate
 from flask_wtf.csrf import CSRFProtect
 from werkzeug.middleware.proxy_fix import ProxyFix
 
-# Configure logging
-logging.basicConfig(level=logging.DEBUG)
+# Configure logging - PRODUÇÃO OTIMIZADA
+logging.basicConfig(level=logging.WARNING)  # Apenas warnings e erros
 
 # Create app instance
 app = Flask(__name__)

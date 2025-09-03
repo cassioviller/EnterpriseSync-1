@@ -1,0 +1,64 @@
+Request URL
+https://www.sige.cassioviller.tech/api/obras/servicos
+Request Method
+POST
+Status Code
+400 Bad Request
+Remote Address
+69.62.91.57:443
+Referrer Policy
+strict-origin-when-cross-origin
+content-length
+83
+content-type
+application/json
+date
+Wed, 03 Sep 2025 18:57:12 GMT
+server
+gunicorn
+set-cookie
+session=.eJwljs0KwzAMg98l5x3sJG7qvkyxHZv1NvozGGPvvkBvkpDE901r7H4803Lulz_SuvW0pIlbJzEIaIWVa9hs7AFDQAtWQCsgWpVAKXvuo95QnUods_CsFuHFe0XDaihcFCZgL-KWaVYZX23q2PLISquzWWYkCmBBpjRArsP3myYPq5-XHMcqdm5vv2F_f2LuN8Y.aLiPiA.ohGQE0RQ_7kswVWx2VElP5OWvsE; HttpOnly; Path=/
+vary
+Cookie
+:authority
+www.sige.cassioviller.tech
+:method
+POST
+:path
+/api/obras/servicos
+:scheme
+https
+accept
+*/*
+accept-encoding
+gzip, deflate, br, zstd
+accept-language
+pt-BR,pt;q=0.9,en-US;q=0.8,en;q=0.7
+content-length
+30
+content-type
+application/json
+cookie
+rl_page_init_referrer=RudderEncrypt%3AU2FsdGVkX1%2BY8p6%2Bt0cQxQAlV%2Fqrjn2EOdi9KUDDrEltR6IzAF3VqtK0MW7GMi3TbGX%2FwKjTt%2FlJhg1uhAEjAw%3D%3D; rl_page_init_referring_domain=RudderEncrypt%3AU2FsdGVkX19HbUPkOj4h4n2o44sgnN%2FOT1qdMhYb7Me6oUl6ib%2BK%2FJnwedfwL%2Fin; rl_anonymous_id=RudderEncrypt%3AU2FsdGVkX19cuV1QwanenEVz0QGEIohkGDaiNajG883gI836hZ3RAwB6IQ6GS4oc4Zu%2Fy9z0tXfSRGW1Pr%2FUJw%3D%3D; rl_user_id=RudderEncrypt%3AU2FsdGVkX19uaITITqYKSrYL1xX7qu%2BSkQ0Cs3cIlaMB52QD7QqsRP3jcryUrh9SPXPdyZUhm20GoWW%2FcVeMO3tIlfzY08A5pGD3E7eAYVXPMcI5gVDen2z9VWc7byjU21JNQAcHRxMWFh4W5S1CK%2FZLpbNUkpbZ9hR99whfbng%3D; rl_trait=RudderEncrypt%3AU2FsdGVkX18s%2B5LtXxshmra5ZRPfthTRsJ3OtjuyC3Kla6yYqrmoD9SXsbLpyf7Pc6QGw%2BDoalGYwfizhNU9WCZE9cCeMriGi%2FV93UCpKIE%2BX7HoJfQRi0i7aEnHi5lfhkkM1aMATTAHAIHdMWXU2Q%3D%3D; rl_session=RudderEncrypt%3AU2FsdGVkX19gzO%2B2XRdlRITv9nbDxMIsW4%2Fr%2BqhzLi21TkoxXhrAVrK3Id9eOhdK4OmvV5KZ33t8EDe2wpXkPn9MLC64DykxBbXlrEodP6vv7MofQOo3II8%2BRJJFs%2FltU3bNq0eaZGbo%2FT5uZ6MADA%3D%3D; ph_phc_4URIAm1uYfJO7j8kWSe0J8lc8IqnstRLS7Jx8NcakHo_posthog=%7B%22distinct_id%22%3A%222216df120291d2866957c78a265affade5afc8d41f028c3d5d129d77623b8b47%230f49456f-bda4-4676-ba36-8eba13d89337%22%2C%22%24sesid%22%3A%5B1746043679213%2C%220196884b-a5df-79da-83b4-ef52dbeadf9b%22%2C1746043381215%5D%2C%22%24epp%22%3Atrue%2C%22%24initial_person_info%22%3A%7B%22r%22%3A%22https%3A%2F%2Feasypanel.cassioviller.tech%2F%22%2C%22u%22%3A%22https%3A%2F%2Fn8n.cassioviller.tech%2Fsetup%22%7D%7D; session=.eJwljs0KwzAMg98l5x3sJG7qvkyxHZv1NvozGGPvvkBvkpDE901r7H4803Lulz_SuvW0pIlbJzEIaIWVa9hs7AFDQAtWQCsgWpVAKXvuo95QnUods_CsFuHFe0XDaihcFCZgL-KWaVYZX23q2PLISquzWWYkCmBBpjRArsP3myYPq5-XHMcqdm5vv2F_f2LuN8Y.aLiPgg.Mpm5Y_kIO4bb2VHFUWlrqrRXsuI
+dnt
+1
+origin
+https://www.sige.cassioviller.tech
+priority
+u=1, i
+referer
+https://www.sige.cassioviller.tech/obras/detalhes/16
+sec-ch-ua
+"Not;A=Brand";v="99", "Google Chrome";v="139", "Chromium";v="139"
+sec-ch-ua-mobile
+?0
+sec-ch-ua-platform
+"Windows"
+sec-fetch-dest
+empty
+sec-fetch-mode
+cors
+sec-fetch-site
+same-origin
+user-agent
+Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Safari/537.36

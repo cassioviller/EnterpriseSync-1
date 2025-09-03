@@ -6,7 +6,9 @@ import logging
 from sqlalchemy import text
 from models import db
 
+# PRODUÇÃO: Reduzir logs para evitar loops infinitos
 logger = logging.getLogger(__name__)
+logger.setLevel(logging.ERROR)  # SOMENTE ERROS
 
 def executar_migracoes():
     """
