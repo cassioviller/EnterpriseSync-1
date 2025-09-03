@@ -1394,6 +1394,40 @@ def editar_obra(id):
             servicos_selecionados = request.form.getlist('servicos_obra')
             print(f"DEBUG EDITAR OBRA: Serviços selecionados = {servicos_selecionados}")
             
+            # CORREÇÃO: Salvar associações serviço-obra após editar
+            if servicos_selecionados:
+                try:
+                    # Detectar admin_id correto (igual às APIs)
+                    admin_id = obra.admin_id  # Usar admin_id da obra sendo editada
+                    
+                    # Remover associações antigas desta obra
+                    ServicoObra.query.filter_by(obra_id=obra.id, admin_id=admin_id).delete()
+                    
+                    # Adicionar novas associações
+                    for servico_id in servicos_selecionados:
+                        if servico_id:  # Verificar se não está vazio
+                            # Verificar se serviço pertence ao mesmo admin
+                            servico = Servico.query.filter_by(id=int(servico_id), admin_id=admin_id).first()
+                            if servico:
+                                nova_associacao = ServicoObra(
+                                    obra_id=obra.id,
+                                    servico_id=int(servico_id),
+                                    admin_id=admin_id,
+                                    quantidade_planejada=1.0,
+                                    quantidade_executada=0.0,
+                                    ativo=True,
+                                    created_at=datetime.now()
+                                )
+                                db.session.add(nova_associacao)
+                                print(f"➕ Serviço {servico_id} associado à obra {obra.id}")
+                            else:
+                                print(f"⚠️ Serviço {servico_id} não encontrado para admin_id={admin_id}")
+                    
+                    print(f"✅ Processados {len(servicos_selecionados)} serviços para obra {obra.id}")
+                    
+                except Exception as e:
+                    print(f"❌ Erro ao processar serviços: {e}")
+            
             db.session.commit()
             
             flash(f'Obra "{obra.nome}" atualizada com sucesso!', 'success')
