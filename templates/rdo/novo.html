@@ -586,12 +586,14 @@ function carregarDadosUltimoRDO() {
     fetch(`/api/ultimo-rdo-dados/${obraId}`)
         .then(response => response.json())
         .then(data => {
+            console.log('📊 Dados recebidos:', data);
             if (data.success && data.ultimo_rdo) {
                 if (data.primeira_rdo) {
                     console.log(`✅ Primeira RDO - carregando serviços com percentual 0%`);
                     exibirDadosPrimeiraRDO(data.ultimo_rdo);
                 } else {
-                    console.log(`✅ Último RDO encontrado: ${data.ultimo_rdo.numero_rdo}`);
+                    console.log(`✅ Último RDO encontrado:`, data.ultimo_rdo.numero_rdo);
+                    console.log(`🔧 Chamando exibirDadosPrimeiraRDO com dados preenchidos...`);
                     // CORREÇÃO: Carregar formulário editável com dados pré-preenchidos
                     exibirDadosPrimeiraRDO(data.ultimo_rdo, true); // true = com dados preenchidos
                 }
