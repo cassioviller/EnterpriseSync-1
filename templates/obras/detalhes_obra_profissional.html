@@ -1305,24 +1305,36 @@ function atualizarInterfaceSelecao() {
     const areaSelecionados = document.getElementById('servicosSelecionados');
     const listaSelecionados = document.getElementById('listaSelecionados');
     
-    // Atualizar contadores
-    contadorSelecionados.textContent = contador;
-    contadorBotao.textContent = contador;
+    // Verificação de segurança - só atualiza elementos que existem
+    if (contadorSelecionados) {
+        contadorSelecionados.textContent = contador;
+    }
+    if (contadorBotao) {
+        contadorBotao.textContent = contador;
+    }
     
     // Habilitar/desabilitar botão salvar
-    btnSalvar.disabled = contador === 0;
+    if (btnSalvar) {
+        btnSalvar.disabled = contador === 0;
+    }
     
     if (contador > 0) {
         // Mostrar área de selecionados
-        areaSelecionados.classList.remove('d-none');
+        if (areaSelecionados) {
+            areaSelecionados.classList.remove('d-none');
+        }
         
         // Atualizar lista de selecionados
-        listaSelecionados.innerHTML = servicosSelecionados.map(servico => 
-            `<span class="badge bg-primary me-2 mb-2">${servico.nome}</span>`
-        ).join('');
+        if (listaSelecionados) {
+            listaSelecionados.innerHTML = servicosSelecionados.map(servico => 
+                `<span class="badge bg-primary me-2 mb-2">${servico.nome}</span>`
+            ).join('');
+        }
     } else {
         // Ocultar área de selecionados
-        areaSelecionados.classList.add('d-none');
+        if (areaSelecionados) {
+            areaSelecionados.classList.add('d-none');
+        }
     }
 }
 
@@ -1357,6 +1369,12 @@ function salvarServicosSelecionados() {
     
     const obraId = {{ obra.id }};
     const btnSalvar = document.getElementById('btnSalvarServicos');
+    
+    // Verificação de segurança - verificar se botão existe
+    if (!btnSalvar) {
+        console.error('❌ Botão salvar não encontrado');
+        return;
+    }
     
     // Desabilitar botão durante o salvamento
     btnSalvar.disabled = true;
@@ -1405,9 +1423,11 @@ function salvarServicosSelecionados() {
             mostrarMensagem('Erro ao salvar serviços', 'error');
         })
         .finally(() => {
-            // Reabilitar botão
-            btnSalvar.disabled = false;
-            btnSalvar.innerHTML = '<i class="fas fa-save me-2"></i>Salvar Serviços (<span id="contadorBotao">0</span>)';
+            // Reabilitar botão com verificação de segurança
+            if (btnSalvar) {
+                btnSalvar.disabled = false;
+                btnSalvar.innerHTML = '<i class="fas fa-save me-2"></i>Salvar Serviços (<span id="contadorBotao">0</span>)';
+            }
         });
 }
 
