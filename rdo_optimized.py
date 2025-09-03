@@ -62,7 +62,7 @@ def obter_ultimo_rdo_obra(obra_id, data_atual, admin_id):
     return RDO.query.filter(
         RDO.obra_id == obra_id,
         RDO.admin_id == admin_id,
-        RDO.data_relatorio < data_atual
+        RDO.data_relatorio <= data_atual  # CORREÇÃO: incluir RDOs de hoje também
     ).order_by(RDO.data_relatorio.desc()).first()
 
 # ================================
