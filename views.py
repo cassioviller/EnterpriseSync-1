@@ -5302,14 +5302,18 @@ def adicionar_servico_obra():
             pass
         
         if admin_id is None:
-            # Fallback inteligente (prioriza admin_id=2)
-            servicos_admin_2 = db.session.execute(
-                text("SELECT COUNT(*) FROM servico WHERE admin_id = 2 AND ativo = true")
-            ).fetchone()
-            if servicos_admin_2 and servicos_admin_2[0] > 0:
-                admin_id = 2
-            else:
-                admin_id = get_admin_id_dinamico()
+            # CORREÇÃO: Usar admin_id dinâmico primeiro (funciona em dev e prod)
+            admin_id = get_admin_id_dinamico()
+            
+            # Se ainda não encontrou, tentar fallback para produção
+            if admin_id is None:
+                servicos_admin_2 = db.session.execute(
+                    text("SELECT COUNT(*) FROM servico WHERE admin_id = 2 AND ativo = true")
+                ).fetchone()
+                if servicos_admin_2 and servicos_admin_2[0] > 0:
+                    admin_id = 2
+                else:
+                    admin_id = 10  # Fallback desenvolvimento
         
         print(f"🔧 API ADICIONAR SERVIÇO: admin_id={admin_id}")
         
@@ -5392,14 +5396,18 @@ def remover_servico_obra():
             pass
         
         if admin_id is None:
-            # Fallback inteligente (prioriza admin_id=2)
-            servicos_admin_2 = db.session.execute(
-                text("SELECT COUNT(*) FROM servico WHERE admin_id = 2 AND ativo = true")
-            ).fetchone()
-            if servicos_admin_2 and servicos_admin_2[0] > 0:
-                admin_id = 2
-            else:
-                admin_id = get_admin_id_dinamico()
+            # CORREÇÃO: Usar admin_id dinâmico primeiro (funciona em dev e prod)
+            admin_id = get_admin_id_dinamico()
+            
+            # Se ainda não encontrou, tentar fallback para produção
+            if admin_id is None:
+                servicos_admin_2 = db.session.execute(
+                    text("SELECT COUNT(*) FROM servico WHERE admin_id = 2 AND ativo = true")
+                ).fetchone()
+                if servicos_admin_2 and servicos_admin_2[0] > 0:
+                    admin_id = 2
+                else:
+                    admin_id = 10  # Fallback desenvolvimento
         
         print(f"🗑️ API REMOVER SERVIÇO: admin_id={admin_id}")
         
