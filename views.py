@@ -5339,9 +5339,9 @@ def api_servicos_obra(obra_id):
 
 # ===== API PARA GERENCIAR SERVIÇOS DA OBRA =====
 
-@main_bp.route('/api/obras/servicos', methods=['POST'])
-def adicionar_servico_obra():
-    """API para adicionar serviço à obra"""
+@main_bp.route('/api/obras/servicos', methods=['POST', 'DELETE'])
+def gerenciar_servico_obra():
+    """API unificada para gerenciar serviços da obra"""
     try:
         data = request.get_json()
         obra_id = data.get('obra_id')
@@ -5349,6 +5349,21 @@ def adicionar_servico_obra():
         
         if not obra_id or not servico_id:
             return jsonify({'success': False, 'message': 'Dados incompletos'}), 400
+        
+        # Determinar se é POST (adicionar) ou DELETE (remover)
+        if request.method == 'DELETE':
+            return _remover_servico_obra(obra_id, servico_id)
+        else:  # POST
+            return _adicionar_servico_obra(obra_id, servico_id)
+            
+    except Exception as e:
+        db.session.rollback()
+        print(f"ERRO API SERVIÇOS OBRA: {str(e)}")
+        return jsonify({'success': False, 'message': 'Erro interno do servidor'}), 500
+
+def _adicionar_servico_obra(obra_id, servico_id):
+    """Função auxiliar para adicionar serviço à obra"""
+    try:
         
         # CORREÇÃO: Usar admin_id do usuário logado (session_user_id)
         admin_id = None
@@ -5450,16 +5465,9 @@ def adicionar_servico_obra():
         print(f"ERRO ADICIONAR SERVIÇO OBRA: {str(e)}")
         return jsonify({'success': False, 'message': 'Erro interno do servidor'}), 500
 
-@main_bp.route('/api/obras/servicos', methods=['DELETE'])
-def remover_servico_obra():
-    """API para remover serviço da obra"""
+def _remover_servico_obra(obra_id, servico_id):
+    """Função auxiliar para remover serviço da obra"""
     try:
-        data = request.get_json()
-        obra_id = data.get('obra_id')
-        servico_id = data.get('servico_id')
-        
-        if not obra_id or not servico_id:
-            return jsonify({'success': False, 'message': 'Dados incompletos'}), 400
         
         # CORREÇÃO: Usar admin_id do usuário logado (session_user_id)
         admin_id = None
