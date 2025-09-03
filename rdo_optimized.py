@@ -183,14 +183,14 @@ def api_ultimo_rdo_dados(obra_id):
             print(f"✅ PRIMEIRA RDO: {len(servicos_dados)} serviços carregados com percentual 0%")
             return jsonify(resultado)
         
-        # CORREÇÃO: Buscar subatividades individuais do último RDO
+        # CORREÇÃO: Buscar subatividades individuais do último RDO usando campos corretos
         subatividades_rdo = RDOServicoSubatividade.query.filter_by(rdo_id=ultimo_rdo.id).all()
         
         # Agrupar por serviço
         servicos_dict = {}
         for subatividade_rdo in subatividades_rdo:
-            if subatividade_rdo.subatividade and subatividade_rdo.subatividade.servico:
-                servico = subatividade_rdo.subatividade.servico
+            if subatividade_rdo.servico:  # Usar relacionamento direto do servico
+                servico = subatividade_rdo.servico
                 servico_id = servico.id
                 
                 if servico_id not in servicos_dict:
@@ -201,11 +201,12 @@ def api_ultimo_rdo_dados(obra_id):
                         'subatividades': []
                     }
                 
+                # Usar campos diretos do modelo RDOServicoSubatividade
                 servicos_dict[servico_id]['subatividades'].append({
-                    'id': subatividade_rdo.subatividade.id,
-                    'nome': subatividade_rdo.subatividade.nome,
+                    'id': subatividade_rdo.id,  # Usar ID da própria subatividade do RDO
+                    'nome': subatividade_rdo.nome_subatividade,  # Campo direto
                     'percentual': float(subatividade_rdo.percentual_conclusao or 0),
-                    'descricao': getattr(subatividade_rdo.subatividade, 'descricao', '')
+                    'descricao': subatividade_rdo.descricao_subatividade or ''  # Campo direto
                 })
         
         servicos_dados = list(servicos_dict.values())
