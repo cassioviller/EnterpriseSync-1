@@ -1258,10 +1258,20 @@ function carregarServicosDisponiveis() {
         });
 }
 
-// Array para armazenar serviços selecionados
+// Array para armazenar serviços selecionados (global)
 let servicosSelecionados = [];
 
-// Função para alternar seleção de serviço
+// Aguardar carregamento completo do DOM antes de inicializar JavaScript
+document.addEventListener('DOMContentLoaded', function() {
+    console.log('✅ DOM carregado - Inicializando sistema de seleção de serviços');
+    
+    // Inicializar interface se elementos existirem
+    if (document.getElementById('contadorSelecionados')) {
+        atualizarInterfaceSelecao();
+    }
+});
+
+// Função para alternar seleção de serviço (global para HTML)
 function toggleServicoSelecao(checkbox) {
     const servicoId = parseInt(checkbox.dataset.servicoId);
     const servicoNome = checkbox.dataset.servicoNome;

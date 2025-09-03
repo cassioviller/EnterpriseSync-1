@@ -1,0 +1,36 @@
+Explanation
+
+Understanding the problem
+The error TypeError: Cannot set properties of null (setting 'textContent') indicates that your code is trying to set the textContent property of a variable or object that is currently null. In this specific case, based on the error message and the function name atualizarInterfaceSelecao, it's highly probable that you are trying to access a DOM element that hasn't been found in the document yet, and thus the result of the selection (e.g., using document.getElementById or document.querySelector) is null. You cannot set properties on null. [1, 2]
+
+Suggested fix
+Ensure that the DOM element you are trying to access in the atualizarInterfaceSelecao function exists in the document before you attempt to set its textContent. This often happens when your script runs before the HTML element is fully loaded and available in the DOM.
+
+One common way to fix this is to wrap the code that accesses the DOM in an event listener that waits for the document to be fully loaded, such as the DOMContentLoaded event.
+
+js
+
+document.addEventListener('DOMContentLoaded', function() {
+    // Your code that accesses DOM elements goes here
+    function atualizarInterfaceSelecao() {
+        // Make sure the element exists before setting textContent
+        const element = document.getElementById('your-element-id'); // Replace 'your-element-id' with the actual ID
+        if (element) {
+            element.textContent = 'some text';
+        } else {
+            console.error('Element not found!');
+        }
+    }
+
+    // Call your function after the DOM is loaded
+    // ... calls to atualizarInterfaceSelecao or related code ...
+});
+Use code snippets with caution
+
+Alternatively, you could move your <script> tag to the end of the <body> section in your HTML. This ensures that the HTML elements are parsed and available when your script runs.
+
+Summary
+The TypeError: Cannot set properties of null (setting 'textContent') error occurs when you attempt to modify the textContent of a DOM element that hasn't been found (is null). The fix involves ensuring the DOM element exists before trying to access its properties, often by waiting for the document to load or placing your script tag correctly.
+
+Sources and related content
+Data used to understand this message
