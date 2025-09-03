@@ -88,7 +88,26 @@ def get_admin_id():
         # Debug da sessão atual
         logger.info(f"🔍 SESSION DEBUG: {dict(session) if session else 'No session'}")
         
-        # Priorizar usuário autenticado
+        # CORREÇÃO: Verificar conflito entre sessão e current_user (igual API)
+        session_user_id = session.get('_user_id')
+        
+        # Se há sessão mas current_user diferente, usar sessão (igual na API)
+        if session_user_id and current_user and str(current_user.id) != str(session_user_id):
+            logger.info(f"🚨 CONFLITO DETECTADO CRUD: session_user_id={session_user_id}, current_user.id={current_user.id}")
+            try:
+                session_user = Usuario.query.get(int(session_user_id))
+                if session_user and session_user.tipo_usuario == TipoUsuario.ADMIN:
+                    admin_id = session_user.id
+                    logger.info(f"✅ CORREÇÃO SESSÃO CRUD: ADMIN (ID:{admin_id})")
+                    return admin_id
+                elif session_user and hasattr(session_user, 'admin_id') and session_user.admin_id:
+                    admin_id = session_user.admin_id
+                    logger.info(f"✅ CORREÇÃO SESSÃO CRUD: Funcionário (admin_id:{admin_id})")
+                    return admin_id
+            except Exception as session_error:
+                logger.error(f"❌ ERRO ao buscar usuário da sessão CRUD: {session_error}")
+        
+        # Usar current_user normal se não há conflito
         if current_user.is_authenticated:
             # Debug do usuário atual
             logger.info(f"🔍 CRUD DEBUG: current_user.id={current_user.id}, tipo={current_user.tipo_usuario}, admin_id={getattr(current_user, 'admin_id', 'N/A')}")
