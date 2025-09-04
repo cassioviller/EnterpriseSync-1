@@ -268,6 +268,16 @@ with app.app_context():
     except Exception as e:
         logging.error(f"❌ Erro ao registrar blueprint configurações: {e}")
     
+    # Registrar API limpa de serviços da obra
+    try:
+        from api_servicos_obra_limpa import api_servicos_obra_bp
+        app.register_blueprint(api_servicos_obra_bp)
+        logging.info("✅ Blueprint API serviços obra LIMPA registrado")
+    except ImportError as e:
+        logging.warning(f"⚠️ Blueprint API serviços obra limpa não encontrado: {e}")
+    except Exception as e:
+        logging.error(f"❌ Erro ao registrar blueprint API serviços obra limpa: {e}")
+    
     # Photo migration moved to migrations.py for cleaner app initialization
     
     # Development authentication bypass (PERMANENTEMENTE DESABILITADO)

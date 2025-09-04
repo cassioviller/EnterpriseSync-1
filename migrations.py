@@ -1050,3 +1050,83 @@ def migrar_tabela_servico_obra_real():
             connection.close()
         except:
             pass
+
+def criar_tabela_servico_obra_real_limpa():
+    """
+    Cria tabela servico_obra_real versão limpa e simplificada
+    """
+    try:
+        logger.info("🔄 Criando tabela servico_obra_real versão LIMPA...")
+        
+        # Usar SQLAlchemy diretamente
+        from sqlalchemy import text
+        
+        # Verificar se tabela existe
+        result = db.session.execute(text("""
+            SELECT EXISTS (
+                SELECT FROM information_schema.tables 
+                WHERE table_name = 'servico_obra_real'
+            )
+        """)).scalar()
+        
+        if not result:
+            logger.info("🆕 Criando nova tabela servico_obra_real...")
+            
+            # Criar tabela usando SQLAlchemy
+            db.session.execute(text("""
+                CREATE TABLE servico_obra_real (
+                    id SERIAL PRIMARY KEY,
+                    obra_id INTEGER NOT NULL REFERENCES obra(id),
+                    servico_id INTEGER NOT NULL REFERENCES servico(id),
+                    
+                    -- Quantidades
+                    quantidade_planejada NUMERIC(10,2) DEFAULT 1.0,
+                    quantidade_executada NUMERIC(10,2) DEFAULT 0.0,
+                    percentual_concluido NUMERIC(5,2) DEFAULT 0.0,
+                    
+                    -- Valores
+                    valor_unitario NUMERIC(10,2) DEFAULT 0.0,
+                    valor_total_planejado NUMERIC(10,2) DEFAULT 0.0,
+                    valor_total_executado NUMERIC(10,2) DEFAULT 0.0,
+                    
+                    -- Status e controle
+                    status VARCHAR(50) DEFAULT 'Não Iniciado',
+                    prioridade INTEGER DEFAULT 3,
+                    
+                    -- Datas
+                    data_inicio_planejada DATE,
+                    data_inicio_real DATE,
+                    data_fim_planejada DATE,
+                    data_fim_real DATE,
+                    
+                    -- Aprovação
+                    aprovado BOOLEAN DEFAULT FALSE,
+                    aprovado_em TIMESTAMP,
+                    aprovado_por_id INTEGER,
+                    
+                    -- Observações
+                    observacoes TEXT,
+                    observacoes_execucao TEXT,
+                    
+                    -- Multi-tenant
+                    admin_id INTEGER NOT NULL,
+                    ativo BOOLEAN DEFAULT TRUE,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    
+                    UNIQUE(obra_id, servico_id, admin_id)
+                )
+            """))
+            
+            # Índices básicos
+            db.session.execute(text("CREATE INDEX idx_servico_obra_real_obra_id ON servico_obra_real(obra_id)"))
+            db.session.execute(text("CREATE INDEX idx_servico_obra_real_admin_id ON servico_obra_real(admin_id)"))
+            
+            db.session.commit()
+            logger.info("✅ Tabela servico_obra_real LIMPA criada com sucesso!")
+        else:
+            logger.info("✅ Tabela servico_obra_real já existe")
+            
+    except Exception as e:
+        logger.error(f"❌ Erro ao criar tabela limpa: {e}")
+        db.session.rollback()
