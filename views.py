@@ -3625,7 +3625,15 @@ def duplicar_rdo(id):
             nova_sub.percentual_conclusao = sub_original.percentual_conclusao
             nova_sub.observacoes_tecnicas = sub_original.observacoes_tecnicas
             nova_sub.ordem_execucao = sub_original.ordem_execucao
-            nova_sub.admin_id = current_user.admin_id
+            # Detectar admin_id correto dinamicamente
+            if hasattr(current_user, 'admin_id') and current_user.admin_id:
+                nova_sub.admin_id = current_user.admin_id
+            elif hasattr(current_user, 'tipo_usuario') and current_user.tipo_usuario == TipoUsuario.ADMIN:
+                nova_sub.admin_id = current_user.id
+            else:
+                # Buscar funcionário para obter admin_id
+                funcionario = Funcionario.query.filter_by(email=current_user.email).first()
+                nova_sub.admin_id = funcionario.admin_id if funcionario else 10
             
             db.session.add(nova_sub)
         
@@ -4290,7 +4298,7 @@ def rdo_salvar_unificado():
                 rdo_servico_subativ.nome_subatividade = dados['nome']
                 rdo_servico_subativ.percentual_conclusao = dados['percentual']
                 rdo_servico_subativ.observacoes_tecnicas = dados['observacoes']
-                rdo_servico_subativ.admin_id = current_user.admin_id
+                rdo_servico_subativ.admin_id = admin_id_correto
                 rdo_servico_subativ.servico_id = 1  # Serviço genérico para campos manuais
                 db.session.add(rdo_servico_subativ)
                 subatividades_processadas += 1
@@ -4318,7 +4326,7 @@ def rdo_salvar_unificado():
                             rdo_servico_subativ.nome_subatividade = subatividade.nome
                             rdo_servico_subativ.percentual_conclusao = percentual
                             rdo_servico_subativ.observacoes_tecnicas = observacoes
-                            rdo_servico_subativ.admin_id = current_user.admin_id
+                            rdo_servico_subativ.admin_id = admin_id_correto
                             rdo_servico_subativ.servico_id = subatividade.servico_id  # Importante para hierarchy
                             db.session.add(rdo_servico_subativ)
                             subatividades_processadas += 1
@@ -4330,7 +4338,7 @@ def rdo_salvar_unificado():
                             rdo_servico_subativ.nome_subatividade = f'Subatividade {subatividade_id}'
                             rdo_servico_subativ.percentual_conclusao = percentual
                             rdo_servico_subativ.observacoes_tecnicas = observacoes
-                            rdo_servico_subativ.admin_id = current_user.admin_id
+                            rdo_servico_subativ.admin_id = admin_id_correto
                             rdo_servico_subativ.servico_id = 1  # Genérico
                             db.session.add(rdo_servico_subativ)
                             subatividades_processadas += 1
@@ -4356,7 +4364,7 @@ def rdo_salvar_unificado():
                         rdo_servico_subativ.nome_subatividade = descricao
                         rdo_servico_subativ.percentual_conclusao = float(ativ_data.get('percentual', 0))
                         rdo_servico_subativ.observacoes_tecnicas = ativ_data.get('observacoes', '').strip()
-                        rdo_servico_subativ.admin_id = current_user.admin_id
+                        rdo_servico_subativ.admin_id = admin_id_correto
                         rdo_servico_subativ.servico_id = 1  # Serviço genérico
                         db.session.add(rdo_servico_subativ)
                         print(f"DEBUG: Atividade convertida: {descricao} - {ativ_data.get('percentual', 0)}%")
@@ -5149,7 +5157,7 @@ def api_rdo_servicos_obra(obra_id):
                     if not subatividades_all:
                         subatividades_all = SubatividadeMestre.query.filter_by(
                             servico_id=servico.id,
-                            admin_id=current_user.admin_id,
+                            admin_id=admin_id_correto,
                             ativo=True
                         ).order_by(SubatividadeMestre.ordem_padrao).all()
                         print(f"DEBUG API: Com admin_id {current_user.admin_id}: {len(subatividades_all)} subatividades")
@@ -5395,10 +5403,20 @@ def api_rdo_salvar_subatividades():
         if not rdo_id:
             return jsonify({'error': 'RDO ID obrigatório', 'success': False}), 400
         
+        # Detectar admin_id correto dinamicamente
+        if hasattr(current_user, 'admin_id') and current_user.admin_id:
+            admin_id_correto = current_user.admin_id
+        elif hasattr(current_user, 'tipo_usuario') and current_user.tipo_usuario == TipoUsuario.ADMIN:
+            admin_id_correto = current_user.id
+        else:
+            # Buscar funcionário para obter admin_id
+            funcionario = Funcionario.query.filter_by(email=current_user.email).first()
+            admin_id_correto = funcionario.admin_id if funcionario else 10
+        
         # Verificar se RDO pertence ao admin do funcionário
         rdo = db.session.query(RDO).join(Obra).filter(
             RDO.id == rdo_id,
-            Obra.admin_id == current_user.admin_id
+            Obra.admin_id == admin_id_correto
         ).first()
         
         if not rdo:
@@ -5420,7 +5438,7 @@ def api_rdo_salvar_subatividades():
             subatividade.incremento_dia = subatividade.percentual_conclusao - subatividade.percentual_anterior
             subatividade.observacoes_tecnicas = sub_data.get('observacoes_tecnicas', '').strip()
             subatividade.ordem_execucao = int(sub_data.get('ordem_execucao', 0))
-            subatividade.admin_id = current_user.admin_id
+            subatividade.admin_id = admin_id_correto
             
             db.session.add(subatividade)
             subatividades_salvas.append(subatividade.to_dict())
