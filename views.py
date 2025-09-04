@@ -1163,6 +1163,8 @@ def obras():
         except ValueError as e:
             print(f"DEBUG: Erro na data_fim: {e}")
     
+    # Importar desc localmente para evitar conflitos
+    from sqlalchemy import desc
     obras = query.order_by(desc(Obra.data_inicio)).all()
     
     print(f"DEBUG FILTROS OBRAS: {filtros}")
