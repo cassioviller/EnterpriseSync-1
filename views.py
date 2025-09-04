@@ -6410,11 +6410,12 @@ def gerar_numero_rdo(obra_id, data_relatorio):
         data_str = data_relatorio.strftime('%Y%m%d')
         codigo_obra = obra.codigo or f'OBR{obra.id:03d}'
         
-        # Buscar último RDO do dia para esta obra
+        # Buscar último RDO do dia para esta obra  
+        from sqlalchemy import desc
         ultimo_rdo = RDO.query.filter(
             RDO.obra_id == obra_id,
             RDO.numero_rdo.like(f'RDO-{codigo_obra}-{data_str}%')
-        ).order_by(RDO.numero_rdo.desc()).first()
+        ).order_by(desc(RDO.numero_rdo)).first()
         
         if ultimo_rdo:
             try:
