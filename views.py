@@ -63,7 +63,7 @@ print("=" * 60)
 
 # Importar utilitários de resiliência
 try:
-    from utils.idempotency import idempotent, rdo_key_generator, funcionario_key_generator
+    # Idempotência removida conforme solicitação do usuário
     from utils.circuit_breaker import circuit_breaker, pdf_generation_fallback, database_query_fallback
     from utils.saga import RDOSaga, FuncionarioSaga
     print("✅ Utilitários de resiliência importados com sucesso")
@@ -3047,11 +3047,6 @@ def novo_rdo():
 
 @main_bp.route('/rdo/criar', methods=['POST'])
 @funcionario_required
-@idempotent(
-    operation_type='rdo_create',
-    ttl_seconds=3600,  # 1 hora
-    key_generator=rdo_key_generator
-)
 def criar_rdo():
     """Cria um novo RDO"""
     try:
@@ -4089,12 +4084,7 @@ def funcionario_rdo_novo():
     return redirect(url_for('main.rdo_novo_unificado'))
 
 @main_bp.route('/rdo/salvar', methods=['POST'])
-@funcionario_required 
-@idempotent(
-    operation_type='rdo_save',
-    ttl_seconds=1800,  # 30 minutos
-    key_generator=rdo_key_generator
-)
+@funcionario_required
 def rdo_salvar_unificado():
     """Interface unificada para salvar RDO - Admin e Funcionário"""
     try:
@@ -4473,11 +4463,6 @@ def rdo_salvar_unificado():
 # Alias para compatibilidade com rota antiga de salvar
 @main_bp.route('/funcionario/rdo/criar', methods=['POST'])
 @funcionario_required
-@idempotent(
-    operation_type='funcionario_rdo_create',
-    ttl_seconds=3600,
-    key_generator=rdo_key_generator
-)
 def funcionario_criar_rdo():
     """Redirect para nova rota unificada de salvar"""
     return rdo_salvar_unificado()
