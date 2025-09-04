@@ -1165,7 +1165,7 @@ function carregarServicosDisponiveis() {
     const container = document.getElementById('servicosDisponiveis');
     container.innerHTML = '<div class="col-12 text-center"><i class="fas fa-spinner fa-spin"></i> Carregando serviços...</div>';
     
-    fetch('/api/servicos')
+    fetch('/api/servicos-disponiveis-obra/{{ obra.id }}')
         .then(response => {
             console.log('📡 Resposta da API:', response.status);
             return response.json();
@@ -1366,7 +1366,7 @@ function salvarServicosSelecionados() {
     
     // Salvar todos os serviços em paralelo
     const promises = servicosSelecionados.map(servico => 
-        fetch('/api/obras/servicos', {
+        fetch('/api/obras/servicos-rdo', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -1415,7 +1415,7 @@ function salvarServicosSelecionados() {
 function adicionarServicoObra(servicoId, servicoNome) {
     const obraId = {{ obra.id }};
     
-    fetch('/api/obras/servicos', {
+    fetch('/api/obras/servicos-rdo', {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
@@ -1546,6 +1546,43 @@ function adicionarServicoNaLista(servicoId, servicoNome, servicoData) {
     `;
     
     container.innerHTML += servicoCard;
+}
+
+// Renderizar serviço RDO com progresso das subatividades
+function renderizarServicoRDO(servico) {
+    return `
+        <div class="servico-rdo card border-primary mb-3" style="background: #f8fafc; border-radius: 12px; border-left: 4px solid #3b82f6;">
+            <div class="card-body" style="padding: 1.5rem;">
+                <div class="servico-header" style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 1rem;">
+                    <div class="servico-info" style="flex: 1;">
+                        <h4 class="servico-nome" style="font-weight: 600; color: #1f2937; margin: 0 0 0.5rem 0; font-size: 1.1rem;">
+                            <i class="fas fa-tools" style="color: #3b82f6; margin-right: 0.5rem;"></i>
+                            ${servico.nome}
+                        </h4>
+                        <p class="servico-categoria" style="margin: 0; font-size: 0.9rem; color: #6b7280;">
+                            <strong>Categoria:</strong> ${servico.categoria || 'Geral'}
+                        </p>
+                        <p class="servico-subatividades" style="margin: 0.5rem 0; font-size: 0.9rem; color: #6b7280;">
+                            <strong>Subatividades:</strong> ${servico.total_subatividades_ativas || 0}/${servico.total_subatividades_possiveis || 0}
+                        </p>
+                    </div>
+                    <div class="servico-progresso-badge" style="text-align: center; margin-left: 1rem;">
+                        <div class="progress-badge" style="background: ${servico.progresso >= 100 ? '#22c55e' : servico.progresso >= 70 ? '#3b82f6' : servico.progresso >= 40 ? '#f59e0b' : '#ef4444'}; color: white; padding: 0.5rem 0.8rem; border-radius: 20px; font-weight: 600; font-size: 0.9rem;">
+                            ${(servico.progresso || 0).toFixed(1)}%
+                        </div>
+                    </div>
+                </div>
+                <div class="progress" style="height: 8px; background: #e2e8f0; border-radius: 4px; overflow: hidden;">
+                    <div class="progress-bar" style="width: ${(servico.progresso || 0).toFixed(1)}%; height: 100%; background: ${servico.progresso >= 100 ? '#22c55e' : servico.progresso >= 70 ? '#3b82f6' : servico.progresso >= 40 ? '#f59e0b' : '#ef4444'}; transition: width 0.5s ease;">
+                    </div>
+                </div>
+                <div class="progress-text" style="display: flex; justify-content: space-between; margin-top: 0.5rem; font-size: 0.8rem; color: #6b7280;">
+                    <span>${servico.progresso == 0 ? 'Não iniciado' : servico.progresso < 40 ? 'Em início' : servico.progresso < 70 ? 'Em progresso' : servico.progresso < 100 ? 'Quase pronto' : 'Concluído'}</span>
+                    <span style="font-weight: 600;">${(servico.progresso || 0).toFixed(1)}%</span>
+                </div>
+            </div>
+        </div>
+    `;
 }
 
 // Mostrar mensagem de feedback
