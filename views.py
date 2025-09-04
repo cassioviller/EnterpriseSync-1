@@ -3218,7 +3218,7 @@ def visualizar_rdo(id):
         
         if not rdo:
             flash('RDO não encontrado.', 'error')
-            return redirect('/funcionario/rdo/consolidado')
+            return redirect(url_for('main.funcionario_rdo_consolidado'))
         
         # Buscar subatividades do RDO (sem relacionamentos problemáticos)
         subatividades = RDOServicoSubatividade.query.filter_by(rdo_id=rdo.id).all()
@@ -3364,9 +3364,16 @@ def visualizar_rdo(id):
         # NOVA LÓGICA: Mostrar TODOS os serviços da obra (executados + não executados)
         subatividades_por_servico = {}
         
-        # PASSO 1: Adicionar todos os serviços CADASTRADOS na obra (mesmo que não executados)
+        # PASSO 1: Adicionar apenas os serviços CADASTRADOS na obra (validação rigorosa)
         try:
-            servicos_cadastrados = ServicoObra.query.filter_by(obra_id=rdo.obra_id).all()
+            admin_id = get_admin_id_dinamico()
+            servicos_cadastrados = ServicoObra.query.filter_by(
+                obra_id=rdo.obra_id
+            ).join(Servico, ServicoObra.servico_id == Servico.id).filter(
+                Servico.admin_id == admin_id  # Isolamento multi-tenant
+            ).all()
+            
+            print(f"DEBUG SERVIÇOS OBRA {rdo.obra_id}: {len(servicos_cadastrados)} encontrados")
             
             for servico_obra in servicos_cadastrados:
                 servico = Servico.query.get(servico_obra.servico_id)
@@ -5000,9 +5007,12 @@ def _extrair_subatividades_form(form_data, operation_id):
     subatividades = []
     
     try:
+        print(f"🔍 [DEBUG:{operation_id}] form_keys_all: {list(form_data.keys())}")
+        
         # Buscar todos os campos de subatividade no formato: subatividade_SERVICO_INDEX_CAMPO
         for key, value in form_data.items():
             if key.startswith('subatividade_') and key.endswith('_percentual'):
+                print(f"🔍 [DEBUG:{operation_id}] found_percentual_field: {key} = {value}")
                 # Extrair servico_id e index do nome do campo
                 parts = key.split('_')
                 if len(parts) >= 4:
@@ -5025,6 +5035,29 @@ def _extrair_subatividades_form(form_data, operation_id):
                     
                     subatividades.append(subatividade)
                     print(f"📋 [EXTRACT:{operation_id}] sub_found servico={servico_id} nome='{nome}' perc={percentual}%")
+        
+        # Fallback: tentar formato alternativo sub_SERVICO_INDEX
+        if not subatividades:
+            print(f"🔍 [DEBUG:{operation_id}] trying_fallback_format...")
+            for key, value in form_data.items():
+                if key.startswith('sub_') and key.count('_') >= 2:
+                    parts = key.split('_')
+                    if len(parts) >= 3:
+                        servico_id = parts[1]
+                        index = parts[2]
+                        
+                        try:
+                            percentual = float(value) if value else 0.0
+                            subatividade = {
+                                'servico_id': int(servico_id),
+                                'nome': f'Subatividade {index}',
+                                'percentual': percentual,
+                                'index': int(index)
+                            }
+                            subatividades.append(subatividade)
+                            print(f"📋 [FALLBACK:{operation_id}] sub_found servico={servico_id} index={index} perc={percentual}%")
+                        except ValueError:
+                            continue
         
         # Ordenar por servico_id e index
         subatividades.sort(key=lambda x: (x['servico_id'], x['index']))
