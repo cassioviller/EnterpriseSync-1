@@ -5995,6 +5995,157 @@ def remover_servico_obra():
         print(f"ERRO REMOVER SERVIÇO OBRA: {str(e)}")
         return jsonify({'success': False, 'message': 'Erro interno do servidor'}), 500
 
+# ===== NOVAS APIS PARA SISTEMA RDO =====
+
+@main_bp.route('/api/obras/servicos-rdo', methods=['POST', 'OPTIONS'])
+@login_required
+def adicionar_servico_rdo_obra():
+    """API para adicionar serviço ao RDO da obra criando registros iniciais"""
+    if request.method == 'OPTIONS':
+        response = make_response()
+        response.headers.add('Access-Control-Allow-Origin', '*')
+        response.headers.add('Access-Control-Allow-Headers', 'Content-Type,Authorization')
+        response.headers.add('Access-Control-Allow-Methods', 'GET,PUT,POST,DELETE,OPTIONS')
+        return response
+    
+    try:
+        data = request.get_json()
+        obra_id = data.get('obra_id')
+        servico_id = data.get('servico_id')
+        
+        if not obra_id or not servico_id:
+            return jsonify({'success': False, 'message': 'Dados incompletos'}), 400
+        
+        # Detectar admin_id
+        admin_id = current_user.id if current_user.tipo_usuario == TipoUsuario.ADMIN else current_user.admin_id
+        
+        # Verificar se obra e serviço pertencem ao admin
+        obra = Obra.query.filter_by(id=obra_id, admin_id=admin_id).first()
+        if not obra:
+            return jsonify({'success': False, 'message': 'Obra não encontrada'}), 404
+        
+        servico = Servico.query.filter_by(id=servico_id, admin_id=admin_id, ativo=True).first()
+        if not servico:
+            return jsonify({'success': False, 'message': 'Serviço não encontrado'}), 404
+        
+        # Buscar ou criar RDO do dia atual
+        from datetime import date
+        hoje = date.today()
+        rdo = RDO.query.filter_by(obra_id=obra_id, data_relatorio=hoje).first()
+        
+        if not rdo:
+            # Criar RDO inicial para hoje
+            rdo = RDO(
+                numero_rdo=f"RDO-{obra_id}-{hoje.strftime('%Y%m%d')}",
+                data_relatorio=hoje,
+                obra_id=obra_id,
+                criado_por_id=current_user.id,
+                admin_id=admin_id,
+                clima_geral="Ensolarado",
+                temperatura_media="25°C",
+                umidade_relativa=60
+            )
+            db.session.add(rdo)
+            db.session.flush()  # Para obter o ID do RDO
+        
+        # Buscar subatividades mestre do serviço
+        subatividades_mestre = SubatividadeMestre.query.filter_by(
+            servico_id=servico_id, 
+            admin_id=admin_id, 
+            ativo=True
+        ).order_by(SubatividadeMestre.ordem_padrao).all()
+        
+        if not subatividades_mestre:
+            return jsonify({'success': False, 'message': 'Nenhuma subatividade encontrada para este serviço'}), 400
+        
+        # Criar registros RDOServicoSubatividade para cada subatividade com percentual 0
+        registros_criados = 0
+        for subatividade in subatividades_mestre:
+            # Verificar se já existe registro para esta subatividade
+            existe = RDOServicoSubatividade.query.filter_by(
+                rdo_id=rdo.id,
+                servico_id=servico_id,
+                nome_subatividade=subatividade.nome
+            ).first()
+            
+            if not existe:
+                novo_registro = RDOServicoSubatividade(
+                    rdo_id=rdo.id,
+                    servico_id=servico_id,
+                    nome_subatividade=subatividade.nome,
+                    descricao_subatividade=subatividade.descricao or '',
+                    percentual_conclusao=0.0,
+                    percentual_anterior=0.0,
+                    incremento_dia=0.0,
+                    observacoes_tecnicas='',
+                    ordem_execucao=subatividade.ordem_padrao,
+                    ativo=True,
+                    admin_id=admin_id
+                )
+                db.session.add(novo_registro)
+                registros_criados += 1
+        
+        db.session.commit()
+        
+        return jsonify({
+            'success': True,
+            'message': f'Serviço adicionado ao RDO com {registros_criados} subatividades inicializadas',
+            'servico': {
+                'id': servico.id,
+                'nome': servico.nome,
+                'descricao': servico.descricao
+            },
+            'rdo_id': rdo.id,
+            'subatividades_criadas': registros_criados
+        })
+        
+    except Exception as e:
+        db.session.rollback()
+        print(f"🚨 ERRO ADICIONAR SERVIÇO RDO: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({
+            'success': False,
+            'message': f'Erro interno: {str(e)}',
+            'error_type': type(e).__name__
+        }), 500
+
+@main_bp.route('/api/servicos-disponiveis-obra/<int:obra_id>')
+@login_required
+def api_servicos_disponiveis_obra(obra_id):
+    """Retorna serviços que ainda não foram adicionados ao RDO da obra"""
+    try:
+        admin_id = current_user.id if current_user.tipo_usuario == TipoUsuario.ADMIN else current_user.admin_id
+        
+        # Buscar serviços que ainda não estão no RDO desta obra
+        servicos_no_rdo = db.session.query(Servico.id).join(
+            RDOServicoSubatividade, Servico.id == RDOServicoSubatividade.servico_id
+        ).join(
+            RDO, RDOServicoSubatividade.rdo_id == RDO.id
+        ).filter(
+            RDO.obra_id == obra_id,
+            RDOServicoSubatividade.ativo == True
+        ).distinct().subquery()
+        
+        servicos_disponiveis = Servico.query.filter(
+            Servico.admin_id == admin_id,
+            Servico.ativo == True,
+            ~Servico.id.in_(servicos_no_rdo)
+        ).all()
+        
+        return jsonify({
+            'success': True,
+            'servicos': [{
+                'id': s.id,
+                'nome': s.nome,
+                'categoria': s.categoria,
+                'descricao': s.descricao
+            } for s in servicos_disponiveis]
+        })
+        
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
 @main_bp.route('/funcionario/rdo/progresso/<int:obra_id>')
 @funcionario_required
 def api_rdo_progresso_obra(obra_id):
