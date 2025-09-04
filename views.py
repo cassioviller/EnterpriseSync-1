@@ -4966,6 +4966,7 @@ def salvar_rdo_maestria():
                     nome_subatividade=sub_data['nome'],
                     percentual_conclusao=sub_data['percentual'],
                     descricao_subatividade=sub_data.get('descricao', ''),
+                    admin_id=admin_id,  # Campo obrigatório
                     ativo=True
                 )
                 db.session.add(sub_rdo)
