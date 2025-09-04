@@ -1,0 +1,69 @@
+# DOCKERFILE EASYPANEL - SIGE v8.1 - CORREÇÃO 405
+# Configuração específica para resolver Method Not Allowed
+FROM python:3.11-slim-bullseye
+
+# Metadados
+LABEL maintainer="SIGE v8.1 EasyPanel" \
+      version="8.1" \
+      description="Sistema Integrado de Gestão Empresarial - EasyPanel Deploy Fixed"
+
+# Variáveis de build
+ARG DEBIAN_FRONTEND=noninteractive
+
+# Instalar dependências do sistema
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    postgresql-client curl wget gcc g++ python3-dev libpq-dev \
+    libffi-dev libssl-dev make && \
+    apt-get clean && rm -rf /var/lib/apt/lists/*
+
+# Criar usuário para segurança
+RUN groupadd -r sige && useradd -r -g sige sige
+
+# Definir diretório de trabalho
+WORKDIR /app
+
+# Copiar e instalar dependências
+COPY pyproject.toml ./
+RUN pip install --no-cache-dir --upgrade pip setuptools wheel && \
+    pip install --no-cache-dir .
+
+# Copiar código da aplicação
+COPY . .
+
+# Criar diretórios necessários
+RUN mkdir -p /app/static/fotos_funcionarios /app/static/fotos \
+    /app/static/images /app/uploads /app/logs /app/temp && \
+    chown -R sige:sige /app
+
+# Copiar script de entrada otimizado
+COPY docker-entrypoint-unified.sh /app/docker-entrypoint.sh
+RUN chmod +x /app/docker-entrypoint.sh
+
+# Mudar para usuário não-root
+USER sige
+
+# Variáveis de ambiente EasyPanel (específicas para resolver 405)
+ENV FLASK_APP=main.py \
+    FLASK_ENV=production \
+    FLASK_DEBUG=false \
+    WTF_CSRF_ENABLED=false \
+    PORT=5000 \
+    PYTHONPATH=/app \
+    PYTHONUNBUFFERED=1 \
+    PYTHONIOENCODING=utf-8 \
+    SHOW_DETAILED_ERRORS=true \
+    CORS_ORIGINS="*" \
+    CORS_METHODS="GET,POST,PUT,DELETE,OPTIONS"
+
+# Expor porta
+EXPOSE 5000
+
+# Health check robusto
+HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
+  CMD curl -f http://localhost:5000/health || exit 1
+
+# Comando de entrada
+ENTRYPOINT ["/app/docker-entrypoint.sh"]
+CMD ["gunicorn", "--bind", "0.0.0.0:5000", "--workers", "2", \
+     "--timeout", "120", "--access-logfile", "-", "--error-logfile", "-", \
+     "--log-level", "info", "main:app"]

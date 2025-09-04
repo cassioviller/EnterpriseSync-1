@@ -2806,7 +2806,7 @@ def rdos():
 
 
 
-@main_bp.route('/rdo/excluir/<int:rdo_id>', methods=['POST'])
+@main_bp.route('/rdo/excluir/<int:rdo_id>', methods=['POST', 'GET'])
 @funcionario_required
 def excluir_rdo(rdo_id):
     """Excluir RDO e todas suas dependências"""
@@ -5700,7 +5700,7 @@ def api_servicos_obra(obra_id):
 
 # ===== API PARA GERENCIAR SERVIÇOS DA OBRA =====
 
-@main_bp.route('/api/obras/servicos', methods=['POST', 'OPTIONS'])
+@main_bp.route('/api/obras/servicos', methods=['GET', 'POST', 'OPTIONS'])
 def adicionar_servico_obra():
     """API para adicionar serviço à obra"""
     # Handle preflight OPTIONS request
@@ -6674,7 +6674,7 @@ def editar_servico(servico_id):
         flash('Erro ao editar serviço.', 'error')
         return redirect(url_for('main.servicos'))
 
-@main_bp.route('/servicos/<int:servico_id>/toggle', methods=['POST'])
+@main_bp.route('/servicos/<int:servico_id>/toggle', methods=['POST', 'PUT'])
 @admin_required
 def toggle_servico(servico_id):
     """Alternar status ativo/inativo do serviço"""
@@ -6776,7 +6776,7 @@ def editar_usuario(usuario_id):
     
     return render_template('usuarios/editar_usuario.html', usuario=usuario)
 
-@main_bp.route('/usuarios/<int:usuario_id>/excluir', methods=['POST'])
+@main_bp.route('/usuarios/<int:usuario_id>/excluir', methods=['POST', 'GET'])
 @admin_required
 def excluir_usuario(usuario_id):
     """Excluir usuário com tratamento robusto de relacionamentos"""
