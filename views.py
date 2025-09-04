@@ -5003,10 +5003,10 @@ def api_ultimo_rdo_dados_corrigida(obra_id):
                     servico = sub_rdo.servico
                     servico_id = servico.id
                     
-                    # 🚫 FILTRO: Apenas serviços que estão cadastrados na obra
-                    if ids_servicos_permitidos is not None and servico_id not in ids_servicos_permitidos:
-                        print(f"🚫 IGNORANDO serviço {servico.nome} (ID {servico_id}) - não cadastrado na obra")
-                        continue
+                    # ✅ CORREÇÃO: Remover filtro restritivo - serviços do RDO são válidos por definição
+                    # if ids_servicos_permitidos is not None and servico_id not in ids_servicos_permitidos:
+                    #     print(f"🚫 IGNORANDO serviço {servico.nome} (ID {servico_id}) - não cadastrado na obra")
+                    #     continue
                     
                     if servico_id not in servicos_dict:
                         servicos_dict[servico_id] = {
