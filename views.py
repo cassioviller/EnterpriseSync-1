@@ -1450,7 +1450,8 @@ def obter_servicos_da_obra(obra_id, admin_id=None):
         
         # Consulta principal
         query = text("""
-            SELECT s.id, s.nome, s.categoria, so.quantidade_planejada, so.quantidade_executada, so.ativo
+            SELECT s.id, s.nome, s.descricao, s.categoria, s.unidade_medida, s.custo_unitario,
+                   so.quantidade_planejada, so.quantidade_executada, so.ativo
             FROM servico s
             JOIN servico_obra so ON s.id = so.servico_id
             WHERE so.obra_id = :obra_id AND so.ativo = true AND s.admin_id = :admin_id
@@ -1461,12 +1462,21 @@ def obter_servicos_da_obra(obra_id, admin_id=None):
         
         servicos_lista = []
         for row in result:
+            # Calcular progresso baseado em quantidade
+            progresso = 0.0
+            if row.quantidade_planejada and row.quantidade_planejada > 0:
+                progresso = (row.quantidade_executada or 0) / row.quantidade_planejada * 100
+            
             servicos_lista.append({
                 'id': row.id,
                 'nome': row.nome,
+                'descricao': row.descricao or '',
                 'categoria': row.categoria,
+                'unidade_medida': row.unidade_medida,
+                'custo_unitario': row.custo_unitario,
                 'quantidade_planejada': float(row.quantidade_planejada or 0),
                 'quantidade_executada': float(row.quantidade_executada or 0),
+                'progresso': progresso,
                 'ativo': row.ativo
             })
         
