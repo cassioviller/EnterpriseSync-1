@@ -543,7 +543,7 @@
                                                name="servicos_obra" 
                                                value="{{ servico.id }}" 
                                                id="servico_{{ servico.id }}"
-                                               {% if obra and servico in servicos_obra %}checked{% endif %}>
+                                               {% if obra and servico.id in servicos_obra %}checked{% endif %}>
                                         <label class="form-check-label w-100" for="servico_{{ servico.id }}">
                                             <strong>{{ servico.nome }}</strong>
                                             {% if servico.descricao %}
