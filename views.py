@@ -1417,10 +1417,12 @@ def editar_obra(id):
                             # Reativar associação existente
                             servico_obra_existente.ativo = True
                         else:
-                            # Criar nova associação
+                            # Criar nova associação com valores padrão obrigatórios
                             nova_associacao = ServicoObra(
                                 obra_id=obra.id,
                                 servico_id=servico_id,
+                                quantidade_planejada=1.0,  # Valor padrão obrigatório
+                                quantidade_executada=0.0,  # Valor padrão obrigatório
                                 ativo=True
                             )
                             db.session.add(nova_associacao)
