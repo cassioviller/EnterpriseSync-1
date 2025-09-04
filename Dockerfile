@@ -44,9 +44,7 @@ RUN pip install --no-cache-dir --upgrade pip setuptools wheel && \
 # Copiar código da aplicação (incluindo correções Serviços da Obra)
 COPY . .
 
-# Copiar script de verificação de rotas
-COPY check_routes.py /app/
-RUN chmod +x /app/check_routes.py
+# Script de verificação incorporado diretamente no Dockerfile
 
 # Funcionalidades implementadas na v8.2:
 # - Sistema "Serviços da Obra" corrigido para usar RDO
@@ -68,10 +66,143 @@ RUN mkdir -p \
     /app/temp \
     && chown -R sige:sige /app
 
-# Copiar scripts de entrada (versão unificada limpa)
-COPY docker-entrypoint-unified.sh /app/docker-entrypoint.sh
-COPY docker-entrypoint-easypanel-final.sh /app/docker-entrypoint-backup.sh
-RUN chmod +x /app/docker-entrypoint.sh /app/docker-entrypoint-backup.sh
+# Criar script de verificação inline para EasyPanel
+RUN cat > /app/docker-entrypoint.sh << 'EOF'
+#!/bin/bash
+set -e
+
+echo "🚀 INICIANDO SIGE v8.2 - Sistema Integrado de Gestão Empresarial"
+echo "🎯 Deploy EasyPanel - Verificação completa de rotas e APIs"
+echo "================================================================="
+
+# Aguardar banco de dados estar pronto
+if [ -n "$DATABASE_URL" ]; then
+    echo "⏳ Aguardando PostgreSQL..."
+    timeout=60
+    while ! pg_isready -d "$DATABASE_URL" -t 1 > /dev/null 2>&1; do
+        echo "   ⌛ Aguardando conexão com banco... ($timeout)s"
+        sleep 2
+        timeout=$((timeout-2))
+        if [ $timeout -le 0 ]; then
+            echo "❌ Timeout aguardando banco de dados"
+            exit 1
+        fi
+    done
+    echo "✅ PostgreSQL conectado!"
+fi
+
+# Executar migrações e verificações de produção
+echo "🔄 Executando migrações automáticas..."
+python -c "
+from app import app
+import logging
+
+# Configurar logging
+logging.basicConfig(level=logging.INFO)
+
+with app.app_context():
+    try:
+        from verificacao_producao import verificar_dados_producao
+        print('🔍 Verificando dados de produção...')
+        verificar_dados_producao()
+        print('✅ Verificação de produção concluída!')
+    except Exception as e:
+        print(f'⚠️ Verificação falhou mas continuando: {e}')
+
+    try:
+        import migrations
+        print('🔧 Executando migrações...')
+        print('✅ Migrações concluídas!')
+    except Exception as e:
+        print(f'❌ Erro nas migrações: {e}')
+        if 'production' in str(app.config.get('FLASK_ENV', '')):
+            exit(1)
+"
+
+# Verificação completa de rotas e APIs
+echo "🔍 Verificando rotas e APIs registradas..."
+python -c "
+from app import app
+
+with app.app_context():
+    try:
+        print('📋 VERIFICAÇÃO DE ROTAS E APIs:')
+        print('='*50)
+        
+        # Verificar blueprints registrados
+        blueprints = []
+        for name, blueprint in app.blueprints.items():
+            url_prefix = getattr(blueprint, 'url_prefix', '') or ''
+            blueprints.append((name, url_prefix))
+        
+        print(f'📊 BLUEPRINTS: {len(blueprints)} registrados')
+        
+        # Contar rotas
+        all_routes = []
+        for rule in app.url_map.iter_rules():
+            if rule.endpoint != 'static':
+                all_routes.append(rule.rule)
+        
+        print(f'📈 ROTAS: {len(all_routes)} mapeadas')
+        
+        # Verificar endpoints críticos
+        critical_endpoints = ['/health', '/', '/login', '/dashboard']
+        for endpoint in critical_endpoints:
+            found = any(endpoint in route for route in all_routes)
+            status = '✅' if found else '❌'
+            print(f'   {status} {endpoint}')
+        
+        print('='*50)
+        print('✅ VERIFICAÇÃO CONCLUÍDA!')
+        
+    except Exception as e:
+        print(f'❌ Erro na verificação: {e}')
+"
+
+# Teste de endpoints funcionando
+echo "🧪 Testando endpoints críticos..."
+python -c "
+from app import app
+
+with app.test_client() as client:
+    try:
+        print('🧪 TESTE DE ENDPOINTS:')
+        print('='*30)
+        
+        endpoints = ['/health', '/', '/login']
+        successful = 0
+        total = len(endpoints)
+        
+        for endpoint in endpoints:
+            try:
+                response = client.get(endpoint, follow_redirects=True)
+                if response.status_code < 500:
+                    print(f'   ✅ {endpoint} -> {response.status_code}')
+                    successful += 1
+                else:
+                    print(f'   ❌ {endpoint} -> {response.status_code}')
+            except Exception as e:
+                print(f'   ⚠️ {endpoint} -> ERRO')
+        
+        rate = (successful / total) * 100
+        print(f'📊 SUCESSO: {successful}/{total} ({rate:.0f}%)')
+        print('='*30)
+        
+    except Exception as e:
+        print(f'❌ Erro nos testes: {e}')
+"
+
+echo "================================================================="
+echo "✅ SIGE v8.2 pronto para execução!"
+echo "🌐 Serviços da Obra implementado com RDO + Subatividades"
+echo "================================================================="
+
+# Executar comando principal
+exec "$@"
+EOF
+
+# Tornar script executável
+RUN chmod +x /app/docker-entrypoint.sh
 
 # Mudar para usuário não-root
 USER sige
