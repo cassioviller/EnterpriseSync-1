@@ -4854,19 +4854,48 @@ def api_ultimo_rdo_dados_corrigida(obra_id):
             # Primeira RDO - carregar serviços da obra com percentual 0%
             print(f"🔍 Primeira RDO da obra {obra_id} - carregando serviços com percentual 0%")
             
-            # Buscar serviços cadastrados na obra (NOVA TABELA)
+            # Buscar serviços com múltiplas estratégias (igual à outra API)
+            servicos_obra = []
             try:
-                # CORREÇÃO: Usar nova tabela servico_obra_real
-                servicos_obra = db.session.query(Servico).join(ServicoObraReal).filter(
+                # ESTRATÉGIA 1: Buscar via servico_obra_real (tabela nova)
+                servicos_obra_query = db.session.query(Servico).join(ServicoObraReal).filter(
                     ServicoObraReal.obra_id == obra_id,
                     ServicoObraReal.ativo == True,
                     Servico.admin_id == admin_id,
                     Servico.ativo == True
                 ).all()
-                print(f"🔍 BUSCA NA NOVA TABELA servico_obra_real para obra {obra_id}")
+                
+                for servico in servicos_obra_query:
+                    if servico.admin_id == admin_id:
+                        servicos_obra.append(servico)
+                        
+                print(f"🔍 ÚLTIMO RDO - ESTRATÉGIA 1: Encontrados {len(servicos_obra)} serviços")
+                
             except Exception as e:
-                print(f"⚠️ Erro ao buscar na nova tabela: {e}")
-                # Fallback para tabela antiga se nova não funcionar
+                print(f"⚠️ ÚLTIMO RDO - Erro ESTRATÉGIA 1: {e}")
+                
+            # ESTRATÉGIA 2: Se não encontrou, buscar via RDO existente (dados históricos)
+            if not servicos_obra:
+                try:
+                    # Buscar serviços que já foram usados em RDOs desta obra
+                    servicos_rdo = db.session.query(Servico).join(RDOServicoSubatividade).join(RDO).filter(
+                        RDO.obra_id == obra_id,
+                        RDO.admin_id == admin_id,
+                        Servico.admin_id == admin_id,
+                        Servico.ativo == True
+                    ).distinct().all()
+                    
+                    for servico in servicos_rdo:
+                        if servico.admin_id == admin_id:
+                            servicos_obra.append(servico)
+                            
+                    print(f"🔍 ÚLTIMO RDO - ESTRATÉGIA 2: Encontrados {len(servicos_obra)} serviços")
+                    
+                except Exception as e:
+                    print(f"⚠️ ÚLTIMO RDO - Erro ESTRATÉGIA 2: {e}")
+                    
+            # ESTRATÉGIA 3: Fallback - tabela antiga
+            if not servicos_obra:
                 try:
                     servicos_obra = db.session.query(Servico).join(ServicoObra).filter(
                         ServicoObra.obra_id == obra_id,
@@ -4874,8 +4903,9 @@ def api_ultimo_rdo_dados_corrigida(obra_id):
                         Servico.admin_id == admin_id,
                         Servico.ativo == True
                     ).all()
-                    print(f"🔄 FALLBACK: Usando tabela antiga servico_obra")
-                except:
+                    print(f"🔍 ÚLTIMO RDO - ESTRATÉGIA 3: Encontrados {len(servicos_obra)} serviços")
+                except Exception as e:
+                    print(f"⚠️ ÚLTIMO RDO - Erro ESTRATÉGIA 3: {e}")
                     servicos_obra = []
             
             if not servicos_obra:
