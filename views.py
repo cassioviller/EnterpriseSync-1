@@ -4813,16 +4813,29 @@ def api_ultimo_rdo_dados_corrigida(obra_id):
             # Primeira RDO - carregar serviços da obra com percentual 0%
             print(f"🔍 Primeira RDO da obra {obra_id} - carregando serviços com percentual 0%")
             
-            # Buscar serviços cadastrados na obra
+            # Buscar serviços cadastrados na obra (NOVA TABELA)
             try:
-                servicos_obra = db.session.query(Servico).join(ServicoObra).filter(
-                    ServicoObra.obra_id == obra_id,
-                    ServicoObra.ativo == True,
+                # CORREÇÃO: Usar nova tabela servico_obra_real
+                servicos_obra = db.session.query(Servico).join(ServicoObraReal).filter(
+                    ServicoObraReal.obra_id == obra_id,
+                    ServicoObraReal.ativo == True,
                     Servico.admin_id == admin_id,
                     Servico.ativo == True
                 ).all()
-            except:
-                servicos_obra = []
+                print(f"🔍 BUSCA NA NOVA TABELA servico_obra_real para obra {obra_id}")
+            except Exception as e:
+                print(f"⚠️ Erro ao buscar na nova tabela: {e}")
+                # Fallback para tabela antiga se nova não funcionar
+                try:
+                    servicos_obra = db.session.query(Servico).join(ServicoObra).filter(
+                        ServicoObra.obra_id == obra_id,
+                        ServicoObra.ativo == True,
+                        Servico.admin_id == admin_id,
+                        Servico.ativo == True
+                    ).all()
+                    print(f"🔄 FALLBACK: Usando tabela antiga servico_obra")
+                except:
+                    servicos_obra = []
             
             if not servicos_obra:
                 # Se não há serviços na obra, buscar todos os serviços da empresa

@@ -66,10 +66,11 @@ RUN mkdir -p \
     /app/temp \
     && chown -R sige:sige /app
 
-# Criar script de verificação inline para EasyPanel
-RUN printf '#!/bin/bash\nset -e\n\necho "🚀 INICIANDO SIGE v8.2 - Sistema Integrado de Gestão Empresarial"\necho "🎯 Deploy EasyPanel - Verificação completa de rotas e APIs"\necho "================================================================="\n\n' > /app/docker-entrypoint.sh && \
-    printf 'echo "🔄 Executando migrações automáticas..."\npython -c "\nfrom app import app\nimport logging\nlogging.basicConfig(level=logging.INFO)\nwith app.app_context():\n    try:\n        from verificacao_producao import verificar_dados_producao\n        verificar_dados_producao()\n        print(\\"✅ Verificação de produção concluída!\\")\n    except Exception as e:\n        print(f\\"⚠️ Verificação falhou: {e}\\")\n    try:\n        import migrations\n        print(\\"✅ Migrações concluídas!\\")\n    except Exception as e:\n        print(f\\"❌ Erro nas migrações: {e}\\")\n"\n\n' >> /app/docker-entrypoint.sh && \
-    printf 'echo "✅ SIGE v8.2 pronto para execução!"\necho "================================================================"\n\nexec "$@"\n' >> /app/docker-entrypoint.sh && \
+# Criar script de verificação melhorado para EasyPanel com tratamento de PostgreSQL
+RUN printf '#!/bin/bash\nset -e\n\necho "🚀 INICIANDO SIGE v9.0 - Sistema Integrado de Gestão Empresarial"\necho "🎯 Deploy EasyPanel - Verificação completa com PostgreSQL"\necho "================================================================="\n\n' > /app/docker-entrypoint.sh && \
+    printf '# Aguardar PostgreSQL estar disponível\necho "🔄 Aguardando PostgreSQL..."\nfor i in {1..30}; do\n    if pg_isready -h ${DATABASE_HOST:-viajey_sige} -p ${DATABASE_PORT:-5432} -U ${DATABASE_USER:-sige} > /dev/null 2>&1; then\n        echo "✅ PostgreSQL conectado!"\n        break\n    fi\n    echo "⏳ Tentativa $i/30 - aguardando PostgreSQL..."\n    sleep 2\ndone\n\n' >> /app/docker-entrypoint.sh && \
+    printf 'echo "🔄 Executando verificações e migrações..."\npython -c "\nimport os\nos.environ.setdefault(\\"DATABASE_URL\\", \\"postgresql://sige:sige@viajey_sige:5432/sige?sslmode=disable\\")\nfrom app import app\nimport logging\nlogging.basicConfig(level=logging.INFO)\nwith app.app_context():\n    try:\n        from models import db\n        db.create_all()\n        print(\\"✅ Tabelas verificadas/criadas!\\")\n    except Exception as e:\n        print(f\\"⚠️ Erro nas tabelas: {e}\\")\n    try:\n        from migrations import executar_migracoes\n        executar_migracoes()\n        print(\\"✅ Migrações concluídas!\\")\n    except Exception as e:\n        print(f\\"⚠️ Erro nas migrações: {e}\\")\n"\n\n' >> /app/docker-entrypoint.sh && \
+    printf 'echo "✅ SIGE v9.0 pronto para execução!"\necho "================================================================"\n\nexec "$@"\n' >> /app/docker-entrypoint.sh && \
     chmod +x /app/docker-entrypoint.sh
 
 # Mudar para usuário não-root
