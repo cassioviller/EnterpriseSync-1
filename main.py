@@ -10,37 +10,9 @@ except ImportError as e:
 except Exception as e:
     print(f"❌ Erro ao registrar sistema de edição RDO: {e}")
 
-# Registrar sistema de salvamento RDO
-try:
-    from rdo_salvar_sistema import rdo_salvar_bp
-    app.register_blueprint(rdo_salvar_bp, url_prefix='/')
-    print("✅ Sistema de salvamento RDO registrado")
-except ImportError as e:
-    print(f"⚠️ Sistema RDO salvar não encontrado: {e}")
 
-# Registrar API de serviços flexíveis
-try:
-    from api_servicos_flexivel import api_servicos_bp
-    app.register_blueprint(api_servicos_bp, url_prefix='/')
-    print("✅ API de serviços flexíveis registrada")
-except ImportError as e:
-    print(f"⚠️ API serviços flexíveis não encontrada: {e}")
 
-# Registrar salvamento RDO sem conflito
-try:
-    from rdo_salvar_sem_conflito import rdo_sem_conflito_bp
-    app.register_blueprint(rdo_sem_conflito_bp, url_prefix='/')
-    print("✅ Sistema RDO sem conflito registrado")
-except ImportError as e:
-    print(f"⚠️ Sistema RDO sem conflito não encontrado: {e}")
 
-# Registrar sistema de visualização RDO  
-try:
-    from rdo_viewer_editor import rdo_viewer_bp
-    app.register_blueprint(rdo_viewer_bp, url_prefix='/viewer')
-    print("✅ Sistema de visualização RDO registrado")
-except ImportError as e:
-    print(f"⚠️ Sistema RDO viewer não encontrado: {e}")
 
 # Registrar sistema CRUD RDO completo
 try:
@@ -50,13 +22,6 @@ try:
 except ImportError as e:
     print(f"⚠️ Sistema CRUD RDO não encontrado: {e}")
 
-# Registrar sistema RDO otimizado (API último RDO)
-try:
-    from rdo_optimized import rdo_bp
-    app.register_blueprint(rdo_bp)
-    print("✅ Sistema RDO otimizado registrado")
-except ImportError as e:
-    print(f"⚠️ Sistema RDO otimizado não encontrado: {e}")
 from flask import flash, redirect, url_for, render_template_string
 import traceback
 import logging
