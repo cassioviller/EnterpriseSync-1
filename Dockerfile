@@ -67,7 +67,7 @@ RUN mkdir -p \
     && chown -R sige:sige /app
 
 # Criar script de verificação inline para EasyPanel
-RUN cat > /app/docker-entrypoint.sh << 'EOF'
+RUN cat > /app/docker-entrypoint.sh << 'EOF' && chmod +x /app/docker-entrypoint.sh
 #!/bin/bash
 set -e
 
@@ -200,9 +200,6 @@ echo "================================================================="
 # Executar comando principal
 exec "$@"
 EOF
-
-# Tornar script executável
-RUN chmod +x /app/docker-entrypoint.sh
 
 # Mudar para usuário não-root
 USER sige
