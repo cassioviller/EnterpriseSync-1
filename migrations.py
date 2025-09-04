@@ -56,6 +56,9 @@ def executar_migracoes():
         
         # Migração 13: CRÍTICA - Corrigir admin_id em serviços existentes
         corrigir_admin_id_servicos_existentes()
+        
+        # Migração 14: NOVA - Criar tabela ServicoObraReal
+        migrar_tabela_servico_obra_real()
 
         logger.info("✅ Migrações automáticas concluídas com sucesso!")
         
@@ -946,6 +949,101 @@ def corrigir_admin_id_servicos_existentes():
         
     except Exception as e:
         logger.error(f"❌ Erro ao corrigir admin_id em serviços: {e}")
+        try:
+            connection.rollback()
+            cursor.close()
+            connection.close()
+        except:
+            pass
+
+def migrar_tabela_servico_obra_real():
+    """
+    Criar tabela ServicoObraReal para gestão avançada de serviços na obra
+    """
+    try:
+        logger.info("🔄 Verificando se tabela servico_obra_real existe...")
+        
+        connection = db.engine.raw_connection()
+        cursor = connection.cursor()
+        
+        # Verificar se a tabela já existe
+        cursor.execute("""
+            SELECT COUNT(*) 
+            FROM information_schema.tables 
+            WHERE table_name = 'servico_obra_real'
+        """)
+        
+        tabela_existe = cursor.fetchone()[0] > 0
+        
+        if not tabela_existe:
+            logger.info("🔧 Criando tabela servico_obra_real...")
+            
+            cursor.execute("""
+                CREATE TABLE servico_obra_real (
+                    id SERIAL PRIMARY KEY,
+                    obra_id INTEGER NOT NULL REFERENCES obra(id),
+                    servico_id INTEGER NOT NULL REFERENCES servico(id),
+                    
+                    -- Planejamento detalhado
+                    quantidade_planejada NUMERIC(12,4) NOT NULL DEFAULT 0.0,
+                    quantidade_executada NUMERIC(12,4) DEFAULT 0.0,
+                    percentual_concluido NUMERIC(5,2) DEFAULT 0.0,
+                    
+                    -- Controle de prazo
+                    data_inicio_planejada DATE,
+                    data_fim_planejada DATE,
+                    data_inicio_real DATE,
+                    data_fim_real DATE,
+                    
+                    -- Controle de custos
+                    valor_unitario NUMERIC(10,2) DEFAULT 0.0,
+                    valor_total_planejado NUMERIC(12,2) DEFAULT 0.0,
+                    valor_total_executado NUMERIC(12,2) DEFAULT 0.0,
+                    
+                    -- Status e controle
+                    status VARCHAR(30) DEFAULT 'Não Iniciado',
+                    prioridade INTEGER DEFAULT 3,
+                    responsavel_id INTEGER REFERENCES funcionario(id),
+                    
+                    -- Observações e notas
+                    observacoes TEXT,
+                    notas_tecnicas TEXT,
+                    
+                    -- Controle de qualidade
+                    aprovado BOOLEAN DEFAULT FALSE,
+                    data_aprovacao TIMESTAMP,
+                    aprovado_por_id INTEGER REFERENCES funcionario(id),
+                    
+                    -- Multi-tenant e controle
+                    admin_id INTEGER NOT NULL REFERENCES usuario(id),
+                    ativo BOOLEAN DEFAULT TRUE,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    
+                    -- Constraint unique
+                    UNIQUE(obra_id, servico_id)
+                )
+            """)
+            
+            logger.info("✅ Tabela servico_obra_real criada com sucesso!")
+            
+            # Criar índices para performance
+            cursor.execute("CREATE INDEX idx_servico_obra_real_obra ON servico_obra_real(obra_id)")
+            cursor.execute("CREATE INDEX idx_servico_obra_real_servico ON servico_obra_real(servico_id)")
+            cursor.execute("CREATE INDEX idx_servico_obra_real_admin ON servico_obra_real(admin_id)")
+            cursor.execute("CREATE INDEX idx_servico_obra_real_status ON servico_obra_real(status)")
+            
+            logger.info("✅ Índices criados para servico_obra_real!")
+        else:
+            logger.info("✅ Tabela servico_obra_real já existe")
+        
+        connection.commit()
+        cursor.close()
+        connection.close()
+        logger.info("🎯 Migração da tabela ServicoObraReal concluída!")
+        
+    except Exception as e:
+        logger.error(f"❌ Erro ao criar tabela servico_obra_real: {e}")
         try:
             connection.rollback()
             cursor.close()

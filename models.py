@@ -125,9 +125,10 @@ class Obra(db.Model):
     registros_ponto = db.relationship('RegistroPonto', backref='obra_ref', lazy=True, overlaps="obra_ref")
     custos = db.relationship('CustoObra', backref='obra_ref', lazy=True, overlaps="obra_ref")
     servicos_obra = db.relationship('ServicoObra', backref='obra', cascade='all, delete-orphan', lazy=True)
+    servicos_reais = db.relationship('ServicoObraReal', backref='obra_real', cascade='all, delete-orphan', lazy=True)
 
 class ServicoObra(db.Model):
-    """Relacionamento entre Serviços e Obras com quantidade planejada"""
+    """Relacionamento ORIGINAL - Serviços das Propostas vinculados às Obras (MANTIDO PARA COMPATIBILIDADE)"""
     __tablename__ = 'servico_obra'
     
     id = db.Column(db.Integer, primary_key=True)
@@ -143,9 +144,9 @@ class ServicoObra(db.Model):
     # Unique constraint para evitar duplicatas
     __table_args__ = (db.UniqueConstraint('obra_id', 'servico_id', name='_obra_servico_uc'),)
 
-class ObraServico(db.Model):
-    """Nova tabela aprimorada para gestão completa de serviços na obra"""
-    __tablename__ = 'obra_servico'
+class ServicoObraReal(db.Model):
+    """NOVA TABELA - Gestão completa dos serviços reais executados na obra com controle avançado"""
+    __tablename__ = 'servico_obra_real'
     
     id = db.Column(db.Integer, primary_key=True)
     obra_id = db.Column(db.Integer, db.ForeignKey('obra.id'), nullable=False)
@@ -188,14 +189,12 @@ class ObraServico(db.Model):
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     
     # Relacionamentos
-    obra = db.relationship('Obra', backref='obra_servicos', lazy=True)
-    servico = db.relationship('Servico', backref='obra_servicos', lazy=True)
-    responsavel = db.relationship('Funcionario', foreign_keys=[responsavel_id], backref='servicos_responsavel', lazy=True)
-    aprovado_por = db.relationship('Funcionario', foreign_keys=[aprovado_por_id], backref='servicos_aprovados', lazy=True)
-    admin = db.relationship('Usuario', backref='obra_servicos_criados', lazy=True)
+    responsavel = db.relationship('Funcionario', foreign_keys=[responsavel_id], backref='servicos_responsavel_real', lazy=True)
+    aprovado_por = db.relationship('Funcionario', foreign_keys=[aprovado_por_id], backref='servicos_aprovados_real', lazy=True)
+    admin = db.relationship('Usuario', backref='servicos_obra_real_criados', lazy=True)
     
     # Unique constraint para evitar duplicatas
-    __table_args__ = (db.UniqueConstraint('obra_id', 'servico_id', name='_obra_servico_unique'),)
+    __table_args__ = (db.UniqueConstraint('obra_id', 'servico_id', name='_servico_obra_real_uc'),)
 
 class Veiculo(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -250,6 +249,7 @@ class Servico(db.Model):
     # Removido: subatividades obsoletas - agora usamos SubatividadeMestre
     historico_produtividade = db.relationship('HistoricoProdutividadeServico', backref='servico', lazy=True)
     servicos_obra = db.relationship('ServicoObra', backref='servico', lazy=True)
+    servicos_reais = db.relationship('ServicoObraReal', backref='servico_real', lazy=True)
     admin = db.relationship('Usuario', backref='servicos_criados')
 
 # Removido: SubAtividade - substituído por SubatividadeMestre

@@ -134,6 +134,14 @@ except ImportError:
 app.register_blueprint(main_bp)
 app.register_blueprint(production_bp, url_prefix='/prod')
 
+# Register ServicoObraReal blueprint
+try:
+    from crud_servico_obra_real import servico_obra_real_bp
+    app.register_blueprint(servico_obra_real_bp)
+    logging.info("✅ Blueprint ServicoObraReal registrado")
+except ImportError as e:
+    logging.warning(f"ServicosObraReal não disponível: {e}")
+
 # Test routes removed for production cleanliness
 
 # Register error handlers
