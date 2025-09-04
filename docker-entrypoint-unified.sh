@@ -1,10 +1,10 @@
 #!/bin/bash
-# Script de entrada unificado para SIGE v8.0
-# Funciona tanto em desenvolvimento quanto produção
+# Script de entrada unificado para SIGE v8.2
+# Sistema "Serviços da Obra" baseado em RDO + Subatividades
 
 set -e
 
-echo "🚀 Iniciando SIGE v8.0 (Build Unificado)"
+echo "🚀 Iniciando SIGE v8.2 (Serviços da Obra Corrigido)"
 
 # Detectar ambiente
 if [[ "${FLASK_ENV:-production}" == "development" ]]; then
@@ -131,13 +131,15 @@ from flask import url_for
 
 with app.app_context():
     try:
-        # Testar rotas críticas
+        # Testar rotas críticas (incluindo novas APIs v8.2)
         rotas_criticas = [
             'main.dashboard',
             'main.funcionarios', 
             'main.funcionario_rdo_consolidado',
             'main.funcionario_rdo_novo',
-            'main.health_check'
+            'main.health_check',
+            'main.adicionar_servico_rdo_obra',
+            'main.api_servicos_disponiveis_obra'
         ]
         
         for rota in rotas_criticas:

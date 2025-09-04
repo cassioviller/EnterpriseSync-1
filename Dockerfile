@@ -1,13 +1,13 @@
-# DOCKERFILE UNIFICADO - SIGE v8.1 - CORREÇÃO 405
-# Configuração EasyPanel com correção Method Not Allowed
-# Sistema Integrado de Gestão Empresarial - Deploy Fixed
+# DOCKERFILE UNIFICADO - SIGE v8.2 - SERVIÇOS DA OBRA CORRIGIDO
+# Sistema com "Serviços da Obra" baseado em RDO + Subatividades
+# Sistema Integrado de Gestão Empresarial - Deploy Production Ready
 
 FROM python:3.11-slim-bullseye
 
 # Metadados
-LABEL maintainer="SIGE v8.1 EasyPanel" \
-      version="8.1" \
-      description="Sistema Integrado de Gestão Empresarial - EasyPanel Deploy Fixed"
+LABEL maintainer="SIGE v8.2 EasyPanel" \
+      version="8.2" \
+      description="Sistema Integrado de Gestão Empresarial - Serviços da Obra Corrigido"
 
 # Variáveis de build
 ARG DEBIAN_FRONTEND=noninteractive
@@ -41,8 +41,15 @@ COPY pyproject.toml ./
 RUN pip install --no-cache-dir --upgrade pip setuptools wheel && \
     pip install --no-cache-dir .
 
-# Copiar código da aplicação
+# Copiar código da aplicação (incluindo correções Serviços da Obra)
 COPY . .
+
+# Funcionalidades implementadas na v8.2:
+# - Sistema "Serviços da Obra" corrigido para usar RDO
+# - API /api/obras/servicos-rdo para criação automática de RDO inicial  
+# - API /api/servicos-disponiveis-obra/<obra_id> para filtrar serviços disponíveis
+# - Frontend atualizado com renderização de progresso das subatividades
+# - Função obter_servicos_da_obra() corrigida para tabelas servico + subatividade_mestre
 
 # Copiar sistema de erro detalhado para produção
 COPY utils/production_error_handler.py /app/utils/
