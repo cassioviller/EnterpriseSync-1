@@ -4900,6 +4900,147 @@ def api_rdo_maestria(obra_id):
         
         return _resposta_erro(operation_id, 'SYSTEM_ERROR', str(e), 500)
 
+# === SISTEMA DE SALVAMENTO RDO MAESTRIA DIGITAL ===
+
+@main_bp.route('/salvar-rdo-flexivel', methods=['POST'])
+def salvar_rdo_maestria():
+    """
+    Sistema de Salvamento RDO - Arquitetura Joris Kuypers
+    
+    Processa formulários de RDO com:
+    • Validação robusta de dados
+    • Transações atômicas
+    • Rollback automático em falhas
+    • Observabilidade completa
+    """
+    
+    operation_id = str(uuid.uuid4())[:8]
+    start_time = datetime.now()
+    
+    try:
+        print(f"💾 [SAVE:{operation_id}] rdo_save_start timestamp={start_time.isoformat()}")
+        
+        # === FASE 1: VALIDAÇÃO DE DADOS ===
+        obra_id = request.form.get('obra_id')
+        data_relatorio = request.form.get('data_relatorio')
+        observacoes_gerais = request.form.get('observacoes_gerais', '')
+        
+        if not obra_id or not data_relatorio:
+            return _erro_validacao(operation_id, 'Obra e data são obrigatórias')
+            
+        admin_id = get_admin_id_dinamico()
+        print(f"✅ [SAVE:{operation_id}] validation_ok obra_id={obra_id} date={data_relatorio} admin_id={admin_id}")
+        
+        # === FASE 2: PROCESSAMENTO DE SUBATIVIDADES ===
+        subatividades_dados = _extrair_subatividades_form(request.form, operation_id)
+        
+        if not subatividades_dados:
+            return _erro_validacao(operation_id, 'Nenhuma subatividade encontrada no formulário')
+            
+        print(f"📊 [SAVE:{operation_id}] subatividades_extracted count={len(subatividades_dados)}")
+        
+        # === FASE 3: TRANSAÇÃO ATÔMICA ===
+        try:
+            db.session.begin()
+            
+            # Criar RDO principal
+            novo_rdo = RDO(
+                obra_id=int(obra_id),
+                admin_id=admin_id,
+                data_relatorio=datetime.strptime(data_relatorio, '%Y-%m-%d').date(),
+                numero_rdo=f"RDO-{datetime.now().strftime('%Y%m%d')}-{obra_id}",
+                observacoes_gerais=observacoes_gerais,
+                status='ativo'
+            )
+            
+            db.session.add(novo_rdo)
+            db.session.flush()  # Para obter o ID
+            
+            print(f"✅ [SAVE:{operation_id}] rdo_created id={novo_rdo.id} numero={novo_rdo.numero_rdo}")
+            
+            # Salvar subatividades
+            subatividades_salvas = 0
+            for sub_data in subatividades_dados:
+                sub_rdo = RDOServicoSubatividade(
+                    rdo_id=novo_rdo.id,
+                    servico_id=sub_data['servico_id'],
+                    nome_subatividade=sub_data['nome'],
+                    percentual_conclusao=sub_data['percentual'],
+                    descricao_subatividade=sub_data.get('descricao', ''),
+                    ativo=True
+                )
+                db.session.add(sub_rdo)
+                subatividades_salvas += 1
+            
+            print(f"💾 [SAVE:{operation_id}] subatividades_saved count={subatividades_salvas}")
+            
+            # Commit da transação
+            db.session.commit()
+            
+            duration_ms = (datetime.now() - start_time).total_seconds() * 1000
+            print(f"✅ [SAVE:{operation_id}] transaction_success duration_ms={duration_ms:.2f}")
+            
+            flash('RDO salvo com sucesso!', 'success')
+            return redirect(url_for('main.rdo_consolidado'))
+            
+        except Exception as e:
+            db.session.rollback()
+            print(f"❌ [SAVE:{operation_id}] transaction_failed error='{str(e)}'")
+            raise
+            
+    except Exception as e:
+        duration_ms = (datetime.now() - start_time).total_seconds() * 1000
+        print(f"❌ [SAVE:{operation_id}] save_failed duration_ms={duration_ms:.2f} error='{str(e)}'")
+        
+        flash(f'Erro ao salvar RDO: {str(e)}', 'error')
+        return redirect(url_for('main.novo_rdo'))
+
+def _extrair_subatividades_form(form_data, operation_id):
+    """Extrai dados de subatividades do formulário com parsing inteligente"""
+    subatividades = []
+    
+    try:
+        # Buscar todos os campos de subatividade no formato: subatividade_SERVICO_INDEX_CAMPO
+        for key, value in form_data.items():
+            if key.startswith('subatividade_') and key.endswith('_percentual'):
+                # Extrair servico_id e index do nome do campo
+                parts = key.split('_')
+                if len(parts) >= 4:
+                    servico_id = parts[1]
+                    index = parts[2]
+                    
+                    # Buscar campos relacionados
+                    nome_key = f"subatividade_{servico_id}_{index}_nome"
+                    id_key = f"subatividade_{servico_id}_{index}_id"
+                    
+                    nome = form_data.get(nome_key, f'Subatividade {index}')
+                    percentual = float(value) if value else 0.0
+                    
+                    subatividade = {
+                        'servico_id': int(servico_id),
+                        'nome': nome,
+                        'percentual': percentual,
+                        'index': int(index)
+                    }
+                    
+                    subatividades.append(subatividade)
+                    print(f"📋 [EXTRACT:{operation_id}] sub_found servico={servico_id} nome='{nome}' perc={percentual}%")
+        
+        # Ordenar por servico_id e index
+        subatividades.sort(key=lambda x: (x['servico_id'], x['index']))
+        
+        return subatividades
+        
+    except Exception as e:
+        print(f"❌ [EXTRACT:{operation_id}] extraction_failed error='{str(e)}'")
+        return []
+
+def _erro_validacao(operation_id, mensagem):
+    """Retorna erro de validação padronizado"""
+    print(f"⚠️ [VALIDATION:{operation_id}] error='{mensagem}'")
+    flash(f'Erro de validação: {mensagem}', 'error')
+    return redirect(url_for('main.novo_rdo'))
+
 # === FUNÇÕES AUXILIARES DA MAESTRIA DIGITAL ===
 
 def _buscar_obra_segura(obra_id):
