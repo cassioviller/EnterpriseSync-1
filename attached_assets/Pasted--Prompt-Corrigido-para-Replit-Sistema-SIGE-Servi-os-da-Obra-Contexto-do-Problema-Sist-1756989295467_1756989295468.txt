@@ -1,0 +1,300 @@
+# Prompt Corrigido para Replit - Sistema SIGE: Serviços da Obra
+
+## Contexto do Problema
+
+**Sistema:** SIGE (Sistema Integrado de Gestão Empresarial) - Aplicação Flask com PostgreSQL
+
+**Problema Identificado:**
+A seção "Serviços da Obra" na página de detalhes da obra está buscando dados da tabela errada. Deve mostrar os serviços executados no RDO (Relatório Diário de Obras) baseados nas tabelas `servico` e `subatividade_mestre`, não da tabela `servico_obra` (que é para propostas comerciais).
+
+## Estrutura das Tabelas Corretas
+
+### Tabela `servico`
+- Contém os serviços principais (MEZANINO, ESTRUTURA METÁLICA, COBERTURA METÁLICA, etc.)
+- Campos principais: `id`, `nome`, `descricao`, `categoria`, `unidade_medida`, `admin_id`, `ativo`
+
+### Tabela `subatividade_mestre`
+- Contém as subatividades de cada serviço (ex: "1. Detalhamento do projeto", "2. seleção de materiais", etc.)
+- Campos principais: `id`, `servico_id`, `nome`, `descricao`, `ordem_padrao`, `admin_id`, `ativo`
+
+### Tabela `rdo_servico_subatividade`
+- Contém os registros de execução das subatividades nos RDOs
+- Campos principais: `id`, `rdo_id`, `servico_id`, `nome_subatividade`, `percentual_conclusao`, `admin_id`
+
+## Tarefas para Correção
+
+### Tarefa 1: Corrigir a Função `obter_servicos_da_obra()`
+
+**Arquivo:** `views.py`
+
+**Problema:** A função está consultando a tabela `servico_obra` em vez de buscar os serviços do RDO.
+
+**Solução:**
+```python
+def obter_servicos_da_obra(obra_id, admin_id=None):
+    """Obtém os serviços executados no RDO da obra com suas subatividades e progresso"""
+    try:
+        # Se admin_id não fornecido, tentar detectar
+        if not admin_id:
+            obra = Obra.query.get(obra_id)
+            admin_id = get_admin_id_robusta(obra)
+        
+        # Consulta para buscar serviços com subatividades e progresso do RDO
+        query = text("""
+            SELECT DISTINCT s.id, s.nome, s.descricao, s.categoria, s.unidade_medida, s.custo_unitario,
+                   COUNT(rss.id) as total_subatividades_ativas,
+                   AVG(rss.percentual_conclusao) as progresso_medio,
+                   (SELECT COUNT(*) FROM subatividade_mestre sm WHERE sm.servico_id = s.id AND sm.ativo = true) as total_subatividades_possiveis
+            FROM servico s
+            JOIN rdo_servico_subatividade rss ON s.id = rss.servico_id
+            JOIN rdo r ON rss.rdo_id = r.id
+            WHERE r.obra_id = :obra_id AND rss.ativo = true 
+              AND s.admin_id = :admin_id AND s.ativo = true
+            GROUP BY s.id, s.nome, s.descricao, s.categoria, s.unidade_medida, s.custo_unitario
+            ORDER BY s.nome
+        """)
+        
+        result = db.session.execute(query, {'obra_id': obra_id, 'admin_id': admin_id}).fetchall()
+        
+        servicos_lista = []
+        for row in result:
+            # Calcular progresso baseado na média das subatividades
+            progresso = float(row.progresso_medio or 0)
+            
+            servicos_lista.append({
+                'id': row.id,
+                'nome': row.nome,
+                'descricao': row.descricao or '',
+                'categoria': row.categoria,
+                'unidade_medida': row.unidade_medida,
+                'custo_unitario': row.custo_unitario,
+                'total_subatividades_ativas': row.total_subatividades_ativas,
+                'total_subatividades_possiveis': row.total_subatividades_possiveis,
+                'progresso': progresso,
+                'ativo': True
+            })
+        
+        print(f"✅ {len(servicos_lista)} serviços encontrados para obra {obra_id}")
+        return servicos_lista
+        
+    except Exception as e:
+        print(f"❌ Erro ao obter serviços da obra {obra_id}: {e}")
+        return []
+```
+
+### Tarefa 2: Criar Nova API para Adicionar Serviços ao RDO
+
+**Arquivo:** `views.py`
+
+**Problema:** A API atual adiciona à tabela `servico_obra`. Precisa criar RDO inicial com subatividades zeradas.
+
+**Solução:**
+```python
+@main_bp.route('/api/obras/servicos-rdo', methods=['POST', 'OPTIONS'])
+@login_required
+def adicionar_servico_rdo_obra():
+    """API para adicionar serviço ao RDO da obra criando registros iniciais"""
+    if request.method == 'OPTIONS':
+        response = make_response()
+        response.headers.add('Access-Control-Allow-Origin', '*')
+        response.headers.add('Access-Control-Allow-Headers', 'Content-Type,Authorization')
+        response.headers.add('Access-Control-Allow-Methods', 'GET,PUT,POST,DELETE,OPTIONS')
+        return response
+    
+    try:
+        data = request.get_json()
+        obra_id = data.get('obra_id')
+        servico_id = data.get('servico_id')
+        
+        if not obra_id or not servico_id:
+            return jsonify({'success': False, 'message': 'Dados incompletos'}), 400
+        
+        # Detectar admin_id
+        admin_id = current_user.id if current_user.tipo_usuario == TipoUsuario.ADMIN else current_user.admin_id
+        
+        # Verificar se obra e serviço pertencem ao admin
+        obra = Obra.query.filter_by(id=obra_id, admin_id=admin_id).first()
+        if not obra:
+            return jsonify({'success': False, 'message': 'Obra não encontrada'}), 404
+        
+        servico = Servico.query.filter_by(id=servico_id, admin_id=admin_id, ativo=True).first()
+        if not servico:
+            return jsonify({'success': False, 'message': 'Serviço não encontrado'}), 404
+        
+        # Buscar ou criar RDO do dia atual
+        hoje = date.today()
+        rdo = RDO.query.filter_by(obra_id=obra_id, data_relatorio=hoje).first()
+        
+        if not rdo:
+            # Criar RDO inicial para hoje
+            rdo = RDO(
+                numero_rdo=f"RDO-{obra_id}-{hoje.strftime('%Y%m%d')}",
+                data_relatorio=hoje,
+                obra_id=obra_id,
+                criado_por_id=current_user.id,
+                admin_id=admin_id,
+                clima_geral="Ensolarado",
+                temperatura_media="25°C",
+                umidade_relativa=60
+            )
+            db.session.add(rdo)
+            db.session.flush()  # Para obter o ID do RDO
+        
+        # Buscar subatividades mestre do serviço
+        subatividades_mestre = SubatividadeMestre.query.filter_by(
+            servico_id=servico_id, 
+            admin_id=admin_id, 
+            ativo=True
+        ).order_by(SubatividadeMestre.ordem_padrao).all()
+        
+        if not subatividades_mestre:
+            return jsonify({'success': False, 'message': 'Nenhuma subatividade encontrada para este serviço'}), 400
+        
+        # Criar registros RDOServicoSubatividade para cada subatividade com percentual 0
+        registros_criados = 0
+        for subatividade in subatividades_mestre:
+            # Verificar se já existe registro para esta subatividade
+            existe = RDOServicoSubatividade.query.filter_by(
+                rdo_id=rdo.id,
+                servico_id=servico_id,
+                nome_subatividade=subatividade.nome
+            ).first()
+            
+            if not existe:
+                novo_registro = RDOServicoSubatividade(
+                    rdo_id=rdo.id,
+                    servico_id=servico_id,
+                    nome_subatividade=subatividade.nome,
+                    descricao_subatividade=subatividade.descricao or '',
+                    percentual_conclusao=0.0,
+                    percentual_anterior=0.0,
+                    incremento_dia=0.0,
+                    observacoes_tecnicas='',
+                    ordem_execucao=subatividade.ordem_padrao,
+                    ativo=True,
+                    admin_id=admin_id
+                )
+                db.session.add(novo_registro)
+                registros_criados += 1
+        
+        db.session.commit()
+        
+        return jsonify({
+            'success': True,
+            'message': f'Serviço adicionado ao RDO com {registros_criados} subatividades inicializadas',
+            'servico': {
+                'id': servico.id,
+                'nome': servico.nome,
+                'descricao': servico.descricao
+            },
+            'rdo_id': rdo.id,
+            'subatividades_criadas': registros_criados
+        })
+        
+    except Exception as e:
+        db.session.rollback()
+        print(f"🚨 ERRO ADICIONAR SERVIÇO RDO: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({
+            'success': False,
+            'message': f'Erro interno: {str(e)}',
+            'error_type': type(e).__name__
+        }), 500
+```
+
+### Tarefa 3: Atualizar o Frontend
+
+**Arquivo:** Template HTML da página de detalhes da obra
+
+**Alterações necessárias:**
+
+1. **Alterar a URL da API de adição:**
+```javascript
+// De:
+fetch('/api/obras/servicos', { method: 'POST', ... })
+
+// Para:
+fetch('/api/obras/servicos-rdo', { method: 'POST', ... })
+```
+
+2. **Atualizar a lista de serviços disponíveis:**
+```javascript
+// Buscar serviços que ainda não estão no RDO da obra
+function carregarServicosDisponiveis(obraId) {
+    fetch(`/api/servicos-disponiveis-obra/${obraId}`)
+        .then(response => response.json())
+        .then(data => {
+            // Preencher dropdown com serviços que ainda não foram adicionados ao RDO
+        });
+}
+```
+
+3. **Exibir informações de progresso:**
+```javascript
+// Mostrar progresso baseado nas subatividades
+function renderizarServicoRDO(servico) {
+    return `
+        <div class="servico-rdo">
+            <h4>${servico.nome}</h4>
+            <p>Categoria: ${servico.categoria}</p>
+            <p>Subatividades: ${servico.total_subatividades_ativas}/${servico.total_subatividades_possiveis}</p>
+            <div class="progress">
+                <div class="progress-bar" style="width: ${servico.progresso}%">
+                    ${servico.progresso.toFixed(1)}%
+                </div>
+            </div>
+        </div>
+    `;
+}
+```
+
+### Tarefa 4: API Auxiliar para Serviços Disponíveis
+
+**Criar nova rota:**
+```python
+@main_bp.route('/api/servicos-disponiveis-obra/<int:obra_id>')
+@login_required
+def api_servicos_disponiveis_obra(obra_id):
+    """Retorna serviços que ainda não foram adicionados ao RDO da obra"""
+    try:
+        admin_id = current_user.id if current_user.tipo_usuario == TipoUsuario.ADMIN else current_user.admin_id
+        
+        # Buscar serviços que ainda não estão no RDO desta obra
+        servicos_no_rdo = db.session.query(Servico.id).join(
+            RDOServicoSubatividade, Servico.id == RDOServicoSubatividade.servico_id
+        ).join(
+            RDO, RDOServicoSubatividade.rdo_id == RDO.id
+        ).filter(
+            RDO.obra_id == obra_id,
+            RDOServicoSubatividade.ativo == True
+        ).distinct().subquery()
+        
+        servicos_disponiveis = Servico.query.filter(
+            Servico.admin_id == admin_id,
+            Servico.ativo == True,
+            ~Servico.id.in_(servicos_no_rdo)
+        ).all()
+        
+        return jsonify({
+            'success': True,
+            'servicos': [{
+                'id': s.id,
+                'nome': s.nome,
+                'categoria': s.categoria,
+                'descricao': s.descricao
+            } for s in servicos_disponiveis]
+        })
+        
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+```
+
+## Resumo das Alterações
+
+1. **Corrigir `obter_servicos_da_obra()`** - buscar dados do RDO em vez de propostas
+2. **Criar `adicionar_servico_rdo_obra()`** - adicionar serviços ao RDO com subatividades zeradas
+3. **Criar `api_servicos_disponiveis_obra()`** - listar serviços ainda não adicionados
+4. **Atualizar frontend** - usar as novas APIs e exibir progresso das subatividades
+
+Com essas alterações, a seção "Serviços da Obra" mostrará corretamente os serviços executados no RDO, e ao adicionar novos serviços, criará automaticamente um RDO inicial com todas as subatividades em 0%.
