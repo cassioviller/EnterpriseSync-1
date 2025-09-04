@@ -4276,33 +4276,32 @@ def rdo_salvar_unificado():
                 numero = key.split('_')[2]  # ['nome', 'subatividade', '1', 'percentual']
                 percentual = float(value) if value else 0
                 
-                if percentual > 0:
-                    nome_key = f'nome_subatividade_{numero}'
-                    obs_key = f'observacoes_subatividade_{numero}'
-                    
-                    nome = request.form.get(nome_key, '').strip()
-                    observacoes = request.form.get(obs_key, '').strip()
-                    
-                    if nome:  # Só processar se tem nome
-                        campos_personalizados[numero] = {
-                            'nome': nome,
-                            'percentual': percentual,
-                            'observacoes': observacoes
-                        }
+                # Sempre processar, mesmo com percentual 0
+                nome_key = f'nome_subatividade_{numero}'
+                obs_key = f'observacoes_subatividade_{numero}'
+                
+                nome = request.form.get(nome_key, '').strip()
+                observacoes = request.form.get(obs_key, '').strip()
+                
+                if nome:  # Só processar se tem nome
+                    campos_personalizados[numero] = {
+                        'nome': nome,
+                        'percentual': percentual,
+                        'observacoes': observacoes
+                    }
         
-        # Processar campos personalizados primeiro
+        # Processar campos personalizados primeiro (salvar todos, mesmo 0%)
         for numero, dados in campos_personalizados.items():
-            if dados['percentual'] > 0:
-                rdo_servico_subativ = RDOServicoSubatividade()
-                rdo_servico_subativ.rdo_id = rdo.id
-                rdo_servico_subativ.nome_subatividade = dados['nome']
-                rdo_servico_subativ.percentual_conclusao = dados['percentual']
-                rdo_servico_subativ.observacoes_tecnicas = dados['observacoes']
-                rdo_servico_subativ.admin_id = admin_id_correto
-                rdo_servico_subativ.servico_id = 1  # Serviço genérico para campos manuais
-                db.session.add(rdo_servico_subativ)
-                subatividades_processadas += 1
-                print(f"DEBUG MANUAL: {dados['nome']}: {dados['percentual']}% - {dados['observacoes'][:30]}...")
+            rdo_servico_subativ = RDOServicoSubatividade()
+            rdo_servico_subativ.rdo_id = rdo.id
+            rdo_servico_subativ.nome_subatividade = dados['nome']
+            rdo_servico_subativ.percentual_conclusao = dados['percentual']
+            rdo_servico_subativ.observacoes_tecnicas = dados['observacoes']
+            rdo_servico_subativ.admin_id = admin_id_correto
+            rdo_servico_subativ.servico_id = 1  # Serviço genérico para campos manuais
+            db.session.add(rdo_servico_subativ)
+            subatividades_processadas += 1
+            print(f"DEBUG MANUAL: {dados['nome']}: {dados['percentual']}% - {dados['observacoes'][:30] if dados['observacoes'] else 'Sem obs'}...")
         
         # Percorrer subatividades do sistema padrão
         for key, value in request.form.items():
@@ -4312,37 +4311,37 @@ def rdo_salvar_unificado():
                     subatividade_id = int(key.split('_')[1])
                     percentual = float(value) if value else 0
                     
-                    if percentual > 0:  # Só salvar se tem percentual
-                        # Buscar observações correspondentes
-                        obs_key = f'subatividade_{subatividade_id}_observacoes'
-                        observacoes = request.form.get(obs_key, '').strip()
-                        
-                        # Buscar informações da subatividade
-                        subatividade = SubatividadeMestre.query.get(subatividade_id)
-                        if subatividade:
-                            # Salvar no sistema RDO hierárquico
-                            rdo_servico_subativ = RDOServicoSubatividade()
-                            rdo_servico_subativ.rdo_id = rdo.id
-                            rdo_servico_subativ.nome_subatividade = subatividade.nome
-                            rdo_servico_subativ.percentual_conclusao = percentual
-                            rdo_servico_subativ.observacoes_tecnicas = observacoes
-                            rdo_servico_subativ.admin_id = admin_id_correto
-                            rdo_servico_subativ.servico_id = subatividade.servico_id  # Importante para hierarchy
-                            db.session.add(rdo_servico_subativ)
-                            subatividades_processadas += 1
-                            print(f"DEBUG SISTEMA: {subatividade.nome}: {percentual}% - {observacoes[:30]}...")
-                        else:
-                            # Se não encontrou subatividade, salvar como personalizada
-                            rdo_servico_subativ = RDOServicoSubatividade()
-                            rdo_servico_subativ.rdo_id = rdo.id
-                            rdo_servico_subativ.nome_subatividade = f'Subatividade {subatividade_id}'
-                            rdo_servico_subativ.percentual_conclusao = percentual
-                            rdo_servico_subativ.observacoes_tecnicas = observacoes
-                            rdo_servico_subativ.admin_id = admin_id_correto
-                            rdo_servico_subativ.servico_id = 1  # Genérico
-                            db.session.add(rdo_servico_subativ)
-                            subatividades_processadas += 1
-                            print(f"DEBUG GENERICO: Subatividade {subatividade_id}: {percentual}%")
+                    # Salvar todas as subatividades, mesmo com 0%
+                    # Buscar observações correspondentes
+                    obs_key = f'subatividade_{subatividade_id}_observacoes'
+                    observacoes = request.form.get(obs_key, '').strip()
+                    
+                    # Buscar informações da subatividade
+                    subatividade = SubatividadeMestre.query.get(subatividade_id)
+                    if subatividade:
+                        # Salvar no sistema RDO hierárquico
+                        rdo_servico_subativ = RDOServicoSubatividade()
+                        rdo_servico_subativ.rdo_id = rdo.id
+                        rdo_servico_subativ.nome_subatividade = subatividade.nome
+                        rdo_servico_subativ.percentual_conclusao = percentual
+                        rdo_servico_subativ.observacoes_tecnicas = observacoes
+                        rdo_servico_subativ.admin_id = admin_id_correto
+                        rdo_servico_subativ.servico_id = subatividade.servico_id  # Importante para hierarchy
+                        db.session.add(rdo_servico_subativ)
+                        subatividades_processadas += 1
+                        print(f"DEBUG SISTEMA: {subatividade.nome}: {percentual}% - {observacoes[:30] if observacoes else 'Sem obs'}...")
+                    else:
+                        # Se não encontrou subatividade, salvar como personalizada
+                        rdo_servico_subativ = RDOServicoSubatividade()
+                        rdo_servico_subativ.rdo_id = rdo.id
+                        rdo_servico_subativ.nome_subatividade = f'Subatividade {subatividade_id}'
+                        rdo_servico_subativ.percentual_conclusao = percentual
+                        rdo_servico_subativ.observacoes_tecnicas = observacoes
+                        rdo_servico_subativ.admin_id = admin_id_correto
+                        rdo_servico_subativ.servico_id = 1  # Genérico
+                        db.session.add(rdo_servico_subativ)
+                        subatividades_processadas += 1
+                        print(f"DEBUG GENERICO: Subatividade {subatividade_id}: {percentual}%")
                         
                 except (ValueError, IndexError) as e:
                     print(f"Erro ao processar subatividade {key}: {e}")
