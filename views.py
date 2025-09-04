@@ -5644,19 +5644,33 @@ def adicionar_servico_obra():
         
         print(f"✅ SERVIÇO ENCONTRADO: {servico.nome}")
         
-        # Verificar se já existe associação
+        # Verificar se já existe associação (considerar registros sem admin_id)
         print(f"🔍 VERIFICANDO ASSOCIAÇÃO EXISTENTE")
         servico_obra_existente = ServicoObra.query.filter_by(
             obra_id=obra_id, 
             servico_id=servico_id
         ).first()
         
+        print(f"🔍 ASSOCIAÇÃO ENCONTRADA: {servico_obra_existente is not None}")
+        if servico_obra_existente:
+            print(f"   - ID: {servico_obra_existente.id}")
+            print(f"   - Ativo: {servico_obra_existente.ativo}")
+            print(f"   - Admin_ID: {getattr(servico_obra_existente, 'admin_id', 'N/A')}")
+        
         if servico_obra_existente:
             if servico_obra_existente.ativo:
+                print(f"⚠️ SERVIÇO JÁ ATIVO")
                 return jsonify({'success': False, 'message': 'Serviço já está associado à obra'}), 400
             else:
+                print(f"🔄 REATIVANDO REGISTRO EXISTENTE")
                 # Reativar se estava desativado
                 servico_obra_existente.ativo = True
+                servico_obra_existente.updated_at = datetime.now()
+                
+                # Garantir que o admin_id esteja correto
+                if not hasattr(servico_obra_existente, 'admin_id') or servico_obra_existente.admin_id is None:
+                    servico_obra_existente.admin_id = admin_id
+                    print(f"✅ ADMIN_ID CORRIGIDO: {admin_id}")
         else:
             # Criar nova associação (usando apenas campos que existem na tabela)
             servico_obra = ServicoObra(
