@@ -40,6 +40,11 @@ app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 app.config['WTF_CSRF_ENABLED'] = False
 
+# Configurações específicas para resolver erro SERVER_NAME  
+app.config['SERVER_NAME'] = None  # Permite qualquer host
+app.config['APPLICATION_ROOT'] = '/'  # Raiz da aplicação  
+app.config['PREFERRED_URL_SCHEME'] = 'http'  # Esquema padrão
+
 # Configure CORS for AJAX requests
 CORS(app, origins="*", methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"])
 
