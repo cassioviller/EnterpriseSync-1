@@ -4998,30 +4998,41 @@ def api_ultimo_rdo_dados_corrigida(obra_id):
             subatividades_rdo = RDOServicoSubatividade.query.filter_by(rdo_id=ultimo_rdo.id).all()
             servicos_dict = {}
             
+            # CORREÇÃO CRÍTICA: Processar DIRETAMENTE pela servico_id da tabela rdo_servico_subatividade
             for sub_rdo in subatividades_rdo:
-                if sub_rdo.servico:
-                    servico = sub_rdo.servico
-                    servico_id = servico.id
-                    
-                    # ✅ CORREÇÃO: Remover filtro restritivo - serviços do RDO são válidos por definição
-                    # if ids_servicos_permitidos is not None and servico_id not in ids_servicos_permitidos:
-                    #     print(f"🚫 IGNORANDO serviço {servico.nome} (ID {servico_id}) - não cadastrado na obra")
-                    #     continue
-                    
-                    if servico_id not in servicos_dict:
-                        servicos_dict[servico_id] = {
-                            'id': servico.id,
-                            'nome': servico.nome,
-                            'categoria': getattr(servico, 'categoria', 'Não categorizado'),
-                            'subatividades': []
-                        }
-                    
-                    servicos_dict[servico_id]['subatividades'].append({
-                        'id': sub_rdo.id,
-                        'nome': sub_rdo.nome_subatividade,
-                        'percentual': float(sub_rdo.percentual_conclusao or 0),
-                        'descricao': sub_rdo.descricao_subatividade or ''
-                    })
+                servico_id = sub_rdo.servico_id
+                print(f"🔍 Processando subatividade: servico_id={servico_id}, nome='{sub_rdo.nome_subatividade}'")
+                
+                # Buscar serviço diretamente pelo ID (sem depender de relacionamento)
+                try:
+                    servico = Servico.query.filter_by(id=servico_id, admin_id=admin_id, ativo=True).first()
+                    if not servico:
+                        print(f"⚠️ Serviço ID {servico_id} não encontrado - pulando")
+                        continue
+                        
+                    print(f"✅ Serviço encontrado: {servico.nome} (ID {servico_id})")
+                except Exception as e:
+                    print(f"❌ Erro ao buscar serviço ID {servico_id}: {e}")
+                    continue
+                
+                # Adicionar ao dicionário de serviços
+                if servico_id not in servicos_dict:
+                    servicos_dict[servico_id] = {
+                        'id': servico.id,
+                        'nome': servico.nome,
+                        'categoria': getattr(servico, 'categoria', 'Não categorizado'),
+                        'subatividades': []
+                    }
+                
+                # Adicionar subatividade com TODOS os dados
+                servicos_dict[servico_id]['subatividades'].append({
+                    'id': sub_rdo.id,
+                    'nome': sub_rdo.nome_subatividade,
+                    'percentual': float(sub_rdo.percentual_conclusao or 0),
+                    'descricao': sub_rdo.descricao_subatividade or ''
+                })
+                
+                print(f"✅ Subatividade adicionada: '{sub_rdo.nome_subatividade}' ({sub_rdo.percentual_conclusao}%)")
             
             servicos_dados = list(servicos_dict.values())
         except Exception as e:
