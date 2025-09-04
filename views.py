@@ -8,6 +8,60 @@ from sqlalchemy import func, desc, or_, and_, text
 import os
 import json
 
+# SISTEMA DE LOG DETALHADO PARA MÓDULOS
+import sys
+import importlib.util
+
+def verificar_modulo_detalhado(nome_modulo, descricao=""):
+    """Verificar se um módulo existe e mostrar logs detalhados"""
+    try:
+        spec = importlib.util.find_spec(nome_modulo)
+        if spec is None:
+            print(f"❌ MÓDULO NÃO ENCONTRADO: {nome_modulo} ({descricao})")
+            print(f"   📍 Localização esperada: {nome_modulo.replace('.', '/')}.py")
+            print(f"   📂 Python path: {sys.path}")
+            return False
+        else:
+            print(f"✅ MÓDULO ENCONTRADO: {nome_modulo} ({descricao})")
+            print(f"   📍 Localização: {spec.origin}")
+            return True
+    except Exception as e:
+        print(f"🚨 ERRO AO VERIFICAR MÓDULO {nome_modulo}: {e}")
+        return False
+
+print("🔍 VERIFICAÇÃO DETALHADA DE MÓDULOS - INÍCIO")
+print("=" * 60)
+
+# Verificar módulos específicos que estão falhando
+modulos_verificar = [
+    ('bypass_auth', 'Sistema de bypass de autenticação'),
+    ('utils.idempotency', 'Utilitários de idempotência'),
+    ('utils.circuit_breaker', 'Circuit breakers para resiliência'),
+    ('utils.saga', 'Padrão SAGA para transações'),
+    ('migrations', 'Sistema de migrações automáticas'),
+    ('models', 'Modelos do banco de dados'),
+    ('auth', 'Sistema de autenticação')
+]
+
+modulos_encontrados = []
+modulos_faltando = []
+
+for modulo, desc in modulos_verificar:
+    if verificar_modulo_detalhado(modulo, desc):
+        modulos_encontrados.append(modulo)
+    else:
+        modulos_faltando.append(modulo)
+
+print("\n📊 RESUMO DA VERIFICAÇÃO:")
+print(f"   ✅ Módulos encontrados: {len(modulos_encontrados)}")
+print(f"   ❌ Módulos faltando: {len(modulos_faltando)}")
+
+if modulos_faltando:
+    print(f"\n🚨 MÓDULOS FALTANDO: {', '.join(modulos_faltando)}")
+    print("   💡 Ação recomendada: Verificar se arquivos existem e caminhos estão corretos")
+
+print("=" * 60)
+
 # Importar utilitários de resiliência
 try:
     from utils.idempotency import idempotent, rdo_key_generator, funcionario_key_generator
@@ -15,7 +69,8 @@ try:
     from utils.saga import RDOSaga, FuncionarioSaga
     print("✅ Utilitários de resiliência importados com sucesso")
 except ImportError as e:
-    print(f"⚠️ Erro ao importar utilitários de resiliência: {e}")
+    print(f"⚠️ MODULO UTILS FALTANDO: {e}")
+    print("   📝 Criando fallbacks para manter compatibilidade...")
     # Fallbacks para manter compatibilidade
     def idempotent(*args, **kwargs):
         def decorator(func):
@@ -26,6 +81,7 @@ except ImportError as e:
         def decorator(func):
             return func
         return decorator
+    print("   ✅ Fallbacks criados com sucesso")
 
 main_bp = Blueprint('main', __name__)
 
