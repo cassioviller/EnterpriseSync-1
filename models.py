@@ -143,6 +143,60 @@ class ServicoObra(db.Model):
     # Unique constraint para evitar duplicatas
     __table_args__ = (db.UniqueConstraint('obra_id', 'servico_id', name='_obra_servico_uc'),)
 
+class ObraServico(db.Model):
+    """Nova tabela aprimorada para gestão completa de serviços na obra"""
+    __tablename__ = 'obra_servico'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    obra_id = db.Column(db.Integer, db.ForeignKey('obra.id'), nullable=False)
+    servico_id = db.Column(db.Integer, db.ForeignKey('servico.id'), nullable=False)
+    
+    # Planejamento detalhado
+    quantidade_planejada = db.Column(db.Numeric(12, 4), nullable=False, default=0.0)
+    quantidade_executada = db.Column(db.Numeric(12, 4), default=0.0)
+    percentual_concluido = db.Column(db.Numeric(5, 2), default=0.0)  # 0.00 a 100.00%
+    
+    # Controle de prazo
+    data_inicio_planejada = db.Column(db.Date)
+    data_fim_planejada = db.Column(db.Date)
+    data_inicio_real = db.Column(db.Date)
+    data_fim_real = db.Column(db.Date)
+    
+    # Controle de custos
+    valor_unitario = db.Column(db.Numeric(10, 2), default=0.0)
+    valor_total_planejado = db.Column(db.Numeric(12, 2), default=0.0)
+    valor_total_executado = db.Column(db.Numeric(12, 2), default=0.0)
+    
+    # Status e controle
+    status = db.Column(db.String(30), default='Não Iniciado')  # Não Iniciado, Em Andamento, Concluído, Pausado
+    prioridade = db.Column(db.Integer, default=3)  # 1=Alta, 2=Média, 3=Baixa
+    responsavel_id = db.Column(db.Integer, db.ForeignKey('funcionario.id'))  # Funcionário responsável
+    
+    # Observações e notas
+    observacoes = db.Column(db.Text)
+    notas_tecnicas = db.Column(db.Text)  # Para detalhes técnicos específicos
+    
+    # Controle de qualidade
+    aprovado = db.Column(db.Boolean, default=False)
+    data_aprovacao = db.Column(db.DateTime)
+    aprovado_por_id = db.Column(db.Integer, db.ForeignKey('funcionario.id'))
+    
+    # Multi-tenant e controle
+    admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False)
+    ativo = db.Column(db.Boolean, default=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    # Relacionamentos
+    obra = db.relationship('Obra', backref='obra_servicos', lazy=True)
+    servico = db.relationship('Servico', backref='obra_servicos', lazy=True)
+    responsavel = db.relationship('Funcionario', foreign_keys=[responsavel_id], backref='servicos_responsavel', lazy=True)
+    aprovado_por = db.relationship('Funcionario', foreign_keys=[aprovado_por_id], backref='servicos_aprovados', lazy=True)
+    admin = db.relationship('Usuario', backref='obra_servicos_criados', lazy=True)
+    
+    # Unique constraint para evitar duplicatas
+    __table_args__ = (db.UniqueConstraint('obra_id', 'servico_id', name='_obra_servico_unique'),)
+
 class Veiculo(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     placa = db.Column(db.String(10), unique=True, nullable=False)
