@@ -1395,7 +1395,10 @@ def processar_servicos_obra(obra_id, servicos_selecionados):
         
         # Processar novos serviços contratados
         servicos_processados = 0
-        admin_id = get_admin_id_robusta()
+        # CORREÇÃO: Usar admin_id da obra, não do sistema
+        obra = Obra.query.get(obra_id)
+        admin_id = obra.admin_id if obra and obra.admin_id else get_admin_id_robusta()
+        print(f"🎯 USANDO ADMIN_ID DA OBRA: {admin_id}")
         
         for servico_id in servicos_selecionados:
             if servico_id and str(servico_id).strip():
