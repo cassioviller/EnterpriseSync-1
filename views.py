@@ -1384,18 +1384,27 @@ def get_admin_id_robusta(obra=None, current_user=None):
         return 10
 
 def processar_servicos_obra(obra_id, servicos_selecionados):
-    """Processa associação de serviços CONTRATADOS à obra (não RDO)"""
+    """Processa associação de serviços RDO à obra para execução"""
     try:
-        print(f"🔧 PROCESSANDO SERVIÇOS CONTRATADOS: obra_id={obra_id}, {len(servicos_selecionados)} serviços")
+        print(f"🔧 PROCESSANDO SERVIÇOS RDO: obra_id={obra_id}, {len(servicos_selecionados)} serviços")
         
-        # CORREÇÃO: Volta para SERVICO_OBRA (serviços contratados)
-        # Desativar associações existentes na tabela correta
-        ServicoObra.query.filter_by(obra_id=obra_id).update({'ativo': False})
-        print(f"🧹 Associações de serviços anteriores desativadas")
+        # CORREÇÃO: Desativar subatividades RDO existentes desta obra
+        from sqlalchemy import and_
         
-        # Processar novos serviços contratados
+        # Primeiro buscar os IDs dos RDOs desta obra
+        rdos_obra = db.session.query(RDO.id).filter(RDO.obra_id == obra_id).subquery()
+        
+        # Depois desativar as subatividades usando os IDs encontrados
+        subatividades_existentes = RDOServicoSubatividade.query.filter(
+            and_(
+                RDOServicoSubatividade.rdo_id.in_(db.session.query(rdos_obra.c.id)),
+                RDOServicoSubatividade.ativo == True
+            )
+        ).update({'ativo': False}, synchronize_session=False)
+        print(f"🧹 Associações RDO anteriores desativadas: {subatividades_existentes}")
+        
+        # Processar novos serviços RDO
         servicos_processados = 0
-        # CORREÇÃO: Usar admin_id da obra, não do sistema
         obra = Obra.query.get(obra_id)
         admin_id = obra.admin_id if obra and obra.admin_id else get_admin_id_robusta()
         print(f"🎯 USANDO ADMIN_ID DA OBRA: {admin_id}")
@@ -1405,28 +1414,59 @@ def processar_servicos_obra(obra_id, servicos_selecionados):
                 try:
                     servico_id_int = int(servico_id)
                     
-                    # Verificar se associação já existe na tabela SERVICO_OBRA
-                    associacao_existente = ServicoObra.query.filter_by(
-                        obra_id=obra_id, servico_id=servico_id_int
+                    # Verificar se RDO existe para esta obra (qualquer admin_id)
+                    from datetime import date
+                    data_hoje = date.today()
+                    
+                    # Primeiro tentar encontrar RDO de hoje
+                    rdo_existente = RDO.query.filter_by(
+                        obra_id=obra_id, 
+                        data_relatorio=data_hoje
                     ).first()
                     
-                    if associacao_existente:
-                        # Reativar existente
-                        associacao_existente.ativo = True
-                        associacao_existente.updated_at = datetime.utcnow()
-                        print(f"✅ Serviço {servico_id_int} reativado")
-                    else:
-                        # Criar nova associação na tabela SERVICO_OBRA
-                        nova_associacao = ServicoObra(
+                    # Se não encontrou, tentar RDO mais recente desta obra
+                    if not rdo_existente:
+                        rdo_existente = RDO.query.filter_by(obra_id=obra_id).order_by(RDO.data_relatorio.desc()).first()
+                    
+                    # Só criar novo se realmente não existir nenhum
+                    if not rdo_existente:
+                        # Criar número único usando timestamp
+                        import time
+                        timestamp = str(int(time.time()))[-6:]  # últimos 6 dígitos
+                        
+                        rdo_existente = RDO(
+                            numero_rdo=f"RDO-{obra_id}-{data_hoje.strftime('%Y%m%d')}-{timestamp}",
                             obra_id=obra_id,
-                            servico_id=servico_id_int,
-                            quantidade_planejada=1.0,
-                            quantidade_executada=0.0,
-                            ativo=True,
-                            admin_id=admin_id
+                            data_relatorio=data_hoje,
+                            status='Rascunho',
+                            admin_id=admin_id,
+                            criado_por_id=admin_id
                         )
-                        db.session.add(nova_associacao)
-                        print(f"🆕 Nova associação de serviço contratado criada: {servico_id_int}")
+                        db.session.add(rdo_existente)
+                        db.session.flush()
+                        print(f"📝 NOVO RDO CRIADO: ID {rdo_existente.id}")
+                    else:
+                        print(f"♻️ REUTILIZANDO RDO EXISTENTE: ID {rdo_existente.id}")
+                    
+                    # Buscar o serviço para pegar o nome
+                    servico = Servico.query.get(servico_id_int)
+                    if not servico:
+                        print(f"⚠️ Serviço {servico_id_int} não encontrado")
+                        continue
+                    
+                    # Criar nova subatividade RDO
+                    nova_subatividade = RDOServicoSubatividade(
+                        rdo_id=rdo_existente.id,
+                        servico_id=servico_id_int,
+                        nome_subatividade=f"{servico.nome} - Execução",
+                        descricao_subatividade=f"Serviço {servico.nome} associado via edição",
+                        percentual_conclusao=0.0,
+                        observacoes_tecnicas='Adicionado via edição de obra',
+                        ativo=True,
+                        admin_id=admin_id
+                    )
+                    db.session.add(nova_subatividade)
+                    print(f"🆕 Nova subatividade RDO criada para serviço {servico_id_int}")
                     
                     servicos_processados += 1
                     
@@ -1445,7 +1485,7 @@ def processar_servicos_obra(obra_id, servicos_selecionados):
         return 0
 
 def obter_servicos_da_obra(obra_id, admin_id=None):
-    """Obtém lista de serviços CONTRATADOS associados à obra (não RDO)"""
+    """Obtém lista de serviços RDO sendo executados na obra"""
     try:
         from sqlalchemy import text
         
@@ -1454,16 +1494,19 @@ def obter_servicos_da_obra(obra_id, admin_id=None):
             obra = Obra.query.get(obra_id)
             admin_id = get_admin_id_robusta(obra)
         
-        print(f"🔍 BUSCANDO SERVIÇOS CONTRATADOS para obra {obra_id}, admin_id {admin_id}")
+        print(f"🔍 BUSCANDO SERVIÇOS RDO EXECUTADOS para obra {obra_id}, admin_id {admin_id}")
         
-        # CORREÇÃO: Volta para SERVICO_OBRA (serviços contratados/orçados)
+        # CORREÇÃO: Volta para RDO_SERVICO_SUBATIVIDADE (serviços em execução)
         query = text("""
-            SELECT s.id, s.nome, s.descricao, s.categoria, s.unidade_medida, s.custo_unitario,
-                   so.quantidade_planejada, so.quantidade_executada, so.ativo
+            SELECT DISTINCT s.id, s.nome, s.descricao, s.categoria, s.unidade_medida, s.custo_unitario,
+                   COUNT(rss.id) as total_subatividades,
+                   AVG(rss.percentual_conclusao) as progresso_medio
             FROM servico s
-            JOIN servico_obra so ON s.id = so.servico_id
-            WHERE so.obra_id = :obra_id AND so.ativo = true 
-              AND (s.admin_id = :admin_id OR so.admin_id = :admin_id OR so.admin_id IS NULL)
+            JOIN rdo_servico_subatividade rss ON s.id = rss.servico_id
+            JOIN rdo r ON rss.rdo_id = r.id
+            WHERE r.obra_id = :obra_id AND rss.ativo = true 
+              AND (s.admin_id = :admin_id OR rss.admin_id = :admin_id)
+            GROUP BY s.id, s.nome, s.descricao, s.categoria, s.unidade_medida, s.custo_unitario
             ORDER BY s.nome
         """)
         
@@ -1471,11 +1514,6 @@ def obter_servicos_da_obra(obra_id, admin_id=None):
         
         servicos_lista = []
         for row in result:
-            # Calcular progresso baseado em quantidade
-            progresso = 0.0
-            if row.quantidade_planejada and row.quantidade_planejada > 0:
-                progresso = (row.quantidade_executada or 0) / row.quantidade_planejada * 100
-            
             servicos_lista.append({
                 'id': row.id,
                 'nome': row.nome,
@@ -1483,17 +1521,16 @@ def obter_servicos_da_obra(obra_id, admin_id=None):
                 'categoria': row.categoria,
                 'unidade_medida': row.unidade_medida,
                 'custo_unitario': row.custo_unitario,
-                'quantidade_planejada': float(row.quantidade_planejada or 0),
-                'quantidade_executada': float(row.quantidade_executada or 0),
-                'progresso': round(progresso, 1),
-                'ativo': row.ativo
+                'total_subatividades': int(row.total_subatividades or 0),
+                'progresso': round(float(row.progresso_medio or 0), 1),
+                'ativo': True
             })
         
-        print(f"✅ {len(servicos_lista)} serviços CONTRATADOS encontrados para obra {obra_id}")
+        print(f"✅ {len(servicos_lista)} serviços RDO EXECUTADOS encontrados para obra {obra_id}")
         return servicos_lista
         
     except Exception as e:
-        print(f"❌ Erro ao obter serviços contratados da obra {obra_id}: {e}")
+        print(f"❌ Erro ao obter serviços RDO da obra {obra_id}: {e}")
         return []
 
 def obter_servicos_disponiveis(admin_id):
@@ -5653,55 +5690,92 @@ def adicionar_servico_obra():
         
         print(f"✅ SERVIÇO ENCONTRADO: {servico.nome}")
         
-        # CORREÇÃO: Verificar se já existe associação na tabela SERVICO_OBRA
-        print(f"🔍 VERIFICANDO ASSOCIAÇÃO DE SERVIÇO CONTRATADO")
+        # CORREÇÃO: Verificar se já existe associação RDO
+        print(f"🔍 VERIFICANDO ASSOCIAÇÃO RDO EXISTENTE")
         
-        servico_obra_existente = ServicoObra.query.filter_by(
-            obra_id=obra_id, 
-            servico_id=servico_id
+        # Buscar por subatividades RDO que já usam este serviço nesta obra
+        from sqlalchemy import and_
+        rdo_existente_query = db.session.query(RDOServicoSubatividade).join(RDO).filter(
+            and_(
+                RDO.obra_id == obra_id,
+                RDOServicoSubatividade.servico_id == servico_id,
+                RDOServicoSubatividade.admin_id == admin_id,
+                RDOServicoSubatividade.ativo == True
+            )
         ).first()
         
-        print(f"🔍 ASSOCIAÇÃO ENCONTRADA: {servico_obra_existente is not None}")
-        if servico_obra_existente:
-            print(f"   - ID: {servico_obra_existente.id}")
-            print(f"   - Ativo: {servico_obra_existente.ativo}")
-            print(f"   - Admin_ID: {getattr(servico_obra_existente, 'admin_id', 'N/A')}")
+        print(f"🔍 ASSOCIAÇÃO RDO ENCONTRADA: {rdo_existente_query is not None}")
+        if rdo_existente_query:
+            print(f"   - ID: {rdo_existente_query.id}")
+            print(f"   - RDO ID: {rdo_existente_query.rdo_id}")
+            print(f"   - Ativo: {rdo_existente_query.ativo}")
+            print(f"   - Admin_ID: {rdo_existente_query.admin_id}")
         
-        if servico_obra_existente and servico_obra_existente.ativo:
-            print(f"⚠️ SERVIÇO JÁ CONTRATADO PARA ESTA OBRA")
-            return jsonify({'success': False, 'message': 'Serviço já está contratado para esta obra'}), 400
+        if rdo_existente_query:
+            print(f"⚠️ SERVIÇO JÁ ESTÁ SENDO EXECUTADO NESTA OBRA")
+            return jsonify({'success': False, 'message': 'Serviço já está sendo executado nesta obra'}), 400
         else:
-            print(f"🆕 CRIANDO NOVA ASSOCIAÇÃO DE SERVIÇO CONTRATADO")
+            print(f"🆕 CRIANDO NOVA ASSOCIAÇÃO RDO")
             
-            if servico_obra_existente:
-                # Reativar existente
-                servico_obra_existente.ativo = True
-                servico_obra_existente.admin_id = admin_id
-                print(f"🔄 REATIVANDO ASSOCIAÇÃO EXISTENTE")
-            else:
-                # Criar nova associação na tabela SERVICO_OBRA
-                servico_obra = ServicoObra(
+            # Verificar se RDO existe para esta obra
+            from datetime import date
+            data_hoje = date.today()
+            
+            # Tentar encontrar RDO de hoje primeiro
+            rdo_existente = RDO.query.filter_by(
+                obra_id=obra_id, 
+                data_relatorio=data_hoje
+            ).first()
+            
+            # Se não encontrou, tentar RDO mais recente
+            if not rdo_existente:
+                rdo_existente = RDO.query.filter_by(obra_id=obra_id).order_by(RDO.data_relatorio.desc()).first()
+            
+            # Só criar novo se realmente não existir
+            if not rdo_existente:
+                print(f"📝 CRIANDO NOVO RDO PARA A OBRA {obra_id}")
+                import time
+                timestamp = str(int(time.time()))[-6:]
+                
+                rdo_existente = RDO(
+                    numero_rdo=f"RDO-{obra_id}-{data_hoje.strftime('%Y%m%d')}-{timestamp}",
                     obra_id=obra_id,
-                    servico_id=servico_id,
-                    quantidade_planejada=1.0,
-                    quantidade_executada=0.0,
-                    observacoes='Serviço adicionado via modal',
-                    ativo=True,
-                    admin_id=admin_id
+                    data_relatorio=data_hoje,
+                    status='Rascunho',
+                    admin_id=admin_id,
+                    criado_por_id=admin_id
                 )
-                db.session.add(servico_obra)
-                print(f"✅ ASSOCIAÇÃO DE SERVIÇO CONTRATADO ADICIONADA")
+                db.session.add(rdo_existente)
+                db.session.flush()  # Para obter o ID do RDO
+                print(f"✅ RDO CRIADO COM ID: {rdo_existente.id}")
+            else:
+                print(f"♻️ REUTILIZANDO RDO EXISTENTE: {rdo_existente.id}")
+            
+            # Criar subatividade padrão para o serviço
+            rdo_servico_sub = RDOServicoSubatividade(
+                rdo_id=rdo_existente.id,
+                servico_id=servico_id,
+                nome_subatividade=f"{servico.nome} - Preparação",
+                descricao_subatividade=f"Atividade inicial do serviço {servico.nome}",
+                percentual_conclusao=0.0,
+                observacoes_tecnicas='Serviço adicionado via modal',
+                ativo=True,
+                admin_id=admin_id
+            )
+            
+            db.session.add(rdo_servico_sub)
+            print(f"✅ SUBATIVIDADE RDO ADICIONADA À SESSÃO")
         
         print(f"💾 FAZENDO COMMIT DA TRANSAÇÃO")
         db.session.commit()
         print(f"✅ COMMIT REALIZADO COM SUCESSO")
         
-        # Verificar se o registro foi realmente salvo (na tabela SERVICO_OBRA)
-        verificacao = ServicoObra.query.filter_by(obra_id=obra_id, servico_id=servico_id, ativo=True).first()
+        # Verificar se o registro foi realmente salvo (na tabela RDO)
+        verificacao = RDOServicoSubatividade.query.filter_by(servico_id=servico_id, admin_id=admin_id, ativo=True).first()
         if verificacao:
-            print(f"✅ VERIFICAÇÃO: Serviço contratado salvo com ID {verificacao.id}")
+            print(f"✅ VERIFICAÇÃO: Subatividade RDO salva com ID {verificacao.id}")
         else:
-            print(f"❌ VERIFICAÇÃO: Serviço contratado não encontrado após commit!")
+            print(f"❌ VERIFICAÇÃO: Subatividade RDO não encontrada após commit!")
         
         return jsonify({
             'success': True, 
