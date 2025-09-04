@@ -1557,89 +1557,76 @@ def verificar_dados_producao(admin_id):
         return False
 
 def processar_servicos_obra(obra_id, servicos_selecionados):
-    """Processa associação de serviços RDO à obra para execução"""
+    """Processa associação de serviços à obra usando NOVA TABELA servico_obra_real"""
     try:
-        print(f"🔧 PROCESSANDO SERVIÇOS RDO: obra_id={obra_id}, {len(servicos_selecionados)} serviços")
+        print(f"🔧 PROCESSANDO SERVIÇOS NOVA TABELA: obra_id={obra_id}, {len(servicos_selecionados)} serviços")
         
-        # CORREÇÃO: Desativar subatividades RDO existentes desta obra
-        from sqlalchemy import and_
+        # ===== NOVO SISTEMA: USAR TABELA servico_obra_real =====
         
-        # Primeiro buscar os IDs dos RDOs desta obra
-        rdos_obra = db.session.query(RDO.id).filter(RDO.obra_id == obra_id).subquery()
-        
-        # Depois desativar as subatividades usando os IDs encontrados
-        subatividades_existentes = RDOServicoSubatividade.query.filter(
-            and_(
-                RDOServicoSubatividade.rdo_id.in_(db.session.query(rdos_obra.c.id)),
-                RDOServicoSubatividade.ativo == True
-            )
+        # Desativar serviços existentes na nova tabela
+        servicos_desativados = ServicoObraReal.query.filter_by(
+            obra_id=obra_id,
+            ativo=True
         ).update({'ativo': False}, synchronize_session=False)
-        print(f"🧹 Associações RDO anteriores desativadas: {subatividades_existentes}")
+        print(f"🧹 Serviços anteriores desativados na nova tabela: {servicos_desativados}")
         
-        # Processar novos serviços RDO
+        # Processar novos serviços usando ServicoObraReal
         servicos_processados = 0
         obra = Obra.query.get(obra_id)
         admin_id = obra.admin_id if obra and obra.admin_id else get_admin_id_robusta()
         print(f"🎯 USANDO ADMIN_ID DA OBRA: {admin_id}")
+        
+        from datetime import date
+        data_hoje = date.today()
         
         for servico_id in servicos_selecionados:
             if servico_id and str(servico_id).strip():
                 try:
                     servico_id_int = int(servico_id)
                     
-                    # Verificar se RDO existe para esta obra (qualquer admin_id)
-                    from datetime import date
-                    data_hoje = date.today()
-                    
-                    # Primeiro tentar encontrar RDO de hoje
-                    rdo_existente = RDO.query.filter_by(
-                        obra_id=obra_id, 
-                        data_relatorio=data_hoje
+                    # Buscar o serviço para validação
+                    servico = Servico.query.filter_by(
+                        id=servico_id_int,
+                        admin_id=admin_id,
+                        ativo=True
                     ).first()
                     
-                    # Se não encontrou, tentar RDO mais recente desta obra
-                    if not rdo_existente:
-                        rdo_existente = RDO.query.filter_by(obra_id=obra_id).order_by(RDO.data_relatorio.desc()).first()
-                    
-                    # Só criar novo se realmente não existir nenhum
-                    if not rdo_existente:
-                        # Criar número único usando timestamp
-                        import time
-                        timestamp = str(int(time.time()))[-6:]  # últimos 6 dígitos
-                        
-                        rdo_existente = RDO(
-                            numero_rdo=f"RDO-{obra_id}-{data_hoje.strftime('%Y%m%d')}-{timestamp}",
-                            obra_id=obra_id,
-                            data_relatorio=data_hoje,
-                            status='Rascunho',
-                            admin_id=admin_id,
-                            criado_por_id=admin_id
-                        )
-                        db.session.add(rdo_existente)
-                        db.session.flush()
-                        print(f"📝 NOVO RDO CRIADO: ID {rdo_existente.id}")
-                    else:
-                        print(f"♻️ REUTILIZANDO RDO EXISTENTE: ID {rdo_existente.id}")
-                    
-                    # Buscar o serviço para pegar o nome
-                    servico = Servico.query.get(servico_id_int)
                     if not servico:
-                        print(f"⚠️ Serviço {servico_id_int} não encontrado")
+                        print(f"⚠️ Serviço {servico_id_int} não encontrado ou não pertence ao admin {admin_id}")
                         continue
                     
-                    # Criar nova subatividade RDO
-                    nova_subatividade = RDOServicoSubatividade(
-                        rdo_id=rdo_existente.id,
+                    # Verificar se serviço já existe na nova tabela
+                    servico_existente = ServicoObraReal.query.filter_by(
+                        obra_id=obra_id,
                         servico_id=servico_id_int,
-                        nome_subatividade=f"{servico.nome} - Execução",
-                        descricao_subatividade=f"Serviço {servico.nome} associado via edição",
-                        percentual_conclusao=0.0,
-                        observacoes_tecnicas='Adicionado via edição de obra',
-                        ativo=True,
-                        admin_id=admin_id
+                        admin_id=admin_id,
+                        ativo=True
+                    ).first()
+                    
+                    if servico_existente:
+                        print(f"⚠️ Serviço {servico.nome} já está associado à obra")
+                        continue
+                    
+                    # Criar novo registro na tabela servico_obra_real
+                    novo_servico_obra = ServicoObraReal(
+                        obra_id=obra_id,
+                        servico_id=servico_id_int,
+                        quantidade_planejada=1.0,  # Padrão
+                        quantidade_executada=0.0,
+                        percentual_concluido=0.0,
+                        valor_unitario=servico.custo_unitario or 0.0,
+                        valor_total_planejado=servico.custo_unitario or 0.0,
+                        valor_total_executado=0.0,
+                        status='Não Iniciado',
+                        prioridade=3,  # Média
+                        data_inicio_planejada=data_hoje,
+                        observacoes=f'Serviço adicionado via edição em {data_hoje.strftime("%d/%m/%Y")}',
+                        admin_id=admin_id,
+                        ativo=True
                     )
-                    db.session.add(nova_subatividade)
-                    print(f"🆕 Nova subatividade RDO criada para serviço {servico_id_int}")
+                    
+                    db.session.add(novo_servico_obra)
+                    print(f"🆕 Novo serviço {servico.nome} adicionado à nova tabela")
                     
                     servicos_processados += 1
                     
