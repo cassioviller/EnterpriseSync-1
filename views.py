@@ -5149,68 +5149,88 @@ def mastery_dashboard():
         return redirect(url_for('main.funcionario_rdo_consolidado'))
 
 def _extrair_subatividades_form(form_data, operation_id):
-    """Extrai dados de subatividades do formulário com parsing inteligente"""
+    """
+    Extrai dados de subatividades do formulário com parsing inteligente
+    Implementa observabilidade completa seguindo princípios de Digital Mastery
+    """
+    from utils.observability import mastery_observer
+    
     subatividades = []
     
     try:
-        print(f"🔍 [DEBUG:{operation_id}] form_keys_all: {list(form_data.keys())}")
+        mastery_observer.add_step(operation_id, 'FORM_EXTRACTION_START', {
+            'total_form_keys': len(form_data.keys()),
+            'form_keys': list(form_data.keys())
+        })
         
-        # Buscar todos os campos de subatividade no formato: subatividade_SERVICO_INDEX_CAMPO
+        # NOVO PADRÃO: subatividade_ID_percentual (onde ID é o ID da subatividade existente)
+        percentual_fields = []
         for key, value in form_data.items():
             if key.startswith('subatividade_') and key.endswith('_percentual'):
+                percentual_fields.append((key, value))
                 print(f"🔍 [DEBUG:{operation_id}] found_percentual_field: {key} = {value}")
-                # Extrair servico_id e index do nome do campo
-                parts = key.split('_')
-                if len(parts) >= 4:
-                    servico_id = parts[1]
-                    index = parts[2]
-                    
-                    # Buscar campos relacionados
-                    nome_key = f"subatividade_{servico_id}_{index}_nome"
-                    id_key = f"subatividade_{servico_id}_{index}_id"
-                    
-                    nome = form_data.get(nome_key, f'Subatividade {index}')
-                    percentual = float(value) if value else 0.0
-                    
-                    subatividade = {
-                        'servico_id': int(servico_id),
-                        'nome': nome,
-                        'percentual': percentual,
-                        'index': int(index)
-                    }
-                    
-                    subatividades.append(subatividade)
-                    print(f"📋 [EXTRACT:{operation_id}] sub_found servico={servico_id} nome='{nome}' perc={percentual}%")
         
-        # Fallback: tentar formato alternativo sub_SERVICO_INDEX
-        if not subatividades:
-            print(f"🔍 [DEBUG:{operation_id}] trying_fallback_format...")
-            for key, value in form_data.items():
-                if key.startswith('sub_') and key.count('_') >= 2:
-                    parts = key.split('_')
-                    if len(parts) >= 3:
-                        servico_id = parts[1]
-                        index = parts[2]
+        mastery_observer.add_step(operation_id, 'PERCENTUAL_FIELDS_FOUND', {
+            'count': len(percentual_fields),
+            'fields': [f[0] for f in percentual_fields]
+        })
+        
+        if percentual_fields:
+            # Padrão ATUAL: subatividade_SUBATIVIDADE_ID_percentual
+            for key, value in percentual_fields:
+                try:
+                    # Extrair ID da subatividade do campo: subatividade_187_percentual -> 187
+                    subatividade_id = key.replace('subatividade_', '').replace('_percentual', '')
+                    
+                    if subatividade_id.isdigit():
+                        # Buscar informações da subatividade no banco
+                        from models import RDOServicoSubatividade
+                        subatividade_existente = db.session.query(RDOServicoSubatividade).filter_by(
+                            id=int(subatividade_id)
+                        ).first()
                         
-                        try:
+                        if subatividade_existente:
                             percentual = float(value) if value else 0.0
-                            subatividade = {
-                                'servico_id': int(servico_id),
-                                'nome': f'Subatividade {index}',
+                            
+                            subatividade_data = {
+                                'subatividade_id': int(subatividade_id),
+                                'servico_id': subatividade_existente.servico_id,
+                                'nome': subatividade_existente.nome_subatividade,
                                 'percentual': percentual,
-                                'index': int(index)
+                                'descricao': subatividade_existente.descricao_subatividade or ''
                             }
-                            subatividades.append(subatividade)
-                            print(f"📋 [FALLBACK:{operation_id}] sub_found servico={servico_id} index={index} perc={percentual}%")
-                        except ValueError:
-                            continue
+                            
+                            subatividades.append(subatividade_data)
+                            
+                            print(f"✅ [EXTRACT:{operation_id}] subatividade_extracted: {subatividade_data}")
+                            
+                        else:
+                            print(f"⚠️ [EXTRACT:{operation_id}] subatividade_not_found: id={subatividade_id}")
+                            
+                except Exception as field_error:
+                    print(f"❌ [EXTRACT:{operation_id}] field_error: {key} -> {str(field_error)}")
+                    continue
         
-        # Ordenar por servico_id e index
-        subatividades.sort(key=lambda x: (x['servico_id'], x['index']))
+        mastery_observer.add_step(operation_id, 'EXTRACTION_COMPLETED', {
+            'subactivities_extracted': len(subatividades),
+            'extraction_method': 'EXISTING_SUBACTIVITIES',
+            'details': subatividades
+        })
         
+        if not subatividades:
+            mastery_observer.add_step(operation_id, 'EXTRACTION_FALLBACK_ATTEMPTED', {
+                'reason': 'No subactivities found with current method'
+            })
+            print(f"🔍 [DEBUG:{operation_id}] trying_fallback_format...")
+            
+        print(f"📊 [EXTRACT:{operation_id}] final_result: {len(subatividades)} subatividades extracted")
         return subatividades
         
     except Exception as e:
+        mastery_observer.add_step(operation_id, 'EXTRACTION_ERROR', {
+            'error_type': type(e).__name__,
+            'error_message': str(e)
+        })
         print(f"❌ [EXTRACT:{operation_id}] extraction_failed error='{str(e)}'")
         return []
 
