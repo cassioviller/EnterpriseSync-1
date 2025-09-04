@@ -4849,15 +4849,32 @@ def api_test_rdo_servicos_obra(obra_id):
 # API para carregar dados do último RDO - CORRIGIDA
 @main_bp.route('/api/ultimo-rdo-dados/<int:obra_id>')
 def api_ultimo_rdo_dados_corrigida(obra_id):
-    """API para obter dados do último RDO de uma obra"""
+    """API para obter dados do último RDO de uma obra - SEMPRE VAZIO PARA NOVOS RDOs"""
     try:
         admin_id = get_admin_id_dinamico()
-        print(f"✅ API ÚLTIMO RDO: obra_id={obra_id}, admin_id={admin_id}")
+        print(f"✅ API NOVO RDO VAZIO: obra_id={obra_id}, admin_id={admin_id}")
         
-        # Verificar se existe pelo menos um RDO para esta obra
+        # CORREÇÃO: SEMPRE retornar RDO vazio para novos RDOs
+        # Não carregar dados anteriores automaticamente
+        resultado = {
+            'success': True,
+            'primeira_rdo': True,
+            'ultimo_rdo': {
+                'id': None,
+                'numero_rdo': 'NOVO_RDO',
+                'data_relatorio': datetime.now().strftime('%Y-%m-%d'),
+                'servicos': [],  # SEMPRE VAZIO
+                'funcionarios': [],  # SEMPRE VAZIO
+                'total_servicos': 0
+            }
+        }
+        print("✅ RDO VAZIO: Sistema não carrega dados anteriores automaticamente")
+        return jsonify(resultado)
+        
+        # CÓDIGO ANTERIOR DESABILITADO - MANTER PARA REFERÊNCIA
         ultimo_rdo = RDO.query.filter_by(obra_id=obra_id, admin_id=admin_id).order_by(RDO.data_relatorio.desc()).first()
         
-        if not ultimo_rdo:
+        if False:  # DESABILITADO
             # Primeira RDO - carregar serviços da obra com percentual 0%
             print(f"🔍 Primeira RDO da obra {obra_id} - carregando serviços com percentual 0%")
             
