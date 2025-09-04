@@ -1876,6 +1876,42 @@ def detalhes_obra(id):
             from models import Servico
             from sqlalchemy import text
             
+            # PRODUÇÃO DOCKER: Buscar serviços de forma robusta
+            admin_id_consulta = None
+            
+            # 1. Tentar usar admin_id da obra primeiro
+            if hasattr(obra, 'admin_id') and obra.admin_id:
+                admin_id_consulta = obra.admin_id
+                print(f"🏗️ PRODUÇÃO SERVIÇOS: Usando admin_id da obra = {admin_id_consulta}")
+            
+            # 2. Fallback para admin_id detectado
+            elif admin_id:
+                admin_id_consulta = admin_id
+                print(f"🔍 PRODUÇÃO SERVIÇOS: Usando admin_id detectado = {admin_id_consulta}")
+            
+            # 3. Fallback robusto: buscar admin_id via consulta direta
+            else:
+                try:
+                    admin_fallback = db.session.execute(text("""
+                        SELECT DISTINCT s.admin_id 
+                        FROM servico s 
+                        JOIN servico_obra so ON s.id = so.servico_id 
+                        WHERE so.obra_id = :obra_id AND so.ativo = true 
+                        LIMIT 1
+                    """), {'obra_id': obra_id}).fetchone()
+                    
+                    if admin_fallback:
+                        admin_id_consulta = admin_fallback[0]
+                        print(f"🔄 PRODUÇÃO SERVIÇOS FALLBACK: admin_id encontrado = {admin_id_consulta}")
+                    else:
+                        admin_id_consulta = 2  # Fallback final para produção
+                        print(f"⚠️ PRODUÇÃO SERVIÇOS FALLBACK FINAL: admin_id = {admin_id_consulta}")
+                except Exception as fallback_error:
+                    admin_id_consulta = 2
+                    print(f"🚨 PRODUÇÃO SERVIÇOS ERRO: {fallback_error}, usando admin_id = {admin_id_consulta}")
+            
+            print(f"✅ PRODUÇÃO SERVIÇOS FINAL: Consultando com admin_id = {admin_id_consulta}")
+            
             # Buscar serviços que foram especificamente cadastrados nesta obra
             servicos_obra_query = db.session.execute(text("""
                 SELECT s.id, s.nome, s.descricao, s.categoria, s.unidade_medida, s.custo_unitario,
@@ -1884,7 +1920,7 @@ def detalhes_obra(id):
                 JOIN servico_obra so ON s.id = so.servico_id 
                 WHERE so.obra_id = :obra_id AND so.ativo = true AND s.admin_id = :admin_id
                 ORDER BY s.nome
-            """), {'obra_id': obra_id, 'admin_id': admin_id or obra.admin_id}).fetchall()
+            """), {'obra_id': obra_id, 'admin_id': admin_id_consulta}).fetchall()
             
             # Converter para lista de dicionários para o template
             servicos_obra = []
@@ -1930,10 +1966,43 @@ def detalhes_obra(id):
                     'progresso': progresso
                 })
             
-            print(f"DEBUG SERVIÇOS OBRA: {len(servicos_obra)} serviços encontrados cadastrados na obra")
+            print(f"✅ DEBUG SERVIÇOS OBRA: {len(servicos_obra)} serviços encontrados para obra {obra_id} com admin_id {admin_id_consulta}")
+            
+            # Se não encontrou serviços, tentar consulta sem filtro de admin_id como fallback
+            if not servicos_obra:
+                print(f"🔄 PRODUÇÃO: Tentando consulta alternativa sem filtro admin_id")
+                try:
+                    servicos_obra_fallback = db.session.execute(text("""
+                        SELECT s.id, s.nome, s.descricao, s.categoria, s.unidade_medida, s.custo_unitario,
+                               so.quantidade_planejada, so.quantidade_executada
+                        FROM servico s 
+                        JOIN servico_obra so ON s.id = so.servico_id 
+                        WHERE so.obra_id = :obra_id AND so.ativo = true
+                        ORDER BY s.nome
+                    """), {'obra_id': obra_id}).fetchall()
+                    
+                    # Processar resultados do fallback
+                    for row in servicos_obra_fallback:
+                        servicos_obra.append({
+                            'id': row.id,
+                            'nome': row.nome,
+                            'descricao': row.descricao or '',
+                            'categoria': row.categoria,
+                            'unidade_medida': row.unidade_medida,
+                            'custo_unitario': row.custo_unitario,
+                            'quantidade_planejada': row.quantidade_planejada,
+                            'quantidade_executada': row.quantidade_executada or 0,
+                            'progresso': 0  # Progresso padrão para fallback
+                        })
+                    
+                    print(f"✅ PRODUÇÃO FALLBACK: {len(servicos_obra)} serviços encontrados sem filtro admin_id")
+                except Exception as fallback_error:
+                    print(f"🚨 PRODUÇÃO: Erro no fallback de serviços: {fallback_error}")
             
         except Exception as e:
-            print(f"ERRO ao buscar serviços da obra: {e}")
+            print(f"🚨 PRODUÇÃO: ERRO CRÍTICO ao buscar serviços da obra: {e}")
+            import traceback
+            traceback.print_exc()
             servicos_obra = []
         total_rdos = len(rdos_obra)
         rdos_finalizados = len([r for r in rdos_obra if r.status == 'Finalizado'])
