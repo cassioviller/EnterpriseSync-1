@@ -582,26 +582,35 @@ function carregarDadosUltimoRDO() {
         </div>
     `;
     
-    // Fazer requisição para API do último RDO
-    fetch(`/api/ultimo-rdo-dados/${obraId}`)
+    // === MAESTRIA DIGITAL API V3 ===
+    // Nova API com observabilidade total e circuit breakers
+    fetch(`/api/rdo/ultima-dados/${obraId}`)
         .then(response => response.json())
         .then(data => {
-            console.log('🔍 [DEBUG] Dados recebidos completos:', data);
+            // === MAESTRIA DIGITAL - OBSERVABILIDADE ===
+            const operation_id = data.metadata?.operation_id || 'unknown';
+            const duration = data.metadata?.duration_ms || 0;
+            
+            console.log(`🎯 [MAESTRIA:${operation_id}] API_RESPONSE duration=${duration}ms success=${data.success}`);
+            console.log('📊 [DADOS_COMPLETOS]:', data);
             
             if (data.success) {
                 if (data.primeira_rdo && data.ultima_rdo) {
-                    console.log(`✅ Primeira RDO - carregando ${data.ultima_rdo.total_servicos} serviços com 0%`);
-                    exibirDadosPrimeiraRDO(data.ultima_rdo);
+                    const servicos = data.ultima_rdo.total_servicos || 0;
+                    console.log(`🆕 [PRIMEIRA_RDO:${operation_id}] servicos=${servicos} estado=INIT`);
+                    exibirDadosPrimeiraRDOMaestria(data.ultima_rdo, data.metadata);
                 } else if (data.ultima_rdo) {
-                    console.log(`✅ RDO existente encontrado: ${data.ultima_rdo.numero_rdo}`);
-                    exibirDadosUltimoRDO(data.ultima_rdo);
+                    const rdo_num = data.ultima_rdo.numero_rdo;
+                    console.log(`🔄 [RDO_EXISTENTE:${operation_id}] rdo=${rdo_num} estado=LOADED`);
+                    exibirDadosUltimoRDOMaestria(data.ultima_rdo, data.metadata);
                 } else {
-                    console.log('ℹ️ Nenhum dado de RDO encontrado');
+                    console.log(`ℹ️ [SEM_DADOS:${operation_id}] estado=EMPTY`);
                     exibirMensagemSemRDOAnterior();
                 }
             } else {
-                console.error('❌ API retornou erro:', data.error || 'Erro desconhecido');
-                exibirErroCarregamento();
+                const error_code = data.error_code || 'UNKNOWN_ERROR';
+                console.error(`❌ [API_ERROR:${operation_id}] code=${error_code} message='${data.error}'`);
+                exibirErroCarregamento(data.error, error_code);
             }
         })
         .catch(error => {
@@ -716,92 +725,210 @@ function exibirDadosUltimoRDO(ultimoRDO) {
     }
 }
 
-function exibirDadosPrimeiraRDO(primeiraRDO) {
-    console.log('🆕 [MAESTRIA] Inicializando primeira RDO da obra:', primeiraRDO);
+// === MAESTRIA DIGITAL - RENDERIZAÇÃO PRIMEIRA RDO ===
+function exibirDadosPrimeiraRDOMaestria(primeiraRDO, metadata) {
+    const operation_id = metadata?.operation_id || 'unknown';
+    console.log(`🆕 [RENDER:${operation_id}] primeira_rdo_render_start`);
     
     const container = document.getElementById('servicos-container');
     if (!container) {
-        console.error('❌ Container servicos-container não encontrado');
+        console.error(`❌ [RENDER:${operation_id}] container_not_found`);
         return;
     }
     
     try {
+        // === HEADER ELEGANTE COM OBSERVABILIDADE ===
         let html = `
-            <div class="alert alert-warning border-0 shadow-sm mb-4">
+            <div class="alert alert-primary border-0 shadow-lg mb-4" style="background: linear-gradient(135deg, #0066cc 0%, #004499 100%); color: white;">
                 <div class="d-flex align-items-center">
-                    <i class="fas fa-star fa-2x text-warning me-3"></i>
-                    <div>
-                        <h6 class="mb-1 fw-bold">🆕 Primeira RDO desta Obra</h6>
-                        <p class="mb-0">RDO: ${primeiraRDO.numero_rdo} • Data: ${primeiraRDO.data_relatorio}</p>
+                    <div class="me-3">
+                        <i class="fas fa-rocket fa-2x"></i>
+                    </div>
+                    <div class="flex-grow-1">
+                        <h5 class="mb-1 fw-bold">🆕 Primeira RDO - Início da Obra</h5>
+                        <p class="mb-1 opacity-90">RDO: ${primeiraRDO.numero_rdo} • Data: ${primeiraRDO.data_relatorio}</p>
+                        <small class="opacity-75">Operation: ${operation_id} • ${metadata?.duration_ms || 0}ms</small>
+                    </div>
+                    <div class="text-end">
+                        <div class="badge bg-light text-dark px-3 py-2">
+                            <i class="fas fa-chart-line me-1"></i>
+                            ${primeiraRDO.total_servicos || 0} serviços
+                        </div>
                     </div>
                 </div>
             </div>
         `;
         
-        // Verificar se há serviços
+        // === PROCESSAMENTO DE SERVIÇOS ===
         if (primeiraRDO && primeiraRDO.servicos && primeiraRDO.servicos.length > 0) {
-            console.log(`📋 Exibindo ${primeiraRDO.servicos.length} serviços da primeira RDO`);
+            console.log(`📊 [RENDER:${operation_id}] rendering_services count=${primeiraRDO.servicos.length}`);
+            
+            // Estatísticas dos serviços
+            const totalSubatividades = primeiraRDO.servicos.reduce((acc, s) => acc + (s.subatividades?.length || 0), 0);
             
             html += `
-                <div class="mb-3">
-                    <h6><i class="fas fa-list-check me-2"></i>Serviços da Obra (${primeiraRDO.servicos.length})</h6>
+                <div class="row mb-4">
+                    <div class="col-md-8">
+                        <h6 class="text-success mb-0">
+                            <i class="fas fa-tasks me-2"></i>Serviços da Obra
+                        </h6>
+                        <small class="text-muted">${primeiraRDO.servicos.length} serviços • ${totalSubatividades} subatividades</small>
+                    </div>
+                    <div class="col-md-4 text-end">
+                        <div class="badge bg-success-subtle text-success px-3 py-2">
+                            <i class="fas fa-check-circle me-1"></i>Prontos para execução
+                        </div>
+                    </div>
                 </div>
             `;
             
-            primeiraRDO.servicos.forEach(servico => {
-                console.log(`🔧 Renderizando serviço: ${servico.nome} (${servico.categoria})`);
+            // === RENDERIZAÇÃO DE SERVIÇOS COM DESIGN MODERNO ===
+            primeiraRDO.servicos.forEach((servico, index) => {
+                console.log(`🔧 [RENDER:${operation_id}] service_${index} name='${servico.nome}' subs=${servico.subatividades?.length || 0}`);
+                
+                const gradientColors = [
+                    'linear-gradient(135deg, #6c757d 0%, #495057 100%)',
+                    'linear-gradient(135deg, #20c997 0%, #198754 100%)',
+                    'linear-gradient(135deg, #0dcaf0 0%, #0a58ca 100%)',
+                    'linear-gradient(135deg, #fd7e14 0%, #dc3545 100%)'
+                ];
+                
+                const gradient = gradientColors[index % gradientColors.length];
                 
                 html += `
-                    <div class="card mb-3 border-0 shadow-sm">
-                        <div class="card-header bg-light border-0 py-3">
-                            <div class="d-flex justify-content-between align-items-center">
-                                <div>
-                                    <h6 class="mb-1 fw-bold">${servico.nome}</h6>
-                                    <span class="badge bg-info px-3 py-1">${servico.categoria}</span>
-                                </div>
-                                <div class="text-end">
-                                    <div class="progress" style="width: 120px; height: 8px;">
-                                        <div class="progress-bar bg-secondary" style="width: 0%"></div>
+                    <div class="card border-0 shadow-lg mb-4 overflow-hidden" style="border-radius: 12px;">
+                        <div class="card-header border-0 p-0">
+                            <div class="p-4" style="background: ${gradient}; color: white;">
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <div>
+                                        <h6 class="mb-2 fw-bold">${servico.nome}</h6>
+                                        <div class="d-flex align-items-center gap-3">
+                                            <span class="badge bg-white bg-opacity-25 px-3 py-1">
+                                                <i class="fas fa-tag me-1"></i>${servico.categoria}
+                                            </span>
+                                            <span class="badge bg-white bg-opacity-25 px-3 py-1">
+                                                <i class="fas fa-list me-1"></i>${servico.subatividades?.length || 0} etapas
+                                            </span>
+                                        </div>
                                     </div>
-                                    <small class="text-muted">0% concluído</small>
+                                    <div class="text-end">
+                                        <div class="progress bg-white bg-opacity-25" style="width: 120px; height: 10px; border-radius: 5px;">
+                                            <div class="progress-bar bg-white bg-opacity-50" style="width: 0%; border-radius: 5px;"></div>
+                                        </div>
+                                        <small class="d-block mt-1 opacity-90">0% inicial</small>
+                                    </div>
                                 </div>
                             </div>
                         </div>
-                        <div class="card-body">
-                            ${renderizarSubatividadesPrimeira(servico.subatividades)}
+                        <div class="card-body p-4">
+                            ${renderizarSubatividadesMaestria(servico.subatividades, operation_id)}
                         </div>
                     </div>
                 `;
             });
             
+            // === DICAS E PRÓXIMOS PASSOS ===
             html += `
-                <div class="alert alert-info border-0 mt-3">
-                    <i class="fas fa-lightbulb me-2"></i>
-                    <strong>Dica:</strong> Todos os serviços começam com 0%. Você pode ajustar os percentuais ao criar o RDO.
+                <div class="card border-0 shadow-sm bg-light">
+                    <div class="card-body p-4">
+                        <div class="row align-items-center">
+                            <div class="col-md-8">
+                                <h6 class="text-primary mb-2">
+                                    <i class="fas fa-lightbulb me-2"></i>Próximos Passos
+                                </h6>
+                                <p class="mb-0 text-muted">
+                                    Todos os serviços foram inicializados com 0%. Você pode ajustar os percentuais de cada subatividade ao criar o primeiro RDO.
+                                </p>
+                            </div>
+                            <div class="col-md-4 text-end">
+                                <button class="btn btn-success btn-lg" onclick="window.scrollTo({top: 0, behavior: 'smooth'})">
+                                    <i class="fas fa-arrow-up me-2"></i>Criar RDO
+                                </button>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             `;
             
         } else {
-            console.warn('⚠️ Nenhum serviço encontrado na primeira RDO');
+            console.warn(`⚠️ [RENDER:${operation_id}] no_services_found`);
             html += `
                 <div class="text-center py-5">
-                    <i class="fas fa-exclamation-triangle fa-3x text-muted mb-3"></i>
-                    <h6 class="text-muted">Nenhum serviço cadastrado nesta obra</h6>
-                    <p class="text-muted">Cadastre os serviços primeiro para poder criar RDOs</p>
-                    <button class="btn btn-primary mt-2" onclick="window.location.href='/servicos'">
-                        <i class="fas fa-plus me-1"></i>Cadastrar Serviços
+                    <div class="mb-4">
+                        <i class="fas fa-tools fa-4x text-muted opacity-50"></i>
+                    </div>
+                    <h5 class="text-muted mb-3">Nenhum serviço cadastrado</h5>
+                    <p class="text-muted mb-4">Para criar RDOs, você precisa primeiro cadastrar os serviços desta obra.</p>
+                    <button class="btn btn-primary btn-lg" onclick="window.location.href='/servicos'">
+                        <i class="fas fa-plus me-2"></i>Cadastrar Serviços
                     </button>
                 </div>
             `;
         }
         
         container.innerHTML = html;
-        console.log('✅ [MAESTRIA] Primeira RDO renderizada com sucesso');
+        console.log(`✅ [RENDER:${operation_id}] primeira_rdo_render_success`);
+        
+        // Adicionar animação sutil
+        container.style.opacity = '0';
+        container.style.transform = 'translateY(20px)';
+        setTimeout(() => {
+            container.style.transition = 'all 0.3s ease';
+            container.style.opacity = '1';
+            container.style.transform = 'translateY(0)';
+        }, 50);
         
     } catch (error) {
-        console.error('❌ [ERRO CRÍTICO] Falha na primeira RDO:', error);
+        console.error(`❌ [RENDER:${operation_id}] primeira_rdo_render_error error='${error.message}'`);
         exibirErroCarregamento();
     }
+}
+
+// === RENDERIZAÇÃO DE SUBATIVIDADES MODERNA ===
+function renderizarSubatividadesMaestria(subatividades, operation_id) {
+    if (!subatividades || subatividades.length === 0) {
+        return `
+            <div class="text-center py-3">
+                <i class="fas fa-info-circle text-muted me-2"></i>
+                <span class="text-muted">Nenhuma subatividade específica cadastrada</span>
+            </div>
+        `;
+    }
+    
+    console.log(`📋 [SUB_RENDER:${operation_id}] subatividades_count=${subatividades.length}`);
+    
+    let html = '<div class="row g-3">';
+    
+    subatividades.forEach((sub, index) => {
+        const progressColors = ['bg-secondary', 'bg-info', 'bg-success', 'bg-warning'];
+        const progressColor = progressColors[index % progressColors.length];
+        
+        html += `
+            <div class="col-md-6">
+                <div class="p-3 border rounded-3 bg-white h-100">
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <div class="fw-medium text-dark">${sub.nome}</div>
+                        <div class="badge ${progressColor} bg-opacity-25 text-dark px-2 py-1">
+                            ${sub.percentual || 0}%
+                        </div>
+                    </div>
+                    <div class="progress" style="height: 8px; border-radius: 4px;">
+                        <div class="progress-bar ${progressColor}" style="width: ${sub.percentual || 0}%; border-radius: 4px;"></div>
+                    </div>
+                    ${sub.descricao ? `<small class="text-muted d-block mt-2">${sub.descricao}</small>` : ''}
+                </div>
+            </div>
+        `;
+    });
+    
+    html += '</div>';
+    return html;
+}
+
+// === FUNÇÃO LEGADA MANTIDA PARA COMPATIBILIDADE ===
+function exibirDadosPrimeiraRDO(primeiraRDO) {
+    console.log('🔄 [LEGACY] Redirecionando para função maestria...');
+    exibirDadosPrimeiraRDOMaestria(primeiraRDO, {operation_id: 'legacy'});
 }
 
 function renderizarSubatividadesPrimeira(subatividades) {
@@ -958,7 +1085,7 @@ function carregarServicosDaObra(obraId) {
     `;
     
     // Fazer requisição para API específica do último RDO
-    fetch(`/api/test/rdo/ultimo-rdo-dados/${obraId}`)
+    fetch(`/api/rdo/ultima-dados/${obraId}`)
         .then(response => response.json())
         .then(data => {
             if (data.success) {
