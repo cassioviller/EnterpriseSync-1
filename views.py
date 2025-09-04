@@ -1545,6 +1545,7 @@ def obter_servicos_da_obra(obra_id, admin_id=None):
     """Obtém lista de serviços principais sendo executados na obra (via subatividade_mestre)"""
     try:
         from sqlalchemy import text
+        from sqlalchemy.exc import SQLAlchemyError
         
         # Se admin_id não fornecido, tentar detectar
         if not admin_id:
@@ -1553,44 +1554,60 @@ def obter_servicos_da_obra(obra_id, admin_id=None):
         
         print(f"🔍 BUSCANDO SERVIÇOS PRINCIPAIS EXECUTADOS para obra {obra_id}, admin_id {admin_id}")
         
-        # CORREÇÃO FINAL: Buscar serviços que têm subatividades sendo executadas no RDO
-        # Como rdo_servico_subatividade não tem subatividade_id, vamos buscar diretamente por servico_id
-        query = text("""
-            SELECT DISTINCT s.id, s.nome, s.descricao, s.categoria, s.unidade_medida, s.custo_unitario,
-                   COUNT(rss.id) as total_subatividades_ativas,
-                   AVG(rss.percentual_conclusao) as progresso_medio,
-                   (SELECT COUNT(*) FROM subatividade_mestre sm WHERE sm.servico_id = s.id AND sm.ativo = true) as total_subatividades_possiveis
-            FROM servico s
-            JOIN rdo_servico_subatividade rss ON rss.servico_id = s.id
-            JOIN rdo r ON rss.rdo_id = r.id
-            WHERE r.obra_id = :obra_id AND rss.ativo = true 
-              AND s.admin_id = :admin_id AND s.ativo = true
-            GROUP BY s.id, s.nome, s.descricao, s.categoria, s.unidade_medida, s.custo_unitario
-            ORDER BY s.nome
-        """)
-        
-        result = db.session.execute(query, {'obra_id': obra_id, 'admin_id': admin_id}).fetchall()
-        
-        servicos_lista = []
-        for row in result:
-            servicos_lista.append({
-                'id': row.id,
-                'nome': row.nome,
-                'descricao': row.descricao or '',
-                'categoria': row.categoria,
-                'unidade_medida': row.unidade_medida,
-                'custo_unitario': row.custo_unitario,
-                'total_subatividades': int(row.total_subatividades_ativas or 0),
-                'total_subatividades_possiveis': int(row.total_subatividades_possiveis or 0),
-                'progresso': round(float(row.progresso_medio or 0), 1),
-                'ativo': True
-            })
-        
-        print(f"✅ {len(servicos_lista)} serviços PRINCIPAIS encontrados para obra {obra_id}")
-        return servicos_lista
-        
+        # Usar uma nova sessão isolada para evitar conflitos de transação
+        try:
+            # CORREÇÃO FINAL: Buscar serviços que têm subatividades sendo executadas no RDO
+            # Como rdo_servico_subatividade não tem subatividade_id, vamos buscar diretamente por servico_id
+            query = text("""
+                SELECT DISTINCT s.id, s.nome, s.descricao, s.categoria, s.unidade_medida, s.custo_unitario,
+                       COUNT(rss.id) as total_subatividades_ativas,
+                       AVG(rss.percentual_conclusao) as progresso_medio,
+                       (SELECT COUNT(*) FROM subatividade_mestre sm WHERE sm.servico_id = s.id AND sm.ativo = true) as total_subatividades_possiveis
+                FROM servico s
+                JOIN rdo_servico_subatividade rss ON rss.servico_id = s.id
+                JOIN rdo r ON rss.rdo_id = r.id
+                WHERE r.obra_id = :obra_id AND rss.ativo = true 
+                  AND s.admin_id = :admin_id AND s.ativo = true
+                GROUP BY s.id, s.nome, s.descricao, s.categoria, s.unidade_medida, s.custo_unitario
+                ORDER BY s.nome
+            """)
+            
+            result = db.session.execute(query, {'obra_id': obra_id, 'admin_id': admin_id}).fetchall()
+            
+            servicos_lista = []
+            for row in result:
+                servicos_lista.append({
+                    'id': row.id,
+                    'nome': row.nome,
+                    'descricao': row.descricao or '',
+                    'categoria': row.categoria,
+                    'unidade_medida': row.unidade_medida,
+                    'custo_unitario': row.custo_unitario,
+                    'total_subatividades': int(row.total_subatividades_ativas or 0),
+                    'total_subatividades_possiveis': int(row.total_subatividades_possiveis or 0),
+                    'progresso': round(float(row.progresso_medio or 0), 1),
+                    'ativo': True
+                })
+            
+            print(f"✅ {len(servicos_lista)} serviços PRINCIPAIS encontrados para obra {obra_id}")
+            return servicos_lista
+            
+        except SQLAlchemyError as sql_error:
+            # Rollback em caso de erro SQL específico
+            print(f"🔄 ROLLBACK: Erro SQLAlchemy detectado: {sql_error}")
+            db.session.rollback()
+            # Tentar fallback após rollback
+            raise sql_error
+            
     except Exception as e:
         print(f"❌ Erro ao obter serviços da obra {obra_id}: {e}")
+        # Fazer rollback e tentar fallback
+        try:
+            db.session.rollback()
+            print("🔄 ROLLBACK executado")
+        except:
+            print("⚠️ Rollback falhou")
+            
         # Fallback simpler - buscar apenas serviços que têm RDO
         try:
             query_simples = text("""
@@ -1622,6 +1639,11 @@ def obter_servicos_da_obra(obra_id, admin_id=None):
             return servicos_lista
         except Exception as e2:
             print(f"❌ Erro no fallback: {e2}")
+            try:
+                db.session.rollback()
+                print("🔄 ROLLBACK fallback executado")
+            except:
+                pass
             return []
 
 def obter_servicos_disponiveis(admin_id):
@@ -2069,13 +2091,28 @@ def detalhes_obra(id):
             rdos_obra = []
         
         # ===== SISTEMA REFATORADO DE SERVIÇOS DA OBRA =====
-        # Usar nova função para buscar serviços da obra
+        # Usar nova função para buscar serviços da obra com proteção de transação
+        servicos_obra = []
         try:
+            # Fazer rollback preventivo antes de buscar serviços
+            try:
+                db.session.rollback()
+                print("🔄 ROLLBACK preventivo executado")
+            except:
+                pass
+            
             admin_id_para_servicos = get_admin_id_robusta(obra)
             servicos_obra = obter_servicos_da_obra(obra_id, admin_id_para_servicos)
             print(f"🎯 SERVIÇOS DA OBRA: {len(servicos_obra)} serviços encontrados usando sistema refatorado")
+            
         except Exception as e:
             print(f"🚨 ERRO ao buscar serviços da obra: {e}")
+            # Fazer rollback em caso de erro e tentar busca simples
+            try:
+                db.session.rollback()
+                print("🔄 ROLLBACK após erro executado")
+            except:
+                pass
             servicos_obra = []
         
         # Continuar com o resto da função
