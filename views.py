@@ -5627,16 +5627,25 @@ def adicionar_servico_obra():
         print(f"🎯 API ADICIONAR SERVIÇO FINAL: admin_id={admin_id}")
         
         # Verificar se obra pertence ao admin
+        print(f"🔍 VERIFICANDO OBRA {obra_id} para admin_id {admin_id}")
         obra = Obra.query.filter_by(id=obra_id, admin_id=admin_id).first()
         if not obra:
+            print(f"❌ OBRA NÃO ENCONTRADA")
             return jsonify({'success': False, 'message': 'Obra não encontrada'}), 404
         
+        print(f"✅ OBRA ENCONTRADA: {obra.nome}")
+        
         # Verificar se serviço pertence ao admin
+        print(f"🔍 VERIFICANDO SERVIÇO {servico_id} para admin_id {admin_id}")
         servico = Servico.query.filter_by(id=servico_id, admin_id=admin_id).first()
         if not servico:
+            print(f"❌ SERVIÇO NÃO ENCONTRADO")
             return jsonify({'success': False, 'message': 'Serviço não encontrado'}), 404
         
+        print(f"✅ SERVIÇO ENCONTRADO: {servico.nome}")
+        
         # Verificar se já existe associação
+        print(f"🔍 VERIFICANDO ASSOCIAÇÃO EXISTENTE")
         servico_obra_existente = ServicoObra.query.filter_by(
             obra_id=obra_id, 
             servico_id=servico_id
