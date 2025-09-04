@@ -637,7 +637,7 @@ def migrar_sistema_rdo_aprimorado():
         connection = psycopg2.connect(os.environ.get("DATABASE_URL"))
         cursor = connection.cursor()
         
-        logger.info("🔄 Criando tabelas do sistema RDO aprimorado...")
+        logger.info("🔄 Criando tabelas do sistema RDO aprimorado (preservando dados existentes)...")
         
         # Tabela subatividade_mestre
         cursor.execute("""
@@ -688,7 +688,7 @@ def migrar_sistema_rdo_aprimorado():
         logger.info("✅ Tabela rdo_servico_subatividade criada com sucesso")
         
         # REMOVIDO: Não inserir dados automaticamente - apenas criar tabelas vazias
-        logger.info("✅ Tabelas criadas sem dados - estrutura pronta para qualquer ambiente")
+        logger.info("✅ Estrutura de tabelas garantida - dados existentes preservados")
         
         connection.commit()
         cursor.close()
