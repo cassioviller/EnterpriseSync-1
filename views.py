@@ -4861,11 +4861,21 @@ def api_ultimo_rdo_dados_corrigida(obra_id):
                     servicos_obra = []
             
             if not servicos_obra:
-                # Se não há serviços na obra, buscar todos os serviços da empresa
-                servicos_obra = Servico.query.filter_by(admin_id=admin_id, ativo=True).all()
-                print(f"✅ Carregando {len(servicos_obra)} serviços da empresa")
+                print("⚠️ NENHUM SERVIÇO CADASTRADO NESTA OBRA - Retornando lista vazia")
+                return jsonify({
+                    'success': True,
+                    'primeira_rdo': True,
+                    'ultimo_rdo': {
+                        'id': None,
+                        'numero_rdo': 'PRIMEIRA_RDO',
+                        'data_relatorio': datetime.now().strftime('%Y-%m-%d'),
+                        'servicos': [],
+                        'funcionarios': [],
+                        'total_servicos': 0
+                    }
+                })
             else:
-                print(f"✅ Encontrados {len(servicos_obra)} serviços da obra")
+                print(f"✅ Encontrados {len(servicos_obra)} serviços ESPECÍFICOS da obra")
             
             servicos_dados = []
             for servico in servicos_obra:
@@ -4920,8 +4930,23 @@ def api_ultimo_rdo_dados_corrigida(obra_id):
         servicos_dados = []
         funcionarios_dados = []
         
-        # Buscar serviços do último RDO
+        # Buscar serviços do último RDO - FILTRAR APENAS OS DA OBRA
         try:
+            # Primeiro, buscar quais serviços estão cadastrados na obra
+            try:
+                servicos_permitidos_obra = db.session.query(Servico.id).join(ServicoObraReal).filter(
+                    ServicoObraReal.obra_id == obra_id,
+                    ServicoObraReal.ativo == True,
+                    Servico.admin_id == admin_id,
+                    Servico.ativo == True
+                ).all()
+                ids_servicos_permitidos = [s.id for s in servicos_permitidos_obra]
+                print(f"🏢 Serviços permitidos na obra {obra_id}: {ids_servicos_permitidos}")
+            except Exception as e:
+                print(f"⚠️ Erro ao buscar serviços da obra: {e}")
+                # Fallback: permitir todos os serviços (comportamento antigo)
+                ids_servicos_permitidos = None
+            
             subatividades_rdo = RDOServicoSubatividade.query.filter_by(rdo_id=ultimo_rdo.id).all()
             servicos_dict = {}
             
@@ -4929,6 +4954,11 @@ def api_ultimo_rdo_dados_corrigida(obra_id):
                 if sub_rdo.servico:
                     servico = sub_rdo.servico
                     servico_id = servico.id
+                    
+                    # 🚫 FILTRO: Apenas serviços que estão cadastrados na obra
+                    if ids_servicos_permitidos is not None and servico_id not in ids_servicos_permitidos:
+                        print(f"🚫 IGNORANDO serviço {servico.nome} (ID {servico_id}) - não cadastrado na obra")
+                        continue
                     
                     if servico_id not in servicos_dict:
                         servicos_dict[servico_id] = {
