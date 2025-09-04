@@ -3558,10 +3558,8 @@ def rdo_novo_unificado():
 def funcionario_rdo_consolidado():
     """Lista RDOs consolidada - página original que estava funcionando"""
     try:
-        from bypass_auth import obter_admin_id
-        
-        # Usar sistema de bypass para obter admin_id correto
-        admin_id_correto = obter_admin_id()
+        # Usar sistema de detecção dinâmica para obter admin_id correto
+        admin_id_correto = get_admin_id_dinamico()
         
         # Buscar funcionário para logs
         funcionario_atual = None
