@@ -1,0 +1,110 @@
+Aqui vai um perfil completo (pronto para copiar/colar) e, em seguida, uma lista organizada dos conhecimentos dessa pessoa.
+
+# Perfil — Arquiteto/CTO “mão na massa” (25+ anos)
+
+Profissional sênior de engenharia de software com atuação híbrida entre arquitetura, desenvolvimento prático, operações e consultoria. Especialista em integração de sistemas de missão crítica, observabilidade ponta-a-ponta e entrega contínua em ambientes regulados. É conhecido por transformar requisitos de negócio em soluções sob medida, com foco em robustez (idempotência, tolerância a falhas, consistência), velocidade de entrega e custo total de propriedade. Domina profundamente a stack em que trabalha (ex.: Java/Spring Boot + Kubernetes), lê código-fonte de frameworks, e preza por “acertar de primeira” através de entendimento profundo, padrões comprovados e pragmatismo. Atua como líder técnico, mentor e interlocutor com stakeholders, sabendo equilibrar valor rápido e manutenção de longo prazo.
+
+## Estilo e Filosofia
+
+* **Maestria orientada a problemas reais:** o estudo segue as necessidades dos projetos e clientes.
+* **Pragmatismo com propósito:** aplica o nível certo de engenharia ao contexto (MVP vs. plataforma duradoura).
+* **Feedback loop operacional:** quem constrói precisa **ver** produção (logs, métricas, traços) e reagir rápido.
+* **Entrega pequena e frequente:** mudanças de baixo risco; correções em minutos via CI/CD bem azeitado.
+* **Profundidade antes de amplitude:** dominar linguagem/plataforma e padrões; só então expandir.
+* **Comunicação com lastro técnico:** convencer pelo argumento, dados e demonstração funcionando.
+
+---
+
+# Lista de Conhecimentos (por áreas)
+
+## Fundamentos de Engenharia
+
+* Estruturas de dados, algoritmos, concorrência e paralelismo.
+* POO, SOLID, princípios de design, leitura crítica de código alheio (frameworks/open source).
+* Modelagem de domínio, requisitos não-funcionais (disponibilidade, latência, confiabilidade, segurança).
+
+## Linguagens & Frameworks
+
+* **Back-end:** Java (Spring/Spring Boot: DI, Actuator, Web, Data, Security), Go (conectores, gRPC), Python (scripts/automação).
+* **Front-end (noções para integração):** React e fundamentos de build/deploy front-end moderno.
+* **Build & empacotamento:** Gradle/Maven; camadas de imagem eficientes (Jib/Buildpacks), otimização de rebuild.
+
+## Arquitetura & Integração
+
+* **Integração síncrona vs. assíncrona** (HTTP/REST, gRPC, WebSockets).
+* **Mensageria/Middleware:** Kafka, RabbitMQ, SQS/SNS; padrões ponto-a-ponto vs. pub/sub.
+* **Padrões de resiliência:** retries com backoff, **circuit breaker**, timeouts, bulkheads, **idempotência**, deduplicação, DLQ.
+* **Padrões transacionais distribuídos:** **Saga** (coreografia/orquestração), **Outbox**, transações locais vs. consistência eventual.
+* **Orquestração de processos** multi-backends; compensações e reconciliação para manter consistência.
+* **API design & versionamento**, contratos e compatibilidade progressiva.
+
+## Observabilidade & Operações
+
+* **Logs estruturados**, correlação, níveis e retenção.
+* **Métricas** técnicas e **de negócio**; dashboards para operação e produto.
+* **Tracing distribuído** (ex.: OpenTelemetry) e análise ponta-a-ponta.
+* **SLO/SLI/SLA**, alerta acionável, runbooks, análise de incidentes e aprendizado pós-mortem.
+
+## DevOps, Plataformas & Cloud
+
+* **Containerização:** Docker (camadas, cache, tamanho da imagem).
+* **Kubernetes:** Deployments, readiness/liveness, autoscaling, configuração/segredos, estratégias **blue/green** e **canary**.
+* **CI/CD:** pipelines rápidos, promoção entre ambientes, rollbacks seguros, feature flags.
+* **Infra como Código:** noções de Terraform/Helm para provisionamento e repetibilidade.
+* **Cloud services:** uso pragmático de serviços gerenciados (mensageria, bancos, observabilidade).
+
+## Dados & Persistência
+
+* **Bancos relacionais e NoSQL**, modelagem para leitura/escrita, índices e desempenho.
+* **Pooling de conexões**, health checks, migrações, governança de esquema.
+* **Cache** (aplicativo/edge) e padrões de consistência.
+
+## Qualidade & Testes
+
+* Pirâmide de testes (unitário, integração, contrato, e2e).
+* Testabilidade de componentes assíncronos e de integrações (testes de consumidor/contrato).
+* Estratégias de teste em ambientes não-produtivos vs. **detecção/correção rápida em produção** com baixo risco.
+
+## Segurança & Compliance
+
+* **Princípio dos 4 olhos (4-eyes)**, segregação de funções, trilhas de auditoria.
+* Princípio do menor privilégio, gestão de segredos, hardening de endpoints.
+* Adequação a ambientes regulados (financeiro, jogos, governo) com evidências automatizadas de deploy.
+
+## Processos & Métodos
+
+* Ágil sem desperdício: sprints/iterações, **menos ênfase em story points**, mais em fluxo, demonstrações frequentes.
+* Gestão de risco por tamanho de mudança, métricas de fluxo (lead time, change failure rate).
+* Parcerias com cliente (co-criação, transparência, educação do stakeholder).
+
+## Liderança & Colaboração
+
+* **Mentoria** de júniors/plenos: tempo para investigação, pedir ajuda com contexto, aprendizado explícito.
+* **Pré-vendas consultivo:** tradução de dores de negócio em arquitetura/roadmap com ROI/TCO.
+* **Comunicação multiaudiência:** engenharia, gestão, compliance; argumentação baseada em dados.
+* **Treinamentos e palestras**, difusão de padrões e boas práticas.
+
+## Decisões Arquiteturais (trade-offs frequentes)
+
+* Microservices vs. monólitos modularizados; granularidade de serviços (ex.: adaptadores gRPC diante de bancos).
+* Custo total de propriedade vs. velocidade de entrega; quando **não** sofisticar (YAGNI).
+* Padronização vs. autonomia de times; orquestração vs. coreografia.
+
+---
+
+## Indicadores de Resultado (exemplos do que esse perfil entrega)
+
+* Integração de **dezenas de back-ends** com observabilidade completa e **erros recuperáveis** (idempotência/reprocesso).
+* **Tempo de correção em produção < 30 min** para regressões funcionais isoladas, graças a CI/CD e telemetria claros.
+* **Queda de incidentes** por adoção de padrões de resiliência e telemetria voltada a causas raiz.
+* **Onboarding técnico acelerado** via padrões codificados, templates de serviço e documentação viva.
+
+---
+
+## Resumo em 5 linhas (para LinkedIn/CV)
+
+Arquiteto/CTO “mão na massa”, 25+ anos em plataformas de missão crítica.
+Especialista em **integração**, **observabilidade** e **resiliência** (circuit breaker, idempotência, Sagas).
+Domínio de **Java/Spring Boot** em **Kubernetes**, CI/CD rápido e confiável.
+Pragmático: entrega valor cedo, com bases sólidas para longevidade e baixo TCO.
+Líder/mentor, comunica com profundidade técnica para todas as audiências.

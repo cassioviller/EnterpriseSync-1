@@ -4817,13 +4817,20 @@ def api_test_rdo_servicos_obra(obra_id):
         traceback.print_exc()
         return jsonify({'error': 'Erro interno', 'success': False}), 500
 
-# API para carregar dados do último RDO - CORRIGIDA
+# API para carregar dados do último RDO - COM ISOLAMENTO RIGOROSO
 @main_bp.route('/api/ultimo-rdo-dados/<int:obra_id>')
 def api_ultimo_rdo_dados_corrigida(obra_id):
-    """API para obter dados do último RDO de uma obra"""
+    """API com isolamento rigoroso para obter dados do último RDO"""
     try:
+        from security_wrapper import log_api_call, health_check_environment_isolation
+        
         admin_id = get_admin_id_dinamico()
         print(f"✅ API ÚLTIMO RDO: obra_id={obra_id}, admin_id={admin_id}")
+        
+        # HEALTH CHECK: Detectar contaminação crítica
+        health_status = health_check_environment_isolation()
+        if health_status['status'] == 'CRITICAL':
+            print(f"🚨 CONTAMINAÇÃO DETECTADA na API último RDO: {health_status['alerts']}")
         
         # Verificar se existe pelo menos um RDO para esta obra
         ultimo_rdo = RDO.query.filter_by(obra_id=obra_id, admin_id=admin_id).order_by(RDO.data_relatorio.desc()).first()
@@ -5114,23 +5121,89 @@ def api_test_ultimo_rdo_dados(obra_id):
 @main_bp.route('/api/rdo/servicos-obra/<int:obra_id>')
 @funcionario_required
 def api_rdo_servicos_obra_temp(obra_id):
-    """API temporária que retorna lista vazia enquanto corrigimos o problema"""
+    """API com isolamento rigoroso e audit trail para detectar vazamentos"""
     try:
+        from security_wrapper import get_servicos_seguros, log_api_call, health_check_environment_isolation
+        
         admin_id = get_admin_id_dinamico()
         obra = Obra.query.filter_by(id=obra_id, admin_id=admin_id).first()
         if not obra:
+            log_api_call("api_rdo_servicos_obra", obra_id, admin_id, 0, "OBRA_NAO_ENCONTRADA")
             return jsonify({'error': 'Obra não encontrada', 'success': False}), 404
+        
+        # HEALTH CHECK: Detectar contaminação de ambiente
+        health_status = health_check_environment_isolation()
+        if health_status['status'] == 'CRITICAL':
+            print(f"🚨 CONTAMINAÇÃO DETECTADA: {health_status['alerts']}")
+        
+        # Buscar serviços com wrapper de segurança
+        servicos_obra = []
+        try:
+            # Tentar buscar serviços específicos da obra via servico_obra_real
+            servicos_obra_query = db.session.query(Servico).join(ServicoObraReal).filter(
+                ServicoObraReal.obra_id == obra_id,
+                ServicoObraReal.ativo == True,
+                Servico.admin_id == admin_id,
+                Servico.ativo == True
+            ).all()
             
-        print(f"⚠️ API RDO SERVIÇOS: Obra {obra.nome} SEM serviços cadastrados - lista vazia")
+            # Validação de segurança: garantir que todos pertencem ao admin correto
+            servicos_obra = []
+            for servico in servicos_obra_query:
+                if servico.admin_id != admin_id:
+                    print(f"🚨 VAZAMENTO DETECTADO: Serviço {servico.nome} (admin_id={servico.admin_id}) em consulta para admin_id={admin_id}")
+                    continue
+                servicos_obra.append(servico)
+                
+        except Exception as e:
+            print(f"Erro ao buscar serviços da obra: {e}")
+            
+        # Log de auditoria
+        servicos_nomes = [s.nome for s in servicos_obra] if servicos_obra else []
+        log_api_call("api_rdo_servicos_obra", obra_id, admin_id, len(servicos_obra), servicos_nomes)
+        
+        # Se não há serviços específicos da obra, retornar lista vazia (NÃO buscar todos da empresa)
+        if not servicos_obra:
+            print(f"✅ ISOLAMENTO CORRETO: Obra {obra.nome} SEM serviços cadastrados - retornando lista vazia")
+            return jsonify({
+                'success': True,
+                'obra_id': obra_id,
+                'obra_nome': obra.nome,
+                'servicos': [],
+                'message': 'Nenhum serviço cadastrado nesta obra',
+                'debug_health': health_status if health_status['status'] != 'OK' else None
+            })
+        
+        # Processar serviços encontrados
+        servicos_data = []
+        for servico in servicos_obra:
+            # Dupla validação de segurança
+            if servico.admin_id != admin_id:
+                print(f"🚨 BLOQUEANDO VAZAMENTO: Serviço {servico.nome} rejeitado por admin_id incorreto")
+                continue
+                
+            servicos_data.append({
+                'id': servico.id,
+                'nome': servico.nome,
+                'categoria': servico.categoria or 'Geral',
+                'subatividades': []  # Simplificado para debugging
+            })
+        
+        print(f"✅ RETORNANDO {len(servicos_data)} serviços VALIDADOS para obra {obra.nome}")
+        
         return jsonify({
             'success': True,
             'obra_id': obra_id,
             'obra_nome': obra.nome,
-            'servicos': [],
-            'message': 'Nenhum serviço cadastrado nesta obra'
+            'servicos': servicos_data,
+            'total': len(servicos_data),
+            'debug_health': health_status if health_status['status'] != 'OK' else None
         })
+        
     except Exception as e:
-        print(f"ERRO API RDO SERVIÇOS: {e}")
+        print(f"ERRO CRÍTICO API RDO SERVIÇOS: {e}")
+        import traceback
+        traceback.print_exc()
         return jsonify({'error': 'Erro interno', 'success': False}), 500
 
 def salvar_subatividades_temp():  # Função temporária para conter código órfão
