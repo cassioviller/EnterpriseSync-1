@@ -5587,11 +5587,18 @@ def adicionar_servico_obra():
     except:
         pass
     try:
+        print(f"🚀 INÍCIO API ADICIONAR SERVIÇO")
         data = request.get_json()
+        print(f"📊 DADOS RECEBIDOS: {data}")
+        
         obra_id = data.get('obra_id')
         servico_id = data.get('servico_id')
         
+        print(f"🔍 OBRA_ID: {obra_id} (tipo: {type(obra_id)})")
+        print(f"🔍 SERVICO_ID: {servico_id} (tipo: {type(servico_id)})")
+        
         if not obra_id or not servico_id:
+            print(f"❌ DADOS INCOMPLETOS")
             return jsonify({'success': False, 'message': 'Dados incompletos'}), 400
         
         # Usar mesmo sistema de detecção da API principal
