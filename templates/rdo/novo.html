@@ -821,7 +821,7 @@ function exibirDadosPrimeiraRDOMaestria(primeiraRDO, metadata) {
                             </div>
                         </div>
                         <div class="card-body p-4">
-                            ${renderizarSubatividadesMaestria(servico.subatividades, operation_id)}
+                            ${renderizarSubatividadesEditaveisMaestria(servico, operation_id)}
                         </div>
                     </div>
                 `;
@@ -884,7 +884,100 @@ function exibirDadosPrimeiraRDOMaestria(primeiraRDO, metadata) {
     }
 }
 
-// === RENDERIZAÇÃO DE SUBATIVIDADES MODERNA ===
+// === RENDERIZAÇÃO DE SUBATIVIDADES EDITÁVEIS ===
+function renderizarSubatividadesEditaveisMaestria(servico, operation_id) {
+    const subatividades = servico.subatividades || [];
+    
+    if (subatividades.length === 0) {
+        return `
+            <div class="text-center py-3">
+                <i class="fas fa-info-circle text-muted me-2"></i>
+                <span class="text-muted">Nenhuma subatividade cadastrada para este serviço</span>
+            </div>
+        `;
+    }
+    
+    console.log(`📋 [SUB_EDITABLE:${operation_id}] servico=${servico.nome} subatividades=${subatividades.length}`);
+    
+    let html = '<div class="row g-3">';
+    
+    subatividades.forEach((sub, index) => {
+        const inputId = `sub_${servico.id}_${index}`;
+        const progressColors = ['secondary', 'info', 'success', 'warning'];
+        const progressColor = progressColors[index % progressColors.length];
+        
+        html += `
+            <div class="col-md-6">
+                <div class="card border-0 shadow-sm h-100">
+                    <div class="card-header bg-light border-0 py-2">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <small class="fw-bold text-${progressColor}">${sub.nome}</small>
+                            <span class="badge bg-${progressColor} bg-opacity-25 text-${progressColor} px-2 py-1" id="badge_${inputId}">
+                                0%
+                            </span>
+                        </div>
+                    </div>
+                    <div class="card-body p-3">
+                        <div class="mb-2">
+                            <div class="progress" style="height: 10px; border-radius: 5px;">
+                                <div class="progress-bar bg-${progressColor}" id="progress_${inputId}" style="width: 0%; border-radius: 5px;"></div>
+                            </div>
+                        </div>
+                        
+                        <div class="input-group input-group-sm">
+                            <input type="number" 
+                                   class="form-control" 
+                                   id="${inputId}"
+                                   name="subatividade_${servico.id}_${index}_percentual"
+                                   value="0"
+                                   min="0"
+                                   max="100"
+                                   step="0.1"
+                                   onchange="atualizarProgressoSubatividade('${inputId}', this.value)"
+                                   oninput="atualizarProgressoSubatividade('${inputId}', this.value)"
+                                   form="formNovoRDO">
+                            <span class="input-group-text">%</span>
+                        </div>
+                        
+                        ${sub.descricao ? `<small class="text-muted d-block mt-2">${sub.descricao}</small>` : ''}
+                        
+                        <!-- Campos hidden para envio -->
+                        <input type="hidden" name="subatividade_${servico.id}_${index}_id" value="${sub.id}">
+                        <input type="hidden" name="subatividade_${servico.id}_${index}_nome" value="${sub.nome}">
+                        <input type="hidden" name="subatividade_${servico.id}_${index}_servico_id" value="${servico.id}">
+                    </div>
+                </div>
+            </div>
+        `;
+    });
+    
+    html += '</div>';
+    return html;
+}
+
+// === FUNÇÃO PARA ATUALIZAR PROGRESSO EM TEMPO REAL ===
+function atualizarProgressoSubatividade(inputId, valor) {
+    const progressBar = document.getElementById(`progress_${inputId}`);
+    const badge = document.getElementById(`badge_${inputId}`);
+    
+    if (progressBar && badge) {
+        const percentual = Math.max(0, Math.min(100, parseFloat(valor) || 0));
+        
+        progressBar.style.width = `${percentual}%`;
+        badge.textContent = `${percentual.toFixed(1)}%`;
+        
+        // Mudar cor baseado no progresso
+        const progressClass = percentual >= 100 ? 'bg-success' : 
+                             percentual >= 75 ? 'bg-info' :
+                             percentual >= 50 ? 'bg-warning' : 'bg-secondary';
+        
+        progressBar.className = `progress-bar ${progressClass}`;
+        
+        console.log(`📊 Progresso atualizado: ${inputId} = ${percentual}%`);
+    }
+}
+
+// === RENDERIZAÇÃO DE SUBATIVIDADES MODERNA (somente visualização) ===
 function renderizarSubatividadesMaestria(subatividades, operation_id) {
     if (!subatividades || subatividades.length === 0) {
         return `

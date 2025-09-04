@@ -11,12 +11,12 @@ function carregarDadosUltimoRDO(obraId) {
     
     console.log(`🔄 Carregando dados do último RDO para obra ${obraId}`);
     
-    fetch(`/api/ultimo-rdo-dados/${obraId}`)
+    fetch(`/api/rdo/ultima-dados/${obraId}`)
         .then(response => response.json())
         .then(data => {
-            if (data.success && data.ultimo_rdo) {
-                console.log(`✅ Último RDO encontrado: ${data.ultimo_rdo.numero_rdo}`);
-                preencherDadosRDO(data.ultimo_rdo);
+            if (data.success && data.ultima_rdo) {
+                console.log(`✅ Último RDO encontrado: ${data.ultima_rdo.numero_rdo}`);
+                preencherDadosRDO(data.ultima_rdo);
             } else {
                 console.log('ℹ️ Nenhum RDO anterior encontrado para esta obra');
             }
@@ -100,26 +100,30 @@ function testarUltimoRDO() {
     const obraId = obraSelect.value;
     console.log(`🔄 Carregando dados do último RDO para obra ${obraId}`);
     
-    // Chamar a função que já existe no template
-    fetch(`/api/ultimo-rdo-dados/${obraId}`)
+    // === MAESTRIA DIGITAL - NOVA API ===
+    fetch(`/api/rdo/ultima-dados/${obraId}`)
         .then(response => response.json())
         .then(data => {
             console.log('📊 Dados recebidos:', data);
-            if (data.success && data.ultimo_rdo) {
+            if (data.success && data.ultima_rdo) {
                 if (data.primeira_rdo) {
                     console.log('✅ Primeira RDO - carregando serviços com percentual 0%');
-                    // Chamar função do template se existe
-                    if (typeof exibirDadosPrimeiraRDO === 'function') {
-                        exibirDadosPrimeiraRDO(data.ultimo_rdo);
+                    // Chamar função MAESTRIA se existe
+                    if (typeof exibirDadosPrimeiraRDOMaestria === 'function') {
+                        exibirDadosPrimeiraRDOMaestria(data.ultima_rdo, data.metadata);
+                    } else if (typeof exibirDadosPrimeiraRDO === 'function') {
+                        exibirDadosPrimeiraRDO(data.ultima_rdo);
                     } else {
-                        console.log('📋 Função exibirDadosPrimeiraRDO não encontrada');
+                        console.log('📋 Função de primeira RDO não encontrada');
                     }
                 } else {
-                    console.log('✅ Último RDO encontrado:', data.ultimo_rdo.numero_rdo);
-                    if (typeof exibirDadosUltimoRDO === 'function') {
-                        exibirDadosUltimoRDO(data.ultimo_rdo);
+                    console.log('✅ Último RDO encontrado:', data.ultima_rdo.numero_rdo);
+                    if (typeof exibirDadosUltimoRDOMaestria === 'function') {
+                        exibirDadosUltimoRDOMaestria(data.ultima_rdo, data.metadata);
+                    } else if (typeof exibirDadosUltimoRDO === 'function') {
+                        exibirDadosUltimoRDO(data.ultima_rdo);
                     } else {
-                        console.log('📋 Função exibirDadosUltimoRDO não encontrada');
+                        console.log('📋 Função de último RDO não encontrada');
                     }
                 }
             } else {
