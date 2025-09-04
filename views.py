@@ -1353,16 +1353,160 @@ def nova_obra():
                          funcionarios=funcionarios, 
                          servicos_disponiveis=servicos_disponiveis)
 
+# ========== SISTEMA DE SERVIÇOS DA OBRA - REFATORADO COMPLETO ==========
+
+def get_admin_id_robusta(obra=None, current_user=None):
+    """Sistema robusto para detectar admin_id correto"""
+    try:
+        # 1. Priorizar admin_id da obra
+        if obra and hasattr(obra, 'admin_id') and obra.admin_id:
+            return obra.admin_id
+        
+        # 2. Usar admin_id do usuário autenticado
+        if current_user and hasattr(current_user, 'admin_id') and current_user.admin_id:
+            return current_user.admin_id
+        
+        # 3. Usar ID do usuário como fallback
+        if current_user and hasattr(current_user, 'id') and current_user.id:
+            return current_user.id
+        
+        # 4. Fallback SQL direto
+        from sqlalchemy import text
+        result = db.session.execute(text("SELECT admin_id FROM funcionario WHERE ativo = true LIMIT 1")).fetchone()
+        if result:
+            return result[0]
+        
+        # 5. Fallback final
+        return 10  # Padrão desenvolvimento
+        
+    except Exception as e:
+        print(f"ERRO get_admin_id_robusta: {e}")
+        return 10
+
+def processar_servicos_obra(obra_id, servicos_selecionados):
+    """Processa associação de serviços à obra de forma robusta"""
+    try:
+        print(f"🔧 PROCESSANDO SERVIÇOS: obra_id={obra_id}, {len(servicos_selecionados)} serviços")
+        
+        # Limpar associações existentes
+        ServicoObra.query.filter_by(obra_id=obra_id).update({'ativo': False})
+        print(f"🧹 Associações anteriores desativadas")
+        
+        # Processar novos serviços
+        servicos_processados = 0
+        for servico_id in servicos_selecionados:
+            if servico_id and str(servico_id).strip():
+                try:
+                    servico_id_int = int(servico_id)
+                    
+                    # Verificar se associação já existe
+                    associacao_existente = ServicoObra.query.filter_by(
+                        obra_id=obra_id, servico_id=servico_id_int
+                    ).first()
+                    
+                    if associacao_existente:
+                        # Reativar existente
+                        associacao_existente.ativo = True
+                        associacao_existente.updated_at = datetime.utcnow()
+                        print(f"✅ Serviço {servico_id_int} reativado")
+                    else:
+                        # Criar nova associação
+                        nova_associacao = ServicoObra(
+                            obra_id=obra_id,
+                            servico_id=servico_id_int,
+                            quantidade_planejada=1.0,
+                            quantidade_executada=0.0,
+                            ativo=True,
+                            created_at=datetime.utcnow()
+                        )
+                        db.session.add(nova_associacao)
+                        print(f"🆕 Nova associação criada para serviço {servico_id_int}")
+                    
+                    servicos_processados += 1
+                    
+                except (ValueError, TypeError) as ve:
+                    print(f"❌ Erro ao processar serviço '{servico_id}': {ve}")
+                except Exception as se:
+                    print(f"❌ Erro inesperado com serviço {servico_id}: {se}")
+        
+        print(f"✅ {servicos_processados} serviços processados com sucesso")
+        return servicos_processados
+        
+    except Exception as e:
+        print(f"🚨 ERRO CRÍTICO em processar_servicos_obra: {e}")
+        import traceback
+        traceback.print_exc()
+        return 0
+
+def obter_servicos_da_obra(obra_id, admin_id=None):
+    """Obtém lista de serviços associados à obra"""
+    try:
+        from sqlalchemy import text
+        
+        # Se admin_id não fornecido, tentar detectar
+        if not admin_id:
+            obra = Obra.query.get(obra_id)
+            admin_id = get_admin_id_robusta(obra)
+        
+        # Consulta principal
+        query = text("""
+            SELECT s.id, s.nome, s.categoria, so.quantidade_planejada, so.quantidade_executada, so.ativo
+            FROM servico s
+            JOIN servico_obra so ON s.id = so.servico_id
+            WHERE so.obra_id = :obra_id AND so.ativo = true AND s.admin_id = :admin_id
+            ORDER BY s.nome
+        """)
+        
+        result = db.session.execute(query, {'obra_id': obra_id, 'admin_id': admin_id}).fetchall()
+        
+        servicos_lista = []
+        for row in result:
+            servicos_lista.append({
+                'id': row.id,
+                'nome': row.nome,
+                'categoria': row.categoria,
+                'quantidade_planejada': float(row.quantidade_planejada or 0),
+                'quantidade_executada': float(row.quantidade_executada or 0),
+                'ativo': row.ativo
+            })
+        
+        print(f"✅ {len(servicos_lista)} serviços encontrados para obra {obra_id}")
+        return servicos_lista
+        
+    except Exception as e:
+        print(f"❌ Erro ao obter serviços da obra {obra_id}: {e}")
+        return []
+
+def obter_servicos_disponiveis(admin_id):
+    """Obtém lista de serviços disponíveis para associação"""
+    try:
+        servicos = Servico.query.filter_by(admin_id=admin_id, ativo=True).order_by(Servico.nome).all()
+        return servicos
+    except Exception as e:
+        print(f"❌ Erro ao obter serviços disponíveis: {e}")
+        return []
+
+def obter_funcionarios(admin_id):
+    """Obtém lista de funcionários disponíveis"""
+    try:
+        funcionarios = Funcionario.query.filter_by(admin_id=admin_id, ativo=True).order_by(Funcionario.nome).all()
+        return funcionarios
+    except Exception as e:
+        print(f"❌ Erro ao obter funcionários: {e}")
+        return []
+
 # CRUD OBRAS - Editar Obra
 @main_bp.route('/obras/editar/<int:id>', methods=['GET', 'POST'])
 @login_required
 def editar_obra(id):
-    """Editar obra existente"""
+    """Editar obra existente - SISTEMA REFATORADO"""
     obra = Obra.query.get_or_404(id)
     
     if request.method == 'POST':
         try:
-            # Atualizar dados básicos
+            print(f"🔧 INICIANDO EDIÇÃO DA OBRA {id}: {obra.nome}")
+            
+            # Atualizar dados básicos da obra
             obra.nome = request.form.get('nome')
             obra.endereco = request.form.get('endereco', '')
             obra.status = request.form.get('status', 'Em andamento')
@@ -1393,144 +1537,50 @@ def editar_obra(id):
                 import secrets
                 obra.token_cliente = secrets.token_urlsafe(32)
             
-            # Processar serviços selecionados na edição
+            # ===== SISTEMA REFATORADO DE SERVIÇOS =====
+            # Processar serviços selecionados usando nova função
             servicos_selecionados = request.form.getlist('servicos_obra')
-            print(f"DEBUG EDITAR OBRA: Serviços selecionados = {servicos_selecionados}")
+            print(f"📝 SERVIÇOS SELECIONADOS: {servicos_selecionados}")
             
-            # PRODUÇÃO DOCKER: Processar serviços de forma robusta
-            try:
-                print(f"🔧 PRODUÇÃO: Processando {len(servicos_selecionados)} serviços selecionados")
-                
-                # Primeiro, desativar todos os serviços atualmente associados
-                updated_count = ServicoObra.query.filter_by(obra_id=obra.id).update({'ativo': False})
-                print(f"🔄 PRODUÇÃO: {updated_count} associações desativadas")
-                
-                # Processar cada serviço selecionado com verificação robusta
-                servicos_processados = 0
-                for servico_id in servicos_selecionados:
-                    if servico_id and str(servico_id).strip():
-                        try:
-                            servico_id = int(servico_id)
-                            print(f"📝 PRODUÇÃO: Processando serviço {servico_id}")
-                            
-                            # Verificar se já existe a associação
-                            servico_obra_existente = ServicoObra.query.filter_by(
-                                obra_id=obra.id,
-                                servico_id=servico_id
-                            ).first()
-                            
-                            if servico_obra_existente:
-                                # Reativar associação existente
-                                servico_obra_existente.ativo = True
-                                print(f"✅ PRODUÇÃO: Serviço {servico_id} reativado")
-                            else:
-                                # Criar nova associação com valores padrão robustos
-                                nova_associacao = ServicoObra(
-                                    obra_id=obra.id,
-                                    servico_id=servico_id,
-                                    quantidade_planejada=1.0,  # Valor padrão obrigatório
-                                    quantidade_executada=0.0,  # Valor padrão obrigatório
-                                    ativo=True
-                                )
-                                db.session.add(nova_associacao)
-                                print(f"🆕 PRODUÇÃO: Nova associação criada para serviço {servico_id}")
-                            
-                            servicos_processados += 1
-                            
-                        except ValueError as ve:
-                            print(f"❌ PRODUÇÃO: Erro ao converter serviço_id '{servico_id}': {ve}")
-                        except Exception as se:
-                            print(f"❌ PRODUÇÃO: Erro ao processar serviço {servico_id}: {se}")
-                
-                print(f"✅ PRODUÇÃO: {servicos_processados} serviços processados com sucesso")
-                
-            except Exception as servico_error:
-                print(f"🚨 PRODUÇÃO ERRO CRÍTICO ao processar serviços: {servico_error}")
-                import traceback
-                traceback.print_exc()
+            # Usar função refatorada para processar serviços
+            servicos_processados = processar_servicos_obra(obra.id, servicos_selecionados)
             
-            # PRODUÇÃO DOCKER: Commit robusto com múltiplas tentativas
+            # ===== COMMIT ROBUSTO =====
+            # Salvar todas as alterações
             try:
                 db.session.commit()
-                print(f"✅ PRODUÇÃO: Commit realizado com sucesso para obra {obra.id}")
+                print(f"✅ OBRA {obra.id} ATUALIZADA: {servicos_processados} serviços processados")
                 flash(f'Obra "{obra.nome}" atualizada com sucesso!', 'success')
                 return redirect(url_for('main.detalhes_obra', id=obra.id))
                 
             except Exception as commit_error:
-                print(f"🚨 PRODUÇÃO: Erro no commit: {commit_error}")
-                try:
-                    db.session.rollback()
-                    print("🔄 PRODUÇÃO: Rollback executado")
-                except Exception as rollback_error:
-                    print(f"❌ PRODUÇÃO: Erro no rollback: {rollback_error}")
-                
-                # Tentar commit novamente após rollback
-                try:
-                    db.session.commit()
-                    print("✅ PRODUÇÃO: Segunda tentativa de commit bem-sucedida")
-                    flash(f'Obra "{obra.nome}" atualizada com sucesso!', 'success')
-                    return redirect(url_for('main.detalhes_obra', id=obra.id))
-                except Exception as second_commit_error:
-                    print(f"🚨 PRODUÇÃO: Segunda tentativa falhou: {second_commit_error}")
-                    flash(f'Erro ao salvar obra: {str(commit_error)}', 'error')
+                print(f"🚨 ERRO NO COMMIT: {commit_error}")
+                db.session.rollback()
+                flash(f'Erro ao salvar obra: {str(commit_error)}', 'error')
             
         except Exception as e:
-            print(f"🚨 PRODUÇÃO: Erro geral na edição: {str(e)}")
-            try:
-                db.session.rollback()
-                print("🔄 PRODUÇÃO: Rollback de emergência executado")
-            except:
-                pass
+            print(f"🚨 ERRO GERAL NA EDIÇÃO: {str(e)}")
+            db.session.rollback()
             flash(f'Erro ao atualizar obra: {str(e)}', 'error')
     
-    # GET request - carregar lista de funcionários e serviços para edição
+    # ===== GET REQUEST - CARREGAR DADOS PARA EDIÇÃO =====
     try:
-        # PRODUÇÃO DOCKER: Sistema robusto de detecção de admin_id
-        admin_id = None
+        # Usar sistema robusto de detecção de admin_id
+        admin_id = get_admin_id_robusta(obra, current_user)
+        print(f"🔍 ADMIN_ID DETECTADO PARA EDIÇÃO: {admin_id}")
         
-        # 1. Primeiro, tentar usar admin_id da própria obra
-        if hasattr(obra, 'admin_id') and obra.admin_id:
-            admin_id = obra.admin_id
-            print(f"🏗️ PRODUÇÃO: Usando admin_id da obra = {admin_id}")
+        # Carregar funcionários disponíveis
+        funcionarios = obter_funcionarios(admin_id)
         
-        # 2. Se não tiver, usar usuário autenticado
-        elif current_user.is_authenticated:
-            if hasattr(current_user, 'admin_id') and current_user.admin_id:
-                admin_id = current_user.admin_id
-                print(f"👤 PRODUÇÃO: Usando admin_id do usuário = {admin_id}")
-            elif hasattr(current_user, 'id') and current_user.id:
-                admin_id = current_user.id
-                print(f"🆔 PRODUÇÃO: Usando ID do usuário = {admin_id}")
+        # Carregar serviços disponíveis
+        servicos_disponiveis = obter_servicos_disponiveis(admin_id)
         
-        # 3. Fallback robusto para produção Docker
-        if not admin_id:
-            try:
-                # Buscar qualquer admin válido no banco como fallback
-                from sqlalchemy import text
-                result = db.session.execute(text("SELECT DISTINCT admin_id FROM funcionario WHERE ativo = true LIMIT 1")).fetchone()
-                if result:
-                    admin_id = result[0]
-                    print(f"🔄 PRODUÇÃO FALLBACK: admin_id encontrado = {admin_id}")
-                else:
-                    admin_id = 2  # Fallback final para produção
-                    print(f"⚠️ PRODUÇÃO FALLBACK FINAL: admin_id = {admin_id}")
-            except Exception as fallback_error:
-                admin_id = 2  # Fallback absoluto para produção
-                print(f"🚨 PRODUÇÃO ERRO FALLBACK: {fallback_error}, usando admin_id = {admin_id}")
+        # Buscar serviços já associados à obra usando função refatorada
+        servicos_obra_lista = obter_servicos_da_obra(obra.id, admin_id)
+        servicos_obra = [s['id'] for s in servicos_obra_lista]
         
-        print(f"✅ PRODUÇÃO FINAL: admin_id selecionado = {admin_id}")
-        funcionarios = Funcionario.query.filter_by(admin_id=admin_id, ativo=True).order_by(Funcionario.nome).all()
-        servicos_disponiveis = Servico.query.filter_by(admin_id=admin_id, ativo=True).order_by(Servico.nome).all()
-        
-        # Buscar serviços já associados à obra através da tabela ServicoObra
-        try:
-            servicos_obra_ids = db.session.query(ServicoObra.servico_id).filter_by(obra_id=obra.id, ativo=True).all()
-            servicos_obra = [id[0] for id in servicos_obra_ids]
-        except:
-            servicos_obra = []
-        
-        print(f"DEBUG EDITAR OBRA: {len(funcionarios)} funcionários e {len(servicos_disponiveis)} serviços carregados para admin_id={admin_id}")
-        print(f"DEBUG EDITAR OBRA: Serviços já associados à obra: {servicos_obra}")
+        print(f"✅ EDIÇÃO CARREGADA: {len(funcionarios)} funcionários, {len(servicos_disponiveis)} serviços disponíveis")
+        print(f"✅ SERVIÇOS DA OBRA: {len(servicos_obra)} já associados")
         
     except Exception as e:
         print(f"ERRO ao carregar dados para edição: {e}")
@@ -1871,139 +1921,17 @@ def detalhes_obra(id):
         except:
             rdos_obra = []
         
-        # Buscar APENAS serviços cadastrados na obra (não todos os serviços)
+        # ===== SISTEMA REFATORADO DE SERVIÇOS DA OBRA =====
+        # Usar nova função para buscar serviços da obra
         try:
-            from models import Servico
-            from sqlalchemy import text
-            
-            # PRODUÇÃO DOCKER: Buscar serviços de forma robusta
-            admin_id_consulta = None
-            
-            # 1. Tentar usar admin_id da obra primeiro
-            if hasattr(obra, 'admin_id') and obra.admin_id:
-                admin_id_consulta = obra.admin_id
-                print(f"🏗️ PRODUÇÃO SERVIÇOS: Usando admin_id da obra = {admin_id_consulta}")
-            
-            # 2. Fallback para admin_id detectado
-            elif admin_id:
-                admin_id_consulta = admin_id
-                print(f"🔍 PRODUÇÃO SERVIÇOS: Usando admin_id detectado = {admin_id_consulta}")
-            
-            # 3. Fallback robusto: buscar admin_id via consulta direta
-            else:
-                try:
-                    admin_fallback = db.session.execute(text("""
-                        SELECT DISTINCT s.admin_id 
-                        FROM servico s 
-                        JOIN servico_obra so ON s.id = so.servico_id 
-                        WHERE so.obra_id = :obra_id AND so.ativo = true 
-                        LIMIT 1
-                    """), {'obra_id': obra_id}).fetchone()
-                    
-                    if admin_fallback:
-                        admin_id_consulta = admin_fallback[0]
-                        print(f"🔄 PRODUÇÃO SERVIÇOS FALLBACK: admin_id encontrado = {admin_id_consulta}")
-                    else:
-                        admin_id_consulta = 2  # Fallback final para produção
-                        print(f"⚠️ PRODUÇÃO SERVIÇOS FALLBACK FINAL: admin_id = {admin_id_consulta}")
-                except Exception as fallback_error:
-                    admin_id_consulta = 2
-                    print(f"🚨 PRODUÇÃO SERVIÇOS ERRO: {fallback_error}, usando admin_id = {admin_id_consulta}")
-            
-            print(f"✅ PRODUÇÃO SERVIÇOS FINAL: Consultando com admin_id = {admin_id_consulta}")
-            
-            # Buscar serviços que foram especificamente cadastrados nesta obra
-            servicos_obra_query = db.session.execute(text("""
-                SELECT s.id, s.nome, s.descricao, s.categoria, s.unidade_medida, s.custo_unitario,
-                       so.quantidade_planejada, so.quantidade_executada
-                FROM servico s 
-                JOIN servico_obra so ON s.id = so.servico_id 
-                WHERE so.obra_id = :obra_id AND so.ativo = true AND s.admin_id = :admin_id
-                ORDER BY s.nome
-            """), {'obra_id': obra_id, 'admin_id': admin_id_consulta}).fetchall()
-            
-            # Converter para lista de dicionários para o template
-            servicos_obra = []
-            for row in servicos_obra_query:
-                # Calcular progresso baseado no último RDO (não em quantidade)
-                progresso = 0.0
-                try:
-                    from models import RDO, RDOServicoSubatividade
-                    
-                    # Buscar último RDO da obra
-                    ultimo_rdo_servico = RDO.query.filter_by(obra_id=obra_id).order_by(RDO.data_relatorio.desc()).first()
-                    
-                    if ultimo_rdo_servico:
-                        # Buscar subatividades deste serviço no último RDO
-                        subatividades_servico = RDOServicoSubatividade.query.filter_by(
-                            rdo_id=ultimo_rdo_servico.id,
-                            servico_id=row.id
-                        ).all()
-                        
-                        if subatividades_servico:
-                            # Calcular média dos percentuais das subatividades
-                            total_percentuais = sum(sub.percentual_conclusao or 0 for sub in subatividades_servico)
-                            progresso = total_percentuais / len(subatividades_servico) if len(subatividades_servico) > 0 else 0.0
-                        else:
-                            # Fallback: usar quantidade se não há dados de RDO
-                            if row.quantidade_planejada and row.quantidade_planejada > 0:
-                                progresso = (row.quantidade_executada or 0) / row.quantidade_planejada * 100
-                except Exception as e:
-                    print(f"ERRO ao calcular progresso do serviço {row.id}: {e}")
-                    # Fallback: usar quantidade
-                    if row.quantidade_planejada and row.quantidade_planejada > 0:
-                        progresso = (row.quantidade_executada or 0) / row.quantidade_planejada * 100
-                
-                servicos_obra.append({
-                    'id': row.id,
-                    'nome': row.nome,
-                    'descricao': row.descricao or '',
-                    'categoria': row.categoria,
-                    'unidade_medida': row.unidade_medida,
-                    'custo_unitario': row.custo_unitario,
-                    'quantidade_planejada': row.quantidade_planejada,
-                    'quantidade_executada': row.quantidade_executada or 0,
-                    'progresso': progresso
-                })
-            
-            print(f"✅ DEBUG SERVIÇOS OBRA: {len(servicos_obra)} serviços encontrados para obra {obra_id} com admin_id {admin_id_consulta}")
-            
-            # Se não encontrou serviços, tentar consulta sem filtro de admin_id como fallback
-            if not servicos_obra:
-                print(f"🔄 PRODUÇÃO: Tentando consulta alternativa sem filtro admin_id")
-                try:
-                    servicos_obra_fallback = db.session.execute(text("""
-                        SELECT s.id, s.nome, s.descricao, s.categoria, s.unidade_medida, s.custo_unitario,
-                               so.quantidade_planejada, so.quantidade_executada
-                        FROM servico s 
-                        JOIN servico_obra so ON s.id = so.servico_id 
-                        WHERE so.obra_id = :obra_id AND so.ativo = true
-                        ORDER BY s.nome
-                    """), {'obra_id': obra_id}).fetchall()
-                    
-                    # Processar resultados do fallback
-                    for row in servicos_obra_fallback:
-                        servicos_obra.append({
-                            'id': row.id,
-                            'nome': row.nome,
-                            'descricao': row.descricao or '',
-                            'categoria': row.categoria,
-                            'unidade_medida': row.unidade_medida,
-                            'custo_unitario': row.custo_unitario,
-                            'quantidade_planejada': row.quantidade_planejada,
-                            'quantidade_executada': row.quantidade_executada or 0,
-                            'progresso': 0  # Progresso padrão para fallback
-                        })
-                    
-                    print(f"✅ PRODUÇÃO FALLBACK: {len(servicos_obra)} serviços encontrados sem filtro admin_id")
-                except Exception as fallback_error:
-                    print(f"🚨 PRODUÇÃO: Erro no fallback de serviços: {fallback_error}")
-            
+            admin_id_para_servicos = get_admin_id_robusta(obra)
+            servicos_obra = obter_servicos_da_obra(obra_id, admin_id_para_servicos)
+            print(f"🎯 SERVIÇOS DA OBRA: {len(servicos_obra)} serviços encontrados usando sistema refatorado")
         except Exception as e:
-            print(f"🚨 PRODUÇÃO: ERRO CRÍTICO ao buscar serviços da obra: {e}")
-            import traceback
-            traceback.print_exc()
+            print(f"🚨 ERRO ao buscar serviços da obra: {e}")
             servicos_obra = []
+        
+        # Continuar com o resto da função
         total_rdos = len(rdos_obra)
         rdos_finalizados = len([r for r in rdos_obra if r.status == 'Finalizado'])
         rdos_periodo = rdos_obra
