@@ -5057,42 +5057,26 @@ def salvar_rdo_maestria():
             for i, sub_data in enumerate(subatividades_dados):
                 sub_start = datetime.now()
                 
-                # Atualizar subatividade existente em vez de criar nova
-                if 'subatividade_id' in sub_data:
-                    # Atualizar subatividade existente
-                    sub_rdo = db.session.query(RDOServicoSubatividade).filter_by(
-                        id=sub_data['subatividade_id']
-                    ).first()
-                    
-                    if sub_rdo:
-                        sub_rdo.percentual_conclusao = sub_data['percentual']
-                        # Não incrementar contador pois estamos atualizando
-                    else:
-                        # Se não encontrou, criar nova
-                        sub_rdo = RDOServicoSubatividade(
-                            rdo_id=novo_rdo.id,
-                            servico_id=sub_data['servico_id'],
-                            nome_subatividade=sub_data['nome'],
-                            percentual_conclusao=sub_data['percentual'],
-                            descricao_subatividade=sub_data.get('descricao', ''),
-                            admin_id=admin_id,
-                            ativo=True
-                        )
-                        db.session.add(sub_rdo)
-                        subatividades_salvas += 1
-                else:
-                    # Criar nova subatividade
-                    sub_rdo = RDOServicoSubatividade(
-                        rdo_id=novo_rdo.id,
-                        servico_id=sub_data['servico_id'],
-                        nome_subatividade=sub_data['nome'],
-                        percentual_conclusao=sub_data['percentual'],
-                        descricao_subatividade=sub_data.get('descricao', ''),
-                        admin_id=admin_id,
-                        ativo=True
-                    )
-                    db.session.add(sub_rdo)
-                    subatividades_salvas += 1
+                # SEMPRE criar nova subatividade para o novo RDO
+                sub_rdo = RDOServicoSubatividade(
+                    rdo_id=novo_rdo.id,
+                    servico_id=sub_data['servico_id'],
+                    nome_subatividade=sub_data['nome'],
+                    percentual_conclusao=sub_data['percentual'],
+                    descricao_subatividade=sub_data.get('descricao', ''),
+                    admin_id=admin_id,
+                    ativo=True
+                )
+                db.session.add(sub_rdo)
+                subatividades_salvas += 1
+                
+                mastery_observer.add_step(operation_id, f'SUBACTIVITY_{i}_CREATED', {
+                    'rdo_id': novo_rdo.id,
+                    'servico_id': sub_data['servico_id'],
+                    'nome': sub_data['nome'],
+                    'percentual': sub_data['percentual'],
+                    'action': 'CREATE_NEW'
+                })
                 
                 sub_duration = (datetime.now() - sub_start).total_seconds() * 1000
                 subactivities_details.append({
