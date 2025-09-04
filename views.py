@@ -4298,7 +4298,9 @@ def rdo_salvar_unificado():
             rdo_servico_subativ.percentual_conclusao = dados['percentual']
             rdo_servico_subativ.observacoes_tecnicas = dados['observacoes']
             rdo_servico_subativ.admin_id = admin_id_correto
-            rdo_servico_subativ.servico_id = 1  # Serviço genérico para campos manuais
+            # Buscar primeiro serviço disponível para este admin
+            primeiro_servico = Servico.query.filter_by(admin_id=admin_id_correto).first()
+            rdo_servico_subativ.servico_id = primeiro_servico.id if primeiro_servico else None
             db.session.add(rdo_servico_subativ)
             subatividades_processadas += 1
             print(f"DEBUG MANUAL: {dados['nome']}: {dados['percentual']}% - {dados['observacoes'][:30] if dados['observacoes'] else 'Sem obs'}...")
@@ -4338,7 +4340,9 @@ def rdo_salvar_unificado():
                         rdo_servico_subativ.percentual_conclusao = percentual
                         rdo_servico_subativ.observacoes_tecnicas = observacoes
                         rdo_servico_subativ.admin_id = admin_id_correto
-                        rdo_servico_subativ.servico_id = 1  # Genérico
+                        # Buscar primeiro serviço disponível para este admin
+                        primeiro_servico = Servico.query.filter_by(admin_id=admin_id_correto).first()
+                        rdo_servico_subativ.servico_id = primeiro_servico.id if primeiro_servico else None
                         db.session.add(rdo_servico_subativ)
                         subatividades_processadas += 1
                         print(f"DEBUG GENERICO: Subatividade {subatividade_id}: {percentual}%")
@@ -4364,7 +4368,9 @@ def rdo_salvar_unificado():
                         rdo_servico_subativ.percentual_conclusao = float(ativ_data.get('percentual', 0))
                         rdo_servico_subativ.observacoes_tecnicas = ativ_data.get('observacoes', '').strip()
                         rdo_servico_subativ.admin_id = admin_id_correto
-                        rdo_servico_subativ.servico_id = 1  # Serviço genérico
+                        # Buscar primeiro serviço disponível para este admin
+                        primeiro_servico = Servico.query.filter_by(admin_id=admin_id_correto).first()
+                        rdo_servico_subativ.servico_id = primeiro_servico.id if primeiro_servico else None
                         db.session.add(rdo_servico_subativ)
                         print(f"DEBUG: Atividade convertida: {descricao} - {ativ_data.get('percentual', 0)}%")
             except (json.JSONDecodeError, ValueError) as e:
