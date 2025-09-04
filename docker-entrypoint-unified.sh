@@ -133,9 +133,9 @@ with app.app_context():
         # Detectar admin_id recomendado para produção
         print('\\n🎯 DETECÇÃO AUTOMÁTICA DE ADMIN_ID:')
         
-        # Buscar admin_id com mais dados combinados
+        # Buscar admin_id com mais dados combinados (query corrigida)
         combined_query = text('''
-            SELECT admin_id, 
+            SELECT all_admins.admin_id, 
                    COALESCE(f.funcionarios, 0) + COALESCE(s.servicos, 0) + COALESCE(o.obras, 0) as total_dados
             FROM (
                 SELECT DISTINCT admin_id FROM funcionario 
@@ -145,7 +145,7 @@ with app.app_context():
             LEFT JOIN (SELECT admin_id, COUNT(*) as funcionarios FROM funcionario WHERE ativo = true GROUP BY admin_id) f ON all_admins.admin_id = f.admin_id
             LEFT JOIN (SELECT admin_id, COUNT(*) as servicos FROM servico WHERE ativo = true GROUP BY admin_id) s ON all_admins.admin_id = s.admin_id  
             LEFT JOIN (SELECT admin_id, COUNT(*) as obras FROM obra GROUP BY admin_id) o ON all_admins.admin_id = o.admin_id
-            ORDER BY total_dados DESC, admin_id ASC
+            ORDER BY total_dados DESC, all_admins.admin_id ASC
             LIMIT 1
         ''')
         

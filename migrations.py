@@ -687,68 +687,8 @@ def migrar_sistema_rdo_aprimorado():
         
         logger.info("✅ Tabela rdo_servico_subatividade criada com sucesso")
         
-        # Popular com dados de exemplo para demonstração
-        cursor.execute("""
-            INSERT INTO subatividade_mestre (servico_id, nome, descricao, ordem_padrao, admin_id) 
-            SELECT DISTINCT 
-                s.id,
-                CASE s.nome
-                    WHEN 'Alvenaria de Vedação' THEN 'Levantamento de Parede'
-                    WHEN 'Estrutura de Concreto Armado' THEN 'Preparação das Formas'
-                    WHEN 'Pintura Interna' THEN 'Aplicação de Primer'
-                    WHEN 'Instalação Elétrica' THEN 'Passagem de Eletrodutos'
-                    WHEN 'Revestimento Cerâmico' THEN 'Preparação do Substrato'
-                    ELSE 'Etapa Inicial'
-                END,
-                CASE s.nome
-                    WHEN 'Alvenaria de Vedação' THEN 'Levantamento das paredes de vedação com blocos cerâmicos'
-                    WHEN 'Estrutura de Concreto Armado' THEN 'Montagem e posicionamento das formas para concretagem'
-                    WHEN 'Pintura Interna' THEN 'Aplicação de primer preparatório nas superfícies'
-                    WHEN 'Instalação Elétrica' THEN 'Instalação dos eletrodutos e infraestrutura elétrica'
-                    WHEN 'Revestimento Cerâmico' THEN 'Preparação e nivelamento do substrato para aplicação'
-                    ELSE 'Primeira etapa de execução do serviço'
-                END,
-                1,
-                10
-            FROM servico s 
-            WHERE s.ativo = TRUE 
-            AND NOT EXISTS (
-                SELECT 1 FROM subatividade_mestre sm 
-                WHERE sm.servico_id = s.id AND sm.admin_id = 10
-            )
-            LIMIT 50
-        """)
-        
-        # Segunda subatividade para cada serviço
-        cursor.execute("""
-            INSERT INTO subatividade_mestre (servico_id, nome, descricao, ordem_padrao, admin_id) 
-            SELECT DISTINCT 
-                s.id,
-                CASE s.nome
-                    WHEN 'Alvenaria de Vedação' THEN 'Chapisco'
-                    WHEN 'Estrutura de Concreto Armado' THEN 'Concretagem'
-                    WHEN 'Pintura Interna' THEN 'Aplicação de Tinta'
-                    WHEN 'Instalação Elétrica' THEN 'Fiação e Conexões'
-                    WHEN 'Revestimento Cerâmico' THEN 'Aplicação de Cerâmica'
-                    ELSE 'Etapa Intermediária'
-                END,
-                CASE s.nome
-                    WHEN 'Alvenaria de Vedação' THEN 'Aplicação de chapisco nas paredes levantadas'
-                    WHEN 'Estrutura de Concreto Armado' THEN 'Concretagem da estrutura com controle de qualidade'
-                    WHEN 'Pintura Interna' THEN 'Aplicação da tinta final com acabamento'
-                    WHEN 'Instalação Elétrica' THEN 'Passagem de fiação e execução de conexões'
-                    WHEN 'Revestimento Cerâmico' THEN 'Assentamento das peças cerâmicas'
-                    ELSE 'Segunda etapa de execução do serviço'
-                END,
-                2,
-                10
-            FROM servico s 
-            WHERE s.ativo = TRUE 
-            AND EXISTS (SELECT 1 FROM subatividade_mestre sm WHERE sm.servico_id = s.id AND sm.admin_id = 10)
-            LIMIT 50
-        """)
-        
-        logger.info("✅ Dados de exemplo inseridos nas subatividades mestre")
+        # REMOVIDO: Não inserir dados automaticamente - apenas criar tabelas vazias
+        logger.info("✅ Tabelas criadas sem dados - estrutura pronta para qualquer ambiente")
         
         connection.commit()
         cursor.close()
