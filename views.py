@@ -4923,7 +4923,7 @@ def salvar_rdo_maestria():
         # === FASE 1: VALIDAÇÃO DE DADOS ===
         obra_id = request.form.get('obra_id')
         data_relatorio = request.form.get('data_relatorio')
-        observacoes_gerais = request.form.get('observacoes_gerais', '')
+        comentario_geral = request.form.get('observacoes_gerais', '')
         
         if not obra_id or not data_relatorio:
             return _erro_validacao(operation_id, 'Obra e data são obrigatórias')
@@ -4945,10 +4945,11 @@ def salvar_rdo_maestria():
             novo_rdo = RDO(
                 obra_id=int(obra_id),
                 admin_id=admin_id,
+                criado_por_id=admin_id,  # Campo obrigatório
                 data_relatorio=datetime.strptime(data_relatorio, '%Y-%m-%d').date(),
                 numero_rdo=f"RDO-{datetime.now().strftime('%Y%m%d')}-{obra_id}",
-                observacoes_gerais=observacoes_gerais,
-                status='ativo'
+                comentario_geral=comentario_geral,
+                status='Finalizado'
             )
             
             db.session.add(novo_rdo)
