@@ -1734,6 +1734,13 @@ def editar_obra(id):
     
     # ===== GET REQUEST - CARREGAR DADOS PARA EDIÇÃO =====
     try:
+        # Fazer rollback preventivo para evitar transações abortadas
+        try:
+            db.session.rollback()
+            print("🔄 ROLLBACK preventivo na edição executado")
+        except:
+            pass
+        
         # Usar sistema robusto de detecção de admin_id
         admin_id = get_admin_id_robusta(obra, current_user)
         print(f"🔍 ADMIN_ID DETECTADO PARA EDIÇÃO: {admin_id}")
@@ -1744,15 +1751,30 @@ def editar_obra(id):
         # Carregar serviços disponíveis
         servicos_disponiveis = obter_servicos_disponiveis(admin_id)
         
-        # Buscar serviços já associados à obra usando função refatorada
-        servicos_obra_lista = obter_servicos_da_obra(obra.id, admin_id)
-        servicos_obra = [s['id'] for s in servicos_obra_lista]
+        # Buscar serviços já associados à obra usando função refatorada com proteção
+        try:
+            servicos_obra_lista = obter_servicos_da_obra(obra.id, admin_id)
+            servicos_obra = [s['id'] for s in servicos_obra_lista]
+        except Exception as servicos_error:
+            print(f"🚨 ERRO ao buscar serviços da obra na edição: {servicos_error}")
+            try:
+                db.session.rollback()
+                print("🔄 ROLLBACK após erro de serviços executado")
+            except:
+                pass
+            servicos_obra_lista = []
+            servicos_obra = []
         
         print(f"✅ EDIÇÃO CARREGADA: {len(funcionarios)} funcionários, {len(servicos_disponiveis)} serviços disponíveis")
         print(f"✅ SERVIÇOS DA OBRA: {len(servicos_obra)} já associados")
         
     except Exception as e:
         print(f"ERRO ao carregar dados para edição: {e}")
+        try:
+            db.session.rollback()
+            print("🔄 ROLLBACK geral na edição executado")
+        except:
+            pass
         funcionarios = []
         servicos_disponiveis = []
         servicos_obra = []
