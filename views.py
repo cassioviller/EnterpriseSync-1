@@ -4305,7 +4305,7 @@ def rdo_salvar_unificado():
             subatividades_processadas += 1
             print(f"DEBUG MANUAL: {dados['nome']}: {dados['percentual']}% - {dados['observacoes'][:30] if dados['observacoes'] else 'Sem obs'}...")
         
-        # Percorrer subatividades do sistema padrão
+        # Percorrer subatividades do sistema padrão - SALVAR APENAS AS PREENCHIDAS
         for key, value in request.form.items():
             if key.startswith('subatividade_') and key.endswith('_percentual'):
                 try:
@@ -4313,11 +4313,11 @@ def rdo_salvar_unificado():
                     subatividade_id = int(key.split('_')[1])
                     percentual = float(value) if value else 0
                     
-                    # Salvar todas as subatividades, mesmo com 0%
                     # Buscar observações correspondentes
                     obs_key = f'subatividade_{subatividade_id}_observacoes'
                     observacoes = request.form.get(obs_key, '').strip()
                     
+                    # Salvar TODAS as subatividades, inclusive 0% (conforme solicitado)
                     # Buscar informações da subatividade
                     subatividade = SubatividadeMestre.query.get(subatividade_id)
                     if subatividade:
@@ -4331,7 +4331,7 @@ def rdo_salvar_unificado():
                         rdo_servico_subativ.servico_id = subatividade.servico_id  # Importante para hierarchy
                         db.session.add(rdo_servico_subativ)
                         subatividades_processadas += 1
-                        print(f"DEBUG SISTEMA: {subatividade.nome}: {percentual}% - {observacoes[:30] if observacoes else 'Sem obs'}...")
+                        print(f"✅ SUBATIVIDADE SALVA: {subatividade.nome}: {percentual}% - {observacoes[:30] if observacoes else 'Sem obs'}...")
                     else:
                         # Se não encontrou subatividade, salvar como personalizada
                         rdo_servico_subativ = RDOServicoSubatividade()
@@ -4345,7 +4345,7 @@ def rdo_salvar_unificado():
                         rdo_servico_subativ.servico_id = primeiro_servico.id if primeiro_servico else None
                         db.session.add(rdo_servico_subativ)
                         subatividades_processadas += 1
-                        print(f"DEBUG GENERICO: Subatividade {subatividade_id}: {percentual}%")
+                        print(f"✅ SUBATIVIDADE PERSONALIZADA SALVA: {subatividade_id}: {percentual}%")
                         
                 except (ValueError, IndexError) as e:
                     print(f"Erro ao processar subatividade {key}: {e}")
