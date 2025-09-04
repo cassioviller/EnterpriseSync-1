@@ -1444,7 +1444,11 @@ def editar_obra(id):
     # GET request - carregar lista de funcionários e serviços para edição
     try:
         # Usar sistema de admin_id dinâmico para edição
-        admin_id = obra.admin_id or get_admin_id_dinamico()
+        try:
+            admin_id = obra.admin_id or get_admin_id_dinamico()
+        except:
+            # Fallback para usuário logado
+            admin_id = getattr(current_user, 'admin_id', getattr(current_user, 'id', 10))
         funcionarios = Funcionario.query.filter_by(admin_id=admin_id, ativo=True).order_by(Funcionario.nome).all()
         servicos_disponiveis = Servico.query.filter_by(admin_id=admin_id, ativo=True).order_by(Servico.nome).all()
         
