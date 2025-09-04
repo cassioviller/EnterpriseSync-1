@@ -4167,11 +4167,20 @@ def rdo_salvar_unificado():
             print(f"DEBUG MULTITENANT: current_user.admin_id={current_user.admin_id}")
             print(f"DEBUG MULTITENANT: current_user.id={current_user.id}")
             
-            # Usar funcionário já encontrado acima
+            # SISTEMA FLEXÍVEL: Admin ou Funcionário podem criar RDO
+            funcionario = None
             
-            print(f"DEBUG MULTITENANT: Funcionário encontrado: {funcionario.nome if funcionario else 'NENHUM'}")
+            # Se é admin, pode criar RDO sem precisar ser funcionário
+            if hasattr(current_user, 'tipo_usuario') and current_user.tipo_usuario == TipoUsuario.ADMIN:
+                print(f"🎯 ADMIN CRIANDO RDO: {current_user.email}")
+                # Admin pode criar RDO diretamente, criar funcionário virtual se necessário
+                funcionario = Funcionario.query.filter_by(admin_id=admin_id_correto, ativo=True).first()
+            else:
+                # Se é funcionário, buscar por email
+                funcionario = Funcionario.query.filter_by(email=current_user.email, admin_id=admin_id_correto, ativo=True).first()
+                print(f"🎯 FUNCIONÁRIO CRIANDO RDO: {funcionario.nome if funcionario else 'Não encontrado'}")
             
-            # SISTEMA SIMPLIFICADO: Usar primeiro funcionário ativo do admin (sem verificação de email)
+            # Se não encontrou funcionário, criar um funcionário padrão
             if not funcionario:
                 print(f"Buscando funcionário para admin_id={admin_id_correto}")
                 funcionario = Funcionario.query.filter_by(admin_id=admin_id_correto, ativo=True).first()
