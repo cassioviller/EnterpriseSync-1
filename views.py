@@ -4471,12 +4471,148 @@ def api_test_rdo_servicos_obra(obra_id):
         traceback.print_exc()
         return jsonify({'error': 'Erro interno', 'success': False}), 500
 
-# Nova API para carregar dados do último RDO
+# API para carregar dados do último RDO - CORRIGIDA
+@main_bp.route('/api/ultimo-rdo-dados/<int:obra_id>')
+def api_ultimo_rdo_dados_corrigida(obra_id):
+    """API para obter dados do último RDO de uma obra"""
+    try:
+        admin_id = get_admin_id_dinamico()
+        print(f"✅ API ÚLTIMO RDO: obra_id={obra_id}, admin_id={admin_id}")
+        
+        # Verificar se existe pelo menos um RDO para esta obra
+        ultimo_rdo = RDO.query.filter_by(obra_id=obra_id, admin_id=admin_id).order_by(RDO.data_relatorio.desc()).first()
+        
+        if not ultimo_rdo:
+            # Primeira RDO - carregar serviços da obra com percentual 0%
+            print(f"🔍 Primeira RDO da obra {obra_id} - carregando serviços com percentual 0%")
+            
+            # Buscar serviços cadastrados na obra
+            try:
+                servicos_obra = db.session.query(Servico).join(ServicoObra).filter(
+                    ServicoObra.obra_id == obra_id,
+                    ServicoObra.ativo == True,
+                    Servico.admin_id == admin_id,
+                    Servico.ativo == True
+                ).all()
+            except:
+                servicos_obra = []
+            
+            if not servicos_obra:
+                # Se não há serviços na obra, buscar todos os serviços da empresa
+                servicos_obra = Servico.query.filter_by(admin_id=admin_id, ativo=True).all()
+                print(f"✅ Carregando {len(servicos_obra)} serviços da empresa")
+            else:
+                print(f"✅ Encontrados {len(servicos_obra)} serviços da obra")
+            
+            servicos_dados = []
+            for servico in servicos_obra:
+                servico_data = {
+                    'id': servico.id,
+                    'nome': servico.nome,
+                    'percentual': 0,
+                    'categoria': getattr(servico, 'categoria', 'Não categorizado'),
+                    'subatividades': []
+                }
+                servicos_dados.append(servico_data)
+            
+            resultado = {
+                'success': True,
+                'primeira_rdo': True,
+                'ultimo_rdo': {
+                    'id': None,
+                    'numero_rdo': 'PRIMEIRA_RDO',
+                    'data_relatorio': datetime.now().strftime('%Y-%m-%d'),
+                    'servicos': servicos_dados,
+                    'funcionarios': [],
+                    'total_servicos': len(servicos_dados)
+                }
+            }
+            
+            print(f"✅ PRIMEIRA RDO: {len(servicos_dados)} serviços carregados")
+            return jsonify(resultado)
+        
+        # Buscar dados do último RDO
+        servicos_dados = []
+        funcionarios_dados = []
+        
+        # Buscar serviços do último RDO
+        try:
+            subatividades_rdo = RDOServicoSubatividade.query.filter_by(rdo_id=ultimo_rdo.id).all()
+            servicos_dict = {}
+            
+            for sub_rdo in subatividades_rdo:
+                if sub_rdo.servico:
+                    servico = sub_rdo.servico
+                    servico_id = servico.id
+                    
+                    if servico_id not in servicos_dict:
+                        servicos_dict[servico_id] = {
+                            'id': servico.id,
+                            'nome': servico.nome,
+                            'categoria': getattr(servico, 'categoria', 'Não categorizado'),
+                            'subatividades': []
+                        }
+                    
+                    servicos_dict[servico_id]['subatividades'].append({
+                        'id': sub_rdo.id,
+                        'nome': sub_rdo.nome_subatividade,
+                        'percentual': float(sub_rdo.percentual_conclusao or 0),
+                        'descricao': sub_rdo.descricao_subatividade or ''
+                    })
+            
+            servicos_dados = list(servicos_dict.values())
+        except Exception as e:
+            print(f"ERRO ao carregar serviços: {e}")
+            servicos_dados = []
+        
+        # Buscar funcionários do último RDO
+        try:
+            funcionarios_rdo = RDOMaoObra.query.filter_by(rdo_id=ultimo_rdo.id).all()
+            for func_rdo in funcionarios_rdo:
+                if func_rdo.funcionario:
+                    funcionarios_dados.append({
+                        'id': func_rdo.funcionario.id,
+                        'nome': func_rdo.funcionario.nome,
+                        'funcao': getattr(func_rdo.funcionario, 'funcao', 'Funcionário'),
+                        'horas_trabalhadas': float(func_rdo.horas_trabalhadas) if func_rdo.horas_trabalhadas else 8.0
+                    })
+        except Exception as e:
+            print(f"ERRO ao carregar funcionários: {e}")
+            funcionarios_dados = []
+        
+        resultado = {
+            'success': True,
+            'primeira_rdo': False,
+            'ultimo_rdo': {
+                'id': ultimo_rdo.id,
+                'numero_rdo': ultimo_rdo.numero_rdo or f'RDO-{ultimo_rdo.id}',
+                'data_relatorio': ultimo_rdo.data_relatorio.strftime('%Y-%m-%d'),
+                'servicos': servicos_dados,
+                'funcionarios': funcionarios_dados,
+                'total_servicos': len(servicos_dados),
+                'total_funcionarios': len(funcionarios_dados)
+            }
+        }
+        
+        print(f"✅ ÚLTIMO RDO ENCONTRADO: {len(servicos_dados)} serviços, {len(funcionarios_dados)} funcionários")
+        return jsonify(resultado)
+        
+    except Exception as e:
+        print(f"❌ ERRO API ÚLTIMO RDO: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({
+            'success': False,
+            'error': str(e),
+            'message': 'Erro ao carregar dados do último RDO'
+        }), 500
+
+# Nova API para carregar dados do último RDO - TESTE
 @main_bp.route('/api/test/rdo/ultimo-rdo-dados/<int:obra_id>')
 def api_test_ultimo_rdo_dados(obra_id):
     """API TEST para carregar serviços com dados do último RDO da obra"""
     try:
-        admin_id = 10
+        admin_id = get_admin_id_dinamico()
         
         # Verificar se obra existe
         obra = Obra.query.filter_by(id=obra_id, admin_id=admin_id).first()
