@@ -627,7 +627,7 @@ def migrar_campo_admin_id_rdo():
 
 def migrar_sistema_rdo_aprimorado():
     """
-    CRÍTICA: Criar tabelas do sistema RDO aprimorado com subatividades
+    CRÍTICA: Criar/atualizar tabelas do sistema RDO aprimorado com verificação de estrutura
     """
     try:
         import psycopg2
@@ -637,55 +637,197 @@ def migrar_sistema_rdo_aprimorado():
         connection = psycopg2.connect(os.environ.get("DATABASE_URL"))
         cursor = connection.cursor()
         
-        logger.info("🔄 Criando tabelas do sistema RDO aprimorado (preservando dados existentes)...")
+        logger.info("🔄 Verificando e atualizando estrutura das tabelas RDO (preservando dados)...")
         
-        # Tabela subatividade_mestre
+        # Verificar se tabelas existem
         cursor.execute("""
-            CREATE TABLE IF NOT EXISTS subatividade_mestre (
-                id SERIAL PRIMARY KEY,
-                servico_id INTEGER NOT NULL REFERENCES servico(id),
-                nome VARCHAR(200) NOT NULL,
-                descricao TEXT,
-                ordem_padrao INTEGER DEFAULT 0,
-                obrigatoria BOOLEAN DEFAULT TRUE,
-                duracao_estimada_horas FLOAT,
-                complexidade INTEGER DEFAULT 1,
-                admin_id INTEGER NOT NULL REFERENCES usuario(id),
-                ativo BOOLEAN DEFAULT TRUE,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-            )
+            SELECT table_name 
+            FROM information_schema.tables 
+            WHERE table_name IN ('subatividade_mestre', 'rdo_servico_subatividade')
+            AND table_schema = 'public'
         """)
+        existing_tables = [row[0] for row in cursor.fetchall()]
+        logger.info(f"📋 Tabelas encontradas: {existing_tables}")
         
+        # SUBATIVIDADE_MESTRE: Criar ou verificar estrutura
+        if 'subatividade_mestre' not in existing_tables:
+            logger.info("🆕 Criando tabela subatividade_mestre...")
+            cursor.execute("""
+                CREATE TABLE subatividade_mestre (
+                    id SERIAL PRIMARY KEY,
+                    servico_id INTEGER NOT NULL REFERENCES servico(id),
+                    nome VARCHAR(200) NOT NULL,
+                    descricao TEXT,
+                    ordem_padrao INTEGER DEFAULT 0,
+                    obrigatoria BOOLEAN DEFAULT TRUE,
+                    duracao_estimada_horas FLOAT,
+                    complexidade INTEGER DEFAULT 1,
+                    admin_id INTEGER NOT NULL REFERENCES usuario(id),
+                    ativo BOOLEAN DEFAULT TRUE,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            """)
+            logger.info("✅ Tabela subatividade_mestre criada")
+        else:
+            logger.info("🔍 Verificando estrutura da tabela subatividade_mestre...")
+            
+            # Definir colunas esperadas
+            expected_columns = {
+                'id': 'SERIAL PRIMARY KEY',
+                'servico_id': 'INTEGER NOT NULL',
+                'nome': 'VARCHAR(200) NOT NULL',
+                'descricao': 'TEXT',
+                'ordem_padrao': 'INTEGER DEFAULT 0',
+                'obrigatoria': 'BOOLEAN DEFAULT TRUE',
+                'duracao_estimada_horas': 'FLOAT',
+                'complexidade': 'INTEGER DEFAULT 1', 
+                'admin_id': 'INTEGER NOT NULL',
+                'ativo': 'BOOLEAN DEFAULT TRUE',
+                'created_at': 'TIMESTAMP DEFAULT CURRENT_TIMESTAMP',
+                'updated_at': 'TIMESTAMP DEFAULT CURRENT_TIMESTAMP'
+            }
+            
+            # Verificar colunas existentes
+            cursor.execute("""
+                SELECT column_name, data_type, character_maximum_length, is_nullable, column_default
+                FROM information_schema.columns 
+                WHERE table_name = 'subatividade_mestre' 
+                ORDER BY ordinal_position
+            """)
+            existing_columns = {row[0]: row for row in cursor.fetchall()}
+            
+            # Adicionar colunas faltantes
+            for col_name in expected_columns:
+                if col_name not in existing_columns and col_name != 'id':  # Nunca alterar ID
+                    try:
+                        col_definition = expected_columns[col_name]
+                        
+                        # Simplificar definição para ALTER TABLE
+                        if col_name == 'servico_id':
+                            col_def = 'INTEGER NOT NULL REFERENCES servico(id)'
+                        elif col_name == 'admin_id':
+                            col_def = 'INTEGER NOT NULL REFERENCES usuario(id)'
+                        elif col_name == 'nome':
+                            col_def = 'VARCHAR(200) NOT NULL'
+                        elif col_name == 'descricao':
+                            col_def = 'TEXT'
+                        elif col_name == 'ordem_padrao':
+                            col_def = 'INTEGER DEFAULT 0'
+                        elif col_name == 'obrigatoria':
+                            col_def = 'BOOLEAN DEFAULT TRUE'
+                        elif col_name == 'duracao_estimada_horas':
+                            col_def = 'FLOAT'
+                        elif col_name == 'complexidade':
+                            col_def = 'INTEGER DEFAULT 1'
+                        elif col_name == 'ativo':
+                            col_def = 'BOOLEAN DEFAULT TRUE'
+                        elif col_name in ['created_at', 'updated_at']:
+                            col_def = 'TIMESTAMP DEFAULT CURRENT_TIMESTAMP'
+                        else:
+                            col_def = 'TEXT'
+                        
+                        cursor.execute(f"ALTER TABLE subatividade_mestre ADD COLUMN IF NOT EXISTS {col_name} {col_def}")
+                        logger.info(f"✅ Coluna '{col_name}' adicionada à subatividade_mestre")
+                        
+                    except Exception as e:
+                        logger.warning(f"⚠️ Erro ao adicionar coluna '{col_name}': {e}")
+            
+            logger.info("✅ Estrutura subatividade_mestre verificada/atualizada")
+        
+        # Criar índices
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_subativ_mestre_servico ON subatividade_mestre(servico_id)")
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_subativ_mestre_admin ON subatividade_mestre(admin_id)")
         
-        logger.info("✅ Tabela subatividade_mestre criada com sucesso")
+        # RDO_SERVICO_SUBATIVIDADE: Criar ou verificar estrutura  
+        if 'rdo_servico_subatividade' not in existing_tables:
+            logger.info("🆕 Criando tabela rdo_servico_subatividade...")
+            cursor.execute("""
+                CREATE TABLE rdo_servico_subatividade (
+                    id SERIAL PRIMARY KEY,
+                    rdo_id INTEGER NOT NULL REFERENCES rdo(id),
+                    servico_id INTEGER NOT NULL REFERENCES servico(id),
+                    nome_subatividade VARCHAR(200) NOT NULL,
+                    descricao_subatividade TEXT,
+                    percentual_conclusao FLOAT DEFAULT 0.0,
+                    percentual_anterior FLOAT DEFAULT 0.0,
+                    incremento_dia FLOAT DEFAULT 0.0,
+                    observacoes_tecnicas TEXT,
+                    ordem_execucao INTEGER DEFAULT 0,
+                    ativo BOOLEAN DEFAULT TRUE,
+                    admin_id INTEGER NOT NULL REFERENCES usuario(id),
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            """)
+            logger.info("✅ Tabela rdo_servico_subatividade criada")
+        else:
+            logger.info("🔍 Verificando estrutura da tabela rdo_servico_subatividade...")
+            
+            # Definir colunas esperadas
+            expected_columns = {
+                'id': 'SERIAL PRIMARY KEY',
+                'rdo_id': 'INTEGER NOT NULL',
+                'servico_id': 'INTEGER NOT NULL', 
+                'nome_subatividade': 'VARCHAR(200) NOT NULL',
+                'descricao_subatividade': 'TEXT',
+                'percentual_conclusao': 'FLOAT DEFAULT 0.0',
+                'percentual_anterior': 'FLOAT DEFAULT 0.0',
+                'incremento_dia': 'FLOAT DEFAULT 0.0',
+                'observacoes_tecnicas': 'TEXT',
+                'ordem_execucao': 'INTEGER DEFAULT 0',
+                'ativo': 'BOOLEAN DEFAULT TRUE',
+                'admin_id': 'INTEGER NOT NULL',
+                'created_at': 'TIMESTAMP DEFAULT CURRENT_TIMESTAMP',
+                'updated_at': 'TIMESTAMP DEFAULT CURRENT_TIMESTAMP'
+            }
+            
+            # Verificar colunas existentes
+            cursor.execute("""
+                SELECT column_name, data_type, character_maximum_length, is_nullable, column_default
+                FROM information_schema.columns 
+                WHERE table_name = 'rdo_servico_subatividade' 
+                ORDER BY ordinal_position
+            """)
+            existing_columns = {row[0]: row for row in cursor.fetchall()}
+            
+            # Adicionar colunas faltantes
+            for col_name in expected_columns:
+                if col_name not in existing_columns and col_name != 'id':  # Nunca alterar ID
+                    try:
+                        # Simplificar definição para ALTER TABLE
+                        if col_name == 'rdo_id':
+                            col_def = 'INTEGER NOT NULL REFERENCES rdo(id)'
+                        elif col_name == 'servico_id':
+                            col_def = 'INTEGER NOT NULL REFERENCES servico(id)'
+                        elif col_name == 'admin_id':
+                            col_def = 'INTEGER NOT NULL REFERENCES usuario(id)'
+                        elif col_name == 'nome_subatividade':
+                            col_def = 'VARCHAR(200) NOT NULL'
+                        elif col_name in ['descricao_subatividade', 'observacoes_tecnicas']:
+                            col_def = 'TEXT'
+                        elif col_name in ['percentual_conclusao', 'percentual_anterior', 'incremento_dia']:
+                            col_def = 'FLOAT DEFAULT 0.0'
+                        elif col_name == 'ordem_execucao':
+                            col_def = 'INTEGER DEFAULT 0'
+                        elif col_name == 'ativo':
+                            col_def = 'BOOLEAN DEFAULT TRUE'
+                        elif col_name in ['created_at', 'updated_at']:
+                            col_def = 'TIMESTAMP DEFAULT CURRENT_TIMESTAMP'
+                        else:
+                            col_def = 'TEXT'
+                        
+                        cursor.execute(f"ALTER TABLE rdo_servico_subatividade ADD COLUMN IF NOT EXISTS {col_name} {col_def}")
+                        logger.info(f"✅ Coluna '{col_name}' adicionada à rdo_servico_subatividade")
+                        
+                    except Exception as e:
+                        logger.warning(f"⚠️ Erro ao adicionar coluna '{col_name}': {e}")
+            
+            logger.info("✅ Estrutura rdo_servico_subatividade verificada/atualizada")
         
-        # Tabela rdo_servico_subatividade
-        cursor.execute("""
-            CREATE TABLE IF NOT EXISTS rdo_servico_subatividade (
-                id SERIAL PRIMARY KEY,
-                rdo_id INTEGER NOT NULL REFERENCES rdo(id),
-                servico_id INTEGER NOT NULL REFERENCES servico(id),
-                nome_subatividade VARCHAR(200) NOT NULL,
-                descricao_subatividade TEXT,
-                percentual_conclusao FLOAT DEFAULT 0.0,
-                percentual_anterior FLOAT DEFAULT 0.0,
-                incremento_dia FLOAT DEFAULT 0.0,
-                observacoes_tecnicas TEXT,
-                ordem_execucao INTEGER DEFAULT 0,
-                ativo BOOLEAN DEFAULT TRUE,
-                admin_id INTEGER NOT NULL REFERENCES usuario(id),
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-            )
-        """)
-        
+        # Criar índices
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_rdo_servico_subativ ON rdo_servico_subatividade(rdo_id, servico_id)")
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_subativ_admin ON rdo_servico_subatividade(admin_id)")
-        
-        logger.info("✅ Tabela rdo_servico_subatividade criada com sucesso")
         
         # REMOVIDO: Não inserir dados automaticamente - apenas criar tabelas vazias
         logger.info("✅ Estrutura de tabelas garantida - dados existentes preservados")
