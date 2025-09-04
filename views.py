@@ -1485,7 +1485,7 @@ def processar_servicos_obra(obra_id, servicos_selecionados):
         return 0
 
 def obter_servicos_da_obra(obra_id, admin_id=None):
-    """Obtém lista de serviços RDO sendo executados na obra"""
+    """Obtém lista de serviços principais sendo executados na obra (via subatividade_mestre)"""
     try:
         from sqlalchemy import text
         
@@ -1494,18 +1494,20 @@ def obter_servicos_da_obra(obra_id, admin_id=None):
             obra = Obra.query.get(obra_id)
             admin_id = get_admin_id_robusta(obra)
         
-        print(f"🔍 BUSCANDO SERVIÇOS RDO EXECUTADOS para obra {obra_id}, admin_id {admin_id}")
+        print(f"🔍 BUSCANDO SERVIÇOS PRINCIPAIS EXECUTADOS para obra {obra_id}, admin_id {admin_id}")
         
-        # CORREÇÃO: Volta para RDO_SERVICO_SUBATIVIDADE (serviços em execução)
+        # CORREÇÃO FINAL: Buscar serviços que têm subatividades sendo executadas no RDO
+        # Como rdo_servico_subatividade não tem subatividade_id, vamos buscar diretamente por servico_id
         query = text("""
             SELECT DISTINCT s.id, s.nome, s.descricao, s.categoria, s.unidade_medida, s.custo_unitario,
-                   COUNT(rss.id) as total_subatividades,
-                   AVG(rss.percentual_conclusao) as progresso_medio
+                   COUNT(rss.id) as total_subatividades_ativas,
+                   AVG(rss.percentual_conclusao) as progresso_medio,
+                   (SELECT COUNT(*) FROM subatividade_mestre sm WHERE sm.servico_id = s.id AND sm.ativo = true) as total_subatividades_possiveis
             FROM servico s
-            JOIN rdo_servico_subatividade rss ON s.id = rss.servico_id
+            JOIN rdo_servico_subatividade rss ON rss.servico_id = s.id
             JOIN rdo r ON rss.rdo_id = r.id
             WHERE r.obra_id = :obra_id AND rss.ativo = true 
-              AND (s.admin_id = :admin_id OR rss.admin_id = :admin_id)
+              AND s.admin_id = :admin_id AND s.ativo = true
             GROUP BY s.id, s.nome, s.descricao, s.categoria, s.unidade_medida, s.custo_unitario
             ORDER BY s.nome
         """)
@@ -1521,17 +1523,49 @@ def obter_servicos_da_obra(obra_id, admin_id=None):
                 'categoria': row.categoria,
                 'unidade_medida': row.unidade_medida,
                 'custo_unitario': row.custo_unitario,
-                'total_subatividades': int(row.total_subatividades or 0),
+                'total_subatividades': int(row.total_subatividades_ativas or 0),
+                'total_subatividades_possiveis': int(row.total_subatividades_possiveis or 0),
                 'progresso': round(float(row.progresso_medio or 0), 1),
                 'ativo': True
             })
         
-        print(f"✅ {len(servicos_lista)} serviços RDO EXECUTADOS encontrados para obra {obra_id}")
+        print(f"✅ {len(servicos_lista)} serviços PRINCIPAIS encontrados para obra {obra_id}")
         return servicos_lista
         
     except Exception as e:
-        print(f"❌ Erro ao obter serviços RDO da obra {obra_id}: {e}")
-        return []
+        print(f"❌ Erro ao obter serviços da obra {obra_id}: {e}")
+        # Fallback simpler - buscar apenas serviços que têm RDO
+        try:
+            query_simples = text("""
+                SELECT DISTINCT s.id, s.nome, s.descricao, s.categoria, s.unidade_medida, s.custo_unitario
+                FROM servico s
+                JOIN rdo_servico_subatividade rss ON s.id = rss.servico_id
+                JOIN rdo r ON rss.rdo_id = r.id
+                WHERE r.obra_id = :obra_id AND rss.ativo = true 
+                  AND s.admin_id = :admin_id AND s.ativo = true
+                ORDER BY s.nome
+            """)
+            result = db.session.execute(query_simples, {'obra_id': obra_id, 'admin_id': admin_id}).fetchall()
+            
+            servicos_lista = []
+            for row in result:
+                servicos_lista.append({
+                    'id': row.id,
+                    'nome': row.nome,
+                    'descricao': row.descricao or '',
+                    'categoria': row.categoria,
+                    'unidade_medida': row.unidade_medida,
+                    'custo_unitario': row.custo_unitario,
+                    'total_subatividades': 0,
+                    'progresso': 0.0,
+                    'ativo': True
+                })
+            
+            print(f"✅ FALLBACK: {len(servicos_lista)} serviços encontrados")
+            return servicos_lista
+        except Exception as e2:
+            print(f"❌ Erro no fallback: {e2}")
+            return []
 
 def obter_servicos_disponiveis(admin_id):
     """Obtém lista de serviços disponíveis para associação"""
@@ -5751,20 +5785,46 @@ def adicionar_servico_obra():
             else:
                 print(f"♻️ REUTILIZANDO RDO EXISTENTE: {rdo_existente.id}")
             
-            # Criar subatividade padrão para o serviço
-            rdo_servico_sub = RDOServicoSubatividade(
-                rdo_id=rdo_existente.id,
-                servico_id=servico_id,
-                nome_subatividade=f"{servico.nome} - Preparação",
-                descricao_subatividade=f"Atividade inicial do serviço {servico.nome}",
-                percentual_conclusao=0.0,
-                observacoes_tecnicas='Serviço adicionado via modal',
-                ativo=True,
-                admin_id=admin_id
-            )
+            # Buscar subatividades padrão do serviço na tabela subatividade_mestre
+            from models_consolidados import SubatividadeMestre
             
-            db.session.add(rdo_servico_sub)
-            print(f"✅ SUBATIVIDADE RDO ADICIONADA À SESSÃO")
+            subatividades_mestre = SubatividadeMestre.query.filter_by(
+                servico_id=servico_id, 
+                admin_id=admin_id, 
+                ativo=True
+            ).order_by(SubatividadeMestre.ordem_padrao).all()
+            
+            if subatividades_mestre:
+                print(f"📋 ENCONTRADAS {len(subatividades_mestre)} SUBATIVIDADES MESTRE")
+                for subatividade in subatividades_mestre:
+                    rdo_servico_sub = RDOServicoSubatividade(
+                        rdo_id=rdo_existente.id,
+                        servico_id=servico_id,
+                        nome_subatividade=subatividade.nome,
+                        descricao_subatividade=subatividade.descricao or f"Subatividade {subatividade.nome}",
+                        percentual_conclusao=0.0,
+                        observacoes_tecnicas=f'Subatividade criada automaticamente baseada em {subatividade.nome}',
+                        ordem_execucao=subatividade.ordem_padrao,
+                        ativo=True,
+                        admin_id=admin_id
+                    )
+                    db.session.add(rdo_servico_sub)
+                    print(f"  ✅ Subatividade '{subatividade.nome}' adicionada")
+            else:
+                # Fallback: criar uma subatividade genérica se não existir no mestre
+                print(f"⚠️ NENHUMA SUBATIVIDADE MESTRE ENCONTRADA - criando genérica")
+                rdo_servico_sub = RDOServicoSubatividade(
+                    rdo_id=rdo_existente.id,
+                    servico_id=servico_id,
+                    nome_subatividade=f"{servico.nome} - Execução Geral",
+                    descricao_subatividade=f"Execução geral do serviço {servico.nome}",
+                    percentual_conclusao=0.0,
+                    observacoes_tecnicas='Subatividade genérica criada automaticamente',
+                    ativo=True,
+                    admin_id=admin_id
+                )
+                db.session.add(rdo_servico_sub)
+                print(f"✅ SUBATIVIDADE GENÉRICA ADICIONADA À SESSÃO")
         
         print(f"💾 FAZENDO COMMIT DA TRANSAÇÃO")
         db.session.commit()
