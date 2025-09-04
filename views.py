@@ -1412,15 +1412,30 @@ def processar_servicos_obra(obra_id, servicos_selecionados):
                 try:
                     servico_id_int = int(servico_id)
                     
-                    # Verificar se RDO existe para esta obra
-                    rdo_existente = RDO.query.filter_by(obra_id=obra_id, admin_id=admin_id).order_by(RDO.data_relatorio.desc()).first()
+                    # Verificar se RDO existe para esta obra (qualquer admin_id)
+                    from datetime import date
+                    data_hoje = date.today()
                     
+                    # Primeiro tentar encontrar RDO de hoje
+                    rdo_existente = RDO.query.filter_by(
+                        obra_id=obra_id, 
+                        data_relatorio=data_hoje
+                    ).first()
+                    
+                    # Se não encontrou, tentar RDO mais recente desta obra
                     if not rdo_existente:
-                        from datetime import date
+                        rdo_existente = RDO.query.filter_by(obra_id=obra_id).order_by(RDO.data_relatorio.desc()).first()
+                    
+                    # Só criar novo se realmente não existir nenhum
+                    if not rdo_existente:
+                        # Criar número único usando timestamp
+                        import time
+                        timestamp = str(int(time.time()))[-6:]  # últimos 6 dígitos
+                        
                         rdo_existente = RDO(
-                            numero_rdo=f"RDO-{obra_id}-{date.today().strftime('%Y%m%d')}",
+                            numero_rdo=f"RDO-{obra_id}-{data_hoje.strftime('%Y%m%d')}-{timestamp}",
                             obra_id=obra_id,
-                            data_relatorio=date.today(),
+                            data_relatorio=data_hoje,
                             status='Rascunho',
                             admin_id=admin_id,
                             criado_por_id=admin_id
@@ -1428,6 +1443,8 @@ def processar_servicos_obra(obra_id, servicos_selecionados):
                         db.session.add(rdo_existente)
                         db.session.flush()
                         print(f"📝 NOVO RDO CRIADO: ID {rdo_existente.id}")
+                    else:
+                        print(f"♻️ REUTILIZANDO RDO EXISTENTE: ID {rdo_existente.id}")
                     
                     # Buscar o serviço para pegar o nome
                     servico = Servico.query.get(servico_id_int)
@@ -5698,16 +5715,30 @@ def adicionar_servico_obra():
         else:
             print(f"🆕 CRIANDO NOVA ASSOCIAÇÃO RDO")
             
-            # PRIMEIRO: Verificar se existe RDO para esta obra
-            rdo_existente = RDO.query.filter_by(obra_id=obra_id, admin_id=admin_id).order_by(RDO.data_relatorio.desc()).first()
+            # PRIMEIRO: Verificar se existe RDO para esta obra (melhorado)
+            from datetime import date
+            data_hoje = date.today()
             
+            # Tentar encontrar RDO de hoje primeiro
+            rdo_existente = RDO.query.filter_by(
+                obra_id=obra_id, 
+                data_relatorio=data_hoje
+            ).first()
+            
+            # Se não encontrou, tentar RDO mais recente
+            if not rdo_existente:
+                rdo_existente = RDO.query.filter_by(obra_id=obra_id).order_by(RDO.data_relatorio.desc()).first()
+            
+            # Só criar novo se realmente não existir
             if not rdo_existente:
                 print(f"📝 CRIANDO NOVO RDO PARA A OBRA {obra_id}")
-                from datetime import date
+                import time
+                timestamp = str(int(time.time()))[-6:]
+                
                 rdo_existente = RDO(
-                    numero_rdo=f"RDO-{obra_id}-{date.today().strftime('%Y%m%d')}",
+                    numero_rdo=f"RDO-{obra_id}-{data_hoje.strftime('%Y%m%d')}-{timestamp}",
                     obra_id=obra_id,
-                    data_relatorio=date.today(),
+                    data_relatorio=data_hoje,
                     status='Rascunho',
                     admin_id=admin_id,
                     criado_por_id=admin_id
@@ -5715,6 +5746,8 @@ def adicionar_servico_obra():
                 db.session.add(rdo_existente)
                 db.session.flush()  # Para obter o ID do RDO
                 print(f"✅ RDO CRIADO COM ID: {rdo_existente.id}")
+            else:
+                print(f"♻️ REUTILIZANDO RDO EXISTENTE: {rdo_existente.id}")
             
             # SEGUNDO: Criar subatividade padrão para o serviço
             rdo_servico_sub = RDOServicoSubatividade(
