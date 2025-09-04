@@ -1663,10 +1663,9 @@ def obter_servicos_da_obra(obra_id, admin_id=None):
         from sqlalchemy import text
         from sqlalchemy.exc import SQLAlchemyError
         
-        # Se admin_id não fornecido, tentar detectar
+        # Se admin_id não fornecido, usar sistema robusto
         if not admin_id:
-            obra = Obra.query.get(obra_id)
-            admin_id = get_admin_id_robusta(obra)
+            admin_id = get_admin_id_robusta()
         
         print(f"🔍 BUSCANDO SERVIÇOS PRINCIPAIS EXECUTADOS para obra {obra_id}, admin_id {admin_id}")
         
@@ -2633,63 +2632,11 @@ def get_admin_id_dinamico():
 
 @main_bp.route('/api/servicos')
 def api_servicos():
-    """API para buscar serviços - Multi-tenant com detecção correta"""
+    """API para buscar serviços - Multi-tenant com sistema robusto"""
     try:
-        # DETECÇÃO CORRETA DE ADMIN_ID PARA PRODUÇÃO E DESENVOLVIMENTO
-        admin_id = None
-        user_status = "não detectado"
-        
-        # PRIORIDADE 1: Verificar sessão Flask primeiro (para resolver conflitos)
-        session_user_id = session.get('_user_id')
-        print(f"🔍 DEBUG SESSÃO: session_user_id={session_user_id}")
-        
-        # PRIORIDADE 2: Usuário autenticado (PRODUÇÃO)
-        print(f"🔍 DEBUG AUTENTICAÇÃO:")
-        print(f"   - current_user exists: {current_user is not None}")
-        if current_user:
-            print(f"   - is_authenticated: {getattr(current_user, 'is_authenticated', 'N/A')}")
-            print(f"   - has tipo_usuario: {hasattr(current_user, 'tipo_usuario')}")
-            print(f"   - tipo_usuario: {getattr(current_user, 'tipo_usuario', 'N/A')}")
-            print(f"   - id: {getattr(current_user, 'id', 'N/A')}")
-            print(f"   - admin_id: {getattr(current_user, 'admin_id', 'N/A')}")
-        
-        # PRIORIDADE: Se há sessão mas current_user diferente, usar sessão
-        if session_user_id and current_user and str(current_user.id) != str(session_user_id):
-            print(f"🚨 CONFLITO DETECTADO: session_user_id={session_user_id}, current_user.id={current_user.id}")
-            # Buscar usuário correto pela sessão
-            try:
-                session_user = Usuario.query.get(int(session_user_id))
-                if session_user and session_user.tipo_usuario == TipoUsuario.ADMIN:
-                    admin_id = session_user.id
-                    user_status = f"ADMIN pela sessão (ID:{admin_id})"
-                    print(f"✅ CORREÇÃO SESSÃO: {user_status}")
-                elif session_user and hasattr(session_user, 'admin_id') and session_user.admin_id:
-                    admin_id = session_user.admin_id
-                    user_status = f"Funcionário pela sessão (admin_id:{admin_id})"
-                    print(f"✅ CORREÇÃO SESSÃO: {user_status}")
-                else:
-                    print("⚠️ Usuário da sessão sem admin_id válido")
-            except Exception as session_error:
-                print(f"❌ ERRO ao buscar usuário da sessão: {session_error}")
-        
-        # Se ainda não foi definido, usar current_user normal
-        if admin_id is None:
-            try:
-                if current_user and current_user.is_authenticated and hasattr(current_user, 'tipo_usuario'):
-                    if current_user.tipo_usuario == TipoUsuario.ADMIN:
-                        admin_id = current_user.id
-                        user_status = f"ADMIN autenticado (ID:{admin_id})"
-                        print(f"✅ PRODUÇÃO: {user_status}")
-                    elif hasattr(current_user, 'admin_id') and current_user.admin_id:
-                        admin_id = current_user.admin_id
-                        user_status = f"Funcionário autenticado (admin_id:{admin_id})"
-                        print(f"✅ PRODUÇÃO: {user_status}")
-                    else:
-                        print("⚠️ PRODUÇÃO: Usuário autenticado mas sem admin_id definido")
-                else:
-                    print("⚠️ PRODUÇÃO: Usuário não autenticado ou sem tipo_usuario")
-            except Exception as auth_error:
-                print(f"❌ ERRO na autenticação: {auth_error}")
+        # Usar sistema robusto de detecção de admin_id
+        admin_id = get_admin_id_robusta()
+        print(f"✅ API SERVIÇOS: Admin_id via sistema robusto - admin_id={admin_id}")
         
         # PRIORIDADE 2: Fallback inteligente para desenvolvimento
         if admin_id is None:
@@ -5120,8 +5067,12 @@ def api_test_ultimo_rdo_dados(obra_id):
 def api_rdo_servicos_obra(obra_id):
     """API para carregar serviços dinamicamente baseado na obra selecionada"""
     try:
-        # Verificar se obra pertence ao admin do funcionário
-        obra = Obra.query.filter_by(id=obra_id, admin_id=current_user.admin_id).first()
+        # Usar sistema robusto para admin_id
+        admin_id = get_admin_id_robusta()
+        print(f"✅ API RDO SERVIÇOS OBRA: Admin_id via sistema robusto - admin_id={admin_id}")
+        
+        # Verificar se obra pertence ao admin
+        obra = Obra.query.filter_by(id=obra_id, admin_id=admin_id).first()
         if not obra:
             return jsonify({'error': 'Obra não encontrada', 'success': False}), 404
         
@@ -5139,7 +5090,7 @@ def api_rdo_servicos_obra(obra_id):
         # Se não há serviços específicos, buscar serviços padrão do sistema
         if not servicos_obra:
             print(f"DEBUG: Nenhum serviço específico da obra {obra_id}, buscando serviços padrão")
-            servicos_padrao = Servico.query.filter_by(admin_id=current_user.admin_id, ativo=True).limit(10).all()
+            servicos_padrao = Servico.query.filter_by(admin_id=admin_id, ativo=True).limit(10).all()
             
             for servico in servicos_padrao:
                 # Buscar subatividades para criar dados de exemplo
@@ -6292,7 +6243,9 @@ def adicionar_servico_rdo_obra():
 def api_servicos_disponiveis_obra(obra_id):
     """Retorna serviços que ainda não foram adicionados ao RDO da obra"""
     try:
-        admin_id = current_user.id if current_user.tipo_usuario == TipoUsuario.ADMIN else current_user.admin_id
+        # Usar sistema robusto para admin_id
+        admin_id = get_admin_id_robusta()
+        print(f"✅ API SERVIÇOS DISPONÍVEIS OBRA: Admin_id via sistema robusto - admin_id={admin_id}")
         
         # Buscar serviços que ainda não estão no RDO desta obra
         servicos_no_rdo = db.session.query(Servico.id).join(
