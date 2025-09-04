@@ -59,6 +59,9 @@ def executar_migracoes():
         
         # Migração 14: NOVA - Criar tabela ServicoObraReal
         migrar_tabela_servico_obra_real()
+        
+        # Migração 15: CRÍTICA - Adicionar coluna local na tabela RDO para produção
+        adicionar_coluna_local_rdo()
 
         logger.info("✅ Migrações automáticas concluídas com sucesso!")
         
@@ -1129,4 +1132,34 @@ def criar_tabela_servico_obra_real_limpa():
             
     except Exception as e:
         logger.error(f"❌ Erro ao criar tabela limpa: {e}")
+        db.session.rollback()
+
+def adicionar_coluna_local_rdo():
+    """Adiciona coluna 'local' na tabela RDO para compatibilidade com produção"""
+    try:
+        logger.info("🔄 Verificando se coluna 'local' existe na tabela RDO...")
+        
+        # Verificar se a coluna local já existe
+        result = db.session.execute(text("""
+            SELECT column_name 
+            FROM information_schema.columns 
+            WHERE table_name='rdo' AND column_name='local'
+        """)).fetchone()
+        
+        if not result:
+            logger.info("🔧 Adicionando coluna 'local' na tabela RDO...")
+            
+            # Adicionar coluna local
+            db.session.execute(text("""
+                ALTER TABLE rdo 
+                ADD COLUMN local VARCHAR(100) DEFAULT 'Campo'
+            """))
+            
+            db.session.commit()
+            logger.info("✅ Coluna 'local' adicionada à tabela RDO com sucesso!")
+        else:
+            logger.info("✅ Coluna 'local' já existe na tabela RDO")
+            
+    except Exception as e:
+        logger.error(f"❌ Erro ao adicionar coluna 'local' na tabela RDO: {e}")
         db.session.rollback()

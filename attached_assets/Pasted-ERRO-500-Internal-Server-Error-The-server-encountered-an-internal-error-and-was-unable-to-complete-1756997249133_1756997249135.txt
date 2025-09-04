@@ -1,0 +1,28 @@
+ERRO: 500 Internal Server Error: The server encountered an internal error and was unable to complete your request. Either the server is overloaded or there is an error in the application.
+
+URL: https://a719a4a9-73c7-43ac-9f05-28b6e4b40780-00-1x2879rl5g3q1.riker.replit.dev/salvar-rdo-flexivel
+MÉTODO: POST
+TIMESTAMP: 04/09/2025 14:47:17
+USER AGENT: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Safari/537.36
+
+TRACEBACK COMPLETO:
+Traceback (most recent call last):
+  File "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/flask/app.py", line 1511, in wsgi_app
+    response = self.full_dispatch_request()
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/flask/app.py", line 920, in full_dispatch_request
+    return self.finalize_request(rv)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/flask/app.py", line 939, in finalize_request
+    response = self.make_response(rv)
+               ^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/flask/app.py", line 1212, in make_response
+    raise TypeError(
+TypeError: The view function for 'main.salvar_rdo_flexivel' did not return a valid response. The function either returned None or ended without a return statement.
+
+
+HEADERS DA REQUISIÇÃO:
+{'Host': 'a719a4a9-73c7-43ac-9f05-28b6e4b40780-00-1x2879rl5g3q1.riker.replit.dev', 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Safari/537.36', 'Content-Length': '436', 'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7', 'Accept-Encoding': 'identity, gzip, deflate, br, zstd', 'Accept-Language': 'pt-BR,pt;q=0.9,en-US;q=0.8,en;q=0.7', 'Cache-Control': 'max-age=0', 'Content-Type': 'application/x-www-form-urlencoded', 'Cookie': 'session=.eJw1j1GKwzAMRK9i_F0W2Y7sKJfoAXZLsGyZBrZJsZNCKb37Gsp-iceMNKOXnstvbFdpevp-abX3oaXWreqTPnONav05AMRtSta0rXuNOartUE1u6i71trT2b8iiYpLWti99eV9O_XKVdtXTXg_ptGQ96egsR-EyDmhcAhdRQiFkKmAT0mDCiBkGTJHHIZmuEwcWJDIWfO67QZxYzMaPybODHKiwGEqUCW1hE3iAYoAQknVAwZcsxfZYDx5y_2o-mtRPG4TO_LzH1uaY9uUhn7bvP-_FVYg.aLmmbg.qs-buZQyn0uevrsyhRxQi9eoKV0', 'Dnt': '1', 'Origin': 'https://a719a4a9-73c7-43ac-9f05-28b6e4b40780-00-1x2879rl5g3q1.riker.replit.dev', 'Referer': 'https://a719a4a9-73c7-43ac-9f05-28b6e4b40780-00-1x2879rl5g3q1.riker.replit.dev/rdo/novo', 'Sec-Ch-Ua': '"Not;A=Brand";v="99", "Google Chrome";v="139", "Chromium";v="139"', 'Sec-Ch-Ua-Mobile': '?0', 'Sec-Ch-Ua-Platform': '"Windows"', 'Sec-Fetch-Dest': 'iframe', 'Sec-Fetch-Mode': 'navigate', 'Sec-Fetch-Site': 'same-origin', 'Sec-Fetch-Storage-Access': 'active', 'Sec-Fetch-User': '?1', 'Upgrade-Insecure-Requests': '1', 'X-Forwarded-For': '191.13.61.70, 10.81.6.131', 'X-Forwarded-Proto': 'https', 'X-Replit-User-Bio': '', 'X-Replit-User-Id': '', 'X-Replit-User-Name': '', 'X-Replit-User-Profile-Image': '', 'X-Replit-User-Roles': '', 'X-Replit-User-Teams': '', 'X-Replit-User-Url': ''}
+
+ARGUMENTOS DA REQUISIÇÃO:
+{}

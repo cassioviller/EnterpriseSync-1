@@ -7048,17 +7048,13 @@ def excluir_usuario(usuario_id):
 # ROTA FLEXÍVEL PARA SALVAR RDO - CORRIGE ERRO 404
 @main_bp.route('/salvar-rdo-flexivel', methods=['POST'])
 @funcionario_required
-@idempotent(
-    operation_type='rdo_save_flexivel',
-    ttl_seconds=1800,  # 30 minutos
-    key_generator=rdo_key_generator
-)
 def salvar_rdo_flexivel():
     """Rota flexível para salvar RDO - compatibilidade com formulários"""
     try:
         print("🚀 SALVAR RDO FLEXÍVEL: Iniciando salvamento")
         
-        # Usar a mesma lógica da função principal
+        # Redirecionar diretamente para a função principal sem idempotência
+        # para evitar problemas de resposta inválida
         return rdo_salvar_unificado()
         
     except Exception as e:
