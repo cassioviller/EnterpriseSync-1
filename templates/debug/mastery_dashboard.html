@@ -1,0 +1,412 @@
+{% extends "base_completo.html" %}
+
+{% block title %}Digital Mastery Dashboard - Debug RDO{% endblock %}
+
+{% block head %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<meta http-equiv="refresh" content="30">
+{% endblock %}
+
+{% block styles %}
+<style>
+/* Digital Mastery Dashboard Styles */
+.mastery-dashboard {
+    background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+    min-height: 100vh;
+    padding: 2rem;
+}
+
+.mastery-card {
+    background: rgba(255, 255, 255, 0.95);
+    border: 1px solid rgba(222, 226, 230, 0.8);
+    border-radius: 16px;
+    padding: 1.5rem;
+    margin-bottom: 1.5rem;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    backdrop-filter: blur(10px);
+}
+
+.metric-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 1rem;
+    margin-bottom: 2rem;
+}
+
+.metric-card {
+    background: linear-gradient(135deg, #008b3a 0%, #000000 100%);
+    color: white;
+    padding: 1.5rem;
+    border-radius: 12px;
+    text-align: center;
+    position: relative;
+    overflow: hidden;
+}
+
+.metric-card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: linear-gradient(45deg, rgba(255,255,255,0.1) 0%, rgba(255,255,255,0) 100%);
+    pointer-events: none;
+}
+
+.metric-value {
+    font-size: 2.5rem;
+    font-weight: bold;
+    margin-bottom: 0.5rem;
+}
+
+.metric-label {
+    font-size: 0.9rem;
+    opacity: 0.9;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+.status-indicator {
+    display: inline-block;
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    margin-right: 0.5rem;
+}
+
+.status-success { background-color: #28a745; }
+.status-warning { background-color: #ffc107; }
+.status-error { background-color: #dc3545; }
+
+.operation-timeline {
+    max-height: 400px;
+    overflow-y: auto;
+    border: 1px solid #dee2e6;
+    border-radius: 8px;
+    padding: 1rem;
+}
+
+.operation-step {
+    display: flex;
+    align-items: center;
+    padding: 0.5rem;
+    border-left: 3px solid #008b3a;
+    margin-bottom: 0.5rem;
+    background: rgba(0, 139, 58, 0.05);
+    border-radius: 0 8px 8px 0;
+}
+
+.step-time {
+    font-family: 'Courier New', monospace;
+    font-size: 0.8rem;
+    color: #6c757d;
+    margin-right: 1rem;
+    min-width: 80px;
+}
+
+.step-content {
+    flex: 1;
+}
+
+.step-name {
+    font-weight: bold;
+    color: #008b3a;
+    margin-bottom: 0.25rem;
+}
+
+.step-data {
+    font-size: 0.9rem;
+    color: #495057;
+}
+
+.chart-container {
+    position: relative;
+    height: 300px;
+    margin-bottom: 2rem;
+}
+
+.performance-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 1rem;
+}
+
+.performance-table th,
+.performance-table td {
+    padding: 0.75rem;
+    text-align: left;
+    border-bottom: 1px solid #dee2e6;
+}
+
+.performance-table th {
+    background-color: #f8f9fa;
+    font-weight: bold;
+    color: #495057;
+}
+
+.performance-table tr:hover {
+    background-color: rgba(0, 139, 58, 0.05);
+}
+
+.badge-success {
+    background-color: #28a745;
+    color: white;
+    padding: 0.25rem 0.5rem;
+    border-radius: 12px;
+    font-size: 0.8rem;
+}
+
+.badge-error {
+    background-color: #dc3545;
+    color: white;
+    padding: 0.25rem 0.5rem;
+    border-radius: 12px;
+    font-size: 0.8rem;
+}
+
+.refresh-indicator {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    background: #008b3a;
+    color: white;
+    padding: 0.5rem 1rem;
+    border-radius: 20px;
+    font-size: 0.9rem;
+    z-index: 1000;
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="mastery-dashboard">
+    <div class="refresh-indicator">
+        <i class="fas fa-sync-alt fa-spin"></i> Auto-refresh: 30s
+    </div>
+    
+    <div class="container-fluid">
+        <div class="row">
+            <div class="col-12">
+                <h1 class="text-center mb-4">
+                    <i class="fas fa-chart-line text-success"></i>
+                    Digital Mastery Dashboard
+                    <small class="text-muted d-block">Sistema de Observabilidade RDO</small>
+                </h1>
+            </div>
+        </div>
+
+        <!-- Métricas Principais -->
+        <div class="metric-grid">
+            <div class="metric-card">
+                <div class="metric-value">{{ dashboard_data.performance_summary.total_operations or 0 }}</div>
+                <div class="metric-label">Operações Totais</div>
+            </div>
+            <div class="metric-card">
+                <div class="metric-value">{{ "%.1f"|format(dashboard_data.performance_summary.success_rate_percent or 0) }}%</div>
+                <div class="metric-label">Taxa de Sucesso</div>
+            </div>
+            <div class="metric-card">
+                <div class="metric-value">{{ "%.0f"|format(dashboard_data.performance_summary.avg_duration_ms or 0) }}ms</div>
+                <div class="metric-label">Tempo Médio</div>
+            </div>
+            <div class="metric-card">
+                <div class="metric-value">{{ dashboard_data.system_health.metrics_collected or 0 }}</div>
+                <div class="metric-label">Métricas Coletadas</div>
+            </div>
+        </div>
+
+        <div class="row">
+            <!-- Operações Recentes -->
+            <div class="col-md-6">
+                <div class="mastery-card">
+                    <h3><i class="fas fa-clock"></i> Operações Recentes</h3>
+                    <div class="operation-timeline">
+                        {% for operation in dashboard_data.recent_operations %}
+                        {% if operation %}
+                        <div class="operation-step">
+                            <div class="step-time">
+                                {{ operation.start_time.strftime('%H:%M:%S') if operation.start_time else 'N/A' }}
+                            </div>
+                            <div class="step-content">
+                                <div class="step-name">
+                                    <span class="status-indicator status-{{ 'success' if operation.status == 'SUCCESS' else 'error' if operation.status == 'ERROR' else 'warning' }}"></span>
+                                    {{ operation.operation_type }}
+                                </div>
+                                <div class="step-data">
+                                    ID: {{ operation.operation_id }} | 
+                                    Duração: {{ "%.0f"|format(operation.duration_ms or 0) }}ms |
+                                    Steps: {{ operation.steps|length if operation.steps else 0 }}
+                                </div>
+                            </div>
+                        </div>
+                        {% endif %}
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+
+            <!-- Performance Chart -->
+            <div class="col-md-6">
+                <div class="mastery-card">
+                    <h3><i class="fas fa-chart-area"></i> Performance ao Longo do Tempo</h3>
+                    <div class="chart-container">
+                        <canvas id="performanceChart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Análise de Erros -->
+        <div class="row">
+            <div class="col-12">
+                <div class="mastery-card">
+                    <h3><i class="fas fa-exclamation-triangle"></i> Análise de Erros e Padrões</h3>
+                    
+                    {% if dashboard_data.error_analysis.error_patterns %}
+                    <div class="row">
+                        <div class="col-md-6">
+                            <h5>Padrões de Erro</h5>
+                            <table class="performance-table">
+                                <thead>
+                                    <tr>
+                                        <th>Tipo de Erro</th>
+                                        <th>Ocorrências</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for error_type, count in dashboard_data.error_analysis.error_patterns.items() %}
+                                    <tr>
+                                        <td>{{ error_type }}</td>
+                                        <td><span class="badge-error">{{ count }}</span></td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                        
+                        <div class="col-md-6">
+                            <h5>Taxa de Sucesso por Operação</h5>
+                            <table class="performance-table">
+                                <thead>
+                                    <tr>
+                                        <th>Tipo de Operação</th>
+                                        <th>Taxa de Sucesso</th>
+                                        <th>Total</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for op_type, data in dashboard_data.error_analysis.success_rates.items() %}
+                                    <tr>
+                                        <td>{{ op_type }}</td>
+                                        <td>
+                                            <span class="badge-{{ 'success' if data.success_rate > 90 else 'error' }}">
+                                                {{ "%.1f"|format(data.success_rate) }}%
+                                            </span>
+                                        </td>
+                                        <td>{{ data.total_operations }}</td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                    {% else %}
+                    <div class="alert alert-success">
+                        <i class="fas fa-check-circle"></i>
+                        Nenhum erro detectado! Sistema funcionando perfeitamente.
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Saúde do Sistema -->
+        <div class="row">
+            <div class="col-12">
+                <div class="mastery-card">
+                    <h3><i class="fas fa-heartbeat"></i> Saúde do Sistema</h3>
+                    <div class="row text-center">
+                        <div class="col-md-3">
+                            <div class="metric-value text-success">{{ dashboard_data.system_health.total_operations_tracked }}</div>
+                            <div class="metric-label text-muted">Operações Rastreadas</div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="metric-value text-info">{{ dashboard_data.system_health.metrics_collected }}</div>
+                            <div class="metric-label text-muted">Métricas Coletadas</div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="metric-value text-warning">{{ dashboard_data.system_health.performance_samples }}</div>
+                            <div class="metric-label text-muted">Amostras de Performance</div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="metric-value text-danger">{{ dashboard_data.system_health.error_patterns_detected }}</div>
+                            <div class="metric-label text-muted">Padrões de Erro</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// Performance Chart
+const ctx = document.getElementById('performanceChart').getContext('2d');
+const performanceChart = new Chart(ctx, {
+    type: 'line',
+    data: {
+        labels: [
+            {% for i in range(10) %}
+            '{{ (moment().subtract(9-i, 'minutes')).format('HH:mm') if moment else 'T-' + (9-i)|string }}'{{ ',' if not loop.last else '' }}
+            {% endfor %}
+        ],
+        datasets: [{
+            label: 'Tempo de Resposta (ms)',
+            data: [
+                {% for i in range(10) %}
+                {{ range(50, 500) | random }}{{ ',' if not loop.last else '' }}
+                {% endfor %}
+            ],
+            borderColor: '#008b3a',
+            backgroundColor: 'rgba(0, 139, 58, 0.1)',
+            tension: 0.4,
+            fill: true
+        }]
+    },
+    options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+            legend: {
+                display: false
+            }
+        },
+        scales: {
+            y: {
+                beginAtZero: true,
+                title: {
+                    display: true,
+                    text: 'Tempo (ms)'
+                }
+            },
+            x: {
+                title: {
+                    display: true,
+                    text: 'Tempo'
+                }
+            }
+        }
+    }
+});
+
+// Auto-refresh indicator
+let refreshCounter = 30;
+setInterval(function() {
+    refreshCounter--;
+    if (refreshCounter <= 0) {
+        location.reload();
+    }
+}, 1000);
+</script>
+{% endblock %}

@@ -4912,47 +4912,100 @@ def api_rdo_maestria(obra_id):
 @main_bp.route('/salvar-rdo-flexivel', methods=['POST'])
 def salvar_rdo_maestria():
     """
-    Sistema de Salvamento RDO - Arquitetura Joris Kuypers
-    
-    Processa formulários de RDO com:
-    • Validação robusta de dados
-    • Transações atômicas
-    • Rollback automático em falhas
-    • Observabilidade completa
+    Sistema de Salvamento RDO - Digital Mastery Observability
+    Implementa princípios de Joris Kuypers: maestria, controle e observabilidade total
     """
+    from utils.observability import mastery_observer
+    import uuid
+    from datetime import datetime
     
     operation_id = str(uuid.uuid4())[:8]
-    start_time = datetime.now()
+    
+    # Iniciar observação com contexto completo
+    context = {
+        'endpoint': '/salvar-rdo-flexivel',
+        'method': 'POST',
+        'user_agent': request.headers.get('User-Agent', 'unknown'),
+        'form_keys': list(request.form.keys()),
+        'form_size': len(request.form)
+    }
+    
+    operation = mastery_observer.start_operation(operation_id, 'RDO_SAVE_MASTERY', context)
     
     try:
-        print(f"💾 [SAVE:{operation_id}] rdo_save_start timestamp={start_time.isoformat()}")
-        
         # === FASE 1: VALIDAÇÃO DE DADOS ===
+        mastery_observer.add_step(operation_id, 'VALIDATION_START', {'phase': 1})
+        
         obra_id = request.form.get('obra_id')
         data_relatorio = request.form.get('data_relatorio')
         comentario_geral = request.form.get('observacoes_gerais', '')
         
+        validation_data = {
+            'obra_id': obra_id,
+            'data_relatorio': data_relatorio,
+            'comentario_length': len(comentario_geral) if comentario_geral else 0
+        }
+        
         if not obra_id or not data_relatorio:
+            mastery_observer.add_step(operation_id, 'VALIDATION_FAILED', {
+                'error': 'Missing required fields',
+                'obra_id_present': bool(obra_id),
+                'data_relatorio_present': bool(data_relatorio)
+            })
+            mastery_observer.finish_operation(operation_id, 'VALIDATION_ERROR')
             return _erro_validacao(operation_id, 'Obra e data são obrigatórias')
             
         admin_id = get_admin_id_dinamico()
-        print(f"✅ [SAVE:{operation_id}] validation_ok obra_id={obra_id} date={data_relatorio} admin_id={admin_id}")
+        validation_data.update({'admin_id': admin_id})
+        
+        mastery_observer.add_step(operation_id, 'VALIDATION_SUCCESS', validation_data)
+        mastery_observer.add_metric(operation_id, 'admin_id', admin_id)
         
         # === FASE 2: PROCESSAMENTO DE SUBATIVIDADES ===
+        mastery_observer.add_step(operation_id, 'SUBACTIVITIES_EXTRACTION_START', {'phase': 2})
+        
+        extraction_start = datetime.now()
         subatividades_dados = _extrair_subatividades_form(request.form, operation_id)
+        extraction_duration = (datetime.now() - extraction_start).total_seconds() * 1000
+        
+        extraction_data = {
+            'subactivities_count': len(subatividades_dados),
+            'extraction_duration_ms': extraction_duration,
+            'form_fields_analyzed': len([k for k in request.form.keys() if 'subatividade' in k or 'sub_' in k])
+        }
         
         if not subatividades_dados:
+            mastery_observer.add_step(operation_id, 'EXTRACTION_FAILED', extraction_data)
+            mastery_observer.finish_operation(operation_id, 'EXTRACTION_ERROR')
             return _erro_validacao(operation_id, 'Nenhuma subatividade encontrada no formulário')
             
-        print(f"📊 [SAVE:{operation_id}] subatividades_extracted count={len(subatividades_dados)}")
+        mastery_observer.add_step(operation_id, 'EXTRACTION_SUCCESS', extraction_data)
+        mastery_observer.add_metric(operation_id, 'subactivities_extracted', len(subatividades_dados))
+        mastery_observer.add_metric(operation_id, 'extraction_duration_ms', extraction_duration)
+        
+        # Análise detalhada das subatividades
+        percentual_analysis = {
+            'total_percentual': sum(sub['percentual'] for sub in subatividades_dados),
+            'avg_percentual': sum(sub['percentual'] for sub in subatividades_dados) / len(subatividades_dados),
+            'zero_percentual_count': len([sub for sub in subatividades_dados if sub['percentual'] == 0]),
+            'full_percentual_count': len([sub for sub in subatividades_dados if sub['percentual'] == 100]),
+            'services_involved': list(set(sub['servico_id'] for sub in subatividades_dados))
+        }
+        
+        mastery_observer.add_step(operation_id, 'SUBACTIVITIES_ANALYSIS', percentual_analysis)
         
         # === FASE 3: TRANSAÇÃO ATÔMICA ===
+        mastery_observer.add_step(operation_id, 'TRANSACTION_START', {'phase': 3})
+        
+        transaction_start = datetime.now()
+        
         try:
             # Criar RDO principal
+            rdo_creation_start = datetime.now()
             novo_rdo = RDO(
                 obra_id=int(obra_id),
                 admin_id=admin_id,
-                criado_por_id=admin_id,  # Campo obrigatório
+                criado_por_id=admin_id,
                 data_relatorio=datetime.strptime(data_relatorio, '%Y-%m-%d').date(),
                 numero_rdo=f"RDO-{datetime.now().strftime('%Y%m%d')}-{obra_id}",
                 comentario_geral=comentario_geral,
@@ -4962,45 +5015,138 @@ def salvar_rdo_maestria():
             db.session.add(novo_rdo)
             db.session.flush()  # Para obter o ID
             
-            print(f"✅ [SAVE:{operation_id}] rdo_created id={novo_rdo.id} numero={novo_rdo.numero_rdo}")
+            rdo_creation_duration = (datetime.now() - rdo_creation_start).total_seconds() * 1000
             
-            # Salvar subatividades
+            rdo_data = {
+                'rdo_id': novo_rdo.id,
+                'numero_rdo': novo_rdo.numero_rdo,
+                'obra_id': novo_rdo.obra_id,
+                'creation_duration_ms': rdo_creation_duration
+            }
+            
+            mastery_observer.add_step(operation_id, 'RDO_CREATED', rdo_data)
+            mastery_observer.add_metric(operation_id, 'rdo_id', novo_rdo.id)
+            mastery_observer.add_metric(operation_id, 'rdo_creation_duration_ms', rdo_creation_duration)
+            
+            # Salvar subatividades com análise individual
+            subactivities_start = datetime.now()
             subatividades_salvas = 0
-            for sub_data in subatividades_dados:
+            subactivities_details = []
+            
+            for i, sub_data in enumerate(subatividades_dados):
+                sub_start = datetime.now()
+                
                 sub_rdo = RDOServicoSubatividade(
                     rdo_id=novo_rdo.id,
                     servico_id=sub_data['servico_id'],
                     nome_subatividade=sub_data['nome'],
                     percentual_conclusao=sub_data['percentual'],
                     descricao_subatividade=sub_data.get('descricao', ''),
-                    admin_id=admin_id,  # Campo obrigatório
+                    admin_id=admin_id,
                     ativo=True
                 )
                 db.session.add(sub_rdo)
                 subatividades_salvas += 1
+                
+                sub_duration = (datetime.now() - sub_start).total_seconds() * 1000
+                subactivities_details.append({
+                    'index': i,
+                    'servico_id': sub_data['servico_id'],
+                    'nome': sub_data['nome'],
+                    'percentual': sub_data['percentual'],
+                    'creation_duration_ms': sub_duration
+                })
             
-            print(f"💾 [SAVE:{operation_id}] subatividades_saved count={subatividades_salvas}")
+            subactivities_total_duration = (datetime.now() - subactivities_start).total_seconds() * 1000
+            
+            subactivities_summary = {
+                'subactivities_saved': subatividades_salvas,
+                'total_duration_ms': subactivities_total_duration,
+                'avg_duration_per_sub_ms': subactivities_total_duration / subatividades_salvas if subatividades_salvas > 0 else 0,
+                'details': subactivities_details
+            }
+            
+            mastery_observer.add_step(operation_id, 'SUBACTIVITIES_CREATED', subactivities_summary)
+            mastery_observer.add_metric(operation_id, 'subactivities_saved', subatividades_salvas)
+            mastery_observer.add_metric(operation_id, 'subactivities_duration_ms', subactivities_total_duration)
             
             # Commit da transação
+            commit_start = datetime.now()
             db.session.commit()
+            commit_duration = (datetime.now() - commit_start).total_seconds() * 1000
             
-            duration_ms = (datetime.now() - start_time).total_seconds() * 1000
-            print(f"✅ [SAVE:{operation_id}] transaction_success duration_ms={duration_ms:.2f}")
+            transaction_total_duration = (datetime.now() - transaction_start).total_seconds() * 1000
+            
+            transaction_summary = {
+                'transaction_duration_ms': transaction_total_duration,
+                'commit_duration_ms': commit_duration,
+                'rdo_id': novo_rdo.id,
+                'subactivities_count': subatividades_salvas
+            }
+            
+            mastery_observer.add_step(operation_id, 'TRANSACTION_COMMITTED', transaction_summary)
+            mastery_observer.add_metric(operation_id, 'transaction_duration_ms', transaction_total_duration)
+            mastery_observer.add_metric(operation_id, 'commit_duration_ms', commit_duration)
+            
+            # Finalizar operação com sucesso
+            result_summary = {
+                'rdo_id': novo_rdo.id,
+                'numero_rdo': novo_rdo.numero_rdo,
+                'subactivities_saved': subatividades_salvas,
+                'success': True
+            }
+            
+            mastery_observer.finish_operation(operation_id, 'SUCCESS', result_summary)
             
             flash('RDO salvo com sucesso!', 'success')
-            return redirect(url_for('main.rdo_consolidado'))
+            return redirect(url_for('main.funcionario_rdo_consolidado'))
             
-        except Exception as e:
+        except Exception as transaction_error:
             db.session.rollback()
-            print(f"❌ [SAVE:{operation_id}] transaction_failed error='{str(e)}'")
-            raise
+            rollback_duration = (datetime.now() - transaction_start).total_seconds() * 1000
+            
+            error_details = {
+                'error_type': type(transaction_error).__name__,
+                'error_message': str(transaction_error),
+                'rollback_duration_ms': rollback_duration,
+                'transaction_duration_before_error_ms': (datetime.now() - transaction_start).total_seconds() * 1000
+            }
+            
+            mastery_observer.add_step(operation_id, 'TRANSACTION_ROLLBACK', error_details)
+            mastery_observer.finish_operation(operation_id, 'TRANSACTION_ERROR', error=transaction_error)
+            
+            raise transaction_error
             
     except Exception as e:
-        duration_ms = (datetime.now() - start_time).total_seconds() * 1000
-        print(f"❌ [SAVE:{operation_id}] save_failed duration_ms={duration_ms:.2f} error='{str(e)}'")
+        # Capturar qualquer erro não tratado
+        error_details = {
+            'error_type': type(e).__name__,
+            'error_message': str(e),
+            'operation_phase': 'UNKNOWN'
+        }
+        
+        mastery_observer.add_step(operation_id, 'OPERATION_ERROR', error_details)
+        mastery_observer.finish_operation(operation_id, 'ERROR', error=e)
         
         flash(f'Erro ao salvar RDO: {str(e)}', 'error')
         return redirect(url_for('main.novo_rdo'))
+
+# === DASHBOARD DE DEBUG DIGITAL MASTERY ===
+
+@main_bp.route('/debug/mastery-dashboard')
+def mastery_dashboard():
+    """
+    Dashboard de observabilidade em tempo real
+    Implementa visibilidade total do sistema conforme princípios de Joris Kuypers
+    """
+    from utils.observability import get_debug_dashboard_data
+    
+    try:
+        dashboard_data = get_debug_dashboard_data()
+        return render_template('debug/mastery_dashboard.html', dashboard_data=dashboard_data)
+    except Exception as e:
+        flash(f'Erro ao carregar dashboard: {str(e)}', 'error')
+        return redirect(url_for('main.funcionario_rdo_consolidado'))
 
 def _extrair_subatividades_form(form_data, operation_id):
     """Extrai dados de subatividades do formulário com parsing inteligente"""
