@@ -132,22 +132,39 @@ from flask import url_for
 with app.app_context():
     try:
         # Testar rotas críticas (incluindo novas APIs v8.2)
-        rotas_criticas = [
+        # Rotas simples sem parâmetros
+        rotas_simples = [
             'main.dashboard',
             'main.funcionarios', 
             'main.funcionario_rdo_consolidado',
             'main.funcionario_rdo_novo',
-            'main.health_check',
-            'main.adicionar_servico_rdo_obra',
-            'main.api_servicos_disponiveis_obra'
+            'main.health_check'
         ]
         
-        for rota in rotas_criticas:
+        # Rotas com parâmetros (testar estrutura apenas)
+        rotas_parametrizadas = [
+            ('main.adicionar_servico_rdo_obra', 'API Adicionar Serviço RDO'),
+            ('main.api_servicos_disponiveis_obra', 'API Serviços Disponíveis')
+        ]
+        
+        # Testar rotas simples
+        for rota in rotas_simples:
             try:
                 url_for(rota)
                 print(f'✅ Rota OK: {rota}')
             except Exception as e:
                 print(f'❌ Rota falhou: {rota} - {e}')
+        
+        # Verificar se rotas parametrizadas existem (sem gerar URL)
+        from flask import current_app
+        for rota_name, descricao in rotas_parametrizadas:
+            try:
+                if rota_name in current_app.url_map._rules_by_endpoint:
+                    print(f'✅ Rota OK: {descricao} ({rota_name})')
+                else:
+                    print(f'❌ Rota não encontrada: {descricao}')
+            except Exception as e:
+                print(f'⚠️ Erro ao verificar {descricao}: {e}')
                 
         print('✅ Verificação de rotas concluída')
         
