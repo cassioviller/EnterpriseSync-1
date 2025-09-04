@@ -5668,8 +5668,14 @@ def adicionar_servico_obra():
         
     except Exception as e:
         db.session.rollback()
-        print(f"ERRO ADICIONAR SERVIÇO OBRA: {str(e)}")
-        return jsonify({'success': False, 'message': 'Erro interno do servidor'}), 500
+        print(f"🚨 ERRO ADICIONAR SERVIÇO OBRA: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({
+            'success': False, 
+            'message': f'Erro interno: {str(e)}',
+            'error_type': type(e).__name__
+        }), 500
 
 @main_bp.route('/api/obras/servicos', methods=['DELETE', 'OPTIONS'])
 def remover_servico_obra():
