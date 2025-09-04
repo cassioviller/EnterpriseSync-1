@@ -604,85 +604,293 @@ function carregarDadosUltimoRDO() {
         });
 }
 
-// CORREÇÃO: Implementar funções que estavam faltando
+// === SISTEMA MODERNO DE EXIBIÇÃO DE RDO ===
+// Implementação baseada em arquitetura de maestria digital
+
 function exibirDadosUltimoRDO(ultimoRDO) {
-    console.log('📋 Exibindo dados do último RDO:', ultimoRDO);
+    console.log('🎯 [MAESTRIA] Processando dados do último RDO:', ultimoRDO.numero_rdo);
     
-    const servicosContainer = document.getElementById('servicos-container');
-    if (!servicosContainer) {
-        console.error('Container servicos-container não encontrado');
+    const container = document.getElementById('servicos-container');
+    if (!container) {
+        console.error('❌ [ERRO CRÍTICO] Container não encontrado');
         return;
     }
     
-    let html = '<div class="alert alert-info"><strong>✅ Carregado:</strong> ' + ultimoRDO.numero_rdo + ' (' + ultimoRDO.data_relatorio + ')</div>';
-    
-    if (ultimoRDO.servicos && ultimoRDO.servicos.length > 0) {
-        html += '<h5>Serviços e Subatividades:</h5>';
-        ultimoRDO.servicos.forEach(servico => {
-            html += `<div class="card mb-2">
-                <div class="card-header"><strong>${servico.nome}</strong> (${servico.categoria})</div>
-                <div class="card-body">`;
+    try {
+        // === HEADER DE STATUS ===
+        let html = `
+            <div class="alert alert-success border-0 shadow-sm mb-4">
+                <div class="d-flex align-items-center">
+                    <i class="fas fa-check-circle fa-2x text-success me-3"></i>
+                    <div>
+                        <h6 class="mb-1 fw-bold">✅ Dados Carregados com Sucesso</h6>
+                        <p class="mb-0 text-muted">RDO: <strong>${ultimoRDO.numero_rdo}</strong> • Data: ${ultimoRDO.data_relatorio}</p>
+                    </div>
+                </div>
+            </div>
+        `;
+        
+        // === SEÇÃO DE SERVIÇOS ===
+        if (ultimoRDO.servicos && ultimoRDO.servicos.length > 0) {
+            html += `
+                <div class="row">
+                    <div class="col-12">
+                        <h5 class="mb-3"><i class="fas fa-cogs me-2"></i>Serviços e Subatividades</h5>
+                    </div>
+                </div>
+            `;
             
-            if (servico.subatividades && servico.subatividades.length > 0) {
-                servico.subatividades.forEach(sub => {
-                    html += `<div class="mb-1">• ${sub.nome}: ${sub.percentual}%</div>`;
-                });
-            }
+            ultimoRDO.servicos.forEach((servico, index) => {
+                const progresso = calcularProgressoServico(servico);
+                const corCategoria = obterCorCategoria(servico.categoria);
+                
+                html += `
+                    <div class="card mb-3 border-0 shadow-sm">
+                        <div class="card-header bg-light border-0 py-3">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <div>
+                                    <h6 class="mb-1 fw-bold">${servico.nome}</h6>
+                                    <span class="badge ${corCategoria} px-3 py-1">${servico.categoria}</span>
+                                </div>
+                                <div class="text-end">
+                                    <div class="progress" style="width: 120px; height: 8px;">
+                                        <div class="progress-bar" style="width: ${progresso}%"></div>
+                                    </div>
+                                    <small class="text-muted">${progresso}% concluído</small>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="card-body">
+                            ${renderizarSubatividades(servico.subatividades)}
+                        </div>
+                    </div>
+                `;
+            });
+        } else {
+            html += `
+                <div class="text-center py-5">
+                    <i class="fas fa-tools fa-3x text-muted mb-3"></i>
+                    <h6 class="text-muted">Nenhum serviço encontrado</h6>
+                </div>
+            `;
+        }
+        
+        // === SEÇÃO DE FUNCIONÁRIOS ===
+        if (ultimoRDO.funcionarios && ultimoRDO.funcionarios.length > 0) {
+            html += `
+                <div class="mt-4">
+                    <h5 class="mb-3"><i class="fas fa-users me-2"></i>Equipe Atual</h5>
+                    <div class="row">
+            `;
+            
+            ultimoRDO.funcionarios.forEach(funcionario => {
+                html += `
+                    <div class="col-md-6 mb-2">
+                        <div class="d-flex align-items-center p-3 bg-light rounded">
+                            <i class="fas fa-user-hard-hat me-2 text-primary"></i>
+                            <div class="flex-grow-1">
+                                <span class="fw-medium">${funcionario.nome}</span>
+                                <small class="text-muted d-block">${funcionario.funcao}</small>
+                            </div>
+                            <span class="badge bg-primary">${funcionario.horas_trabalhadas}h</span>
+                        </div>
+                    </div>
+                `;
+            });
+            
             html += '</div></div>';
-        });
+        }
+        
+        container.innerHTML = html;
+        console.log('✅ [MAESTRIA] Interface renderizada com sucesso');
+        
+    } catch (error) {
+        console.error('❌ [ERRO] Falha na renderização:', error);
+        exibirErroCarregamento();
     }
-    
-    if (ultimoRDO.funcionarios && ultimoRDO.funcionarios.length > 0) {
-        html += '<h5 class="mt-3">Funcionários:</h5>';
-        ultimoRDO.funcionarios.forEach(func => {
-            html += `<div class="badge bg-secondary me-1">${func.nome} (${func.horas_trabalhadas}h)</div>`;
-        });
-    }
-    
-    servicosContainer.innerHTML = html;
 }
 
 function exibirDadosPrimeiraRDO(primeiraRDO) {
-    console.log('🆕 Exibindo dados da primeira RDO');
+    console.log('🆕 [MAESTRIA] Inicializando primeira RDO da obra');
     
-    const servicosContainer = document.getElementById('servicos-container');
-    if (!servicosContainer) return;
+    const container = document.getElementById('servicos-container');
+    if (!container) return;
     
-    servicosContainer.innerHTML = `
-        <div class="alert alert-warning">
-            <strong>🆕 Primeira RDO desta obra</strong><br>
-            Inicie com serviços em 0% de conclusão.
-        </div>
-        <p class="text-muted">Adicione manualmente os serviços desta obra.</p>
-    `;
+    try {
+        let html = `
+            <div class="alert alert-warning border-0 shadow-sm mb-4">
+                <div class="d-flex align-items-center">
+                    <i class="fas fa-star fa-2x text-warning me-3"></i>
+                    <div>
+                        <h6 class="mb-1 fw-bold">🆕 Primeira RDO desta Obra</h6>
+                        <p class="mb-0">Todos os serviços iniciam com 0% de conclusão</p>
+                    </div>
+                </div>
+            </div>
+        `;
+        
+        // Se há serviços disponíveis, mostrar preview
+        if (primeiraRDO && primeiraRDO.servicos && primeiraRDO.servicos.length > 0) {
+            html += `
+                <div class="mb-3">
+                    <h6><i class="fas fa-list-check me-2"></i>Serviços Disponíveis</h6>
+                </div>
+            `;
+            
+            primeiraRDO.servicos.forEach(servico => {
+                html += `
+                    <div class="card mb-2 border-0 shadow-sm">
+                        <div class="card-body py-3">
+                            <div class="d-flex align-items-center">
+                                <i class="fas fa-plus-circle text-success me-3"></i>
+                                <div class="flex-grow-1">
+                                    <span class="fw-medium">${servico.nome}</span>
+                                    <small class="text-muted d-block">${servico.categoria}</small>
+                                </div>
+                                <span class="badge bg-light text-dark">0%</span>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            });
+        } else {
+            html += `
+                <div class="text-center py-4">
+                    <i class="fas fa-plus-circle fa-3x text-muted mb-3"></i>
+                    <h6 class="text-muted">Adicione os serviços desta obra</h6>
+                    <button class="btn btn-primary btn-sm mt-2">
+                        <i class="fas fa-plus me-1"></i>Gerenciar Serviços
+                    </button>
+                </div>
+            `;
+        }
+        
+        container.innerHTML = html;
+        console.log('✅ [MAESTRIA] Primeira RDO inicializada');
+        
+    } catch (error) {
+        console.error('❌ [ERRO] Falha na primeira RDO:', error);
+        exibirErroCarregamento();
+    }
 }
 
 function exibirMensagemSemRDOAnterior() {
-    console.log('ℹ️ Nenhum RDO anterior encontrado');
+    console.log('ℹ️ [MAESTRIA] Estado: Nenhum RDO anterior');
     
-    const servicosContainer = document.getElementById('servicos-container');
-    if (!servicosContainer) return;
+    const container = document.getElementById('servicos-container');
+    if (!container) return;
     
-    servicosContainer.innerHTML = `
-        <div class="alert alert-info">
-            <strong>ℹ️ Nenhum RDO anterior</strong><br>
-            Esta é a primeira RDO desta obra.
+    container.innerHTML = `
+        <div class="alert alert-info border-0 shadow-sm">
+            <div class="d-flex align-items-center">
+                <i class="fas fa-info-circle fa-2x text-info me-3"></i>
+                <div>
+                    <h6 class="mb-1 fw-bold">ℹ️ Primeira RDO da Obra</h6>
+                    <p class="mb-0">Não há registros anteriores para esta obra</p>
+                </div>
+            </div>
+        </div>
+        <div class="text-center py-4">
+            <button class="btn btn-success btn-lg" onclick="iniciarNovaRDO()">
+                <i class="fas fa-rocket me-2"></i>Iniciar Nova RDO
+            </button>
         </div>
     `;
 }
 
 function exibirErroCarregamento() {
-    console.log('❌ Erro no carregamento');
+    console.error('❌ [ERRO CRÍTICO] Sistema de carregamento falhou');
     
-    const servicosContainer = document.getElementById('servicos-container');
-    if (!servicosContainer) return;
+    const container = document.getElementById('servicos-container');
+    if (!container) return;
     
-    servicosContainer.innerHTML = `
-        <div class="alert alert-danger">
-            <strong>❌ Erro ao carregar dados</strong><br>
-            Tente novamente ou adicione os serviços manualmente.
+    container.innerHTML = `
+        <div class="alert alert-danger border-0 shadow-sm">
+            <div class="d-flex align-items-center">
+                <i class="fas fa-exclamation-triangle fa-2x text-danger me-3"></i>
+                <div>
+                    <h6 class="mb-1 fw-bold">❌ Falha no Carregamento</h6>
+                    <p class="mb-0">Erro temporário no sistema - tente novamente</p>
+                </div>
+            </div>
+        </div>
+        <div class="text-center py-4">
+            <button class="btn btn-outline-danger" onclick="location.reload()">
+                <i class="fas fa-redo me-2"></i>Tentar Novamente
+            </button>
+            <button class="btn btn-secondary ms-2" onclick="adicionarManualmente()">
+                <i class="fas fa-plus me-2"></i>Adicionar Manualmente
+            </button>
         </div>
     `;
+}
+
+// === FUNÇÕES AUXILIARES DE MAESTRIA ===
+
+function calcularProgressoServico(servico) {
+    if (!servico.subatividades || servico.subatividades.length === 0) return 0;
+    
+    const totalPercentual = servico.subatividades.reduce((acc, sub) => acc + (sub.percentual || 0), 0);
+    return Math.round(totalPercentual / servico.subatividades.length);
+}
+
+function obterCorCategoria(categoria) {
+    const cores = {
+        'Estrutural': 'bg-primary text-white',
+        'Acabamento': 'bg-success text-white', 
+        'Instalações': 'bg-warning text-dark',
+        'Cobertura': 'bg-info text-white',
+        'Fundação': 'bg-dark text-white',
+        'default': 'bg-secondary text-white'
+    };
+    return cores[categoria] || cores['default'];
+}
+
+function renderizarSubatividades(subatividades) {
+    if (!subatividades || subatividades.length === 0) {
+        return '<p class="text-muted mb-0"><i class="fas fa-info-circle me-1"></i>Nenhuma subatividade cadastrada</p>';
+    }
+    
+    let html = '<div class="row">';
+    subatividades.forEach(sub => {
+        const corBarra = sub.percentual >= 100 ? 'bg-success' : 
+                        sub.percentual >= 50 ? 'bg-warning' : 'bg-danger';
+                        
+        html += `
+            <div class="col-md-6 mb-2">
+                <div class="d-flex justify-content-between align-items-center mb-1">
+                    <small class="fw-medium">${sub.nome}</small>
+                    <small class="text-muted">${sub.percentual}%</small>
+                </div>
+                <div class="progress" style="height: 6px;">
+                    <div class="progress-bar ${corBarra}" style="width: ${sub.percentual}%"></div>
+                </div>
+            </div>
+        `;
+    });
+    html += '</div>';
+    return html;
+}
+
+function iniciarNovaRDO() {
+    console.log('🚀 [MAESTRIA] Iniciando nova RDO...');
+    const obraId = document.getElementById('obra_id')?.value;
+    if (obraId) {
+        carregarDadosUltimoRDO();
+    }
+}
+
+function adicionarManualmente() {
+    console.log('➕ [MAESTRIA] Modo manual ativado');
+    const container = document.getElementById('servicos-container');
+    if (container) {
+        container.innerHTML = `
+            <div class="alert alert-info border-0">
+                <h6><i class="fas fa-hand-paper me-2"></i>Modo Manual Ativo</h6>
+                <p class="mb-0">Adicione os serviços manualmente usando os controles do formulário.</p>
+            </div>
+        `;
+    }
 }
 
 function carregarServicosDaObra(obraId) {
