@@ -604,6 +604,87 @@ function carregarDadosUltimoRDO() {
         });
 }
 
+// CORREÇÃO: Implementar funções que estavam faltando
+function exibirDadosUltimoRDO(ultimoRDO) {
+    console.log('📋 Exibindo dados do último RDO:', ultimoRDO);
+    
+    const servicosContainer = document.getElementById('servicos-container');
+    if (!servicosContainer) {
+        console.error('Container servicos-container não encontrado');
+        return;
+    }
+    
+    let html = '<div class="alert alert-info"><strong>✅ Carregado:</strong> ' + ultimoRDO.numero_rdo + ' (' + ultimoRDO.data_relatorio + ')</div>';
+    
+    if (ultimoRDO.servicos && ultimoRDO.servicos.length > 0) {
+        html += '<h5>Serviços e Subatividades:</h5>';
+        ultimoRDO.servicos.forEach(servico => {
+            html += `<div class="card mb-2">
+                <div class="card-header"><strong>${servico.nome}</strong> (${servico.categoria})</div>
+                <div class="card-body">`;
+            
+            if (servico.subatividades && servico.subatividades.length > 0) {
+                servico.subatividades.forEach(sub => {
+                    html += `<div class="mb-1">• ${sub.nome}: ${sub.percentual}%</div>`;
+                });
+            }
+            html += '</div></div>';
+        });
+    }
+    
+    if (ultimoRDO.funcionarios && ultimoRDO.funcionarios.length > 0) {
+        html += '<h5 class="mt-3">Funcionários:</h5>';
+        ultimoRDO.funcionarios.forEach(func => {
+            html += `<div class="badge bg-secondary me-1">${func.nome} (${func.horas_trabalhadas}h)</div>`;
+        });
+    }
+    
+    servicosContainer.innerHTML = html;
+}
+
+function exibirDadosPrimeiraRDO(primeiraRDO) {
+    console.log('🆕 Exibindo dados da primeira RDO');
+    
+    const servicosContainer = document.getElementById('servicos-container');
+    if (!servicosContainer) return;
+    
+    servicosContainer.innerHTML = `
+        <div class="alert alert-warning">
+            <strong>🆕 Primeira RDO desta obra</strong><br>
+            Inicie com serviços em 0% de conclusão.
+        </div>
+        <p class="text-muted">Adicione manualmente os serviços desta obra.</p>
+    `;
+}
+
+function exibirMensagemSemRDOAnterior() {
+    console.log('ℹ️ Nenhum RDO anterior encontrado');
+    
+    const servicosContainer = document.getElementById('servicos-container');
+    if (!servicosContainer) return;
+    
+    servicosContainer.innerHTML = `
+        <div class="alert alert-info">
+            <strong>ℹ️ Nenhum RDO anterior</strong><br>
+            Esta é a primeira RDO desta obra.
+        </div>
+    `;
+}
+
+function exibirErroCarregamento() {
+    console.log('❌ Erro no carregamento');
+    
+    const servicosContainer = document.getElementById('servicos-container');
+    if (!servicosContainer) return;
+    
+    servicosContainer.innerHTML = `
+        <div class="alert alert-danger">
+            <strong>❌ Erro ao carregar dados</strong><br>
+            Tente novamente ou adicione os serviços manualmente.
+        </div>
+    `;
+}
+
 function carregarServicosDaObra(obraId) {
     const container = document.getElementById('servicos-container');
     container.innerHTML = `
