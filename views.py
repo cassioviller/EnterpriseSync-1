@@ -4824,15 +4824,31 @@ def api_ultimo_rdo_dados_corrigida(obra_id):
     try:
         from security_wrapper import log_api_call, health_check_environment_isolation
         
-        admin_id = get_admin_id_dinamico()
-        print(f"✅ API ÚLTIMO RDO: obra_id={obra_id}, admin_id={admin_id}")
+        # CORREÇÃO ARQUITETURAL: Detectar admin_id CORRETO da obra (igual à API serviços)
+        admin_id_user = get_admin_id_dinamico()  # Admin do usuário logado
+        
+        # Buscar a obra primeiro para descobrir seu admin_id real
+        obra = Obra.query.filter_by(id=obra_id).first()  # Sem filtro de admin_id
+        if not obra:
+            return jsonify({'error': 'Obra não encontrada', 'success': False}), 404
+            
+        # Usar o admin_id DA OBRA (não do usuário) para dados consistentes
+        admin_id_obra = obra.admin_id
+        
+        # VALIDAÇÃO DE SEGURANÇA: Usuário só pode acessar obras do seu ambiente
+        if admin_id_obra != admin_id_user:
+            print(f"🚨 TENTATIVA DE ACESSO CRUZADO RDO: user_admin_id={admin_id_user}, obra_admin_id={admin_id_obra}")
+            return jsonify({'error': 'Acesso negado - obra não pertence ao seu ambiente', 'success': False}), 403
+        
+        admin_id = admin_id_obra  # Usar admin_id correto da obra
+        print(f"✅ API ÚLTIMO RDO: obra_id={obra_id}, admin_id_user={admin_id_user}, admin_id_obra={admin_id}")
         
         # HEALTH CHECK: Detectar contaminação crítica
         health_status = health_check_environment_isolation()
         if health_status['status'] == 'CRITICAL':
             print(f"🚨 CONTAMINAÇÃO DETECTADA na API último RDO: {health_status['alerts']}")
         
-        # Verificar se existe pelo menos um RDO para esta obra
+        # Verificar se existe pelo menos um RDO para esta obra (usando admin_id correto)
         ultimo_rdo = RDO.query.filter_by(obra_id=obra_id, admin_id=admin_id).order_by(RDO.data_relatorio.desc()).first()
         
         if not ultimo_rdo:
@@ -5125,11 +5141,25 @@ def api_rdo_servicos_obra_temp(obra_id):
     try:
         from security_wrapper import get_servicos_seguros, log_api_call, health_check_environment_isolation
         
-        admin_id = get_admin_id_dinamico()
-        obra = Obra.query.filter_by(id=obra_id, admin_id=admin_id).first()
+        # CORREÇÃO ARQUITETURAL: Detectar admin_id CORRETO da obra consultada
+        admin_id_user = get_admin_id_dinamico()  # Admin do usuário logado
+        
+        # Buscar a obra primeiro para descobrir seu admin_id real
+        obra = Obra.query.filter_by(id=obra_id).first()  # Sem filtro de admin_id
         if not obra:
-            log_api_call("api_rdo_servicos_obra", obra_id, admin_id, 0, "OBRA_NAO_ENCONTRADA")
+            log_api_call("api_rdo_servicos_obra", obra_id, admin_id_user, 0, "OBRA_INEXISTENTE")
             return jsonify({'error': 'Obra não encontrada', 'success': False}), 404
+            
+        # Usar o admin_id DA OBRA (não do usuário) para buscar dados consistentes
+        admin_id_obra = obra.admin_id
+        
+        # VALIDAÇÃO DE SEGURANÇA: Usuário só pode acessar obras do seu ambiente
+        if admin_id_obra != admin_id_user:
+            print(f"🚨 TENTATIVA DE ACESSO CRUZADO: user_admin_id={admin_id_user}, obra_admin_id={admin_id_obra}")
+            log_api_call("api_rdo_servicos_obra", obra_id, admin_id_user, 0, f"ACESSO_NEGADO_ADMIN_CROSS_{admin_id_obra}")
+            return jsonify({'error': 'Acesso negado - obra não pertence ao seu ambiente', 'success': False}), 403
+        
+        admin_id = admin_id_obra  # Usar admin_id correto da obra
         
         # HEALTH CHECK: Detectar contaminação de ambiente
         health_status = health_check_environment_isolation()
