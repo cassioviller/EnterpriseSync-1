@@ -78,12 +78,21 @@ servicos_crud_bp = Blueprint('servicos_crud', __name__, url_prefix='/servicos')
 
 # Funções auxiliares
 def get_admin_id():
-    """Obter admin_id do usuário atual com prioridade para usuário autenticado"""
+    """Obter admin_id do usuário atual usando sistema robusto"""
     try:
         # Importar current_user para verificar autenticação
         from flask_login import current_user
         from models import TipoUsuario, Usuario
         from flask import session, request
+        
+        # Usar função robusta das views se disponível
+        try:
+            from views import get_admin_id_robusta
+            admin_id = get_admin_id_robusta()
+            logger.info(f"✅ CRUD SERVIÇOS: Admin_id via sistema robusto - admin_id={admin_id}")
+            return admin_id
+        except ImportError:
+            logger.info("⚠️ Sistema robusto não disponível, usando fallback")
         
         # Debug da sessão atual
         logger.info(f"🔍 SESSION DEBUG: {dict(session) if session else 'No session'}")
@@ -121,27 +130,40 @@ def get_admin_id():
                 logger.info(f"🔍 CRUD SERVIÇOS: Usuário comum autenticado - admin_id={admin_id}")
                 return admin_id
         
-        # Fallback: usar admin_id dinâmico baseado em dados
-        try:
-            from views import get_admin_id_dinamico
-            admin_id = get_admin_id_dinamico()
-            logger.info(f"🔄 Admin_id dinâmico: {admin_id}")
+        # Fallback: usar detecção inteligente
+        from sqlalchemy import text
+        admin_funcionarios = db.session.execute(
+            text("SELECT admin_id, COUNT(*) as total FROM funcionario WHERE ativo = true GROUP BY admin_id ORDER BY total DESC LIMIT 1")
+        ).fetchone()
+        
+        if admin_funcionarios:
+            admin_id = admin_funcionarios[0]
+            logger.info(f"✅ Admin_id detectado via fallback SQL: {admin_id}")
             return admin_id
-        except:
-            # Fallback SQL direto se função não disponível
-            from sqlalchemy import text
-            admin_funcionarios = db.session.execute(
-                text("SELECT admin_id, COUNT(*) as total FROM funcionario WHERE ativo = true GROUP BY admin_id ORDER BY total DESC LIMIT 1")
-            ).fetchone()
+        
+        # Se não há funcionários, tentar por serviços
+        admin_servicos = db.session.execute(
+            text("SELECT admin_id, COUNT(*) as total FROM servico WHERE ativo = true GROUP BY admin_id ORDER BY total DESC LIMIT 1")
+        ).fetchone()
+        
+        if admin_servicos:
+            admin_id = admin_servicos[0]
+            logger.info(f"✅ Admin_id detectado via serviços: {admin_id}")
+            return admin_id
+        
+        # Último fallback - primeiro admin encontrado
+        primeiro_admin = db.session.execute(
+            text("SELECT id FROM usuario WHERE tipo_usuario = 'admin' ORDER BY id LIMIT 1")
+        ).fetchone()
+        
+        if primeiro_admin:
+            admin_id = primeiro_admin[0]
+            logger.warning(f"⚠️ Usando primeiro admin encontrado: {admin_id}")
+            return admin_id
             
-            if admin_funcionarios:
-                admin_id = admin_funcionarios[0]
-                logger.info(f"✅ Admin_id detectado via SQL: {admin_id}")
-                return admin_id
-            
-            # Último fallback - usar admin_id fixo para produção
-            logger.warning("⚠️ Usando admin_id fixo: 50")
-            return 50
+        # Fallback final
+        logger.error("❌ Nenhum admin encontrado, usando fallback")
+        return 1
             
     except Exception as e:
         logger.error(f"❌ Erro ao obter admin_id: {str(e)}")
