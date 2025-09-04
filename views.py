@@ -1388,10 +1388,18 @@ def processar_servicos_obra(obra_id, servicos_selecionados):
     try:
         print(f"🔧 PROCESSANDO SERVIÇOS RDO: obra_id={obra_id}, {len(servicos_selecionados)} serviços")
         
-        # CORREÇÃO: Desativar subatividades RDO existentes desta obra
+        # CORREÇÃO: Desativar subatividades RDO existentes desta obra (SEM JOIN)
         from sqlalchemy import and_
-        subatividades_existentes = db.session.query(RDOServicoSubatividade).join(RDO).filter(
-            and_(RDO.obra_id == obra_id, RDOServicoSubatividade.ativo == True)
+        
+        # Primeiro buscar os IDs dos RDOs desta obra
+        rdos_obra = db.session.query(RDO.id).filter(RDO.obra_id == obra_id).subquery()
+        
+        # Depois desativar as subatividades usando os IDs encontrados
+        subatividades_existentes = RDOServicoSubatividade.query.filter(
+            and_(
+                RDOServicoSubatividade.rdo_id.in_(db.session.query(rdos_obra.c.id)),
+                RDOServicoSubatividade.ativo == True
+            )
         ).update({'ativo': False}, synchronize_session=False)
         print(f"🧹 Associações RDO anteriores desativadas: {subatividades_existentes}")
         
