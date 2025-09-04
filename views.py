@@ -4941,8 +4941,6 @@ def salvar_rdo_maestria():
         
         # === FASE 3: TRANSAÇÃO ATÔMICA ===
         try:
-            db.session.begin()
-            
             # Criar RDO principal
             novo_rdo = RDO(
                 obra_id=int(obra_id),
