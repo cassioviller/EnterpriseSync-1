@@ -4377,37 +4377,62 @@ def rdo_salvar_unificado():
                 print(f"Erro ao processar atividades JSON: {e}")
                 flash(f'Erro ao processar atividades: {e}', 'warning')
         
-        # Processar mão de obra (sistema novo)
-        print("DEBUG: Processando funcionários do formulário...")
+        # Processar funcionários - Sistema Melhorado
+        print("🔍 DEBUG: Processando funcionários do formulário...")
+        funcionarios_processados = 0
         
-        # Percorrer funcionários enviados no formulário
-        for key, value in request.form.items():
-            if key.startswith('funcionario_') and key.endswith('_nome'):
-                try:
-                    # Extrair ID do funcionário: funcionario_123_nome -> 123
-                    funcionario_id = key.split('_')[1]
-                    nome_funcionario = value
-                    
-                    # Buscar horas trabalhadas correspondentes
-                    horas_key = f'funcionario_{funcionario_id}_horas'
-                    horas = float(request.form.get(horas_key, 8))
-                    
-                    if nome_funcionario and horas > 0:
-                        # Buscar funcionário no banco
-                        funcionario = Funcionario.query.get(funcionario_id)
-                        if funcionario:
-                            mao_obra = RDOMaoObra()
-                            mao_obra.rdo_id = rdo.id
-                            mao_obra.funcionario_id = int(funcionario_id)
-                            mao_obra.funcao_exercida = funcionario.funcao_ref.nome if funcionario.funcao_ref else 'Geral'
-                            mao_obra.horas_trabalhadas = horas
-                            db.session.add(mao_obra)
-                            
-                            print(f"DEBUG: Funcionário {nome_funcionario}: {horas}h")
+        # Método 1: Processar funcionários via JSON (preferencial)
+        funcionarios_json = request.form.get('funcionarios', '[]')
+        if funcionarios_json and funcionarios_json != '[]':
+            try:
+                funcionarios_list = json.loads(funcionarios_json)
+                print(f"🔍 Processando {len(funcionarios_list)} funcionários via JSON")
+                
+                for func_data in funcionarios_list:
+                    funcionario_id = func_data.get('funcionario_id') or func_data.get('id')
+                    if funcionario_id:
+                        mao_obra = RDOMaoObra()
+                        mao_obra.rdo_id = rdo.id
+                        mao_obra.funcionario_id = int(funcionario_id)
+                        mao_obra.funcao_exercida = func_data.get('funcao', 'Funcionário')
+                        mao_obra.horas_trabalhadas = float(func_data.get('horas', 8))
+                        db.session.add(mao_obra)
+                        funcionarios_processados += 1
+                        print(f"✅ Funcionário {funcionario_id}: {func_data.get('horas', 8)}h")
                         
-                except (ValueError, IndexError) as e:
-                    print(f"Erro ao processar funcionário {key}: {e}")
-                    continue
+            except (json.JSONDecodeError, ValueError) as e:
+                print(f"❌ Erro ao processar funcionários JSON: {e}")
+        
+        # Método 2: Processar funcionários individuais (fallback)
+        if funcionarios_processados == 0:
+            print("🔍 Tentando método individual...")
+            
+            for key, value in request.form.items():
+                if key.startswith('funcionario_') and key.endswith('_nome'):
+                    try:
+                        funcionario_id = key.split('_')[1]
+                        nome_funcionario = value
+                        
+                        horas_key = f'funcionario_{funcionario_id}_horas'
+                        horas = float(request.form.get(horas_key, 8))
+                        
+                        if nome_funcionario and horas > 0:
+                            funcionario = Funcionario.query.get(funcionario_id)
+                            if funcionario:
+                                mao_obra = RDOMaoObra()
+                                mao_obra.rdo_id = rdo.id
+                                mao_obra.funcionario_id = int(funcionario_id)
+                                mao_obra.funcao_exercida = funcionario.funcao_ref.nome if funcionario.funcao_ref else 'Geral'
+                                mao_obra.horas_trabalhadas = horas
+                                db.session.add(mao_obra)
+                                funcionarios_processados += 1
+                                print(f"✅ Funcionário {nome_funcionario}: {horas}h")
+                            
+                    except (ValueError, IndexError) as e:
+                        print(f"❌ Erro ao processar funcionário {key}: {e}")
+                        continue
+        
+        print(f"🎯 FUNCIONÁRIOS PROCESSADOS: {funcionarios_processados}")
         
         # Processar mão de obra antiga (fallback para compatibilidade)
         mao_obra_json = request.form.get('mao_obra', '[]')
