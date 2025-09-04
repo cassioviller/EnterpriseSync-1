@@ -57,9 +57,9 @@ RUN mkdir -p \
     /app/temp \
     && chown -R sige:sige /app
 
-# Copiar scripts de entrada (produção corrigida e backup)
-COPY docker-entrypoint-easypanel-final.sh /app/docker-entrypoint.sh
-COPY docker-entrypoint-unified.sh /app/docker-entrypoint-backup.sh
+# Copiar scripts de entrada (versão unificada limpa)
+COPY docker-entrypoint-unified.sh /app/docker-entrypoint.sh
+COPY docker-entrypoint-easypanel-final.sh /app/docker-entrypoint-backup.sh
 RUN chmod +x /app/docker-entrypoint.sh /app/docker-entrypoint-backup.sh
 
 # Mudar para usuário não-root
