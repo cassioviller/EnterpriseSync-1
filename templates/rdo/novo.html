@@ -586,16 +586,22 @@ function carregarDadosUltimoRDO() {
     fetch(`/api/ultimo-rdo-dados/${obraId}`)
         .then(response => response.json())
         .then(data => {
-            if (data.success && data.ultimo_rdo) {
-                if (data.primeira_rdo) {
-                    console.log(`✅ Primeira RDO - carregando serviços com percentual 0%`);
-                    exibirDadosPrimeiraRDO(data.ultimo_rdo);
+            console.log('🔍 [DEBUG] Dados recebidos completos:', data);
+            
+            if (data.success) {
+                if (data.primeira_rdo && data.ultima_rdo) {
+                    console.log(`✅ Primeira RDO - carregando ${data.ultima_rdo.total_servicos} serviços com 0%`);
+                    exibirDadosPrimeiraRDO(data.ultima_rdo);
+                } else if (data.ultima_rdo) {
+                    console.log(`✅ RDO existente encontrado: ${data.ultima_rdo.numero_rdo}`);
+                    exibirDadosUltimoRDO(data.ultima_rdo);
                 } else {
-                    console.log(`✅ Último RDO encontrado: ${data.ultimo_rdo.numero_rdo}`);
-                    exibirDadosUltimoRDO(data.ultimo_rdo);
+                    console.log('ℹ️ Nenhum dado de RDO encontrado');
+                    exibirMensagemSemRDOAnterior();
                 }
             } else {
-                exibirMensagemSemRDOAnterior();
+                console.error('❌ API retornou erro:', data.error || 'Erro desconhecido');
+                exibirErroCarregamento();
             }
         })
         .catch(error => {
@@ -711,10 +717,13 @@ function exibirDadosUltimoRDO(ultimoRDO) {
 }
 
 function exibirDadosPrimeiraRDO(primeiraRDO) {
-    console.log('🆕 [MAESTRIA] Inicializando primeira RDO da obra');
+    console.log('🆕 [MAESTRIA] Inicializando primeira RDO da obra:', primeiraRDO);
     
     const container = document.getElementById('servicos-container');
-    if (!container) return;
+    if (!container) {
+        console.error('❌ Container servicos-container não encontrado');
+        return;
+    }
     
     try {
         let html = `
@@ -723,55 +732,99 @@ function exibirDadosPrimeiraRDO(primeiraRDO) {
                     <i class="fas fa-star fa-2x text-warning me-3"></i>
                     <div>
                         <h6 class="mb-1 fw-bold">🆕 Primeira RDO desta Obra</h6>
-                        <p class="mb-0">Todos os serviços iniciam com 0% de conclusão</p>
+                        <p class="mb-0">RDO: ${primeiraRDO.numero_rdo} • Data: ${primeiraRDO.data_relatorio}</p>
                     </div>
                 </div>
             </div>
         `;
         
-        // Se há serviços disponíveis, mostrar preview
+        // Verificar se há serviços
         if (primeiraRDO && primeiraRDO.servicos && primeiraRDO.servicos.length > 0) {
+            console.log(`📋 Exibindo ${primeiraRDO.servicos.length} serviços da primeira RDO`);
+            
             html += `
                 <div class="mb-3">
-                    <h6><i class="fas fa-list-check me-2"></i>Serviços Disponíveis</h6>
+                    <h6><i class="fas fa-list-check me-2"></i>Serviços da Obra (${primeiraRDO.servicos.length})</h6>
                 </div>
             `;
             
             primeiraRDO.servicos.forEach(servico => {
+                console.log(`🔧 Renderizando serviço: ${servico.nome} (${servico.categoria})`);
+                
                 html += `
-                    <div class="card mb-2 border-0 shadow-sm">
-                        <div class="card-body py-3">
-                            <div class="d-flex align-items-center">
-                                <i class="fas fa-plus-circle text-success me-3"></i>
-                                <div class="flex-grow-1">
-                                    <span class="fw-medium">${servico.nome}</span>
-                                    <small class="text-muted d-block">${servico.categoria}</small>
+                    <div class="card mb-3 border-0 shadow-sm">
+                        <div class="card-header bg-light border-0 py-3">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <div>
+                                    <h6 class="mb-1 fw-bold">${servico.nome}</h6>
+                                    <span class="badge bg-info px-3 py-1">${servico.categoria}</span>
                                 </div>
-                                <span class="badge bg-light text-dark">0%</span>
+                                <div class="text-end">
+                                    <div class="progress" style="width: 120px; height: 8px;">
+                                        <div class="progress-bar bg-secondary" style="width: 0%"></div>
+                                    </div>
+                                    <small class="text-muted">0% concluído</small>
+                                </div>
                             </div>
+                        </div>
+                        <div class="card-body">
+                            ${renderizarSubatividadesPrimeira(servico.subatividades)}
                         </div>
                     </div>
                 `;
             });
-        } else {
+            
             html += `
-                <div class="text-center py-4">
-                    <i class="fas fa-plus-circle fa-3x text-muted mb-3"></i>
-                    <h6 class="text-muted">Adicione os serviços desta obra</h6>
-                    <button class="btn btn-primary btn-sm mt-2">
-                        <i class="fas fa-plus me-1"></i>Gerenciar Serviços
+                <div class="alert alert-info border-0 mt-3">
+                    <i class="fas fa-lightbulb me-2"></i>
+                    <strong>Dica:</strong> Todos os serviços começam com 0%. Você pode ajustar os percentuais ao criar o RDO.
+                </div>
+            `;
+            
+        } else {
+            console.warn('⚠️ Nenhum serviço encontrado na primeira RDO');
+            html += `
+                <div class="text-center py-5">
+                    <i class="fas fa-exclamation-triangle fa-3x text-muted mb-3"></i>
+                    <h6 class="text-muted">Nenhum serviço cadastrado nesta obra</h6>
+                    <p class="text-muted">Cadastre os serviços primeiro para poder criar RDOs</p>
+                    <button class="btn btn-primary mt-2" onclick="window.location.href='/servicos'">
+                        <i class="fas fa-plus me-1"></i>Cadastrar Serviços
                     </button>
                 </div>
             `;
         }
         
         container.innerHTML = html;
-        console.log('✅ [MAESTRIA] Primeira RDO inicializada');
+        console.log('✅ [MAESTRIA] Primeira RDO renderizada com sucesso');
         
     } catch (error) {
-        console.error('❌ [ERRO] Falha na primeira RDO:', error);
+        console.error('❌ [ERRO CRÍTICO] Falha na primeira RDO:', error);
         exibirErroCarregamento();
     }
+}
+
+function renderizarSubatividadesPrimeira(subatividades) {
+    if (!subatividades || subatividades.length === 0) {
+        return '<p class="text-muted mb-0"><i class="fas fa-info-circle me-1"></i>Nenhuma subatividade cadastrada</p>';
+    }
+    
+    let html = '<div class="row">';
+    subatividades.forEach(sub => {
+        html += `
+            <div class="col-md-6 mb-2">
+                <div class="d-flex justify-content-between align-items-center mb-1">
+                    <small class="fw-medium">${sub.nome}</small>
+                    <small class="text-muted">0%</small>
+                </div>
+                <div class="progress" style="height: 6px;">
+                    <div class="progress-bar bg-secondary" style="width: 0%"></div>
+                </div>
+            </div>
+        `;
+    });
+    html += '</div>';
+    return html;
 }
 
 function exibirMensagemSemRDOAnterior() {
