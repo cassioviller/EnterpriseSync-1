@@ -1,0 +1,222 @@
+# Solução para Problema de Rotas no Deploy - SIGE
+
+## Problema Identificado
+
+O erro indica que o Flask não consegue construir URLs fora de um contexto de requisição ativa. Isso acontece porque:
+
+1. As novas rotas criadas podem não estar sendo registradas corretamente
+2. O script de verificação está tentando usar `url_for()` para rotas que não existem
+3. Pode haver problemas de importação das novas funções
+
+## Soluções
+
+### Solução 1: Corrigir o Script de Verificação de Rotas
+
+**Arquivo:** `docker-entrypoint-unified.sh`
+
+**Problema:** O script está tentando verificar rotas que podem não existir.
+
+**Correção:**
+```bash
+# Substituir a seção de verificação de rotas por:
+echo "🔍 Verificando estrutura de rotas..."
+python -c "
+from app import app
+
+with app.app_context():
+    try:
+        # Listar todas as rotas disponíveis
+        print('📋 Rotas registradas:')
+        for rule in app.url_map.iter_rules():
+            print(f'   {rule.endpoint}: {rule.rule} [{rule.methods}]')
+        
+        # Verificar se as rotas essenciais existem
+        rotas_essenciais = [
+            'main.dashboard',
+            'main.funcionarios', 
+            'main.health_check'
+        ]
+        
+        rotas_existentes = [rule.endpoint for rule in app.url_map.iter_rules()]
+        
+        for rota in rotas_essenciais:
+            if rota in rotas_existentes:
+                print(f'✅ Rota essencial OK: {rota}')
+            else:
+                print(f'❌ Rota essencial não encontrada: {rota}')
+        
+        print('✅ Verificação de rotas concluída')
+        
+    except Exception as e:
+        print(f'❌ Erro na verificação de rotas: {e}')
+        import traceback
+        traceback.print_exc()
+"
+```
+
+### Solução 2: Verificar Importação das Novas Rotas
+
+**Arquivo:** `views.py`
+
+**Problema:** As novas rotas podem não estar sendo importadas corretamente.
+
+**Verificação:**
+1. Certifique-se de que as novas funções estão definidas no arquivo `views.py`
+2. Verifique se o blueprint `main_bp` está sendo registrado corretamente
+3. Confirme que não há erros de sintaxe nas novas rotas
+
+**Exemplo de rota correta:**
+```python
+@main_bp.route('/api/obras/servicos-rdo', methods=['POST', 'OPTIONS'])
+@login_required
+def adicionar_servico_rdo_obra():
+    # ... código da função
+    pass
+
+@main_bp.route('/api/servicos-disponiveis-obra/<int:obra_id>')
+@login_required  
+def api_servicos_disponiveis_obra(obra_id):
+    # ... código da função
+    pass
+```
+
+### Solução 3: Configurar Variáveis de Ambiente Corretas
+
+**Arquivo:** `Dockerfile` ou variáveis de ambiente
+
+**Adicionar:**
+```bash
+ENV SERVER_NAME=localhost:5000
+ENV APPLICATION_ROOT=/
+ENV PREFERRED_URL_SCHEME=http
+```
+
+### Solução 4: Script de Verificação Simplificado
+
+**Criar arquivo:** `check_routes.py`
+
+```python
+#!/usr/bin/env python3
+"""Script para verificar rotas do SIGE"""
+
+import sys
+import os
+
+# Adicionar o diretório da aplicação ao path
+sys.path.insert(0, '/app')
+
+try:
+    from app import app
+    
+    print("🔍 Verificando rotas do SIGE...")
+    
+    with app.app_context():
+        # Listar todas as rotas
+        routes = []
+        for rule in app.url_map.iter_rules():
+            routes.append({
+                'endpoint': rule.endpoint,
+                'rule': rule.rule,
+                'methods': list(rule.methods)
+            })
+        
+        print(f"📊 Total de rotas encontradas: {len(routes)}")
+        
+        # Verificar rotas específicas das correções
+        rotas_novas = [
+            'main.adicionar_servico_rdo_obra',
+            'main.api_servicos_disponiveis_obra'
+        ]
+        
+        endpoints_existentes = [r['endpoint'] for r in routes]
+        
+        for rota in rotas_novas:
+            if rota in endpoints_existentes:
+                print(f"✅ Nova rota encontrada: {rota}")
+            else:
+                print(f"❌ Nova rota não encontrada: {rota}")
+        
+        # Mostrar algumas rotas importantes
+        print("\n📋 Rotas principais:")
+        for route in routes[:10]:
+            print(f"   {route['endpoint']}: {route['rule']}")
+        
+        print("✅ Verificação concluída com sucesso!")
+        
+except Exception as e:
+    print(f"❌ Erro ao verificar rotas: {e}")
+    import traceback
+    traceback.print_exc()
+    sys.exit(1)
+```
+
+### Solução 5: Dockerfile Corrigido
+
+**Arquivo:** `Dockerfile`
+
+**Adicionar antes do ENTRYPOINT:**
+```dockerfile
+# Copiar script de verificação
+COPY check_routes.py /app/
+RUN chmod +x /app/check_routes.py
+
+# Configurar variáveis para resolver problemas de URL
+ENV SERVER_NAME=0.0.0.0:5000 \
+    APPLICATION_ROOT=/ \
+    PREFERRED_URL_SCHEME=http
+```
+
+### Solução 6: Entrypoint Simplificado
+
+**Arquivo:** `docker-entrypoint-unified.sh`
+
+**Substituir a seção problemática por:**
+```bash
+# Verificar rotas com script dedicado
+echo "🔍 Verificando rotas..."
+python /app/check_routes.py
+
+if [[ $? -ne 0 ]]; then
+    echo "⚠️ Problemas na verificação de rotas, mas continuando..."
+fi
+```
+
+## Implementação Rápida
+
+### Passo 1: Atualizar o Entrypoint
+```bash
+# Substituir a seção de verificação de rotas no docker-entrypoint-unified.sh
+# pela versão simplificada acima
+```
+
+### Passo 2: Criar o Script de Verificação
+```bash
+# Criar o arquivo check_routes.py com o conteúdo fornecido
+```
+
+### Passo 3: Atualizar Dockerfile
+```bash
+# Adicionar as variáveis de ambiente e copiar o script
+```
+
+### Passo 4: Rebuild e Deploy
+```bash
+docker build -t sige:v8.2-fixed .
+docker run -p 5000:5000 sige:v8.2-fixed
+```
+
+## Teste das Rotas
+
+Após o deploy, teste as novas rotas:
+
+```bash
+# Testar rota de adicionar serviço
+curl -X POST http://localhost:5000/api/obras/servicos-rdo \
+  -H "Content-Type: application/json" \
+  -d '{"obra_id": 1, "servico_id": 1}'
+
+# Testar rota de serviços disponíveis  
+curl http://localhost:5000/api/servicos-disponiveis-obra/1
+```
+
+Esta solução deve resolver o problema de rotas não sendo criadas no deploy.

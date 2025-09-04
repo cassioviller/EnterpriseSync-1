@@ -44,6 +44,10 @@ RUN pip install --no-cache-dir --upgrade pip setuptools wheel && \
 # Copiar código da aplicação (incluindo correções Serviços da Obra)
 COPY . .
 
+# Copiar script de verificação de rotas
+COPY check_routes.py /app/
+RUN chmod +x /app/check_routes.py
+
 # Funcionalidades implementadas na v8.2:
 # - Sistema "Serviços da Obra" corrigido para usar RDO
 # - API /api/obras/servicos-rdo para criação automática de RDO inicial  
@@ -72,7 +76,7 @@ RUN chmod +x /app/docker-entrypoint.sh /app/docker-entrypoint-backup.sh
 # Mudar para usuário não-root
 USER sige
 
-# Variáveis de ambiente EasyPanel (específicas para resolver 405)
+# Variáveis de ambiente EasyPanel (específicas para resolver 405 + URL issues)
 ENV FLASK_APP=main.py \
     FLASK_ENV=production \
     FLASK_DEBUG=false \
@@ -83,7 +87,10 @@ ENV FLASK_APP=main.py \
     PYTHONIOENCODING=utf-8 \
     SHOW_DETAILED_ERRORS=true \
     CORS_ORIGINS="*" \
-    CORS_METHODS="GET,POST,PUT,DELETE,OPTIONS"
+    CORS_METHODS="GET,POST,PUT,DELETE,OPTIONS" \
+    SERVER_NAME=0.0.0.0:5000 \
+    APPLICATION_ROOT=/ \
+    PREFERRED_URL_SCHEME=http
 
 # Expor porta
 EXPOSE 5000
