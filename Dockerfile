@@ -66,7 +66,6 @@ RUN mkdir -p \
 # Criar script de entrada integrado no Dockerfile
 RUN cat > /app/docker-entrypoint.sh << 'EOF'
 #!/bin/bash
-set -e
 
 echo "🚀 INICIANDO SIGE v8.2 - Deploy EasyPanel Unificado..."
 echo "🔧 Configuração: ${FLASK_ENV:-production}"
