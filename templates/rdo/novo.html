@@ -210,7 +210,7 @@
                                 <p class="mb-0 opacity-75">Sistema moderno e intuitivo para registro de atividades diárias</p>
                             </div>
                             <div class="text-end">
-                                <a href="{{ url_for('main.rdo_lista') }}" class="btn btn-light btn-sm">
+                                <a href="{{ url_for('main.rdos') }}" class="btn btn-light btn-sm">
                                     <i class="fas fa-arrow-left me-1"></i>
                                     Voltar
                                 </a>
@@ -312,7 +312,7 @@
                                 <i class="fas fa-save me-2"></i>
                                 Salvar RDO
                             </button>
-                            <a href="{{ url_for('main.rdo_lista') }}" class="btn btn-outline-secondary btn-lg">
+                            <a href="{{ url_for('main.rdos') }}" class="btn btn-outline-secondary btn-lg">
                                 <i class="fas fa-times me-2"></i>
                                 Cancelar
                             </a>
@@ -744,7 +744,7 @@ async function submeterFormularioRDO(event) {
             alert('✅ RDO criado com sucesso!');
             
             // Redirecionar para lista de RDOs
-            window.location.href = '/rdo';
+            window.location.href = '/rdos';
         } else {
             throw new Error(`Erro HTTP: ${response.status}`);
         }
