@@ -24,7 +24,7 @@ def editar_rdo_form(rdo_id):
         try:
             from utils.auth_utils import get_admin_id_from_user
         except ImportError:
-            from bypass_auth import obter_admin_id as get_admin_id_from_user
+            # bypass_auth removido - obter_admin_id as get_admin_id_from_user
         from app import db
         
         # Obter admin_id do usuário atual
@@ -86,7 +86,7 @@ def salvar_edicao_rdo(rdo_id):
         try:
             from utils.auth_utils import get_admin_id_from_user
         except ImportError:
-            from bypass_auth import obter_admin_id as get_admin_id_from_user
+            # bypass_auth removido - obter_admin_id as get_admin_id_from_user
         from app import db
         
         # Obter admin_id do usuário atual
@@ -255,7 +255,7 @@ def api_funcionarios_ativos():
         try:
             from utils.auth_utils import get_admin_id_from_user
         except ImportError:
-            from bypass_auth import obter_admin_id as get_admin_id_from_user
+            # bypass_auth removido - obter_admin_id as get_admin_id_from_user
         from models import Funcionario
         
         # Obter admin_id do usuário atual

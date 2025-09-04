@@ -4,12 +4,10 @@ API para sistema de organização avançada de propostas
 
 from flask import Blueprint, request, jsonify
 from models import db, PropostaTemplate, PropostaComercialSIGE, PropostaItem
-try:
-    from bypass_auth import get_current_user_bypass
-except ImportError:
-    def get_current_user_bypass():
-        from flask_login import current_user
-        return current_user
+# bypass_auth removido - usar current_user diretamente
+def get_current_user_bypass():
+    from flask_login import current_user
+    return current_user
 
 api_organizer = Blueprint('api_organizer', __name__, url_prefix='/api')
 

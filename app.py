@@ -261,7 +261,7 @@ with app.app_context():
     # Causa conflitos de admin_id entre sessões
     # if os.environ.get('FLASK_ENV') != 'production':
     #     try:
-    #         import bypass_auth
+    #         bypass_auth removido
     #         logging.info("🔓 Sistema de bypass de autenticação carregado")
     #     except Exception as e:
     #         logging.error(f"Erro ao carregar bypass: {e}")

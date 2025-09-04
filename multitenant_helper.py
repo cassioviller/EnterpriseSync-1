@@ -12,7 +12,7 @@ def get_admin_id():
     try:
         # PRIMEIRO: Tentar usar bypass se disponível (desenvolvimento)
         try:
-            from bypass_auth import MockCurrentUser
+            # bypass_auth removido - MockCurrentUser
             mock_user = MockCurrentUser()
             admin_id = getattr(mock_user, 'admin_id', None) or mock_user.id
             print(f"DEBUG HELPER: Usando bypass - admin_id={admin_id}")
@@ -65,7 +65,7 @@ def get_current_user_safe():
         # Em desenvolvimento com bypass
         if os.getenv('FLASK_ENV') == 'development':
             try:
-                from bypass_auth import MockCurrentUser
+                # bypass_auth removido - MockCurrentUser
                 return MockCurrentUser()
             except ImportError:
                 pass

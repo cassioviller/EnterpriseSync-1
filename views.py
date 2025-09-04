@@ -34,7 +34,6 @@ print("=" * 60)
 
 # Verificar módulos específicos que estão falhando
 modulos_verificar = [
-    ('bypass_auth', 'Sistema de bypass de autenticação'),
     ('utils.idempotency', 'Utilitários de idempotência'),
     ('utils.circuit_breaker', 'Circuit breakers para resiliência'),
     ('utils.saga', 'Padrão SAGA para transações'),
@@ -5717,7 +5716,7 @@ def adicionar_servico_obra():
         from flask_login import current_user
         if not current_user.is_authenticated:
             # Create a mock user for API requests
-            from bypass_auth import MockCurrentUser
+            # bypass_auth removido - sistema não mais necessário
             import flask_login
             flask_login._get_user = lambda: MockCurrentUser()
     except:
@@ -5929,7 +5928,7 @@ def remover_servico_obra():
         from flask_login import current_user
         if not current_user.is_authenticated:
             # Create a mock user for API requests
-            from bypass_auth import MockCurrentUser
+            # bypass_auth removido - sistema não mais necessário
             import flask_login
             flask_login._get_user = lambda: MockCurrentUser()
     except:

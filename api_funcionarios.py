@@ -18,8 +18,9 @@ def get_admin_id():
         from utils.auth_utils import get_admin_id_from_user
         return get_admin_id_from_user()
     except ImportError:
-        from bypass_auth import obter_admin_id
-        return obter_admin_id()
+        # bypass_auth removido - usar admin_id do current_user
+        from flask_login import current_user
+        return getattr(current_user, 'admin_id', current_user.id)
 
 @api_funcionarios_bp.route('/funcionarios-ativos', methods=['GET'])
 def funcionarios_ativos():
