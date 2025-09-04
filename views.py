@@ -1397,6 +1397,39 @@ def editar_obra(id):
             servicos_selecionados = request.form.getlist('servicos_obra')
             print(f"DEBUG EDITAR OBRA: Serviços selecionados = {servicos_selecionados}")
             
+            # Atualizar associações de serviços com a obra
+            try:
+                # Primeiro, desativar todos os serviços atualmente associados
+                ServicoObra.query.filter_by(obra_id=obra.id).update({'ativo': False})
+                
+                # Depois, ativar/criar as novas associações
+                for servico_id in servicos_selecionados:
+                    if servico_id:
+                        servico_id = int(servico_id)
+                        
+                        # Verificar se já existe a associação
+                        servico_obra_existente = ServicoObra.query.filter_by(
+                            obra_id=obra.id,
+                            servico_id=servico_id
+                        ).first()
+                        
+                        if servico_obra_existente:
+                            # Reativar associação existente
+                            servico_obra_existente.ativo = True
+                        else:
+                            # Criar nova associação
+                            nova_associacao = ServicoObra(
+                                obra_id=obra.id,
+                                servico_id=servico_id,
+                                ativo=True
+                            )
+                            db.session.add(nova_associacao)
+                
+                print(f"DEBUG: Serviços da obra atualizados - {len(servicos_selecionados)} serviços associados")
+                
+            except Exception as servico_error:
+                print(f"ERRO ao processar serviços da obra: {servico_error}")
+            
             db.session.commit()
             
             flash(f'Obra "{obra.nome}" atualizada com sucesso!', 'success')
@@ -1408,14 +1441,20 @@ def editar_obra(id):
     
     # GET request - carregar lista de funcionários e serviços para edição
     try:
-        admin_id = obra.admin_id or 10
+        # Usar sistema de admin_id dinâmico para edição
+        admin_id = obra.admin_id or get_admin_id_dinamico()
         funcionarios = Funcionario.query.filter_by(admin_id=admin_id, ativo=True).order_by(Funcionario.nome).all()
         servicos_disponiveis = Servico.query.filter_by(admin_id=admin_id, ativo=True).order_by(Servico.nome).all()
         
-        # Buscar serviços já associados à obra (implementar lógica específica depois)
-        servicos_obra = []
+        # Buscar serviços já associados à obra através da tabela ServicoObra
+        try:
+            servicos_obra_ids = db.session.query(ServicoObra.servico_id).filter_by(obra_id=obra.id, ativo=True).all()
+            servicos_obra = [id[0] for id in servicos_obra_ids]
+        except:
+            servicos_obra = []
         
         print(f"DEBUG EDITAR OBRA: {len(funcionarios)} funcionários e {len(servicos_disponiveis)} serviços carregados para admin_id={admin_id}")
+        print(f"DEBUG EDITAR OBRA: Serviços já associados à obra: {servicos_obra}")
         
     except Exception as e:
         print(f"ERRO ao carregar dados para edição: {e}")
