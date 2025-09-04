@@ -5142,15 +5142,97 @@ def api_rdo_servicos_obra(obra_id):
         
         # Se não há serviços específicos, retornar lista vazia - NÃO CARREGAR TODOS OS SERVIÇOS
         if not servicos_obra:
-
-        # OBRA SEM SERVIÇOS RETORNA LISTA VAZIA - CORREÇÃO APLICADA
-        print(f"DEBUG API: Retornando lista vazia para obra {obra.nome}") 
-
+            print(f"⚠️ OBRA {obra_id} SEM SERVIÇOS CADASTRADOS - Retornando lista vazia")
+            return jsonify({
+                'success': True,
+                'obra_id': obra_id,
+                'obra_nome': obra.nome,
+                'servicos': [],
+                'message': 'Nenhum serviço cadastrado nesta obra'
+            })
+        
+        # Processar serviços específicos da obra
+        for servico_obra, servico in servicos_obra:
+            # Buscar subatividades mestre para este serviço
+            try:
+                print(f"DEBUG API: Buscando subatividades para serviço {servico.id} ({servico.nome}) - admin_id: {admin_id}")
+                
+                # Buscar subatividades sem filtro de admin_id primeiro
+                subatividades_all = SubatividadeMestre.query.filter_by(
+                    servico_id=servico.id,
+                    ativo=True
+                ).order_by(SubatividadeMestre.ordem_padrao).all()
+                
+                print(f"DEBUG API: Encontradas {len(subatividades_all)} subatividades para serviço {servico.nome}")
+                
+                # Se não encontrou, buscar por admin_id específico
+                if not subatividades_all:
+                    subatividades_all = SubatividadeMestre.query.filter_by(
+                        servico_id=servico.id,
+                        admin_id=admin_id,
+                        ativo=True
+                    ).order_by(SubatividadeMestre.ordem_padrao).all()
+                    print(f"DEBUG API: Com admin_id {admin_id}: {len(subatividades_all)} subatividades")
+                
+                subatividades_data = []
+                for sub in subatividades_all:
+                    subatividades_data.append({
+                        'id': sub.id,
+                        'nome': sub.nome,
+                        'descricao': sub.descricao or '',
+                        'unidade_medida': 'UN',  # Campo fixo, não existe na tabela
+                        'percentual_heranca': 0
+                    })
+                    print(f"DEBUG API: Subatividade: {sub.nome}")
+                    
+                    # Se ainda não encontrou, criar subatividades padrão
+                    if not subatividades_data:
+                        print(f"DEBUG API: Criando subatividades padrão para {servico.nome}")
+                        subatividades_padrao = [
+                            f'{servico.nome} - Preparação',
+                            f'{servico.nome} - Execução', 
+                            f'{servico.nome} - Acabamento',
+                            f'{servico.nome} - Finalização'
+                        ]
+                        
+                        for i, nome_sub in enumerate(subatividades_padrao):
+                            subatividades_data.append({
+                                'id': f"{servico.id}{i+1:02d}",
+                                'nome': nome_sub,
+                                'descricao': f'Etapa {i+1} do serviço {servico.nome}',
+                                'unidade_medida': 'UN',
+                                'percentual_heranca': 0
+                            })
+                    
+            except Exception as e:
+                print(f"ERRO CARREGAR SUBATIVIDADES PARA SERVIÇO {servico.id}: {e}")
+                    # Fallback para subatividades simples
+                    subatividades_data = [
+                        {
+                            'id': f"{servico.id}01",
+                            'nome': f'{servico.nome} - Execução',
+                            'descricao': f'Execução do serviço {servico.nome}',
+                            'unidade_medida': 'UN',
+                            'percentual_heranca': 0
+                        }
+                    ]
+                
+                servico_data = {
+                    'id': servico.id,
+                    'nome': servico.nome,
+                    'categoria': servico.categoria or 'Geral',
+                    'unidade_medida': servico.unidade_medida or 'UN',
+                    'subatividades': subatividades_data
+                }
+                servicos_data.append(servico_data)
+        
+        print(f"DEBUG API: Retornando {len(servicos_data)} serviços para obra {obra.nome}")
+        
         return jsonify({
             'success': True,
             'obra': {'id': obra.id, 'nome': obra.nome},
-            'servicos': [],
-            'total': 0
+            'servicos': servicos_data,
+            'total': len(servicos_data)
         })
         
     except Exception as e:
@@ -5159,6 +5241,12 @@ def api_rdo_servicos_obra(obra_id):
         traceback.print_exc()
         return jsonify({'error': 'Erro interno', 'success': False}), 500
 
+@main_bp.route('/api/rdo/herdar-percentuais/<int:obra_id>')
+@funcionario_required
+def api_rdo_herdar_percentuais(obra_id):
+    """API para herdar percentuais do RDO mais recente da obra"""
+    try:
+        # Verificar se obra pertence ao admin do funcionário
         obra = Obra.query.filter_by(id=obra_id, admin_id=current_user.admin_id).first()
         if not obra:
             return jsonify({'error': 'Obra não encontrada', 'success': False}), 404
