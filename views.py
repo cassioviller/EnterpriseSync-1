@@ -3056,14 +3056,16 @@ def criar_rdo():
         obra_id = request.form.get('obra_id', type=int)
         data_relatorio = datetime.strptime(request.form.get('data_relatorio'), '%Y-%m-%d').date()
         
-        # Buscar obra (sem restrição de admin_id para permitir todas as permissões)
-        obra = Obra.query.filter_by(id=obra_id).first()
+        # Buscar obra do admin atual (manter multi-tenant)
+        obra = Obra.query.filter_by(id=obra_id, admin_id=admin_id).first()
         if not obra:
-            flash('Obra não encontrada.', 'error')
+            # Verificar se obra existe mas pertence a outro admin
+            obra_existe = Obra.query.filter_by(id=obra_id).first()
+            if obra_existe:
+                flash('Acesso negado: esta obra pertence a outra empresa.', 'error')
+            else:
+                flash('Obra não encontrada.', 'error')
             return redirect(url_for('main.rdo_novo_unificado'))
-        
-        # Usar o admin_id da obra encontrada
-        admin_id = obra.admin_id
         
         # Verificar se já existe RDO para esta obra/data
         rdo_existente = RDO.query.filter_by(obra_id=obra_id, data_relatorio=data_relatorio).first()
@@ -4122,18 +4124,26 @@ def rdo_salvar_unificado():
             obra_id = request.form.get('obra_id', type=int)
             data_relatorio = datetime.strptime(request.form.get('data_relatorio'), '%Y-%m-%d').date()
             
-            # Buscar funcionário correto primeiro
-            funcionario = Funcionario.query.filter_by(email=current_user.email).first()
-            admin_id_correto = funcionario.admin_id if funcionario else 10
+            # Detectar admin_id correto dinamicamente
+            if hasattr(current_user, 'admin_id') and current_user.admin_id:
+                admin_id_correto = current_user.admin_id
+            elif hasattr(current_user, 'tipo_usuario') and current_user.tipo_usuario == TipoUsuario.ADMIN:
+                admin_id_correto = current_user.id
+            else:
+                # Buscar funcionário para obter admin_id
+                funcionario = Funcionario.query.filter_by(email=current_user.email).first()
+                admin_id_correto = funcionario.admin_id if funcionario else get_admin_id_dinamico()
             
-            # Buscar obra (sem restrição de admin_id para permitir todas as permissões)
-            obra = Obra.query.filter_by(id=obra_id).first()
+            # Buscar obra do admin atual (manter multi-tenant)
+            obra = Obra.query.filter_by(id=obra_id, admin_id=admin_id_correto).first()
             if not obra:
-                flash('Obra não encontrada.', 'error')
+                # Verificar se obra existe mas pertence a outro admin
+                obra_existe = Obra.query.filter_by(id=obra_id).first()
+                if obra_existe:
+                    flash('Acesso negado: esta obra pertence a outra empresa.', 'error')
+                else:
+                    flash('Obra não encontrada.', 'error')
                 return redirect(url_for('main.funcionario_rdo_novo'))
-            
-            # Usar o admin_id da obra encontrada
-            admin_id_correto = obra.admin_id
             
             # Verificar se já existe RDO para esta obra/data
             rdo_existente = RDO.query.filter_by(obra_id=obra_id, data_relatorio=data_relatorio).first()
