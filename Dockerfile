@@ -1,13 +1,13 @@
-# DOCKERFILE UNIFICADO - SIGE v8.0
-# Idêntico entre desenvolvimento e produção
-# Sistema Integrado de Gestão Empresarial - EasyPanel Ready
+# DOCKERFILE UNIFICADO - SIGE v8.1 - CORREÇÃO 405
+# Configuração EasyPanel com correção Method Not Allowed
+# Sistema Integrado de Gestão Empresarial - Deploy Fixed
 
 FROM python:3.11-slim-bullseye
 
 # Metadados
-LABEL maintainer="SIGE v8.0" \
-      version="8.0" \
-      description="Sistema Integrado de Gestão Empresarial - Unified Build"
+LABEL maintainer="SIGE v8.1 EasyPanel" \
+      version="8.1" \
+      description="Sistema Integrado de Gestão Empresarial - EasyPanel Deploy Fixed"
 
 # Variáveis de build
 ARG DEBIAN_FRONTEND=noninteractive
@@ -65,14 +65,18 @@ RUN chmod +x /app/docker-entrypoint.sh /app/docker-entrypoint-backup.sh
 # Mudar para usuário não-root
 USER sige
 
-# Variáveis de ambiente padrão
+# Variáveis de ambiente EasyPanel (específicas para resolver 405)
 ENV FLASK_APP=main.py \
     FLASK_ENV=production \
+    FLASK_DEBUG=false \
+    WTF_CSRF_ENABLED=false \
     PORT=5000 \
     PYTHONPATH=/app \
     PYTHONUNBUFFERED=1 \
     PYTHONIOENCODING=utf-8 \
-    SHOW_DETAILED_ERRORS=true
+    SHOW_DETAILED_ERRORS=true \
+    CORS_ORIGINS="*" \
+    CORS_METHODS="GET,POST,PUT,DELETE,OPTIONS"
 
 # Expor porta
 EXPOSE 5000
