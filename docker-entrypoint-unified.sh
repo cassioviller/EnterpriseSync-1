@@ -164,6 +164,162 @@ with app.app_context():
         traceback.print_exc()
 "
 
+# Verificar registros de rotas e APIs
+echo "🔍 Verificando registros de rotas e APIs..."
+python -c "
+from app import app
+import importlib.util
+import os
+
+with app.app_context():
+    try:
+        print('📋 VERIFICAÇÃO COMPLETA DE ROTAS E APIs:')
+        print('='*70)
+        
+        # Listar todos os blueprints registrados
+        blueprints = []
+        for name, blueprint in app.blueprints.items():
+            url_prefix = getattr(blueprint, 'url_prefix', '') or ''
+            blueprints.append((name, url_prefix))
+        
+        print(f'📊 BLUEPRINTS REGISTRADOS: {len(blueprints)} encontrados')
+        for name, prefix in sorted(blueprints):
+            status = '✅' if prefix else '🔸'
+            print(f'   {status} {name}: {prefix or \"/\" } ')
+        
+        # Verificar rotas principais
+        print('\\n🎯 ROTAS PRINCIPAIS:')
+        critical_routes = [
+            '/',
+            '/health', 
+            '/login',
+            '/dashboard',
+            '/funcionarios',
+            '/obras',
+            '/servicos',
+            '/api/funcionarios',
+            '/api/servicos'
+        ]
+        
+        # Coletar todas as rotas
+        all_routes = []
+        for rule in app.url_map.iter_rules():
+            if rule.endpoint != 'static':
+                all_routes.append((rule.rule, rule.methods, rule.endpoint))
+        
+        print(f'   📈 Total de rotas mapeadas: {len(all_routes)}')
+        
+        # Verificar rotas críticas
+        route_rules = [route[0] for route in all_routes]
+        for route in critical_routes:
+            if any(route in rule for rule in route_rules):
+                print(f'   ✅ {route} - ENCONTRADA')
+            else:
+                print(f'   ⚠️  {route} - NÃO ENCONTRADA')
+        
+        # Verificar APIs específicas
+        print('\\n🔧 APIs ESPECIALIZADAS:')
+        api_patterns = [
+            ('/api/funcionarios', 'Gestão de funcionários'),
+            ('/api/servicos', 'Gestão de serviços'),
+            ('/api/mobile', 'API mobile'),
+            ('/servicos', 'CRUD serviços'),
+            ('/rdo', 'Sistema RDO'),
+            ('/propostas', 'Sistema propostas')
+        ]
+        
+        for pattern, desc in api_patterns:
+            matching_routes = [route for route in route_rules if pattern in route]
+            if matching_routes:
+                print(f'   ✅ {pattern} ({len(matching_routes)} rotas) - {desc}')
+            else:
+                print(f'   ⚠️  {pattern} - {desc} NÃO ENCONTRADO')
+        
+        # Verificar health check especificamente
+        print('\\n❤️ HEALTH CHECK:')
+        health_routes = [route for route in all_routes if 'health' in route[0].lower()]
+        if health_routes:
+            for route, methods, endpoint in health_routes:
+                print(f'   ✅ {route} [{\"|\".join(methods)}] -> {endpoint}')
+        else:
+            print('   ⚠️  Nenhuma rota de health check encontrada')
+        
+        # Estatísticas finais
+        print('\\n📊 ESTATÍSTICAS FINAIS:')
+        api_routes = len([r for r in all_routes if '/api/' in r[0]])
+        web_routes = len(all_routes) - api_routes
+        print(f'   🌐 Rotas web: {web_routes}')
+        print(f'   🔌 Rotas API: {api_routes}')
+        print(f'   📦 Blueprints: {len(blueprints)}')
+        
+        print('='*70)
+        print('✅ VERIFICAÇÃO DE ROTAS E APIs CONCLUÍDA!')
+        
+    except Exception as e:
+        print(f'❌ Erro na verificação de rotas: {e}')
+        import traceback
+        traceback.print_exc()
+"
+
+# Teste de endpoints críticos funcionando
+echo "🧪 Testando endpoints críticos..."
+python -c "
+from app import app
+import json
+
+with app.test_client() as client:
+    try:
+        print('🧪 TESTE DE ENDPOINTS CRÍTICOS:')
+        print('='*50)
+        
+        # Definir endpoints críticos para teste
+        critical_endpoints = [
+            ('/health', 'GET', 'Health Check'),
+            ('/', 'GET', 'Home Page'),
+            ('/login', 'GET', 'Login Page'),
+            ('/dashboard', 'GET', 'Dashboard (pode redirecionar)'),
+        ]
+        
+        successful_tests = 0
+        total_tests = len(critical_endpoints)
+        
+        for endpoint, method, description in critical_endpoints:
+            try:
+                if method == 'GET':
+                    response = client.get(endpoint, follow_redirects=True)
+                elif method == 'POST':
+                    response = client.post(endpoint, follow_redirects=True)
+                else:
+                    continue
+                
+                # Considerar sucesso se não for erro 50x
+                if response.status_code < 500:
+                    print(f'   ✅ {endpoint} [{method}] -> {response.status_code} - {description}')
+                    successful_tests += 1
+                else:
+                    print(f'   ❌ {endpoint} [{method}] -> {response.status_code} - {description}')
+                    
+            except Exception as endpoint_error:
+                print(f'   ⚠️  {endpoint} [{method}] -> ERRO: {str(endpoint_error)[:50]}... - {description}')
+        
+        # Resultado final
+        success_rate = (successful_tests / total_tests) * 100
+        print(f'\\n📊 RESULTADO DOS TESTES:')
+        print(f'   ✅ Sucessos: {successful_tests}/{total_tests} ({success_rate:.1f}%)')
+        
+        if success_rate >= 75:
+            print('   🎯 ENDPOINTS CRÍTICOS FUNCIONANDO!')
+        else:
+            print('   ⚠️  Alguns endpoints podem ter problemas')
+        
+        print('='*50)
+        
+    except Exception as e:
+        print(f'❌ Erro nos testes de endpoint: {e}')
+        import traceback
+        traceback.print_exc()
+"
+
 if [[ $? -ne 0 && "${FLASK_ENV}" == "production" ]]; then
     echo "❌ Falha crítica nas migrações em produção"
     exit 1
