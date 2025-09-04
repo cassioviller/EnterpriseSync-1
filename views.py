@@ -1413,32 +1413,148 @@ def nova_obra():
 # ========== SISTEMA DE SERVIÇOS DA OBRA - REFATORADO COMPLETO ==========
 
 def get_admin_id_robusta(obra=None, current_user=None):
-    """Sistema robusto para detectar admin_id correto"""
+    """Sistema robusto de detecção de admin_id para DESENVOLVIMENTO E PRODUÇÃO"""
     try:
-        # 1. Priorizar admin_id da obra
+        # 1. Se obra tem admin_id, usar da obra
         if obra and hasattr(obra, 'admin_id') and obra.admin_id:
+            print(f"🎯 Admin_ID da obra: {obra.admin_id}")
             return obra.admin_id
         
-        # 2. Usar admin_id do usuário autenticado
+        # 2. Se usuário tem admin_id, usar do usuário
         if current_user and hasattr(current_user, 'admin_id') and current_user.admin_id:
+            print(f"🎯 Admin_ID do usuário: {current_user.admin_id}")
             return current_user.admin_id
         
         # 3. Usar ID do usuário como fallback
         if current_user and hasattr(current_user, 'id') and current_user.id:
+            print(f"🎯 Admin_ID usando ID do usuário: {current_user.id}")
             return current_user.id
         
-        # 4. Fallback SQL direto
+        # 4. DETECÇÃO AUTOMÁTICA PARA PRODUÇÃO - buscar admin_id com mais funcionários
         from sqlalchemy import text
-        result = db.session.execute(text("SELECT admin_id FROM funcionario WHERE ativo = true LIMIT 1")).fetchone()
-        if result:
-            return result[0]
+        try:
+            result = db.session.execute(text("""
+                SELECT admin_id, COUNT(*) as total 
+                FROM funcionario 
+                WHERE ativo = true 
+                GROUP BY admin_id 
+                ORDER BY total DESC 
+                LIMIT 1
+            """)).fetchone()
+            
+            if result and result[0]:
+                admin_id = result[0]
+                print(f"🎯 PRODUÇÃO: admin_id detectado por funcionários: {admin_id} ({result[1]} funcionários)")
+                return admin_id
+        except Exception as func_error:
+            print(f"Erro busca funcionários: {func_error}")
         
-        # 5. Fallback final
-        return 10  # Padrão desenvolvimento
+        # 5. Fallback por serviços se não tem funcionários
+        try:
+            result = db.session.execute(text("""
+                SELECT admin_id, COUNT(*) as total 
+                FROM servico 
+                WHERE ativo = true 
+                GROUP BY admin_id 
+                ORDER BY total DESC 
+                LIMIT 1
+            """)).fetchone()
+            
+            if result and result[0]:
+                admin_id = result[0]
+                print(f"🎯 PRODUÇÃO: admin_id detectado por serviços: {admin_id} ({result[1]} serviços)")
+                return admin_id
+        except Exception as serv_error:
+            print(f"Erro busca serviços: {serv_error}")
+        
+        # 6. Fallback por obras
+        try:
+            result = db.session.execute(text("""
+                SELECT admin_id, COUNT(*) as total 
+                FROM obra 
+                WHERE admin_id IS NOT NULL 
+                GROUP BY admin_id 
+                ORDER BY total DESC 
+                LIMIT 1
+            """)).fetchone()
+            
+            if result and result[0]:
+                admin_id = result[0]
+                print(f"🎯 PRODUÇÃO: admin_id detectado por obras: {admin_id} ({result[1]} obras)")
+                return admin_id
+        except Exception as obra_error:
+            print(f"Erro busca obras: {obra_error}")
+        
+        # 7. Buscar primeiro admin_id que existir
+        try:
+            result = db.session.execute(text("""
+                SELECT admin_id 
+                FROM (
+                    SELECT admin_id FROM funcionario WHERE admin_id IS NOT NULL
+                    UNION 
+                    SELECT admin_id FROM servico WHERE admin_id IS NOT NULL  
+                    UNION
+                    SELECT admin_id FROM obra WHERE admin_id IS NOT NULL
+                ) t 
+                ORDER BY admin_id ASC 
+                LIMIT 1
+            """)).fetchone()
+            
+            if result and result[0]:
+                admin_id = result[0]
+                print(f"🎯 PRODUÇÃO: primeiro admin_id encontrado: {admin_id}")
+                return admin_id
+        except Exception as first_error:
+            print(f"Erro busca primeiro admin_id: {first_error}")
+        
+        # 8. Fallback final seguro
+        print("⚠️ FALLBACK: Usando admin_id=1 como padrão de produção")
+        return 1
         
     except Exception as e:
-        print(f"ERRO get_admin_id_robusta: {e}")
-        return 10
+        print(f"ERRO CRÍTICO get_admin_id_robusta: {e}")
+        return 1  # Fallback de produção
+
+def verificar_dados_producao(admin_id):
+    """Verifica se admin_id tem dados suficientes para funcionar em produção"""
+    try:
+        from sqlalchemy import text
+        
+        # Verificar se tem funcionários
+        funcionarios = db.session.execute(text(
+            "SELECT COUNT(*) FROM funcionario WHERE admin_id = :admin_id AND ativo = true"
+        ), {'admin_id': admin_id}).scalar()
+        
+        # Verificar se tem serviços
+        servicos = db.session.execute(text(
+            "SELECT COUNT(*) FROM servico WHERE admin_id = :admin_id AND ativo = true"
+        ), {'admin_id': admin_id}).scalar()
+        
+        # Verificar se tem subatividades
+        subatividades = db.session.execute(text(
+            "SELECT COUNT(*) FROM subatividade_mestre WHERE admin_id = :admin_id AND ativo = true"
+        ), {'admin_id': admin_id}).scalar()
+        
+        # Verificar se tem obras
+        obras = db.session.execute(text(
+            "SELECT COUNT(*) FROM obra WHERE admin_id = :admin_id"
+        ), {'admin_id': admin_id}).scalar()
+        
+        print(f"📊 VERIFICAÇÃO PRODUÇÃO admin_id {admin_id}: {funcionarios} funcionários, {servicos} serviços, {subatividades} subatividades, {obras} obras")
+        
+        # Considerar válido se tem pelo menos serviços OU funcionários OU obras
+        is_valid = funcionarios > 0 or servicos > 0 or obras > 0
+        
+        if not is_valid:
+            print(f"⚠️ ADMIN_ID {admin_id} NÃO TEM DADOS SUFICIENTES")
+        else:
+            print(f"✅ ADMIN_ID {admin_id} VALIDADO PARA PRODUÇÃO")
+            
+        return is_valid
+        
+    except Exception as e:
+        print(f"ERRO verificação produção admin_id {admin_id}: {e}")
+        return False
 
 def processar_servicos_obra(obra_id, servicos_selecionados):
     """Processa associação de serviços RDO à obra para execução"""

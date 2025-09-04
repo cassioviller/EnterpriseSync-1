@@ -100,6 +100,70 @@ with app.app_context():
             print('⚠️  Continuando em modo desenvolvimento...')
 "
 
+# Verificar dados de produção após migrações
+echo "🔍 Verificando dados de produção..."
+python -c "
+from app import app, db
+from sqlalchemy import text
+
+with app.app_context():
+    try:
+        print('📊 VERIFICAÇÃO COMPLETA DE DADOS DE PRODUÇÃO:')
+        print('='*60)
+        
+        # Verificar admin_ids disponíveis em cada tabela
+        print('🔍 Admin_IDs por tabela:')
+        
+        # Funcionários
+        funcionarios = db.session.execute(text('SELECT admin_id, COUNT(*) FROM funcionario WHERE ativo = true GROUP BY admin_id ORDER BY admin_id')).fetchall()
+        print(f'   👥 Funcionários: {dict(funcionarios) if funcionarios else \"Nenhum\"}')
+        
+        # Serviços  
+        servicos = db.session.execute(text('SELECT admin_id, COUNT(*) FROM servico WHERE ativo = true GROUP BY admin_id ORDER BY admin_id')).fetchall()
+        print(f'   🔧 Serviços: {dict(servicos) if servicos else \"Nenhum\"}')
+        
+        # Subatividades
+        subatividades = db.session.execute(text('SELECT admin_id, COUNT(*) FROM subatividade_mestre WHERE ativo = true GROUP BY admin_id ORDER BY admin_id')).fetchall()
+        print(f'   📋 Subatividades: {dict(subatividades) if subatividades else \"Nenhum\"}')
+        
+        # Obras
+        obras = db.session.execute(text('SELECT admin_id, COUNT(*) FROM obra GROUP BY admin_id ORDER BY admin_id')).fetchall()
+        print(f'   🏗️  Obras: {dict(obras) if obras else \"Nenhum\"}')
+        
+        # Detectar admin_id recomendado para produção
+        print('\\n🎯 DETECÇÃO AUTOMÁTICA DE ADMIN_ID:')
+        
+        # Buscar admin_id com mais dados combinados
+        combined_query = text('''
+            SELECT admin_id, 
+                   COALESCE(f.funcionarios, 0) + COALESCE(s.servicos, 0) + COALESCE(o.obras, 0) as total_dados
+            FROM (
+                SELECT DISTINCT admin_id FROM funcionario 
+                UNION SELECT DISTINCT admin_id FROM servico 
+                UNION SELECT DISTINCT admin_id FROM obra WHERE admin_id IS NOT NULL
+            ) all_admins
+            LEFT JOIN (SELECT admin_id, COUNT(*) as funcionarios FROM funcionario WHERE ativo = true GROUP BY admin_id) f ON all_admins.admin_id = f.admin_id
+            LEFT JOIN (SELECT admin_id, COUNT(*) as servicos FROM servico WHERE ativo = true GROUP BY admin_id) s ON all_admins.admin_id = s.admin_id  
+            LEFT JOIN (SELECT admin_id, COUNT(*) as obras FROM obra GROUP BY admin_id) o ON all_admins.admin_id = o.admin_id
+            ORDER BY total_dados DESC, admin_id ASC
+            LIMIT 1
+        ''')
+        
+        recommended = db.session.execute(combined_query).fetchone()
+        if recommended and recommended[0]:
+            print(f'   ✅ Admin_ID recomendado para produção: {recommended[0]} (total: {recommended[1]} registros)')
+        else:
+            print('   ⚠️  Nenhum admin_id encontrado com dados')
+        
+        print('='*60)
+        print('✅ Verificação de produção concluída com sucesso!')
+        
+    except Exception as e:
+        print(f'❌ Erro na verificação de produção: {e}')
+        import traceback
+        traceback.print_exc()
+"
+
 if [[ $? -ne 0 && "${FLASK_ENV}" == "production" ]]; then
     echo "❌ Falha crítica nas migrações em produção"
     exit 1
