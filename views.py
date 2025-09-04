@@ -1,7 +1,7 @@
 from flask import Blueprint, render_template, request, redirect, url_for, flash, jsonify, make_response, send_file, session
 from flask_login import login_required, current_user, login_user, logout_user
 from werkzeug.security import check_password_hash, generate_password_hash
-from models import db, Usuario, TipoUsuario, Funcionario, Obra, RDO, RDOMaoObra, RDOEquipamento, RDOOcorrencia, RDOFoto, AlocacaoEquipe, Servico, ServicoObra, RDOServicoSubatividade, SubatividadeMestre
+from models import db, Usuario, TipoUsuario, Funcionario, Obra, RDO, RDOMaoObra, RDOEquipamento, RDOOcorrencia, RDOFoto, AlocacaoEquipe, Servico, ServicoObra, ServicoObraReal, RDOServicoSubatividade, SubatividadeMestre
 from auth import super_admin_required, admin_required, funcionario_required
 from datetime import datetime, date, timedelta
 from sqlalchemy import func, desc, or_, and_, text
@@ -1658,7 +1658,7 @@ def processar_servicos_obra(obra_id, servicos_selecionados):
         return 0
 
 def obter_servicos_da_obra(obra_id, admin_id=None):
-    """Obtém lista de serviços principais sendo executados na obra (via subatividade_mestre)"""
+    """Obtém lista de serviços da obra usando NOVA TABELA servico_obra_real"""
     try:
         from sqlalchemy import text
         from sqlalchemy.exc import SQLAlchemyError
@@ -1667,44 +1667,44 @@ def obter_servicos_da_obra(obra_id, admin_id=None):
         if not admin_id:
             admin_id = get_admin_id_robusta()
         
-        print(f"🔍 BUSCANDO SERVIÇOS PRINCIPAIS EXECUTADOS para obra {obra_id}, admin_id {admin_id}")
+        print(f"🔍 BUSCANDO SERVIÇOS NA NOVA TABELA servico_obra_real para obra {obra_id}, admin_id {admin_id}")
         
-        # Usar uma nova sessão isolada para evitar conflitos de transação
+        # Usar nova tabela ServicoObraReal
         try:
-            # CORREÇÃO FINAL: Buscar serviços que têm subatividades sendo executadas no RDO
-            # Como rdo_servico_subatividade não tem subatividade_id, vamos buscar diretamente por servico_id
-            query = text("""
-                SELECT DISTINCT s.id, s.nome, s.descricao, s.categoria, s.unidade_medida, s.custo_unitario,
-                       COUNT(rss.id) as total_subatividades_ativas,
-                       AVG(rss.percentual_conclusao) as progresso_medio,
-                       (SELECT COUNT(*) FROM subatividade_mestre sm WHERE sm.servico_id = s.id AND sm.ativo = true) as total_subatividades_possiveis
-                FROM servico s
-                JOIN rdo_servico_subatividade rss ON rss.servico_id = s.id
-                JOIN rdo r ON rss.rdo_id = r.id
-                WHERE r.obra_id = :obra_id AND rss.ativo = true 
-                  AND s.admin_id = :admin_id AND s.ativo = true
-                GROUP BY s.id, s.nome, s.descricao, s.categoria, s.unidade_medida, s.custo_unitario
-                ORDER BY s.nome
-            """)
-            
-            result = db.session.execute(query, {'obra_id': obra_id, 'admin_id': admin_id}).fetchall()
+            # Buscar serviços usando a nova tabela
+            servicos_obra_real = db.session.query(ServicoObraReal, Servico).join(
+                Servico, ServicoObraReal.servico_id == Servico.id
+            ).filter(
+                ServicoObraReal.obra_id == obra_id,
+                ServicoObraReal.admin_id == admin_id,
+                ServicoObraReal.ativo == True,
+                Servico.ativo == True
+            ).all()
             
             servicos_lista = []
-            for row in result:
+            for servico_obra_real, servico in servicos_obra_real:
                 servicos_lista.append({
-                    'id': row.id,
-                    'nome': row.nome,
-                    'descricao': row.descricao or '',
-                    'categoria': row.categoria,
-                    'unidade_medida': row.unidade_medida,
-                    'custo_unitario': row.custo_unitario,
-                    'total_subatividades': int(row.total_subatividades_ativas or 0),
-                    'total_subatividades_possiveis': int(row.total_subatividades_possiveis or 0),
-                    'progresso': round(float(row.progresso_medio or 0), 1),
-                    'ativo': True
+                    'id': servico.id,
+                    'nome': servico.nome,
+                    'descricao': servico.descricao or '',
+                    'categoria': servico.categoria,
+                    'unidade_medida': servico.unidade_medida,
+                    'custo_unitario': servico.custo_unitario,
+                    'quantidade_planejada': float(servico_obra_real.quantidade_planejada),
+                    'quantidade_executada': float(servico_obra_real.quantidade_executada),
+                    'percentual_concluido': float(servico_obra_real.percentual_concluido),
+                    'status': servico_obra_real.status,
+                    'prioridade': servico_obra_real.prioridade,
+                    'valor_total_planejado': float(servico_obra_real.valor_total_planejado),
+                    'valor_total_executado': float(servico_obra_real.valor_total_executado),
+                    'progresso': round(float(servico_obra_real.percentual_concluido), 1),
+                    'ativo': True,
+                    'data_inicio_planejada': servico_obra_real.data_inicio_planejada.isoformat() if servico_obra_real.data_inicio_planejada else None,
+                    'data_fim_planejada': servico_obra_real.data_fim_planejada.isoformat() if servico_obra_real.data_fim_planejada else None,
+                    'observacoes': servico_obra_real.observacoes or ''
                 })
             
-            print(f"✅ {len(servicos_lista)} serviços PRINCIPAIS encontrados para obra {obra_id}")
+            print(f"✅ {len(servicos_lista)} serviços encontrados na NOVA TABELA para obra {obra_id}")
             return servicos_lista
             
         except SQLAlchemyError as sql_error:
@@ -5907,120 +5907,67 @@ def adicionar_servico_obra():
         
         print(f"✅ SERVIÇO ENCONTRADO: {servico.nome}")
         
-        # LÓGICA SIMPLES: Sempre criar RDO inicial quando adicionar serviço
-        print(f"🆕 ADICIONANDO SERVIÇO À OBRA COM RDO INICIAL")
+        # ===== NOVO SISTEMA: USAR TABELA SERVICO_OBRA_REAL =====
+        print(f"🆕 ADICIONANDO SERVIÇO À NOVA TABELA servico_obra_real")
         
-        # Verificar se RDO existe para esta obra
+        # Verificar se serviço já está associado à obra
+        servico_existente = ServicoObraReal.query.filter_by(
+            obra_id=obra_id,
+            servico_id=servico_id,
+            admin_id=admin_id
+        ).first()
+        
+        if servico_existente:
+            print(f"⚠️ SERVIÇO JÁ ASSOCIADO À OBRA")
+            return jsonify({'success': False, 'message': 'Serviço já vinculado a esta obra'}), 400
+        
+        # Criar novo registro na tabela servico_obra_real
         from datetime import date
         data_hoje = date.today()
         
-        # Tentar encontrar RDO de hoje primeiro
-        rdo_existente = RDO.query.filter_by(
-            obra_id=obra_id, 
-            data_relatorio=data_hoje
-        ).first()
+        # Obter dados do formulário ou usar padrões
+        quantidade_planejada = float(data.get('quantidade_planejada', 1.0))
+        valor_unitario = float(data.get('valor_unitario', servico.custo_unitario or 0.0))
         
-        # Se não encontrou, tentar RDO mais recente
-        if not rdo_existente:
-            rdo_existente = RDO.query.filter_by(obra_id=obra_id).order_by(RDO.data_relatorio.desc()).first()
-        
-        # Só criar novo se realmente não existir
-        if not rdo_existente:
-            print(f"📝 CRIANDO NOVO RDO PARA A OBRA {obra_id}")
-            import time
-            timestamp = str(int(time.time()))[-6:]
-            
-            rdo_existente = RDO(
-                numero_rdo=f"RDO-{obra_id}-{data_hoje.strftime('%Y%m%d')}-{timestamp}",
-                obra_id=obra_id,
-                data_relatorio=data_hoje,
-                status='Rascunho',
-                admin_id=admin_id,
-                criado_por_id=admin_id
-            )
-            db.session.add(rdo_existente)
-            db.session.flush()  # Para obter o ID do RDO
-            print(f"✅ RDO CRIADO COM ID: {rdo_existente.id}")
-        else:
-            print(f"♻️ REUTILIZANDO RDO EXISTENTE: {rdo_existente.id}")
-        
-        # Buscar subatividades padrão do serviço na tabela subatividade_mestre
-        from models import SubatividadeMestre
-        
-        subatividades_mestre = SubatividadeMestre.query.filter_by(
-            servico_id=servico_id, 
-            admin_id=admin_id, 
+        novo_servico_obra = ServicoObraReal(
+            obra_id=obra_id,
+            servico_id=servico_id,
+            quantidade_planejada=quantidade_planejada,
+            quantidade_executada=0.0,
+            percentual_concluido=0.0,
+            valor_unitario=valor_unitario,
+            valor_total_planejado=quantidade_planejada * valor_unitario,
+            valor_total_executado=0.0,
+            status='Não Iniciado',
+            prioridade=3,  # Prioridade média por padrão
+            data_inicio_planejada=data_hoje,
+            observacoes=f'Serviço adicionado automaticamente em {data_hoje.strftime("%d/%m/%Y")}',
+            admin_id=admin_id,
             ativo=True
-        ).order_by(SubatividadeMestre.ordem_padrao).all()
+        )
         
-        if subatividades_mestre:
-            print(f"📋 ENCONTRADAS {len(subatividades_mestre)} SUBATIVIDADES MESTRE")
-            for subatividade in subatividades_mestre:
-                # Verificar se subatividade já existe para evitar duplicatas
-                existe_sub = RDOServicoSubatividade.query.filter_by(
-                    rdo_id=rdo_existente.id,
-                    servico_id=servico_id,
-                    nome_subatividade=subatividade.nome,
-                    ativo=True
-                ).first()
-                
-                if not existe_sub:
-                    rdo_servico_sub = RDOServicoSubatividade(
-                        rdo_id=rdo_existente.id,
-                        servico_id=servico_id,
-                        nome_subatividade=subatividade.nome,
-                        descricao_subatividade=subatividade.descricao or f"Subatividade {subatividade.nome}",
-                        percentual_conclusao=0.0,
-                        observacoes_tecnicas=f'RDO inicial criado para {subatividade.nome} - 0%',
-                        ordem_execucao=subatividade.ordem_padrao,
-                        ativo=True,
-                        admin_id=admin_id
-                    )
-                    db.session.add(rdo_servico_sub)
-                    print(f"  ✅ Subatividade INICIAL '{subatividade.nome}' com 0% adicionada")
-                else:
-                    print(f"  ⚠️ Subatividade '{subatividade.nome}' já existe, pulando")
-        else:
-            # Fallback: criar uma subatividade genérica se não existir no mestre
-            print(f"⚠️ NENHUMA SUBATIVIDADE MESTRE ENCONTRADA - criando genérica inicial")
-            
-            # Verificar se já existe genérica
-            existe_generica = RDOServicoSubatividade.query.filter_by(
-                rdo_id=rdo_existente.id,
-                servico_id=servico_id,
-                ativo=True
-            ).first()
-            
-            if not existe_generica:
-                rdo_servico_sub = RDOServicoSubatividade(
-                    rdo_id=rdo_existente.id,
-                    servico_id=servico_id,
-                    nome_subatividade=f"{servico.nome} - Execução Inicial",
-                    descricao_subatividade=f"RDO inicial do serviço {servico.nome}",
-                    percentual_conclusao=0.0,
-                    observacoes_tecnicas='RDO inicial criado automaticamente - 0%',
-                    ativo=True,
-                    admin_id=admin_id
-                )
-                db.session.add(rdo_servico_sub)
-                print(f"✅ SUBATIVIDADE INICIAL GENÉRICA com 0% ADICIONADA À SESSÃO")
-            else:
-                print(f"⚠️ Subatividade genérica já existe, pulando")
+        db.session.add(novo_servico_obra)
         
         print(f"💾 FAZENDO COMMIT DA TRANSAÇÃO")
         db.session.commit()
         print(f"✅ COMMIT REALIZADO COM SUCESSO")
         
-        # Verificar se o registro foi realmente salvo (na tabela RDO)
-        verificacao = RDOServicoSubatividade.query.filter_by(servico_id=servico_id, admin_id=admin_id, ativo=True).first()
+        # Verificar se o registro foi realmente salvo na nova tabela
+        verificacao = ServicoObraReal.query.filter_by(
+            obra_id=obra_id, 
+            servico_id=servico_id, 
+            admin_id=admin_id,
+            ativo=True
+        ).first()
+        
         if verificacao:
-            print(f"✅ VERIFICAÇÃO: Subatividade RDO salva com ID {verificacao.id}")
+            print(f"✅ VERIFICAÇÃO: Serviço salvo na nova tabela com ID {verificacao.id}")
         else:
-            print(f"❌ VERIFICAÇÃO: Subatividade RDO não encontrada após commit!")
+            print(f"❌ VERIFICAÇÃO: Serviço não encontrado na nova tabela após commit!")
         
         return jsonify({
             'success': True, 
-            'message': 'Serviço adicionado à obra com sucesso',
+            'message': 'Serviço adicionado à obra com sucesso (nova tabela)',
             'servico': {
                 'id': servico.id,
                 'nome': servico.nome,
