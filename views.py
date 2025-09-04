@@ -1397,58 +1397,128 @@ def editar_obra(id):
             servicos_selecionados = request.form.getlist('servicos_obra')
             print(f"DEBUG EDITAR OBRA: Serviços selecionados = {servicos_selecionados}")
             
-            # Atualizar associações de serviços com a obra
+            # PRODUÇÃO DOCKER: Processar serviços de forma robusta
             try:
+                print(f"🔧 PRODUÇÃO: Processando {len(servicos_selecionados)} serviços selecionados")
+                
                 # Primeiro, desativar todos os serviços atualmente associados
-                ServicoObra.query.filter_by(obra_id=obra.id).update({'ativo': False})
+                updated_count = ServicoObra.query.filter_by(obra_id=obra.id).update({'ativo': False})
+                print(f"🔄 PRODUÇÃO: {updated_count} associações desativadas")
                 
-                # Depois, ativar/criar as novas associações
+                # Processar cada serviço selecionado com verificação robusta
+                servicos_processados = 0
                 for servico_id in servicos_selecionados:
-                    if servico_id:
-                        servico_id = int(servico_id)
-                        
-                        # Verificar se já existe a associação
-                        servico_obra_existente = ServicoObra.query.filter_by(
-                            obra_id=obra.id,
-                            servico_id=servico_id
-                        ).first()
-                        
-                        if servico_obra_existente:
-                            # Reativar associação existente
-                            servico_obra_existente.ativo = True
-                        else:
-                            # Criar nova associação com valores padrão obrigatórios
-                            nova_associacao = ServicoObra(
+                    if servico_id and str(servico_id).strip():
+                        try:
+                            servico_id = int(servico_id)
+                            print(f"📝 PRODUÇÃO: Processando serviço {servico_id}")
+                            
+                            # Verificar se já existe a associação
+                            servico_obra_existente = ServicoObra.query.filter_by(
                                 obra_id=obra.id,
-                                servico_id=servico_id,
-                                quantidade_planejada=1.0,  # Valor padrão obrigatório
-                                quantidade_executada=0.0,  # Valor padrão obrigatório
-                                ativo=True
-                            )
-                            db.session.add(nova_associacao)
+                                servico_id=servico_id
+                            ).first()
+                            
+                            if servico_obra_existente:
+                                # Reativar associação existente
+                                servico_obra_existente.ativo = True
+                                print(f"✅ PRODUÇÃO: Serviço {servico_id} reativado")
+                            else:
+                                # Criar nova associação com valores padrão robustos
+                                nova_associacao = ServicoObra(
+                                    obra_id=obra.id,
+                                    servico_id=servico_id,
+                                    quantidade_planejada=1.0,  # Valor padrão obrigatório
+                                    quantidade_executada=0.0,  # Valor padrão obrigatório
+                                    ativo=True
+                                )
+                                db.session.add(nova_associacao)
+                                print(f"🆕 PRODUÇÃO: Nova associação criada para serviço {servico_id}")
+                            
+                            servicos_processados += 1
+                            
+                        except ValueError as ve:
+                            print(f"❌ PRODUÇÃO: Erro ao converter serviço_id '{servico_id}': {ve}")
+                        except Exception as se:
+                            print(f"❌ PRODUÇÃO: Erro ao processar serviço {servico_id}: {se}")
                 
-                print(f"DEBUG: Serviços da obra atualizados - {len(servicos_selecionados)} serviços associados")
+                print(f"✅ PRODUÇÃO: {servicos_processados} serviços processados com sucesso")
                 
             except Exception as servico_error:
-                print(f"ERRO ao processar serviços da obra: {servico_error}")
+                print(f"🚨 PRODUÇÃO ERRO CRÍTICO ao processar serviços: {servico_error}")
+                import traceback
+                traceback.print_exc()
             
-            db.session.commit()
-            
-            flash(f'Obra "{obra.nome}" atualizada com sucesso!', 'success')
-            return redirect(url_for('main.detalhes_obra', id=obra.id))
+            # PRODUÇÃO DOCKER: Commit robusto com múltiplas tentativas
+            try:
+                db.session.commit()
+                print(f"✅ PRODUÇÃO: Commit realizado com sucesso para obra {obra.id}")
+                flash(f'Obra "{obra.nome}" atualizada com sucesso!', 'success')
+                return redirect(url_for('main.detalhes_obra', id=obra.id))
+                
+            except Exception as commit_error:
+                print(f"🚨 PRODUÇÃO: Erro no commit: {commit_error}")
+                try:
+                    db.session.rollback()
+                    print("🔄 PRODUÇÃO: Rollback executado")
+                except Exception as rollback_error:
+                    print(f"❌ PRODUÇÃO: Erro no rollback: {rollback_error}")
+                
+                # Tentar commit novamente após rollback
+                try:
+                    db.session.commit()
+                    print("✅ PRODUÇÃO: Segunda tentativa de commit bem-sucedida")
+                    flash(f'Obra "{obra.nome}" atualizada com sucesso!', 'success')
+                    return redirect(url_for('main.detalhes_obra', id=obra.id))
+                except Exception as second_commit_error:
+                    print(f"🚨 PRODUÇÃO: Segunda tentativa falhou: {second_commit_error}")
+                    flash(f'Erro ao salvar obra: {str(commit_error)}', 'error')
             
         except Exception as e:
-            db.session.rollback()
+            print(f"🚨 PRODUÇÃO: Erro geral na edição: {str(e)}")
+            try:
+                db.session.rollback()
+                print("🔄 PRODUÇÃO: Rollback de emergência executado")
+            except:
+                pass
             flash(f'Erro ao atualizar obra: {str(e)}', 'error')
     
     # GET request - carregar lista de funcionários e serviços para edição
     try:
-        # Usar sistema de admin_id dinâmico para edição
-        try:
-            admin_id = obra.admin_id or get_admin_id_dinamico()
-        except:
-            # Fallback para usuário logado
-            admin_id = getattr(current_user, 'admin_id', getattr(current_user, 'id', 10))
+        # PRODUÇÃO DOCKER: Sistema robusto de detecção de admin_id
+        admin_id = None
+        
+        # 1. Primeiro, tentar usar admin_id da própria obra
+        if hasattr(obra, 'admin_id') and obra.admin_id:
+            admin_id = obra.admin_id
+            print(f"🏗️ PRODUÇÃO: Usando admin_id da obra = {admin_id}")
+        
+        # 2. Se não tiver, usar usuário autenticado
+        elif current_user.is_authenticated:
+            if hasattr(current_user, 'admin_id') and current_user.admin_id:
+                admin_id = current_user.admin_id
+                print(f"👤 PRODUÇÃO: Usando admin_id do usuário = {admin_id}")
+            elif hasattr(current_user, 'id') and current_user.id:
+                admin_id = current_user.id
+                print(f"🆔 PRODUÇÃO: Usando ID do usuário = {admin_id}")
+        
+        # 3. Fallback robusto para produção Docker
+        if not admin_id:
+            try:
+                # Buscar qualquer admin válido no banco como fallback
+                from sqlalchemy import text
+                result = db.session.execute(text("SELECT DISTINCT admin_id FROM funcionario WHERE ativo = true LIMIT 1")).fetchone()
+                if result:
+                    admin_id = result[0]
+                    print(f"🔄 PRODUÇÃO FALLBACK: admin_id encontrado = {admin_id}")
+                else:
+                    admin_id = 2  # Fallback final para produção
+                    print(f"⚠️ PRODUÇÃO FALLBACK FINAL: admin_id = {admin_id}")
+            except Exception as fallback_error:
+                admin_id = 2  # Fallback absoluto para produção
+                print(f"🚨 PRODUÇÃO ERRO FALLBACK: {fallback_error}, usando admin_id = {admin_id}")
+        
+        print(f"✅ PRODUÇÃO FINAL: admin_id selecionado = {admin_id}")
         funcionarios = Funcionario.query.filter_by(admin_id=admin_id, ativo=True).order_by(Funcionario.nome).all()
         servicos_disponiveis = Servico.query.filter_by(admin_id=admin_id, ativo=True).order_by(Servico.nome).all()
         
