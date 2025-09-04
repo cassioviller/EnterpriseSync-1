@@ -4506,12 +4506,34 @@ def api_ultimo_rdo_dados_corrigida(obra_id):
             
             servicos_dados = []
             for servico in servicos_obra:
+                # Buscar subatividades do serviço
+                try:
+                    subatividades = SubatividadeMestre.query.filter_by(
+                        servico_id=servico.id,
+                        admin_id=admin_id,
+                        ativo=True
+                    ).all()
+                    
+                    subatividades_dados = []
+                    for sub in subatividades:
+                        subatividades_dados.append({
+                            'id': sub.id,
+                            'nome': sub.nome,
+                            'percentual': 0,  # Primeira RDO = 0%
+                            'descricao': getattr(sub, 'descricao', '')
+                        })
+                    
+                    print(f"✅ Serviço {servico.nome}: {len(subatividades_dados)} subatividades carregadas")
+                except Exception as e:
+                    print(f"⚠️ Erro ao carregar subatividades do serviço {servico.id}: {e}")
+                    subatividades_dados = []
+                
                 servico_data = {
                     'id': servico.id,
                     'nome': servico.nome,
                     'percentual': 0,
                     'categoria': getattr(servico, 'categoria', 'Não categorizado'),
-                    'subatividades': []
+                    'subatividades': subatividades_dados
                 }
                 servicos_dados.append(servico_data)
             
