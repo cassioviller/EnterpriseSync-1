@@ -490,7 +490,7 @@ function renderizarCardServico(servico, isPrimeiraRDO = false) {
     const corCategoria = obterCorCategoria(servico.categoria);
     
     let html = `
-        <div class="service-card">
+        <div class="service-card" data-servico-id="${servico.id}">
             <div class="card-header bg-light">
                 <div class="d-flex justify-content-between align-items-center">
                     <div>
@@ -513,16 +513,28 @@ function renderizarCardServico(servico, isPrimeiraRDO = false) {
         html += '<div class="row">';
         servico.subatividades.forEach((sub, index) => {
             const percentual = isPrimeiraRDO ? 0 : (sub.percentual || 0);
+            const inputId = `sub_${servico.id}_${sub.id || index}_percentual`;
+            const inputName = `subatividade[${servico.id}][${sub.id || index}][percentual]`;
+            
             html += `
-                <div class="col-md-6 mb-2">
-                    <div class="d-flex justify-content-between align-items-center mb-1">
-                        <small class="fw-medium">${sub.nome}</small>
-                        <small class="text-muted">${percentual}%</small>
+                <div class="col-md-6 mb-3">
+                    <label for="${inputId}" class="form-label small fw-medium">${sub.nome}</label>
+                    <div class="input-group input-group-sm">
+                        <input type="number" 
+                               id="${inputId}"
+                               name="${inputName}" 
+                               class="form-control subatividade-input" 
+                               value="${percentual}" 
+                               min="0" 
+                               max="100" 
+                               step="0.1"
+                               data-servico-id="${servico.id}"
+                               data-sub-id="${sub.id || index}"
+                               onchange="atualizarProgressoServico(${servico.id})">
+                        <span class="input-group-text">%</span>
                     </div>
-                    <div class="progress" style="height: 6px;">
-                        <div class="progress-bar ${obterCorProgress(percentual)}" 
-                             style="width: ${percentual}%"></div>
-                    </div>
+                    <input type="hidden" name="subatividade[${servico.id}][${sub.id || index}][nome]" value="${sub.nome}">
+                    <input type="hidden" name="subatividade[${servico.id}][${sub.id || index}][descricao]" value="${sub.descricao || ''}">
                 </div>
             `;
         });
@@ -561,6 +573,64 @@ function obterCorProgress(percentual) {
     if (percentual >= 50) return 'bg-warning';
     if (percentual >= 25) return 'bg-secondary';
     return 'bg-light';
+}
+
+// === ATUALIZAÇÃO DINÂMICA DE PROGRESSO ===
+function atualizarProgressoServico(servicoId) {
+    const servicoCard = document.querySelector(`[data-servico-id="${servicoId}"]`);
+    if (!servicoCard) return;
+    
+    const inputs = servicoCard.querySelectorAll('.subatividade-input');
+    let totalProgress = 0;
+    let validInputs = 0;
+    
+    inputs.forEach(input => {
+        const value = parseFloat(input.value) || 0;
+        if (value >= 0 && value <= 100) {
+            totalProgress += value;
+            validInputs++;
+        }
+    });
+    
+    const progressoMedio = validInputs > 0 ? (totalProgress / validInputs) : 0;
+    
+    // Atualizar barra de progresso
+    const progressBar = servicoCard.querySelector('.progress-bar');
+    const progressText = servicoCard.querySelector('.text-muted');
+    
+    if (progressBar && progressText) {
+        progressBar.style.width = `${progressoMedio}%`;
+        progressBar.className = `progress-bar ${obterCorProgress(progressoMedio)}`;
+        progressText.textContent = `${progressoMedio.toFixed(1)}% concluído`;
+    }
+    
+    logSystem('debug', `Progresso atualizado para serviço ${servicoId}: ${progressoMedio.toFixed(1)}%`);
+}
+
+// === COLETA DE DADOS DO FORMULÁRIO ===
+function coletarDadosSubatividades() {
+    const subatividades = [];
+    const inputs = document.querySelectorAll('.subatividade-input');
+    
+    inputs.forEach(input => {
+        const servicoId = input.dataset.servicoId;
+        const subId = input.dataset.subId;
+        const nome = document.querySelector(`input[name="subatividade[${servicoId}][${subId}][nome]"]`)?.value || '';
+        const descricao = document.querySelector(`input[name="subatividade[${servicoId}][${subId}][descricao]"]`)?.value || '';
+        const percentual = parseFloat(input.value) || 0;
+        
+        if (nome && percentual >= 0) {
+            subatividades.push({
+                servico_id: servicoId,
+                subatividade_id: subId,
+                nome: nome,
+                descricao: descricao,
+                percentual: percentual
+            });
+        }
+    });
+    
+    return subatividades;
 }
 
 // === ESTADOS DA INTERFACE ===
@@ -630,9 +700,98 @@ function exibirErro(mensagem) {
     `;
 }
 
+// === SUBMISSÃO DO FORMULÁRIO ===
+async function submeterFormularioRDO(event) {
+    event.preventDefault();
+    
+    const form = document.getElementById('formNovoRDO');
+    const formData = new FormData(form);
+    
+    // Validação básica
+    const obraId = formData.get('obra_id');
+    const dataRelatorio = formData.get('data_relatorio');
+    const local = formData.get('local');
+    
+    if (!obraId || !dataRelatorio || !local) {
+        alert('⚠️ Por favor, preencha todos os campos obrigatórios');
+        return;
+    }
+    
+    logSystem('info', 'Iniciando submissão do formulário RDO', {
+        obra_id: obraId,
+        data: dataRelatorio,
+        local: local
+    });
+    
+    // Mostrar indicador de carregamento
+    const submitBtn = document.querySelector('button[type="submit"]');
+    const originalText = submitBtn.innerHTML;
+    submitBtn.disabled = true;
+    submitBtn.innerHTML = '<div class="loading-spinner me-2"></div>Salvando RDO...';
+    
+    try {
+        const response = await fetch('/rdo/criar', {
+            method: 'POST',
+            body: formData
+        });
+        
+        const result = await response.text(); // Pode ser JSON ou redirect
+        
+        if (response.ok) {
+            logSystem('success', 'RDO salvo com sucesso');
+            
+            // Mostrar mensagem de sucesso
+            alert('✅ RDO criado com sucesso!');
+            
+            // Redirecionar para lista de RDOs
+            window.location.href = '/rdo';
+        } else {
+            throw new Error(`Erro HTTP: ${response.status}`);
+        }
+        
+    } catch (error) {
+        logSystem('error', 'Falha ao salvar RDO', error);
+        alert(`❌ Erro ao salvar RDO: ${error.message}`);
+        
+        // Restaurar botão
+        submitBtn.disabled = false;
+        submitBtn.innerHTML = originalText;
+    }
+}
+
+// === VALIDAÇÃO DE FORMULÁRIO ===
+function validarFormulario() {
+    const form = document.getElementById('formNovoRDO');
+    const inputs = form.querySelectorAll('input[required], select[required]');
+    let valid = true;
+    
+    inputs.forEach(input => {
+        if (!input.value.trim()) {
+            input.classList.add('is-invalid');
+            valid = false;
+        } else {
+            input.classList.remove('is-invalid');
+            input.classList.add('is-valid');
+        }
+    });
+    
+    return valid;
+}
+
 // === INICIALIZAÇÃO ===
 document.addEventListener('DOMContentLoaded', function() {
     logSystem('success', 'Sistema RDO com Maestria Digital carregado com sucesso');
+    
+    // Configurar evento de submissão
+    const form = document.getElementById('formNovoRDO');
+    form.addEventListener('submit', submeterFormularioRDO);
+    
+    // Configurar validação em tempo real
+    const inputs = form.querySelectorAll('input, select, textarea');
+    inputs.forEach(input => {
+        input.addEventListener('blur', validarFormulario);
+        input.addEventListener('change', validarFormulario);
+    });
     
     // Auto-carregar dados se obra já estiver selecionada
     const obraSelect = document.getElementById('obra_id');
