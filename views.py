@@ -1448,13 +1448,14 @@ def obter_servicos_da_obra(obra_id, admin_id=None):
             obra = Obra.query.get(obra_id)
             admin_id = get_admin_id_robusta(obra)
         
-        # Consulta principal
+        # Consulta principal (incluir registros sem admin_id para compatibilidade com produção)
         query = text("""
             SELECT s.id, s.nome, s.descricao, s.categoria, s.unidade_medida, s.custo_unitario,
                    so.quantidade_planejada, so.quantidade_executada, so.ativo
             FROM servico s
             JOIN servico_obra so ON s.id = so.servico_id
-            WHERE so.obra_id = :obra_id AND so.ativo = true AND s.admin_id = :admin_id
+            WHERE so.obra_id = :obra_id AND so.ativo = true 
+              AND (s.admin_id = :admin_id OR so.admin_id IS NULL)
             ORDER BY s.nome
         """)
         
@@ -5672,6 +5673,7 @@ def adicionar_servico_obra():
                     servico_obra_existente.admin_id = admin_id
                     print(f"✅ ADMIN_ID CORRIGIDO: {admin_id}")
         else:
+            print(f"🆕 CRIANDO NOVA ASSOCIAÇÃO")
             # Criar nova associação (usando apenas campos que existem na tabela)
             servico_obra = ServicoObra(
                 obra_id=obra_id,
@@ -5682,9 +5684,24 @@ def adicionar_servico_obra():
                 ativo=True
             )
             
+            # Adicionar admin_id se o modelo suportar
+            if hasattr(servico_obra, 'admin_id'):
+                servico_obra.admin_id = admin_id
+                print(f"✅ ADMIN_ID DEFINIDO: {admin_id}")
+            
             db.session.add(servico_obra)
+            print(f"✅ REGISTRO ADICIONADO À SESSÃO")
         
+        print(f"💾 FAZENDO COMMIT DA TRANSAÇÃO")
         db.session.commit()
+        print(f"✅ COMMIT REALIZADO COM SUCESSO")
+        
+        # Verificar se o registro foi realmente salvo
+        verificacao = ServicoObra.query.filter_by(obra_id=obra_id, servico_id=servico_id, ativo=True).first()
+        if verificacao:
+            print(f"✅ VERIFICAÇÃO: Registro salvo com ID {verificacao.id}")
+        else:
+            print(f"❌ VERIFICAÇÃO: Registro não encontrado após commit!")
         
         return jsonify({
             'success': True, 
