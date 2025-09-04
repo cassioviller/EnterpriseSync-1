@@ -2914,6 +2914,8 @@ def rdos():
 
 # ===== ROTAS ESPECÍFICAS PARA FUNCIONÁRIOS - RDO =====
 
+
+
 @main_bp.route('/rdo/excluir/<int:rdo_id>', methods=['POST', 'GET'])
 @funcionario_required
 def excluir_rdo(rdo_id):
@@ -3859,6 +3861,8 @@ def api_percentuais_ultimo_rdo(obra_id):
     except Exception as e:
         print(f"ERRO API ATIVIDADES OBRA: {str(e)}")
         return jsonify({'error': 'Erro interno'}), 500
+
+
 
 @main_bp.route('/rdo/novo')
 @funcionario_required
@@ -5113,28 +5117,291 @@ def api_test_ultimo_rdo_dados(obra_id):
 
 @main_bp.route('/api/rdo/servicos-obra/<int:obra_id>')
 @funcionario_required
-def api_rdo_servicos_obra_temp(obra_id):
-    """API temporária que retorna lista vazia enquanto corrigimos o problema"""
+def api_rdo_servicos_obra(obra_id):
+    """API para carregar serviços dinamicamente baseado na obra selecionada"""
     try:
-        admin_id = get_admin_id_dinamico()
+        # Usar sistema robusto para admin_id
+        admin_id = get_admin_id_robusta()
+        print(f"✅ API RDO SERVIÇOS OBRA: Admin_id via sistema robusto - admin_id={admin_id}")
+        
+        # Verificar se obra pertence ao admin
         obra = Obra.query.filter_by(id=obra_id, admin_id=admin_id).first()
         if not obra:
             return jsonify({'error': 'Obra não encontrada', 'success': False}), 404
-            
-        print(f"⚠️ API RDO SERVIÇOS: Obra {obra.nome} SEM serviços cadastrados - lista vazia")
+        
+        # Buscar serviços associados à obra
+        servicos_obra = db.session.query(ServicoObra, Servico).join(
+            Servico, ServicoObra.servico_id == Servico.id
+        ).filter(
+            ServicoObra.obra_id == obra_id,
+            ServicoObra.ativo == True,
+            Servico.ativo == True
+        ).all()
+        
+        servicos_data = []
+        
+        # Se não há serviços específicos, retornar lista vazia - NÃO CARREGAR TODOS OS SERVIÇOS
+        if not servicos_obra:
+            print(f"⚠️ OBRA {obra_id} SEM SERVIÇOS CADASTRADOS - Retornando lista vazia")
+            return jsonify({
+                'success': True,
+                'obra_id': obra_id,
+                'obra_nome': obra.nome,
+                'servicos': [],
+                'message': 'Nenhum serviço cadastrado nesta obra'
+            })
+        
+        # Processar serviços específicos da obra
+        for servico_obra, servico in servicos_obra:
+            # Buscar subatividades mestre para este serviço
+            try:
+                print(f"DEBUG API: Buscando subatividades para serviço {servico.id} ({servico.nome}) - admin_id: {admin_id}")
+                
+                # Buscar subatividades sem filtro de admin_id primeiro
+                subatividades_all = SubatividadeMestre.query.filter_by(
+                    servico_id=servico.id,
+                    ativo=True
+                ).order_by(SubatividadeMestre.ordem_padrao).all()
+                
+                print(f"DEBUG API: Encontradas {len(subatividades_all)} subatividades para serviço {servico.nome}")
+                
+                # Se não encontrou, buscar por admin_id específico
+                if not subatividades_all:
+                    subatividades_all = SubatividadeMestre.query.filter_by(
+                        servico_id=servico.id,
+                        admin_id=admin_id,
+                        ativo=True
+                    ).order_by(SubatividadeMestre.ordem_padrao).all()
+                    print(f"DEBUG API: Com admin_id {admin_id}: {len(subatividades_all)} subatividades")
+                
+                subatividades_data = []
+                for sub in subatividades_all:
+                    subatividades_data.append({
+                        'id': sub.id,
+                        'nome': sub.nome,
+                        'descricao': sub.descricao or '',
+                        'unidade_medida': 'UN',  # Campo fixo, não existe na tabela
+                        'percentual_heranca': 0
+                    })
+                    print(f"DEBUG API: Subatividade: {sub.nome}")
+                    
+                    # Se ainda não encontrou, criar subatividades padrão
+                    if not subatividades_data:
+                        print(f"DEBUG API: Criando subatividades padrão para {servico.nome}")
+                        subatividades_padrao = [
+                            f'{servico.nome} - Preparação',
+                            f'{servico.nome} - Execução', 
+                            f'{servico.nome} - Acabamento',
+                            f'{servico.nome} - Finalização'
+                        ]
+                        
+                        for i, nome_sub in enumerate(subatividades_padrao):
+                            subatividades_data.append({
+                                'id': f"{servico.id}{i+1:02d}",
+                                'nome': nome_sub,
+                                'descricao': f'Etapa {i+1} do serviço {servico.nome}',
+                                'unidade_medida': 'UN',
+                                'percentual_heranca': 0
+                            })
+                    
+            except Exception as e:
+                print(f"ERRO CARREGAR SUBATIVIDADES PARA SERVIÇO {servico.id}: {e}")
+                    # Fallback para subatividades simples
+                    subatividades_data = [
+                        {
+                            'id': f"{servico.id}01",
+                            'nome': f'{servico.nome} - Execução',
+                            'descricao': f'Execução do serviço {servico.nome}',
+                            'unidade_medida': 'UN',
+                            'percentual_heranca': 0
+                        }
+                    ]
+                
+                servico_data = {
+                    'id': servico.id,
+                    'nome': servico.nome,
+                    'categoria': servico.categoria or 'Geral',
+                    'unidade_medida': servico.unidade_medida or 'UN',
+                    'subatividades': subatividades_data
+                }
+                servicos_data.append(servico_data)
+        
+        print(f"DEBUG API: Retornando {len(servicos_data)} serviços para obra {obra.nome}")
+        
         return jsonify({
             'success': True,
-            'obra_id': obra_id,
-            'obra_nome': obra.nome,
-            'servicos': [],
-            'message': 'Nenhum serviço cadastrado nesta obra'
+            'obra': {'id': obra.id, 'nome': obra.nome},
+            'servicos': servicos_data,
+            'total': len(servicos_data)
         })
+        
     except Exception as e:
-        print(f"ERRO API RDO SERVIÇOS: {e}")
+        print(f"ERRO API RDO SERVIÇOS OBRA: {str(e)}")
+        import traceback
+        traceback.print_exc()
         return jsonify({'error': 'Erro interno', 'success': False}), 500
 
-def salvar_subatividades_temp():  # Função temporária para conter código órfão
-    pass
+@main_bp.route('/api/rdo/herdar-percentuais/<int:obra_id>')
+@funcionario_required
+def api_rdo_herdar_percentuais(obra_id):
+    """API para herdar percentuais do RDO mais recente da obra"""
+    try:
+        # Verificar se obra pertence ao admin do funcionário
+        obra = Obra.query.filter_by(id=obra_id, admin_id=current_user.admin_id).first()
+        if not obra:
+            return jsonify({'error': 'Obra não encontrada', 'success': False}), 404
+        
+        # Buscar o RDO mais recente da obra (excluindo rascunhos)
+        ultimo_rdo = RDO.query.filter_by(
+            obra_id=obra_id
+        ).filter(
+            RDO.status.in_(['Finalizado', 'Em Aprovação'])
+        ).order_by(RDO.data_relatorio.desc()).first()
+        
+        if not ultimo_rdo:
+            return jsonify({
+                'success': True,
+                'message': 'Nenhum RDO anterior encontrado',
+                'heranca': []
+            })
+        
+        # Buscar subatividades do último RDO
+        subatividades_anteriores = RDOServicoSubatividade.query.filter_by(
+            rdo_id=ultimo_rdo.id,
+            ativo=True
+        ).all()
+        
+        heranca_data = []
+        for sub in subatividades_anteriores:
+            heranca_data.append({
+                'servico_id': sub.servico_id,
+                'servico_nome': sub.servico.nome if sub.servico else None,
+                'nome_subatividade': sub.nome_subatividade,
+                'percentual_anterior': sub.percentual_conclusao,
+                'descricao_subatividade': sub.descricao_subatividade,
+                'observacoes_tecnicas': sub.observacoes_tecnicas,
+                'ordem_execucao': sub.ordem_execucao
+            })
+        
+        return jsonify({
+            'success': True,
+            'ultimo_rdo': {
+                'id': ultimo_rdo.id,
+                'numero_rdo': ultimo_rdo.numero_rdo,
+                'data_relatorio': ultimo_rdo.data_relatorio.strftime('%Y-%m-%d')
+            },
+            'heranca': heranca_data,
+            'total': len(heranca_data)
+        })
+        
+    except Exception as e:
+        print(f"ERRO API RDO HERDAR PERCENTUAIS: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': 'Erro interno', 'success': False}), 500
+
+@main_bp.route('/api/test/rdo/salvar-subatividades', methods=['POST'])
+def api_test_rdo_salvar_subatividades():
+    """API TEST para salvar subatividades do RDO com validações avançadas"""
+    try:
+        from rdo_validations import RDOValidator, RDOBusinessRules, RDOAuditLog
+        
+        data = request.get_json()
+        rdo_id = data.get('rdo_id')
+        obra_id = data.get('obra_id')
+        data_relatorio = data.get('data_relatorio')
+        subatividades = data.get('subatividades', [])
+        admin_id = 10  # Usar admin_id padrão para teste
+        
+        # Validações básicas
+        if not rdo_id and not obra_id:
+            return jsonify({'error': 'RDO ID ou Obra ID obrigatório', 'success': False}), 400
+        
+        # Se é criação de novo RDO
+        if not rdo_id and obra_id:
+            # Validar regras de data
+            try:
+                data_obj = datetime.strptime(data_relatorio, '%Y-%m-%d').date()
+                RDOValidator.validate_date_rules(data_obj, obra_id)
+                RDOValidator.validate_obra_status(obra_id, admin_id)
+            except Exception as e:
+                return jsonify({'error': str(e), 'success': False}), 400
+            
+            # Criar novo RDO
+            novo_rdo = RDO()
+            novo_rdo.obra_id = obra_id
+            novo_rdo.data_relatorio = data_obj
+            novo_rdo.numero_rdo = RDOBusinessRules.generate_rdo_number(obra_id)
+            novo_rdo.status = 'Rascunho'
+            novo_rdo.admin_id = admin_id
+            # Buscar um funcionário existente do admin para o teste
+            funcionario_teste = Funcionario.query.filter_by(admin_id=admin_id).first()
+            novo_rdo.criado_por_id = funcionario_teste.id if funcionario_teste else None
+            novo_rdo.responsavel_tecnico = f'Funcionário Teste (ID: 15)'
+            
+            db.session.add(novo_rdo)
+            db.session.commit()
+            rdo_id = novo_rdo.id
+            
+            # Log de auditoria
+            RDOAuditLog.log_rdo_creation(rdo_id, 15)
+        
+        # Validar subatividades
+        validation_errors = []
+        warnings = []
+        alerts = []
+        
+        for sub_data in subatividades:
+            try:
+                percentual = float(sub_data.get('percentual_conclusao', 0))
+                servico_id = sub_data.get('servico_id')
+                servico_nome = sub_data.get('servico_nome', 'N/A')
+                subatividade_nome = sub_data.get('nome_subatividade', '')
+                
+                # Validações avançadas
+                RDOValidator.validate_percentage(percentual)
+                RDOValidator.validate_percentage_progression(
+                    obra_id, servico_id, percentual, servico_nome, subatividade_nome
+                )
+                
+            except Exception as e:
+                validation_errors.append(str(e))
+        
+        # Se houve erros de validação, retornar sem salvar
+        if validation_errors:
+            return jsonify({
+                'success': False,
+                'errors': validation_errors,
+                'message': 'Corrija os erros antes de salvar'
+            }), 400
+        
+        # Gerar alertas e avisos
+        alerts = RDOValidator.get_completion_alerts(subatividades)
+        gap_warning = RDOValidator.validate_long_gap_warning(obra_id)
+        if gap_warning['warning']:
+            warnings.append(gap_warning)
+        
+        # Validações de sequência lógica
+        for servico_nome in set(sub.get('servico_nome', '') for sub in subatividades):
+            servico_subs = [sub for sub in subatividades if sub.get('servico_nome') == servico_nome]
+            seq_warnings = RDOValidator.validate_logical_sequence(servico_subs, servico_nome)
+            warnings.extend(seq_warnings)
+        
+        return jsonify({
+            'success': True,
+            'message': 'Validações concluídas com sucesso',
+            'rdo_id': rdo_id,
+            'alerts': alerts,
+            'warnings': warnings,
+            'suggestions': RDOBusinessRules.suggest_next_activities(obra_id),
+            'overall_progress': RDOBusinessRules.calculate_overall_progress(obra_id)
+        })
+        
+    except Exception as e:
+        print(f"ERRO API TEST RDO SALVAR: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': 'Erro interno', 'success': False}), 500
 
 @main_bp.route('/api/rdo/salvar-subatividades', methods=['POST'])
 @funcionario_required  
