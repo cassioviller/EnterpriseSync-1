@@ -5212,7 +5212,7 @@ def _processar_rdo_existente(ultimo_rdo, admin_id):
                 'timestamp': datetime.now().isoformat()
             }
         })
-        
+    
     except Exception as e:
         print(f"❌ ERRO _processar_rdo_existente: {e}")
         import traceback
@@ -5222,6 +5222,84 @@ def _processar_rdo_existente(ultimo_rdo, admin_id):
             'error': 'Falha ao processar RDO existente',
             'error_code': 'RDO_EXISTENTE_ERROR'
         }), 500
+
+@main_bp.route('/api/rdo/ultima-dados/<int:obra_id>')
+@funcionario_required
+def api_rdo_ultima_dados(obra_id):
+    """
+    API CRÍTICA: Buscar dados do último RDO de uma obra
+    Corrige erro 404 no frontend rdo_autocomplete.js
+    """
+    try:
+        # Usar admin_id robusto (mesma lógica do salvamento)
+        admin_id = get_admin_id_robusta()
+        
+        print(f"🔍 API ultima-dados: Buscando RDO para obra {obra_id}, admin_id {admin_id}")
+        
+        # Buscar último RDO da obra
+        ultimo_rdo = RDO.query.join(Obra).filter(
+            Obra.id == obra_id,
+            Obra.admin_id == admin_id
+        ).order_by(RDO.data_relatorio.desc()).first()
+        
+        if not ultimo_rdo:
+            print(f"ℹ️ Nenhum RDO encontrado para obra {obra_id}")
+            return jsonify({
+                'success': False,
+                'message': 'Nenhum RDO anterior encontrado para esta obra'
+            })
+        
+        # Buscar subatividades do último RDO
+        subatividades = RDOServicoSubatividade.query.filter_by(
+            rdo_id=ultimo_rdo.id
+        ).all()
+        
+        # Buscar funcionários do último RDO
+        funcionarios_rdo = RDOMaoObra.query.filter_by(
+            rdo_id=ultimo_rdo.id
+        ).all()
+        
+        # Montar dados dos serviços
+        servicos_data = []
+        for sub in subatividades:
+            servicos_data.append({
+                'nome': sub.nome_subatividade,
+                'percentual': float(sub.percentual_conclusao or 0),
+                'observacoes': sub.observacoes_tecnicas or ''
+            })
+        
+        # Montar dados dos funcionários
+        funcionarios_data = []
+        for func_rdo in funcionarios_rdo:
+            if func_rdo.funcionario:
+                funcionarios_data.append({
+                    'id': func_rdo.funcionario.id,
+                    'nome': func_rdo.funcionario.nome,
+                    'cargo': func_rdo.funcionario.cargo or 'Funcionário',
+                    'horas_trabalhadas': float(func_rdo.horas_trabalhadas or 8.8)
+                })
+        
+        print(f"✅ API ultima-dados: {len(servicos_data)} serviços, {len(funcionarios_data)} funcionários")
+        
+        return jsonify({
+            'success': True,
+            'ultima_rdo': {
+                'numero_rdo': ultimo_rdo.numero_rdo or f'RDO-{ultimo_rdo.id}',
+                'data_relatorio': ultimo_rdo.data_relatorio.strftime('%Y-%m-%d'),
+                'servicos': servicos_data,
+                'funcionarios': funcionarios_data,
+                'observacoes_gerais': ultimo_rdo.observacoes_gerais or ''
+            }
+        })
+        
+    except Exception as e:
+        print(f"❌ ERRO API ultima-dados: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        })
 
 def _buscar_servicos_obra_resiliente(obra_id, admin_id):
     """Busca serviços da obra com múltiplas estratégias resilientes"""
