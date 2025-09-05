@@ -5223,6 +5223,103 @@ def _processar_rdo_existente(ultimo_rdo, admin_id):
             'error_code': 'RDO_EXISTENTE_ERROR'
         }), 500
 
+@main_bp.route('/api/servicos-obra-primeira-rdo/<int:obra_id>')
+def api_servicos_obra_primeira_rdo(obra_id):
+    """
+    API ESPECÍFICA: Buscar serviços de uma obra para primeira RDO
+    Retorna serviços com subatividades para exibição em cards
+    """
+    try:
+        # CORREÇÃO CRÍTICA: Detectar admin_id baseado na obra específica
+        obra_base = db.session.query(Obra).filter_by(id=obra_id).first()
+        if not obra_base:
+            return jsonify({
+                'success': False,
+                'error': f'Obra {obra_id} não encontrada no sistema'
+            }), 404
+        
+        admin_id = obra_base.admin_id
+        print(f"🎯 CORREÇÃO: admin_id detectado pela obra {obra_id} = {admin_id}")
+        
+        print(f"🎯 API servicos-obra-primeira-rdo: obra {obra_id}, admin_id {admin_id}")
+        
+        # Verificar se obra existe e pertence ao admin
+        obra = Obra.query.filter_by(id=obra_id, admin_id=admin_id).first()
+        if not obra:
+            print(f"❌ Obra {obra_id} não encontrada para admin_id {admin_id}")
+            return jsonify({
+                'success': False,
+                'error': 'Obra não encontrada ou sem permissão de acesso'
+            }), 404
+        
+        # Buscar serviços da obra usando estratégia resiliente
+        servicos_obra = _buscar_servicos_obra_resiliente(obra_id, admin_id)
+        
+        if not servicos_obra:
+            print(f"ℹ️ Nenhum serviço encontrado para obra {obra_id}")
+            return jsonify({
+                'success': False,
+                'message': 'Nenhum serviço cadastrado para esta obra'
+            })
+        
+        # Montar dados dos serviços com suas subatividades
+        servicos_data = []
+        for servico in servicos_obra:
+            # Buscar subatividades do serviço
+            subatividades = SubatividadeMestre.query.filter_by(
+                servico_id=servico.id,
+                admin_id=admin_id,
+                ativo=True
+            ).order_by(SubatividadeMestre.ordem_padrao).all()
+            
+            subatividades_data = []
+            for sub in subatividades:
+                subatividades_data.append({
+                    'id': sub.id,
+                    'nome': sub.nome,
+                    'descricao': sub.descricao or '',
+                    'percentual': 0.0  # Sempre 0% para primeira RDO
+                })
+            
+            # Se não tem subatividades mestre, criar uma padrão
+            if not subatividades_data:
+                subatividades_data.append({
+                    'id': f'default_{servico.id}',
+                    'nome': servico.nome,
+                    'descricao': 'Execução completa do serviço',
+                    'percentual': 0.0
+                })
+            
+            servico_data = {
+                'id': servico.id,
+                'nome': servico.nome,
+                'categoria': getattr(servico, 'categoria', 'Geral'),
+                'descricao': servico.descricao or '',
+                'subatividades': subatividades_data
+            }
+            servicos_data.append(servico_data)
+        
+        print(f"✅ API servicos-obra-primeira-rdo: {len(servicos_data)} serviços encontrados")
+        
+        return jsonify({
+            'success': True,
+            'servicos': servicos_data,
+            'total_servicos': len(servicos_data),
+            'obra': {
+                'id': obra.id,
+                'nome': obra.nome
+            }
+        })
+        
+    except Exception as e:
+        print(f"❌ ERRO API servicos-obra-primeira-rdo: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
 @main_bp.route('/api/rdo/ultima-dados/<int:obra_id>')
 @funcionario_required
 def api_rdo_ultima_dados(obra_id):

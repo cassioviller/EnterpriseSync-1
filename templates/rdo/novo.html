@@ -2161,8 +2161,8 @@ function exibirMensagemSemRDOAnterior() {
 function carregarServicosParaPrimeiraRDO(obraId) {
     console.log(`🔍 PRIMEIRA RDO: Buscando serviços para obra ${obraId}`);
     
-    // Usar API de serviços da obra existente
-    fetch(`/api/servicos-obra/${obraId}`)
+    // Usar API de teste temporariamente e criar API definitiva
+    fetch(`/api/servicos-obra-primeira-rdo/${obraId}`)
         .then(response => response.json())
         .then(data => {
             console.log('📊 Serviços da obra recebidos:', data);
@@ -2197,37 +2197,92 @@ function exibirServicosParaPrimeiraRDO(servicos) {
     
     servicos.forEach((servico, index) => {
         html += `
-            <div class="col-md-6 col-lg-4 mb-3">
-                <div class="card h-100">
-                    <div class="card-header bg-light">
+            <div class="col-md-12 mb-3">
+                <div class="card">
+                    <div class="card-header bg-success text-white">
                         <h6 class="card-title mb-0">
-                            <i class="fas fa-tools text-success"></i>
+                            <i class="fas fa-tools"></i>
                             ${servico.nome || `Serviço ${index + 1}`}
                         </h6>
-                        <small class="text-muted">Categoria: ${servico.categoria || 'Geral'}</small>
+                        <small>Categoria: ${servico.categoria || 'Geral'} | Subatividades: ${servico.subatividades ? servico.subatividades.length : 1}</small>
                     </div>
                     <div class="card-body">
-                        <div class="mb-3">
-                            <label class="form-label">Percentual de Conclusão (%)</label>
-                            <input type="number" 
-                                   class="form-control" 
-                                   name="subatividade_${servico.id}_1_percentual"
-                                   min="0" 
-                                   max="100" 
-                                   value="0"
-                                   placeholder="0">
+                        <div class="row">
+        `;
+        
+        // Processar subatividades do serviço
+        if (servico.subatividades && servico.subatividades.length > 0) {
+            servico.subatividades.forEach((subatividade, subIndex) => {
+                html += `
+                    <div class="col-md-6 mb-3">
+                        <div class="card border-light">
+                            <div class="card-body">
+                                <h6 class="card-subtitle mb-2 text-muted">
+                                    <i class="fas fa-cog"></i> ${subatividade.nome}
+                                </h6>
+                                <div class="mb-2">
+                                    <label class="form-label">Percentual (%)</label>
+                                    <input type="number" 
+                                           class="form-control" 
+                                           name="subatividade_${servico.id}_${subatividade.id}_percentual"
+                                           min="0" 
+                                           max="100" 
+                                           value="0"
+                                           placeholder="0">
+                                </div>
+                                <div class="mb-2">
+                                    <label class="form-label">Observações</label>
+                                    <textarea class="form-control" 
+                                              name="subatividade_${servico.id}_${subatividade.id}_observacoes"
+                                              rows="2" 
+                                              placeholder="${subatividade.descricao || 'Observações da subatividade...'}"></textarea>
+                                </div>
+                                <!-- Campo oculto para o nome da subatividade -->
+                                <input type="hidden" 
+                                       name="nome_subatividade_${servico.id}_${subatividade.id}" 
+                                       value="${subatividade.nome}">
+                            </div>
                         </div>
-                        <div class="mb-3">
-                            <label class="form-label">Observações</label>
-                            <textarea class="form-control" 
-                                      name="subatividade_${servico.id}_1_observacoes"
-                                      rows="2" 
-                                      placeholder="Descreva o progresso ou observações..."></textarea>
+                    </div>
+                `;
+            });
+        } else {
+            // Fallback se não tem subatividades
+            html += `
+                <div class="col-md-12 mb-3">
+                    <div class="card border-light">
+                        <div class="card-body">
+                            <h6 class="card-subtitle mb-2 text-muted">
+                                <i class="fas fa-cog"></i> ${servico.nome} (Execução Completa)
+                            </h6>
+                            <div class="mb-2">
+                                <label class="form-label">Percentual de Conclusão (%)</label>
+                                <input type="number" 
+                                       class="form-control" 
+                                       name="subatividade_${servico.id}_1_percentual"
+                                       min="0" 
+                                       max="100" 
+                                       value="0"
+                                       placeholder="0">
+                            </div>
+                            <div class="mb-2">
+                                <label class="form-label">Observações</label>
+                                <textarea class="form-control" 
+                                          name="subatividade_${servico.id}_1_observacoes"
+                                          rows="2" 
+                                          placeholder="Descreva o progresso ou observações..."></textarea>
+                            </div>
+                            <input type="hidden" 
+                                   name="nome_subatividade_${servico.id}_1" 
+                                   value="${servico.nome}">
                         </div>
-                        <!-- Campo oculto para o nome do serviço -->
-                        <input type="hidden" 
-                               name="nome_subatividade_${servico.id}_1" 
-                               value="${servico.nome}">
+                    </div>
+                </div>
+            `;
+        }
+        
+        html += `
+                        </div>
                     </div>
                 </div>
             </div>
