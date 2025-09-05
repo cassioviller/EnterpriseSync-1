@@ -4366,14 +4366,17 @@ def rdo_salvar_unificado():
                 print(f"🔍 CAMPO: {chave} = {valor}")
                 if 'percentual' in chave and valor:
                     try:
-                        # CORREÇÃO: Extrair padrão servico_subatividade_percentual
+                        # CORREÇÃO CRÍTICA: Extrair servico_id REAL da obra, não do campo
                         if chave.startswith('subatividade_') and chave.endswith('_percentual'):
-                            # Formato: subatividade_118_15222_percentual -> servico_id=118, sub_id=15222
+                            # Formato: subatividade_139_17681_percentual -> servico_real_id=139, sub_id=17681
                             parts = chave.replace('subatividade_', '').replace('_percentual', '').split('_')
                             if len(parts) >= 2:
-                                servico_id = parts[0] 
+                                servico_real_id = parts[0]  # ID do serviço REAL da obra
                                 subatividade_id = parts[1]
-                                sub_id = f"{servico_id}_{subatividade_id}"
+                                sub_id = f"{servico_real_id}_{subatividade_id}"
+                                
+                                # USAR O servico_real_id para salvar corretamente
+                                servico_id = servico_real_id
                                 
                                 # Buscar nome da subatividade
                                 nome_key = f'nome_subatividade_{servico_id}_{subatividade_id}'
