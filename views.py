@@ -178,32 +178,23 @@ def dashboard():
         # Determinar admin_id - usar mesma lógica que funciona na página funcionários
         admin_id = None  # Vamos detectar dinamicamente
         
-        # DIAGNÓSTICO COMPLETO PARA PRODUÇÃO
-        print(f"🔍 DASHBOARD DEBUG PRODUÇÃO:")
-        print(f"  - current_user.is_authenticated: {getattr(current_user, 'is_authenticated', False)}")
-        print(f"  - current_user.email: {getattr(current_user, 'email', 'N/A')}")
-        print(f"  - current_user.tipo_usuario: {getattr(current_user, 'tipo_usuario', 'N/A')}")
-        print(f"  - current_user.admin_id: {getattr(current_user, 'admin_id', 'N/A')}")
-        print(f"  - current_user.id: {getattr(current_user, 'id', 'N/A')}")
+        # Determinar admin_id para produção
         
         if hasattr(current_user, 'tipo_usuario') and current_user.is_authenticated:
             if current_user.tipo_usuario == TipoUsuario.ADMIN:
                 admin_id = current_user.id
-                print(f"✅ DEBUG DASHBOARD PROD: Admin direto - admin_id={admin_id}")
             elif hasattr(current_user, 'admin_id') and current_user.admin_id:
                 admin_id = current_user.admin_id
-                print(f"✅ DEBUG DASHBOARD PROD: Via admin_id do usuário - admin_id={admin_id}")
             else:
                 # Buscar pelo email na tabela usuarios
                 try:
                     usuario_db = Usuario.query.filter_by(email=current_user.email).first()
                     if usuario_db and usuario_db.admin_id:
                         admin_id = usuario_db.admin_id
-                        print(f"✅ DEBUG DASHBOARD PROD: Via busca na tabela usuarios - admin_id={admin_id}")
                     else:
-                        print(f"⚠️ DASHBOARD PROD: Usuário não encontrado na tabela usuarios ou sem admin_id")
+                        pass
                 except Exception as e:
-                    print(f"❌ DEBUG DASHBOARD PROD: Erro ao buscar na tabela usuarios: {e}")
+                    pass
         
         # Se ainda não encontrou admin_id, detectar automaticamente
         if admin_id is None:
@@ -321,24 +312,20 @@ def dashboard():
                 ).fetchone()
                 admin_id = funcionarios_admin[0] if funcionarios_admin else 1
             
-        print(f"✅ DEBUG DASHBOARD KPIs: Usando admin_id={admin_id} para cálculos")
         
         # Verificar estrutura completa do banco para diagnóstico
         try:
             # Diagnóstico completo do banco de dados
-            print(f"🔍 DIAGNÓSTICO COMPLETO DO BANCO DE DADOS:")
             
             # Total de funcionários por admin_id
             funcionarios_por_admin = db.session.execute(
                 text("SELECT admin_id, COUNT(*) as total, COUNT(CASE WHEN ativo = true THEN 1 END) as ativos FROM funcionario GROUP BY admin_id ORDER BY admin_id")
             ).fetchall()
-            print(f"  📊 FUNCIONÁRIOS POR ADMIN: {[(row[0], row[1], row[2]) for row in funcionarios_por_admin]}")
             
             # Total de obras por admin_id
             obras_por_admin = db.session.execute(
                 text("SELECT admin_id, COUNT(*) as total FROM obra GROUP BY admin_id ORDER BY admin_id")
             ).fetchall()
-            print(f"  🏗️ OBRAS POR ADMIN: {[(row[0], row[1]) for row in obras_por_admin]}")
             
             # Verificar estrutura da tabela registro_ponto primeiro
             try:
@@ -346,14 +333,12 @@ def dashboard():
                     text("SELECT column_name FROM information_schema.columns WHERE table_name = 'registro_ponto' ORDER BY ordinal_position")
                 ).fetchall()
                 colunas_str = [col[0] for col in colunas_ponto]
-                print(f"  🔍 COLUNAS REGISTRO_PONTO: {colunas_str}")
                 
                 # Usar coluna correta baseada na estrutura real
                 coluna_data = 'data' if 'data' in colunas_str else 'data_registro'
                 registros_ponto = db.session.execute(
                     text(f"SELECT COUNT(*) FROM registro_ponto WHERE {coluna_data} >= '2025-07-01' AND {coluna_data} <= '2025-07-31'")
                 ).fetchone()
-                print(f"  ⏰ REGISTROS DE PONTO (Jul/2025): {registros_ponto[0] if registros_ponto else 0}")
             except Exception as e:
                 print(f"  ❌ ERRO registros ponto: {e}")
             
@@ -391,7 +376,6 @@ def dashboard():
         
         # Buscar todos os funcionários ativos para o admin_id detectado
         funcionarios_dashboard = Funcionario.query.filter_by(admin_id=admin_id, ativo=True).all()
-        print(f"✅ DEBUG DASHBOARD KPIs: Encontrados {len(funcionarios_dashboard)} funcionários para admin_id={admin_id}")
         
         # Se não encontrou funcionários, buscar o admin_id com mais dados
         if len(funcionarios_dashboard) == 0:
@@ -401,7 +385,6 @@ def dashboard():
                 print(f"📊 TODOS OS ADMINS DISPONÍVEIS: {[(row[0], row[1]) for row in todos_admins]}")
                 if todos_admins and len(todos_admins) > 0:
                     admin_correto = todos_admins[0][0]
-                    print(f"🔄 CORREÇÃO AUTOMÁTICA: Mudando de admin_id={admin_id} para admin_id={admin_correto} (tem {todos_admins[0][1]} funcionários)")
                     admin_id = admin_correto
                     funcionarios_dashboard = Funcionario.query.filter_by(admin_id=admin_id, ativo=True).all()
                     print(f"✅ APÓS CORREÇÃO: {len(funcionarios_dashboard)} funcionários encontrados")
@@ -421,7 +404,6 @@ def dashboard():
             
             # Refazer busca de funcionários
             funcionarios_dashboard = Funcionario.query.filter_by(admin_id=admin_id, ativo=True).all()
-            print(f"✅ APÓS ROLLBACK: {len(funcionarios_dashboard)} funcionários encontrados")
             
             for func in funcionarios_dashboard:
                 try:
@@ -474,16 +456,11 @@ def dashboard():
             ).all()
             custo_alimentacao_real += sum(o.valor or 0 for o in outros_alimentacao)
             
-            print(f"DEBUG ALIMENTAÇÃO DASHBOARD: Registros={sum(a.valor or 0 for a in alimentacao_registros):.2f}, Outros={sum(o.valor or 0 for o in outros_alimentacao):.2f}, Total={custo_alimentacao_real:.2f}")
         except Exception as e:
             print(f"Erro cálculo alimentação: {e}")
             custo_alimentacao_real = 0
         
         # Debug dos valores calculados
-        print(f"DEBUG DASHBOARD: {len(funcionarios_dashboard)} funcionários")
-        print(f"DEBUG DASHBOARD: Custo total calculado: R$ {total_custo_real:.2f}")
-        print(f"DEBUG DASHBOARD: Horas totais: {total_horas_real}")
-        print(f"DEBUG DASHBOARD: Extras totais: {total_extras_real}")
         
         # Calcular KPIs específicos corretamente
         # 1. Custos de Transporte (veículos) - usar campo data_custo para filtrar
@@ -496,7 +473,6 @@ def dashboard():
                 CustoVeiculo.data_custo <= data_fim
             ).all()
             custo_transporte_real = sum(c.valor or 0 for c in custos_veiculo)
-            print(f"DEBUG Custos veículo: R$ {custo_transporte_real:.2f}")
         except Exception as e:
             print(f"Erro custos veículo: {e}")
             # Fallback: usar todos os registros se filtro falhar
