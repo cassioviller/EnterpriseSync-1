@@ -3,6 +3,9 @@ from flask_login import login_required, current_user, login_user, logout_user
 from werkzeug.security import check_password_hash, generate_password_hash
 from models import db, Usuario, TipoUsuario, Funcionario, Obra, RDO, RDOMaoObra, RDOEquipamento, RDOOcorrencia, RDOFoto, AlocacaoEquipe, Servico, ServicoObra, ServicoObraReal, RDOServicoSubatividade, SubatividadeMestre
 from auth import super_admin_required, admin_required, funcionario_required
+
+# Importar API RDO Refatorada
+from rdo_api_refactored import rdo_api_bp
 from datetime import datetime, date, timedelta
 from sqlalchemy import func, desc, or_, and_, text
 import os
