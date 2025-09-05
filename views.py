@@ -5432,14 +5432,35 @@ def api_rdo_ultima_dados(obra_id):
             rdo_id=ultimo_rdo.id
         ).all()
         
-        # Montar dados dos serviços
-        servicos_data = []
+        # Montar dados dos serviços CORRIGIDO - agrupar subatividades por serviço
+        servicos_agrupados = {}
+        
+        # Agrupar subatividades por serviço
         for sub in subatividades:
-            servicos_data.append({
-                'nome': sub.nome_subatividade,
-                'percentual': float(sub.percentual_conclusao or 0),
-                'observacoes': sub.observacoes_tecnicas or ''
-            })
+            servico_id = sub.servico_id
+            if servico_id not in servicos_agrupados:
+                # Buscar dados do serviço
+                servico = Servico.query.get(servico_id)
+                if servico:
+                    servicos_agrupados[servico_id] = {
+                        'id': servico.id,
+                        'nome': servico.nome,
+                        'categoria': getattr(servico, 'categoria', 'Geral'),
+                        'descricao': servico.descricao or '',
+                        'subatividades': []
+                    }
+            
+            # Adicionar subatividade ao serviço
+            if servico_id in servicos_agrupados:
+                servicos_agrupados[servico_id]['subatividades'].append({
+                    'id': sub.id,
+                    'nome': sub.nome_subatividade,
+                    'percentual': float(sub.percentual_conclusao or 0),
+                    'observacoes': sub.observacoes_tecnicas or ''
+                })
+        
+        # Converter para lista
+        servicos_data = list(servicos_agrupados.values())
         
         # Montar dados dos funcionários
         funcionarios_data = []
