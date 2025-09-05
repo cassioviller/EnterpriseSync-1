@@ -4294,31 +4294,52 @@ def rdo_salvar_unificado():
             subatividades_map = {}
             
             for chave, valor in form_data.items():
+                print(f"🔍 CAMPO: {chave} = {valor}")
                 if 'percentual' in chave and valor:
                     try:
-                        # Extrair ID da subatividade de qualquer formato
-                        if chave.startswith('subatividade_'):
-                            # Formato: subatividade_34_1_percentual -> ID: 34_1
-                            parts = chave.replace('subatividade_', '').replace('_percentual', '')
-                            sub_id = parts
+                        # CORREÇÃO: Extrair padrão servico_subatividade_percentual
+                        if chave.startswith('subatividade_') and chave.endswith('_percentual'):
+                            # Formato: subatividade_118_15222_percentual -> servico_id=118, sub_id=15222
+                            parts = chave.replace('subatividade_', '').replace('_percentual', '').split('_')
+                            if len(parts) >= 2:
+                                servico_id = parts[0] 
+                                subatividade_id = parts[1]
+                                sub_id = f"{servico_id}_{subatividade_id}"
+                                
+                                # Buscar nome da subatividade
+                                nome_key = f'nome_subatividade_{servico_id}_{subatividade_id}'
+                                nome_sub = form_data.get(nome_key, f'Subatividade {subatividade_id}')
+                            else:
+                                sub_id = parts[0] if parts else chave
+                                servico_id = parts[0] if parts else "1"
+                                subatividade_id = parts[1] if len(parts) > 1 else "1"
+                                nome_sub = f'Subatividade {sub_id}'
                         elif chave.startswith('nome_subatividade_'):
                             # Formato: nome_subatividade_1_percentual -> ID: 1
                             sub_id = chave.split('_')[2]
+                            servico_id = "1"
+                            subatividade_id = sub_id
+                            nome_sub = f'Subatividade {sub_id}'
                         else:
                             # Formato genérico
                             sub_id = chave.replace('_percentual', '').split('_')[-1]
+                            servico_id = "1"
+                            subatividade_id = sub_id
+                            nome_sub = f'Subatividade {sub_id}'
                         
                         percentual = float(valor) if valor else 0
                         
                         if percentual > 0:  # Só processar se tem percentual
                             # Buscar observações correspondentes
-                            obs_key_1 = f'subatividade_{sub_id}_observacoes'
+                            obs_key_1 = f'subatividade_{servico_id}_{subatividade_id}_observacoes'
                             obs_key_2 = f'observacoes_subatividade_{sub_id}'
                             observacoes = form_data.get(obs_key_1, '') or form_data.get(obs_key_2, '')
                             
                             subatividades_map[sub_id] = {
                                 'id': sub_id,
-                                'nome': f'Subatividade {sub_id}',
+                                'servico_id': servico_id,
+                                'subatividade_id': subatividade_id,
+                                'nome': nome_sub,
                                 'percentual': percentual,
                                 'observacoes': observacoes
                             }
