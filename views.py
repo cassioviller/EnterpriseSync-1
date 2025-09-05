@@ -3233,11 +3233,21 @@ def visualizar_rdo(id):
         peso_por_subatividade = 0
         
         try:
-            # PASSO 1: Buscar TODAS as subatividades PLANEJADAS da obra (cadastro)
-            # Buscar serviços cadastrados para esta obra
+            # PASSO 1: Buscar APENAS os serviços QUE TÊM SUBATIVIDADES no RDO
+            # Buscar serviços com subatividades executadas nesta obra
             from models import ServicoObra, SubatividadeMestre
             
-            servicos_da_obra = ServicoObra.query.filter_by(obra_id=rdo.obra_id).all()
+            # Buscar apenas serviços que foram utilizados nos RDOs desta obra
+            servicos_utilizados = db.session.query(
+                RDOServicoSubatividade.servico_id
+            ).join(RDO).filter(
+                RDO.obra_id == rdo.obra_id
+            ).distinct().subquery()
+            
+            servicos_da_obra = ServicoObra.query.filter(
+                ServicoObra.obra_id == rdo.obra_id,
+                ServicoObra.servico_id.in_(servicos_utilizados)
+            ).all()
             
             total_subatividades_obra = 0
             servicos_encontrados = []
