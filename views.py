@@ -5363,14 +5363,10 @@ def _buscar_servicos_obra_resiliente(obra_id, admin_id):
         except Exception as e:
             print(f"⚠️ ERRO ESTRATÉGIA_2: {e}")
         
-        # ESTRATÉGIA 3: Buscar todos os serviços do admin_id (fallback)
-        servicos_todos = Servico.query.filter_by(
-            admin_id=admin_id, 
-            ativo=True
-        ).all()
-        
-        print(f"✅ ESTRATÉGIA_3: {len(servicos_todos)} serviços encontrados para admin_id={admin_id}")
-        return servicos_todos
+        # ESTRATÉGIA 3 REMOVIDA: Estava retornando todos os serviços do admin_id
+        # Isso causava exibição de serviços não relacionados à obra
+        print(f"❌ NENHUM SERVIÇO ENCONTRADO para obra_id={obra_id}, admin_id={admin_id}")
+        return []
         
     except Exception as e:
         print(f"❌ ERRO CRÍTICO _buscar_servicos_obra_resiliente: {e}")
