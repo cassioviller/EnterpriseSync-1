@@ -5248,10 +5248,50 @@ def _extrair_subatividades_form(form_data, operation_id):
         })
         
         if not subatividades:
-            mastery_observer.add_step(operation_id, 'EXTRACTION_FALLBACK_ATTEMPTED', {
-                'reason': 'No subactivities found with current method'
+            mastery_observer.add_step(operation_id, 'EXTRACTION_FALLBACK_PRIMEIRA_RDO', {
+                'reason': 'Trying fallback for primeira RDO format'
             })
-            print(f"🔍 [DEBUG:{operation_id}] trying_fallback_format...")
+            print(f"🔍 [DEBUG:{operation_id}] trying_primeira_rdo_format...")
+            
+            # FORMATO PRIMEIRA RDO: subatividade_SERVICO_INDEX_percentual
+            for key, value in form_data.items():
+                if key.startswith('subatividade_') and key.endswith('_percentual'):
+                    try:
+                        # Extrair servico_id e index: subatividade_121_0_percentual -> servico=121, index=0
+                        parts = key.replace('subatividade_', '').replace('_percentual', '').split('_')
+                        
+                        if len(parts) == 2:  # servico_id e index
+                            servico_id = int(parts[0])
+                            index = int(parts[1])
+                            percentual = float(value) if value else 0.0
+                            
+                            # Buscar nome da subatividade (campo nome correspondente)
+                            nome_key = f"subatividade_{servico_id}_{index}_nome"
+                            nome = form_data.get(nome_key, f'Subatividade {index}')
+                            
+                            # Buscar descrição
+                            desc_key = f"subatividade_{servico_id}_{index}_descricao"
+                            descricao = form_data.get(desc_key, '')
+                            
+                            subatividade_data = {
+                                'servico_id': servico_id,
+                                'nome': nome,
+                                'percentual': percentual,
+                                'descricao': descricao,
+                                'index': index
+                            }
+                            
+                            subatividades.append(subatividade_data)
+                            print(f"✅ [PRIMEIRA_RDO:{operation_id}] subatividade_extracted: {subatividade_data}")
+                            
+                    except (ValueError, IndexError) as e:
+                        print(f"❌ [PRIMEIRA_RDO:{operation_id}] parse_error: {key} -> {str(e)}")
+                        continue
+            
+            mastery_observer.add_step(operation_id, 'PRIMEIRA_RDO_EXTRACTION_COMPLETED', {
+                'subactivities_extracted': len(subatividades),
+                'extraction_method': 'PRIMEIRA_RDO_FORMAT'
+            })
             
         print(f"📊 [EXTRACT:{operation_id}] final_result: {len(subatividades)} subatividades extracted")
         return subatividades
