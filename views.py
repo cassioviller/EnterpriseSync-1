@@ -4454,36 +4454,27 @@ def rdo_salvar_unificado():
                                 subatividade_id = parts[1]
                                 sub_id = f"{servico_original_id}_{subatividade_id}"
                                 
-                                # CORREÇÃO CRÍTICA: Buscar ESPECIFICAMENTE o serviço da COBERTURA METÁLICA
-                                # Não qualquer serviço ativo, mas o que corresponde ao original
-                                servico_obra = db.session.query(ServicoObraReal).filter_by(
-                                    obra_id=obra_id,
-                                    ativo=True
-                                ).join(Servico).filter(
-                                    Servico.admin_id == admin_id_correto,
-                                    Servico.ativo == True,
-                                    Servico.id == servico_original_id  # BUSCAR ESPECÍFICO
-                                ).first()
+                                # SOLUÇÃO DIRETA: USAR SEMPRE O SERVIÇO DA ÚLTIMA RDO
+                                # Buscar qual serviço foi usado na última RDO desta obra
+                                ultimo_servico_rdo = db.session.query(RDOServicoSubatividade).join(RDO).filter(
+                                    RDO.obra_id == obra_id,
+                                    RDO.admin_id == admin_id_correto,
+                                    RDO.id != rdo.id  # Não o RDO atual sendo criado
+                                ).order_by(RDO.data_relatorio.desc()).first()
                                 
-                                # Se não encontrou o serviço específico, buscar por nome como fallback
-                                if not servico_obra:
-                                    servico_origem = Servico.query.get(servico_original_id)
-                                    if servico_origem:
-                                        servico_obra = db.session.query(ServicoObraReal).filter_by(
-                                            obra_id=obra_id,
-                                            ativo=True
-                                        ).join(Servico).filter(
-                                            Servico.admin_id == admin_id_correto,
-                                            Servico.nome == servico_origem.nome  # Buscar por nome
-                                        ).first()
-                                        print(f"🔄 BUSCA POR NOME: {servico_origem.nome}")
-                                
-                                if servico_obra and servico_obra.servico:
-                                    servico_id = servico_obra.servico.id  # ID correto 
-                                    print(f"🎯 MAPEAMENTO CORRETO: {servico_original_id} -> {servico_id} ({servico_obra.servico.nome})")
+                                if ultimo_servico_rdo:
+                                    servico_id = ultimo_servico_rdo.servico_id  # ID do serviço da última RDO
+                                    servico_nome = "Último RDO"
+                                    try:
+                                        servico_obj = Servico.query.get(servico_id)
+                                        if servico_obj:
+                                            servico_nome = servico_obj.nome
+                                    except:
+                                        pass
+                                    print(f"🎯 USANDO SERVIÇO DA ÚLTIMA RDO: {servico_original_id} -> {servico_id} ({servico_nome})")
                                 else:
-                                    print(f"⚠️ SERVIÇO {servico_original_id} NÃO ENCONTRADO NA OBRA")
-                                    servico_id = servico_original_id  # Fallback
+                                    print(f"⚠️ NENHUMA RDO ANTERIOR ENCONTRADA - usando serviço original {servico_original_id}")
+                                    servico_id = servico_original_id
                                 
                                 # Buscar nome da subatividade no banco de dados - ESTRATÉGIA MÚLTIPLA
                                 nome_sub = None
