@@ -5661,7 +5661,6 @@ def salvar_rdo_flexivel():
         
         # FASE 4: PERSISTIR COM TRANSAÇÃO ROBUSTA (Arquitetura Joris Kuypers INLINE)
         try:
-            db.session.begin()
             
             # Salvar RDO principal
             db.session.add(rdo)
