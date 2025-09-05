@@ -4389,81 +4389,8 @@ def rdo_salvar_unificado():
         
         print(f"✅ TOTAL SALVO: {subatividades_processadas} subatividades")
         
-        # MANTER CÓDIGO LEGADO COMO FALLBACK (removendo duplicação)
-        campos_personalizados = {}
-        
-        # FORMATO LEGADO: nome_subatividade_1_percentual = valor
-        for key, value in request.form.items():
-            if key.startswith('nome_subatividade_') and key.endswith('_percentual') and len(subatividades_extraidas) == 0:
-                # Extrair número: nome_subatividade_1_percentual -> 1
-                numero = key.split('_')[2]  # ['nome', 'subatividade', '1', 'percentual']
-                percentual = float(value) if value else 0
-                
-                # Sempre processar, mesmo com percentual 0
-                nome_key = f'nome_subatividade_{numero}'
-                obs_key = f'observacoes_subatividade_{numero}'
-                
-                nome = request.form.get(nome_key, '').strip()
-                observacoes = request.form.get(obs_key, '').strip()
-                
-                if nome:  # Só processar se tem nome
-                    campos_personalizados[numero] = {
-                        'nome': nome,
-                        'percentual': percentual,
-                        'observacoes': observacoes
-                    }
-        
-        # FORMATO 2: subatividade_X_percentual (formato alternativo)
-        for key, value in request.form.items():
-            if key.startswith('subatividade_') and 'percentual' in key and not key.startswith('nome_subatividade_'):
-                try:
-                    # Extrair ID: subatividade_34_1_percentual -> 34_1
-                    parts = key.replace('subatividade_', '').replace('_percentual', '')
-                    subatividade_id = parts.split('_')[0] if '_' in parts else parts
-                    percentual = float(value) if value else 0
-                    
-                    # Buscar observações correspondentes
-                    obs_key = f'subatividade_{parts}_observacoes'
-                    observacoes = request.form.get(obs_key, '').strip()
-                    
-                    # Usar ID como nome se não houver nome específico
-                    nome = f'Subatividade {subatividade_id}'
-                    
-                    if percentual > 0 or observacoes:  # Salvar se tem percentual ou observações
-                        numero = f"alt_{subatividade_id}"
-                        campos_personalizados[numero] = {
-                            'nome': nome,
-                            'percentual': percentual,
-                            'observacoes': observacoes
-                        }
-                        
-                except (ValueError, IndexError) as e:
-                    print(f"❌ [RDO_SAVE] Erro ao processar {key}: {e}")
-                    continue
-        
-        # FORMATO 3: REMOVIDO - Estava causando duplicação com sistema principal
-        
-        print(f"❌ [RDO_SAVE] CAMPOS_PERSONALIZADOS_ENCONTRADOS: {len(campos_personalizados)}")
-        for numero, dados in campos_personalizados.items():
-            print(f"   {numero}: {dados['nome']} = {dados['percentual']}%")
-        
-        # Processar campos personalizados primeiro (salvar todos, mesmo 0%)
-        for numero, dados in campos_personalizados.items():
-            rdo_servico_subativ = RDOServicoSubatividade()
-            rdo_servico_subativ.rdo_id = rdo.id
-            rdo_servico_subativ.nome_subatividade = dados['nome']
-            rdo_servico_subativ.percentual_conclusao = dados['percentual']
-            rdo_servico_subativ.observacoes_tecnicas = dados['observacoes']
-            rdo_servico_subativ.admin_id = admin_id_correto
-            # Buscar primeiro serviço disponível para este admin
-            primeiro_servico = Servico.query.filter_by(admin_id=admin_id_correto).first()
-            rdo_servico_subativ.servico_id = primeiro_servico.id if primeiro_servico else None
-            db.session.add(rdo_servico_subativ)
-            subatividades_processadas += 1
-            print(f"DEBUG MANUAL: {dados['nome']}: {dados['percentual']}% - {dados['observacoes'][:30] if dados['observacoes'] else 'Sem obs'}...")
-        
-        # SISTEMA LEGACY REMOVIDO - Estava conflitando com o sistema novo
-        # O sistema principal (linhas 4396-4418) já processa todos os campos corretamente
+        # TODOS OS SISTEMAS LEGACY REMOVIDOS - Usando apenas o sistema principal
+        # Sistema novo (linhas acima) já processa todos os campos corretamente
         
         print(f"❌ [RDO_SAVE] TOTAL_SUBATIVIDADES_PROCESSADAS: {subatividades_processadas}")
         
