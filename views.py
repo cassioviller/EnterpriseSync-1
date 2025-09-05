@@ -4235,15 +4235,22 @@ def rdo_salvar_unificado():
         print(f"DEBUG FUNCIONÁRIO: RDO {rdo.numero_rdo} criado por funcionário ID {current_user.id}")
         
         # CORREÇÃO: Processar subatividades (SISTEMA CORRIGIDO)
-        print("DEBUG CORRIGIDO: Processando subatividades do formulário...")
-        print("🔍 TODOS OS CAMPOS DO FORMULÁRIO RECEBIDOS:")
-        print(f"   Total campos: {len(request.form)}")
+        print("❌ [RDO_SAVE] INICIO_PROCESSAMENTO_SUBATIVIDADES")
+        print(f"❌ [RDO_SAVE] ADMIN_ID_USADO: {admin_id_correto}")
+        print(f"❌ [RDO_SAVE] TOTAL_CAMPOS_FORM: {len(request.form)}")
+        print("❌ [RDO_SAVE] TODOS_CAMPOS_FORM:")
+        
         campos_subatividades = []
+        campos_percentual = []
         for key, value in request.form.items():
             print(f"   {key} = {value}")
             if key.startswith('nome_subatividade_'):
                 campos_subatividades.append(key)
-        print(f"🎯 Campos de subatividades encontrados: {len(campos_subatividades)} - {campos_subatividades}")
+            elif key.startswith('subatividade_') and 'percentual' in key:
+                campos_percentual.append((key, value))
+                
+        print(f"❌ [RDO_SAVE] CAMPOS_SUBATIVIDADES_NOME: {len(campos_subatividades)} - {campos_subatividades}")
+        print(f"❌ [RDO_SAVE] CAMPOS_SUBATIVIDADES_PERCENTUAL: {len(campos_percentual)} - {campos_percentual}")
         
         # DEBUG ESPECÍFICO: Verificar se os dados estão sendo processados
         if campos_subatividades:
@@ -4342,7 +4349,17 @@ def rdo_salvar_unificado():
                     print(f"Erro ao processar subatividade {key}: {e}")
                     continue
         
-        print(f"✅ TOTAL SUBATIVIDADES PROCESSADAS: {subatividades_processadas}")
+        print(f"❌ [RDO_SAVE] TOTAL_SUBATIVIDADES_PROCESSADAS: {subatividades_processadas}")
+        
+        # VALIDAÇÃO ESPECÍFICA PARA PRODUÇÃO
+        if subatividades_processadas == 0:
+            print("❌ [RDO_SAVE] ERRO_VALIDACAO_PRODUCAO:")
+            print(f"   - Nenhuma subatividade processada")
+            print(f"   - Campos nome encontrados: {len(campos_subatividades)}")
+            print(f"   - Campos percentual encontrados: {len(campos_percentual)}")
+            print(f"   - Admin_ID: {admin_id_correto}")
+            flash('Erro de validação: Nenhuma subatividade encontrada no formulário', 'error')
+            return redirect(url_for('main.rdo_novo_unificado'))
         
         # Processar atividades antigas se não há subatividades (compatibilidade)
         atividades_json = request.form.get('atividades', '[]')
