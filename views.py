@@ -1590,17 +1590,24 @@ def processar_servicos_obra(obra_id, servicos_selecionados):
                         print(f"⚠️ Serviço {servico_id_int} não encontrado ou não pertence ao admin {admin_id}")
                         continue
                     
-                    # Verificar se serviço já existe na nova tabela
+                    # Verificar se serviço já existe na nova tabela (ativo ou inativo)
                     servico_existente = ServicoObraReal.query.filter_by(
                         obra_id=obra_id,
                         servico_id=servico_id_int,
-                        admin_id=admin_id,
-                        ativo=True
-                    ).first()
+                        admin_id=admin_id
+                    ).first()  # Busca qualquer registro, ativo ou não
                     
                     if servico_existente:
-                        print(f"⚠️ Serviço {servico.nome} já está associado à obra")
-                        continue
+                        # Se existe mas está inativo, reativar
+                        if not servico_existente.ativo:
+                            servico_existente.ativo = True
+                            servico_existente.observacoes = f'Serviço reativado via edição em {data_hoje.strftime("%d/%m/%Y")}'
+                            print(f"🔄 Serviço {servico.nome} reativado na obra")
+                            servicos_processados += 1
+                            continue
+                        else:
+                            print(f"⚠️ Serviço {servico.nome} já está ativo na obra")
+                            continue
                     
                     # Criar novo registro na tabela servico_obra_real
                     novo_servico_obra = ServicoObraReal(
