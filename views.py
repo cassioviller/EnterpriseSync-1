@@ -2839,9 +2839,15 @@ def rdos():
                     ).all()
                     
                     if subatividades:
-                        # Calcular média das subatividades (máximo 100%)
-                        soma_percentuais = sum(min(sub.percentual_conclusao or 0, 100) for sub in subatividades)
-                        progresso_real = min(soma_percentuais / len(subatividades), 100)
+                        # USAR MESMA FÓRMULA DO SISTEMA INTERNO: soma_percentuais / (100 * total_subatividades) * 100
+                        soma_percentuais = sum(sub.percentual_conclusao or 0 for sub in subatividades)
+                        total_subatividades = len(subatividades)
+                        
+                        # Fórmula correta igual ao sistema de visualização
+                        progresso_real = round((soma_percentuais / (100 * total_subatividades)) * 100, 1) if total_subatividades > 0 else 0
+                        progresso_real = min(progresso_real, 100)  # Máximo 100%
+                        
+                        print(f"DEBUG CARD PROGRESSO RDO {rdo.id}: {soma_percentuais}% soma ÷ (100×{total_subatividades}) = {progresso_real}%")
                     else:
                         progresso_real = 0
                     
