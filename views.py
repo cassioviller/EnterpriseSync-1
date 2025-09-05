@@ -4264,10 +4264,10 @@ def rdo_salvar_unificado():
         
         subatividades_processadas = 0
         
-        # NOVO: Também processar campos de texto livre (nomes personalizados)
+        # CORREÇÃO CRÍTICA: Aceitar múltiplos formatos de campos
         campos_personalizados = {}
         
-        # Formato: nome_subatividade_1_percentual = valor, nome_subatividade_1 = nome
+        # FORMATO 1: nome_subatividade_1_percentual = valor
         for key, value in request.form.items():
             if key.startswith('nome_subatividade_') and key.endswith('_percentual'):
                 # Extrair número: nome_subatividade_1_percentual -> 1
@@ -4287,6 +4287,53 @@ def rdo_salvar_unificado():
                         'percentual': percentual,
                         'observacoes': observacoes
                     }
+        
+        # FORMATO 2: subatividade_X_percentual (formato alternativo)
+        for key, value in request.form.items():
+            if key.startswith('subatividade_') and 'percentual' in key and not key.startswith('nome_subatividade_'):
+                try:
+                    # Extrair ID: subatividade_34_1_percentual -> 34_1
+                    parts = key.replace('subatividade_', '').replace('_percentual', '')
+                    subatividade_id = parts.split('_')[0] if '_' in parts else parts
+                    percentual = float(value) if value else 0
+                    
+                    # Buscar observações correspondentes
+                    obs_key = f'subatividade_{parts}_observacoes'
+                    observacoes = request.form.get(obs_key, '').strip()
+                    
+                    # Usar ID como nome se não houver nome específico
+                    nome = f'Subatividade {subatividade_id}'
+                    
+                    if percentual > 0 or observacoes:  # Salvar se tem percentual ou observações
+                        numero = f"alt_{subatividade_id}"
+                        campos_personalizados[numero] = {
+                            'nome': nome,
+                            'percentual': percentual,
+                            'observacoes': observacoes
+                        }
+                        
+                except (ValueError, IndexError) as e:
+                    print(f"❌ [RDO_SAVE] Erro ao processar {key}: {e}")
+                    continue
+        
+        # FORMATO 3: Qualquer campo que termine com percentual (captura geral)
+        for key, value in request.form.items():
+            if 'percentual' in key and key not in [campo for campo in campos_personalizados]:
+                try:
+                    percentual = float(value) if value else 0
+                    if percentual > 0:  # Só salvar se tem percentual
+                        numero = f"gen_{len(campos_personalizados)}"
+                        campos_personalizados[numero] = {
+                            'nome': f'Atividade {key}',
+                            'percentual': percentual,
+                            'observacoes': ''
+                        }
+                except:
+                    continue
+        
+        print(f"❌ [RDO_SAVE] CAMPOS_PERSONALIZADOS_ENCONTRADOS: {len(campos_personalizados)}")
+        for numero, dados in campos_personalizados.items():
+            print(f"   {numero}: {dados['nome']} = {dados['percentual']}%")
         
         # Processar campos personalizados primeiro (salvar todos, mesmo 0%)
         for numero, dados in campos_personalizados.items():
