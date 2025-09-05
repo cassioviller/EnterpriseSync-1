@@ -4364,7 +4364,7 @@ def rdo_salvar_unificado():
             
             for chave, valor in form_data.items():
                 print(f"🔍 CAMPO: {chave} = {valor}")
-                if 'percentual' in chave and valor:
+                if 'percentual' in chave:
                     try:
                         # CORREÇÃO CRÍTICA: Extrair servico_id REAL da obra, não do campo
                         if chave.startswith('subatividade_') and chave.endswith('_percentual'):
@@ -4401,7 +4401,7 @@ def rdo_salvar_unificado():
                         
                         percentual = float(valor) if valor else 0
                         
-                        if percentual > 0:  # Só processar se tem percentual
+                        if percentual >= 0:  # Processar TODAS as subatividades (incluindo 0%)
                             # Buscar observações correspondentes
                             obs_key_1 = f'subatividade_{servico_id}_{subatividade_id}_observacoes'
                             obs_key_2 = f'observacoes_subatividade_{sub_id}'
