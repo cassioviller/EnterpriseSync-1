@@ -5265,13 +5265,22 @@ def _extrair_subatividades_form(form_data, operation_id):
                             index = int(parts[1])
                             percentual = float(value) if value else 0.0
                             
-                            # Buscar nome da subatividade (campo nome correspondente)
-                            nome_key = f"subatividade_{servico_id}_{index}_nome"
-                            nome = form_data.get(nome_key, f'Subatividade {index}')
+                            # Para primeira RDO, buscar subatividade template do banco
+                            from models import ServicoObraReal
+                            subatividade_template = db.session.query(ServicoObraReal).filter_by(
+                                servico_id=servico_id,
+                                admin_id=admin_id
+                            ).offset(index).first()
                             
-                            # Buscar descrição
-                            desc_key = f"subatividade_{servico_id}_{index}_descricao"
-                            descricao = form_data.get(desc_key, '')
+                            if subatividade_template:
+                                nome = subatividade_template.nome_subatividade
+                                descricao = subatividade_template.descricao_subatividade or ''
+                            else:
+                                # Fallback para campos do formulário
+                                nome_key = f"subatividade_{servico_id}_{index}_nome"
+                                nome = form_data.get(nome_key, f'Subatividade {index}')
+                                desc_key = f"subatividade_{servico_id}_{index}_descricao"
+                                descricao = form_data.get(desc_key, '')
                             
                             subatividade_data = {
                                 'servico_id': servico_id,
