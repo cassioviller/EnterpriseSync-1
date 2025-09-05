@@ -3429,9 +3429,13 @@ def visualizar_rdo(id):
         # NOVA LÓGICA: Mostrar TODOS os serviços da obra (executados + não executados)
         subatividades_por_servico = {}
         
-        # PASSO 1: Adicionar todos os serviços CADASTRADOS na obra (mesmo que não executados)
+        # PASSO 1: Adicionar APENAS os serviços ATIVOS da obra (NOVA TABELA)
         try:
-            servicos_cadastrados = ServicoObra.query.filter_by(obra_id=rdo.obra_id).all()
+            servicos_cadastrados = ServicoObraReal.query.filter_by(
+                obra_id=rdo.obra_id,
+                ativo=True  # FILTRAR APENAS ATIVOS
+            ).all()
+            print(f"🎯 SERVIÇOS ATIVOS ENCONTRADOS: {len(servicos_cadastrados)}")
             
             for servico_obra in servicos_cadastrados:
                 servico = Servico.query.get(servico_obra.servico_id)
@@ -3522,17 +3526,28 @@ def visualizar_rdo(id):
             print(f"ERRO AO BUSCAR SERVIÇOS CADASTRADOS: {e}")
             print(f"DEBUG: Será usado fallback com subatividades executadas apenas")
         
-        # PASSO 2: Adicionar subatividades EXECUTADAS
+        # PASSO 2: Adicionar APENAS subatividades EXECUTADAS de serviços ATIVOS
         for sub in subatividades:
             servico_id = sub.servico_id
-            if servico_id not in subatividades_por_servico:
-                subatividades_por_servico[servico_id] = {
-                    'servico': sub.servico,
-                    'subatividades': [],
-                    'subatividades_nao_executadas': []
-                }
-            sub.executada = True  # Marcar como executada
-            subatividades_por_servico[servico_id]['subatividades'].append(sub)
+            
+            # VERIFICAR SE SERVIÇO ESTÁ ATIVO NA OBRA
+            servico_ativo = ServicoObraReal.query.filter_by(
+                obra_id=rdo.obra_id,
+                servico_id=servico_id,
+                ativo=True
+            ).first()
+            
+            if servico_ativo:  # SÓ EXIBIR SE SERVIÇO ESTIVER ATIVO
+                if servico_id not in subatividades_por_servico:
+                    subatividades_por_servico[servico_id] = {
+                        'servico': sub.servico,
+                        'subatividades': [],
+                        'subatividades_nao_executadas': []
+                    }
+                sub.executada = True  # Marcar como executada
+                subatividades_por_servico[servico_id]['subatividades'].append(sub)
+            else:
+                print(f"⚠️ SUBATIVIDADE IGNORADA: Serviço {servico_id} não ativo na obra")
         
         return render_template('rdo/visualizar_rdo_moderno.html', 
                              rdo=rdo, 
