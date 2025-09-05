@@ -4823,13 +4823,21 @@ def api_funcionario_funcionarios_alias():
 def api_test_rdo_servicos_obra(obra_id):
     """API TEST para carregar serviços dinamicamente baseado na obra selecionada"""
     try:
-        # Usar admin_id padrão para teste
-        admin_id = 10
+        # CORREÇÃO CRÍTICA: Detectar admin_id baseado na obra específica
+        obra_base = db.session.query(Obra).filter_by(id=obra_id).first()
+        if not obra_base:
+            return jsonify({
+                'success': False,
+                'error': f'Obra {obra_id} não encontrada no sistema'
+            }), 404
         
-        # Verificar se obra existe
+        admin_id = obra_base.admin_id
+        print(f"🎯 API TEST CORREÇÃO: admin_id detectado pela obra {obra_id} = {admin_id}")
+        
+        # Verificar se obra existe e pertence ao admin correto
         obra = Obra.query.filter_by(id=obra_id, admin_id=admin_id).first()
         if not obra:
-            return jsonify({'error': 'Obra não encontrada', 'success': False}), 404
+            return jsonify({'error': 'Obra não encontrada ou sem permissão', 'success': False}), 404
         
         # Buscar serviços associados à obra
         servicos_obra = db.session.query(ServicoObra, Servico).join(
