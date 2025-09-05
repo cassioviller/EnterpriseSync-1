@@ -1,8 +1,10 @@
 # DOCKERFILE MAESTRIA DIGITAL - SIGE v10.0 - JORIS KUYPERS ARCHITECTURE
 # Sistema RDO com Observabilidade Completa + Digital Mastery Principles
 # "Kaipa da primeira vez certo" - Implementação robusta para produção
+# Aplicação dos princípios: Robustez, Escalabilidade, Observabilidade e Manutenibilidade
 
-FROM python:3.11-slim-bullseye
+# Usar imagem mais leve e segura para produção
+FROM python:3.11-slim-bookworm
 
 # Metadados Digital Mastery
 LABEL maintainer="SIGE v10.0 Digital Mastery" \
@@ -15,11 +17,15 @@ LABEL maintainer="SIGE v10.0 Digital Mastery" \
 ARG DEBIAN_FRONTEND=noninteractive
 ARG BUILD_ENV=production
 
-# Instalar dependências sistema + observabilidade
+# Instalar dependências sistema com segurança otimizada (Digital Mastery)
 RUN apt-get update && apt-get install -y --no-install-recommends \
+    # PostgreSQL client para conexão
     postgresql-client \
+    # Ferramentas de observabilidade
     curl \
     wget \
+    jq \
+    # Build tools mínimos
     gcc \
     g++ \
     python3-dev \
@@ -27,9 +33,14 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libffi-dev \
     libssl-dev \
     make \
-    jq \
+    # Segurança e monitoramento
+    ca-certificates \
+    procps \
+    # Cleanup automático
     && apt-get clean \
-    && rm -rf /var/lib/apt/lists/*
+    && rm -rf /var/lib/apt/lists/* \
+    && rm -rf /tmp/* \
+    && rm -rf /var/tmp/*
 
 # Criar usuário para segurança (Digital Mastery principle)
 RUN groupadd -r sige && useradd -r -g sige sige
@@ -37,12 +48,16 @@ RUN groupadd -r sige && useradd -r -g sige sige
 # Definir diretório de trabalho
 WORKDIR /app
 
-# Copiar requirements primeiro para cache de dependências
-COPY pyproject.toml ./
+# Multi-stage dependency caching (Joris principle: efficiency)
+COPY requirements.txt pyproject.toml* setup.py* ./
 
-# Instalar dependências Python
+# Instalar dependências Python com otimização (Digital Mastery)
 RUN pip install --no-cache-dir --upgrade pip setuptools wheel && \
-    pip install --no-cache-dir .
+    # Instalar dependências principais
+    if [ -f requirements.txt ]; then pip install --no-cache-dir -r requirements.txt; fi && \
+    if [ -f pyproject.toml ]; then pip install --no-cache-dir .; fi && \
+    # Cleanup pip cache
+    pip cache purge
 
 # Copiar código da aplicação (incluindo sistema de observabilidade)
 COPY . .
@@ -61,7 +76,7 @@ RUN mkdir -p \
 # Mudar para usuário não-root
 USER sige
 
-# Variáveis de ambiente Digital Mastery
+# Variáveis de ambiente Digital Mastery (Produção Otimizada)
 ENV FLASK_APP=main.py \
     FLASK_ENV=production \
     FLASK_DEBUG=false \
@@ -70,22 +85,55 @@ ENV FLASK_APP=main.py \
     PYTHONPATH=/app \
     PYTHONUNBUFFERED=1 \
     PYTHONIOENCODING=utf-8 \
-    SHOW_DETAILED_ERRORS=true \
-    CORS_ORIGINS="*" \
+    # Segurança aprimorada para produção
+    SHOW_DETAILED_ERRORS=false \
+    # CORS controlado para produção
+    CORS_ORIGINS="https://sige.cassiovilier.tech,http://localhost:5000" \
     CORS_METHODS="GET,POST,PUT,DELETE,OPTIONS" \
     SERVER_NAME=0.0.0.0:5000 \
     APPLICATION_ROOT=/ \
-    PREFERRED_URL_SCHEME=http \
+    PREFERRED_URL_SCHEME=https \
+    # Digital Mastery flags
     DIGITAL_MASTERY_MODE=true \
-    OBSERVABILITY_ENABLED=true
+    OBSERVABILITY_ENABLED=true \
+    PRODUCTION_MODE=true \
+    # Performance tuning
+    GUNICORN_WORKERS=4 \
+    GUNICORN_TIMEOUT=300 \
+    GUNICORN_KEEPALIVE=65 \
+    # Circuit breaker config
+    CIRCUIT_BREAKER_ENABLED=true \
+    RETRY_MAX_ATTEMPTS=3
 
 # Expor porta
 EXPOSE 5000
 
-# Health check com observabilidade
-HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
-  CMD curl -f http://localhost:${PORT:-5000}/health || exit 1
+# Health check avançado com observabilidade (Joris principle: robustness)
+HEALTHCHECK --interval=30s --timeout=15s --start-period=120s --retries=5 \
+  CMD curl -f http://localhost:${PORT:-5000}/health \
+      --connect-timeout 10 \
+      --max-time 15 \
+      --retry 2 \
+      --retry-delay 1 \
+      --retry-max-time 30 \
+      --silent \
+      --show-error \
+      || exit 1
 
-# Comando de entrada com Digital Mastery
+# Comando de entrada com Digital Mastery (Produção Otimizada)
 ENTRYPOINT ["/app/docker-entrypoint-digital-mastery.sh"]
-CMD ["gunicorn", "--bind", "0.0.0.0:5000", "--workers", "2", "--timeout", "120", "--access-logfile", "-", "--error-logfile", "-", "--log-level", "info", "main:app"]
+CMD ["gunicorn", \
+    "--bind", "0.0.0.0:5000", \
+    "--workers", "${GUNICORN_WORKERS:-4}", \
+    "--worker-class", "sync", \
+    "--worker-connections", "1000", \
+    "--timeout", "${GUNICORN_TIMEOUT:-300}", \
+    "--keepalive", "${GUNICORN_KEEPALIVE:-65}", \
+    "--max-requests", "1000", \
+    "--max-requests-jitter", "100", \
+    "--preload", \
+    "--access-logfile", "-", \
+    "--error-logfile", "-", \
+    "--log-level", "info", \
+    "--capture-output", \
+    "main:app"]

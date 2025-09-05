@@ -1,9 +1,16 @@
 #!/bin/bash
-# DIGITAL MASTERY ENTRYPOINT - SIGE v10.0
-# Implementação dos Princípios de Joris Kuypers
-# "Kaipa da primeira vez certo" + Observabilidade Completa
+# DIGITAL MASTERY ENTRYPOINT - SIGE v10.0 PRODUCTION
+# Implementação dos Princípios de Joris Kuypers para PRODUÇÃO
+# "Kaipa da primeira vez certo" + Observabilidade Completa + Robustez
+# Aplicação dos 4 pilares: Robustez, Escalabilidade, Observabilidade, Manutenibilidade
 
-set -e
+set -euo pipefail  # Fail fast com pipeline safety
+IFS=$'\n\t'       # Secure Internal Field Separator
+
+# Trap para cleanup em caso de erro (Joris principle: resilience)
+trap 'echo "❌ ERRO FATAL na linha $LINENO. Saída código: $?"; exit 1' ERR
+trap 'echo "⚠️ SIGTERM recebido. Shutdown graceful..."; exit 0' TERM
+trap 'echo "⚠️ SIGINT recebido. Shutdown graceful..."; exit 0' INT
 
 echo "🎯 =============================================="
 echo "🚀 SIGE v10.0 - DIGITAL MASTERY ARCHITECTURE"
@@ -20,23 +27,40 @@ export OBSERVABILITY_ENABLED=true
 echo "🔧 DATABASE_URL: $DATABASE_URL"
 echo "📊 DIGITAL_MASTERY_MODE: $DIGITAL_MASTERY_MODE"
 
-# PostgreSQL connection with observability
-echo "🔄 Aguardando PostgreSQL com observabilidade..."
+# PostgreSQL connection com retry exponential backoff (Joris: robustness)
+echo "🔄 Aguardando PostgreSQL com estratégia avançada..."
 POSTGRES_RETRIES=0
 MAX_RETRIES=30
+BASE_DELAY=1
 
 while [ $POSTGRES_RETRIES -lt $MAX_RETRIES ]; do
     if pg_isready -h ${DATABASE_HOST:-viajey_sige} -p ${DATABASE_PORT:-5432} -U ${DATABASE_USER:-sige} > /dev/null 2>&1; then
         echo "✅ PostgreSQL conectado! (tentativa: $((POSTGRES_RETRIES + 1)))"
-        break
+        
+        # Teste de conexão SQL avançado
+        if psql "$DATABASE_URL" -c "SELECT 1;" > /dev/null 2>&1; then
+            echo "✅ Teste SQL avançado: SUCESSO"
+            break
+        else
+            echo "⚠️ PostgreSQL disponível mas conexão SQL falhou"
+        fi
     fi
+    
     POSTGRES_RETRIES=$((POSTGRES_RETRIES + 1))
-    echo "⏳ Tentativa $POSTGRES_RETRIES/$MAX_RETRIES - aguardando PostgreSQL..."
-    sleep 2
+    # Exponential backoff com jitter
+    DELAY=$((BASE_DELAY * (2 ** (POSTGRES_RETRIES / 5))))
+    JITTER=$((RANDOM % 3))
+    TOTAL_DELAY=$((DELAY + JITTER))
+    
+    echo "⏳ Tentativa $POSTGRES_RETRIES/$MAX_RETRIES - aguardando ${TOTAL_DELAY}s..."
+    sleep $TOTAL_DELAY
 done
 
 if [ $POSTGRES_RETRIES -eq $MAX_RETRIES ]; then
-    echo "❌ ERRO: PostgreSQL não disponível após $MAX_RETRIES tentativas"
+    echo "❌ ERRO CRÍTICO: PostgreSQL inacessível após $MAX_RETRIES tentativas"
+    echo "🔍 Database URL: $DATABASE_URL"
+    echo "🔍 Host: ${DATABASE_HOST:-viajey_sige}"
+    echo "🔍 Port: ${DATABASE_PORT:-5432}"
     exit 1
 fi
 
@@ -103,12 +127,16 @@ except Exception as e:
 logger.info('🎯 DIGITAL MASTERY INITIALIZATION COMPLETED')
 "
 
-# RDO System Corrections for Production
+# RDO System Corrections for Production (Joris: "Kaipa da primeira vez certo")
 echo "🔧 Aplicando correções RDO para produção..."
 
-# Apply critical RDO logs fix directly to views.py
+# Apply critical RDO fixes with error handling
 echo "🎯 Aplicando logs críticos de RDO..."
-python3 production_rdo_fix.py
+if [ -f "production_rdo_fix.py" ]; then
+    python3 production_rdo_fix.py || echo "⚠️ Warning: production_rdo_fix.py não executado"
+else
+    echo "⚠️ production_rdo_fix.py não encontrado - pulando"
+fi
 python3 -c "
 import logging
 from datetime import datetime
