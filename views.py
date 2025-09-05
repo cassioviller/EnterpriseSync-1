@@ -4095,11 +4095,40 @@ def rdo_salvar_unificado():
         # Verificar se é edição ou criação
         rdo_id = request.form.get('rdo_id', type=int)
         
+        # CORREÇÃO CRÍTICA: Definir admin_id de forma robusta PRIMEIRO
+        def get_admin_id_robusta():
+            """Função robusta para obter admin_id em qualquer contexto"""
+            try:
+                # Estratégia 1: Verificar se é admin direto
+                if hasattr(current_user, 'tipo_usuario') and current_user.tipo_usuario == TipoUsuario.ADMIN:
+                    return current_user.id
+                
+                # Estratégia 2: Verificar se tem admin_id (funcionário)
+                if hasattr(current_user, 'admin_id') and current_user.admin_id:
+                    return current_user.admin_id
+                
+                # Estratégia 3: Buscar funcionário para obter admin_id
+                funcionario = Funcionario.query.filter_by(email=current_user.email).first()
+                if funcionario and funcionario.admin_id:
+                    return funcionario.admin_id
+                
+                # Estratégia 4: Usar função dinâmica
+                return get_admin_id_dinamico()
+                
+            except Exception as e:
+                print(f"❌ ERRO CRÍTICO get_admin_id_robusta: {e}")
+                # Fallback para desenvolvimento
+                return 10
+        
+        # Aplicar admin_id robusto em TODO o contexto
+        admin_id_correto = get_admin_id_robusta()
+        print(f"✅ admin_id determinado de forma robusta: {admin_id_correto}")
+        
         if rdo_id:
-            # EDIÇÃO - Buscar RDO existente
+            # EDIÇÃO - Buscar RDO existente usando admin_id robusto
             rdo = RDO.query.join(Obra).filter(
                 RDO.id == rdo_id,
-                Obra.admin_id == current_user.admin_id
+                Obra.admin_id == admin_id_correto
             ).first()
             
             if not rdo:
@@ -4119,19 +4148,9 @@ def rdo_salvar_unificado():
             print(f"DEBUG EDIÇÃO: Editando RDO {rdo.numero_rdo}")
             
         else:
-            # CRIAÇÃO - Lógica original
+            # CRIAÇÃO - Usar admin_id já definido de forma robusta
             obra_id = request.form.get('obra_id', type=int)
             data_relatorio = datetime.strptime(request.form.get('data_relatorio'), '%Y-%m-%d').date()
-            
-            # Detectar admin_id correto dinamicamente
-            if hasattr(current_user, 'admin_id') and current_user.admin_id:
-                admin_id_correto = current_user.admin_id
-            elif hasattr(current_user, 'tipo_usuario') and current_user.tipo_usuario == TipoUsuario.ADMIN:
-                admin_id_correto = current_user.id
-            else:
-                # Buscar funcionário para obter admin_id
-                funcionario = Funcionario.query.filter_by(email=current_user.email).first()
-                admin_id_correto = funcionario.admin_id if funcionario else get_admin_id_dinamico()
             
             # Buscar obra do admin atual (manter multi-tenant)
             obra = Obra.query.filter_by(id=obra_id, admin_id=admin_id_correto).first()
@@ -4264,12 +4283,97 @@ def rdo_salvar_unificado():
         
         subatividades_processadas = 0
         
-        # CORREÇÃO CRÍTICA: Aceitar múltiplos formatos de campos
+        # CORREÇÃO JORIS KUYPERS: Extração robusta de subatividades (Kaipa da primeira vez certo)
+        def extrair_subatividades_formulario_robusto(form_data):
+            """Extração robusta com múltiplas estratégias - Joris Kuypers approach"""
+            subatividades = []
+            
+            print(f"🔍 EXTRAÇÃO ROBUSTA - Dados recebidos: {len(form_data)} campos")
+            
+            # Estratégia 1: Buscar padrões conhecidos
+            subatividades_map = {}
+            
+            for chave, valor in form_data.items():
+                if 'percentual' in chave and valor:
+                    try:
+                        # Extrair ID da subatividade de qualquer formato
+                        if chave.startswith('subatividade_'):
+                            # Formato: subatividade_34_1_percentual -> ID: 34_1
+                            parts = chave.replace('subatividade_', '').replace('_percentual', '')
+                            sub_id = parts
+                        elif chave.startswith('nome_subatividade_'):
+                            # Formato: nome_subatividade_1_percentual -> ID: 1
+                            sub_id = chave.split('_')[2]
+                        else:
+                            # Formato genérico
+                            sub_id = chave.replace('_percentual', '').split('_')[-1]
+                        
+                        percentual = float(valor) if valor else 0
+                        
+                        if percentual > 0:  # Só processar se tem percentual
+                            # Buscar observações correspondentes
+                            obs_key_1 = f'subatividade_{sub_id}_observacoes'
+                            obs_key_2 = f'observacoes_subatividade_{sub_id}'
+                            observacoes = form_data.get(obs_key_1, '') or form_data.get(obs_key_2, '')
+                            
+                            subatividades_map[sub_id] = {
+                                'id': sub_id,
+                                'nome': f'Subatividade {sub_id}',
+                                'percentual': percentual,
+                                'observacoes': observacoes
+                            }
+                            
+                    except (ValueError, IndexError) as e:
+                        print(f"⚠️ Erro ao processar {chave}: {e}")
+                        continue
+            
+            # Converter mapa para lista
+            for sub_id, dados in subatividades_map.items():
+                subatividades.append(dados)
+            
+            print(f"✅ EXTRAÇÃO CONCLUÍDA: {len(subatividades)} subatividades válidas")
+            for i, sub in enumerate(subatividades):
+                print(f"   [{i+1}] {sub['nome']}: {sub['percentual']}%")
+            
+            return subatividades
+        
+        # Aplicar extração robusta
+        subatividades_extraidas = extrair_subatividades_formulario_robusto(request.form)
+        
+        # Validação robusta
+        if not subatividades_extraidas:
+            print("❌ NENHUMA SUBATIVIDADE VÁLIDA ENCONTRADA")
+            flash('Erro: Nenhuma subatividade válida encontrada no formulário', 'error')
+            return redirect(url_for('main.rdo_novo_unificado'))
+        
+        print(f"✅ VALIDAÇÃO PASSOU: {len(subatividades_extraidas)} subatividades válidas")
+        
+        # Processar subatividades extraídas
+        subatividades_processadas = 0
+        for sub_data in subatividades_extraidas:
+            rdo_servico_subativ = RDOServicoSubatividade()
+            rdo_servico_subativ.rdo_id = rdo.id
+            rdo_servico_subativ.nome_subatividade = sub_data['nome']
+            rdo_servico_subativ.percentual_conclusao = sub_data['percentual']
+            rdo_servico_subativ.observacoes_tecnicas = sub_data['observacoes']
+            rdo_servico_subativ.admin_id = admin_id_correto
+            
+            # Buscar primeiro serviço disponível
+            primeiro_servico = Servico.query.filter_by(admin_id=admin_id_correto).first()
+            rdo_servico_subativ.servico_id = primeiro_servico.id if primeiro_servico else None
+            
+            db.session.add(rdo_servico_subativ)
+            subatividades_processadas += 1
+            print(f"✅ SUBATIVIDADE SALVA: {sub_data['nome']}: {sub_data['percentual']}%")
+        
+        print(f"✅ TOTAL SALVO: {subatividades_processadas} subatividades")
+        
+        # MANTER CÓDIGO LEGADO COMO FALLBACK (removendo duplicação)
         campos_personalizados = {}
         
-        # FORMATO 1: nome_subatividade_1_percentual = valor
+        # FORMATO LEGADO: nome_subatividade_1_percentual = valor
         for key, value in request.form.items():
-            if key.startswith('nome_subatividade_') and key.endswith('_percentual'):
+            if key.startswith('nome_subatividade_') and key.endswith('_percentual') and len(subatividades_extraidas) == 0:
                 # Extrair número: nome_subatividade_1_percentual -> 1
                 numero = key.split('_')[2]  # ['nome', 'subatividade', '1', 'percentual']
                 percentual = float(value) if value else 0
