@@ -4418,19 +4418,42 @@ def rdo_salvar_unificado():
                     try:
                         # CORREÇÃO CRÍTICA: Extrair servico_id REAL da obra, não do campo
                         if chave.startswith('subatividade_') and chave.endswith('_percentual'):
-                            # Formato: subatividade_139_17681_percentual -> servico_real_id=139, sub_id=17681
+                            # Formato: subatividade_139_17681_percentual -> servico_original_id=139, sub_id=17681
                             parts = chave.replace('subatividade_', '').replace('_percentual', '').split('_')
                             if len(parts) >= 2:
-                                servico_real_id = parts[0]  # ID do serviço REAL da obra
+                                servico_original_id = int(parts[0])  # ID original do serviço
                                 subatividade_id = parts[1]
-                                sub_id = f"{servico_real_id}_{subatividade_id}"
+                                sub_id = f"{servico_original_id}_{subatividade_id}"
                                 
-                                # USAR O servico_real_id para salvar corretamente
-                                servico_id = servico_real_id
+                                # CORREÇÃO JORIS KUYPERS: Buscar serviço correspondente no admin atual
+                                # O serviço pode ter ID diferente em diferentes ambientes (dev vs prod)
+                                servico_obra = db.session.query(ServicoObraReal).filter_by(
+                                    obra_id=obra_id,
+                                    ativo=True
+                                ).join(Servico).filter(
+                                    Servico.admin_id == admin_id_correto,
+                                    Servico.ativo == True
+                                ).first()
                                 
-                                # Buscar nome da subatividade
-                                nome_key = f'nome_subatividade_{servico_id}_{subatividade_id}'
-                                nome_sub = form_data.get(nome_key, f'Subatividade {subatividade_id}')
+                                if servico_obra and servico_obra.servico:
+                                    servico_id = servico_obra.servico.id  # ID correto do admin atual
+                                    print(f"🎯 MAPEAMENTO CORRIGIDO: {servico_original_id} -> {servico_id} ({servico_obra.servico.nome})")
+                                else:
+                                    servico_id = servico_original_id  # Fallback
+                                
+                                # Buscar nome da subatividade no banco de dados
+                                subatividade_mestre = SubatividadeMestre.query.filter_by(
+                                    id=int(subatividade_id)
+                                ).first()
+                                
+                                if subatividade_mestre:
+                                    nome_sub = subatividade_mestre.nome
+                                    print(f"✅ NOME SUBATIVIDADE: {nome_sub}")
+                                else:
+                                    # Fallback: buscar nome via campo do formulário
+                                    nome_key = f'nome_subatividade_{servico_original_id}_{subatividade_id}'
+                                    nome_sub = form_data.get(nome_key, f'Subatividade {subatividade_id}')
+                                    print(f"⚠️ NOME FALLBACK: {nome_sub}")
                             else:
                                 sub_id = parts[0] if parts else chave
                                 servico_id = parts[0] if parts else "1"
