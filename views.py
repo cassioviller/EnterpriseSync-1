@@ -3541,28 +3541,40 @@ def visualizar_rdo(id):
             print(f"ERRO AO BUSCAR SERVIÇOS CADASTRADOS: {e}")
             print(f"DEBUG: Será usado fallback com subatividades executadas apenas")
         
-        # PASSO 2: Adicionar APENAS subatividades EXECUTADAS de serviços ATIVOS
+        # PASSO 2: Adicionar subatividades EXECUTADAS (sem verificação restritiva)
         for sub in subatividades:
             servico_id = sub.servico_id
             
-            # VERIFICAR SE SERVIÇO ESTÁ ATIVO NA OBRA
-            servico_ativo = ServicoObraReal.query.filter_by(
-                obra_id=rdo.obra_id,
-                servico_id=servico_id,
-                ativo=True
-            ).first()
-            
-            if servico_ativo:  # SÓ EXIBIR SE SERVIÇO ESTIVER ATIVO
-                if servico_id not in subatividades_por_servico:
+            # CORREÇÃO: Para visualização, mostrar TODAS as subatividades salvas
+            # A verificação de serviço ativo é feita durante o salvamento, não na visualização
+            if servico_id not in subatividades_por_servico:
+                # Buscar dados do serviço para exibir
+                servico = sub.servico if hasattr(sub, 'servico') and sub.servico else Servico.query.get(servico_id)
+                if servico:
                     subatividades_por_servico[servico_id] = {
-                        'servico': sub.servico,
+                        'servico': servico,
                         'subatividades': [],
                         'subatividades_nao_executadas': []
                     }
-                sub.executada = True  # Marcar como executada
-                subatividades_por_servico[servico_id]['subatividades'].append(sub)
-            else:
-                print(f"⚠️ SUBATIVIDADE IGNORADA: Serviço {servico_id} não ativo na obra")
+                    print(f"✅ SERVIÇO VISUALIZAÇÃO: {servico.nome} (ID: {servico_id})")
+                else:
+                    # Fallback para RDO com serviços não encontrados
+                    mock_servico = type('MockServico', (), {
+                        'id': servico_id,
+                        'nome': f'Serviço RDO-{rdo.numero_rdo}',
+                        'categoria': 'RDO'
+                    })()
+                    subatividades_por_servico[servico_id] = {
+                        'servico': mock_servico,
+                        'subatividades': [],
+                        'subatividades_nao_executadas': []
+                    }
+                    print(f"⚠️ SERVIÇO MOCK CRIADO: {mock_servico.nome}")
+            
+            # Adicionar subatividade sempre (dados salvos são válidos)
+            sub.executada = True  # Marcar como executada
+            subatividades_por_servico[servico_id]['subatividades'].append(sub)
+            print(f"✅ SUBATIVIDADE ADICIONADA: {sub.nome_subatividade} - {sub.percentual_conclusao}%")
         
         return render_template('rdo/visualizar_rdo_moderno.html', 
                              rdo=rdo, 
