@@ -4219,11 +4219,30 @@ def rdo_salvar_unificado():
                 flash(f'Já existe um RDO para esta obra na data {data_relatorio.strftime("%d/%m/%Y")}.', 'warning')
                 return redirect(url_for('main.funcionario_rdo_novo'))
             
-            # Gerar número do RDO específico para este admin
-            contador_rdos = RDO.query.join(Obra).filter(
-                Obra.admin_id == admin_id_correto
-            ).count()
-            numero_rdo = f"RDO-{admin_id_correto}-{datetime.now().year}-{contador_rdos + 1:03d}"
+            # Gerar número único do RDO com verificação de duplicação
+            import random
+            ano_atual = datetime.now().year
+            contador = 1
+            
+            while True:
+                numero_proposto = f"RDO-{admin_id_correto}-{ano_atual}-{contador:03d}"
+                
+                # Verificar se já existe
+                rdo_existente = RDO.query.filter_by(numero_rdo=numero_proposto).first()
+                
+                if not rdo_existente:
+                    numero_rdo = numero_proposto
+                    print(f"✅ NÚMERO RDO ÚNICO GERADO: {numero_rdo}")
+                    break
+                else:
+                    print(f"⚠️ Número {numero_proposto} já existe, tentando próximo...")
+                    contador += 1
+                    
+                # Proteção contra loop infinito (máximo 999 RDOs por ano)
+                if contador > 999:
+                    numero_rdo = f"RDO-{admin_id_correto}-{ano_atual}-{random.randint(1000, 9999):04d}"
+                    print(f"🚨 FALLBACK: Usando número aleatório {numero_rdo}")
+                    break
             
             # Criar RDO com campos padronizados
             rdo = RDO()
