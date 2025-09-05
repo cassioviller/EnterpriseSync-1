@@ -1438,86 +1438,11 @@ def get_admin_id_robusta(obra=None, current_user=None):
             print(f"🎯 Admin_ID da obra: {obra.admin_id}")
             return obra.admin_id
         
-        # 4. DETECÇÃO AUTOMÁTICA PARA PRODUÇÃO - buscar admin_id com mais funcionários
-        from sqlalchemy import text
-        try:
-            result = db.session.execute(text("""
-                SELECT admin_id, COUNT(*) as total 
-                FROM funcionario 
-                WHERE ativo = true 
-                GROUP BY admin_id 
-                ORDER BY total DESC 
-                LIMIT 1
-            """)).fetchone()
-            
-            if result and result[0]:
-                admin_id = result[0]
-                print(f"🎯 PRODUÇÃO: admin_id detectado por funcionários: {admin_id} ({result[1]} funcionários)")
-                return admin_id
-        except Exception as func_error:
-            print(f"Erro busca funcionários: {func_error}")
-        
-        # 5. Fallback por serviços se não tem funcionários
-        try:
-            result = db.session.execute(text("""
-                SELECT admin_id, COUNT(*) as total 
-                FROM servico 
-                WHERE ativo = true 
-                GROUP BY admin_id 
-                ORDER BY total DESC 
-                LIMIT 1
-            """)).fetchone()
-            
-            if result and result[0]:
-                admin_id = result[0]
-                print(f"🎯 PRODUÇÃO: admin_id detectado por serviços: {admin_id} ({result[1]} serviços)")
-                return admin_id
-        except Exception as serv_error:
-            print(f"Erro busca serviços: {serv_error}")
-        
-        # 6. Fallback por obras
-        try:
-            result = db.session.execute(text("""
-                SELECT admin_id, COUNT(*) as total 
-                FROM obra 
-                WHERE admin_id IS NOT NULL 
-                GROUP BY admin_id 
-                ORDER BY total DESC 
-                LIMIT 1
-            """)).fetchone()
-            
-            if result and result[0]:
-                admin_id = result[0]
-                print(f"🎯 PRODUÇÃO: admin_id detectado por obras: {admin_id} ({result[1]} obras)")
-                return admin_id
-        except Exception as obra_error:
-            print(f"Erro busca obras: {obra_error}")
-        
-        # 7. Buscar primeiro admin_id que existir
-        try:
-            result = db.session.execute(text("""
-                SELECT admin_id 
-                FROM (
-                    SELECT admin_id FROM funcionario WHERE admin_id IS NOT NULL
-                    UNION 
-                    SELECT admin_id FROM servico WHERE admin_id IS NOT NULL  
-                    UNION
-                    SELECT admin_id FROM obra WHERE admin_id IS NOT NULL
-                ) t 
-                ORDER BY admin_id ASC 
-                LIMIT 1
-            """)).fetchone()
-            
-            if result and result[0]:
-                admin_id = result[0]
-                print(f"🎯 PRODUÇÃO: primeiro admin_id encontrado: {admin_id}")
-                return admin_id
-        except Exception as first_error:
-            print(f"Erro busca primeiro admin_id: {first_error}")
-        
-        # 8. Fallback final seguro
-        print("⚠️ FALLBACK: Usando admin_id=1 como padrão de produção")
-        return 1
+        # ⚠️ SEM USUÁRIO LOGADO: ERRO CRÍTICO DE SEGURANÇA
+        print("❌ ERRO CRÍTICO: Nenhum usuário autenticado encontrado!")
+        print("❌ Sistema multi-tenant requer usuário logado OBRIGATORIAMENTE")
+        print("❌ Não é permitido detecção automática de admin_id")
+        return None
         
     except Exception as e:
         print(f"ERRO CRÍTICO get_admin_id_robusta: {e}")
