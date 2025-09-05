@@ -1,14 +1,6 @@
 from app import app
 
-# Registrar API RDO Refatorada
-try:
-    from rdo_api_refactored import rdo_api_bp
-    app.register_blueprint(rdo_api_bp)
-    print("✅ API RDO Refatorada registrada (Joris Kuypers Architecture)")
-except ImportError as e:
-    print(f"⚠️ Erro ao importar API RDO refatorada: {e}")
-except Exception as e:
-    print(f"❌ Erro ao registrar API RDO refatorada: {e}")
+# API RDO Refatorada removida - funcionalidade integrada em salvar_rdo_flexivel
 
 # Registrar sistema de edição de RDO
 try:

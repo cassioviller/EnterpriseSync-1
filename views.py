@@ -4,8 +4,7 @@ from werkzeug.security import check_password_hash, generate_password_hash
 from models import db, Usuario, TipoUsuario, Funcionario, Obra, RDO, RDOMaoObra, RDOEquipamento, RDOOcorrencia, RDOFoto, AlocacaoEquipe, Servico, ServicoObra, ServicoObraReal, RDOServicoSubatividade, SubatividadeMestre
 from auth import super_admin_required, admin_required, funcionario_required
 
-# Importar API RDO Refatorada
-from rdo_api_refactored import rdo_api_bp
+# API RDO Refatorada integrada inline na função salvar_rdo_flexivel
 from datetime import datetime, date, timedelta
 from sqlalchemy import func, desc, or_, and_, text
 import os
@@ -5492,8 +5491,6 @@ def salvar_rdo_flexivel():
     ARQUITETURA REFATORADA - Joris Kuypers Digital Mastery
     Implementação robusta com separação clara de responsabilidades
     """
-    # IMPORTAR CLASSES DA NOVA ARQUITETURA
-    from rdo_api_refactored import RDOServiceContext, RDOSubActivityProcessor, RDOPersistenceManager
     import logging
     
     logger = logging.getLogger(__name__)
@@ -5507,24 +5504,74 @@ def salvar_rdo_flexivel():
         obra_id = request.form.get('obra_id', type=int)
         
         if not all([funcionario_id, admin_id, obra_id]):
+            logger.error(f"❌ Dados inválidos: funcionario_id={funcionario_id}, admin_id={admin_id}, obra_id={obra_id}")
+            logger.error(f"❌ Campos form: {list(request.form.keys())[:10]}")
             flash('Dados de sessão inválidos. Faça login novamente.', 'error')
             return redirect(url_for('main.funcionario_rdo_novo'))
             
         logger.info(f"🎯 Dados da sessão: obra_id={obra_id}, admin_id={admin_id}")
         
-        # FASE 1: DESCOBRIR CONTEXTO DO SERVIÇO (Arquitetura Joris Kuypers)
-        service_context = RDOServiceContext(obra_id, admin_id)
-        target_service_id, service_name = service_context.get_service_context()
+        # FASE 1: DESCOBRIR CONTEXTO DO SERVIÇO (Arquitetura Joris Kuypers INLINE)
+        # Buscar último serviço usado nesta obra
+        ultimo_servico_rdo = db.session.query(RDOServicoSubatividade).join(RDO).filter(
+            RDO.obra_id == obra_id,
+            RDO.admin_id == admin_id
+        ).order_by(RDO.data_relatorio.desc()).first()
         
-        if not target_service_id:
-            flash('Não foi possível identificar o serviço para esta obra', 'error')
-            return redirect(url_for('main.funcionario_rdo_novo'))
-            
-        logger.info(f"🎯 SERVIÇO DESCOBERTO: {service_name} (ID: {target_service_id})")
+        if ultimo_servico_rdo:
+            target_service_id = ultimo_servico_rdo.servico_id
+            servico_obj = Servico.query.get(target_service_id)
+            service_name = servico_obj.nome if servico_obj else f"Serviço {target_service_id}"
+            logger.info(f"🎯 SERVIÇO DO HISTÓRICO: {service_name} (ID: {target_service_id})")
+        else:
+            # Fallback: primeiro serviço ativo da obra
+            try:
+                servico_obra = db.session.query(ServicoObraReal).join(Servico).filter(
+                    ServicoObraReal.obra_id == obra_id,
+                    ServicoObraReal.ativo == True,
+                    Servico.admin_id == admin_id,
+                    Servico.ativo == True
+                ).first()
+                
+                if servico_obra and servico_obra.servico:
+                    target_service_id = servico_obra.servico.id
+                    service_name = servico_obra.servico.nome
+                    logger.info(f"🎯 SERVIÇO DA OBRA: {service_name} (ID: {target_service_id})")
+                else:
+                    flash('Não foi possível identificar o serviço para esta obra', 'error')
+                    return redirect(url_for('main.funcionario_rdo_novo'))
+            except Exception as e:
+                logger.error(f"❌ Erro ao buscar serviço da obra: {e}")
+                flash('Erro ao identificar serviço da obra', 'error')
+                return redirect(url_for('main.funcionario_rdo_novo'))
         
-        # FASE 2: PROCESSAR DADOS DAS SUBATIVIDADES
-        processor = RDOSubActivityProcessor(request.form.to_dict())
-        subactivities = processor.extract_subactivities()
+        # FASE 2: PROCESSAR DADOS DAS SUBATIVIDADES (Arquitetura Joris Kuypers INLINE)
+        subactivities = []
+        for field_name, field_value in request.form.items():
+            if field_name.startswith('subatividade_') and field_name.endswith('_percentual'):
+                try:
+                    parts = field_name.replace('subatividade_', '').replace('_percentual', '').split('_')
+                    if len(parts) >= 2:
+                        original_service_id = int(parts[0])
+                        sub_id = parts[1]
+                        
+                        percentual = float(field_value) if field_value else 0.0
+                        obs_field = f"subatividade_{original_service_id}_{sub_id}_observacoes"
+                        observacoes = request.form.get(obs_field, "")
+                        nome_field = f"nome_subatividade_{original_service_id}_{sub_id}"
+                        nome = request.form.get(nome_field, f"Subatividade {sub_id}")
+                        
+                        subactivities.append({
+                            'original_service_id': original_service_id,
+                            'sub_id': sub_id,
+                            'nome': nome,
+                            'percentual': percentual,
+                            'observacoes': observacoes
+                        })
+                        
+                except (ValueError, IndexError) as e:
+                    logger.warning(f"⚠️ Erro ao processar campo {field_name}: {e}")
+                    continue
         
         if not subactivities:
             flash('Nenhuma subatividade encontrada no formulário', 'error')
@@ -5553,11 +5600,40 @@ def salvar_rdo_flexivel():
             admin_id=admin_id
         )
         
-        # FASE 4: PERSISTIR COM ARQUITETURA ROBUSTA
-        persistence_manager = RDOPersistenceManager(admin_id)
-        success = persistence_manager.save_rdo_with_subactivities(
-            rdo, subactivities, target_service_id
-        )
+        # FASE 4: PERSISTIR COM TRANSAÇÃO ROBUSTA (Arquitetura Joris Kuypers INLINE)
+        try:
+            db.session.begin()
+            
+            # Salvar RDO principal
+            db.session.add(rdo)
+            db.session.flush()  # Para obter o ID
+            
+            logger.info(f"💾 RDO {rdo.numero_rdo} criado com ID {rdo.id}")
+            
+            # Salvar todas as subatividades no serviço correto
+            for sub_data in subactivities:
+                subatividade = RDOServicoSubatividade(
+                    rdo_id=rdo.id,
+                    servico_id=target_service_id,  # SEMPRE usar o serviço descoberto
+                    nome_subatividade=sub_data['nome'],
+                    percentual_conclusao=sub_data['percentual'],
+                    observacoes_tecnicas=sub_data['observacoes'],
+                    admin_id=admin_id,
+                    ativo=True
+                )
+                
+                db.session.add(subatividade)
+                logger.debug(f"💾 Subatividade salva: {sub_data['nome']} -> Serviço {target_service_id}")
+            
+            # Commit da transação
+            db.session.commit()
+            success = True
+            logger.info(f"✅ RDO {rdo.numero_rdo} salvo com {len(subactivities)} subatividades")
+            
+        except Exception as e:
+            db.session.rollback()
+            logger.error(f"❌ Erro ao salvar RDO: {e}")
+            success = False
         
         if success:
             flash(f'RDO {numero_rdo} salvo com sucesso! Serviço: {service_name}', 'success')
