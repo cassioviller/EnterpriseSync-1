@@ -5185,12 +5185,17 @@ def _extrair_subatividades_form(form_data, operation_id):
     """
     from utils.observability import mastery_observer
     
+    # Garantir admin_id correto
+    admin_id = get_admin_id_dinamico()
+    print(f"🎯 [EXTRACT:{operation_id}] usando_admin_id={admin_id} para extração de subatividades")
+    
     subatividades = []
     
     try:
         mastery_observer.add_step(operation_id, 'FORM_EXTRACTION_START', {
             'total_form_keys': len(form_data.keys()),
-            'form_keys': list(form_data.keys())
+            'form_keys': list(form_data.keys()),
+            'admin_id_usado': admin_id
         })
         
         # NOVO PADRÃO: subatividade_ID_percentual (onde ID é o ID da subatividade existente)
@@ -5213,10 +5218,11 @@ def _extrair_subatividades_form(form_data, operation_id):
                     subatividade_id = key.replace('subatividade_', '').replace('_percentual', '')
                     
                     if subatividade_id.isdigit():
-                        # Buscar informações da subatividade no banco
+                        # Buscar informações da subatividade no banco com admin_id correto
                         from models import RDOServicoSubatividade
                         subatividade_existente = db.session.query(RDOServicoSubatividade).filter_by(
-                            id=int(subatividade_id)
+                            id=int(subatividade_id),
+                            admin_id=admin_id
                         ).first()
                         
                         if subatividade_existente:
