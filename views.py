@@ -5498,10 +5498,34 @@ def salvar_rdo_flexivel():
         # IMPLEMENTAÇÃO DA NOVA ARQUITETURA DIRETAMENTE AQUI
         logger.info("🎯 JORIS KUYPERS ARCHITECTURE: Iniciando salvamento RDO")
         
-        # Obter dados básicos da sessão
-        funcionario_id = session.get('funcionario_id')
-        admin_id = session.get('admin_id')
+        # Obter dados básicos da sessão e formulário
+        funcionario_id = session.get('funcionario_id') or request.form.get('funcionario_id', type=int)
+        admin_id = session.get('admin_id') or request.form.get('admin_id_form', type=int)
         obra_id = request.form.get('obra_id', type=int)
+        
+        # FALLBACK: Se sessão perdida, buscar admin_id dinamicamente
+        if not admin_id and funcionario_id:
+            funcionario = Funcionario.query.get(funcionario_id)
+            if funcionario:
+                admin_id = funcionario.admin_id
+                session['admin_id'] = admin_id
+                logger.info(f"🔄 Admin_id recuperado via funcionário: {admin_id}")
+        
+        # Se ainda não tem admin_id, usar detecção automática baseada na obra
+        if not admin_id and obra_id:
+            obra = Obra.query.get(obra_id)
+            if obra:
+                admin_id = obra.admin_id
+                session['admin_id'] = admin_id
+                logger.info(f"🔄 Admin_id recuperado via obra: {admin_id}")
+        
+        # ÚLTIMO RECURSO: Se não tem funcionario_id, usar o primeiro funcionário do admin
+        if not funcionario_id and admin_id:
+            funcionario = Funcionario.query.filter_by(admin_id=admin_id, ativo=True).first()
+            if funcionario:
+                funcionario_id = funcionario.id
+                session['funcionario_id'] = funcionario_id
+                logger.info(f"🔄 Funcionario_id recuperado: {funcionario_id}")
         
         if not all([funcionario_id, admin_id, obra_id]):
             logger.error(f"❌ Dados inválidos: funcionario_id={funcionario_id}, admin_id={admin_id}, obra_id={obra_id}")

@@ -360,6 +360,9 @@
             </div>
             <div class="rdo-card-body">
                 <form method="POST" action="/salvar-rdo-flexivel" id="formNovoRDO">
+                    <!-- Campos ocultos para garantir dados da sessão -->
+                    <input type="hidden" name="funcionario_id" value="{{ session.funcionario_id }}">
+                    <input type="hidden" name="admin_id_form" value="{{ session.admin_id }}">
                     <div class="filtros-grid">
                         <div class="form-group">
                             <label class="form-label">
