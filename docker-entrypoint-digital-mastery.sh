@@ -105,6 +105,10 @@ logger.info('🎯 DIGITAL MASTERY INITIALIZATION COMPLETED')
 
 # RDO System Corrections for Production
 echo "🔧 Aplicando correções RDO para produção..."
+
+# Apply critical RDO logs fix directly to views.py
+echo "🎯 Aplicando logs críticos de RDO..."
+python3 production_rdo_fix.py
 python3 -c "
 import logging
 from datetime import datetime
