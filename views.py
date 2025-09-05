@@ -5570,11 +5570,19 @@ def salvar_rdo_flexivel():
                 return redirect(url_for('main.funcionario_rdo_novo'))
         
         # FASE 2: PROCESSAR DADOS DAS SUBATIVIDADES (Arquitetura Joris Kuypers INLINE)
+        logger.info(f"🔍 DEBUG FORMULÁRIO - Campos recebidos:")
+        for key, value in request.form.items():
+            if 'subatividade' in key:
+                logger.info(f"  📝 {key} = {value}")
+        
         subactivities = []
         for field_name, field_value in request.form.items():
             if field_name.startswith('subatividade_') and field_name.endswith('_percentual'):
                 try:
+                    # Tentar formato: subatividade_139_292_percentual
                     parts = field_name.replace('subatividade_', '').replace('_percentual', '').split('_')
+                    logger.info(f"🔍 Processando campo {field_name}, parts: {parts}")
+                    
                     if len(parts) >= 2:
                         original_service_id = int(parts[0])
                         sub_id = parts[1]
@@ -5584,6 +5592,8 @@ def salvar_rdo_flexivel():
                         observacoes = request.form.get(obs_field, "")
                         nome_field = f"nome_subatividade_{original_service_id}_{sub_id}"
                         nome = request.form.get(nome_field, f"Subatividade {sub_id}")
+                        
+                        logger.info(f"📦 Subatividade extraída: {nome} = {percentual}%")
                         
                         subactivities.append({
                             'original_service_id': original_service_id,
@@ -5596,6 +5606,32 @@ def salvar_rdo_flexivel():
                 except (ValueError, IndexError) as e:
                     logger.warning(f"⚠️ Erro ao processar campo {field_name}: {e}")
                     continue
+        
+        # FALLBACK: Se não encontrou pelo formato padrão, tentar outros formatos
+        if not subactivities:
+            logger.info("🔄 Tentando formatos alternativos de subatividade...")
+            for field_name, field_value in request.form.items():
+                if 'percentual' in field_name and field_value:
+                    logger.info(f"🔍 Campo percentual encontrado: {field_name} = {field_value}")
+                    try:
+                        # Extrair qualquer número do nome do campo
+                        import re
+                        numbers = re.findall(r'\d+', field_name)
+                        if len(numbers) >= 1:
+                            sub_id = numbers[-1]  # Último número
+                            percentual = float(field_value) if field_value else 0.0
+                            nome = f"Subatividade {sub_id}"
+                            
+                            subactivities.append({
+                                'original_service_id': target_service_id,
+                                'sub_id': sub_id,
+                                'nome': nome,
+                                'percentual': percentual,
+                                'observacoes': ""
+                            })
+                            logger.info(f"✅ Subatividade alternativa: {nome} = {percentual}%")
+                    except:
+                        continue
         
         if not subactivities:
             flash('Nenhuma subatividade encontrada no formulário', 'error')
