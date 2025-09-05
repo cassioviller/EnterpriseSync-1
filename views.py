@@ -3329,14 +3329,15 @@ def visualizar_rdo(id):
                 for chave, percentual in progresso_por_subatividade.items():
                     progresso_total_pontos += percentual
                 
-                # Progresso da obra = soma dos percentuais / total de subatividades planejadas
-                progresso_obra = round(progresso_total_pontos / total_subatividades_obra, 1)
+                # Progresso da obra = (soma das porcentagens / 100) * número de subatividades
+                # FÓRMULA CORRIGIDA pelo usuário
+                progresso_obra = round((progresso_total_pontos / 100) * len(progresso_por_subatividade), 1)
                 
-                print(f"DEBUG PROGRESSO DETALHADO (LÓGICA CORRIGIDA):")
+                print(f"DEBUG PROGRESSO DETALHADO (FÓRMULA CORRIGIDA):")
                 print(f"  - Subatividades PLANEJADAS (cadastro): {total_subatividades_obra}")
                 print(f"  - Subatividades EXECUTADAS: {len(progresso_por_subatividade)}")
                 print(f"  - Soma total dos percentuais: {progresso_total_pontos}%")
-                print(f"  - Fórmula: {progresso_total_pontos} ÷ {total_subatividades_obra} = {progresso_obra}%")
+                print(f"  - Fórmula: ({progresso_total_pontos} ÷ 100) × {len(progresso_por_subatividade)} = {progresso_obra}%")
                 print(f"  - Progresso final da obra: {progresso_obra}%")
                 
                 # Mostrar quais subatividades faltam executar
@@ -3356,7 +3357,8 @@ def visualizar_rdo(id):
                 
                 total_subatividades_obra = len(subatividades_unicas)
                 progresso_total_pontos = sum(sub.percentual_conclusao or 0 for sub in subatividades)
-                progresso_obra = round(progresso_total_pontos / total_subatividades_obra, 1) if total_subatividades_obra > 0 else 0
+                # Aplicar mesma fórmula: (soma das porcentagens / 100) * número de subatividades
+                progresso_obra = round((progresso_total_pontos / 100) * len(subatividades), 1) if len(subatividades) > 0 else 0
                 peso_por_subatividade = 100.0 / total_subatividades_obra if total_subatividades_obra > 0 else 0
         
         # Calcular total de horas trabalhadas
