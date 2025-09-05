@@ -4454,20 +4454,35 @@ def rdo_salvar_unificado():
                                 subatividade_id = parts[1]
                                 sub_id = f"{servico_original_id}_{subatividade_id}"
                                 
-                                # CORREÇÃO JORIS KUYPERS: Buscar serviço correspondente no admin atual
-                                # O serviço pode ter ID diferente em diferentes ambientes (dev vs prod)
+                                # CORREÇÃO CRÍTICA: Buscar ESPECIFICAMENTE o serviço da COBERTURA METÁLICA
+                                # Não qualquer serviço ativo, mas o que corresponde ao original
                                 servico_obra = db.session.query(ServicoObraReal).filter_by(
                                     obra_id=obra_id,
                                     ativo=True
                                 ).join(Servico).filter(
                                     Servico.admin_id == admin_id_correto,
-                                    Servico.ativo == True
+                                    Servico.ativo == True,
+                                    Servico.id == servico_original_id  # BUSCAR ESPECÍFICO
                                 ).first()
                                 
+                                # Se não encontrou o serviço específico, buscar por nome como fallback
+                                if not servico_obra:
+                                    servico_origem = Servico.query.get(servico_original_id)
+                                    if servico_origem:
+                                        servico_obra = db.session.query(ServicoObraReal).filter_by(
+                                            obra_id=obra_id,
+                                            ativo=True
+                                        ).join(Servico).filter(
+                                            Servico.admin_id == admin_id_correto,
+                                            Servico.nome == servico_origem.nome  # Buscar por nome
+                                        ).first()
+                                        print(f"🔄 BUSCA POR NOME: {servico_origem.nome}")
+                                
                                 if servico_obra and servico_obra.servico:
-                                    servico_id = servico_obra.servico.id  # ID correto do admin atual
-                                    print(f"🎯 MAPEAMENTO CORRIGIDO: {servico_original_id} -> {servico_id} ({servico_obra.servico.nome})")
+                                    servico_id = servico_obra.servico.id  # ID correto 
+                                    print(f"🎯 MAPEAMENTO CORRETO: {servico_original_id} -> {servico_id} ({servico_obra.servico.nome})")
                                 else:
+                                    print(f"⚠️ SERVIÇO {servico_original_id} NÃO ENCONTRADO NA OBRA")
                                     servico_id = servico_original_id  # Fallback
                                 
                                 # Buscar nome da subatividade no banco de dados - ESTRATÉGIA MÚLTIPLA
