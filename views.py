@@ -2620,40 +2620,61 @@ def get_admin_id_dinamico():
             return 1
 
 @main_bp.route('/api/servicos')
+@login_required
 def api_servicos():
     """API para buscar serviços - Multi-tenant com sistema robusto"""
     try:
         # CORREÇÃO CRÍTICA: Obter admin_id do usuário autenticado
+        admin_id = None
+        user_status = "Usuário não autenticado"
+        
+        print(f"🔍 DEBUG API: current_user exists={current_user is not None}")
+        print(f"🔍 DEBUG API: is_authenticated={getattr(current_user, 'is_authenticated', False)}")
+        if hasattr(current_user, 'id'):
+            print(f"🔍 DEBUG API: current_user.id={current_user.id}")
+        if hasattr(current_user, 'admin_id'):
+            print(f"🔍 DEBUG API: current_user.admin_id={current_user.admin_id}")
+        if hasattr(current_user, 'tipo_usuario'):
+            print(f"🔍 DEBUG API: current_user.tipo_usuario={current_user.tipo_usuario}")
+        
         if current_user and current_user.is_authenticated:
-            if current_user.tipo_usuario == TipoUsuario.ADMIN:
+            # Funcionário sempre tem admin_id
+            if hasattr(current_user, 'admin_id') and current_user.admin_id:
+                admin_id = current_user.admin_id
+                user_status = f"Funcionário autenticado (admin_id={admin_id})"
+                print(f"✅ API SERVIÇOS: Admin_id do funcionário - admin_id={admin_id}")
+            # Se não tem admin_id, é um admin
+            elif hasattr(current_user, 'id'):
                 admin_id = current_user.id
+                user_status = f"Admin autenticado (id={admin_id})"
                 print(f"✅ API SERVIÇOS: Admin_id do usuário logado - admin_id={admin_id}")
             else:
-                admin_id = current_user.admin_id
-                print(f"✅ API SERVIÇOS: Admin_id do funcionário - admin_id={admin_id}")
-        else:
-            # Usar sistema robusto de detecção de admin_id apenas como fallback
-            admin_id = get_admin_id_robusta()
-            print(f"⚠️ API SERVIÇOS FALLBACK: Admin_id via sistema robusto - admin_id={admin_id}")
+                print("⚠️ API SERVIÇOS: Usuário autenticado mas sem ID válido")
         
-        # Se ainda não conseguiu determinar, usar fallback
+        # Se não conseguiu obter do usuário autenticado, usar fallback
         if admin_id is None:
-            print("⚠️ DESENVOLVIMENTO: Usando fallback inteligente")
+            admin_id = get_admin_id_robusta()
+            user_status = f"Fallback sistema robusto (admin_id={admin_id})"
+            print(f"⚠️ API SERVIÇOS FALLBACK: Admin_id via sistema robusto - admin_id={admin_id}")
             
-            # Primeiro tenta admin_id=2 (produção simulada)
-            servicos_admin_2 = db.session.execute(
-                text("SELECT COUNT(*) FROM servico WHERE admin_id = 2 AND ativo = true")
-            ).fetchone()
-            
-            if servicos_admin_2 and servicos_admin_2[0] > 0:
-                admin_id = 2
-                user_status = f"Fallback admin_id=2 ({servicos_admin_2[0]} serviços)"
-                print(f"✅ DESENVOLVIMENTO: {user_status}")
-            else:
-                # Fallback para admin com mais funcionários
-                admin_id = get_admin_id_dinamico()
-                user_status = f"Fallback dinâmico (admin_id:{admin_id})"
-                print(f"✅ DESENVOLVIMENTO: {user_status}")
+            # Se ainda não conseguiu determinar, usar fallback adicional
+            if admin_id is None:
+                print("⚠️ DESENVOLVIMENTO: Usando fallback inteligente")
+                
+                # Primeiro tenta admin_id=2 (produção simulada)
+                servicos_admin_2 = db.session.execute(
+                    text("SELECT COUNT(*) FROM servico WHERE admin_id = 2 AND ativo = true")
+                ).fetchone()
+                
+                if servicos_admin_2 and servicos_admin_2[0] > 0:
+                    admin_id = 2
+                    user_status = f"Fallback admin_id=2 ({servicos_admin_2[0]} serviços)"
+                    print(f"✅ DESENVOLVIMENTO: {user_status}")
+                else:
+                    # Fallback para admin com mais funcionários
+                    admin_id = get_admin_id_dinamico()
+                    user_status = f"Fallback dinâmico (admin_id={admin_id})"
+                    print(f"✅ DESENVOLVIMENTO: {user_status}")
         
         print(f"🎯 API SERVIÇOS FINAL: admin_id={admin_id}")
         
