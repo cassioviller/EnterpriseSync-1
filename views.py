@@ -1751,9 +1751,11 @@ def obter_servicos_da_obra(obra_id, admin_id=None):
             return []
 
 def obter_servicos_disponiveis(admin_id):
-    """Obtém lista de serviços disponíveis para associação"""
+    """Obtém lista de TODOS os serviços disponíveis no sistema (acesso global)"""
     try:
-        servicos = Servico.query.filter_by(admin_id=admin_id, ativo=True).order_by(Servico.nome).all()
+        # ⚡ ACESSO GLOBAL: Todos os admins veem todos os serviços
+        servicos = Servico.query.filter_by(ativo=True).order_by(Servico.nome).all()
+        print(f"🌐 ACESSO GLOBAL: Retornando {len(servicos)} serviços para admin_id={admin_id}")
         return servicos
     except Exception as e:
         print(f"❌ Erro ao obter serviços disponíveis: {e}")
