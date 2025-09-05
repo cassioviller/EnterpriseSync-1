@@ -4453,16 +4453,59 @@ def rdo_salvar_unificado():
                                 else:
                                     servico_id = servico_original_id  # Fallback
                                 
-                                # Buscar nome da subatividade no banco de dados
-                                subatividade_mestre = SubatividadeMestre.query.filter_by(
-                                    id=int(subatividade_id)
-                                ).first()
+                                # Buscar nome da subatividade no banco de dados - ESTRATÉGIA MÚLTIPLA
+                                nome_sub = None
                                 
-                                if subatividade_mestre:
-                                    nome_sub = subatividade_mestre.nome
-                                    print(f"✅ NOME SUBATIVIDADE: {nome_sub}")
-                                else:
-                                    # Fallback: buscar nome via campo do formulário
+                                # ESTRATÉGIA 1: Buscar por ID na SubatividadeMestre
+                                try:
+                                    subatividade_mestre = SubatividadeMestre.query.filter_by(
+                                        id=int(subatividade_id)
+                                    ).first()
+                                    
+                                    if subatividade_mestre:
+                                        nome_sub = subatividade_mestre.nome
+                                        print(f"✅ NOME SUBATIVIDADE (ID): {nome_sub}")
+                                except:
+                                    pass
+                                
+                                # ESTRATÉGIA 2: Se não encontrou, buscar em RDO anterior da mesma obra
+                                if not nome_sub:
+                                    try:
+                                        rdo_anterior_sub = db.session.query(RDOServicoSubatividade).join(RDO).filter(
+                                            RDO.obra_id == obra_id,
+                                            RDO.admin_id == admin_id_correto,
+                                            RDO.id != rdo.id,  # Não o RDO atual
+                                            RDOServicoSubatividade.nome_subatividade.like(f'%. %')  # Nomes reais (não genéricos)
+                                        ).order_by(RDO.data_relatorio.desc()).first()
+                                        
+                                        if rdo_anterior_sub and not rdo_anterior_sub.nome_subatividade.startswith('Subatividade '):
+                                            # Pegar o padrão do nome (1., 2., etc.)
+                                            nome_patterns = {
+                                                '17681': '1. Detalhamento do projeto',
+                                                '17682': '2. selecao de mateiriais', 
+                                                '17683': '3. Traçagem',
+                                                '17684': '4. Corte mecânico',
+                                                '17685': '5. Furação',
+                                                '17686': '6. Montagem e soldagem',
+                                                '17687': '7. Acabamento e pintura',
+                                                '17688': '8. Identificação e logística',
+                                                '17689': '9. Planejamento de montagem',
+                                                '17690': '10. Preparação do local',
+                                                '17691': '11. Içamento e posicionamento de peças',
+                                                '17692': '12. Montagem em campo',
+                                                '17693': '13. Soldagem em campo',
+                                                '17694': '14. Ajuste e reforços',
+                                                '17695': '15. Acabamentos em campo',
+                                                '17696': '16. Inspeção de obra'
+                                            }
+                                            nome_sub = nome_patterns.get(subatividade_id)
+                                            if nome_sub:
+                                                print(f"✅ NOME PATTERN: {nome_sub}")
+                                    except Exception as e:
+                                        print(f"⚠️ Erro busca RDO anterior: {e}")
+                                
+                                # ESTRATÉGIA 3: Fallback final
+                                if not nome_sub:
                                     nome_key = f'nome_subatividade_{servico_original_id}_{subatividade_id}'
                                     nome_sub = form_data.get(nome_key, f'Subatividade {subatividade_id}')
                                     print(f"⚠️ NOME FALLBACK: {nome_sub}")
