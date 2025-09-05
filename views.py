@@ -1751,11 +1751,11 @@ def obter_servicos_da_obra(obra_id, admin_id=None):
             return []
 
 def obter_servicos_disponiveis(admin_id):
-    """Obtém lista de TODOS os serviços disponíveis no sistema (acesso global)"""
+    """Obtém lista de serviços disponíveis APENAS do admin específico (multi-tenant)"""
     try:
-        # ⚡ ACESSO GLOBAL: Todos os admins veem todos os serviços
-        servicos = Servico.query.filter_by(ativo=True).order_by(Servico.nome).all()
-        print(f"🌐 ACESSO GLOBAL: Retornando {len(servicos)} serviços para admin_id={admin_id}")
+        # 🔒 ISOLAMENTO MULTI-TENANT: Cada admin vê APENAS seus próprios serviços
+        servicos = Servico.query.filter_by(admin_id=admin_id, ativo=True).order_by(Servico.nome).all()
+        print(f"🔒 MULTI-TENANT: Retornando {len(servicos)} serviços para admin_id={admin_id}")
         return servicos
     except Exception as e:
         print(f"❌ Erro ao obter serviços disponíveis: {e}")
